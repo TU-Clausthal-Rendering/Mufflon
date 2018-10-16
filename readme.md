@@ -1,4 +1,4 @@
-Muflon\
+Mufflon\
 A scientific renderer
 =
 
@@ -13,5 +13,6 @@ General Design Goals
 
 * Maintainability: a modularized architecture and certain guild lines (see doc/ folder) shall provide a high maintainability for a long lifetime
 * Performance: we target performance over artist freedom. There is no need for a 20 layer skin model or other highly customisable effects. Therefore optimization may partially done on the cost of flexibility.
+* Low Memory overhead: we target huge scenes and there should not be wasted memory.
 * CPU-GPU hybrid: Algorithms on both sides shall create the same results. If possible code should be shared directly.
 * Debugging: Profiling and debugging options for the analyze of new algortihms
