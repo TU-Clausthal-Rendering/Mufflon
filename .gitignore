@@ -1,0 +1,4 @@
+# Ignore MSVC and build directories
+
+.vs/
+build/

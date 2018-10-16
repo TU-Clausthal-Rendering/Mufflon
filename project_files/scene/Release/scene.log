@@ -1,0 +1,10 @@
+﻿  test.cpp
+  Generating code
+  All 1994 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  scene.vcxproj -> C:\Users\Florian\Desktop\Repos\mufflon\build\Release\scene.exe
+  Copies the necessary .dll's into the execution directory
+  C:\Users\Florian\Desktop\Repos\mufflon\external\OpenMesh-7.1\Release\bin\OpenMeshCore.dll
+  1 File(s) copied
+  C:\Users\Florian\Desktop\Repos\mufflon\external\OpenMesh-7.1\Release\bin\OpenMeshTools.dll
+  1 File(s) copied
