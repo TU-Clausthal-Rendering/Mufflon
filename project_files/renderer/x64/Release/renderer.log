@@ -1,5 +1,0 @@
-﻿  LINK : /LTCG specified but no code generation required; remove /LTCG from the link command line to improve linker performance
-  renderer.vcxproj -> C:\Users\Florian\Desktop\Repos\mufflon\build\Release\renderer.exe
-  Copies the necessary .dll's into the execution directory
-  C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.0\bin\cudart64_100.dll
-  1 File(s) copied

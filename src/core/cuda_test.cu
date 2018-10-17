@@ -1,7 +1,13 @@
 #include <cuda_runtime.h>
 #include <iostream>
 
-int main(int argc, const char *argv[]) {
-	std::cout << "Hello CUDA!" << std::endl;
-	std::cout << "Devices: " << std::endl;
-}
+namespace cuda {
+
+	void test() {
+		std::cout << "Hello CUDA!" << std::endl;
+		int device_count;
+		cudaGetDeviceCount(&device_count);
+		std::cout << "Devices: " << device_count << std::endl;
+	}
+
+} // namespace cuda
