@@ -16,23 +16,33 @@
     <Filter Include="Source Files\core">
       <UniqueIdentifier>{4f839c27-2bab-4f08-811e-c11770e49102}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene">
+      <UniqueIdentifier>{c0d8a07c-587b-4734-b9a3-bcf6509f4274}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\util">
+      <UniqueIdentifier>{1041faed-f993-4d2a-97ee-546b781b7caa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="..\..\src\core\cuda_test.cu">
-      <Filter>Source Files\core</Filter>
-    </CudaCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\src\core\mesh_test.cpp">
-      <Filter>Source Files\core</Filter>
+    <ClCompile Include="..\..\src\core\scene\object.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\test.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\core\mesh_test.hpp">
-      <Filter>Source Files\core</Filter>
+    <ClInclude Include="..\..\src\core\scene\object.hpp">
+      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\cuda_test.hpp">
-      <Filter>Source Files\core</Filter>
+    <ClInclude Include="..\..\src\core\scene\bvh.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\sphere.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\assert.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

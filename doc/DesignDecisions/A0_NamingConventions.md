@@ -5,6 +5,7 @@ Classes
 - Either none abstract (pure virtual) or all -> interface, denoted with 'I' prefix
 - Member variables are allowed in interfaces
 - struct only for POD types, otherwise class
+- TODO: Member variables last? General order
 
 Function and method names
 -
