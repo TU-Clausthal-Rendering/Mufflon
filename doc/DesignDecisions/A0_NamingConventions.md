@@ -5,7 +5,20 @@ Classes
 - Either none abstract (pure virtual) or all -> interface, denoted with 'I' prefix
 - Member variables are allowed in interfaces
 - struct only for POD types, otherwise class
-- TODO: Member variables last? General order
+- General order:
+
+      // Documentation
+      class Bla {
+      public:
+          <type defs (using, structs)>
+          <methods>
+      protected:
+          <methods>
+      private:
+          <type defs (using, structs)>
+          <methods>
+          <variables>
+      };
 
 Function and method names
 -
@@ -30,7 +43,21 @@ Variables
 Switch-statement:
 -
 
-- TODO
+- use scopes except for very simple switches (single statements in all cases or similar)
+
+        switch(...) {
+            case A: {
+                ...
+            } break;
+            case B:     // OK, Multiple conditions without statements in between
+            case C: {
+                ...
+            } break;
+            case D:     // fallthrough should be avoided, but flagged if used
+                ...
+                [[falltrough]]
+            case E:
+        }
 
 Tabs vs. spaces
 -
@@ -45,7 +72,7 @@ Brackets & whitespaces
 -
 
 - Curly brackets open on the same line as their expression, e.g.
-        
+
         for(...) {
 - No whitespaces between round brackets and their expression, but between round and curly brackets
 - Whitespace between operator and operand (may be omitted at programmer's discretion, e.g. x*x + ...)
@@ -69,7 +96,12 @@ Brackets & whitespaces
 East-side vs. west-side
 -
 
-- TODO
+- const / constexpr in front of the type 
+- pointer and reference go to the type
+- multiple declartions forbidden
+    - structured binding allowed and preferred: `auto [x, y] = ...`
+- variables should be initialized if possible
+    - if not possible write `type var; // [CONDITIONAL INIT]`
 
 Constructor
 -
@@ -89,9 +121,10 @@ Namespaces
 -
 
 - Nested namespaces only as
-    
+
         namespace a::b::c {
-- TODO: using namespace std?
+- no using namespace std (except function local for ADL)
+- using own namespace OK
 - TODO: nested namespaces are c++17 feature - CUDA doesn't support this yet
 
 Auto
@@ -100,4 +133,33 @@ Auto
 - auto only for complex types (within limits up to programmer's discretion)
 - Deducted pointer types must be made explicit, i.e.
 
-        auto *a = ...
+        auto* a = ...
+
+Includes / Headers
+-
+
+- in headers only for aggregated types (inheritance, members)
+- forward declare if possible
+- only short members without include dependencies in headers
+
+Errors
+-
+
+- no error codes
+- use exceptions for errors
+- inherit from std::exception
+- no abuse of exceptions (control flow, ...)
+- use custom assert `mAssert(cond)` and `mAssertMsg(cond, msg)`
+- use custom logging (no direct cout/cerr)
+
+      logPedantic(<list of arbitrary types with a to_string()>)
+      logInfo(<list of arbitrary types with a to_string()>)
+      logWarning(<list of arbitrary types with a to_string()>)
+      logError(<list of arbitrary types with a to_string()>)
+      logFatal(<list of arbitrary types with a to_string()>)
+
+Strings
+-
+
+- use std::string
+- use std::string_view if appropriate
