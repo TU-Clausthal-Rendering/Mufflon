@@ -27,9 +27,6 @@
     <ClCompile Include="..\..\src\core\scene\object.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -42,6 +39,12 @@
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\assert.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\mesh.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\vectors.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
