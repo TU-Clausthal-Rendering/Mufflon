@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/vectors.hpp"
+#include "util/types.hpp"
 #include <cstdint>
 
 namespace mufflon::scene {
@@ -11,9 +11,9 @@ struct MaterialIndex {
 };
 
 struct Sphere {
-	util::Vec3 position;
-	float radius;
-	MaterialIndex mat_index;
+	Vec3f position;
+	Real radius;
+	MaterialIndex matIndex;
 };
 
 } // namespace mufflon::scene

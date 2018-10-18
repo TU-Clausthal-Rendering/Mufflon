@@ -39,6 +39,7 @@ Variables
 - Static non-const has 's_' as prefix
 - Parameters have same convention as normal variables
 - Value parameters are to be treated as const, ie. they must not be changed during the function, regardless whether they are declared as such
+- For abbreviations follow the convention regardless, e.g. a member variable should be named m_currentBvh, while a function would be named build_bvh
 
 Switch-statement:
 -
