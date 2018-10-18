@@ -11,7 +11,7 @@ It explains why something is as it is.
 An ARD can be revisited and changed later, but should always include its own history of previous decisions.
 The gain is that new contributors get a fast introduction to the project.
 Also, there will be less arbitrary repeated changes.
-Anyone who things "this could be done better" should first look if and why it was not done better.
+Anyone who thinks "this could be done better" should first look if and why it was not done better.
 If the new idea is indeed better, new ADRs documenting the idea should be created and outdate ones annotated.
 It is important to keep each one in the history to make sure bad ideas are not repeated.
 
