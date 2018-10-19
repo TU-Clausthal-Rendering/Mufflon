@@ -70,10 +70,12 @@
   - Point
   - Directional
   - Envmap
+  - Blackbody
   - Area (material basis -> sphere, triangle, quads, [Opt] textured)
   - Spot (PBRT type)
   - [Opt] Textured point light
   - Hierarchy for sampling and realtime renderer
+  - non-spectral
 * Cameras
   - Pinhole
   - Focus
