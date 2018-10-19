@@ -22,10 +22,40 @@
     <Filter Include="Source Files\util">
       <UniqueIdentifier>{1041faed-f993-4d2a-97ee-546b781b7caa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\deps">
+      <UniqueIdentifier>{2e36dc33-c950-49ca-b900-e29a589276dd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\epsilon">
+      <UniqueIdentifier>{7d270109-2d37-4429-be90-4496e5789d29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\chinoise">
+      <UniqueIdentifier>{74096dcd-5d7d-49b0-adfe-fb85f4af9456}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\core\scene\object.cpp">
       <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\epsilon\src\2dintersection.cpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\epsilon\src\3dfunctions.cpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
+      <Filter>Source Files\deps\chinoise</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp">
+      <Filter>Source Files\deps\chinoise</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp">
+      <Filter>Source Files\deps\chinoise</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -46,6 +76,48 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\vectors.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\2dtypes.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\3dtypes.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\configure.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\defaultconfig.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\elementarytypes.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp">
+      <Filter>Source Files\deps\chinoise</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\chinoise\include\cn\fieldnoise.hpp">
+      <Filter>Source Files\deps\chinoise</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\chinoise\include\cn\rnd.hpp">
+      <Filter>Source Files\deps\chinoise</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\chinoise\include\cn\sampler.hpp">
+      <Filter>Source Files\deps\chinoise</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

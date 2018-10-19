@@ -1,0 +1,6 @@
+[submodule "deps/epsilon"]
+	path = deps/epsilon
+	url = https://github.com/Jojendersie/Epsilon-Intersection.git
+[submodule "deps/chinoise"]
+	path = deps/chinoise
+	url = https://github.com/Jojendersie/Chi-Noise.git
