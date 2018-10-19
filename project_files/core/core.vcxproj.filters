@@ -57,6 +57,9 @@
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp">
       <Filter>Source Files\deps\chinoise</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\log.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -120,6 +123,9 @@
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\types.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>

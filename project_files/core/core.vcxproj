@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
+    <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />
@@ -41,6 +42,7 @@
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\sphere.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
+    <ClInclude Include="..\..\src\util\log.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
