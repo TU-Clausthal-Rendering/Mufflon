@@ -74,9 +74,6 @@
     <ClInclude Include="..\..\src\core\scene\mesh.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\util\vectors.hpp">
-      <Filter>Source Files\util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
@@ -118,6 +115,12 @@
     </ClInclude>
     <ClInclude Include="..\..\deps\chinoise\include\cn\sampler.hpp">
       <Filter>Source Files\deps\chinoise</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\iterators.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\types.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
