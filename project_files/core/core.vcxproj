@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
+    <ClCompile Include="..\..\src\core\scene\sphere.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>

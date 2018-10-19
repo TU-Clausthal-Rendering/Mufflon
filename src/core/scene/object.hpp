@@ -1,30 +1,58 @@
 #pragma once
 
-#include <OpenMesh/Core/Mesh/Handles.hh>
-#include <OpenMesh/Core/Utils/Property.hh>
-#include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
-#include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
-#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include "bvh.hpp"
 #include "mesh.hpp"
 #include "sphere.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
+#include "ei/vector.hpp"
+#include "ei/3dtypes.hpp"
+#include "util/log.hpp"
 #include <climits>
 #include <cstdint>
+#include <istream>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
+// Forward declarations
+namespace OpenMesh {
+
 template < class Type >
-struct OpenMesh::VPropHandleT;
+struct VPropHandleT;
 template < class Type >
-struct OpenMesh::FPropHandleT;
-struct OpenMesh::VertexHandle;
-// TODO: class Vec3f;
+struct FPropHandleT;
+struct VertexHandle;
+
+namespace Decimater {
+
+template < typename Mesh >
+class DecimaterT;
+
+} // namespace Decimater
+
+namespace Subdivider {
+namespace Uniform {
+
+template < typename Mesh, typename Real >
+class SubdividerT;
+
+} // namespace Uniform
+
+namespace Adaptive {
+
+template < typename Mesh >
+class CompositeT;
+
+} // namespace Adaptive
+} // namespace Subdivider
+} // namespace OpenMesh
+
 
 namespace mufflon::scene {
 
+// Forward declarations
 template < class Iter >
 class IteratorRange;
 template < class Kernel, std::size_t N >
@@ -37,30 +65,45 @@ class PolygonCWIterator;
  */
 class Object {
 public:
+	// Basic properties
 	using Vertex = Vec3f;
 	using Normal = Vec3f;
+	using UvCoordinate = Vec2f;
 	using Index = u32;
+
+	// Supported polygons
 	using Triangle = std::array<Index, 3u>;
 	using Quad = std::array<Index, 4u>;
+
+	// Handles for accessing data
 	using VertexHandle = OpenMesh::VertexHandle;
 	using TriangleHandle = PolyMesh::FaceHandle;
 	using QuadHandle = PolyMesh::FaceHandle;
 	using SphereHandle = Index; // TODO: do we need invalid indices?
+
+	// Property handles
 	template < class Type >
 	using VertexPropertyHandle = OpenMesh::VPropHandleT<Type>;
 	template < class Type >
 	using FacePropertyHandle = OpenMesh::FPropHandleT<Type>;
 	template < std::size_t N >
+
 	using PolyIterator = PolygonCWIterator<PolyMesh::AttribKernel, N>;
 	using SphereIterator = typename std::vector<Sphere>::const_iterator;
+	using BulkReturn = std::tuple<VertexHandle, std::size_t, std::size_t, std::size_t>;
 
 	static constexpr std::size_t NO_ANIMATION_FRAME = std::numeric_limits<std::size_t>::max();
 	static constexpr std::size_t DEFAULT_LOD_LEVEL = 0u;
 
+	// TODO: layout compatibility?
 	static_assert(sizeof(OpenMesh::Vec3f) == sizeof(Vertex), "Vertex type must be compatible to OpenMesh");
 	static_assert(sizeof(OpenMesh::Vec3f) == sizeof(Normal), "Normal type must be compatible to OpenMesh");
 
+	Object() = default;
+	/// Constructs a new object and reserves enough space for the given primitives
 	Object(std::size_t vertices, std::size_t edges, std::size_t faces, std::size_t spheres);
+	/// Creates a new object from a given poly-mesh
+	Object(PolyMesh&& mesh);
 	Object(const Object&) = default;
 	Object(Object&&) = default;
 	Object& operator=(const Object&) = default;
@@ -71,16 +114,62 @@ public:
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t faces, std::size_t spheres);
 
 	/// Adds a new vertex with default-initialized custom properties.
-	VertexHandle add_vertex(const Vertex&, const Normal&);
+	VertexHandle add_vertex(const Vertex&, const Normal&, const UvCoordinate&);
+	/**
+	 * Bulk-loads n vertices (position and normal).
+	 * The method calls 'reserve' to ensure enough space exists.
+	 */
+	template < class IterV, class IterN, class IterUv >
+	BulkReturn add_vertex_bulk(IterV vertexBegin, IterN normalBegin, IterUv uvBegin, std::size_t n) {
+		this->reserve(m_meshData.n_vertices() + n, m_meshData.n_edges(), m_meshData.n_faces());
+		auto currVertex = vertexBegin;
+		auto currNormal = normalBegin;
+		IterUv currUv = uvBegin;
+		// Save the first vertex handle
+		VertexHandle firstVh = m_meshData.vertices_begin() + m_meshData.n_vertices();
+		for(std::size_t i = 0u; i < n; ++i)
+			this->add_vertex(*(currVertex++), *(currNormal++), *(currUv++));
+		return {firstVh, n, n, n};
+	}
+	/**
+	 * Bulk-loads n vertices (position and normal).
+	 * The method doesn't reserve space in advance, resulting in more allocations
+	 * than the sized equivalent.
+	 */
+	template < class IterV, class IterN, class IterUv >
+	BulkReturn add_vertex_bulk(IterV vertexBegin, IterN normalBegin, IterUv uvBegin, IterV vertexEnd) {
+		IterV currVertex = vertexBegin;
+		IterN currNormal = normalBegin;
+		IterUv currUv = uvBegin;
+		// Save the first vertex handle
+		VertexHandle firstVh = m_meshData.vertices_begin() + m_meshData.n_vertices();
+		// Track number of inserted vertices
+		std::size_t addedVertices = 0u;
+		for(; vertexBegin != vertexEnd; ++addedVertices)
+			this->add_vertex(*(currVertex++), *(currNormal++), *(currUv++));
+		return {firstVh, addedVertices, addedVertices, addedVertices};
+	}
+	/**
+	 * Bulk-loads n vertices.
+	 * The method calls 'reserve' to ensure enough space exists.
+	 * Returns the handle to the first read vertex, the number of read vertices,
+	 * normals, and texture coordinates;
+	 */
+	BulkReturn add_vertex_bulk(std::istream&, std::istream&, std::istream&, std::size_t);
 	/// Returns the position of a vertex.
 	const Vertex& get_vertex(const VertexHandle& handle) const;
-
 	/// Sets the position of the vertex.
 	void set_vertex(const VertexHandle& handle, const Vertex& vertex);
+
 	/// Returns the normal of a vertex.
 	const Normal &get_normal(const VertexHandle& handle) const;
 	/// Sets the normal of a vertex.
 	void set_normal(const VertexHandle& handle, const Normal& normal);
+
+	/// Returns the UV coordniates of a vertex.
+	const UvCoordinate& get_texcoord(const VertexHandle& handle) const;
+	/// Sets the UV coordnates of a vertex.
+	void set_texcoord(const VertexHandle& handle, const UvCoordinate& uv);
 
 	/**
 	 * Adds new triangle.
@@ -95,21 +184,12 @@ public:
 	/// Adds new sphere.
 	SphereHandle add_sphere(const Sphere&);
 
-	/// Returns an iterator range for all polygons
-	IteratorRange<PolyIterator<0u>> polygons() const;
-	/// Returns an iterator range for all triangles
-	IteratorRange<PolyIterator<3u>> triangles() const;
-	/// Returns an iterator range for all quads
-	IteratorRange<PolyIterator<4u>> quads() const;
-	/// Returns an iterator range for all spheres
-	IteratorRange<SphereIterator> spheres() const;
-
 	/// Requests a new per-vertex property of type Type.
 	template < class Type >
 	VertexPropertyHandle<Type> request_property(const std::string& name) {
 		VertexPropertyHandle<Type> prop_handle;
 		m_meshData.add_property(prop_handle, name);
-		// TODO: m_meshData.property(proper_handle).reserve()
+		logInfo("Added property '", name, "' to object PLACEHOLDER");
 		return prop_handle;
 	}
 
@@ -155,7 +235,10 @@ public:
 	 */
 	void tessellate_adaptive(OpenMesh::Subdivider::Adaptive::CompositeT<AdaptivePolyMesh>&, std::size_t);
 
-
+	/**
+	 * Creates a new LoD by applying a decimater to the mesh.
+	 * The decimater brings its own error function to decide what to decimate.
+	 */
 	Object create_lod(OpenMesh::Decimater::DecimaterT<PolyMesh>&, std::size_t);
 
 	/// Returns the object's animation frame
@@ -172,10 +255,13 @@ public:
 private:
 	PolyMesh m_meshData; /// Structure representing both triangle and quad data
 	std::vector<Sphere> m_sphereData; /// List of spheres
+	// TODO: sphere properties
 	std::size_t m_animationFrame; /// Current frame of a possible animation
 	std::size_t m_lodLevel; /// Current level-of-detail
 	// TODO: how to handle the LoDs?
 	Bvh m_bvh;
+
+	// TODO: non-CPU memory
 };
 
 } // namespace mufflon::scene

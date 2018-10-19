@@ -60,6 +60,9 @@
     <ClCompile Include="..\..\src\util\log.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\sphere.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -76,6 +79,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\mesh.hpp">
       <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\iterators.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\types.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
@@ -127,6 +136,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\iterators.hpp">
+      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
