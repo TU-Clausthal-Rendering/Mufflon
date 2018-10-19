@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -36,11 +36,12 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\src\core\scene\bvh.hpp" />
+    <ClInclude Include="..\..\src\core\scene\iterators.hpp" />
     <ClInclude Include="..\..\src\core\scene\mesh.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\sphere.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
-    <ClInclude Include="..\..\src\util\vectors.hpp" />
+    <ClInclude Include="..\..\src\util\types.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -104,7 +105,7 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
     </PostBuildEvent>
     <Link>
       <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\Florian\Desktop\Repos\mufflon\external\OpenMesh-7.1\Debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <Include>
@@ -128,7 +129,7 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\Florian\Desktop\Repos\mufflon\external\OpenMesh-7.1\Release\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
