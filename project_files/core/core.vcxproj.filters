@@ -31,11 +31,11 @@
     <Filter Include="Source Files\deps\chinoise">
       <UniqueIdentifier>{74096dcd-5d7d-49b0-adfe-fb85f4af9456}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\geometry">
+      <UniqueIdentifier>{365ffabc-15c6-4dc4-b619-470e239da2f4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\core\scene\object.cpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClCompile>
@@ -60,7 +60,13 @@
     <ClCompile Include="..\..\src\util\log.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\sphere.cpp">
+    <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp">
+      <Filter>Source Files\core\scene\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp">
+      <Filter>Source Files\core\scene\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\object.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
   </ItemGroup>
@@ -68,17 +74,8 @@
     <ClInclude Include="..\..\src\core\scene\object.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\bvh.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\sphere.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\assert.hpp">
       <Filter>Source Files\util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\mesh.hpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\iterators.hpp">
       <Filter>Header Files</Filter>
@@ -138,6 +135,27 @@
       <Filter>Source Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\iterators.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp">
+      <Filter>Source Files\core\scene\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\punning.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp">
+      <Filter>Source Files\core\scene\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\tagged_tuple.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accell_struct.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\residency.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>

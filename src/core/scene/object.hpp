@@ -1,62 +1,23 @@
 #pragma once
 
-#include "bvh.hpp"
-#include "mesh.hpp"
-#include "sphere.hpp"
+#include "residency.hpp"
+#include "geometry/polygon.hpp"
+#include "geometry/sphere.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/log.hpp"
+#include "util/tagged_tuple.hpp"
 #include <climits>
 #include <cstdint>
-#include <istream>
-#include <optional>
+#include <memory>
 #include <string>
-#include <tuple>
-#include <vector>
-
-// Forward declarations
-namespace OpenMesh {
-
-template < class Type >
-struct VPropHandleT;
-template < class Type >
-struct FPropHandleT;
-struct VertexHandle;
-
-namespace Decimater {
-
-template < typename Mesh >
-class DecimaterT;
-
-} // namespace Decimater
-
-namespace Subdivider {
-namespace Uniform {
-
-template < typename Mesh, typename Real >
-class SubdividerT;
-
-} // namespace Uniform
-
-namespace Adaptive {
-
-template < typename Mesh >
-class CompositeT;
-
-} // namespace Adaptive
-} // namespace Subdivider
-} // namespace OpenMesh
-
 
 namespace mufflon::scene {
 
 // Forward declarations
-template < class Iter >
-class IteratorRange;
-template < class Kernel, std::size_t N >
-class PolygonCWIterator;
+class IAccellerationStructure;
 
 /**
  * Representation of a scene object.
@@ -65,203 +26,177 @@ class PolygonCWIterator;
  */
 class Object {
 public:
+	// Available geometry types - extend if necessary
+	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
+
 	// Basic properties
-	using Vertex = Vec3f;
+	using Point = Vec3f;
 	using Normal = Vec3f;
 	using UvCoordinate = Vec2f;
 	using Index = u32;
-
-	// Supported polygons
-	using Triangle = std::array<Index, 3u>;
-	using Quad = std::array<Index, 4u>;
-
-	// Handles for accessing data
-	using VertexHandle = OpenMesh::VertexHandle;
-	using TriangleHandle = PolyMesh::FaceHandle;
-	using QuadHandle = PolyMesh::FaceHandle;
-	using SphereHandle = Index; // TODO: do we need invalid indices?
 
 	// Property handles
 	template < class Type >
 	using VertexPropertyHandle = OpenMesh::VPropHandleT<Type>;
 	template < class Type >
 	using FacePropertyHandle = OpenMesh::FPropHandleT<Type>;
-	template < std::size_t N >
-
-	using PolyIterator = PolygonCWIterator<PolyMesh::AttribKernel, N>;
-	using SphereIterator = typename std::vector<Sphere>::const_iterator;
-	using BulkReturn = std::tuple<VertexHandle, std::size_t, std::size_t, std::size_t>;
 
 	static constexpr std::size_t NO_ANIMATION_FRAME = std::numeric_limits<std::size_t>::max();
 	static constexpr std::size_t DEFAULT_LOD_LEVEL = 0u;
 
-	// TODO: layout compatibility?
-	static_assert(sizeof(OpenMesh::Vec3f) == sizeof(Vertex), "Vertex type must be compatible to OpenMesh");
-	static_assert(sizeof(OpenMesh::Vec3f) == sizeof(Normal), "Normal type must be compatible to OpenMesh");
-
 	Object() = default;
-	/// Constructs a new object and reserves enough space for the given primitives
-	Object(std::size_t vertices, std::size_t edges, std::size_t faces, std::size_t spheres);
-	/// Creates a new object from a given poly-mesh
-	Object(PolyMesh&& mesh);
 	Object(const Object&) = default;
 	Object(Object&&) = default;
 	Object& operator=(const Object&) = default;
 	Object& operator=(Object&&) = default;
 	~Object() = default;
 
-	/// Reserves enough space in the data structure to fit at least the specified number of objects.
-	void reserve(std::size_t vertices, std::size_t edges, std::size_t faces, std::size_t spheres);
-
-	/// Adds a new vertex with default-initialized custom properties.
-	VertexHandle add_vertex(const Vertex&, const Normal&, const UvCoordinate&);
-	/**
-	 * Bulk-loads n vertices (position and normal).
-	 * The method calls 'reserve' to ensure enough space exists.
-	 */
-	template < class IterV, class IterN, class IterUv >
-	BulkReturn add_vertex_bulk(IterV vertexBegin, IterN normalBegin, IterUv uvBegin, std::size_t n) {
-		this->reserve(m_meshData.n_vertices() + n, m_meshData.n_edges(), m_meshData.n_faces());
-		auto currVertex = vertexBegin;
-		auto currNormal = normalBegin;
-		IterUv currUv = uvBegin;
-		// Save the first vertex handle
-		VertexHandle firstVh = m_meshData.vertices_begin() + m_meshData.n_vertices();
-		for(std::size_t i = 0u; i < n; ++i)
-			this->add_vertex(*(currVertex++), *(currNormal++), *(currUv++));
-		return {firstVh, n, n, n};
-	}
-	/**
-	 * Bulk-loads n vertices (position and normal).
-	 * The method doesn't reserve space in advance, resulting in more allocations
-	 * than the sized equivalent.
-	 */
-	template < class IterV, class IterN, class IterUv >
-	BulkReturn add_vertex_bulk(IterV vertexBegin, IterN normalBegin, IterUv uvBegin, IterV vertexEnd) {
-		IterV currVertex = vertexBegin;
-		IterN currNormal = normalBegin;
-		IterUv currUv = uvBegin;
-		// Save the first vertex handle
-		VertexHandle firstVh = m_meshData.vertices_begin() + m_meshData.n_vertices();
-		// Track number of inserted vertices
-		std::size_t addedVertices = 0u;
-		for(; vertexBegin != vertexEnd; ++addedVertices)
-			this->add_vertex(*(currVertex++), *(currNormal++), *(currUv++));
-		return {firstVh, addedVertices, addedVertices, addedVertices};
-	}
-	/**
-	 * Bulk-loads n vertices.
-	 * The method calls 'reserve' to ensure enough space exists.
-	 * Returns the handle to the first read vertex, the number of read vertices,
-	 * normals, and texture coordinates;
-	 */
-	BulkReturn add_vertex_bulk(std::istream&, std::istream&, std::istream&, std::size_t);
-	/// Returns the position of a vertex.
-	const Vertex& get_vertex(const VertexHandle& handle) const;
-	/// Sets the position of the vertex.
-	void set_vertex(const VertexHandle& handle, const Vertex& vertex);
-
-	/// Returns the normal of a vertex.
-	const Normal &get_normal(const VertexHandle& handle) const;
-	/// Sets the normal of a vertex.
-	void set_normal(const VertexHandle& handle, const Normal& normal);
-
-	/// Returns the UV coordniates of a vertex.
-	const UvCoordinate& get_texcoord(const VertexHandle& handle) const;
-	/// Sets the UV coordnates of a vertex.
-	void set_texcoord(const VertexHandle& handle, const UvCoordinate& uv);
-
-	/**
-	 * Adds new triangle.
-	 * Any referenced vertices must have been added prior.
-	 */
-	TriangleHandle add_triangle(const Triangle&);
-	/**
-	 * Adds new quad.
-	 * Any referenced vertices must have been added prior.
-	 */
-	QuadHandle add_quad(const Quad&);
-	/// Adds new sphere.
-	SphereHandle add_sphere(const Sphere&);
-
-	/// Requests a new per-vertex property of type Type.
-	template < class Type >
-	VertexPropertyHandle<Type> request_property(const std::string& name) {
-		VertexPropertyHandle<Type> prop_handle;
-		m_meshData.add_property(prop_handle, name);
-		logInfo("Added property '", name, "' to object PLACEHOLDER");
-		return prop_handle;
+	/// Reserves memory for geometry type.
+	template < class Geom, class... Args >
+	void reserve(Args&& ...args) {
+		m_cpuData.m_geometryData.get<Geom>().reserve(std::forward<Args>(args)...);
 	}
 
-	/// Removes the property from the mesh.
-	template < class Type >
-	void remove_property(const VertexPropertyHandle<Type>& handle) {
-		m_meshData.remove_property(handle);
+	/// Resizes storage of geometry type.
+	template < class Geom, class... Args >
+	void resize(Args&& ...args) {
+		m_cpuData.m_isDirty = true;
+		m_cpuData.m_geometryData.get<Geom>().resize(std::forward<Args>(args)...);
 	}
 
-	/**
-	 * Attempts to locate a property by its name.
-	 */
-	template < class Type >
-	std::optional<VertexPropertyHandle<Type>> find_property(const std::string& name) {
-		VertexPropertyHandle<Type> propertyHandle;
-		if(m_meshData.get_property_handle(propertyHandle, name))
-			return propertyHandle;
-		return std::nullopt;
+	/// Adds a primitive (e.g. vertex, triangle, sphere...) to geometry.
+	template < class Geom, class... Args >
+	auto add(Args&& ...args) {
+		m_cpuData.m_isDirty = true;
+		return m_cpuData.m_geometryData.get<Geom>().add(std::forward<Args>(args)...);
 	}
 
-	/// Queries the currently set property value of a vertex.
-	template < class Type >
-	const Type& get_property(const VertexHandle& vertexHandle, const VertexPropertyHandle<Type>& propHandle) const {
-		return m_meshData.property(propHandle, vertexHandle);
+	/// Requests an attribute for the geometry type.
+	template < class Geom, class Type >
+	auto request(const std::string& name) {
+		m_cpuData.m_isDirty = true;
+		return m_cpuData.m_geometryData.get<Geom>().request(name);
+	}
+	/// Removes an attribute for the geometry type.
+	template < class Geom, class AttributeHandle >
+	void remove(const AttributeHandle& handle) {
+		m_cpuData.m_isDirty = true;
+		m_cpuData.m_geometryData.get<Geom>().remove(handle);
+	}
+	/// Attempts to find an attribute by name.
+	template < class Geom >
+	auto find(const std::string& name) {
+		m_cpuData.m_geometryData.get<Geom>().find(name);
+	}
+	/**
+	 * Aquires a reference to an attribute, valid until the attribute gets removed.
+	 * Since we cannot track what the user does with this attribute, the object must manually be marked as 'dirty'
+	 * before the next operation on a different residency.
+	 */
+	template <  class Geom, class AttributeHandle >
+	auto &aquire(const AttributeHandle& attrHandle) {
+		return m_cpuData.m_geometryData.get<Geom>().aquire(attrHandle);
+	}
+	/**
+	 * Aquires a reference to an attribute, valid until the attribute gets removed.
+	 * The read-only version of aquire does not need the dirty flag.
+	 */
+	template < class Geom, class AttributeHandle >
+	const auto &aquire(const AttributeHandle& attrHandle) const {
+		return m_cpuData.m_geometryData.get<Geom>().aquire(attrHandle);
 	}
 
-	/// Queries the currently set property value of a vertex.
-	template < class Type >
-	void set_property(const VertexHandle& vertexHandle, const VertexPropertyHandle<Type>& propHandle, const Type& value) {
-		m_meshData.property(propHandle, vertexHandle) = value;
+	/// Applies tessellation to the geometry type.
+	template < class Geom, class Tessellater, class... Args >
+	void tessellate(Tessellater& tessellater, Args&& ...args) {
+		m_cpuData.m_isDirty = true;
+		m_cpuData.m_geometryData.get<Geom>()
+			.tessellate(tessellater,std::forward<Args>(args)...);
+	}
+	/// Creates a new LoD by applying a decimater to the geomtry type.
+	template < class Geom, class Decimater, class... Args >
+	Object create_lod(Decimater& decimater, Args&& ...args) {
+		// TODO: what do we want exactly?
+		Object temp(*this);
+		temp.m_cpuData.m_geometryData.get<Geom>()
+			.create_lod(decimater, std::forward<Args>(args)...);
+		temp.m_cpuData.m_isDirty = true;
+		temp.m_accellDirty = true;
+		return temp;
 	}
 
-	/**
-	 * Uses uniform subdivision to tessellate the mesh.
-	 * Level of subdivision etc. need to be preconfigured.
-	 */
-	void tessellate_uniform(OpenMesh::Subdivider::Uniform::SubdividerT<PolyMesh, Real>&, std::size_t);
+	/// Grants direct access to the mesh data (const only).
+	template < class Geom, class... Args >
+	const auto& native(Args&& ...args) {
+		return m_cpuData.m_geometryData.get<Geom>().native(std::forward<Args>(args)...);
+	}
 
-	/**
-	 * Uses adaptive subdivision to tessellate the mesh.
-	 * Since adaptive tessellation requires additional per-mesh attributes, this method
-	 * copies the mesh into a different representation before and after.
-	 */
-	void tessellate_adaptive(OpenMesh::Subdivider::Adaptive::CompositeT<AdaptivePolyMesh>&, std::size_t);
+	/// Returns the object's animation frame.
+	std::size_t get_animation_frame() const noexcept {
+		return m_animationFrame;
+	}
+	/// Sets the object's animation frame.
+	void set_animation_frame(std::size_t frame) noexcept {
+		m_animationFrame = frame;
+	}
 
-	/**
-	 * Creates a new LoD by applying a decimater to the mesh.
-	 * The decimater brings its own error function to decide what to decimate.
-	 */
-	Object create_lod(OpenMesh::Decimater::DecimaterT<PolyMesh>&, std::size_t);
+	/// Checks if data on one of the system parts has been modified.
+	bool is_data_dirty(Residency res) const noexcept;
+	/// Checks if the accelleration structure on one of the system parts has been modified.
+	bool is_accell_dirty(Residency res) const noexcept;
+	
+	/// Checks whether the object currently has a BVH.
+	bool has_accell_structure() const noexcept {
+		return m_accell_struct != nullptr;
+	}
+	/// Returns the BVH of this object.
+	const IAccellerationStructure& get_accell_structure() const noexcept {
+		mAssert(this->has_accell_structure());
+		return *m_accell_struct;
+	}
+	/// Clears the BVH of this object.
+	void clear_accell_structutre() {
+		// Mark as dirty only if we change something
+		m_accellDirty |= m_accell_struct != nullptr;
+		m_accell_struct.reset();
+	}
+	/// Initializes the accelleration structure to a given implementation.
+	template < class Accell, class... Args >
+	void set_accell_structure(Args&& ...args) {
+		m_accell_struct = std::make_unique<Accell>(std::forward<Args>(args)...);
+	}
+	/// (Re-)builds the accelleration structure.
+	void build_accell_structure();
 
-	/// Returns the object's animation frame
-	std::size_t get_animation_frame() const noexcept { return m_animationFrame; }
-	/// Sets the object's animation frame
-	void set_animation_frame(std::size_t frame) noexcept { m_animationFrame = frame; }
-
-	const Bvh& get_bvh() const noexcept { return m_bvh; }
-
-	void build_bvh();
-
-	// TODO: should normals receive special treatment?
+	/// Makes this object's data resident in the memory system
+	void make_resident(Residency);
+	/// Removes this object's data from the given memory system
+	void unload_resident(Residency);
 
 private:
-	PolyMesh m_meshData; /// Structure representing both triangle and quad data
-	std::vector<Sphere> m_sphereData; /// List of spheres
-	// TODO: sphere properties
-	std::size_t m_animationFrame; /// Current frame of a possible animation
-	std::size_t m_lodLevel; /// Current level-of-detail
-	// TODO: how to handle the LoDs?
-	Bvh m_bvh;
+	struct {
+		GeometryTuple m_geometryData;
+		bool m_isDirty;
+	} m_cpuData;
 
+	struct {
+		// TODO
+		bool m_isDirty;
+	} m_cudaData;
+
+	struct {
+		// TODO
+		bool m_isDirty;
+	} m_openGlData;
+
+	bool m_accellDirty = false;
+	std::size_t m_animationFrame = NO_ANIMATION_FRAME; /// Current frame of a possible animation
+	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; /// Current level-of-detail
+	std::unique_ptr<IAccellerationStructure > m_accell_struct = nullptr;
+
+	// TODO: how to handle the LoDs?
 	// TODO: non-CPU memory
+	// TODO: dirty flags
 };
 
 } // namespace mufflon::scene

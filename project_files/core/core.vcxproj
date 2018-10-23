@@ -18,8 +18,9 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dfunctions.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
+    <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
+    <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
-    <ClCompile Include="..\..\src\core\scene\sphere.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -37,14 +38,18 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
-    <ClInclude Include="..\..\src\core\scene\bvh.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accell_struct.hpp" />
+    <ClInclude Include="..\..\src\core\scene\attributes.hpp" />
+    <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
+    <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp" />
     <ClInclude Include="..\..\src\core\scene\iterators.hpp" />
-    <ClInclude Include="..\..\src\core\scene\mesh.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
-    <ClInclude Include="..\..\src\core\scene\sphere.hpp" />
+    <ClInclude Include="..\..\src\core\scene\residency.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
     <ClInclude Include="..\..\src\util\log.hpp" />
+    <ClInclude Include="..\..\src\util\punning.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />
+    <ClInclude Include="..\..\src\util\tagged_tuple.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
