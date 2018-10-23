@@ -59,6 +59,12 @@ public:
 		return m_cpuData.m_geometryData.get<Geom>().add(std::forward<Args>(args)...);
 	}
 
+	template < class Geom, class... Args >
+	auto add_bulk(Args&& ...args) {
+		m_cpuData.m_isDirty = true;
+		return m_cpuData.m_geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
+	}
+
 	/// Requests an attribute for the geometry type.
 	template < class Geom, class Type >
 	auto request(const std::string& name) {

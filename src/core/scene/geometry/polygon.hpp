@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ei/vector.hpp"
+#include "util/assert.hpp"
 #include "util/types.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <optional>
@@ -142,6 +143,58 @@ public:
 	 */
 	VertexBulkReturn add_bulk(std::size_t count, std::istream& pointStream,
 							  std::istream& normalStream, std::istream& uvStream);
+	/**
+	 * Bulk-loads the given attribute starting at the given vertex.
+	 * The number of read values will be capped by the number of vertice present
+	 * after the starting position.
+	 */
+	template < class Type >
+	std::size_t add_bulk(const Attribute<Type>& attribute, const VertexHandle& startVertex,
+						 std::size_t count, std::istream& attrStream) {
+		mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData.n_vertices());
+		// Cap the number of attributes
+		std::size_t actualCount = std::min(m_meshData.n_vertices() - static_cast<std::size_t>(startVertex.idx()),
+										   count);
+		// Read the attribute from the stream
+		attrStream.read(attribute.data_vector().data(), actualCount * sizeof(Type));
+		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
+		return actuallyRead;
+	}
+	/**
+	 * Bulk-loads the given attribute starting at the given face.
+	 * The number of read values will be capped by the number of faces present
+	 * after the starting position.
+	 */
+	template < class Type >
+	std::size_t add_bulk(const Attribute<Type>& attribute, const FaceHandle& startFace,
+						 std::size_t count, std::istream& attrStream) {
+		mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData.n_faces());
+		// Cap the number of attributes
+		std::size_t actualCount = std::min(m_meshData.n_faces() - static_cast<std::size_t>(startFace.idx()),
+										   count);
+		// Read the attribute from the stream
+		attrStream.read(attribute.data_vector().data(), actualCount * sizeof(Type));
+		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
+		return actuallyRead;
+	}
+	/// Also performs bulk-load for an attribute, but aquires it first.
+	template < class Type >
+	std::size_t add_bulk(const VertexAttributeHandle<Type>& attrHandle,
+						 const VertexHandle& startVertex, std::size_t count,
+						 std::istream& attrStream) {
+		mAssert(attrHandle.is_valid());
+		Attribute<Type>& attribute = m_meshData.property(attrHandle);
+		return add_bulk(attribute, startVertex, count, attrStream);
+	}
+	/// Also performs bulk-load for an attribute, but aquires it first.
+	template < class Type >
+	std::size_t add_bulk(const FaceAttributeHandle<Type>& attrHandle,
+						 const FaceHandle& startFace, std::size_t count,
+						 std::istream& attrStream) {
+		mAssert(attrHandle.is_valid());
+		Attribute<Type>& attribute = m_meshData.property(attrHandle);
+		return add_bulk(attribute, startFace, count, attrStream);
+	}
 
 	template < template < class > class AttributeHandle, class Type >
 	const Type& get(const VertexHandle& vertexHandle, const AttributeHandle<Type>& attrHandle) const {

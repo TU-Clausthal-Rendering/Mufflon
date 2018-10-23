@@ -96,6 +96,28 @@ public:
 	 * read spheres.
 	 */
 	BulkReturn add_bulk(std::size_t count, std::istream& radPosStream);
+	/**
+	 * Bulk-loads the given attribute starting at the given sphere.
+	 * The number of read values will be capped by the number of spheres present
+	 * after the starting position.
+	 */
+	template < class Attribute >
+	std::size_t add_bulk(const Attribute& attribute, const SphereHandle& startSphere,
+						 std::size_t count, std::istream& attrStream) {
+		std::size_t actualCount = std::min(m_sphereData.size() - startSphere, count);
+		// Read the attribute from the stream
+		attrStream.read(attribute.as_bytes(), actualCount * attribute.elem_size());
+		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / attribute.elem_size();
+		return actuallyRead;
+	}
+	/// Also performs bulk-load for an attribute, but aquires it first.
+	template < class Attr >
+	std::size_t add_bulk(const AttributeHandle<Attr>& attrHandle,
+						 const SphereHandle& startSphere, std::size_t count,
+						 std::istream& attrStream) {
+		Attr& attribute = m_attributes.aquire(attrHandle);
+		return add_bulk(attribute, startSphere, count, attrStream);
+	}
 
 	template < class Attribute >
 	Attribute &aquire(const AttributeHandle<Attribute>& attrHandle) {
