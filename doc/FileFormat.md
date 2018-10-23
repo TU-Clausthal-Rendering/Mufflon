@@ -21,18 +21,18 @@ The names must match the names stored in the binary itself.
         "version": "1.0",
         "binary": "<file name relative to this json>"
         "cameras": {
-            "<name1>" {
-                "type": "{pinhole, focus}",
+            "<name1>": {
+                "type": "{pinhole, focus, ortho}",
                 "path": [[x1,y1,z1], ...],    // List of vec3 (at least 1)
                 "viewDir": [[x1,y1,z1], ...], // List of vec3 with the same length as "path", not necessarily normalized
                 "up": [[x1,y1,z1], ...],      // OPTIONAL [0,1,0], must have the same length as "path" if defined, not necessarily normalized
                 ...
             },
-            "<name2>" {
+            "<name2>": {
                 ...
             } ...
         },
-        "lights" {
+        "lights": {
             "<name1>": {
                 "type": "{point, directitonal, spot, envmap, goniometric}",
                 ...
@@ -113,27 +113,86 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                        <JUMP_TABLE>
 
     <JUMP_TABLE> = u32          // Number of entries in the table N
-                   N*u64        // Absolute start position of the object/LOD, the index in the array is the <OBJID>/lod level (0-based)
+                   N*u64        // Absolute start position of the object/LOD,
+                                // the index in the array is the <OBJID>/lod level (0-based)
 
-    <OBJECTS> = N*<OBJECT>      // List of objects with the number specified by N from the jump table
+    <OBJECTS> = u32 <FLAGS>
+                N*<OBJECT>      // List of objects with the number specified by N from the jump table
 
-    <OBJECT> = <STRING>         // The name, used as [obj:name] in the above JSON specification
+    <FLAGS> = DEFLATE 1                 // All <VERTEXDATA>, <SPHERES>, and index data (<TRIANGLES>, <QUADS>
+                                        // indies, material indices) and <ATTRIBUTES> are
+                                        // deflate compressed. All optional compressed blocks are marked
+                                        // with ' (each ' is one independent DEFLATE stream).
+            | COMPRESSED_NORMALS 2      // Normals can be compressed into 32bit with a custom compression
+
+    <OBJECT> = u32 'Obj_'       // Type check for this section
+               <STRING>         // The name, used as [obj:name] in the above JSON specification
+               u32              // Keyframe of the object if animated or 0xffffffff
+               u32              // <OBJID> of the previous object in an animation sequence or 0xffffffff
                <JUMP_TABLE>     // Jump table over LODs (number = D)
                D*<LOD>
 
 LODs contain the real geometry. It must have sorted geometry, because attributes (like count of indices) differ per geometry.
 
-    <LOD> = <TRIANGLES>
-            <QUADS>
-            <SPHERES>
-    <TRIANGLES> = TODO
+    <LOD> = u32 'LOD_'          // Type check for this section
+            u32                 // Number of triangles T
+            u32                 // Number of quads Q
+            u32                 // Number of spheres S
+            u32                 // Number of vertices V
+            u32                 // Number of vertex attributes
+            u32                 // Number of face attributes (same for triangles and quads)
+            u32                 // Number of sphere attributes
+            <VERTEXDATA>'
+            <ATTRIBUTES>'       // Optional Vertex attributes
+            <TRIANGLES>'
+            <QUADS>'
+            <SPHERES>'
+    <VERTEXDATA> = V*3*f32      // Positions (vec3)
+                   V*3*f32 | V*u32  // Normals (vec3, normalized)
+                                // OR compressed normals (Oct-mapping see below)
+                   V*2*f32      // UV coordinates (vec2)
 
-            TODO:
-            Vertex <POSITIONS>, <NORMALS>, <UV>, CUSTOM
-            Tri, indices, material
-            Sphere <POSITION>, <RADIUS>, <COLOR>/CUSTOM
+    <TRIANGLES> = T*3*u32       // Indices of the vertices (0-based, per LOD)
+                  T*u16         // Material indices (<MATID> from <MATERIALS_HEADER>)
+                  <ATTRIBUTES>  // Optional list of face attributes
+    <QUADS> = Q*4*u32           // Indices of vertices (0-based, per LOD)
+              Q*u16             // Material indices (<MATID> from <MATERIALS_HEADER>)
+              <ATTRIBUTES>      // Optional list of face attributes, must have the same entries as for triangles
+    <SPHERES> = S*4*f32         // Position (3 f32) and radius (1 f32) interleaved
+                S*u16           // Material indices (<MATID> from <MATERIALS_HEADER>)
+                <ATTRIBUTES>
+
+The custom attributes can add additional information to triangles, quads and spheres.
+There might be attributes outside this specification. Therefore the syntax is very general.
+However, there is a specification for a few predefined possible attributes (with [] below).
+
+    <ATTRIBUTES> = u32 'Attr'   // Type check for this section
+                   <STRING>     // Name (Custom)
+                   <STRING>     // Meta information (Custom)
+                   u32          // Meta information (Custom flags)
+                   u64          // Size in bytes
+                   <BYTES>      // Size many bytes
+
+    [AdditionalUV2D] = "AdditionalUV2D"
+                       "{Light, Displacement}"
+                       0
+                       #Bytes to be interpreted as 2*f32 per vertex/face
+    [Color8] = "Color8"
+               "{RGBA, sRGB_A}"
+               0
+               #Bytes to be interpreted as 8-bit RGBA normalized uint tuples (in total 32 bit per element)
+    [Color32] = "Color32"
+                "{RGBA, sRGB_A}"
+                0
+                #Bytes to be interpreted as 32-bit RGBA float tuples (in total 128 bit per element)
 
 Finally, there are the instances.
 Objects which are not instanced explicitly will have one instance with the identity transformation.
 
-    <INSTANCES>
+    <INSTANCES> = u32 'Inst'    // Type check for this section
+                  u32           // Number of instances I
+                  I*<INSTANCE>
+    <INSTANCE> = u32            // <OBJID> (0-based index of the object in the <OBJECTS> section)
+                 u32            // Keyframe of the instance if animated or 0xffffffff
+                 u32            // <InstID> of the previous object in an animation sequence or 0xffffffff
+                 12*f32         // 3x4 transformation matrix (rotation, scaling, translation)
