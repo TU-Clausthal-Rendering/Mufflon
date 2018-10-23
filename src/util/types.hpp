@@ -14,11 +14,6 @@ using i16 = std::int16_t;
 using i32 = std::int32_t;
 using i64 = std::int64_t;
 
-// TODO: replace with proper math library
-using Vec2f = OpenMesh::Vec2f;
-using Vec3f = OpenMesh::Vec3f;
-using Vec4f = OpenMesh::Vec4f;
-
 using Real = float;
 
 } // namespace mufflon

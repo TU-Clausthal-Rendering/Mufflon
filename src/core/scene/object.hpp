@@ -28,19 +28,7 @@ class Object {
 public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
-
-	// Basic properties
-	using Point = Vec3f;
-	using Normal = Vec3f;
-	using UvCoordinate = Vec2f;
-	using Index = u32;
-
-	// Property handles
-	template < class Type >
-	using VertexPropertyHandle = OpenMesh::VPropHandleT<Type>;
-	template < class Type >
-	using FacePropertyHandle = OpenMesh::FPropHandleT<Type>;
-
+	
 	static constexpr std::size_t NO_ANIMATION_FRAME = std::numeric_limits<std::size_t>::max();
 	static constexpr std::size_t DEFAULT_LOD_LEVEL = 0u;
 
@@ -196,7 +184,6 @@ private:
 
 	// TODO: how to handle the LoDs?
 	// TODO: non-CPU memory
-	// TODO: dirty flags
 };
 
 } // namespace mufflon::scene
