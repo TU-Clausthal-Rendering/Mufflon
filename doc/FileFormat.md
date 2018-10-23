@@ -34,7 +34,7 @@ The names must match the names stored in the binary itself.
         },
         "lights": {
             "<name1>": {
-                "type": "{point, directitonal, spot, envmap, goniometric}",
+                "type": "{point, directional, spot, envmap, goniometric}",
                 ...
             } ...
         },
@@ -68,6 +68,28 @@ Cameras
 Lights
 --
 
+This section lists the required attributes for the different types of light sources
+
+    "type": "point",
+    "position": [x,y,z],            // vec3
+    "flux" or "intensity: [a,b,c],  // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3)
+    "scale": float,                 // Multiplier for "flux"/"intensity"
+
+    "type": "directional",
+    "direction": [x,y,z],           // Direction in which the light travels (incident direction)
+    "irradiance": [a,b,c],          // Irradiance [W/m²]
+    "scale": float,                 // Multiplier for "irradiance"
+
+    "type": "spot",                 // PBRT type of spot light
+                                    // "intensity" * clamp((cosθ - "cosWidth") / ("falloffStart" - "cosWidth"), 0, 1) ^ "exponent"
+    "intensity": [a,b,c],           // Peak intensity [W/sr]
+    "scale": float,                 // Multiplier for "intensity"
+    "exponent": float,
+    "cosWidth" or "width": float,   // An angle "width" in radiant for the half-opening angle or the
+                                    // cosine of this angle
+    "cosFalloffStart" or "falloffStart": float  // An angle "falloffStart" in radiant for the angle up to
+                                                //which the peak intensity is used or the cosine of this angle
+
 Materials
 --
 
@@ -81,7 +103,7 @@ Alias types:
 
 ---
 
-The binary file
+The binary file (*.mff)
 -
 
 The binary file contains all the geometric and instancing data of a scene with a strict ordering.
