@@ -2,7 +2,7 @@
 
 #include "util/types.hpp"
 
-namespace mufflon::scene {
+namespace mufflon::scene::material {
 
 	/**
 	 * A medium is a volumetric material. We do not support true volume rendering
@@ -39,4 +39,4 @@ namespace mufflon::scene {
 
 	using MediumHandle = u16;
 
-} // namespace mufflon::scene
+} // namespace mufflon::scene::material

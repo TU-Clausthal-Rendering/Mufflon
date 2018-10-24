@@ -4,7 +4,7 @@
 #include "core/scene/residency.hpp"
 #include "medium.hpp"
 
-namespace mufflon::scene {
+namespace mufflon::scene::material {
 
 /**
  * List of all implemented materials. These materials may form a hierarchy through
@@ -20,6 +20,16 @@ enum class Materials: i32 {
 	BLEND,			// Mix two other materials
 	FRESNEL,		// Mix two other materials using Fresnel equations
 	GLASS,			// Mix of FRESNEL [TORRANCE, WALTER]
+};
+
+struct HandlePack {
+	Materials type;
+};
+
+struct ParameterPack {
+	Materials type;
+	MediumHandle outerMedium;
+	MediumHandle innerMedium;
 };
 
 /**
@@ -54,7 +64,7 @@ public:
 	 * outBuffer: pointer to a writeable buffer with at least get
 	 *		get_handle_pack_size(device) memory.
 	 */
-	virtual void get_handle_pack(Residency device, void* outBuffer) const = 0;
+	virtual void get_handle_pack(Residency device, HandlePack* outBuffer) const = 0;
 
 	/*
 	 * Get the instanciated parameters for the evaluation of the material.
@@ -66,7 +76,7 @@ public:
 	 * outBuffer: pointer to a writeable buffer with at least get
 	 *		get_parameter_pack_size(device) memory.
 	 */
-	virtual void get_parameter_pack(Residency device, const ei::Vec2& texCoord, void* outBuffer) const = 0;
+	virtual void get_parameter_pack(Residency device, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
 
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {
@@ -105,4 +115,4 @@ protected:
 	MediumHandle m_innerMedium;
 };
 
-} // namespace mufflon::scene
+} // namespace mufflon::scene::material
