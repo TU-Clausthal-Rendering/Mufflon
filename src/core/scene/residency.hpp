@@ -1,6 +1,6 @@
 #pragma once
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 /// Contains the possible data locations of the scene.
 enum class Residency {
@@ -9,4 +9,4 @@ enum class Residency {
 	OPENGL
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

@@ -2,7 +2,7 @@
 
 #include "util/types.hpp"
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 	// Scene specific types go here
 
@@ -15,9 +15,10 @@ namespace mufflon::scene {
 	using MaterialIndex = u32;
 
 	struct TangentSpace {
-		Normal n;
+		Normal shadingN;		// The shading normal
+		Normal geoN;			// The geometric normal (of the real traced surface)
 		TangentU tU;
 		TangentV tV;
 	};
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

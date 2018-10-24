@@ -67,6 +67,12 @@
     <ClCompile Include="..\..\src\core\scene\object.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\materials\lambert.cu">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\materials\material.cpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -177,5 +183,13 @@
     <ClInclude Include="..\..\src\core\scene\types.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="..\..\src\core\scene\materials\sample.cu">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

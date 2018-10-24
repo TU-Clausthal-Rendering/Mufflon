@@ -20,6 +20,8 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
+    <ClCompile Include="..\..\src\core\scene\materials\lambert.cu" />
+    <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
@@ -44,6 +46,7 @@
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp" />
     <ClInclude Include="..\..\src\core\scene\instance.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\sample.hpp" />
@@ -57,6 +60,9 @@
     <ClInclude Include="..\..\src\util\punning.hpp" />
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="..\..\src\core\scene\materials\sample.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

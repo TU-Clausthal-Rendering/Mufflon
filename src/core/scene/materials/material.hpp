@@ -2,9 +2,10 @@
 
 #include "util/types.hpp"
 #include "core/scene/residency.hpp"
+#include "core/scene/types.hpp"
 #include "medium.hpp"
 
-namespace mufflon::scene::material {
+namespace mufflon { namespace scene { namespace material {
 
 /**
  * List of all implemented materials. These materials may form a hierarchy through
@@ -20,7 +21,12 @@ enum class Materials: i32 {
 	BLEND,			// Mix two other materials
 	FRESNEL,		// Mix two other materials using Fresnel equations
 	GLASS,			// Mix of FRESNEL [TORRANCE, WALTER]
+
+	NUM				// How many materials are there?
 };
+#ifndef __CUDA_ARCH__
+const std::string& to_string(Materials type);
+#endif
 
 struct HandlePack {
 	Materials type;
@@ -95,7 +101,7 @@ public:
 	// Is there any contribution from reflections? (contribution for incident and excident on the same side)
 	virtual bool is_brdf() const = 0;
 	// Is there any contribution from refractions? (contribution for incident and excident on opposite sides)
-	virtual bool is_brdf() const = 0;
+	virtual bool is_btdf() const = 0;
 	// Does this material need a half vector for evaluations?
 	virtual bool is_halfvector_based() const = 0;
 
@@ -115,4 +121,4 @@ protected:
 	MediumHandle m_innerMedium;
 };
 
-} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::material

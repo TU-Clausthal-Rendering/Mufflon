@@ -4,7 +4,7 @@
 #include "core/scene/types.hpp"
 #include <cuda_runtime.h>
 
-namespace mufflon::scene::material {
+namespace mufflon { namespace scene { namespace material {
 
 	/*
 	 * A RndSet is a fixed size set of random numbers which may be consumed by a material
@@ -20,9 +20,15 @@ namespace mufflon::scene::material {
 
 	// Return value of an importance sampler
 	struct Sample {
-		Spectrum throughput;	// BxDF * cosθ / pdfF
-		float pdfF;				// Sampling PDF in forward direction (current sampler)
-		float pdfB;				// Sampling PDF with reversed incident and excident directions
+		Spectrum throughput {1.0f};		// BxDF * cosθ / pdfF
+		Direction excident {0.0f};		// The sampled direction
+		float pdfF {0.0f};				// Sampling PDF in forward direction (current sampler)
+		float pdfB {0.0f};				// Sampling PDF with reversed incident and excident directions
+		enum class Type: u32 {			// Type of interaction
+			INVALID,
+			REFLECTED,
+			REFRACTED,
+		} type = Type::INVALID;
 	};
 
 	/*
@@ -31,11 +37,12 @@ namespace mufflon::scene::material {
 	 * incident: normalized incident direction. Points towards the surface.
 	 * adjoint: false if this is a view sub-path, true if it is a light sub-path.
 	 */
-	__host__ __device__ Sample sample(const TangentSpace& tangentSpace,
-									  const ParameterPack* materialPack,
-									  const Direction& incident,
-									  const RndSet& rndSet,
-									  bool adjoint);
+	__host__ __device__ Sample
+	sample(const TangentSpace& tangentSpace,
+		   const ParameterPack& params,
+		   const Direction& incident,
+		   const RndSet& rndSet,
+		   bool adjoint);
 
 	// Return value of a BxDF evaluation function
 	struct EvalValue {
@@ -49,12 +56,15 @@ namespace mufflon::scene::material {
 	 * Evaluate an BxDF and its associtated PDFs for two directions.
 	 * incident: normalized incident direction. Points towards the surface.
 	 * excident: normalized excident direction. Points away from the surface.
-	 * adjoint: false if this is a view sub-path, true if it is a light sub-path.
+	 * adjoint: false if the incident is a view sub-path, true if it is a light sub-path.
+	 * merge: Used to apply a different shading normal correction.
 	 */
-	__host__ __device__ EvalValue evaluate(const TangentSpace& tangentSpace,
-										   const ParameterPack* materialPack,
-										   const Direction& incident,
-										   const Direction& excident,
-										   bool adjoint);
+	__host__ __device__ EvalValue
+	evaluate(const TangentSpace& tangentSpace,
+			 const ParameterPack& params,
+			 const Direction& incident,
+			 const Direction& excident,
+			 bool adjoint,
+			 bool merge);
 
-} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::material
