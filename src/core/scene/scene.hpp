@@ -16,8 +16,8 @@ namespace mufflon::scene {
 class Scene {
 public:
 	struct DeviceScene {
-		Object::DeviceObject* m_objects;
-		Instance::DeviceInstance* m_instances;
+		Object::DeviceObject* objects;
+		Instance::DeviceInstance* instances;
 		// TODO: camera and stuff
 	};
 

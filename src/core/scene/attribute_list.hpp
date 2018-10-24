@@ -1,7 +1,6 @@
 #pragma once
 
-#include "util/assert.hpp"
-#include <cstddef>
+#include "attribute.hpp"
 #include <map>
 #include <optional>
 #include <vector>
@@ -9,158 +8,8 @@
 namespace mufflon::scene {
 
 /**
- * Base class for all attribtues.
- * Any attribute which should be used in an attribute array needs to inherit
- * from this.
- */
-class IBaseAttribute {
-public:
-	IBaseAttribute() = default;
-	IBaseAttribute(const IBaseAttribute&) = default;
-	IBaseAttribute(IBaseAttribute&&) = default;
-	IBaseAttribute& operator=(const IBaseAttribute&) = default;
-	IBaseAttribute& operator=(IBaseAttribute&&) = default;
-	virtual ~IBaseAttribute() = default;
-	virtual void reserve(std::size_t count) = 0;
-	virtual void resize(std::size_t count) = 0;
-	virtual void clear() = 0;
-	virtual std::string_view name() const noexcept = 0;
-	virtual bool empty() const noexcept = 0;
-	virtual std::size_t size() const noexcept = 0;
-	virtual std::size_t elem_size() const noexcept = 0;
-	virtual std::size_t capacity() const noexcept = 0;
-	virtual char* as_bytes() noexcept = 0;
-	virtual const char* as_bytes() const noexcept = 0;
-};
-
-template < class T >
-class ArrayAttribute : public IBaseAttribute {
-public:
-	using Type = T;
-
-	ArrayAttribute(std::string name) :
-		IBaseAttribute(),
-		m_name(std::move(name))
-	{}
-
-	ArrayAttribute(std::string name, std::size_t n_res) :
-		IBaseAttribute(),
-		m_name(std::move(name))
-	{
-		this->reserve(n_res);
-	}
-
-	virtual void reserve(std::size_t count) override {
-		m_data.reserve(count);
-	}
-
-	virtual void resize(std::size_t count) override {
-		m_data.resize(count);
-	}
-
-	virtual void clear() override {
-		m_data.clear();
-	}
-
-	virtual std::string_view name() const noexcept override {
-		return std::string_view(m_name);
-	}
-
-	virtual bool empty() const noexcept {
-		return m_data.empty();
-	}
-
-	virtual std::size_t size() const noexcept override {
-		return m_data.size();
-	}
-
-	virtual std::size_t elem_size() const noexcept override {
-		return sizeof(Type);
-	}
-
-	virtual std::size_t capacity() const noexcept override {
-		return m_data.capacity();
-	}
-
-	T& operator[](std::size_t index) noexcept {
-		mAssert(index < m_data.size());
-		return m_data[index];
-	}
-
-	const T& operator[](std::size_t index) const noexcept {
-		mAssert(index < m_data.size());
-		return m_data[index];
-	}
-
-	T& at(std::size_t index) {
-		if(index >= m_data.size())
-			throw std::out_of_range("Attribute index out of range!");
-		return m_data[index];
-	}
-
-	const T& at(std::size_t index) const {
-		if(index >= m_data.size())
-			throw std::out_of_range("Attribute index out of range!");
-		return m_data[index];
-	}
-
-	T* data() noexcept {
-		return m_data.data();
-	}
-
-	const T* data() const noexcept {
-		return m_data.data();
-	}
-
-	char* as_bytes() noexcept override {
-		return reinterpret_cast<char*>(m_data.data());
-	}
-
-	const char* as_bytes() const noexcept override {
-		return reinterpret_cast<const char*>(m_data.data());
-	}
-
-	void push_back(const Type& val) {
-		m_data.push_back(val);
-	}
-
-	void push_back(Type&& val) {
-		m_data.push_back(val);
-	}
-
-	template < class... Args >
-	T &emplace_back(Args&& ...args) {
-		return m_data.emplace_back(std::forward<Args>(args)...);
-	}
-
-	void pop_back() {
-		m_data.pop_back();
-	}
-
-	T& front() {
-		return m_data.front();
-	}
-
-	const T& front() const {
-		return m_data.front();
-	}
-
-	T& back() {
-		return m_data.back();
-	}
-
-	const T& back() const {
-		return m_data.back();
-	}
-
-private:
-	std::string m_name;
-	std::vector<T> m_data;
-};
-
-/**
  * Represents a list of attributes.
- * While it accepts any kind of attribute derived from IBaseAttribute, 
+ * While it accepts any kind of attribute derived from IBaseAttribute,
  */
 class AttributeList {
 public:
@@ -203,15 +52,21 @@ public:
 		}
 
 		Iterator& operator++() {
-			do
+			do {
 				++m_curr;
-			while(m_curr != m_attribs.end() && *m_curr != nullptr);
+			} while(m_curr != m_attribs.end() && *m_curr != nullptr);
 			return *this;
 		}
 		Iterator operator++(int) {
 			Iterator temp(*this);
 			++(*this);
 			return temp;
+		}
+
+		Iterator operator+(std::size_t i) const {
+			Iterator temp(m_attribs, m_curr + i);
+			while(temp.m_curr != temp.m_attribs.end() && *temp.m_curr == nullptr)
+				++temp.m_curr;
 		}
 
 		IBaseAttribute& operator*() {
@@ -265,7 +120,7 @@ public:
 		// Attribute "cast" to later allow us to correctly determine attribute type
 		if(attrIter != m_mapping.end())
 			return AttributeHandle<Attr>(attrIter->second.index());
-		
+
 		// Since we leave deleted attributes in the vector, we need to manually iterate it
 		// Default-index is end of vector
 		AttributeHandle<Attr> newAttr(m_attributes.size());
@@ -278,7 +133,7 @@ public:
 		}
 		// Create the new attribute and mapping to handle
 		m_attributes.push_back(std::make_unique<Attr>(std::move(name)));
-		m_mapping.insert(std::make_pair(m_attributes.back()->name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
+		m_mapping.insert(std::make_pair(m_attributes.back()->get_name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
 		return newAttr;
 	}
 
@@ -343,6 +198,11 @@ public:
 			if(attr != nullptr)
 				attr->clear();
 		}
+	}
+
+	/// Gets the number of attributes.
+	std::size_t size() const noexcept {
+		return m_mapping.size();
 	}
 
 	Iterator begin() {

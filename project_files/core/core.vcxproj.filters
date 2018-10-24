@@ -135,9 +135,6 @@
     <ClInclude Include="..\..\src\core\scene\iterators.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\attributes.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp">
       <Filter>Source Files\core\scene\geometry</Filter>
     </ClInclude>
@@ -149,9 +146,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp">
       <Filter>Source Files\util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\accell_struct.hpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\residency.hpp">
       <Filter>Source Files\core\scene</Filter>
@@ -191,5 +185,14 @@
     <CudaCompile Include="..\..\src\core\scene\materials\sample.cu">
       <Filter>Source Files\core\scene\materials</Filter>
     </CudaCompile>
+    <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attribute.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

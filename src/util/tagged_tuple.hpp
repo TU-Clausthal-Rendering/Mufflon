@@ -67,6 +67,18 @@ public:
 		return Index<T, Args...>::value;
 	}
 
+	/// Access to the tuple value by index.
+	template < std::size_t I >
+	constexpr Type<I>& get() noexcept {
+		return std::get<I>(m_tuple);
+	}
+
+	/// Access to the tuple value by index.
+	template < std::size_t I >
+	constexpr const Type<I>& get() const noexcept {
+		return std::get<I>(m_tuple);
+	}
+
 	/// Access to the tuple value by type.
 	template < class T >
 	constexpr T& get() noexcept {

@@ -1,28 +1,28 @@
 #include "object.hpp"
-#include "accell_struct.hpp"
+#include "accel_struct.hpp"
 
 namespace mufflon::scene {
 
 bool Object::is_data_dirty(Residency res) const noexcept {
 	switch(res) {
-		case Residency::CPU: return m_cpuData.m_isDirty;
-		case Residency::CUDA: return m_cudaData.m_isDirty;
-		case Residency::OPENGL: return m_openGlData.m_isDirty;
+		case Residency::CPU: return m_cpuData.isDirty;
+		case Residency::CUDA: return m_cudaData.isDirty;
+		case Residency::OPENGL: return m_openGlData.isDirty;
 	}
 	return false;
 }
 
 
-bool Object::is_accell_dirty(Residency res) const noexcept {
-	return m_accellDirty || m_accell_struct->is_dirty(res);
+bool Object::is_accel_dirty(Residency res) const noexcept {
+	return m_accelDirty || m_accel_struct->is_dirty(res);
 }
 
-void Object::build_accell_structure() {
+void Object::build_accel_structure() {
 	// We no longer need this indication - the structure itself will tell us
 	// if and where we are dirty
-	m_accellDirty = false;
+	m_accelDirty = false;
 
-	m_accell_struct->build();
+	m_accel_struct->build();
 }
 
 void Object::make_resident(Residency res) {

@@ -17,7 +17,7 @@
 namespace mufflon::scene {
 
 // Forward declarations
-class IAccellerationStructure;
+class IAccelerationStructure;
 
 /**
  * Representation of a scene object.
@@ -28,6 +28,11 @@ class Object {
 public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
+
+	/// Object representation in device memory
+	struct DeviceObject {
+		// TODO: grab from polygons/spheres
+	};
 	
 	static constexpr std::size_t NO_ANIMATION_FRAME = std::numeric_limits<std::size_t>::max();
 	static constexpr std::size_t DEFAULT_LOD_LEVEL = 0u;
@@ -42,45 +47,45 @@ public:
 	/// Reserves memory for geometry type.
 	template < class Geom, class... Args >
 	void reserve(Args&& ...args) {
-		m_cpuData.m_geometryData.get<Geom>().reserve(std::forward<Args>(args)...);
+		m_cpuData.geometryData.get<Geom>().reserve(std::forward<Args>(args)...);
 	}
 
 	/// Resizes storage of geometry type.
 	template < class Geom, class... Args >
 	void resize(Args&& ...args) {
-		m_cpuData.m_isDirty = true;
-		m_cpuData.m_geometryData.get<Geom>().resize(std::forward<Args>(args)...);
+		m_cpuData.isDirty = true;
+		m_cpuData.geometryData.get<Geom>().resize(std::forward<Args>(args)...);
 	}
 
 	/// Adds a primitive (e.g. vertex, triangle, sphere...) to geometry.
 	template < class Geom, class... Args >
 	auto add(Args&& ...args) {
-		m_cpuData.m_isDirty = true;
-		return m_cpuData.m_geometryData.get<Geom>().add(std::forward<Args>(args)...);
+		m_cpuData.isDirty = true;
+		return m_cpuData.geometryData.get<Geom>().add(std::forward<Args>(args)...);
 	}
 
 	template < class Geom, class... Args >
 	auto add_bulk(Args&& ...args) {
-		m_cpuData.m_isDirty = true;
-		return m_cpuData.m_geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
+		m_cpuData.isDirty = true;
+		return m_cpuData.geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
 	}
 
 	/// Requests an attribute for the geometry type.
 	template < class Geom, class Type >
 	auto request(const std::string& name) {
-		m_cpuData.m_isDirty = true;
-		return m_cpuData.m_geometryData.get<Geom>().request(name);
+		m_cpuData.isDirty = true;
+		return m_cpuData.geometryData.get<Geom>().request(name);
 	}
 	/// Removes an attribute for the geometry type.
 	template < class Geom, class AttributeHandle >
 	void remove(const AttributeHandle& handle) {
-		m_cpuData.m_isDirty = true;
-		m_cpuData.m_geometryData.get<Geom>().remove(handle);
+		m_cpuData.isDirty = true;
+		m_cpuData.geometryData.get<Geom>().remove(handle);
 	}
 	/// Attempts to find an attribute by name.
 	template < class Geom >
 	auto find(const std::string& name) {
-		m_cpuData.m_geometryData.get<Geom>().find(name);
+		m_cpuData.geometryData.get<Geom>().find(name);
 	}
 	/**
 	 * Aquires a reference to an attribute, valid until the attribute gets removed.
@@ -89,7 +94,7 @@ public:
 	 */
 	template <  class Geom, class AttributeHandle >
 	auto &aquire(const AttributeHandle& attrHandle) {
-		return m_cpuData.m_geometryData.get<Geom>().aquire(attrHandle);
+		return m_cpuData.geometryData.get<Geom>().aquire(attrHandle);
 	}
 	/**
 	 * Aquires a reference to an attribute, valid until the attribute gets removed.
@@ -97,14 +102,14 @@ public:
 	 */
 	template < class Geom, class AttributeHandle >
 	const auto &aquire(const AttributeHandle& attrHandle) const {
-		return m_cpuData.m_geometryData.get<Geom>().aquire(attrHandle);
+		return m_cpuData.geometryData.get<Geom>().aquire(attrHandle);
 	}
 
 	/// Applies tessellation to the geometry type.
 	template < class Geom, class Tessellater, class... Args >
 	void tessellate(Tessellater& tessellater, Args&& ...args) {
-		m_cpuData.m_isDirty = true;
-		m_cpuData.m_geometryData.get<Geom>()
+		m_cpuData.isDirty = true;
+		m_cpuData.geometryData.get<Geom>()
 			.tessellate(tessellater,std::forward<Args>(args)...);
 	}
 	/// Creates a new LoD by applying a decimater to the geomtry type.
@@ -112,17 +117,17 @@ public:
 	Object create_lod(Decimater& decimater, Args&& ...args) {
 		// TODO: what do we want exactly?
 		Object temp(*this);
-		temp.m_cpuData.m_geometryData.get<Geom>()
+		temp.m_cpuData.geometryData.get<Geom>()
 			.create_lod(decimater, std::forward<Args>(args)...);
-		temp.m_cpuData.m_isDirty = true;
-		temp.m_accellDirty = true;
+		temp.m_cpuData.isDirty = true;
+		temp.m_accelDirty = true;
 		return temp;
 	}
 
 	/// Grants direct access to the mesh data (const only).
 	template < class Geom, class... Args >
 	const auto& native(Args&& ...args) {
-		return m_cpuData.m_geometryData.get<Geom>().native(std::forward<Args>(args)...);
+		return m_cpuData.geometryData.get<Geom>().native(std::forward<Args>(args)...);
 	}
 
 	/// Returns the object's animation frame.
@@ -136,31 +141,31 @@ public:
 
 	/// Checks if data on one of the system parts has been modified.
 	bool is_data_dirty(Residency res) const noexcept;
-	/// Checks if the accelleration structure on one of the system parts has been modified.
-	bool is_accell_dirty(Residency res) const noexcept;
+	/// Checks if the acceleration structure on one of the system parts has been modified.
+	bool is_accel_dirty(Residency res) const noexcept;
 	
 	/// Checks whether the object currently has a BVH.
-	bool has_accell_structure() const noexcept {
-		return m_accell_struct != nullptr;
+	bool has_accel_structure() const noexcept {
+		return m_accel_struct != nullptr;
 	}
 	/// Returns the BVH of this object.
-	const IAccellerationStructure& get_accell_structure() const noexcept {
-		mAssert(this->has_accell_structure());
-		return *m_accell_struct;
+	const IAccelerationStructure& get_accel_structure() const noexcept {
+		mAssert(this->has_accel_structure());
+		return *m_accel_struct;
 	}
 	/// Clears the BVH of this object.
-	void clear_accell_structutre() {
+	void clear_accel_structutre() {
 		// Mark as dirty only if we change something
-		m_accellDirty |= m_accell_struct != nullptr;
-		m_accell_struct.reset();
+		m_accelDirty |= m_accel_struct != nullptr;
+		m_accel_struct.reset();
 	}
-	/// Initializes the accelleration structure to a given implementation.
-	template < class Accell, class... Args >
-	void set_accell_structure(Args&& ...args) {
-		m_accell_struct = std::make_unique<Accell>(std::forward<Args>(args)...);
+	/// Initializes the acceleration structure to a given implementation.
+	template < class Accel, class... Args >
+	void set_accel_structure(Args&& ...args) {
+		m_accel_struct = std::make_unique<Accel>(std::forward<Args>(args)...);
 	}
-	/// (Re-)builds the accelleration structure.
-	void build_accell_structure();
+	/// (Re-)builds the acceleration structure.
+	void build_accel_structure();
 
 	/// Makes this object's data resident in the memory system
 	void make_resident(Residency);
@@ -169,24 +174,24 @@ public:
 
 private:
 	struct {
-		GeometryTuple m_geometryData;
-		bool m_isDirty;
+		GeometryTuple geometryData;
+		bool isDirty;
 	} m_cpuData;
 
 	struct {
 		// TODO
-		bool m_isDirty;
+		bool isDirty;
 	} m_cudaData;
 
 	struct {
 		// TODO
-		bool m_isDirty;
+		bool isDirty;
 	} m_openGlData;
 
-	bool m_accellDirty = false;
+	bool m_accelDirty = false;
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; /// Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; /// Current level-of-detail
-	std::unique_ptr<IAccellerationStructure > m_accell_struct = nullptr;
+	std::unique_ptr<IAccelerationStructure > m_accel_struct = nullptr;
 
 	// TODO: how to handle the LoDs?
 	// TODO: non-CPU memory

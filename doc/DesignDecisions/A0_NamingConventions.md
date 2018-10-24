@@ -19,6 +19,7 @@ Classes
           <methods>
           <variables>
       };
+- Initialization syntax follows C++17 guidelines, i.e. use curly brackets for object construction whenever possible: `Timer t{};`
 
 Function and method names
 -
@@ -28,7 +29,11 @@ Function and method names
 
         void test(int foo,
                   int bar);
+- If a function's signature exceeds reasonable length, the function's name and parameters may be put on the next line without extra indentation, e.g.:
 
+        __device__ __host__ ExtraLongReturnTypeName
+        alsoVeryLongFunctionName(Param p1,
+                                 Param p2);
 - Functions which return properties have the prefix `get`
 
 

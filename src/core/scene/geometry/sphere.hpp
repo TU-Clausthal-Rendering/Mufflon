@@ -1,8 +1,10 @@
 #pragma once
 
 #include "util/types.hpp"
+#include "util/flag.hpp"
 #include "ei/vector.hpp"
-#include "core/scene/attributes.hpp"
+#include "../attribute_list.hpp"
+#include "../residency.hpp"
 #include "core/scene/types.hpp"
 #include <istream>
 #include <tuple>
@@ -40,6 +42,21 @@ public:
 			};
 			float arr[4u];
 		} m_radPos;
+	};
+
+	/// Memory-agnostic type for returning possibly needed handles when making a residency call.
+	template < Residency res >
+	struct DeviceHandles {};
+
+	/// Handle specialization for CUDA
+	template <>
+	struct DeviceHandles<Residency::CUDA> {
+		u32 numSpheres;
+		u32 numAttribs;
+		Sphere* spheres;
+		MaterialIndex* matIndices;
+		// TODO
+		void** attributes;
 	};
 
 	/// Default construction, creates material-index attribute.
@@ -103,7 +120,7 @@ public:
 	template < class Attribute >
 	std::size_t add_bulk(const Attribute& attribute, const SphereHandle& startSphere,
 						 std::size_t count, std::istream& attrStream) {
-		std::size_t actualCount = std::min(m_sphereData.size() - startSphere, count);
+		std::size_t actualCount = std::min(m_sphereData.get_size() - startSphere, count);
 		// Read the attribute from the stream
 		attrStream.read(attribute.as_bytes(), actualCount * attribute.elem_size());
 		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / attribute.elem_size();
@@ -118,15 +135,14 @@ public:
 		return add_bulk(attribute, startSphere, count, attrStream);
 	}
 
-	template < class Attribute >
-	Attribute &aquire(const AttributeHandle<Attribute>& attrHandle) {
-		return m_attributes.aquire(attrHandle);
+	template < class Attr >
+	Attr &aquire(const AttributeHandle<Attr>& attrHandle) {
+		m_attributes.aquire(attrHandle);
 	}
 
-	template < class Attribute >
-	const Attribute &aquire(const AttributeHandle<Attribute>& attrHandle) const {
-		// TODO: lock attributes?
-		return m_attributes.aquire(attrHandle);
+	template < class Attr >
+	const Attr &aquire(const AttributeHandle<Attr>& attrHandle) const {
+		m_attributes.aquire(attrHandle);
 	}
 
 	template < class Attribute >
@@ -141,7 +157,7 @@ public:
 		this->aquire(attrHandle)[sphereHandle] = val;
 	}
 
-	/// Gets a constant handle to the underlying sphere data.
+	// Gets a constant handle to the underlying sphere data.
 	const ArrayAttribute<Sphere>& native() const {
 		return m_sphereData;
 	}
@@ -150,6 +166,12 @@ private:
 	AttributeList m_attributes;
 	ArrayAttribute<Sphere>& m_sphereData;
 	ArrayAttribute<MaterialIndex>& m_matIndex;
+
+	std::vector<util::DirtyFlags<Residency>> m_attribDirty;
+
+	// TODO: dirty flag
+	// TODO: CUDA
+	// TODO: OpenGL
 };
 
 } // namespace mufflon::scene::geometry
