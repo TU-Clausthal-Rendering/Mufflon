@@ -29,6 +29,8 @@ Function and method names
         void test(int foo,
                   int bar);
 
+- Functions which return properties have the prefix `get`
+
 
 Variables
 -
@@ -164,3 +166,26 @@ Strings
 
 - use std::string
 - use std::string_view if appropriate
+
+Comments
+-
+
+* header, one liner: //
+
+      // Enum for cool stuff
+      enum class Flags {
+          A,      // Flag A description
+          B,      // Flag B description
+      };
+
+* header, complex descriptions as block
+
+      /**
+       * Big blabla.
+       * Lots of details.
+       * a: the parameter description (optional)
+       * ...
+       */
+       float foo(int a);
+
+* In source code: //
