@@ -3,6 +3,7 @@
 #include "ei/vector.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
+#include "core/scene/types.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <optional>
 #include <tuple>
@@ -37,11 +38,7 @@ struct PolygonTraits : public OpenMesh::DefaultTraits {
 class Polygons {
 public:
 	// Basic type definitions
-	using Point = ei::Vec3;
-	using Normal = ei::Vec3;
-	using UvCoordinate = ei::Vec2;
 	using Index = u32;
-	using MaterialIndex = u32;
 	using Triangle = std::array<Index, 3u>;
 	using Quad = std::array<Index, 4u>;
 	// OpenMesh types

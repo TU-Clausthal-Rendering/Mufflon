@@ -2,7 +2,8 @@
 
 #include "util/types.hpp"
 #include "ei/vector.hpp"
-#include "../attributes.hpp"
+#include "core/scene/attributes.hpp"
+#include "core/scene/types.hpp"
 #include <istream>
 #include <tuple>
 #include <vector>
@@ -16,9 +17,7 @@ namespace mufflon::scene::geometry {
 class Spheres {
 public:
 	// Basic type definitions
-	using Point = ei::Vec3;
 	using Index = u32;
-	using MaterialIndex = u32;
 	using SphereHandle = std::size_t;
 	template < class Attr >
 	using AttributeHandle = AttributeList::AttributeHandle<Attr>;

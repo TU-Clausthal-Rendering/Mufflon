@@ -168,5 +168,14 @@
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\sample.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\types.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\types.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
