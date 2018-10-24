@@ -47,6 +47,7 @@ The names must match the names stored in the binary itself.
         "scenarios": {
             "<name1>: {
                 "camera": "<name of a camera>",
+                "resolution": [int,int],        // Target image resolution
                 "lights": ["light:name1", ...]  // List of light sources
                 "lod": int,             // Global level of detail number [0,...] where 0 has the highest resolution, OPTIONAL 0
                 "[mat:name1]": "<name of a material>",
@@ -66,6 +67,27 @@ The names must match the names stored in the binary itself.
 Cameras
 --
 
+`"type": "pinhole"`\
+Infinitely sharp camera model.
+
+    "fov": float     // vertical field of view in degree [°], DEFAULT 25°
+
+`"type": "focus"`\
+Realistic camera model.
+
+    "focalLength": float,           // FocalLength in [mm] (typical 10-400mm), DEFAULT 35mm
+    "chipHeight": float,            // Chip heigh in [mm] (typical <24mm), DEFAULT 24mm
+    "focusDistance": float,         // sharp distance in meters [m],
+    "aperture": float               // Aperture in f-stops (typical 1.0, 1.4, 1.8, ...), DEFAULT 1.0
+
+`"type": "ortho"`\
+The orthographic camera spans a box volume which is projected to a plane with position and orientation specified by "path", "viewDir" and "up".
+It has a near clipping at this plane (lower half space is not projected), but extends to infinity in positive direction.
+The box is spanned symmetrical around the position ("width"/2 in each horizontal direction, ...).
+
+    "width": float,                 // Width of the box volume in meter [m]
+    "height": float,                // Height of the box volume in meter [m]
+
 Lights
 --
 
@@ -73,7 +95,7 @@ This section lists the required attributes for the different types of light sour
 
 `"type": "point"`
 
-    "position": [x,y,z],            // vec3 vec3 world space position
+    "position": [x,y,z],            // vec3 vec3 world space position in [m]
     "flux" or "intensity: [a,b,c],  // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3)
     "scale": float,                 // Multiplier for "flux"/"intensity"
 
@@ -86,6 +108,8 @@ This section lists the required attributes for the different types of light sour
 `"type": "spot"`\
 PBRT type of spot light: "intensity" * clamp((cosθ - "cosWidth") / ("falloffStart" - "cosWidth"), 0, 1) ^ "exponent".
 
+    "position": [x,y,z],            // vec3 vec3 world space position in [m]
+    "direction": [x,y,z],           // Direction in which the light travels (incident direction), not necessarily normalized
     "intensity": [a,b,c],           // Peak intensity [W/sr]
     "scale": float,                 // Multiplier for "intensity"
     "exponent": float,
@@ -102,7 +126,7 @@ PBRT type of spot light: "intensity" * clamp((cosθ - "cosWidth") / ("falloffSta
 `"type": "goniometric"`\
 A measured light source. Similar to a point light
 
-    "position": [x,y,z],            // vec3 world space position
+    "position": [x,y,z],            // vec3 world space position in [m]
     "map": "<texture name>"         // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as intensity [W/sr],
     "scale":, float,                // Multiplier for the "map"
 
@@ -244,7 +268,7 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
             <TRIANGLES>'
             <QUADS>'
             <SPHERES>'
-    <VERTEXDATA> = V*3*f32      // Positions (vec3)
+    <VERTEXDATA> = V*3*f32      // Positions (vec3, in meter [m])
                    V*3*f32 | V*u32  // Normals (vec3, normalized)
                                 // OR compressed normals (Oct-mapping see below)
                    V*2*f32      // UV coordinates (vec2)
@@ -255,7 +279,7 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
     <QUADS> = Q*4*u32           // Indices of vertices (0-based, per LOD)
               Q*u16             // Material indices (<MATID> from <MATERIALS_HEADER>)
               <ATTRIBUTES>      // Optional list of face attributes, must have the same entries as for triangles
-    <SPHERES> = S*4*f32         // Position (3 f32) and radius (1 f32) interleaved
+    <SPHERES> = S*4*f32         // Position (3 f32) and radius (1 f32) interleaved in meter [m]
                 S*u16           // Material indices (<MATID> from <MATERIALS_HEADER>)
                 <ATTRIBUTES>
 
