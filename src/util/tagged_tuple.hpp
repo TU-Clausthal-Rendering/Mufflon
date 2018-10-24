@@ -2,7 +2,7 @@
 
 #include <tuple>
 
-namespace mufflon::util {
+namespace mufflon { namespace util {
 
 // Utility functions to ensure that all types are distinct
 namespace tagged_tuple_detail {
@@ -113,4 +113,4 @@ private:
 	std::tuple<Args...> m_tuple;
 };
 
-} // namespace mufflon::util
+}} // namespace mufflon::util

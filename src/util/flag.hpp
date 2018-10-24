@@ -4,7 +4,7 @@
 #include <climits>
 #include <type_traits>
 
-namespace mufflon::util {
+namespace mufflon { namespace util {
 
 /**
  * A kind of bitset which allows for change tracking of attributes.
@@ -85,4 +85,4 @@ private:
 	EnumType m_hasChanges;
 };
 
-} // namespace mufflon::util
+}} // namespace mufflon::util
