@@ -1,6 +1,7 @@
 #pragma once
 
-#include <OpenMesh/Core/Geometry/VectorT.hh>
+#include <OpenMesh/Core/Geometry/VectorT.hh> // TODO: remove (leftover, ei::vec replaces this)
+#include <ei/vector.hpp>
 #include <cstdint>
 
 namespace mufflon {
@@ -15,5 +16,7 @@ using i32 = std::int32_t;
 using i64 = std::int64_t;
 
 using Real = float;
+
+using Spectrum = ei::Vec3;
 
 } // namespace mufflon
