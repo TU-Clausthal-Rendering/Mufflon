@@ -2,19 +2,24 @@
 
 #include "residency.hpp"
 
+// forward declaration
+namespace ei {
+struct Ray;
+} // namespace ei
+
 namespace mufflon::scene {
 
 /**
  * Interface for generic accelleration structure.
  */
-class IAccellerationStructure {
+class IAccelerationStructure {
 public:
-	IAccellerationStructure() = default;
-	IAccellerationStructure(const IAccellerationStructure&) = default;
-	IAccellerationStructure(IAccellerationStructure&&) = default;
-	IAccellerationStructure& operator=(const IAccellerationStructure&) = default;
-	IAccellerationStructure& operator=(IAccellerationStructure&&) = default;
-	virtual ~IAccellerationStructure() = default;
+	IAccelerationStructure() = default;
+	IAccelerationStructure(const IAccelerationStructure&) = default;
+	IAccelerationStructure(IAccelerationStructure&&) = default;
+	IAccelerationStructure& operator=(const IAccelerationStructure&) = default;
+	IAccelerationStructure& operator=(IAccelerationStructure&&) = default;
+	virtual ~IAccelerationStructure() = default;
 
 	/// Checks whether the structure is currently available on the given system.
 	virtual bool is_resident(Residency res) const = 0;
@@ -26,6 +31,8 @@ public:
 	virtual void build() = 0;
 	/// Checks whether the data on a given system has been modified and is out of sync.
 	virtual bool is_dirty(Residency res) const = 0;
+
+	// TODO: intersections for Rays
 };
 
 } // namespace mufflon::scene
