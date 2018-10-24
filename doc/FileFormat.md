@@ -79,7 +79,7 @@ This section lists the required attributes for the different types of light sour
 
 `"type": "directional"`
 
-    "direction": [x,y,z],           // Direction in which the light travels (incident direction)
+    "direction": [x,y,z],           // Direction in which the light travels (incident direction), not necessarily normalized
     "radiance": [a,b,c],            // Radiance [W/m²sr]
     "scale": float,                 // Multiplier for "radiance"
 
@@ -108,6 +108,65 @@ A measured light source. Similar to a point light
 
 Materials
 --
+
+`"type": "lambert"`
+
+    "albedo": [r,g,b] | <texture>   // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
+                                    // DEFAULT: [0.5, 0.5, 0.5]
+
+`"type": "torrance"`
+
+    "roughness": float | [α_x,α_y,r]    // isotropic roughness value [0,1] (except Beckmann [0,inf])
+                | <texture>,            // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
+                                        // OR a texture with one or three channels (relative path)
+                                        // DEFAULT: 0.5
+    "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
+                                        // DEFAULT: [0.5, 0.5, 0.5]
+
+`"type": "walter"`
+
+    "roughness": float | [α_x,α_y,r]    // isotropic roughness value [0,1] (except Beckmann [0,inf])
+                 | <texture>,           // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
+                                        // OR a texture with one or three channels (relative path)
+                                        // DEFAULT: 0.5
+    "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
+
+`"type": "emissive"`
+
+    "radiance": [r,g,b] | <texture>,    // Surface radiance in [W/m²sr]
+    "scale: float                       // Multiplier for radiance
+
+`"type": "orennayar"`
+
+    "albedo": [r,g,b] | <texture>,  // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
+                                    // DEFAULT: [0.5, 0.5, 0.5]
+    "roughness": float              // [0,π/2], with 0 this resembles to "lambert"
+                                    // DEFAULT: 1.0
+
+`"type": "blend"`\
+Additive blending. Usually the factors for the two layers should be positive and add to one for physical plausible results.
+It is allowed to use all kinds of factors if desired.
+E.g. "factorA" = "factorB" = 1 makes sense for an "emissive", "lambert" mixed material.
+
+    "layerA": {
+        <recursive material>        // A different material beginning with "type"...
+    },
+    "layerB": {
+        <recursive material>        // A different material beginning with "type"...
+    },
+    "factorA": float,               // Factor which is multiplied with the reflectance of layer A
+    "factorB": float,               // Factor which is multiplied with the reflectance of layer B
+
+`"type": "fresnel"`\
+Angular dependent blending of two layers (dielectric-dielectric DD or dielectric-conductor DC fresnel).
+
+    "refractionIndex": float | [n,k], // The real part of the refraction index (for DD) OR complex number (vec2, for DC)
+    "layerReflection": {
+        <recursive material>        // A different material beginning with "type"...
+    },
+    "layerRefraction": {
+        <recursive material>        // A different material beginning with "type"...
+    }
 
 Alias types:
 * "glass" = "fresnel"["torrance", "walter"]
