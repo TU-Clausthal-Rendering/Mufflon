@@ -32,6 +32,9 @@
     <Filter Include="Source Files\core\scene\materials">
       <UniqueIdentifier>{afa2cece-3753-4915-9d7f-e73d4aeb3a60}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\textures">
+      <UniqueIdentifier>{f4a4e5ef-3dd4-457b-b188-4f02684ed554}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -69,6 +72,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp">
+      <Filter>Source Files\core\scene\textures</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -126,9 +132,6 @@
     <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\iterators.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp">
       <Filter>Source Files\core\scene\geometry</Filter>
     </ClInclude>
@@ -173,6 +176,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp">
+      <Filter>Source Files\core\scene\textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp">
+      <Filter>Source Files\core\scene\textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\textures\texture.hpp">
+      <Filter>Source Files\core\scene\textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accessor.hpp">
+      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -25,6 +25,7 @@
     </CudaCompile>
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
+    <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -44,6 +45,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accessor.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
@@ -56,6 +58,9 @@
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\residency.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
     <ClInclude Include="..\..\src\core\scene\types.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
     <ClInclude Include="..\..\src\util\flag.hpp" />

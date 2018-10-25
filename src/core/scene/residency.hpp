@@ -15,13 +15,11 @@ enum class Device : unsigned char {
 	OPENGL	= 4u
 };
 
-// Generic type for device-something-handles
-template < Device dev, class T, class V >
+// Generic type-trait for device-something-handles
+template < Device dev, class T >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
-	using Type = T;
-	using ValueType = V;
-	using HandleType = ValueType*;
+	using HandleType = T;
 };
 
 // Handle type exclusively for arrays, i.e. they must support vector-esque operations
@@ -30,11 +28,17 @@ struct DeviceArrayHandle;
 
 template < class T >
 struct DeviceArrayHandle<Device::CPU, T> :
-	public DeviceHandle<Device::CPU, T, std::vector<T>> {};
+	public DeviceHandle<Device::CPU, std::vector<T>*> {
+	using Type = T;
+	using ValueType = std::vector<T>;
+};
 
 template < class T >
 struct DeviceArrayHandle<Device::CUDA, T> :
-	public DeviceHandle<Device::CUDA, T, thrust::device_vector<T>> {};
+	public DeviceHandle<Device::CUDA, thrust::device_vector<T>*> {
+	using Type = T;
+	using ValueType = thrust::device_vector<T>;
+};
 
 // Operations on the device arrays (override if they differ for some devices)
 template < Device dev, template <Device, class> class H >

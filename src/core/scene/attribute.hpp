@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "accessor.hpp"
 #include "util/assert.hpp"
 #include <cstddef>
 #include <istream>
@@ -51,68 +52,6 @@ public:
 	using DefaultHandleType = DeviceArrayHandle<DEFAULT_DEVICE, Type>;
 	template < Device dev >
 	using ArrayOps = DeviceArrayOps<dev, Type>;
-
-	// Provides constant-only access to the attribute data
-	template < Device dev >
-	class ConstAccessor {
-	public:
-		static constexpr Device DEVICE = dev;
-		using Type = T;
-		using HandleType = typename DeviceArrayHandle<DEVICE, Type>::HandleType;
-
-		ConstAccessor(const HandleType& handle) :
-			m_handle(&handle) {}
-		ConstAccessor(const ConstAccessor&) = default;
-		ConstAccessor(ConstAccessor&&) = default;
-		ConstAccessor& operator=(const ConstAccessor&) = default;
-		ConstAccessor& operator=(ConstAccessor&&) = default;
-		~ConstAccessor() = default;
-
-		const HandleType& operator*() const {
-			mAssert(m_handle != nullptr);
-			return *m_handle;
-		}
-
-		const HandleType* operator->() const {
-			return m_handle;
-		}
-
-	private:
-		const HandleType* m_handle;
-	};
-
-	// Provides read-and-write access to the attribute data. Flags as dirty upon destruction
-	template < Device dev >
-	class Accessor {
-	public:
-		static constexpr Device DEVICE = dev;
-		using Type = T;
-		using HandleType = typename DeviceArrayHandle<DEVICE, Type>::HandleType;
-
-		Accessor(HandleType& handle, util::DirtyFlags<Device>& flags) :
-			m_handle(&handle), m_flags(flags) {}
-		Accessor(const Accessor&) = delete;
-		Accessor(Accessor&&) = default;
-		Accessor& operator=(const Accessor&) = delete;
-		Accessor& operator=(Accessor&&) = default;
-		~Accessor() {
-			// TODO: would we like lazy copying?
-			m_flags.mark_changed(DEVICE);
-		}
-
-		HandleType& operator*() {
-			mAssert(m_handle != nullptr);
-			return *m_handle;
-		}
-
-		HandleType* operator->() {
-			return m_handle;
-		}
-
-	private:
-		HandleType* m_handle;
-		util::DirtyFlags<Device>& m_flags;
-	};
 
 	ArrayAttribute(std::string name) :
 		m_name(std::move(name))
@@ -175,16 +114,16 @@ public:
 
 	// Aquire a read-only accessor
 	template < Device dev = DEFAULT_DEVICE >
-	ConstAccessor<dev> aquireConst() {
+	ConstAccessor<T, dev> aquireConst() {
 		this->synchronize<dev>();
-		return ConstAccessor<dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle);
+		return ConstAccessor<T, dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle);
 	}
 
 	// Aquire a writing (and thus dirtying) accessor
 	template < Device dev = DEFAULT_DEVICE >
-	Accessor<dev> aquire() {
+	Accessor<T, dev> aquire() {
 		this->synchronize<dev>();
-		return Accessor<dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle, m_dirty);
+		return Accessor<T, dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle, m_dirty);
 	}
 
 	// Explicitly synchronize the given device
