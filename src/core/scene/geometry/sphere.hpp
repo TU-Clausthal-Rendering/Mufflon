@@ -45,12 +45,12 @@ public:
 	};
 
 	/// Memory-agnostic type for returning possibly needed handles when making a residency call.
-	template < Residency res >
+	template < Device res >
 	struct DeviceHandles {};
 
 	/// Handle specialization for CUDA
 	template <>
-	struct DeviceHandles<Residency::CUDA> {
+	struct DeviceHandles<Device::CUDA> {
 		u32 numSpheres;
 		u32 numAttribs;
 		Sphere* spheres;
@@ -167,7 +167,7 @@ private:
 	ArrayAttribute<Sphere>& m_sphereData;
 	ArrayAttribute<MaterialIndex>& m_matIndex;
 
-	std::vector<util::DirtyFlags<Residency>> m_attribDirty;
+	std::vector<util::DirtyFlags<Device>> m_attribDirty;
 
 	// TODO: dirty flag
 	// TODO: CUDA

@@ -41,22 +41,22 @@ public:
  * Can hand out read or write access.
  * Synchronizes between devices.
  */
-template < class T, Residency defaultDev = Residency::CPU >
+template < class T, Device defaultDev = Device::CPU >
 class ArrayAttribute : public IBaseAttribute {
 public:
-	static constexpr Residency DEFAULT_DEVICE = defaultDev;
+	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	using Type = T;
 	// TODO: readd OpenGL
-	using HandleTypes = DeviceArrayHandles<Type, Residency::CPU, Residency::CUDA>;
+	using HandleTypes = DeviceArrayHandles<Type, Device::CPU, Device::CUDA>;
 	using DefaultHandleType = DeviceArrayHandle<DEFAULT_DEVICE, Type>;
-	template < Residency dev >
+	template < Device dev >
 	using ArrayOps = DeviceArrayOps<dev, Type>;
 
 	// Provides constant-only access to the attribute data
-	template < Residency dev >
+	template < Device dev >
 	class ConstAccessor {
 	public:
-		static constexpr Residency DEVICE = dev;
+		static constexpr Device DEVICE = dev;
 		using Type = T;
 		using HandleType = typename DeviceArrayHandle<DEVICE, Type>::HandleType;
 
@@ -82,14 +82,14 @@ public:
 	};
 
 	// Provides read-and-write access to the attribute data. Flags as dirty upon destruction
-	template < Residency dev >
+	template < Device dev >
 	class Accessor {
 	public:
-		static constexpr Residency DEVICE = dev;
+		static constexpr Device DEVICE = dev;
 		using Type = T;
 		using HandleType = typename DeviceArrayHandle<DEVICE, Type>::HandleType;
 
-		Accessor(HandleType& handle, util::DirtyFlags<Residency> &flags) :
+		Accessor(HandleType& handle, util::DirtyFlags<Device>& flags) :
 			m_handle(&handle), m_flags(flags) {}
 		Accessor(const Accessor&) = delete;
 		Accessor(Accessor&&) = default;
@@ -111,7 +111,7 @@ public:
 
 	private:
 		HandleType* m_handle;
-		util::DirtyFlags<Residency> &m_flags;
+		util::DirtyFlags<Device>& m_flags;
 	};
 
 	ArrayAttribute(std::string name) :
@@ -160,7 +160,7 @@ public:
 		this->resize(currSize + elems);
 		Type* nativePtr = &m_handles.get<DefaultHandleType>().handle.data()[currSize];
 		stream.read(reinterpret_cast<char*>(nativePtr), sizeof(Type) * elems);
-		m_dirty.mark_changed(Residency::CPU);
+		m_dirty.mark_changed(Device::CPU);
 		return static_cast<std::size_t>(stream.gcount()) / sizeof(Type);
 	}
 
@@ -174,21 +174,21 @@ public:
 	}
 
 	// Aquire a read-only accessor
-	template < Residency dev = DEFAULT_DEVICE >
+	template < Device dev = DEFAULT_DEVICE >
 	ConstAccessor<dev> aquireConst() {
 		this->synchronize<dev>();
 		return ConstAccessor<dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle);
 	}
 
 	// Aquire a writing (and thus dirtying) accessor
-	template < Residency dev = DEFAULT_DEVICE >
+	template < Device dev = DEFAULT_DEVICE >
 	Accessor<dev> aquire() {
 		this->synchronize<dev>();
 		return Accessor<dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle, m_dirty);
 	}
 
 	// Explicitly synchronize the given device
-	template < Residency dev = DEFAULT_DEVICE >
+	template < Device dev = DEFAULT_DEVICE >
 	void synchronize() {
 		if(m_dirty.has_competing_changes())
 			throw std::runtime_error("Failure: competing changes for this attribute");
@@ -201,12 +201,12 @@ private:
 	// Helper struct for iterating through all devices and finding one which has changes
 	template < std::size_t I >
 	struct Synchronizer {
-		template < Residency dev >
-		static void synchronize(HandleTypes &handles, util::DirtyFlags<Residency>& flags,
+		template < Device dev >
+		static void synchronize(HandleTypes &handles, util::DirtyFlags<Device>& flags,
 								DeviceArrayHandle<dev, Type>& sync) {
 			if constexpr(I < HandleTypes::size) {
 				auto& changed = handles.get<I>();
-				constexpr Residency CHANGED_DEVICE = changed.DEVICE;
+				constexpr Device CHANGED_DEVICE = changed.DEVICE;
 				if(flags.has_changes(CHANGED_DEVICE)) {
 					// Check if resize is necessary and copy over the data
 					std::size_t changedSize = ArrayOps<CHANGED_DEVICE>::get_size(changed);
@@ -223,7 +223,7 @@ private:
 
 	std::string m_name;
 	HandleTypes m_handles;
-	util::DirtyFlags<Residency> m_dirty;
+	util::DirtyFlags<Device> m_dirty;
 };
 
 

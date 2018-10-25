@@ -22,7 +22,7 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, std::istream& radPosStr
 }
 
 /*template <>
-const Spheres::DeviceHandles<Residency::CUDA>& Spheres::make_resident<Residency::CUDA>() {
+const Spheres::DeviceHandles<Device::CUDA>& Spheres::make_resident<Device::CUDA>() {
 	if(!m_cudaDirty) {
 		// Nothing dirty -> no need to do anything
 		mAssert(m_cudaHandles != nullptr);
@@ -41,7 +41,7 @@ const Spheres::DeviceHandles<Residency::CUDA>& Spheres::make_resident<Residency:
 		m_cudaHandles.reset();
 	}
 	
-	m_cudaHandles = std::make_unique<DeviceHandles<Residency::CUDA>>(nullptr);
+	m_cudaHandles = std::make_unique<DeviceHandles<Device::CUDA>>(nullptr);
 	// Allocate the data with CUDA
 	// TODO: use custom allocator?
 	mAssert(m_attributes.size() >= 2u);

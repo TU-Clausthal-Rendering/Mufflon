@@ -54,13 +54,13 @@ public:
 	 * Size of the material descriptor itself (mainly texture handles)
 	 * The size may vary per device.
 	 */
-	virtual std::size_t get_handle_pack_size(Residency device) const = 0;
+	virtual std::size_t get_handle_pack_size(Device device) const = 0;
 
 	/*
 	 * Size of a fetched parameter instanciation from this material.
 	 * The size may vary per device.
 	 */
-	virtual std::size_t get_parameter_pack_size(Residency device) const = 0;
+	virtual std::size_t get_parameter_pack_size(Device device) const = 0;
 
 	/*
 	 * Get the handles which are required to fetch the current material.
@@ -70,7 +70,7 @@ public:
 	 * outBuffer: pointer to a writeable buffer with at least get
 	 *		get_handle_pack_size(device) memory.
 	 */
-	virtual void get_handle_pack(Residency device, HandlePack* outBuffer) const = 0;
+	virtual void get_handle_pack(Device device, HandlePack* outBuffer) const = 0;
 
 	/*
 	 * Get the instanciated parameters for the evaluation of the material.
@@ -82,7 +82,7 @@ public:
 	 * outBuffer: pointer to a writeable buffer with at least get
 	 *		get_parameter_pack_size(device) memory.
 	 */
-	virtual void get_parameter_pack(Residency device, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
+	virtual void get_parameter_pack(Device device, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
 
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {

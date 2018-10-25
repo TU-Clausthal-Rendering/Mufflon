@@ -140,9 +140,9 @@ public:
 	}
 
 	/// Checks if data on one of the system parts has been modified.
-	bool is_data_dirty(Residency res) const noexcept;
+	bool is_data_dirty(Device res) const noexcept;
 	/// Checks if the acceleration structure on one of the system parts has been modified.
-	bool is_accel_dirty(Residency res) const noexcept;
+	bool is_accel_dirty(Device res) const noexcept;
 	
 	/// Checks whether the object currently has a BVH.
 	bool has_accel_structure() const noexcept {
@@ -168,9 +168,9 @@ public:
 	void build_accel_structure();
 
 	/// Makes this object's data resident in the memory system
-	void make_resident(Residency);
+	void make_resident(Device);
 	/// Removes this object's data from the given memory system
-	void unload_resident(Residency);
+	void unload_resident(Device);
 
 private:
 	struct {
