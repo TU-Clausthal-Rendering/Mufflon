@@ -189,11 +189,11 @@
     <ClInclude Include="..\..\src\core\scene\accessor.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\types.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="..\..\src\core\scene\materials\sample.cu">
-      <Filter>Source Files\core\scene\materials</Filter>
-    </CudaCompile>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
@@ -203,8 +203,5 @@
     <ClInclude Include="..\..\src\core\scene\attribute.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
-    <CudaCompile Include="..\..\src\core\scene\materials\lambert.cu">
-      <Filter>Source Files\core\scene\materials</Filter>
-    </CudaCompile>
   </ItemGroup>
 </Project>

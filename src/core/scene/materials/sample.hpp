@@ -2,34 +2,11 @@
 
 #include "material.hpp"
 #include "core/scene/types.hpp"
+#include "util/log.hpp"
+#include "lambert.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace material {
-
-	/*
-	 * A RndSet is a fixed size set of random numbers which may be consumed by a material
-	 * sampler. The first two values are standard uniform distributed floating point samples
-	 * which should be used to sample the direction.
-	 * The third value is open to additional requirements as layer decisions.
-	 */
-	struct RndSet {
-		float x0;	// In [0,1)
-		float x1;	// In [0,1)
-		u32 i0;		// Full 32 bit random information
-	};
-
-	// Return value of an importance sampler
-	struct Sample {
-		Spectrum throughput {1.0f};		// BxDF * cosθ / pdfF
-		Direction excident {0.0f};		// The sampled direction
-		float pdfF {0.0f};				// Sampling PDF in forward direction (current sampler)
-		float pdfB {0.0f};				// Sampling PDF with reversed incident and excident directions
-		enum class Type: u32 {			// Type of interaction
-			INVALID,
-			REFLECTED,
-			REFRACTED,
-		} type = Type::INVALID;
-	};
 
 	/*
 	 * Importance sampling of a generic material. This method switches to the specific
@@ -42,15 +19,34 @@ namespace mufflon { namespace scene { namespace material {
 		   const ParameterPack& params,
 		   const Direction& incident,
 		   const RndSet& rndSet,
-		   bool adjoint);
+		   bool adjoint) {
+		// Cancel the path if shadowed shading normal (incident)
+		float iDotG = -dot(incident, tangentSpace.geoN);
+		float iDotN = -dot(incident, tangentSpace.shadingN);
+		if(iDotG * iDotN <= 0.0f) return Sample{};
 
-	// Return value of a BxDF evaluation function
-	struct EvalValue {
-		Spectrum bxdf;			// BRDF or BTDF value
-		float cosThetaOut;		// Outgoing cosine
-		float pdfF;				// Sampling PDF in forward direction 
-		float pdfB;				// Sampling PDF with reversed incident and excident directions
-	};
+		// Complete to-tangent space transformation.
+		Direction incidentTS(
+			-dot(incident, tangentSpace.tU),
+			-dot(incident, tangentSpace.tV),
+			iDotN
+		);
+
+		// Use model specific subroutine
+		Sample res;
+		switch(params.type)
+		{
+			case Materials::LAMBERT: {
+				res = lambert_sample(static_cast<const LambertParameterPack&>(params), incidentTS, rndSet);
+			} break;
+			default: ;
+#ifndef __CUDA_ARCH__
+				logWarning("Trying to evaluate unimplemented material type ", params.type);
+#endif
+		}
+
+		return res;
+	}
 
 	/*
 	 * Evaluate an BxDF and its associtated PDFs for two directions.
@@ -65,6 +61,9 @@ namespace mufflon { namespace scene { namespace material {
 			 const Direction& incident,
 			 const Direction& excident,
 			 bool adjoint,
-			 bool merge);
+			 bool merge) {
+		return EvalValue{};
+	}
+}
 
 }}} // namespace mufflon::scene::material
