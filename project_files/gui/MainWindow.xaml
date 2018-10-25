@@ -48,7 +48,7 @@
                     <ColumnDefinition Width="*"/>
                     <!-- properties page -->
                     <ColumnDefinition Width="5"/>
-                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
                 
                 <GridSplitter
@@ -68,6 +68,21 @@
                     Width="5"
                     HorizontalAlignment="Stretch"
                     Background="{StaticResource BorderBrush}"/>
+
+                <!-- scene and renderer properties -->
+                <TabControl
+                    Grid.Column="4"
+                    Background="{StaticResource BackgroundBrush}">
+                    <TabItem Header="Renderer">
+
+                    </TabItem>
+                    <TabItem Header="Material">
+
+                    </TabItem>
+                    <TabItem Header="Light">
+
+                    </TabItem>
+                </TabControl>
             </Grid>
 
             <GridSplitter
