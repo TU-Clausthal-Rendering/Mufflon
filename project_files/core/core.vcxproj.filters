@@ -76,6 +76,9 @@
     <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp">
       <Filter>Source Files\core\scene\textures</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\textures\texture.cpp">
+      <Filter>Source Files\core\scene\textures</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">

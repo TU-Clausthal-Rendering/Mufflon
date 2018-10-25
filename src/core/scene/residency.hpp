@@ -20,6 +20,8 @@ template < Device dev, class H >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
 	using HandleType = H;
+
+	HandleType handle;
 };
 
 // Handle type exclusively for arrays, i.e. they must support vector-esque operations

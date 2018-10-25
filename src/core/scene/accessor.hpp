@@ -42,7 +42,6 @@ public:
 	~ConstAccessor() = default;
 
 	const HandleType& operator*() const {
-		mAssert(m_handle != nullptr);
 		return m_handle;
 	}
 
@@ -74,7 +73,6 @@ public:
 	}
 
 	HandleType& operator*() {
-		mAssert(m_handle != nullptr);
 		return m_handle;
 	}
 
