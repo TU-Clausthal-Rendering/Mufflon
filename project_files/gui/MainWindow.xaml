@@ -9,16 +9,95 @@
         Height="450" 
         Width="800"
         Loaded="OnLoaded">
-    <DockPanel>
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="File"/>
+    <Window.Resources>
+        <SolidColorBrush x:Key="BorderBrush" Color="#999999"/>
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#eee"/>
+        <Thickness x:Key="ThinBorder" Bottom="1"/>
+    </Window.Resources>
+    <DockPanel Background="{StaticResource BackgroundBrush}">
+        <Menu 
+            DockPanel.Dock="Top"
+            BorderThickness="{StaticResource ThinBorder}"
+            BorderBrush="{StaticResource BorderBrush}">
+            <MenuItem Header="File">
+                <MenuItem Header="Load Renderer"/>
+                <MenuItem Header="Load Scene"/>
+            </MenuItem>
             <MenuItem Header="Help">
                 <MenuItem Header="About"/>
             </MenuItem>
         </Menu>
-        <Border 
-            x:Name="BorderHost"
-            DockPanel.Dock="Bottom"
-            Background="Black"/>
+        <Grid DockPanel.Dock="Bottom">
+            <Grid.RowDefinitions>
+                <!-- renderer and property pages -->
+                <RowDefinition Height="*"/>
+                <!-- console -->
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="*"/>
+                <!-- status bar -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- renderer and property pages -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <!-- info page -->
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="5"/>
+                    <!-- renderer -->
+                    <ColumnDefinition Width="*"/>
+                    <!-- properties page -->
+                    <ColumnDefinition Width="5"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+                
+                <GridSplitter
+                    Grid.Column="1"
+                    Width="5"
+                    HorizontalAlignment="Stretch"
+                    Background="{StaticResource BorderBrush}"/>
+
+                <Border 
+                    Grid.Column="2"
+                    x:Name="BorderHost"
+                    DockPanel.Dock="Bottom"
+                    Background="Black"/>
+
+                <GridSplitter
+                    Grid.Column="3"
+                    Width="5"
+                    HorizontalAlignment="Stretch"
+                    Background="{StaticResource BorderBrush}"/>
+            </Grid>
+
+            <GridSplitter
+                ResizeDirection="Rows"
+                Grid.Row="1"
+                Height="5"
+                Width="Auto"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="{StaticResource BorderBrush}"/>
+            
+            <RichTextBox
+                Grid.Row="2"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"/>
+
+            <!-- status bar -->
+            <StatusBar
+                Grid.Row="3"
+                Height="18">
+
+                <StatusBarItem
+                    Width="200"
+                    HorizontalAlignment="Right"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Stretch">
+                    <ProgressBar Value="50"/>
+                </StatusBarItem>
+            </StatusBar>
+        </Grid>
+        
     </DockPanel>
 </Window>
