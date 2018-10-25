@@ -56,7 +56,7 @@ namespace gui.Dll
             }
             catch (Exception e)
             {
-                Dispatcher.Invoke(Error, e.Message);
+                Dispatcher.BeginInvoke(Error, e.Message);
             }
         }
 
