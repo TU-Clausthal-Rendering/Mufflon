@@ -67,9 +67,6 @@
     <ClCompile Include="..\..\src\core\scene\object.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\materials\lambert.cu">
-      <Filter>Source Files\core\scene\materials</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClCompile>
@@ -122,9 +119,6 @@
     </ClInclude>
     <ClInclude Include="..\..\deps\chinoise\include\cn\sampler.hpp">
       <Filter>Source Files\deps\chinoise</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\iterators.hpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\types.hpp">
       <Filter>Source Files\util</Filter>
@@ -194,5 +188,8 @@
     <ClInclude Include="..\..\src\core\scene\attribute.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
+    <CudaCompile Include="..\..\src\core\scene\materials\lambert.cu">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>
