@@ -1,0 +1,154 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Controls;
+using System.Windows.Interop;
+
+namespace gui.Dll
+{
+    public class OpenGLHost : HwndHost
+    {
+        // error callbacks (in case the openGL thread crashes)
+        public delegate void ErrorEvent(string message);
+        public event ErrorEvent Error;
+
+        // host of the HwndHost
+        private readonly Border m_parent;
+
+        // context creation
+        private IntPtr m_hWnd = IntPtr.Zero;
+        private IntPtr m_deviceContext = IntPtr.Zero;
+
+        // render thread (aynchronous openGL drawing)
+        private Thread m_renderThread;
+        private bool m_isRunning = true;
+
+        // helper to detect resize in render thread
+        int m_renderWidth = 0;
+        int m_renderHeight = 0;
+
+        public OpenGLHost(Border parent)
+        {
+            this.m_parent = parent;
+        }
+
+        private void Render(object data)
+        {
+            try
+            {
+                InitializeOpenGl();
+
+                while (m_isRunning)
+                {
+                    HandleResize();
+
+                    if(!Core.iterate())
+                        throw new Exception(Core.GetDllError());
+
+                    if(!Gdi32.SwapBuffers(m_deviceContext))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+            }
+            catch (Exception e)
+            {
+                Dispatcher.Invoke(Error, e.Message);
+            }
+        }
+
+
+        /// <summary>
+        /// openGL initialization (pixel format and wgl context)
+        /// </summary>
+        private void InitializeOpenGl()
+        {
+            m_deviceContext = User32.GetDC(m_hWnd);
+
+            var pfd = new Gdi32.PIXELFORMATDESCRIPTOR();
+            pfd.Init(
+                24, // color bits
+                0, // depth bits
+                0 // stencil bits
+            );
+
+            var pixelFormat = Gdi32.ChoosePixelFormat(m_deviceContext, ref pfd);
+            if (!Gdi32.SetPixelFormat(m_deviceContext, pixelFormat, ref pfd))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+
+            var renderingContext = OpenGl32.wglCreateContext(m_deviceContext);
+            if (renderingContext == IntPtr.Zero)
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+
+            if (!OpenGl32.wglMakeCurrent(m_deviceContext, renderingContext))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+
+            // dll call: initialize glad etc.
+            if (!Core.initialize())
+                throw new Exception(Core.GetDllError());
+        }
+
+        /// <summary>
+        /// calls the dll resize() function if the client area was resized
+        /// </summary>
+        private void HandleResize()
+        {
+            // viewport resize?
+            int newWidth = (int)ActualWidth;
+            int newHeight = (int)ActualHeight;
+
+            if (m_renderWidth != newWidth || m_renderHeight != newHeight)
+            {
+                m_renderWidth = newWidth;
+                m_renderHeight = newHeight;
+                if (!Core.resize(m_renderWidth, m_renderHeight))
+                    throw new Exception(Core.GetDllError());
+            }
+        }
+
+        /// <summary>
+        /// construction of the child window
+        /// </summary>
+        /// <param name="hwndParent">handle of parent window (border)</param>
+        /// <returns></returns>
+        protected override HandleRef BuildWindowCore(HandleRef hwndParent)
+        {
+            m_hWnd = User32.CreateWindowEx(
+                0, // dwstyle
+                "static", // class name
+                "", // window name
+                (int)(User32.WS_FLAGS.WS_CHILD | User32.WS_FLAGS.WS_VISIBLE), // style
+                0, // x
+                0, // y
+                (int)m_parent.ActualWidth, // width
+                (int)m_parent.ActualHeight, // height
+                hwndParent.Handle, // parent handle
+                IntPtr.Zero, // menu
+                IntPtr.Zero, // hInstance
+                0 // param
+            );
+
+            m_renderThread = new Thread(new ParameterizedThreadStart(Render));
+            m_renderThread.Start();
+
+            return new HandleRef(this, m_hWnd);
+        }
+
+        /// <summary>
+        /// stops render thread and performs destruction of window
+        /// </summary>
+        /// <param name="hwnd"></param>
+        protected override void DestroyWindowCore(HandleRef hwnd)
+        {
+            // stop render thread
+            m_isRunning = false;
+            m_renderThread.Join();
+
+            // destroy resources
+            User32.DestroyWindow(hwnd.Handle);
+        }
+    }
+}
