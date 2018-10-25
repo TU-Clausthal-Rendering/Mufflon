@@ -41,11 +41,10 @@ struct DeviceArrayHandle<Device::CUDA, T> :
 };
 
 // Operations on the device arrays (override if they differ for some devices)
-template < Device dev, template <Device, class> class H >
+template < Device dev, class T, template <Device, class> class H >
 struct DeviceArrayOps {
-	template < class T >
-	using HandleType = H<dev, T>;
-	using Type = typename HandleType::Type;
+	using Type = T;
+	using HandleType = H<dev, Type>;
 	using ValueType = typename HandleType::ValueType;
 
 	static std::size_t get_size(const ValueType& sync) {
@@ -69,7 +68,7 @@ struct DeviceArrayOps {
 	}
 
 	template < Device other >
-	static void copy(const typename H<other, T>::ValueType& changed,
+	static void copy(const typename H<other, Type>::ValueType& changed,
 					 ValueType& sync) {
 		// TODO
 		std::runtime_error("Copy between devices not yet supported!");

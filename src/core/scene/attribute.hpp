@@ -13,10 +13,12 @@
 namespace mufflon::scene {
 
 /**
- * Base class for all attribtues.
- * Any attribute which should be used in an attribute array needs to inherit
- * from this.
- */
+	* Base class for all attribtues.
+	* Any attribute which should be used in an attribute array needs to inherit
+	* from this.
+	* Exceptioned from the "getter get 'get' prefix"-rule due to OpenMesh's
+	* 'BaseProperty' interface.
+	*/
 class IBaseAttribute {
 public:
 	IBaseAttribute() = default;
@@ -25,15 +27,131 @@ public:
 	IBaseAttribute& operator=(const IBaseAttribute&) = default;
 	IBaseAttribute& operator=(IBaseAttribute&&) = default;
 	virtual ~IBaseAttribute() = default;
-	virtual std::string_view get_name() const noexcept = 0;
-	virtual std::size_t get_capacity() const = 0;
-	virtual std::size_t get_size() const = 0;
-	virtual std::size_t get_elem_size() const = 0;
+
+	// Methods that we and OpenMesh both care about
 	virtual void reserve(std::size_t count) = 0;
 	virtual void resize(std::size_t count) = 0;
 	virtual void clear() = 0;
-	virtual std::size_t read(std::size_t elems, std::istream&) = 0;
-	virtual std::size_t write(std::ostream&) const = 0;
+	virtual std::size_t n_elements() const = 0;
+	virtual std::size_t element_size() const = 0;
+	virtual std::size_t size_of() const = 0; // Size in bytes
+	virtual std::size_t size_of(std::size_t n) const = 0; // Estimated for no of elems
+	virtual const std::string& name() const = 0;
+
+	// Methods that we both like, but disagree on the interface
+	virtual std::size_t restore(std::istream&, std::size_t elems) = 0;
+	virtual std::size_t store(std::ostream&) const = 0;
+
+	// Methods that OpenMesh would like to have (for future reference)
+	//virtual void push_back() = 0;
+	//virtual void swap(std::size_t i0, std::size_t i1) = 0;
+	//virtual void copy(std::size_t i0, std::size_t i1) = 0;
+	//virtual IBaseAttribute* clone() const = 0;
+	//virtual void set_persistent() = 0;
+};
+
+/**
+ * SyncAttribute
+ */
+template < class Attr, template < Device, Device > class Sync,
+			template < Device > class Hdl >
+class ISyncedAttribute {
+public:
+	/**
+	 * Helper struct needed for storing the actual value behind a handle.
+	 * Otherwise we would be storing a pointer and would have to allocate
+	 * them manually in the tuple.
+	 */
+	template < class H >
+	struct DeviceValue {
+		using HandleType = H;
+		using Type = typename::type_info;
+		using ValueType = typename HandleType::ValueType;
+
+		ValueType value;
+	};
+
+	using AttributeType = Attr;
+	static constexpr Device DEFAULT_DEVICE = AttributeType::DEFAULT_DEVICE;
+	using Type = typename AttributeType::T;
+	template < Device dev >
+	using DeviceHandleType = Hdl<dev>;
+	template < Device changed, Device sync >
+	using SynchronizeOps = Sync<changed, sync>;
+	template < Device dev >
+	using DeviceValueType = DeviceValue<DeviceHandleType<dev>>;
+	using DeviceValueTypes = util::TaggedTuple<DeviceValueType<Device::CPU>,
+		DeviceValueType<Device::CUDA>>;
+	using DefaultHandleType = DeviceHandleType<DEFAULT_DEVICE>;
+	using DefaultValueType = DeviceValueType<DEFAULT_DEVICE>;
+
+	// Aquire a read-only accessor
+	template < Device dev = DEFAULT_DEVICE >
+	ConstAccessor<Type, dev> aquireConst() {
+		this->synchronize<dev>();
+		return ConstAccessor<dev>(&m_value.get<DeviceValueType<dev>>().value);
+	}
+
+	// Aquire a writing (and thus dirtying) accessor
+	template < Device dev = DEFAULT_DEVICE >
+	Accessor<Type, dev> aquire() {
+		this->synchronize<dev>();
+		return Accessor<dev>(&m_value.get<DeviceValueType<dev>>().value, m_dirty);
+	}
+
+	// Explicitly synchronize the given device
+	template < Device dev = DEFAULT_DEVICE >
+	void synchronize() {
+		if (m_dirty.has_competing_changes())
+			throw std::runtime_error("Failure: competing changes for this attribute");
+		if (m_dirty.has_changes()) {
+			SyncHelper<0u>::synchronize(m_value, m_dirty, m_value.get<DeviceValueType<dev>>());
+		}
+	}
+
+private:
+	// Helper struct for iterating through all devices and finding one which has changes
+	template < std::size_t I >
+	struct SyncHelper {
+		template < Device dev >
+		static void synchronize(DeviceValueTypes &values, util::DirtyFlags<Device>& flags,
+			DefaultValueType& sync) {
+			if constexpr (I < HandleTypes::size) {
+				auto& changed = values.get<I>();
+				constexpr Device CHANGED_DEVICE = changed.DEVICE;
+				if (flags.has_changes(CHANGED_DEVICE)) {
+					// Perform synchronization if necessary
+					SynchronizeOps<CHANGED_DEVICE, dev>::synchronize(changed, sync);
+				}
+				else {
+					// Keep looking for device changes
+					SyncHelper<I + 1u>::synchronize(values, flags, sync);
+				}
+			}
+		}
+	};
+
+	util::DirtyFlags<Device> m_dirty;
+	DeviceValueTypes m_value;
+};
+
+// Struct for array synchronization operations
+template < template < Device, class > class V, class T,
+		Device change, Device sync >
+struct ArraySynchronizeOps {
+	using Type = T;
+	template < Device dev >
+	using DeviceValueType = V<dev1, Type>;
+	static constexpr Device CHANGED_DEVICE = change;
+	static constexpr Device CHANGED_DEVICE = sync;
+
+	static void synchronize(DeviceValueType<CHANGED_DEVICE>& changed,
+		DeviceValueType<SYNCED_DEVICE>& sync) {
+		std::size_t changedSize = ArrayOps<CHANGED_DEVICE>::get_size(changed);
+		if (changedSize != ArrayOps<dev>::get_size(sync))
+			ArrayOps<dev>::resize(sync, changedSize);
+		ArrayOps<dev>::copy(changed, sync);
+	}
 };
 
 /**
@@ -43,127 +161,74 @@ public:
  * Synchronizes between devices.
  */
 template < class T, Device defaultDev = Device::CPU >
-class ArrayAttribute : public IBaseAttribute {
+class ArrayAttribute : public IBaseAttribute,
+					   public ISyncedAttribute<ArrayAttribute, ArraySynchronizeOps,
+												DeviceHandleType> {
 public:
-	static constexpr Device DEFAULT_DEVICE = defaultDev;
+	static constexpr Device DEFAULT_DEVICE = Device::CPU;
 	using Type = T;
-	// TODO: readd OpenGL
-	using HandleTypes = DeviceArrayHandles<Type, Device::CPU, Device::CUDA>;
-	using DefaultHandleType = DeviceArrayHandle<DEFAULT_DEVICE, Type>;
 	template < Device dev >
-	using ArrayOps = DeviceArrayOps<dev, Type>;
-
-	ArrayAttribute(std::string name) :
-		m_name(std::move(name))
-	{}
-	ArrayAttribute(const ArrayAttribute&) = default;
-	ArrayAttribute(ArrayAttribute&&) = default;
-	ArrayAttribute& operator=(const ArrayAttribute&) = default;
-	ArrayAttribute& operator=(ArrayAttribute&&) = default;
-	~ArrayAttribute() = default;
-
-	virtual std::string_view get_name() const noexcept override {
-		return m_name;
-	}
-
-	virtual std::size_t get_size() const override {
-		return ArrayOps<DEFAULT_DEVICE>::get_size(m_handles.get<DefaultHandleType>());
-	}
-
-	virtual std::size_t get_capacity() const override {
-		return ArrayOps<DEFAULT_DEVICE>::get_capacity(m_handles.get<DefaultHandleType>());
-	}
-
-	virtual std::size_t get_elem_size() const override {
-		return sizeof(Type);
-	}
+	using DeviceHandleType = DeviceArrayHandle<dev, Type>;
 
 	virtual void reserve(std::size_t n) override {
-		if(n != this->get_capacity())
+		if (n != this->get_capacity())
 			m_dirty.mark_changed(DEFAULT_DEVICE);
-		return ArrayOps<DEFAULT_DEVICE>::reserve(m_handles.get<DefaultHandleType>(), n);
+		return DeviceArrayOps<DEFAULT_DEVICE>::reserve(m_handles.get<DefaultHandleType>(), n);
 	}
 
 	virtual void resize(std::size_t n) override {
-		if(n != this->get_capacity())
+		if (n != this->get_capacity())
 			m_dirty.mark_changed(DEFAULT_DEVICE);
-		return ArrayOps<DEFAULT_DEVICE>::resize(m_handles.get<DefaultHandleType>(), n);
+		return DeviceArrayOps<DEFAULT_DEVICE>::resize(m_handles.get<DefaultHandleType>(), n);
 	}
 
 	virtual void clear() override {
-		ArrayOps<DEFAULT_DEVICE>::clear(m_handles.get<DefaultHandleType>());
+		DeviceArrayOps<DEFAULT_DEVICE>::clear(m_handles.get<DefaultHandleType>());
 	}
 
-	virtual std::size_t read(std::size_t elems, std::istream& stream) override {
+	virtual std::size_t n_elements() const override {
+		return DeviceArrayOps<DEFAULT_DEVICE>::get_size(m_handles.get<DefaultHandleType>());
+	}
+
+	virtual std::size_t element_size() const override {
+		return sizeof(Type);
+	}
+
+	virtual std::size_t size_of() const override {
+		return this->element_size() * this->n_elements();
+	}
+
+	virtual std::size_t size_of(std::size_t n) const override {
+		return this->element_size() * n;
+	}
+
+	virtual const std::string& name() const noexcept override {
+		return m_name;
+	}
+
+	virtual std::size_t restore(std::istream& stream, std::size_t elems) override {
+		if (elems == 0)
+			return 0u;
+
 		const std::size_t currSize = this->get_size();
 		this->resize(currSize + elems);
-		Type* nativePtr = &m_handles.get<DefaultHandleType>().handle.data()[currSize];
+		Accessor<Type, DEFAULT_DEVICE> accessor = this->aquire<DEFAULT_DEVICE>();
+		Type* nativePtr = &(*accessor)[currSize];
 		stream.read(reinterpret_cast<char*>(nativePtr), sizeof(Type) * elems);
 		m_dirty.mark_changed(Device::CPU);
 		return static_cast<std::size_t>(stream.gcount()) / sizeof(Type);
 	}
 
-	virtual std::size_t write(std::ostream& stream) const override {
+	virtual std::size_t store(std::ostream& stream) const override {
 		// TODO: read/write to other device?
-		const std::size_t elems = this->get_size();
-		const Type* nativePtr = m_handles.get<DefaultHandleType>().handle.data();
-		stream.write(reinterpret_cast<const char*>(nativePtr),
-					 sizeof(Type) * elems);
+		ConstAccessor<Type, DEFAULT_DEVICE> accessor = this->aquireConst<DEFAULT_DEVICE>();
+		const Type* nativePtr = &(*accessor)[currSize];
+		stream.write(reinterpret_cast<const char*>(nativePtr), sizeof(Type) * elems);
 		return elems;
 	}
 
-	// Aquire a read-only accessor
-	template < Device dev = DEFAULT_DEVICE >
-	ConstAccessor<T, dev> aquireConst() {
-		this->synchronize<dev>();
-		return ConstAccessor<T, dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle);
-	}
-
-	// Aquire a writing (and thus dirtying) accessor
-	template < Device dev = DEFAULT_DEVICE >
-	Accessor<T, dev> aquire() {
-		this->synchronize<dev>();
-		return Accessor<T, dev>(m_handles.get<DeviceArrayHandle<dev, Type>>().handle, m_dirty);
-	}
-
-	// Explicitly synchronize the given device
-	template < Device dev = DEFAULT_DEVICE >
-	void synchronize() {
-		if(m_dirty.has_competing_changes())
-			throw std::runtime_error("Failure: competing changes for this attribute");
-		if(m_dirty.has_changes()) {
-			Synchronizer<0u>::synchronize(m_handles, m_dirty, m_handles.get<DeviceArrayHandle<dev, Type>>());
-		}
-	}
-
 private:
-	// Helper struct for iterating through all devices and finding one which has changes
-	template < std::size_t I >
-	struct Synchronizer {
-		template < Device dev >
-		static void synchronize(HandleTypes &handles, util::DirtyFlags<Device>& flags,
-								DeviceArrayHandle<dev, Type>& sync) {
-			if constexpr(I < HandleTypes::size) {
-				auto& changed = handles.get<I>();
-				constexpr Device CHANGED_DEVICE = changed.DEVICE;
-				if(flags.has_changes(CHANGED_DEVICE)) {
-					// Check if resize is necessary and copy over the data
-					std::size_t changedSize = ArrayOps<CHANGED_DEVICE>::get_size(changed);
-					if(changedSize != ArrayOps<dev>::get_size(sync))
-						ArrayOps<dev>::resize(sync, changedSize);
-					ArrayOps<dev>::copy(changed, sync);
-				} else {
-					// Keep looking for device changes
-					Synchronizer<I + 1u>::synchronize(handles, flags, sync);
-				}
-			}
-		}
-	};
-
 	std::string m_name;
-	HandleTypes m_handles;
-	util::DirtyFlags<Device> m_dirty;
 };
-
 
 } // namespace mufflon::scene

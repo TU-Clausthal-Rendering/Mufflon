@@ -33,7 +33,7 @@ public:
 	using Type = T;
 	using HandleType = typename DeviceHandle<DEVICE, Type>::HandleType;
 
-	ConstAccessor(const HandleType& handle) :
+	ConstAccessor(HandleType handle) :
 		m_handle(handle) {}
 	ConstAccessor(const ConstAccessor&) = default;
 	ConstAccessor(ConstAccessor&&) = default;
@@ -55,14 +55,14 @@ private:
 };
 
 // Provides read-and-write access to the attribute data. Flags as dirty upon destruction
-template < class Type, Device Dev >
+template < class T, Device Dev >
 class Accessor {
 public:
 	static constexpr Device DEVICE = Dev;
 	using Type = T;
 	using HandleType = typename DeviceHandle<DEVICE, Type>::HandleType;
 
-	Accessor(HandleType& handle, util::DirtyFlags<Device>& flags) :
+	Accessor(HandleType handle, util::DirtyFlags<Device>& flags) :
 		m_handle(handle), m_flags(flags) {}
 	Accessor(const Accessor&) = delete;
 	Accessor(Accessor&&) = default;
