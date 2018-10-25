@@ -26,14 +26,14 @@ namespace mufflon { namespace scene {
 // Provides read-only access
 // Type: The type of the underlying accessed data. The handle types are different
 //		for each type (defined by DeviceHandle).
-template < class T, Device Dev >
+template < class DH >
 class ConstAccessor {
 public:
-	static constexpr Device DEVICE = Dev;
-	using Type = T;
-	using HandleType = typename DeviceHandle<DEVICE, Type>::HandleType;
+	using DeviceHandle = DH;
+	using HandleType = typename DH::HandleType;
+	static constexpr Device DEVICE = DH::DEVICE;
 
-	ConstAccessor(HandleType handle) :
+	ConstAccessor(const HandleType handle) :
 		m_handle(handle) {}
 	ConstAccessor(const ConstAccessor&) = default;
 	ConstAccessor(ConstAccessor&&) = default;
@@ -55,12 +55,12 @@ private:
 };
 
 // Provides read-and-write access to the attribute data. Flags as dirty upon destruction
-template < class T, Device Dev >
+template < class DH >
 class Accessor {
 public:
-	static constexpr Device DEVICE = Dev;
-	using Type = T;
-	using HandleType = typename DeviceHandle<DEVICE, Type>::HandleType;
+	using DeviceHandle = DH;
+	using HandleType = typename DH::HandleType;
+	static constexpr Device DEVICE = DH::DEVICE;
 
 	Accessor(HandleType handle, util::DirtyFlags<Device>& flags) :
 		m_handle(handle), m_flags(flags) {}

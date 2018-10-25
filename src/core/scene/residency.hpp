@@ -16,10 +16,10 @@ enum class Device : unsigned char {
 };
 
 // Generic type-trait for device-something-handles
-template < Device dev, class T >
+template < Device dev, class H >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
-	using HandleType = T;
+	using HandleType = H;
 };
 
 // Handle type exclusively for arrays, i.e. they must support vector-esque operations

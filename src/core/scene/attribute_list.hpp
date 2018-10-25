@@ -133,7 +133,7 @@ public:
 		}
 		// Create the new attribute and mapping to handle
 		m_attributes.push_back(std::make_unique<Attr>(std::move(name)));
-		m_mapping.insert(std::make_pair(m_attributes.back()->get_name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
+		m_mapping.insert(std::make_pair(m_attributes.back()->name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
 		return newAttr;
 	}
 
