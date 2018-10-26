@@ -42,7 +42,7 @@ public:
 	Object(Object&&) = default;
 	Object& operator=(const Object&) = default;
 	Object& operator=(Object&&) = default;
-	~Object() = default;
+	~Object();
 
 	/// Reserves memory for geometry type.
 	template < class Geom, class... Args >
@@ -154,11 +154,7 @@ public:
 		return *m_accel_struct;
 	}
 	/// Clears the BVH of this object.
-	void clear_accel_structutre() {
-		// Mark as dirty only if we change something
-		m_accelDirty |= m_accel_struct != nullptr;
-		m_accel_struct.reset();
-	}
+	void clear_accel_structutre();
 	/// Initializes the acceleration structure to a given implementation.
 	template < class Accel, class... Args >
 	void set_accel_structure(Args&& ...args) {
@@ -191,7 +187,7 @@ private:
 	bool m_accelDirty = false;
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; /// Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; /// Current level-of-detail
-	std::unique_ptr<IAccelerationStructure > m_accel_struct = nullptr;
+	std::unique_ptr<IAccelerationStructure > m_accel_struct;
 
 	// TODO: how to handle the LoDs?
 	// TODO: non-CPU memory

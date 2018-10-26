@@ -23,6 +23,7 @@
     <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
+    <ClCompile Include="..\..\src\core\scene\scene.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />

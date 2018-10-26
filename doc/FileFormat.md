@@ -201,7 +201,6 @@ Alias types:
 * "glass" = "fresnel"["torrance", "walter"]
 
   prefer for optimal sampling
-* "opaque" = "fresnel"["torrance", "lambert"]
 
 
 
