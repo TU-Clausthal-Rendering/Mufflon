@@ -44,26 +44,11 @@ public:
 		} m_radPos;
 	};
 
-	/// Memory-agnostic type for returning possibly needed handles when making a residency call.
-	template < Device res >
-	struct DeviceHandles {};
-
-	/// Handle specialization for CUDA
-	template <>
-	struct DeviceHandles<Device::CUDA> {
-		u32 numSpheres;
-		u32 numAttribs;
-		Sphere* spheres;
-		MaterialIndex* matIndices;
-		// TODO
-		void** attributes;
-	};
-
-	/// Default construction, creates material-index attribute.
+	// Default construction, creates material-index attribute.
 	Spheres() :
 		m_attributes(),
-		m_sphereData(m_attributes.aquire(m_attributes.add<ArrayAttribute<Sphere>>("radius-position"))),
-		m_matIndex(m_attributes.aquire(m_attributes.add<ArrayAttribute<MaterialIndex>>("materialIdx")))
+		m_sphereData(m_attributes.aquire(m_attributes.add<ArrayAttribute, Sphere>("radius-position"))),
+		m_matIndex(m_attributes.aquire(m_attributes.add<ArrayAttribute, MaterialIndex>("materialIdx")))
 	{}
 	Spheres(const Spheres&) = default;
 	Spheres(Spheres&&) = default;
@@ -142,25 +127,13 @@ public:
 		m_attributes.aquire(attrHandle);
 	}
 
-	template < class Attribute >
-	const typename Attribute::Type& get(const SphereHandle& sphereHandle,
-										const AttributeHandle<Attribute>& attrHandle) const {
-		this->aquire(attrHandle)[sphereHandle];
-	}
-
-	template < class Attribute >
-	void set(const SphereHandle& sphereHandle, const AttributeHandle<Attribute>& attrHandle,
-			 const typename Attribute::Type& val) const {
-		this->aquire(attrHandle)[sphereHandle] = val;
-	}
-
 	// Gets a constant handle to the underlying sphere data.
 	const ArrayAttribute<Sphere>& native() const {
 		return m_sphereData;
 	}
 
 private:
-	AttributeList m_attributes;
+	AttributeList<true> m_attributes;
 	ArrayAttribute<Sphere>& m_sphereData;
 	ArrayAttribute<MaterialIndex>& m_matIndex;
 

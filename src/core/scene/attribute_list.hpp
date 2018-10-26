@@ -1,17 +1,19 @@
 #pragma once
 
 #include "attribute.hpp"
-#include <map>
+#include <unordered_map>
 #include <optional>
 #include <vector>
 
 namespace mufflon::scene {
 
 /**
- * Represents a list of attributes.
- * While it accepts any kind of attribute derived from IBaseAttribute,
+ * Base class for attribute list.
+ * Specialization has to be used to differentiate between OpenMesh and our custom attributes.
+ * OpenMesh store their properties internally, thus we need to take it by reference instead 
+ * of allocating it ourselves.
  */
-class AttributeList {
+class BaseAttributeList {
 public:
 	using ListType = std::vector<std::unique_ptr<IBaseAttribute>>;
 
@@ -28,7 +30,7 @@ public:
 
 	private:
 		using IteratorType = typename std::vector<std::unique_ptr<IBaseAttribute>>::iterator;
-		friend class AttributeList;
+		friend class BaseAttributeList;
 
 		AttributeHandle(std::size_t idx) :
 			m_index(idx) {}
@@ -102,40 +104,12 @@ public:
 		typename ListType::iterator m_curr;
 	};
 
-	AttributeList() = default;
-	AttributeList(const AttributeList&) = default;
-	AttributeList(AttributeList&&) = default;
-	AttributeList& operator=(const AttributeList&) = default;
-	AttributeList& operator=(AttributeList&&) = default;
-	~AttributeList() = default;
-
-	/**
-	 * Adds a new attribute to the attribute list.
-	 * If the name is already in use, this returns std::nullopt.
-	 */
-	template < class Attr >
-	AttributeHandle<Attr> add(std::string name) {
-		// Check if attribute already exists
-		auto attrIter = m_mapping.find(name);
-		// Attribute "cast" to later allow us to correctly determine attribute type
-		if(attrIter != m_mapping.end())
-			return AttributeHandle<Attr>(attrIter->second.index());
-
-		// Since we leave deleted attributes in the vector, we need to manually iterate it
-		// Default-index is end of vector
-		AttributeHandle<Attr> newAttr(m_attributes.size());
-		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
-			if(m_attributes[i] == nullptr) {
-				// Found a hole to place attribute in
-				newAttr = AttributeHandle<Attr>(i);
-				break;
-			}
-		}
-		// Create the new attribute and mapping to handle
-		m_attributes.push_back(std::make_unique<Attr>(std::move(name)));
-		m_mapping.insert(std::make_pair(m_attributes.back()->name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
-		return newAttr;
-	}
+	BaseAttributeList() = default;
+	BaseAttributeList(const BaseAttributeList&) = default;
+	BaseAttributeList(BaseAttributeList&&) = default;
+	BaseAttributeList& operator=(const BaseAttributeList&) = default;
+	BaseAttributeList& operator=(BaseAttributeList&&) = default;
+	~BaseAttributeList() = default;
 
 	template < class Attr >
 	void remove(const AttributeHandle<Attr>& handle) {
@@ -213,9 +187,67 @@ public:
 		return Iterator::end(m_attributes);
 	}
 
+protected:
+	// Adds a new, already constructed attribute to the list
+	template < class Attr >
+	AttributeHandle<Attr> add(std::unique_ptr<Attr>&& attribute) {
+		// Since we leave deleted attributes in the vector, we need to manually iterate it
+		// Default-index is end of vector
+		AttributeHandle<Attr> newAttr(m_attributes.size());
+		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
+			if(m_attributes[i] == nullptr) {
+				// Found a hole to place attribute in
+				newAttr = AttributeHandle<Attr>(i);
+				break;
+			}
+		}
+
+		// Create the new attribute and mapping to handle
+		m_attributes.push_back(std::move(attribute));
+		m_mapping.insert(std::make_pair(m_attributes.back()->name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
+		return newAttr;
+	}
+
 private:
-	std::map<std::string_view, AttributeHandle<IBaseAttribute>> m_mapping;
+	std::unordered_map<std::string_view, AttributeHandle<IBaseAttribute>> m_mapping;
 	ListType m_attributes;
+};
+
+template < bool storeCpu = true >
+class AttributeList : public BaseAttributeList {
+public:
+	/**
+	 * Adds a new attribute to the attribute list.
+	 * If the name is already in use, this returns std::nullopt.
+	 */
+	template < template < class, bool > class Attr, class T >
+	AttributeHandle<Attr<T, storeCpu>> add(std::string name) {
+		// Check if attribute already exists
+		auto attrIter = this->find<Attr<T, storeCpu>>(name);
+		if(attrIter.has_value())
+			return attrIter.value();
+
+		return BaseAttributeList::add<Attr<T, storeCpu>>(std::make_unique<Attr<T, storeCpu>>(std::move(name)));
+	}
+};
+
+// Attribute specialization for OpenMesh-esque scenario
+template <>
+class AttributeList<false> : public BaseAttributeList {
+public:
+	/**
+	 * Adds a new attribute to the attribute list.
+	 * If the name is already in use, this returns std::nullopt.
+	 */
+	template < template < class, bool > class Attr, class T, class Ref >
+	AttributeHandle<Attr<T, false>> add(std::string name, Ref& ref) {
+		// Check if attribute already exists
+		auto attrIter = this->find<Attr<T, false>>(name);
+		if(attrIter.has_value())
+			return attrIter.value();
+
+		return BaseAttributeList::add<Attr<T, false>>(std::make_unique<Attr<T, false>>(std::move(name), ref));
+	}
 };
 
 } // namespace mufflon::scene

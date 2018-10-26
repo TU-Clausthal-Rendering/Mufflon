@@ -14,8 +14,10 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	mAssert(m_meshData.has_vertex_normals());
 	mAssert(m_meshData.has_vertex_texcoords2D());
 	VertexHandle vh = m_meshData.add_vertex(util::pun<OpenMesh::Vec3f>(point));
-	m_meshData.set_normal(vh, util::pun<OpenMesh::Vec3f>(normal));
-	m_meshData.set_texcoord2D(vh, util::pun<OpenMesh::Vec2f>(uv));
+	// TODO: can we do this? Should work, right?
+	(**m_pointsAttr.aquire())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
+	(**m_normalsAttr.aquire())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
+	(**m_uvsAttr.aquire())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
 	return vh;
 }
 
@@ -30,7 +32,8 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle &vh, const Triangle& t
 	FaceHandle hdl = m_meshData.add_face(VertexHandle(tri[0u]), VertexHandle(tri[1u]),
 							   VertexHandle(tri[2u]));
 	mAssert(hdl.is_valid());
-	m_matIndices[hdl.idx()] = idx;
+
+	(**m_matIndexAttr.aquire())[hdl.idx()] = idx;
 	return hdl;
 }
 
@@ -46,7 +49,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle &vh, const Quad& quad,
 	FaceHandle hdl = m_meshData.add_face(VertexHandle(quad[0u]), VertexHandle(quad[1u]),
 							   VertexHandle(quad[2u]), VertexHandle(quad[3u]));
 	mAssert(hdl.is_valid());
-	m_matIndices[hdl.idx()] = idx;
+	(**m_matIndexAttr.aquire())[hdl.idx()] = idx;
 	return hdl;
 }
 

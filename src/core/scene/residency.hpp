@@ -33,13 +33,21 @@ struct DeviceArrayHandle<Device::CPU, T> :
 	public DeviceHandle<Device::CPU, std::vector<T>*> {
 	using Type = T;
 	using ValueType = std::vector<T>;
+
+	DeviceArrayHandle(ValueType* hdl) :
+		DeviceHandle<Device::CPU, ValueType*>{ hdl }
+	{}
 };
 
+// TODO: what's wrong with device vector?
 template < class T >
 struct DeviceArrayHandle<Device::CUDA, T> :
-	public DeviceHandle<Device::CUDA, thrust::device_vector<T>*> {
+	public DeviceHandle<Device::CUDA, std::vector<T>*> {
 	using Type = T;
-	using ValueType = thrust::device_vector<T>;
+	using ValueType = std::vector<T>;
+
+	DeviceArrayHandle(ValueType* hdl) :
+		DeviceHandle<Device::CUDA, ValueType*>{ hdl } {}
 };
 
 // Operations on the device arrays (override if they differ for some devices)
@@ -47,31 +55,29 @@ template < Device dev, class T, template <Device, class> class H >
 struct DeviceArrayOps {
 	using Type = T;
 	using HandleType = H<dev, Type>;
-	using ValueType = typename HandleType::ValueType;
 
-	static std::size_t get_size(const ValueType& sync) {
-		return sync.size();
+	static std::size_t get_size(HandleType sync) {
+		return sync.handle->size();
 	}
 
-	static std::size_t get_capacity(const ValueType& sync) {
-		return sync.capacity();
+	static std::size_t get_capacity(HandleType sync) {
+		return sync.handle->capacity();
 	}
 	
-	static void resize(ValueType& sync, std::size_t elems) {
-		return sync.resize(elems);
+	static void resize(HandleType sync, std::size_t elems) {
+		return sync.handle->resize(elems);
 	}
 
-	static void reserve(ValueType& sync, std::size_t elems) {
-		return sync.reserve(elems);
+	static void reserve(HandleType sync, std::size_t elems) {
+		return sync.handle->reserve(elems);
 	}
 
-	static void clear(ValueType& sync) {
-		sync.clear();
+	static void clear(HandleType sync) {
+		sync.handle->clear();
 	}
 
 	template < Device other >
-	static void copy(const typename H<other, Type>::ValueType& changed,
-					 ValueType& sync) {
+	static void copy(const H<other, Type> changed, HandleType sync) {
 		// TODO
 		std::runtime_error("Copy between devices not yet supported!");
 		//std::copy(changed.handle.cbegin(), changed.handle.cend(), sync.handle.begin());

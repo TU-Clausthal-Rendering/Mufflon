@@ -1,5 +1,6 @@
 #pragma once
 
+#include <OpenMesh/Core/Utils/Property.hh>
 #include "residency.hpp"
 #include "accessor.hpp"
 #include "util/assert.hpp"
@@ -9,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <utility>
 
 namespace mufflon::scene {
 
@@ -56,50 +58,37 @@ public:
 template < class T, Device defaultDev, template < template < Device, class > class,
 												class, Device, Device > class Sync,
 			template < Device, class > class Hdl >
-class ISyncedAttribute {
+class SyncedAttribute {
 public:
-	/**
-	 * Helper struct needed for storing the actual value behind a handle.
-	 * Otherwise we would be storing a pointer and would have to allocate
-	 * them manually in the tuple.
-	 */
-	template < class H >
-	struct DeviceValue {
-		using HandleType = H;
-		using Type = typename HandleType::Type;
-		using ValueType = typename HandleType::ValueType;
-		static constexpr Device DEVICE = HandleType::DEVICE;
-
-		ValueType value;
-	};
-
 	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	using Type = T;
 	template < Device dev >
 	using DeviceHandleType = Hdl<dev, Type>;
 	template < Device change, Device sync >
 	using SynchronizeOps = Sync<Hdl, Type, change, sync>;
-	template < Device dev >
-	using DeviceValueType = DeviceValue<DeviceHandleType<dev>>;
-	using DeviceValueTypes = util::TaggedTuple<DeviceValueType<Device::CPU>,
-		DeviceValueType<Device::CUDA>>;
-	using DefaultHandleType = DeviceHandleType<DEFAULT_DEVICE>;
-	using DefaultValueType = DeviceValueType<DEFAULT_DEVICE>;
 
-	virtual ~ISyncedAttribute() = default;
+	using DeviceHandleTypes = util::TaggedTuple<DeviceHandleType<Device::CPU>,
+		DeviceHandleType<Device::CUDA>>;
+	using DefaultHandleType = DeviceHandleType<DEFAULT_DEVICE>;
+
+	SyncedAttribute(DeviceHandleTypes hdls) :
+		m_handles(std::move(hdls))
+	{}
+
+	virtual ~SyncedAttribute() = default;
 
 	// Aquire a read-only accessor
 	template < Device dev = DEFAULT_DEVICE >
 	ConstAccessor<DeviceHandleType<dev>> aquireConst() {
 		this->synchronize<dev>();
-		return ConstAccessor<DeviceHandleType<dev>>(&m_values.get<DeviceValueType<dev>>().value);
+		return ConstAccessor<DeviceHandleType<dev>>(m_handles.get<DeviceHandleType<dev>>().handle);
 	}
 
 	// Aquire a writing (and thus dirtying) accessor
 	template < Device dev = DEFAULT_DEVICE >
 	Accessor<DeviceHandleType<dev>> aquire() {
 		this->synchronize<dev>();
-		return Accessor<DeviceHandleType<dev>>(&m_values.get<DeviceValueType<dev>>().value, m_dirty);
+		return Accessor<DeviceHandleType<dev>>(m_handles.get<DeviceHandleType<dev>>().handle, m_dirty);
 	}
 
 	// Explicitly synchronize the given device
@@ -108,7 +97,7 @@ public:
 		if (m_dirty.has_competing_changes())
 			throw std::runtime_error("Failure: competing changes for this attribute");
 		if (m_dirty.has_changes()) {
-			sync_impl<dev, 0u>(m_values, m_dirty, m_values.get<DeviceValueType<dev>>());
+			sync_impl<dev, 0u>(m_handles, m_dirty, m_handles.get<DeviceHandleType<dev>>());
 		}
 	}
 
@@ -119,39 +108,32 @@ protected:
 	}
 
 	template < Device dev >
-	DeviceValueType<dev> &get_value() {
-		return m_values.get<DeviceValueType<dev>>();
-	}
-
-	template < Device dev >
-	const DeviceValueType<dev> &get_value() const {
-		return m_values.get<DeviceValueType<dev>>();
+	DeviceHandleType<dev> get_handle() const {
+		return m_handles.get<DeviceHandleType<dev>>();
 	}
 
 private:
 	// Helper function for iterating through all devices and finding one which has changes
 	template < Device dev, std::size_t I >
-	static void sync_impl(DeviceValueTypes &values, util::DirtyFlags<Device>& flags,
-						  DeviceValueType<dev>& sync) {
-		if constexpr (I < DeviceValueTypes::size) {
+	static void sync_impl(DeviceHandleTypes& values, util::DirtyFlags<Device>& flags,
+						DeviceHandleType<dev>& sync) {
+		if constexpr (I < DeviceHandleTypes::size) {
 			// TODO!
-			/*auto& changed = values.get<I>();
-			constexpr Device CHANGED_DEVICE = DeviceValueTypes::Type<I>::DEVICE;
-			// TODO
-			//constexpr Device CHANGED_DEVICE = Device::CUDA;
+			auto& changed = values.get<I>();
+			constexpr Device CHANGED_DEVICE = std::decay_t<decltype(changed)>::DEVICE;
 			if (flags.has_changes(CHANGED_DEVICE)) {
 				// Perform synchronization if necessary
-				SynchronizeOps<CHANGED_DEVICE, dev>::synchronize(changed.value, sync.value);
+				SynchronizeOps<CHANGED_DEVICE, dev>::synchronize(changed, sync);
 			}
 			else {
 				// Keep looking for device changes
 				sync_impl<dev, I + 1u>(values, flags, sync);
-			}*/
+			}
 		}
 	}
 
 	util::DirtyFlags<Device> m_dirty;
-	DeviceValueTypes m_values;
+	DeviceHandleTypes m_handles;
 };
 
 // Struct for array synchronization operations
@@ -164,12 +146,10 @@ struct ArraySynchronizeOps {
 	template < Device dev >
 	using DeviceHandleType = H<dev, Type>;
 	template < Device dev >
-	using DeviceValueType = typename DeviceHandleType<dev>::ValueType;
-	template < Device dev >
 	using DeviceOps = DeviceArrayOps<dev, Type, H>;
 
-	static void synchronize(DeviceValueType<CHANGED_DEVICE>& changed,
-		DeviceValueType<SYNCED_DEVICE>& sync) {
+	static void synchronize(DeviceHandleType<CHANGED_DEVICE>& changed,
+		DeviceHandleType<SYNCED_DEVICE>& sync) {
 		// Check size of the arrays and possibly resize
 		std::size_t changedSize = DeviceOps<CHANGED_DEVICE>::get_size(changed);
 		if (changedSize != DeviceOps<SYNCED_DEVICE>::get_size(sync))
@@ -179,50 +159,147 @@ struct ArraySynchronizeOps {
 	}
 };
 
+/** Struct for storing device values (purely necessary because base-class
+ * constructors need to be called before any member initialization is
+ * possible).
+ * If we're not using OpenMesh, which keeps the value somewhere internally,
+ * we allocate an additional data member to use.
+ */
+template < class T, class DHs, bool storesCpu = true >
+struct ArrayAttributeValues {
+	using Type = T;
+	using DeviceHandleTypes = DHs;
+
+	// Helper struct for storing device values
+	template < Device dev >
+	struct DeviceValue {
+		using Type = T;
+		using HandleType = DeviceArrayHandle<dev, Type>;
+		// Special casing for CPU (due to OpenMesh): only store reference sometimes
+		using ValueType = std::conditional_t<!storesCpu && dev == Device::CPU,
+			typename HandleType::ValueType*, typename HandleType::ValueType>;
+		static constexpr Device DEVICE = dev;
+
+		ValueType value;
+	};
+
+	// Helper struct for extracting the handles for values
+	template < class >
+	struct DeviceValueHelper;
+	template < std::size_t... Is >
+	struct DeviceValueHelper<std::index_sequence<Is...>> {
+		// Allows us to access the individual types
+		template < std::size_t N >
+		using DeviceHandleType = typename DeviceHandleTypes::template Type<N>;
+		
+		template < std::size_t N >
+		static constexpr Device DEVICE = DeviceHandleType<N>::DEVICE;
+
+		// Gives us the equivalent value type for a handle
+		template < std::size_t N >
+		using DeviceValueType = DeviceValue<DeviceHandleType<N>::DEVICE>;
+
+		using DeviceValueTypes = util::TaggedTuple<DeviceValueType<Is>...>;
+
+		static typename DeviceHandleTypes get_handles(DeviceValueTypes& values) {
+			return {get_handle<Is>(values)...};
+		}
+
+	private:
+		template < std::size_t N >
+		static auto get_handle(DeviceValueTypes& values) {
+			// Make a distinction: if we don't store the CPU part, we only have a pointer,
+			// and taking a pointer of a pointer is pointless
+			if constexpr(!storesCpu && DEVICE<N> == Device::CPU)
+				return DeviceArrayHandle<DEVICE<N>, DeviceValueType<N>::Type>(values.get<N>().value);
+			else
+				return DeviceArrayHandle<DEVICE<N>, DeviceValueType<N>::Type>(&values.get<N>().value);
+		}
+	};
+
+	// For external storage so that you may pass the handles into the constructor
+	using DeviceIndices = std::make_index_sequence<DeviceHandleTypes::size>;
+	using DeviceValueTypes = typename DeviceValueHelper<DeviceIndices>::DeviceValueTypes;
+
+	template < bool cpuSide = storesCpu, typename = std::enable_if_t<cpuSide> >
+	ArrayAttributeValues() {}
+
+	// Constructor (only if we're in the special case scenario of OpenMesh
+	template < bool cpuSide = storesCpu, typename Ref = std::enable_if_t<!cpuSide, typename DeviceArrayHandle<Device::CPU, T>::ValueType&> >
+	ArrayAttributeValues(Ref ref) {
+		values.get<DeviceValue<Device::CPU>>().value = &ref;
+	}
+
+	// Actual attribute values
+	DeviceValueTypes values;
+};
+
 /**
- * Array attribute class.
+ * Custom array attribute class.
  * Contains handles for all devices.
  * Can hand out read or write access.
  * Synchronizes between devices.
  */
-template < class T, Device defaultDev = Device::CPU >
+template < class T, bool storesCpu = true, Device defaultDev = Device::CPU >
 class ArrayAttribute : public IBaseAttribute,
-					   public ISyncedAttribute<T, defaultDev, ArraySynchronizeOps,
-												DeviceArrayHandle> {
+					   protected ArrayAttributeValues<T, typename SyncedAttribute<T,
+												   defaultDev, ArraySynchronizeOps,
+												   DeviceArrayHandle>::DeviceHandleTypes, storesCpu>,
+					   public SyncedAttribute<T, defaultDev, ArraySynchronizeOps,
+											  DeviceArrayHandle> {
 public:
 	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	using Type = T;
 	template < Device dev >
 	using ArrayOps = DeviceArrayOps<dev, Type, DeviceArrayHandle>;
+	using SyncAttr = typename SyncedAttribute<T, defaultDev, ArraySynchronizeOps,
+											  DeviceArrayHandle>;
+	using DeviceHandleTypes = typename SyncAttr::DeviceHandleTypes;
+	using DeviceIndices = std::make_index_sequence<DeviceHandleTypes::size>;
+	using ArrayAttrVals = ArrayAttributeValues<T, DeviceHandleTypes, storesCpu>;
 
-	ArrayAttribute(std::string name)
-		: IBaseAttribute(), m_name(std::move(name))
+	// Constructor for storing CPU data ourselves
+	ArrayAttribute(std::string name) :
+		IBaseAttribute(),
+		ArrayAttrVals(),
+		SyncAttr(typename ArrayAttrVals::template DeviceValueHelper<DeviceIndices>::
+				 get_handles(ArrayAttrVals::values)),
+		m_name(std::move(name))
 	{}
 
+	template < class VT >
+	// Constructor for storing CPU data externally
+	ArrayAttribute(std::string name, VT& ref) :
+		IBaseAttribute(),
+		ArrayAttrVals(ref),
+		SyncAttr(typename ArrayAttrVals::template DeviceValueHelper<DeviceIndices>::
+				 get_handles(ArrayAttrVals::values)),
+		m_name(std::move(name)) {}
+
 	virtual void reserve(std::size_t n) override {
-		auto& value = this->get_value<DEFAULT_DEVICE>().value;
-		if (n != ArrayOps<DEFAULT_DEVICE>::get_capacity(value)) {
+		auto handle = this->get_handle<DEFAULT_DEVICE>();
+		if (n != ArrayOps<DEFAULT_DEVICE>::get_capacity(handle)) {
 			this->mark_changed<DEFAULT_DEVICE>();
-			ArrayOps<DEFAULT_DEVICE>::reserve(value, n);
+			ArrayOps<DEFAULT_DEVICE>::reserve(handle, n);
 		}
 	}
 
 	virtual void resize(std::size_t n) override {
 		if (n != this->n_elements()) {
 			this->mark_changed<DEFAULT_DEVICE>();
-			ArrayOps<DEFAULT_DEVICE>::resize(this->get_value<DEFAULT_DEVICE>().value, n);
+			ArrayOps<DEFAULT_DEVICE>::resize(this->get_handle<DEFAULT_DEVICE>(), n);
 		}
 	}
 
 	virtual void clear() override {
 		if (this->n_elements() != 0u) {
 			this->mark_changed<DEFAULT_DEVICE>();
-			ArrayOps<DEFAULT_DEVICE>::clear(this->get_value<DEFAULT_DEVICE>().value);
+			ArrayOps<DEFAULT_DEVICE>::clear(this->get_handle<DEFAULT_DEVICE>());
 		}
 	}
 
 	virtual std::size_t n_elements() const override {
-		return ArrayOps<DEFAULT_DEVICE>::get_size(this->get_value<DEFAULT_DEVICE>().value);
+		return ArrayOps<DEFAULT_DEVICE>::get_size(this->get_handle<DEFAULT_DEVICE>());
 	}
 
 	virtual std::size_t element_size() const override {

@@ -56,61 +56,73 @@ public:
 	static_assert(tagged_tuple_detail::is_all_distinct<Args...>::value,
 				  "The types of a tagged tuple must be distinct!");
 
+	using TupleType = std::tuple<Args...>;
+
 	template < std::size_t N >
 	using Type = std::tuple_element_t<N, std::tuple<Args...>>;
 
 	static constexpr std::size_t size = sizeof...(Args);
 
-	/// Returns the numerical index of the type in the tagged tuple.
+	TaggedTuple(Args&& ...args) :
+		m_tuple(std::forward<Args>(args)...)
+	{}
+	TaggedTuple() = default;
+	TaggedTuple(const TaggedTuple&) = default;
+	TaggedTuple(TaggedTuple&&) = default;
+	TaggedTuple& operator=(const TaggedTuple&) = default;
+	TaggedTuple& operator=(TaggedTuple&&) = default;
+	~TaggedTuple() = default;
+
+	// Returns the numerical index of the type in the tagged tuple.
 	template < class T >
 	static constexpr std::size_t get_index() noexcept {
 		return Index<T, Args...>::value;
 	}
 
-	/// Access to the tuple value by index.
+	// Access to the tuple value by index.
 	template < std::size_t I >
 	constexpr Type<I>& get() noexcept {
 		return std::get<I>(m_tuple);
 	}
 
-	/// Access to the tuple value by index.
+	// Access to the tuple value by index.
 	template < std::size_t I >
 	constexpr const Type<I>& get() const noexcept {
 		return std::get<I>(m_tuple);
 	}
 
-	/// Access to the tuple value by type.
+	// Access to the tuple value by type.
 	template < class T >
 	constexpr T& get() noexcept {
 		return std::get<get_index<T>()>(m_tuple);
 	}
 
-	/// Access to the tuple value by type.
+	// Access to the tuple value by type.
 	template < class T >
 	constexpr const T& get() const noexcept {
 		return std::get<get_index<T>()>(m_tuple);
 	}
 
-	/// Checks whether
+	// Checks whether
 	template < class T >
 	static constexpr bool has() noexcept {
 		return get_index<T>() < size;
 	}
 
 private:
-	/// Helper class for finding the index of a type for tuple lookup
-	template < class... Types >
+	// Helper class for finding the index of a type for tuple lookup
+	template < class... T >
 	struct Index;
 
-	/// Terminate search
+	// Terminate search
 	template < class H, class... Tails >
 	struct Index<H, H, Tails...> : public std::integral_constant<std::size_t, 0> {};
 
-	/// Recurse until we find the type and count the recursions
+	// Recurse until we find the type and count the recursions
 	template < class T, class H, class... Tails >
 	struct Index<T, H, Tails...> : public std::integral_constant<std::size_t, 1 + Index<T, Tails...>::value> {};
 
-	std::tuple<Args...> m_tuple;
+	TupleType m_tuple;
 };
 
 }} // namespace mufflon::util
