@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/types.hpp"
+#include "util/flag.hpp"
 #include "core/scene/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
@@ -29,15 +30,11 @@ enum class Materials: u16 {
 const std::string& to_string(Materials type);
 #endif
 
-struct MaterialPropertyFlags {
+struct MaterialPropertyFlags : public util::Flags<u16> {
 	static constexpr u16 EMISSIVE = 1u;		// Is any component of this material able to emit light?
 	static constexpr u16 REFLECTIVE = 2u;	// BRDF = Is there any contribution from reflections? (contribution for incident and excident on the same side)
 	static constexpr u16 REFRACTIVE = 4u;	// BTDF = Is there any contribution from refractions? (contribution for incident and excident on opposite sides)
 	static constexpr u16 HALFVECTOR_BASED = 8u;	// Does this material need a half vector for evaluations?
-	u16 mask = 0;
-	void set(u16 flag) noexcept { mask = mask | flag; }
-	void clear(u16 flag) noexcept { mask = mask & ~flag; }
-	bool isSet(u16 flag) const noexcept { return (mask & flag) != 0; }
 };
 
 struct HandlePack {

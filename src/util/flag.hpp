@@ -6,6 +6,45 @@
 
 namespace mufflon { namespace util {
 
+// Check if an integer is a power of two.
+template < class T >
+static constexpr bool is_power_of_two(T value) noexcept {
+	return value && !(value & (value - 1));
+}
+
+/**
+ * Basis type to implement custom flags with usefull operations.
+ * Enums (class and legacy) both defy the usecase as flags because they require
+ * repeated castings.
+ * T: an integer type, requires logic operations
+ *
+ * Usage: inherit a struct with static constexpr members of type T for the flags.
+ */
+template < class T >
+struct Flags {
+	using BasicType = T;
+	T mask = 0;
+
+	// Set a flag, may set or remove multiple flags at once
+	void set(T flag) noexcept { mask = mask | flag; }
+	// Remove a flag, may set or remove multiple flags at once
+	void clear(T flag) noexcept { mask = mask & ~flag; }
+	// Remove all flags (initial state)
+	void clear_all() noexcept { mask = 0; }
+	// Remove or set a flag based on the current state, may set or remove multiple flags at once
+	void toggle(T flag) noexcept { mask = mask ^ flag; }
+	// Check if a specific flag is set
+	bool is_set(T flag) const noexcept {
+		mAssertMsg(is_power_of_two(flag),
+				   "Only a single flag (bit) should be checked.");
+		return (mask & flag) != 0;
+	}
+	// Check if NO flag is set
+	bool is_empty() const noexcept { return mask == 0; }
+	// Check if exactly one flag is set
+	bool is_unique() const noexcept { return is_power_of_two(mask); }
+};
+
 /**
  * A kind of bitset which allows for change tracking of attributes.
  */
@@ -75,10 +114,6 @@ private:
 		mAssertMsg(is_power_of_two(value),
 				   "Enums for bitfields must not share bits between values");
 		return value;
-	}
-
-	static constexpr bool is_power_of_two(EnumType value) noexcept {
-		return value && !(value & (value - 1));
 	}
 
 	EnumType m_needsSyncing;
