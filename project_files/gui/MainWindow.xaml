@@ -12,6 +12,8 @@
     <Window.Resources>
         <SolidColorBrush x:Key="BorderBrush" Color="#999999"/>
         <SolidColorBrush x:Key="BackgroundBrush" Color="#eee"/>
+        <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
+        <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
         <Thickness x:Key="ThinBorder" Bottom="1"/>
     </Window.Resources>
     <DockPanel Background="{StaticResource BackgroundBrush}">
@@ -94,10 +96,46 @@
                 VerticalAlignment="Stretch"
                 Background="{StaticResource BorderBrush}"/>
             
-            <RichTextBox
-                Grid.Row="2"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Stretch"/>
+            <!-- console -->
+            <Grid Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <!-- display box -->
+                <ScrollViewer
+                    Grid.Row="0"
+                    Margin="0"
+                    Background="{StaticResource ConsoleBrush}"
+                    x:Name="ConsoleScrollViewer">
+                    <!-- stack panel of messages -->
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Console.Output, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock 
+                                        Text="{Binding Path=.}"
+                                        Foreground="{StaticResource ConsoleFontBrush}"
+                                        FontFamily="Consolas"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- console input box -->
+                <TextBox
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Height="Auto"
+                    Background="{StaticResource ConsoleBrush}"
+                    Foreground="{StaticResource ConsoleFontBrush}"
+                    Text="{Binding Console.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    FontFamily="Consolas"
+                    BorderBrush="{x:Null}"
+                    SelectionBrush="{x:Null}"
+                    x:Name="ConsoleInputBox"/>
+            </Grid>
+            
 
             <!-- status bar -->
             <StatusBar

@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using gui.Dll;
+using gui.ViewModel;
 
 namespace gui
 {
@@ -24,6 +25,8 @@ namespace gui
         public MainWindow()
         {
             InitializeComponent();
+
+            DataContext = new ViewModels(this);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
