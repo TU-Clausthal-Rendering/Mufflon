@@ -25,6 +25,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr get_error(out int length);
 
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void execute_command(string command);
+
         /// <summary>
         /// wrapper for get_error()
         /// </summary>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -24,9 +25,10 @@ namespace gui.Dll
         private IntPtr m_hWnd = IntPtr.Zero;
         private IntPtr m_deviceContext = IntPtr.Zero;
 
-        // render thread (aynchronous openGL drawing)
+        // render thread (asynchronous openGL drawing)
         private Thread m_renderThread;
         private bool m_isRunning = true;
+        private readonly ConcurrentQueue<string> m_commandQueue = new ConcurrentQueue<string>();
 
         // helper to detect resize in render thread
         int m_renderWidth = 0;
@@ -37,6 +39,20 @@ namespace gui.Dll
             this.m_parent = parent;
         }
 
+        /// <summary>
+        /// queues commands for the render thread.
+        /// The commands will be redirected to the dll
+        /// </summary>
+        /// <param name="command"></param>
+        public void QueueCommand(string command)
+        {
+            m_commandQueue.Enqueue(command);
+        }
+
+        /// <summary>
+        /// asynch thread: render method
+        /// </summary>
+        /// <param name="data"></param>
         private void Render(object data)
         {
             try
@@ -45,6 +61,7 @@ namespace gui.Dll
 
                 while (m_isRunning)
                 {
+                    HandleCommands();
                     HandleResize();
 
                     //if(!Core.iterate())
@@ -62,7 +79,7 @@ namespace gui.Dll
 
 
         /// <summary>
-        /// openGL initialization (pixel format and wgl context)
+        /// asynch thread: openGL initialization (pixel format and wgl context)
         /// </summary>
         private void InitializeOpenGl()
         {
@@ -92,7 +109,7 @@ namespace gui.Dll
         }
 
         /// <summary>
-        /// calls the dll resize() function if the client area was resized
+        /// asynch thread: calls the dll resize() function if the client area was resized
         /// </summary>
         private void HandleResize()
         {
@@ -106,6 +123,17 @@ namespace gui.Dll
                 m_renderHeight = newHeight;
                 //if (!Core.resize(m_renderWidth, m_renderHeight))
                 //    throw new Exception(Core.GetDllError());
+            }
+        }
+
+        /// <summary>
+        /// asynch thread: sends queued commands to the dll
+        /// </summary>
+        private void HandleCommands()
+        {
+            while (m_commandQueue.TryDequeue(out var command))
+            {
+                //Core.execute_command(command);
             }
         }
 

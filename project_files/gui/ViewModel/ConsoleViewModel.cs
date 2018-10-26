@@ -13,6 +13,9 @@ using gui.Model;
 
 namespace gui.ViewModel
 {
+    /// <summary>
+    /// View Model for the Console window
+    /// </summary>
     public class ConsoleViewModel : INotifyPropertyChanged
     {
         public ObservableCollection<string> Output { get; } = new ObservableCollection<string>() { "line 1", "more code..." };
@@ -29,7 +32,7 @@ namespace gui.ViewModel
             }
         }
 
-        private Models m_models;
+        private readonly Models m_models;
 
         public ConsoleViewModel(Models models)
         {
@@ -43,9 +46,8 @@ namespace gui.ViewModel
             
             // use input as command
             Output.Add(Input);
-            //OnPropertyChanged(nameof(Output));
+            m_models.App.GlHost.QueueCommand(Input);
             Input = "";
-            // TODO dispatch command to dll
 
             m_models.App.Window.ConsoleInputBox.Focus();
             m_models.App.Window.ConsoleScrollViewer.ScrollToBottom();

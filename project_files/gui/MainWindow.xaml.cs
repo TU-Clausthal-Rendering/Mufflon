@@ -29,14 +29,7 @@ namespace gui
             DataContext = new ViewModels(this);
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            var glHost = new OpenGLHost(BorderHost);
-            glHost.Error += GlHostOnError;
-            BorderHost.Child = glHost;
-        }
-
-        private void GlHostOnError(string message)
+        public void GlHostOnError(string message)
         {
             MessageBox.Show(this, message, "OpenGL Thread Error");
             Close();
