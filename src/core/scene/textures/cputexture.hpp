@@ -1,20 +1,26 @@
 #pragma once
 
 #include "util/types.hpp"
+#include "core/scene/types.hpp"
 
 namespace mufflon { namespace scene { namespace textures {
 
-class CPUTexture {
+class CpuTexture {
 public:
 	// TODO: creating texture and submitting data
-	CPUTexture(u16 width, u16 height, u16 numLayers) {}
-	CPUTexture(const CPUTexture&) = delete;
-	CPUTexture(CPUTexture&&) = default;
-	CPUTexture& operator=(const CPUTexture&) = delete;
-	CPUTexture& operator=(CPUTexture&&) = default;
-	~CPUTexture() = default;
+	CpuTexture(u16 width, u16 height, u16 numLayers) {}
+	CpuTexture(const CpuTexture&) = delete;
+	CpuTexture(CpuTexture&&) = default;
+	CpuTexture& operator=(const CpuTexture&) = delete;
+	CpuTexture& operator=(CpuTexture&&) = default;
+	~CpuTexture() = default;
 
-	// TODO: sample(uv)
+	/*
+	 * Get an (interpolated) texture sample at the given coordinate.
+	 * The border handling mode is always wrap. I.e. modulu operation is performed on the
+	 * texture coordinates.
+	 */
+	ei::Vec4 sample(const UvCoordinate& uv);
 
 	i32 get_width() const noexcept { return m_width; }
 	i32 get_height() const noexcept { return m_height; }

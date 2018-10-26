@@ -3,6 +3,7 @@
 #include "util/types.hpp"
 #include "core/scene/residency.hpp"
 #include "core/scene/types.hpp"
+#include "core/scene/textures/texture.hpp"
 #include "medium.hpp"
 
 namespace mufflon { namespace scene { namespace material {
@@ -30,12 +31,14 @@ const std::string& to_string(Materials type);
 
 struct HandlePack {
 	Materials type;
+	MediumHandle innerMedium;
+	MediumHandle outerMedium;
 };
 
 struct ParameterPack {
 	Materials type;
-	MediumHandle outerMedium;
 	MediumHandle innerMedium;
+	MediumHandle outerMedium;
 };
 
 /**
@@ -58,9 +61,8 @@ public:
 
 	/*
 	 * Size of a fetched parameter instanciation from this material.
-	 * The size may vary per device.
 	 */
-	virtual std::size_t get_parameter_pack_size(Device device) const = 0;
+	virtual std::size_t get_parameter_pack_size() const = 0;
 
 	/*
 	 * Get the handles which are required to fetch the current material.
@@ -77,12 +79,12 @@ public:
 	 * A parameter pack consits of the material type (see Materials) followed
 	 * by the two media handles and and specific parameters used in the
 	 * sampling/evaluation routines.
-	 * device: structure the output for the target device
 	 * texCoord: surface texture coordinate for fetching the textures.
 	 * outBuffer: pointer to a writeable buffer with at least get
 	 *		get_parameter_pack_size(device) memory.
 	 */
-	virtual void get_parameter_pack(Device device, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
+	virtual void get_parameter_pack_cpu(const HandlePack* handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
+	// TODO a similar method for CUDA
 
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {
@@ -117,8 +119,8 @@ public:
 	//virtual Spectrum get_maximum() const = 0;
 
 protected:
-	MediumHandle m_outerMedium;
 	MediumHandle m_innerMedium;
+	MediumHandle m_outerMedium;
 };
 
 }}} // namespace mufflon::scene::material

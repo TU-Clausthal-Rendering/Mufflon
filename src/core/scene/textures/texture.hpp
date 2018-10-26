@@ -8,10 +8,7 @@
 
 namespace mufflon { namespace scene { namespace textures {
 
-class Texture;
-class CPUTexture;
-
-} // namespace textures
+class CpuTexture;
 
 // Handle type exclusively for textures
 template < Device dev >
@@ -19,7 +16,7 @@ struct DeviceTextureHandle;
 
 template<>
 struct DeviceTextureHandle<Device::CPU> :
-	public DeviceHandle<Device::CPU, textures::CPUTexture*> {
+	public DeviceHandle<Device::CPU, textures::CpuTexture*> {
 };
 template<>
 struct DeviceTextureHandle<Device::CUDA> :
@@ -29,8 +26,6 @@ template<>
 struct DeviceTextureHandle<Device::OPENGL> :
 	public DeviceHandle<Device::OPENGL, u64> {
 };
-
-namespace textures {
 
 /*
  * The texture class handles the resource. Sampling and accessing the data
@@ -86,12 +81,14 @@ public:
 private:
 	std::string m_srcFileName;
 	util::DirtyFlags<Device> m_dirty;
-	std::unique_ptr<CPUTexture> m_cpuTexture;
+	std::unique_ptr<CpuTexture> m_cpuTexture;
 	HandleTypes m_handles;
 	// TODO Cuda resoures
 	// TODO OGL resoures
 	// TODO: move into CPUTexture
 
 };
+
+using TextureHandle = std::shared_ptr<Texture>;
 
 }}} // namespace mufflon::scene::textures

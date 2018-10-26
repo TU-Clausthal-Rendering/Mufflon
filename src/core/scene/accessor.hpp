@@ -50,7 +50,7 @@ public:
 	}
 
 private:
-	const HandleType m_handle;
+	HandleType m_handle;
 };
 
 // Provides read-and-write access to the attribute data. Flags as dirty upon destruction

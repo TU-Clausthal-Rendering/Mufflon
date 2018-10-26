@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
+    <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp" />
