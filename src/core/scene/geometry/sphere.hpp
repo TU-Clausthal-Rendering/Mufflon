@@ -120,11 +120,8 @@ public:
 	template < class Attribute >
 	std::size_t add_bulk(const Attribute& attribute, const SphereHandle& startSphere,
 						 std::size_t count, std::istream& attrStream) {
-		std::size_t actualCount = std::min(m_sphereData.get_size() - startSphere, count);
-		// Read the attribute from the stream
-		attrStream.read(attribute.as_bytes(), actualCount * attribute.elem_size());
-		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / attribute.elem_size();
-		return actuallyRead;
+		std::size_t actualCount = std::min(m_sphereData.n_elements() - startSphere, count);
+		return attribute.restore(attrStream, actualCount);
 	}
 	/// Also performs bulk-load for an attribute, but aquires it first.
 	template < class Attr >

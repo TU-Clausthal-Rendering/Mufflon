@@ -4,20 +4,19 @@
 namespace mufflon::scene::geometry {
 
 Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
-	SphereHandle hdl(m_sphereData.get_size());
-	m_attributes.resize(m_sphereData.get_size() + 1u);
+	SphereHandle hdl(m_sphereData.n_elements());
+	m_attributes.resize(m_sphereData.n_elements() + 1u);
 	auto posRadAccessor = m_sphereData.aquire<>();
 	auto matIndexAccessor = m_matIndex.aquire<>();
-	posRadAccessor->back().m_radPos.position = point;
-	posRadAccessor->back().m_radPos.radius = radius;
-	matIndexAccessor->back() = idx;
+	(*posRadAccessor)->back().m_radPos.position = point;
+	(*posRadAccessor)->back().m_radPos.radius = radius;
+	(*matIndexAccessor)->back() = idx;
 	return hdl;
 }
 
 Spheres::BulkReturn Spheres::add_bulk(std::size_t count, std::istream& radPosStream) {
-	SphereHandle hdl(m_sphereData.get_size());
-	m_sphereData.read(count, radPosStream);
-	std::size_t readRadPos = static_cast<std::size_t>(radPosStream.gcount()) / sizeof(Sphere);
+	SphereHandle hdl(m_sphereData.n_elements());
+	std::size_t readRadPos = m_sphereData.restore(radPosStream, count);
 	return {hdl, readRadPos};
 }
 
