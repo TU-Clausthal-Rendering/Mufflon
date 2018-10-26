@@ -42,7 +42,7 @@ public:
 	Object(Object&&) = default;
 	Object& operator=(const Object&) = default;
 	Object& operator=(Object&&) = default;
-	~Object() = default;
+	~Object();
 
 	// Reserves memory for geometry type.
 	template < class Geom, class... Args >
@@ -144,13 +144,9 @@ public:
 		mAssert(this->has_accel_structure());
 		return *m_accel_struct;
 	}
-	// Clears the BVH of this object.
-	void clear_accel_structutre() {
-		// Mark as dirty only if we change something
-		m_accelDirty |= m_accel_struct != nullptr;
-		m_accel_struct.reset();
-	}
-	// Initializes the acceleration structure to a given implementation.
+	/// Clears the BVH of this object.
+	void clear_accel_structutre();
+	/// Initializes the acceleration structure to a given implementation.
 	template < class Accel, class... Args >
 	void set_accel_structure(Args&& ...args) {
 		m_accel_struct = std::make_unique<Accel>(std::forward<Args>(args)...);

@@ -12,7 +12,7 @@ namespace mufflon { namespace scene {
 	using TangentU = Direction;
 	using TangentV = Direction;
 	using UvCoordinate = ei::Vec2;
-	using MaterialIndex = u32;
+	using MaterialIndex = u16;
 
 	struct TangentSpace {
 		Normal shadingN;		// The shading normal

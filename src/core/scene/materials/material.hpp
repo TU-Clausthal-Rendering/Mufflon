@@ -62,6 +62,10 @@ class IMaterial {
 public:
 	virtual ~IMaterial() = default;
 
+	// A name of the material for mental recognition (no program logic depends on this name)
+	const std::string& get_name() const noexcept { return m_name; }
+	void set_name(std::string_view name) { m_name = name; }
+
 	/* 
 	 * Size of the material descriptor itself (mainly texture handles)
 	 * The size may vary per device.
@@ -132,6 +136,10 @@ public:
 protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;
+private:
+	std::string m_name;
 };
+
+using MaterialHandle = IMaterial*;
 
 }}} // namespace mufflon::scene::material
