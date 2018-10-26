@@ -44,6 +44,9 @@ public:
 	virtual std::size_t restore(std::istream&, std::size_t elems) = 0;
 	virtual std::size_t store(std::ostream&) = 0;
 
+	// Methods that only we need
+	virtual void mark_changed() = 0; // Marks changed for the default device
+
 	// Methods that OpenMesh would like to have (for future reference)
 	//virtual void push_back() = 0;
 	//virtual void swap(std::size_t i0, std::size_t i1) = 0;
@@ -58,7 +61,7 @@ public:
 template < class T, Device defaultDev, template < template < Device, class > class,
 												class, Device, Device > class Sync,
 			template < Device, class > class Hdl >
-class SyncedAttribute {
+class SyncedAttribute : public IBaseAttribute {
 public:
 	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	using Type = T;
@@ -101,12 +104,16 @@ public:
 		}
 	}
 
-protected:
 	template < Device dev >
 	void mark_changed() {
 		m_dirty.mark_changed(dev);
 	}
 
+	void mark_changed() override {
+		m_dirty.mark_changed(DEFAULT_DEVICE);
+	}
+
+protected:
 	template < Device dev >
 	DeviceHandleType<dev> get_handle() const {
 		return m_handles.get<DeviceHandleType<dev>>();
@@ -241,8 +248,7 @@ struct ArrayAttributeValues {
  * Synchronizes between devices.
  */
 template < class T, bool storesCpu = true, Device defaultDev = Device::CPU >
-class ArrayAttribute : public IBaseAttribute,
-					   protected ArrayAttributeValues<T, typename SyncedAttribute<T,
+class ArrayAttribute : protected ArrayAttributeValues<T, typename SyncedAttribute<T,
 												   defaultDev, ArraySynchronizeOps,
 												   DeviceArrayHandle>::DeviceHandleTypes, storesCpu>,
 					   public SyncedAttribute<T, defaultDev, ArraySynchronizeOps,
@@ -260,7 +266,6 @@ public:
 
 	// Constructor for storing CPU data ourselves
 	ArrayAttribute(std::string name) :
-		IBaseAttribute(),
 		ArrayAttrVals(),
 		SyncAttr(typename ArrayAttrVals::template DeviceValueHelper<DeviceIndices>::
 				 get_handles(ArrayAttrVals::values)),
@@ -270,7 +275,6 @@ public:
 	template < class VT >
 	// Constructor for storing CPU data externally
 	ArrayAttribute(std::string name, VT& ref) :
-		IBaseAttribute(),
 		ArrayAttrVals(ref),
 		SyncAttr(typename ArrayAttrVals::template DeviceValueHelper<DeviceIndices>::
 				 get_handles(ArrayAttrVals::values)),

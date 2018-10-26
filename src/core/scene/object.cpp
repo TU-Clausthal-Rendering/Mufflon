@@ -3,15 +3,6 @@
 
 namespace mufflon::scene {
 
-bool Object::is_data_dirty(Device res) const noexcept {
-	switch(res) {
-		case Device::CPU: return m_cpuData.isDirty;
-		case Device::CUDA: return m_cudaData.isDirty;
-		case Device::OPENGL: return m_openGlData.isDirty;
-	}
-	return false;
-}
-
 
 bool Object::is_accel_dirty(Device res) const noexcept {
 	return m_accelDirty || m_accel_struct->is_dirty(res);
@@ -23,16 +14,6 @@ void Object::build_accel_structure() {
 	m_accelDirty = false;
 
 	m_accel_struct->build();
-}
-
-void Object::make_resident(Device res) {
-	// TODO
-	throw std::runtime_error("make_resident is not implemented yet!");
-}
-
-void Object::unload_resident(Device res) {
-	// TODO
-	throw std::runtime_error("unload_resident is not implemented yet!");
 }
 
 } // namespace mufflon::scene

@@ -21,15 +21,15 @@ public:
 	IAccelerationStructure& operator=(IAccelerationStructure&&) = default;
 	virtual ~IAccelerationStructure() = default;
 
-	/// Checks whether the structure is currently available on the given system.
+	// Checks whether the structure is currently available on the given system.
 	virtual bool is_resident(Device res) const = 0;
-	/// Makes the structure's data available on the desired system.
+	// Makes the structure's data available on the desired system.
 	virtual void make_resident(Device res) = 0;
-	/// Removes the structure from the given system, if present.
+	// Removes the structure from the given system, if present.
 	virtual void unload_resident(Device res) = 0;
-	/// Builds or rebuilds the structure.
+	// Builds or rebuilds the structure.
 	virtual void build() = 0;
-	/// Checks whether the data on a given system has been modified and is out of sync.
+	// Checks whether the data on a given system has been modified and is out of sync.
 	virtual bool is_dirty(Device res) const = 0;
 
 	// TODO: intersections for Rays

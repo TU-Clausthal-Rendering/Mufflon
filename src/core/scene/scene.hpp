@@ -28,9 +28,9 @@ public:
 	Scene& operator=(Scene&&) = default;
 	~Scene() = default;
 
-	/// Creates a new, empty object in the scene.
+	// Creates a new, empty object in the scene.
 	Object& create_object();
-	/// Adds a new instance.
+	// Adds a new instance.
 	void add_instance(Instance instance);
 
 private:

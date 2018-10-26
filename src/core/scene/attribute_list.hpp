@@ -42,7 +42,7 @@ public:
 		std::size_t m_index;
 	};
 
-	/// Iterator class for all attribute handles
+	// Iterator class for all attribute handles
 	class Iterator {
 	public:
 		static Iterator begin(ListType &attribs) {
@@ -150,31 +150,37 @@ public:
 		return dynamic_cast<Attr&>(*m_attributes[handle.index()]);
 	}
 
-	/// Reserves space for all attributes
+	// Reserves space for all attributes
 	void reserve(std::size_t count) {
-		for(auto &attr : m_attributes) {
+		for(auto& attr : m_attributes) {
 			if(attr != nullptr)
 				attr->reserve(count);
 		}
 	}
 
-	/// Resizes all attributes
+	// Resizes all attributes
 	void resize(std::size_t count) {
-		for(auto &attr : m_attributes) {
+		for(auto& attr : m_attributes) {
 			if(attr != nullptr)
 				attr->resize(count);
 		}
 	}
 
-	/// Clears all attributes
+	// Clears all attributes
 	void clear() {
-		for(auto &attr : m_attributes) {
+		for(auto& attr : m_attributes) {
 			if(attr != nullptr)
 				attr->clear();
 		}
 	}
 
-	/// Gets the number of attributes.
+	// Marks the attribute changed for its default device (ie. OpenMesh did something)
+	void mark_changed() {
+		for(auto& attr : m_attributes)
+			attr->mark_changed();
+	}
+
+	// Gets the number of attributes.
 	std::size_t size() const noexcept {
 		return m_mapping.size();
 	}

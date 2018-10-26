@@ -57,34 +57,31 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& p
 											  std::istream& normalStream, std::istream& uvStream) {
 	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
 	VertexHandle hdl(static_cast<int>(m_meshData.n_vertices()));
-	// Resize all attributes to fit the number of vertices we want to add
-	this->resize(m_meshData.n_vertices() + count, m_meshData.n_edges(), m_meshData.n_faces());
-	// Read the points
-	pointStream.read(reinterpret_cast<char*>(m_meshData.property(m_meshData.points_pph()).data_vector().data()),
-					  sizeof(Point) * count);
-	std::size_t readPoints = static_cast<std::size_t>(pointStream.gcount()) / sizeof(Point);
-	// Read the normals
-	normalStream.read(reinterpret_cast<char*>(m_meshData.property(m_meshData.vertex_normals_pph()).data_vector().data()),
-					  sizeof(Normal) * count);
-	std::size_t readNormals = static_cast<std::size_t>(pointStream.gcount()) / sizeof(Point);
-	// Read the texture coordinates
-	uvStream.read(reinterpret_cast<char*>(m_meshData.property(m_meshData.vertex_texcoords2D_pph()).data_vector().data()),
-				  sizeof(UvCoordinate) * count);
-	std::size_t readUvs = static_cast<std::size_t>(pointStream.gcount()) / sizeof(Point);
 
-	// TODO: bulk-read attributes
+	// Resize the attributes prior
+	m_attributes.resize(m_pointsAttr.n_elements() + count);
+
+	// Read the attributes
+	std::size_t readPoints = m_pointsAttr.restore(pointStream, count);
+	std::size_t readNormals = m_normalsAttr.restore(normalStream, count);
+	std::size_t readUvs = m_uvsAttr.restore(uvStream, count);
+
 	return {hdl, readPoints, readNormals, readUvs};
 }
 
 void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
 				std::size_t divisions) {
 	tessellater(m_meshData, divisions);
+	// Flag the entire polygon as dirty
+	m_attributes.mark_changed();
 	logInfo("Uniformly tessellated polygon mesh with ", divisions, " subdivisions");
 }
 void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
 				std::size_t divisions) {
 	// TODO
 	throw std::runtime_error("Adaptive tessellation isn't implemented yet");
+	// Flag the entire polygon as dirty
+	m_attributes.mark_changed();
 	logInfo("Adaptively tessellated polygon mesh with ", divisions, " subdivisions");
 }
 
@@ -93,6 +90,8 @@ void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 	decimater.mesh() = m_meshData;
 	std::size_t targetDecimations = m_meshData.n_vertices() - target_vertices;
 	std::size_t actualDecimations = decimater.decimate_to(target_vertices);
+	// Flag the entire polygon as dirty
+	m_attributes.mark_changed();
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
 			" decimations performed");
 	// TODO: this leaks mesh outside

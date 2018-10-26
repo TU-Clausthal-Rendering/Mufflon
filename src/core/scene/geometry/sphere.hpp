@@ -23,7 +23,12 @@ public:
 	using SphereHandle = std::size_t;
 	template < class Attr >
 	using AttributeHandle = AttributeList::AttributeHandle<Attr>;
-	using BulkReturn = std::tuple<SphereHandle, std::size_t>;
+
+	// Struct communicating the number of bulk-read spheres
+	struct BulkReturn {
+		SphereHandle handle;
+		std::size_t readSpheres;
+	};
 
 	/**
 	 * Sphere class.
@@ -52,8 +57,8 @@ public:
 	{}
 	Spheres(const Spheres&) = default;
 	Spheres(Spheres&&) = default;
-	Spheres& operator=(const Spheres&) = default;
-	Spheres& operator=(Spheres&&) = default;
+	Spheres& operator=(const Spheres&) = delete;
+	Spheres& operator=(Spheres&&) = delete;
 	~Spheres() = default;
 
 	void reserve(std::size_t count) {
@@ -71,25 +76,25 @@ public:
 		m_attributes.clear();
 	}
 
-	/// Requests a new per-sphere attribute.
+	// Requests a new per-sphere attribute.
 	template < class Attr >
 	AttributeHandle<Attr> request(const std::string& name) {
 		return m_attributes.add<Attr>(name);
 	}
 
-	/// Removes a per-sphere attribute.
+	// Removes a per-sphere attribute.
 	template < class Attr >
 	void remove(const AttributeHandle<Attr> &attr) {
 		m_attributes.remove(attr);
 	}
 
-	/// Finds a per-sphere attribute by name.
+	// Finds a per-sphere attribute by name.
 	template < class Attr >
 	std::optional<AttributeHandle<Attr>> find(const std::string& name) {
 		return m_attributes.find(name);
 	}
 
-	/// Adds a sphere.
+	// Adds a sphere.
 	SphereHandle add(const Point& point, float radius, MaterialIndex idx);
 	/**
 	 * Adds a bulk of spheres.
@@ -108,7 +113,7 @@ public:
 		std::size_t actualCount = std::min(m_sphereData.n_elements() - startSphere, count);
 		return attribute.restore(attrStream, actualCount);
 	}
-	/// Also performs bulk-load for an attribute, but aquires it first.
+	// Also performs bulk-load for an attribute, but aquires it first.
 	template < class Attr >
 	std::size_t add_bulk(const AttributeHandle<Attr>& attrHandle,
 						 const SphereHandle& startSphere, std::size_t count,
@@ -126,22 +131,18 @@ public:
 	const Attr &aquire(const AttributeHandle<Attr>& attrHandle) const {
 		m_attributes.aquire(attrHandle);
 	}
-
-	// Gets a constant handle to the underlying sphere data.
-	const ArrayAttribute<Sphere>& native() const {
-		return m_sphereData;
+	
+	// Synchronizes the default attributes position, normal, uv, matindex 
+	template < Device dev >
+	void synchronize_default() {
+		m_sphereData.mark_changed<dev>();
+		m_matIndex.mark_changed<dev>();
 	}
 
 private:
 	AttributeList<true> m_attributes;
 	ArrayAttribute<Sphere>& m_sphereData;
 	ArrayAttribute<MaterialIndex>& m_matIndex;
-
-	std::vector<util::DirtyFlags<Device>> m_attribDirty;
-
-	// TODO: dirty flag
-	// TODO: CUDA
-	// TODO: OpenGL
 };
 
 } // namespace mufflon::scene::geometry

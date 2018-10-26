@@ -26,7 +26,7 @@ class DecimaterT;
 namespace mufflon::scene::geometry {
 
 
-/// Traits for a polygon mesh - has to have normals and 2D UV coordinates per vertex.
+// Traits for a polygon mesh - has to have normals and 2D UV coordinates per vertex.
 struct PolygonTraits : public OpenMesh::DefaultTraits {
 	VertexAttributes(OpenMesh::Attributes::Normal | OpenMesh::Attributes::TexCoord2D);
 };
@@ -49,8 +49,14 @@ public:
 	using TriangleHandle = OpenMesh::FaceHandle;
 	using QuadHandle = OpenMesh::FaceHandle;
 	using MeshType = OpenMesh::PolyMesh_ArrayKernelT<PolygonTraits>;
-	using VertexBulkReturn = std::tuple<VertexHandle, std::size_t,
-		std::size_t, std::size_t>;
+
+	// Struct for communicating the number of bulk-read vertex attributes
+	struct VertexBulkReturn {
+		VertexHandle handle;
+		std::size_t readPoints;
+		std::size_t readNormals;
+		std::size_t readUvs;
+	};
 
 	// Struct containing handles to both OpenMesh and custom attributes (vertex)
 	template < class T, template < class, bool > class Attr >
@@ -84,7 +90,7 @@ public:
 				  && alignof(OpenMesh::Vec3f) == alignof(Normal),
 				  "Normal type must be compatible to OpenMesh");
 
-	/// Default construction, creates material-index attribute.
+	// Default construction, creates material-index attribute.
 	Polygons() :
 		m_meshData(),
 		m_pointsAttr(this->create_points_attribute()),
@@ -92,7 +98,7 @@ public:
 		m_uvsAttr(this->create_uvs_attribute()),
 		m_matIndexAttr(this->create_mat_index_attribute())
 	{}
-	/// Creates polygon from already-created mesh.
+	// Creates polygon from already-created mesh.
 	Polygons(MeshType&& mesh) :
 		m_meshData(mesh),
 		m_pointsAttr(this->create_points_attribute()),
@@ -103,8 +109,8 @@ public:
 
 	Polygons(const Polygons&) = default;
 	Polygons(Polygons&&) = default;
-	Polygons& operator=(const Polygons&) = default;
-	Polygons& operator=(Polygons&&) = default;
+	Polygons& operator=(const Polygons&) = delete;
+	Polygons& operator=(Polygons&&) = delete;
 	~Polygons() = default;
 	
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t faces) {
@@ -118,19 +124,6 @@ public:
 	void clear() {
 		m_meshData.clear();
 	}
-
-	/// Requests a new attribute, either for face or vertex.
-	/*template < class AttributeHandle >
-	AttributeHandle request(const std::string& name) {
-		AttributeHandle attr_handle;
-		if (!m_meshData.get_property_handle(attr_handle, name)) {
-			m_meshData.add_property(attr_handle, name);
-			// Since we track consistency in our custom attributes, we create one of them
-			// and exchange the vectors. Caution: this relies on PropertyT to just be a
-			// wrapper around a vector!
-		}
-		return attr_handle;
-	}*/
 
 	// Requests a new attribute, either for face or vertex.
 	template < class AttributeHandle >
@@ -185,11 +178,11 @@ public:
 		return m_attributes.aquire(attrHandle.customHandle);
 	}
 
-	/// Adds a new vertex.
+	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
-	/// Adds a new triangle.
+	// Adds a new triangle.
 	TriangleHandle add(const VertexHandle &vh, const Triangle& tri, MaterialIndex idx);
-	/// Adds a new quad.
+	// Adds a new quad.
 	QuadHandle add(const VertexHandle &vh, const Quad& quad, MaterialIndex idx);
 
 	/**
@@ -233,7 +226,7 @@ public:
 		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
 		return actuallyRead;
 	}
-	/// Also performs bulk-load for an attribute, but aquires it first.
+	// Also performs bulk-load for an attribute, but aquires it first.
 	template < class T, template < class, bool > class Attr >
 	std::size_t add_bulk(const VertexAttributeHandle<T, Attr>& attrHandle,
 						 const VertexHandle& startVertex, std::size_t count,
@@ -242,7 +235,7 @@ public:
 		Attr<T, false>& attribute = this->aquire(attrHandle);
 		return add_bulk(attribute, startVertex, count, attrStream);
 	}
-	/// Also performs bulk-load for an attribute, but aquires it first.
+	// Also performs bulk-load for an attribute, but aquires it first.
 	template < class T, template < class, bool > class Attr >
 	std::size_t add_bulk(const FaceAttributeHandle<T, Attr>& attrHandle,
 						 const FaceHandle& startFace, std::size_t count,
@@ -251,6 +244,17 @@ public:
 		Attr<T, false>& attribute = this->aquire(attrHandle);
 		return add_bulk(attribute, startFace, count, attrStream);
 	}
+
+	// Synchronizes the default attributes position, normal, uv, matindex 
+	template < Device dev >
+	void synchronize_default() {
+		m_pointsAttr.mark_changed<dev>();
+		m_normalsAttr.mark_changed<dev>();
+		m_uvsAttr.mark_changed<dev>();
+		m_matIndexAttr.mark_changed<dev>();
+	}
+
+	// TODO: unload
 
 	// Implements tessellation for uniform subdivision.
 	void tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
@@ -262,12 +266,14 @@ public:
 	void create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 					std::size_t target_vertices);
 
-	/// Gets a constant handle to the underlying mesh data.
+	// Gets a constant handle to the underlying mesh data.
 	const MeshType& native() const {
 		return m_meshData;
 	}
 
 private:
+	// These methods simply create references to the attributes
+	// TODO: by holding references to them, if they ever get removed, we're in a bad pot
 	ArrayAttribute<OpenMesh::Vec3f, false>& create_points_attribute() {
 		OpenMesh::VPropHandleT<OpenMesh::Vec3f> pointsHdl = m_meshData.points_pph();
 		mAssert(pointsHdl.is_valid());
