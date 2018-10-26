@@ -15,18 +15,19 @@ std::size_t Lambert::get_handle_pack_size(Device device) const {
 }
 
 void Lambert::get_handle_pack(Device device, HandlePack* outBuffer) const {
+	HandlePack matProps{ Materials::LAMBERT, get_property_flags() };
 	switch(device) {
 		case Device::CPU: {
 			*reinterpret_cast<LambertHandlePack<Device::CPU>*>(outBuffer) =
-				LambertHandlePack{ m_albedo->aquireConst<Device::CPU>(), m_innerMedium, m_outerMedium };
+				LambertHandlePack{ matProps, m_albedo->aquireConst<Device::CPU>() };
 		} break;
 		case Device::CUDA: {
 			*reinterpret_cast<LambertHandlePack<Device::CUDA>*>(outBuffer) =
-				LambertHandlePack{ m_albedo->aquireConst<Device::CUDA>(), m_innerMedium, m_outerMedium };
+				LambertHandlePack{ matProps, m_albedo->aquireConst<Device::CUDA>() };
 		} break;
 		case Device::OPENGL: {
 			*reinterpret_cast<LambertHandlePack<Device::OPENGL>*>(outBuffer) =
-				LambertHandlePack{ m_albedo->aquireConst<Device::OPENGL>(), m_innerMedium, m_outerMedium };
+				LambertHandlePack{ matProps, m_albedo->aquireConst<Device::OPENGL>() };
 		} break;
 	}
 }
