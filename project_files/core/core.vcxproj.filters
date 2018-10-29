@@ -35,6 +35,15 @@
     <Filter Include="Source Files\core\scene\textures">
       <UniqueIdentifier>{f4a4e5ef-3dd4-457b-b188-4f02684ed554}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\deps\glad">
+      <UniqueIdentifier>{76b47af2-c6cc-4ee7-8df3-27e5d3271b32}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\glad\glad">
+      <UniqueIdentifier>{900a9bd5-28ad-4a97-9f6e-2550ae78aaad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\glad\KHR">
+      <UniqueIdentifier>{5b297c7c-acdb-477c-b07b-96c898f5f16a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -81,6 +90,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\interface.cpp">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\glad\glad.c">
+      <Filter>Source Files\deps\glad</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +212,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\types.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\interface.h">
+      <Filter>Source Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\glad\glad\glad.h">
+      <Filter>Source Files\deps\glad\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h">
+      <Filter>Source Files\deps\glad\KHR</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

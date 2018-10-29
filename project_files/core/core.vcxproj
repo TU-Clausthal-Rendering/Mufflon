@@ -18,6 +18,8 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dfunctions.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
+    <ClCompile Include="..\..\deps\glad\glad.c" />
+    <ClCompile Include="..\..\src\core\interface.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp" />
@@ -42,7 +44,10 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
+    <ClInclude Include="..\..\deps\glad\glad\glad.h" />
+    <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h" />
     <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
+    <ClInclude Include="..\..\src\core\interface.h" />
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />
     <ClInclude Include="..\..\src\core\scene\accessor.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
@@ -106,10 +111,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</IntDir>
+    <IncludePath>..\..\deps\glad;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</IntDir>
+    <IncludePath>..\..\deps\glad;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

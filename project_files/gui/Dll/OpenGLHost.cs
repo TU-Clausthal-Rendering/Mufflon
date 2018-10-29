@@ -64,8 +64,8 @@ namespace gui.Dll
                     HandleCommands();
                     HandleResize();
 
-                    //if(!Core.iterate())
-                    //  throw new Exception(Core.GetDllError());
+                    if(!Core.iterate())
+                      throw new Exception(Core.GetDllError());
 
                     if(!Gdi32.SwapBuffers(m_deviceContext))
                         throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -104,8 +104,8 @@ namespace gui.Dll
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
             // dll call: initialize glad etc.
-            //if (!Core.initialize())
-            //    throw new Exception(Core.GetDllError());
+            if (!Core.initialize())
+                throw new Exception(Core.GetDllError());
         }
 
         /// <summary>
@@ -121,8 +121,8 @@ namespace gui.Dll
             {
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
-                //if (!Core.resize(m_renderWidth, m_renderHeight))
-                //    throw new Exception(Core.GetDllError());
+                if (!Core.resize(m_renderWidth, m_renderHeight))
+                    throw new Exception(Core.GetDllError());
             }
         }
 
@@ -133,7 +133,7 @@ namespace gui.Dll
         {
             while (m_commandQueue.TryDequeue(out var command))
             {
-                //Core.execute_command(command);
+                Core.execute_command(command);
             }
         }
 
