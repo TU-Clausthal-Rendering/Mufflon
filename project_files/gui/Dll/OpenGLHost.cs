@@ -122,13 +122,17 @@ namespace gui.Dll
             // viewport resize?
             int newWidth = m_viewport.Width;
             int newHeight = m_viewport.Height;
-            // TODO add offset
+            int newOffsetX = m_viewport.OffsetX;
+            int newOffsetY = m_viewport.OffsetY;
 
-            if (m_renderWidth != newWidth || m_renderHeight != newHeight)
+            if (m_renderWidth != newWidth || m_renderHeight != newHeight ||
+                m_renderOffsetX != newOffsetX || m_renderOffsetY != newOffsetY)
             {
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
-                if (!Core.resize(m_renderWidth, m_renderHeight, 0, 0))
+                m_renderOffsetX = newOffsetX;
+                m_renderOffsetY = newOffsetY;
+                if (!Core.resize(m_renderWidth, m_renderHeight, m_renderOffsetX, m_renderOffsetY))
                     throw new Exception(Core.GetDllError());
             }
         }

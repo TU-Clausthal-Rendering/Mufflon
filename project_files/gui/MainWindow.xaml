@@ -53,25 +53,50 @@
                     <ColumnDefinition Width="5"/>
                     <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <GridSplitter
                     Grid.Column="1"
                     Width="5"
                     HorizontalAlignment="Stretch"
                     Background="{StaticResource BorderBrush}"/>
+                
+                <!-- Renderer with scroll bars -->
+                <Grid
+                    Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <ScrollViewer 
-                    Grid.Column="2"
-                    x:Name="RendererScrollViewer"
-                    HorizontalScrollBarVisibility="Auto"
-                    VerticalScrollBarVisibility="Auto">
                     <Border 
                         x:Name="BorderHost"
-                        Width="{Binding Viewport.Width, Mode=OneWay}"
-                        Height="{Binding Viewport.Height, Mode=OneWay}"
                         DockPanel.Dock="Bottom"
-                        Background="Black"/>
-                </ScrollViewer>
+                        Background="Black"
+                        MaxWidth="{Binding Viewport.RenderWidth}"
+                        MaxHeight="{Binding Viewport.RenderHeight}"/>
+
+                    <ScrollBar 
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Minimum="0"
+                        Maximum="{Binding Viewport.ScrollMaximumY}"
+                        Value="{Binding Viewport.OffsetY}"
+                        ViewportSize="{Binding Viewport.ScrollHeight}"/>
+
+                    <ScrollBar
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Orientation="Horizontal"
+                        Minimum="0"
+                        Maximum="{Binding Viewport.ScrollMaximumX}"
+                        Value="{Binding Viewport.OffsetX}"
+                        ViewportSize="{Binding Viewport.ScrollWidth}"/>
+
+                </Grid>
                 
 
                 <GridSplitter
