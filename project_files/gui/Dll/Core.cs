@@ -20,7 +20,7 @@ namespace gui.Dll
         internal static extern bool initialize();
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool resize(int width, int height);
+        internal static extern bool resize(int width, int height, int offsetX, int offsetY);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr get_error(out int length);

@@ -17,6 +17,7 @@ namespace gui.ViewModel
     public class ViewModels
     {
         public ConsoleViewModel Console { get; }
+        public ViewportViewModel Viewport { get; }
 
         private readonly Models m_models;
 
@@ -27,6 +28,7 @@ namespace gui.ViewModel
 
             // view model initialization
             Console = new ConsoleViewModel(m_models);
+            Viewport = new ViewportViewModel(m_models);
 
             // command initialization
         }

@@ -15,10 +15,10 @@ DLLFUNC(bool) iterate();
 
 /// \brief indicates that the size of the client area has changed. 
 ///        Will be called after intitialize as well
-/// \param width 
-/// \param height 
+/// \param width width of the viewport area
+/// \param height height of the viewport area
 /// \return true on success
-DLLFUNC(bool) resize(int width, int height);
+DLLFUNC(bool) resize(int width, int height, int offsetX, int offsetY);
 
 DLLFUNC(void) execute_command(const char* command);
 

@@ -58,11 +58,19 @@
                     HorizontalAlignment="Stretch"
                     Background="{StaticResource BorderBrush}"/>
 
-                <Border 
+                <ScrollViewer 
                     Grid.Column="2"
-                    x:Name="BorderHost"
-                    DockPanel.Dock="Bottom"
-                    Background="Black"/>
+                    x:Name="RendererScrollViewer"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto">
+                    <Border 
+                        x:Name="BorderHost"
+                        Width="{Binding Viewport.Width, Mode=OneWay}"
+                        Height="{Binding Viewport.Height, Mode=OneWay}"
+                        DockPanel.Dock="Bottom"
+                        Background="Black"/>
+                </ScrollViewer>
+                
 
                 <GridSplitter
                     Grid.Column="3"

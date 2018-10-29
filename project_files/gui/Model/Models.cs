@@ -12,10 +12,12 @@ namespace gui.Model
     public class Models
     {
         public AppModel App { get; }
+        public ViewportModel Viewport { get; }
 
         public Models(MainWindow window)
         {
-            App = new AppModel(window);
+            Viewport = new ViewportModel();
+            App = new AppModel(window, Viewport);
         }
     }
 }

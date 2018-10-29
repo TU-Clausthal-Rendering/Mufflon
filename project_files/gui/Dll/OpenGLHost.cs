@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using gui.Model;
 
 namespace gui.Dll
 {
@@ -20,6 +21,8 @@ namespace gui.Dll
 
         // host of the HwndHost
         private readonly Border m_parent;
+        // information about the viewport
+        private readonly ViewportModel m_viewport;
 
         // context creation
         private IntPtr m_hWnd = IntPtr.Zero;
@@ -31,12 +34,15 @@ namespace gui.Dll
         private readonly ConcurrentQueue<string> m_commandQueue = new ConcurrentQueue<string>();
 
         // helper to detect resize in render thread
-        int m_renderWidth = 0;
-        int m_renderHeight = 0;
+        private int m_renderWidth = 0;
+        private int m_renderHeight = 0;
+        private int m_renderOffsetX = 0;
+        private int m_renderOffsetY = 0;
 
-        public OpenGLHost(Border parent)
+        public OpenGLHost(Border parent, ViewportModel viewport)
         {
-            this.m_parent = parent;
+            m_parent = parent;
+            m_viewport = viewport;
         }
 
         /// <summary>
@@ -114,14 +120,15 @@ namespace gui.Dll
         private void HandleResize()
         {
             // viewport resize?
-            int newWidth = (int)ActualWidth;
-            int newHeight = (int)ActualHeight;
+            int newWidth = m_viewport.Width;
+            int newHeight = m_viewport.Height;
+            // TODO add offset
 
             if (m_renderWidth != newWidth || m_renderHeight != newHeight)
             {
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
-                if (!Core.resize(m_renderWidth, m_renderHeight))
+                if (!Core.resize(m_renderWidth, m_renderHeight, 0, 0))
                     throw new Exception(Core.GetDllError());
             }
         }

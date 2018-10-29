@@ -72,9 +72,11 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Model\AppModel.cs" />
+    <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
+    <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

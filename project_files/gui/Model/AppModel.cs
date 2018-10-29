@@ -16,12 +16,12 @@ namespace gui.Model
         public MainWindow Window { get; }
         public OpenGLHost GlHost { get; }
 
-        public AppModel(MainWindow window)
+        public AppModel(MainWindow window, ViewportModel viewport)
         {
             Window = window;
 
             // init gl host
-            GlHost = new OpenGLHost(window.BorderHost);
+            GlHost = new OpenGLHost(window.BorderHost, viewport);
             GlHost.Error += window.GlHostOnError;
             window.Loaded += (sender, args) => window.BorderHost.Child = GlHost;
         }

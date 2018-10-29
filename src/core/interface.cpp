@@ -35,11 +35,10 @@ bool iterate()
 	return true;
 }
 
-bool resize(int width, int height)
+bool resize(int width, int height, int offsetX, int offsetY)
 {
 	// glViewport should not be called with width or height zero
 	if (width == 0 || height == 0) return true;
-
 	glViewport(0, 0, width, height);
 	return true;
 }
