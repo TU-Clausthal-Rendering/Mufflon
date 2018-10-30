@@ -25,15 +25,15 @@ namespace gui.View.Camera
             InitializeComponent();
         }
 
-        public static readonly DependencyProperty CameraNameProperty = DependencyProperty.Register(
-            "CameraName", typeof(string), typeof(PinholeCameraView), null           
-        );
-
         public string CameraName
         {
-            get => (string) GetValue(CameraNameProperty);
+            get => (string)GetValue(CameraNameProperty);
             set => SetValue(CameraNameProperty, value);
         }
+
+        public static readonly DependencyProperty CameraNameProperty = DependencyProperty.Register(
+            nameof(CameraName), typeof(string), typeof(PinholeCameraView), new PropertyMetadata("CameraName")          
+        );
 
         /*public static readonly DependencyProperty CameraFovProperty = DependencyProperty.Register(
             "CameraFov", typeof(float), typeof(PinholeCameraView), null

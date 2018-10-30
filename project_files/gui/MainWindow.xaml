@@ -4,6 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui"
+        xmlns:view="clr-namespace:gui.View"
+        xmlns:camera="clr-namespace:gui.View.Camera"
         mc:Ignorable="d"
         Title="MainWindow" 
         Height="450" 
@@ -91,6 +93,10 @@
                     <TabItem Header="Light">
 
                     </TabItem>
+                    <TabItem Header="Camera">
+                        <camera:PinholeCameraView
+                            CameraName="Test"/>
+                    </TabItem>
                 </TabControl>
             </Grid>
 
@@ -161,3 +167,4 @@
         
     </DockPanel>
 </Window>
+

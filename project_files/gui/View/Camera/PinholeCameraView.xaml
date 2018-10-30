@@ -6,15 +6,16 @@
              xmlns:local="clr-namespace:gui.View.Camera"
              mc:Ignorable="d" 
              d:DesignHeight="100"
-             d:DesignWidth="160">
+             d:DesignWidth="160"
+             Name="ThisControl">
     <UserControl.Resources>
         <Thickness x:Key="DefaultMargin" Bottom="5" Right="5"/>
     </UserControl.Resources>
     <GroupBox>
         <GroupBox.Header>
-            <TextBlock 
+            <TextBox 
                 Width="100" 
-                Text="{Binding CameraName}"/>
+                Text="{Binding CameraName, ElementName=ThisControl}"/>
         </GroupBox.Header>
         <Grid>
             <Grid.RowDefinitions>
