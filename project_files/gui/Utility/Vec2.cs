@@ -6,24 +6,21 @@ using System.Threading.Tasks;
 
 namespace gui.Utility
 {
-    public struct Vec3<T>
+    public class Vec2<T>
     {
-        public Vec3(T x, T y, T z)
+        public Vec2(T x, T y)
         {
             X = x;
             Y = y;
-            Z = z;
         }
 
-        public Vec3(T v)
+        public Vec2(T v)
         {
             X = v;
             Y = v;
-            Z = v;
         }
 
         public T X { get; }
         public T Y { get; }
-        public T Z { get; }
     }
 }

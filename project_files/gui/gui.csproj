@@ -72,8 +72,12 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Model\AppModel.cs" />
+    <Compile Include="Model\LightModel.cs" />
+    <Compile Include="Model\MaterialModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
+    <Compile Include="Utility\Vec2.cs" />
+    <Compile Include="Utility\Vec3.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
