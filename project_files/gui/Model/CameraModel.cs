@@ -26,6 +26,19 @@ namespace gui.Model
 
         public CameraType Type { get; }
 
+        private string m_name = String.Empty;
+
+        public string Name
+        {
+            get => m_name;
+            set
+            {
+                if (value == null || value == m_name) return;
+                m_name = value;
+                OnPropertyChanged(nameof(Name));
+            }
+        }
+
         private float m_fov = 25.0f;
 
         public float Fov

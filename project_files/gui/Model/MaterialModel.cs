@@ -31,6 +31,19 @@ namespace gui.Model
 
         public MaterialType Type { get; }
 
+        private string m_name = String.Empty;
+
+        public string Name
+        {
+            get => m_name;
+            set
+            {
+                if (value == null || value == m_name) return;
+                m_name = value;
+                OnPropertyChanged(nameof(Name));
+            }
+        }
+
         private Vec3<float> m_albedo = new Vec3<float>(0.5f);
 
         public Vec3<float> Albedo
