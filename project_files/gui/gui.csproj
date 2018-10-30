@@ -72,6 +72,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Model\AppModel.cs" />
+    <Compile Include="Model\CameraModel.cs" />
     <Compile Include="Model\LightModel.cs" />
     <Compile Include="Model\MaterialModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
