@@ -15,9 +15,9 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	mAssert(m_meshData.has_vertex_texcoords2D());
 	VertexHandle vh = m_meshData.add_vertex(util::pun<OpenMesh::Vec3f>(point));
 	// TODO: can we do this? Should work, right?
-	(**m_pointsAttr.aquire())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
-	(**m_normalsAttr.aquire())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
-	(**m_uvsAttr.aquire())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
+	(*m_pointsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
+	(*m_normalsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
+	(*m_uvsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
 	return vh;
 }
 
@@ -33,7 +33,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle &vh, const Triangle& t
 							   VertexHandle(tri[2u]));
 	mAssert(hdl.is_valid());
 
-	(**m_matIndexAttr.aquire())[hdl.idx()] = idx;
+	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
 
@@ -49,7 +49,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle &vh, const Quad& quad,
 	FaceHandle hdl = m_meshData.add_face(VertexHandle(quad[0u]), VertexHandle(quad[1u]),
 							   VertexHandle(quad[2u]), VertexHandle(quad[3u]));
 	mAssert(hdl.is_valid());
-	(**m_matIndexAttr.aquire())[hdl.idx()] = idx;
+	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
 
@@ -59,12 +59,12 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& p
 	VertexHandle hdl(static_cast<int>(m_meshData.n_vertices()));
 
 	// Resize the attributes prior
-	m_attributes.resize(m_pointsAttr.n_elements() + count);
+	m_attributes.resize(m_attributes.get_size() + count);
 
 	// Read the attributes
-	std::size_t readPoints = m_pointsAttr.restore(pointStream, count);
-	std::size_t readNormals = m_normalsAttr.restore(normalStream, count);
-	std::size_t readUvs = m_uvsAttr.restore(uvStream, count);
+	std::size_t readPoints = m_pointsAttr.restore(pointStream, 0u, count);
+	std::size_t readNormals = m_normalsAttr.restore(normalStream, 0u, count);
+	std::size_t readUvs = m_uvsAttr.restore(uvStream, 0u, count);
 
 	return {hdl, readPoints, readNormals, readUvs};
 }
@@ -73,7 +73,7 @@ void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, R
 				std::size_t divisions) {
 	tessellater(m_meshData, divisions);
 	// Flag the entire polygon as dirty
-	m_attributes.mark_changed();
+	m_attributes.mark_changed<>();
 	logInfo("Uniformly tessellated polygon mesh with ", divisions, " subdivisions");
 }
 void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
@@ -81,7 +81,7 @@ void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& 
 	// TODO
 	throw std::runtime_error("Adaptive tessellation isn't implemented yet");
 	// Flag the entire polygon as dirty
-	m_attributes.mark_changed();
+	m_attributes.mark_changed<>();
 	logInfo("Adaptively tessellated polygon mesh with ", divisions, " subdivisions");
 }
 
@@ -91,7 +91,7 @@ void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 	std::size_t targetDecimations = m_meshData.n_vertices() - target_vertices;
 	std::size_t actualDecimations = decimater.decimate_to(target_vertices);
 	// Flag the entire polygon as dirty
-	m_attributes.mark_changed();
+	m_attributes.mark_changed<>();
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
 			" decimations performed");
 	// TODO: this leaks mesh outside

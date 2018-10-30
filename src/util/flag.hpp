@@ -107,6 +107,22 @@ public:
 		return m_needsSyncing & m_hasChanges;
 	}
 
+	// Marks a value as absent on a device
+	void unload(Enum check) noexcept {
+		EnumType value = get_value(check);
+		if(this->is_present(value)) {
+			// Mark as absent as well as in need of sync if it was ever present
+			m_isPresent &= ~value;
+			m_needsSyncing |= value;
+		}
+	}
+
+	// Checks if a value is present on a device at all
+	bool is_present(Enum check) const noexcept {
+		EnumType value = get_value(check);
+		return m_isPresent & value;
+	}
+
 private:
 	static EnumType get_value(Enum e) noexcept {
 		EnumType value = static_cast<EnumType>(e);
@@ -118,6 +134,7 @@ private:
 
 	EnumType m_needsSyncing;
 	EnumType m_hasChanges;
+	EnumType m_isPresent;
 };
 
 }} // namespace mufflon::util

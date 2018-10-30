@@ -21,8 +21,11 @@ public:
 	// Basic type definitions
 	using Index = u32;
 	using SphereHandle = std::size_t;
+	using AttributeListType = AttributeList<false>;
 	template < class Attr >
-	using AttributeHandle = AttributeList::AttributeHandle<Attr>;
+	using AttributeHandle = typename AttributeListType::template AttributeHandle<Attr>;
+	template < class T >
+	using Attribute = typename AttributeListType::template Attribute<T>;
 
 	// Struct communicating the number of bulk-read spheres
 	struct BulkReturn {
@@ -52,8 +55,8 @@ public:
 	// Default construction, creates material-index attribute.
 	Spheres() :
 		m_attributes(),
-		m_sphereData(m_attributes.aquire(m_attributes.add<ArrayAttribute, Sphere>("radius-position"))),
-		m_matIndex(m_attributes.aquire(m_attributes.add<ArrayAttribute, MaterialIndex>("materialIdx")))
+		m_sphereData(m_attributes.aquire(m_attributes.add<Sphere>("radius-position"))),
+		m_matIndex(m_attributes.aquire(m_attributes.add<MaterialIndex>("materialIdx")))
 	{}
 	Spheres(const Spheres&) = default;
 	Spheres(Spheres&&) = default;
@@ -61,19 +64,8 @@ public:
 	Spheres& operator=(Spheres&&) = delete;
 	~Spheres() = default;
 
-	void reserve(std::size_t count) {
-		m_sphereData.reserve(count);
-		m_attributes.reserve(count);
-	}
-
 	void resize(std::size_t count) {
-		m_sphereData.resize(count);
 		m_attributes.resize(count);
-	}
-
-	void clear() {
-		m_sphereData.clear();
-		m_attributes.clear();
 	}
 
 	// Requests a new per-sphere attribute.
@@ -107,11 +99,15 @@ public:
 	 * The number of read values will be capped by the number of spheres present
 	 * after the starting position.
 	 */
-	template < class Attribute >
-	std::size_t add_bulk(const Attribute& attribute, const SphereHandle& startSphere,
+	template < class Type >
+	std::size_t add_bulk(Attribute<Type>& attribute, const SphereHandle& startSphere,
 						 std::size_t count, std::istream& attrStream) {
-		std::size_t actualCount = std::min(m_sphereData.n_elements() - startSphere, count);
-		return attribute.restore(attrStream, actualCount);
+		std::size_t start = startSphere;
+		if(start >= m_attributes.get_size())
+			return 0u;
+		if(start + count >= m_attributes.get_size())
+			m_attributes.resize(start + count);
+		return attribute.restore(attrStream, start, count);
 	}
 	// Also performs bulk-load for an attribute, but aquires it first.
 	template < class Attr >
@@ -119,7 +115,7 @@ public:
 						 const SphereHandle& startSphere, std::size_t count,
 						 std::istream& attrStream) {
 		Attr& attribute = m_attributes.aquire(attrHandle);
-		return add_bulk(attribute, startSphere, count, attrStream);
+		return this->add_bulk(attribute, startSphere, count, attrStream);
 	}
 
 	template < class Attr >
@@ -134,15 +130,19 @@ public:
 	
 	// Synchronizes the default attributes position, normal, uv, matindex 
 	template < Device dev >
-	void synchronize_default() {
-		m_sphereData.mark_changed<dev>();
-		m_matIndex.mark_changed<dev>();
+	void synchronize() {
+		m_attributes.synchronize<dev>();
+	}
+
+	template < Device dev >
+	void unload() {
+		m_attributes.unload<dev>();
 	}
 
 private:
-	AttributeList<true> m_attributes;
-	ArrayAttribute<Sphere>& m_sphereData;
-	ArrayAttribute<MaterialIndex>& m_matIndex;
+	AttributeListType m_attributes;
+	Attribute<Sphere>& m_sphereData;
+	Attribute<MaterialIndex>& m_matIndex;
 };
 
 } // namespace mufflon::scene::geometry

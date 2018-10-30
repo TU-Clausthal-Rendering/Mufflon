@@ -1,6 +1,12 @@
 #pragma once
 
+#include "accessor.hpp"
 #include "attribute.hpp"
+#include "util/assert.hpp"
+#include "util/tagged_tuple.hpp"
+#include <istream>
+#include <ostream>
+#include <cstdlib>
 #include <unordered_map>
 #include <optional>
 #include <vector>
@@ -8,32 +14,29 @@
 namespace mufflon::scene {
 
 /**
- * Base class for attribute list.
- * Specialization has to be used to differentiate between OpenMesh and our custom attributes.
- * OpenMesh store their properties internally, thus we need to take it by reference instead 
- * of allocating it ourselves.
+ * Manages attributes and attribute pool access.
+ * Access may happen via handles only, ie. one needs to aquire an attribute first.
+ * Attribute pools may be synchronized to or unloaded from devices.
+ * useOpenMesh: special case for OpenMesh, which stores its attributes on
+ *     CPU-side itself.
  */
-class BaseAttributeList {
+template < bool useOpenMesh = false, Device defaultDev = Device::CPU >
+class AttributeList {
 public:
-	using ListType = std::vector<std::unique_ptr<IBaseAttribute>>;
+	static constexpr bool USES_OPENMESH = useOpenMesh;
+	static constexpr Device DEFAULT_DEVICE = defaultDev;
+	using AttributePools = util::TaggedTuple<AttributePool<Device::CPU, !USES_OPENMESH>,
+		AttributePool<Device::CUDA, true>>;
 
-	/**
-	 * Generic class serving as a handle to a given attribute.
-	 * It should only be used as a means to communicate to an attribute list
-	 * which attribute is supposed to be adressed.
-	 */
-	template < class Attr >
+	template < class T >
 	class AttributeHandle {
-	public:
-		using AttributeType = Attr;
-
+		using Type = T;
+		friend class AttributeList<USES_OPENMESH, DEFAULT_DEVICE>;
 
 	private:
-		using IteratorType = typename std::vector<std::unique_ptr<IBaseAttribute>>::iterator;
-		friend class BaseAttributeList;
-
 		AttributeHandle(std::size_t idx) :
-			m_index(idx) {}
+			m_index(idx)
+		{}
 
 		constexpr std::size_t index() const noexcept {
 			return m_index;
@@ -42,218 +45,272 @@ public:
 		std::size_t m_index;
 	};
 
-	// Iterator class for all attribute handles
-	class Iterator {
+	// Base type for inheritance
+	class IBaseAttribute {
 	public:
-		static Iterator begin(ListType &attribs) {
-			return Iterator(attribs, attribs.begin());
-		}
-
-		static Iterator end(ListType &attribs) {
-			return Iterator(attribs, attribs.end());
-		}
-
-		Iterator& operator++() {
-			do {
-				++m_curr;
-			} while(m_curr != m_attribs.end() && *m_curr != nullptr);
-			return *this;
-		}
-		Iterator operator++(int) {
-			Iterator temp(*this);
-			++(*this);
-			return temp;
-		}
-
-		Iterator operator+(std::size_t i) const {
-			Iterator temp(m_attribs, m_curr + i);
-			while(temp.m_curr != temp.m_attribs.end() && *temp.m_curr == nullptr)
-				++temp.m_curr;
-		}
-
-		IBaseAttribute& operator*() {
-			mAssert(m_curr != m_attribs.end());
-			return **m_curr;
-		}
-		const IBaseAttribute& operator*() const {
-			mAssert(m_curr != m_attribs.end());
-			return **m_curr;
-		}
-
-		IBaseAttribute* operator->() {
-			return m_curr->get();
-		}
-		const IBaseAttribute* operator->() const {
-			return m_curr->get();
-		}
-
-		bool operator==(const Iterator& iter) const {
-			return m_curr == iter.m_curr;
-		}
-
-		bool operator!=(const Iterator& iter) const {
-			return !((*this) == iter);
-		}
-
-	private:
-		Iterator(ListType &attribs, typename ListType::iterator iter) :
-			m_attribs(attribs),
-			m_curr(iter) {}
-
-		ListType& m_attribs;
-		typename ListType::iterator m_curr;
+		virtual ~IBaseAttribute() {}
 	};
 
-	BaseAttributeList() = default;
-	BaseAttributeList(const BaseAttributeList&) = default;
-	BaseAttributeList(BaseAttributeList&&) = default;
-	BaseAttributeList& operator=(const BaseAttributeList&) = default;
-	BaseAttributeList& operator=(BaseAttributeList&&) = default;
-	~BaseAttributeList() = default;
-
-	template < class Attr >
-	void remove(const AttributeHandle<Attr>& handle) {
-		auto iter = m_mapping.find(m_attributes[handle.index()]->name());
-		if(iter != m_mapping.end()) {
-			// Remove element from both mapping and attribute list
-			m_mapping.erase(iter);
-			m_attributes[handle.index()].reset();
-		}
-	}
-
 	/**
-	 * Finds an attribute handle by the attribute's name.
-	 * If the attribute name can't be found std::nullopt is returned.
+	 * Attribute class granting access to the actual memory.
 	 */
-	template < class Attr >
-	std::optional<AttributeHandle<Attr>> find(const std::string_view& name) {
-		auto attrIter = m_mapping.find(name);
-		if(attrIter == m_mapping.end())
-			return std::nullopt;
-		// Attribute "cast" to later allow us to correctly determine attribute type
-		return AttributeHandle<Attr>(attrIter->second.index());
-	}
+	template < class T, bool usesOpenMesh = USES_OPENMESH >
+	class Attribute : public IBaseAttribute {
+	public:
+		using Type = T;
+		static constexpr bool USES_OPENMESH = usesOpenMesh;
 
-	/**
-	 * Attempts to aquire a valid attribute reference from an attribute handle.
-	 * If the attribute handle has a different type than the originally inserted attribute
-	 * handle, a bad_cast-exception is thrown.
-	 */
-	template < class Attr >
-	Attr &aquire(const AttributeHandle<Attr>& handle) {
-		mAssert(m_attributes[handle.index()] != nullptr);
-		return dynamic_cast<Attr&>(*m_attributes[handle.index()]);
-	}
-	template < class Attr >
-	const Attr &aquire(const AttributeHandle<Attr>& handle) const {
-		mAssert(m_attributes[handle.index()] != nullptr);
-		return dynamic_cast<Attr&>(*m_attributes[handle.index()]);
-	}
-
-	// Reserves space for all attributes
-	void reserve(std::size_t count) {
-		for(auto& attr : m_attributes) {
-			if(attr != nullptr)
-				attr->reserve(count);
+		template < bool openMesh = USES_OPENMESH, typename = std::enable_if_t<!openMesh> >
+		Attribute(AttributePools& pools, util::DirtyFlags<Device>& flags) :
+			m_pools(pools),
+			m_flags(flags) {
+			this->init_impl<0u>();
 		}
-	}
 
-	// Resizes all attributes
-	void resize(std::size_t count) {
-		for(auto& attr : m_attributes) {
-			if(attr != nullptr)
-				attr->resize(count);
+		template < bool openMesh = USES_OPENMESH, typename = std::enable_if_t<openMesh> >
+		Attribute(AttributePools& pools, util::DirtyFlags<Device>& flags, OpenMesh::PropertyT<T>& prop) :
+			m_pools(pools),
+			m_handles(),
+			m_flags(flags) {
+			this->init_impl<0u>(prop);
 		}
-	}
 
-	// Clears all attributes
-	void clear() {
-		for(auto& attr : m_attributes) {
-			if(attr != nullptr)
-				attr->clear();
+		~Attribute() {
+			m_pools.for_each([](std::size_t i, auto& pool) {
+				pool.remove<Type>();
+				return false;
+			});
 		}
-	}
 
-	// Marks the attribute changed for its default device (ie. OpenMesh did something)
-	void mark_changed() {
-		for(auto& attr : m_attributes)
-			attr->mark_changed();
-	}
+		// Aquires a read-write accessor to the attribute
+		template < Device dev = DEFAULT_DEVICE >
+		auto aquire() {
+			using DeviceHdl = DeviceArrayHandle<dev, Type>;
+			this->synchronize<dev>();
+			auto& pool = m_pools.get<AttributePool<dev, stores_itself<dev>()>>();
+			auto& handle = m_handles.get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
+			auto attr = pool.aquire(handle);
 
-	// Gets the number of attributes.
-	std::size_t size() const noexcept {
-		return m_mapping.size();
-	}
+			return Accessor<DeviceHdl>{ static_cast<typename DeviceHdl::HandleType>(attr), m_flags };
+		}
 
-	Iterator begin() {
-		return Iterator::begin(m_attributes);
-	}
+		// Aquires a read-only accessor to the attribute
+		template < Device dev = DEFAULT_DEVICE >
+		auto aquireConst() const {
+			using DeviceHdl = DeviceArrayHandle<dev, Type>;
+			this->synchronize<dev>();
+			const auto& pool = m_pools.get<AttributePool<dev, stores_itself<dev>()>>();
+			const auto& handle = m_handles.get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
+			const auto attr = pool.aquire(handle);
 
-	Iterator end() {
-		return Iterator::end(m_attributes);
-	}
+			return ConstAccessor<DeviceHdl>{ static_cast<const typename DeviceHdl::HandleType>(attr), m_flags };
+		}
 
-protected:
-	// Adds a new, already constructed attribute to the list
-	template < class Attr >
-	AttributeHandle<Attr> add(std::unique_ptr<Attr>&& attribute) {
-		// Since we leave deleted attributes in the vector, we need to manually iterate it
-		// Default-index is end of vector
-		AttributeHandle<Attr> newAttr(m_attributes.size());
-		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
-			if(m_attributes[i] == nullptr) {
-				// Found a hole to place attribute in
-				newAttr = AttributeHandle<Attr>(i);
-				break;
+		// Synchronizes the attribute pool to the given device
+		template < Device dev = DEFAULT_DEVICE >
+		void synchronize() {
+			if(m_flags.needs_sync(dev)) {
+				if(m_flags.has_competing_changes())
+					throw std::runtime_error("Competing changes for attribute detected!");
+				// Synchronize
+				this->synchronize_impl<0u, dev>();
 			}
 		}
 
-		// Create the new attribute and mapping to handle
-		m_attributes.push_back(std::move(attribute));
-		m_mapping.insert(std::make_pair(m_attributes.back()->name(), AttributeHandle<IBaseAttribute>(newAttr.index())));
-		return newAttr;
+		// Restore the attribute from a stream (CPU only)
+		std::size_t restore(std::istream& stream, std::size_t start, std::size_t count) {
+			auto& handle = m_handles.get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
+			return m_pools.get<AttributePool<Device::CPU, !USES_OPENMESH>>().restore(handle, stream, start, count);
+		}
+
+		// Store the attribute into a stream (CPU only)
+		std::size_t store(std::ostream& stream, std::size_t start, std::size_t count) const {
+			const auto& handle = m_handles.get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
+			return m_pools.get<AttributePool<Device::CPU, !USES_OPENMESH>>().store(handle, stream, start, count);
+		}
+
+	private:
+		// Initializes the attribute for all devices
+		template < std::size_t I >
+		void init_impl() {
+			if constexpr(I < AttributePools::size) {
+				m_handles.get<I>() = m_pools.get<I>().add<T>();
+				this->init_impl<I + 1u>();
+			}
+		}
+
+		// Initializes the attribute for all devices
+		template < std::size_t I >
+		void init_impl(OpenMesh::PropertyT<T>& prop) {
+			if constexpr(I < AttributePools::size) {
+				auto& pool = m_pools.get<I>();
+				constexpr Device DEVICE = std::decay_t<decltype(pool)>::DEVICE;
+				if constexpr(DEVICE == Device::CPU) {
+					m_handles.get<I>() = pool.add<T>(prop);
+				} else {
+					m_handles.get<I>() = pool.add<T>();
+				}
+				this->init_impl<I + 1u>();
+			}
+		}
+
+		// Checks all devices for changes and syncs upon finding one
+		template < std::size_t I, Device dev >
+		void synchronize_impl() {
+			if constexpr(I < AttributePools::size) {
+				// Workaround for VS2017 bug: otherwise you may use the 'Type' template of the
+				// tagged tuple
+				auto& changed = m_pools.get<I>();
+				constexpr Device CHANGED_DEVICE = std::decay_t<decltype(changed)>::DEVICE;
+				if(m_flags.has_changes(CHANGED_DEVICE)) {
+					changed.synchronize<dev>(m_pools.get<AttributePool<dev, stores_itself<dev>()>>());
+				} else {
+					this->synchronize_impl<I + 1u, dev>();
+				}
+			}
+		}
+
+		// Helper function to shorten template formulation
+		template < Device dev >
+		static constexpr bool stores_itself() {
+			if constexpr(dev == Device::CPU)
+				return !USES_OPENMESH;
+			else
+				return true;
+		}
+
+		AttributePools& m_pools;
+		util::TaggedTuple<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<T>,
+			typename AttributePool<Device::CUDA, true>::template AttributeHandle<T>> m_handles;
+		util::DirtyFlags<Device>& m_flags;
+	};
+
+	// Adds a new attribute to the list, initially marked as absent
+	template < class T, bool openMesh = USES_OPENMESH, typename = std::enable_if_t<!openMesh> >
+	AttributeHandle<T> add(std::string name) {
+		auto attr = this->find<T>(name);
+		if(attr.has_value())
+			return attr.value();
+
+		// Create a new attribute
+		m_attributes.push_back(std::make_unique<Attribute<T, USES_OPENMESH>>(m_attributePools, m_flags));
+		return { m_attributes.size() - 1u };
+	}
+
+	// Adds a new attribute to the list, initially marked as absent
+	template < class T, bool openMesh = USES_OPENMESH, typename = std::enable_if_t<openMesh> >
+	AttributeHandle<T> add(std::string name, OpenMesh::PropertyT<T>& prop) {
+		auto attr = this->find<T>(name);
+		if(attr.has_value())
+			return attr.value();
+
+		// Create a new attribute
+		m_attributes.push_back(std::make_unique<Attribute<T, USES_OPENMESH>>(m_attributePools, m_flags, prop));
+		return { m_attributes.size() - 1u };
+	}
+
+	// Finds an attribute by its name and returns a handle to it
+	template < class T >
+	std::optional<AttributeHandle<T>> find(const std::string& name) const {
+		auto iter = m_mapping.find(name);
+		if(iter != m_mapping.cend()) {
+			// Make sure the mapping is still valid
+			if(iter->second >= m_attributes.size() || m_attributes[iter->second] == nullptr)
+				return std::nullopt;
+			return AttributeHandle<T>{iter->second};
+		}
+		return std::nullopt;
+	}
+
+	template < class T >
+	void remove(const AttributeHandle<T>& handle) {
+		if(handle.index() >= m_attributes.size() || m_attributes[handle.index()] == nullptr)
+			return;
+		m_attributes[handle.index()].reset();
+		// Since we don't have a bimap, iterate all names
+		for(auto iter = m_mapping.begin(); iter != m_mapping.end(); ++iter) {
+			if(iter->second == handle.index()) {
+				m_mapping.erase(iter);
+				break;
+			}
+		}
+	}
+
+	// Returns the length of all attributes
+	std::size_t get_size() const noexcept {
+		return m_attributePools.get<0u>().get_size();
+	}
+
+	template < Device dev >
+	std::size_t get_bytes() const noexcept {
+		return m_attributePools.get<dev>().get_bytes();
+	}
+
+	// Resizes all attributes on all devices (only reallocs if present)
+	void resize(std::size_t n) {
+		m_attributePools.for_each([n](std::size_t i, auto& elem) {
+			elem.resize(n);
+			return false;
+		});
+	}
+
+	// Synchronizes all attributes on the given device from the last changed device
+	template < Device dev = DEFAULT_DEVICE >
+	void synchronize() {
+		// TODO
+		if(m_flags.needs_sync(dev)) {
+			if(m_flags.has_competing_changes())
+				throw std::runtime_error("Competing changes for attribute detected!");
+			this->synchronize_impl<0u, dev>();
+		}
+	}
+
+	// Unloads all attributes from the given device
+	template < Device dev = DEFAULT_DEVICE >
+	void unload() {
+		m_attributePools.get<AttributePool<dev>>().unload();
+	}
+
+	template < Device dev = DEFAULT_DEVICE >
+	void mark_changed() {
+		m_flags.mark_changed(dev);
+	}
+
+	// Aquires an attribute from its handle
+	template < class T >
+	Attribute<T, USES_OPENMESH>& aquire(const AttributeHandle<T>& hdl) {
+		mAssert(hdl.index() < m_attributes.size());
+		return dynamic_cast<Attribute<T, USES_OPENMESH>&>(*m_attributes[hdl.index()]);
+	}
+
+	// Aquires an attribute from its handle
+	template < class T >
+	const Attribute<T, USES_OPENMESH>& aquire(const AttributeHandle<T>& hdl) const {
+		mAssert(hdl.index() < m_attributes.size());
+		return dynamic_cast<const Attribute<T, USES_OPENMESH>&>(*m_attributes[hdl.index()]);
 	}
 
 private:
-	std::unordered_map<std::string_view, AttributeHandle<IBaseAttribute>> m_mapping;
-	ListType m_attributes;
-};
-
-template < bool storeCpu = true >
-class AttributeList : public BaseAttributeList {
-public:
-	/**
-	 * Adds a new attribute to the attribute list.
-	 * If the name is already in use, this returns std::nullopt.
-	 */
-	template < template < class, bool > class Attr, class T >
-	AttributeHandle<Attr<T, storeCpu>> add(std::string name) {
-		// Check if attribute already exists
-		auto attrIter = this->find<Attr<T, storeCpu>>(name);
-		if(attrIter.has_value())
-			return attrIter.value();
-
-		return BaseAttributeList::add<Attr<T, storeCpu>>(std::make_unique<Attr<T, storeCpu>>(std::move(name)));
+	// Recursing implementation for synchronization
+	template < std::size_t I, Device dev >
+	void synchronize_impl() {
+		if constexpr(I < AttributePools::size) {
+			// Workaround for VS2017 bug: otherwise you may use the 'Type' template of the
+			// tagged tuple
+			auto& changed = m_attributePools.get<I>();
+			constexpr Device CHANGED_DEVICE = std::decay_t<decltype(changed)>::DEVICE;
+			if(m_flags.has_changes(CHANGED_DEVICE)) {
+				changed.synchronize<dev>(m_attributePools.get<AttributePool<dev>>());
+			} else {
+				synchronize_impl<I + 1u, dev>();
+			}
+		}
 	}
-};
 
-// Attribute specialization for OpenMesh-esque scenario
-template <>
-class AttributeList<false> : public BaseAttributeList {
-public:
-	/**
-	 * Adds a new attribute to the attribute list.
-	 * If the name is already in use, this returns std::nullopt.
-	 */
-	template < template < class, bool > class Attr, class T, class Ref >
-	AttributeHandle<Attr<T, false>> add(std::string name, Ref& ref) {
-		// Check if attribute already exists
-		auto attrIter = this->find<Attr<T, false>>(name);
-		if(attrIter.has_value())
-			return attrIter.value();
-
-		return BaseAttributeList::add<Attr<T, false>>(std::make_unique<Attr<T, false>>(std::move(name), ref));
-	}
+	AttributePools m_attributePools;
+	std::vector<std::unique_ptr<IBaseAttribute>> m_attributes;
+	util::DirtyFlags<Device> m_flags;
+	std::unordered_map<std::string, std::size_t> m_mapping;
 };
 
 } // namespace mufflon::scene

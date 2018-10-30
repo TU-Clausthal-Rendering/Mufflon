@@ -109,6 +109,11 @@ public:
 		return get_index<T>() < size;
 	}
 
+	template < class Op >
+	void for_each(Op&& op) {
+
+	}
+
 private:
 	// Helper class for finding the index of a type for tuple lookup
 	template < class... T >
@@ -122,7 +127,29 @@ private:
 	template < class T, class H, class... Tails >
 	struct Index<T, H, Tails...> : public std::integral_constant<std::size_t, 1 + Index<T, Tails...>::value> {};
 
+	template < std::size_t I, class Op >
+	void for_each_impl(Op& op) {
+		if constexpr(I < size) {
+			if(!op(I, this->get<I>()))
+				for_each_impl<I + 1u>(op);
+		}
+	}
+
 	TupleType m_tuple;
 };
+
+// Function overloads to use this type instead of a tuple
+template < class T, class... Types >
+constexpr T& get(TaggedTuple<Types...>& tuple) noexcept {
+	return tuple.get<T>();
+}
+template < class T, class... Types >
+constexpr const T& get(const TaggedTuple<Types...>& tuple) noexcept {
+	return tuple.get<T>();
+}
+
+template < class... Types >
+class std::tuple_size<TaggedTuple<Types...>> :
+	public std::integral_constant<std::size_t, TaggedTuple<Types...>::size> {};
 
 }} // namespace mufflon::util

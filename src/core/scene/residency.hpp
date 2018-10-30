@@ -30,9 +30,9 @@ struct DeviceArrayHandle;
 
 template < class T >
 struct DeviceArrayHandle<Device::CPU, T> :
-	public DeviceHandle<Device::CPU, std::vector<T>*> {
+	public DeviceHandle<Device::CPU, T*> {
 	using Type = T;
-	using ValueType = std::vector<T>;
+	using ValueType = T*;
 
 	DeviceArrayHandle(ValueType* hdl) :
 		DeviceHandle<Device::CPU, ValueType*>{ hdl }
@@ -42,9 +42,9 @@ struct DeviceArrayHandle<Device::CPU, T> :
 // TODO: what's wrong with device vector?
 template < class T >
 struct DeviceArrayHandle<Device::CUDA, T> :
-	public DeviceHandle<Device::CUDA, std::vector<T>*> {
+	public DeviceHandle<Device::CUDA, T*> {
 	using Type = T;
-	using ValueType = std::vector<T>;
+	using ValueType = T*;
 
 	DeviceArrayHandle(ValueType* hdl) :
 		DeviceHandle<Device::CUDA, ValueType*>{ hdl } {}

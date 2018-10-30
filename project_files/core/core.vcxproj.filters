@@ -85,6 +85,9 @@
     <ClCompile Include="..\..\src\core\scene\scene.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\attribute.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -200,6 +203,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\types.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\allocator.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\array_wrapper.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cuda\error.hpp">
+      <Filter>Source Files\core\cuda</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
