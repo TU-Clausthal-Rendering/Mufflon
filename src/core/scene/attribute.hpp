@@ -10,12 +10,30 @@
 
 namespace mufflon::scene {
 
+namespace pool_detail {
+
+// Helper struct indicating an attribute's offset and length within the memory block (in bytes)
+struct MemoryArea {
+	std::size_t offset = std::numeric_limits<std::size_t>::max();
+	std::size_t length = 0u;
+	std::size_t elem_size = 0u;
+};
+
+} // namespace pool_detail
+
 // Attribute pool implementation for devices which use a malloc/realloc/free pattern
-template < class Allocator >
+template < class Alloc >
 class MallocAttributePool {
 public:
+	template < class A >
+	friend class MallocAttributePool;
+
+	using Allocator = Alloc;
+
+	MallocAttributePool() = default;
 	virtual ~MallocAttributePool() {
-		Allocator::free(m_memoryBlock, m_size);
+		if(m_memoryBlock != nullptr)
+			Allocator::free(m_memoryBlock, m_size);
 	}
 
 	// Helper class identifying an attribute in the pool
@@ -44,9 +62,8 @@ public:
 	AttributeHandle<T> add() {
 		// Increase size of memory pool
 		std::size_t newBytes = sizeof(T) * m_attribLength;
-		MemoryArea area{ m_size, newBytes };
-		m_memoryBlock = Allocator::realloc(m_memoryBlock, m_size, m_size + newBytes);
-		m_size += newBytes;
+		pool_detail::MemoryArea area{ m_size, newBytes, sizeof(T) };
+		this->realloc(m_size + newBytes);
 
 		// Save attribute offset and length at a free spot
 		auto iter = m_attribs.begin();
@@ -67,22 +84,60 @@ public:
 	// Removes the given attribute from the pool
 	template < class T >
 	bool remove(const AttributeHandle<T>& hdl) {
-		if(hdl.index >= m_attribs.size())
+		if(hdl.index() >= m_attribs.size())
 			return false;
-		if(m_attribs[hdl.index].offset == std::numeric_limits<std::size_t>::max())
+		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return false;
 
 		// Shrink the memory pool
-		std::size_t removedBytes = m_attribs[hdl.index].length;
+		std::size_t removedBytes = m_attribs[hdl.index()].length;
 		mAssert(removedBytes <= m_size);
-		m_memoryBlock = Allocator::realloc(m_memoryBlock, m_size, m_size - removedBytes);
-		m_size -= removedBytes;
 
 		// Either entirely remove or mark as hole
-		if(hdl.index == m_attribs.size() - 1u)
+		if(hdl.index == m_attribs.size() - 1u) {
+			// Is at the back -> we can reallocate
 			m_attribs.pop_back();
-		else
-			m_attribs[hdl.index] = { std::numeric_limits<std::size_t>::max(), 0u };
+			this->realloc(m_size - removedBytes);
+		} else {
+			if(m_present) {
+				// We might need to shift the following attributes
+				if(removedBytes == m_size) {
+					// Nothing left (or nothing there to begin with) -> unload
+					this->unload();
+				} else {
+					// Loop once to find largest attribute
+					std::size_t largest = 0u;
+					for(std::size_t i = hdl.index() + 1u; i < m_attribs.size(); ++i) {
+						if(m_attribs[i].offset != std::numeric_limits<std::size_t>::max())
+							largest = std::max(largest, m_attribs[i].length);
+					}
+					// Since we're not last there must be one more element that's larger
+					mAssert(largest > 0u);
+
+					// Allocate a swap buffer for the realloc
+					char* swapBlock = Allocator::template alloc<char>(largest);
+					// Start shifting the later attributes
+					std::size_t currOffset = m_attribs[hdl.index()].offset;
+					for(std::size_t i = hdl.index() + 1u; i < m_attribs.size(); ++i) {
+						// Swap the attribute into the temporary buffer, then copy it to its new location
+						if(m_attribs[i].offset != std::numeric_limits<std::size_t>::max()) {
+							Allocator::copy(swapBlock, &m_memoryBlock[m_attribs[i].offset], m_attribs[i].length);
+							Allocator::copy(&m_memoryBlock[currOffset], swapBlock, m_attribs[i].length);
+							m_attribs[i].offset = currOffset;
+							currOffset += m_attribs[i].length;
+						}
+					}
+					
+					// Clean up
+					Allocator::free(swapBlock, largest);
+					m_size -= removedBytes;
+				}
+			} else {
+				// "Pretend" to realloc even though we'll just save the size
+				this->realloc(m_size - removedBytes);
+			}
+			m_attribs[hdl.index()] = { std::numeric_limits<std::size_t>::max(), 0u };
+		}
 
 		return true;
 	}
@@ -112,38 +167,64 @@ public:
 	// Resizes all attributes to the given length
 	void resize(std::size_t length) {
 		if(length != m_attribLength) {
-			std::size_t newSize = length * (m_size / m_attribLength);
-			char* newBlock = nullptr;
-			if(m_present) {
-				// Can only reallocate if we're growing in size
-				if(length > m_attribLength) {
-					m_memoryBlock = Allocator::realloc(m_memoryBlock, m_size, newSize);
-					newBlock = m_memoryBlock;
-				} else {
-					newBlock = Allocator::alloc(newSize);
+			// Check if we had non-zero size before - if not, we need to compute it
+			std::size_t newSize = 0u;
+			if(m_attribLength == 0) {
+				if(length != 0u) {
+					for(const auto& area : m_attribs) {
+						if(area.offset != std::numeric_limits<std::size_t>::max())
+							newSize += area.elem_size;
+					}
+					newSize *= length;
 				}
+			} else {
+				newSize = length * (m_size / m_attribLength);
+			}
+
+			if(newSize == 0u) {
+				// Special case - remove all elements
+				for(auto& area : m_attribs) {
+					if(area.offset != std::numeric_limits<std::size_t>::max()) {
+						area.offset = 0u;
+						area.length = 0u;
+					}
+				}
+				this->unload();
+			} else {
+				char* newBlock = nullptr;
+				if(m_present) {
+					// Can only reallocate if we're growing in size
+					if(length > m_attribLength) {
+						newBlock = Allocator::realloc(m_memoryBlock, m_size, newSize);
+					} else {
+						newBlock = Allocator::alloc(newSize);
+					}
+				}
+
+				// Loop all attributes to shift them , but in reverse to ease copying
+				std::size_t currEnd = newSize;
+				for(auto iter = m_attribs.rbegin(); iter != m_attribs.rend(); ++iter) {
+					if(iter->offset != std::numeric_limits<std::size_t>::max()) {
+						const std::size_t elemSize = iter->length / m_attribLength;
+						mAssert(elemSize != 0u);
+						iter->length = elemSize * length;
+						currEnd -= iter->length;
+						// Copy the still-valid attribute values
+						if(m_present) {
+							mAssert(newBlock != nullptr);
+							mAssert(m_memoryBlock != nullptr);
+							Allocator::copy(&newBlock[currEnd], &m_memoryBlock[iter->offset], iter->length);
+						}
+						iter->offset = currEnd;
+					}
+				}
+
+				if(newBlock != m_memoryBlock)
+					Allocator::free(m_memoryBlock, m_size);
+				m_memoryBlock = newBlock;
+				m_attribLength = length;
 				m_size = newSize;
 			}
-
-			// Loop all attributes to shift them , but in reverse to ease copying
-			std::size_t currEnd = newSize;
-			for(auto iter = m_attribs.rbegin(); iter != m_attribs.rend(); ++iter) {
-				if(iter->offset != std::numeric_limits<std::size_t>::max()) {
-					const std::size_t elemSize = iter->length / m_attribLength;
-					mAssert(elemSize != 0u);
-					iter->length = elemSize * length;
-					currEnd -= iter->length;
-					// Copy the still-valid attribute values
-					if(m_present) {
-						mAssert(newBlock != nullptr);
-						mAssert(m_memoryBlock != nullptr);
-						Allocator::copy(&newBlock[currEnd], &m_memoryBlock[iter->offset], iter->length);
-					}
-					iter->offset = currEnd;
-				}
-			}
-
-			m_attribLength = length;
 		}
 	}
 
@@ -197,14 +278,50 @@ public:
 		return m_present;
 	}
 
-private:
-	// Helper struct indicating an attribute's offset and length within the memory block (in bytes)
-	struct MemoryArea {
-		std::size_t offset = std::numeric_limits<std::size_t>::max();
-		std::size_t length = 0u;
-	};
+protected:
+	// Makes the memory buffer present (but does not sync!)
+	void make_present() {
+		// Since attributes are always changed for all pools, we only need to allocate the necessary space
+		if(!m_present) {
+			mAssert(m_memoryBlock == nullptr);
+			m_memoryBlock = Allocator::template alloc<char>(m_size);
+			m_present = true;
+		}
+	}
 
-	std::vector<MemoryArea> m_attribs;
+	// Gain access to the raw memory block for syncing
+	char* get_pool_data() {
+		return m_memoryBlock;
+	}
+
+	const char* get_pool_data() const {
+		return m_memoryBlock;
+	}
+
+	// Mark the pool as being present on the device again
+	void mark_present() {
+		m_present = true;
+	}
+
+private:
+	// Resizes the internal memory chunk with respect to presence and such
+	void realloc(std::size_t newSize) {
+		// Only resize if we're present on the device
+		if(m_present) {
+			if(newSize == 0u) {
+				// Remove from device
+				this->unload();
+			} else if(newSize != m_size) {
+				if(m_memoryBlock == nullptr)
+					m_memoryBlock = Allocator::template alloc<char>(newSize);
+				else
+					m_memoryBlock = Allocator::realloc(m_memoryBlock, m_size, newSize);
+			}
+		}
+		m_size = newSize;
+	}
+
+	std::vector<pool_detail::MemoryArea> m_attribs;
 	std::size_t m_size = 0u;
 	std::size_t m_attribLength = 0u;
 	bool m_present = false;
@@ -227,6 +344,10 @@ class AttributePool<Device::CPU, true> : public MallocAttributePool<Allocator<De
 public:
 	static constexpr Device DEVICE = Device::CPU;
 	static constexpr bool OWNING = true;
+	template < Device dev, bool owning >
+	friend class AttributePool;
+	template < class A >
+	friend class MallocAttributePool;
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
@@ -243,6 +364,10 @@ class AttributePool<Device::CUDA, true> : public MallocAttributePool<Allocator<D
 public:
 	static constexpr Device DEVICE = Device::CUDA;
 	static constexpr bool OWNING = true;
+	template < Device dev, bool owning >
+	friend class AttributePool;
+	template < class A >
+	friend class MallocAttributePool;
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
@@ -258,6 +383,10 @@ class AttributePool<Device::CPU, false> {
 public:
 	static constexpr Device DEVICE = Device::CPU;
 	static constexpr bool OWNING = false;
+	template < Device dev, bool owning >
+	friend class AttributePool;
+	template < class A >
+	friend class MallocAttributePool;
 
 	// Helper class identifying an attribute in the pool
 	template < class T >
@@ -282,6 +411,11 @@ public:
 	// Adds a new attribute to the pool
 	template < class T >
 	AttributeHandle<T> add(OpenMesh::BaseProperty& prop) {
+		static_assert(!std::is_same_v<T, bool>,
+					  "Due to our synchronization, we can't handle bool yet");
+		static_assert(!std::is_same_v<T, std::string>,
+					  "Due to our synchronization, we can't handle std::string yet");
+
 		// Ensure that the property is at the same size
 		prop.resize(m_attribLength);
 
