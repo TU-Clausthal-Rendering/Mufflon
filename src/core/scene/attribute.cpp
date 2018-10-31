@@ -21,9 +21,8 @@ void AttributePool<Device::CPU, false>::synchronize<Device::CUDA, true>(Attribut
 		if(attrib != nullptr) {
 			// Copy the current attribute into the buffer
 			const std::size_t currLength = attrib->size_of();
-			// TODO: this is hella UB, but I can't think of a better way so far...
-			auto& castedProp = *reinterpret_cast<OpenMesh::PropertyT<char>*>(attrib);
-			cudaMemcpy(&pool.get_pool_data()[currOffset], castedProp.data_vector().data(), currLength, cudaMemcpyHostToDevice);
+			const char* propPtr = m_accessors[i](*attrib);
+			cudaMemcpy(&pool.get_pool_data()[currOffset], propPtr, currLength, cudaMemcpyHostToDevice);
 			currOffset += currLength;
 		}
 	}
@@ -48,9 +47,8 @@ void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(Attribut
 		if(attrib != nullptr) {
 			// Copy from the contiguous buffer into the attributes
 			const std::size_t currLength = attrib->size_of();
-			// TODO: this is hella UB, but I can't think of a better way so far...
-			auto& castedProp = *reinterpret_cast<OpenMesh::PropertyT<char>*>(attrib);
-			cudaMemcpy(castedProp.data_vector().data(), &this->get_pool_data()[currOffset], currLength, cudaMemcpyDeviceToHost);
+			char* propPtr = pool.m_accessors[i](*attrib);
+			cudaMemcpy(propPtr, &this->get_pool_data()[currOffset], currLength, cudaMemcpyDeviceToHost);
 			currOffset += currLength;
 		}
 	}

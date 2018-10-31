@@ -5,6 +5,7 @@
 #include "util/array_wrapper.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
+#include <functional>
 #include <istream>
 #include <ostream>
 
@@ -377,6 +378,7 @@ public:
 		}
 	}
 };
+
 // Specialization for CPU with OpenMesh
 template <>
 class AttributePool<Device::CPU, false> {
@@ -411,11 +413,6 @@ public:
 	// Adds a new attribute to the pool
 	template < class T >
 	AttributeHandle<T> add(OpenMesh::BaseProperty& prop) {
-		static_assert(!std::is_same_v<T, bool>,
-					  "Due to our synchronization, we can't handle bool yet");
-		static_assert(!std::is_same_v<T, std::string>,
-					  "Due to our synchronization, we can't handle std::string yet");
-
 		// Ensure that the property is at the same size
 		prop.resize(m_attribLength);
 
@@ -427,6 +424,12 @@ public:
 			}
 		}
 		m_attributes.push_back(&prop);
+
+		// Create an accessor that can use the type info
+		m_accessors.push_back([](OpenMesh::BaseProperty& prop) {
+			return reinterpret_cast<char*>(dynamic_cast<OpenMesh::PropertyT<T>&>(prop).data_vector().data());
+		});
+
 		// No hole found
 		return AttributeHandle<T>{ m_attributes.size() - 1u };
 	}
@@ -434,16 +437,19 @@ public:
 	// Removes the given attribute from the pool
 	template < class T >
 	bool remove(const AttributeHandle<T>& hdl) {
-		if(hdl.index >= m_attributes.size())
+		if(hdl.index() >= m_attributes.size())
 			return false;
-		if(m_attributes[hdl.index].offset == std::numeric_limits<std::size_t>::max())
+		if(m_attributes[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return false;
 
 		// Either entirely remove or mark as hole
-		if(hdl.index == m_attributes.size() - 1u)
+		if(hdl.index == m_attributes.size() - 1u) {
 			m_attributes.pop_back();
-		else
-			m_attributes[hdl.index] = nullptr;
+			m_accessors.pop_back();
+		} else {
+			m_attributes[hdl.index()] = nullptr;
+			// Don't bother removing the accessor
+		}
 
 		return true;
 	}
@@ -543,9 +549,9 @@ public:
 	}
 
 private:
-	// Non-owning pointer to OpenMesh attribute
 	std::size_t m_attribLength;
-	std::vector<OpenMesh::BaseProperty*> m_attributes;
+	std::vector<OpenMesh::BaseProperty*> m_attributes; // Non-owning pointer to OpenMesh attribute
+	std::vector<std::function<char*(OpenMesh::BaseProperty&)>> m_accessors; // Accessors to attribute
 };
 
 
