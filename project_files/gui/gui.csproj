@@ -77,6 +77,8 @@
     <Compile Include="Model\MaterialModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
+    <Compile Include="Utility\SynchronizedModelList.cs" />
+    <Compile Include="Utility\SynchronizedViewModelList.cs" />
     <Compile Include="Utility\Vec2.cs" />
     <Compile Include="Utility\Vec3.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
