@@ -72,7 +72,10 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Model\AppModel.cs" />
-    <Compile Include="Model\CameraModel.cs" />
+    <Compile Include="Model\Camera\CameraModel.cs" />
+    <Compile Include="Model\Camera\FocusCameraModel.cs" />
+    <Compile Include="Model\Camera\OrthoCameraModel.cs" />
+    <Compile Include="Model\Camera\PinholeCameraModel.cs" />
     <Compile Include="Model\LightModel.cs" />
     <Compile Include="Model\MaterialModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
@@ -81,6 +84,9 @@
     <Compile Include="Utility\SynchronizedViewModelList.cs" />
     <Compile Include="Utility\Vec2.cs" />
     <Compile Include="Utility\Vec3.cs" />
+    <Compile Include="ViewModel\Camera\CamerasViewModel.cs" />
+    <Compile Include="ViewModel\Camera\CameraViewModel.cs" />
+    <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />

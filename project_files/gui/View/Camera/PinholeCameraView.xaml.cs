@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using gui.ViewModel.Camera;
 
 namespace gui.View.Camera
 {
@@ -20,12 +21,13 @@ namespace gui.View.Camera
     /// </summary>
     public partial class PinholeCameraView : UserControl
     {
-        public PinholeCameraView()
+        public PinholeCameraView(PinholeCameraViewModel viewModel)
         {
             InitializeComponent();
+            DataContext = viewModel;
         }
 
-        public string CameraName
+        /*public string CameraName
         {
             get => (string)GetValue(CameraNameProperty);
             set => SetValue(CameraNameProperty, value);
@@ -33,7 +35,7 @@ namespace gui.View.Camera
 
         public static readonly DependencyProperty CameraNameProperty = DependencyProperty.Register(
             nameof(CameraName), typeof(string), typeof(PinholeCameraView), new PropertyMetadata("CameraName")          
-        );
+        );*/
 
         /*public static readonly DependencyProperty CameraFovProperty = DependencyProperty.Register(
             "CameraFov", typeof(float), typeof(PinholeCameraView), null

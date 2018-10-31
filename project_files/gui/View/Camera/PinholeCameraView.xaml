@@ -6,8 +6,7 @@
              xmlns:local="clr-namespace:gui.View.Camera"
              mc:Ignorable="d" 
              d:DesignHeight="100"
-             d:DesignWidth="160"
-             Name="ThisControl">
+             d:DesignWidth="160">
     <UserControl.Resources>
         <Thickness x:Key="DefaultMargin" Bottom="5" Right="5"/>
     </UserControl.Resources>
@@ -15,7 +14,7 @@
         <GroupBox.Header>
             <TextBox 
                 Width="100" 
-                Text="{Binding CameraName, ElementName=ThisControl}"/>
+                Text="{Binding Name}"/>
         </GroupBox.Header>
         <Grid>
             <Grid.RowDefinitions>
@@ -46,7 +45,8 @@
             <TextBox
                 Grid.Column="1"
                 Grid.Row="1"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource DefaultMargin}"
+                Text="{Binding Fov}"/>
         </Grid>
     </GroupBox>
 </UserControl>

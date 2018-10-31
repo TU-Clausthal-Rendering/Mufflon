@@ -8,6 +8,9 @@ using System.Text;
 using System.Threading.Tasks;
 using gui.Annotations;
 using gui.Model;
+using gui.Model.Camera;
+using gui.Utility;
+using gui.ViewModel.Camera;
 
 namespace gui.ViewModel
 {
@@ -18,6 +21,7 @@ namespace gui.ViewModel
     {
         public ConsoleViewModel Console { get; }
         public ViewportViewModel Viewport { get; }
+        public CamerasViewModel Cameras { get; }
 
         private readonly Models m_models;
 
@@ -29,6 +33,12 @@ namespace gui.ViewModel
             // view model initialization
             Console = new ConsoleViewModel(m_models);
             Viewport = new ViewportViewModel(m_models);
+            Cameras = new CamerasViewModel(m_models);
+
+            // test cameras
+            m_models.Cameras.Models.Add(new PinholeCameraModel());
+            m_models.Cameras.Models.Add(new PinholeCameraModel());
+            m_models.Cameras.Models.Add(new PinholeCameraModel());
 
             // command initialization
         }

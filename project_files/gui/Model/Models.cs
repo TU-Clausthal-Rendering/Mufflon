@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model.Camera;
+using gui.Utility;
 
 namespace gui.Model
 {
@@ -13,11 +15,13 @@ namespace gui.Model
     {
         public AppModel App { get; }
         public ViewportModel Viewport { get; }
+        public SynchronizedModelList<CameraModel> Cameras { get; }
 
         public Models(MainWindow window)
         {
             Viewport = new ViewportModel();
             App = new AppModel(window, Viewport);
+            Cameras = new SynchronizedModelList<CameraModel>();
         }
     }
 }

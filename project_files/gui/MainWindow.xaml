@@ -94,8 +94,11 @@
 
                     </TabItem>
                     <TabItem Header="Camera">
-                        <camera:PinholeCameraView
-                            CameraName="Test"/>
+                        <ScrollViewer 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </Grid>
