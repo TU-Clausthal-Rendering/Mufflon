@@ -111,7 +111,15 @@
     <Compile Include="ViewModel\Light\LightViewModel.cs" />
     <Compile Include="ViewModel\Light\PointLightViewModel.cs" />
     <Compile Include="ViewModel\Light\SpotLightViewModel.cs" />
+    <Compile Include="ViewModel\Material\BlendMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\EmissiveMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\FresnelMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\LambertMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\MaterialsViewModel.cs" />
     <Compile Include="ViewModel\Material\MaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\OrennayarMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\TorranceMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
@@ -227,6 +235,9 @@
     <Resource Include="Icons\open.png" />
     <Resource Include="Icons\save.png" />
     <Resource Include="Icons\zoom.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="View\Material\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

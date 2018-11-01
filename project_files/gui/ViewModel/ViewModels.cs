@@ -13,6 +13,7 @@ using gui.Model.Light;
 using gui.Utility;
 using gui.ViewModel.Camera;
 using gui.ViewModel.Light;
+using gui.ViewModel.Material;
 
 namespace gui.ViewModel
 {
@@ -25,6 +26,7 @@ namespace gui.ViewModel
         public ViewportViewModel Viewport { get; }
         public CamerasViewModel Cameras { get; }
         public LightsViewModel Lights { get; }
+        public MaterialsViewModel Materials { get; }
 
         private readonly Models m_models;
 
@@ -38,6 +40,7 @@ namespace gui.ViewModel
             Viewport = new ViewportViewModel(m_models);
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);
+            Materials = new MaterialsViewModel(m_models);
 
             // test cameras
             m_models.Cameras.Models.Add(new PinholeCameraModel());

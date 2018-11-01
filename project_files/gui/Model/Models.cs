@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using gui.Model.Camera;
 using gui.Model.Light;
+using gui.Model.Material;
 using gui.Utility;
 
 namespace gui.Model
@@ -18,6 +19,7 @@ namespace gui.Model
         public ViewportModel Viewport { get; }
         public SynchronizedModelList<CameraModel> Cameras { get; }
         public SynchronizedModelList<LightModel> Lights { get; }
+        public SynchronizedModelList<MaterialModel> Materials { get; }
 
         public Models(MainWindow window)
         {
@@ -25,6 +27,7 @@ namespace gui.Model
             App = new AppModel(window, Viewport);
             Cameras = new SynchronizedModelList<CameraModel>();
             Lights = new SynchronizedModelList<LightModel>();
+            Materials = new SynchronizedModelList<MaterialModel>();
         }
     }
 }

@@ -113,7 +113,11 @@
 
                     </TabItem>
                     <TabItem Header="Material">
-
+                        <ScrollViewer 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Materials.Views}"/>
+                        </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Light">
                         <ScrollViewer 
