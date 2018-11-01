@@ -2,7 +2,6 @@
 
 #include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
-#include <thrust/device_vector.h>
 #include <algorithm>
 #include <vector>
 

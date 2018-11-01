@@ -94,18 +94,26 @@ public:
 	// Default construction, creates material-index attribute.
 	Polygons() :
 		m_meshData(),
-		m_pointsAttr(this->create_points_attribute()),
-		m_normalsAttr(this->create_normals_attribute()),
-		m_uvsAttr(this->create_uvs_attribute()),
-		m_matIndexAttr(this->create_mat_index_attribute())
+		m_pointsHdl(this->create_points_handle()),
+		m_normalsHdl(this->create_normals_handle()),
+		m_uvsHdl(this->create_uvs_handle()),
+		m_matIndexHdl(this->create_mat_index_handle()),
+		m_pointsAttr(this->aquire(m_pointsHdl)),
+		m_normalsAttr(this->aquire(m_normalsHdl)),
+		m_uvsAttr(this->aquire(m_uvsHdl)),
+		m_matIndexAttr(this->aquire(m_matIndexHdl))
 	{}
 	// Creates polygon from already-created mesh.
 	Polygons(MeshType&& mesh) :
 		m_meshData(mesh),
-		m_pointsAttr(this->create_points_attribute()),
-		m_normalsAttr(this->create_normals_attribute()),
-		m_uvsAttr(this->create_uvs_attribute()),
-		m_matIndexAttr(this->create_mat_index_attribute())
+		m_pointsHdl(this->create_points_handle()),
+		m_normalsHdl(this->create_normals_handle()),
+		m_uvsHdl(this->create_uvs_handle()),
+		m_matIndexHdl(this->create_mat_index_handle()),
+		m_pointsAttr(this->aquire(m_pointsHdl)),
+		m_normalsAttr(this->aquire(m_normalsHdl)),
+		m_uvsAttr(this->aquire(m_uvsHdl)),
+		m_matIndexAttr(this->aquire(m_matIndexHdl))
 	{}
 
 	Polygons(const Polygons&) = default;
@@ -130,10 +138,11 @@ public:
 			m_meshData.add_property(attrHandle, name);
 			// ...as well as our attribute list
 			OpenMesh::PropertyT<Type> &omAttr = m_meshData.property(attrHandle);
-			return { attrHandle, m_attributes.add<Type>(name, omAttr) };
+			return { attrHandle, AttributeHelper<AttributeHandle>::add(m_vertexAttributes,
+																	   m_faceAttributes, name, omAttr) };
 		} else {
 			// Found in OpenMesh already, now find it in our list
-			auto opt = m_attributes.find<Type>(name);
+			auto opt = AttributeHelper<AttributeHandle>::find(m_vertexAttributes, m_faceAttributes, name);
 			mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
 					   "property in OpenMesh but not in our custom list");
 			return { attrHandle, opt.value() };
@@ -144,7 +153,7 @@ public:
 	void remove(const AttributeHandle &attr) {
 		// Remove from both lists
 		m_meshData.remove_property(attr.omHandle);
-		m_attributes.remove(attr.customHandle);
+		AttributeHelper<AttributeHandle>::remove(m_vertexAttributes, m_faceAttributes, attr.customHandle);
 	}
 
 	template < class AttributeHandle >
@@ -156,28 +165,44 @@ public:
 		if(!m_meshData.get_property_handle(attrHandle, name))
 			return std::nullopt;
 		// Find attribute in custom list as 
-		auto opt = m_attributes.find<Attribute<Type, false>>(name);
+		auto opt = AttributeHelper<AttributeHandle>::find(m_vertexAttributes, m_faceAttributes, name);
 		mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
 				   "property in OpenMesh but not in our custom list");
 		return { attrHandle, opt.value() };
 	}
 
-	template < class AttributeHandle >
-	auto& aquire(const AttributeHandle& attrHandle) {
-		return m_attributes.aquire(attrHandle.customHandle);
+	template < class T >
+	auto& aquire(const VertexAttributeHandle<T>& attrHandle) {
+		return m_vertexAttributes.aquire(attrHandle.customHandle);
 	}
 
-	template < class AttributeHandle >
-	const auto& aquire(const AttributeHandle& attrHandle) const {
-		return m_attributes.aquire(attrHandle.customHandle);
+	template < class T >
+	const auto& aquire(const VertexAttributeHandle<T>& attrHandle) const {
+		return m_vertexAttributes.aquire(attrHandle.customHandle);
+	}
+
+	template < class T >
+	auto& aquire(const FaceAttributeHandle<T>& attrHandle) {
+		return m_faceAttributes.aquire(attrHandle.customHandle);
+	}
+
+	template < class T >
+	const auto& aquire(const FaceAttributeHandle<T>& attrHandle) const {
+		return m_faceAttributes.aquire(attrHandle.customHandle);
 	}
 
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
 	// Adds a new triangle.
-	TriangleHandle add(const VertexHandle &vh, const Triangle& tri, MaterialIndex idx);
+	TriangleHandle add(const Triangle& tri, MaterialIndex idx);
+	TriangleHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
+					   MaterialIndex idx);
+	TriangleHandle add(const std::array<VertexHandle, 3u>& vertices, MaterialIndex idx);
 	// Adds a new quad.
-	QuadHandle add(const VertexHandle &vh, const Quad& quad, MaterialIndex idx);
+	QuadHandle add(const Quad& quad, MaterialIndex idx);
+	QuadHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
+					   const VertexHandle& v3, MaterialIndex idx);
+	QuadHandle add(const std::array<VertexHandle, 4u>& vertices, MaterialIndex idx);
 
 	/**
 	 * Adds a bulk of vertices.
@@ -191,15 +216,15 @@ public:
 	 * The number of read values will be capped by the number of vertice present
 	 * after the starting position.
 	 */
-	template < template < class > class Attribute, class Type >
-	std::size_t add_bulk(const Attribute<Type>& attribute, const VertexHandle& startVertex,
+	template < class Type >
+	std::size_t add_bulk(Attribute<Type>& attribute, const VertexHandle& startVertex,
 						 std::size_t count, std::istream& attrStream) {
 		mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData.n_vertices());
 		// Cap the number of attributes
 		std::size_t actualCount = std::min(m_meshData.n_vertices() - static_cast<std::size_t>(startVertex.idx()),
 										   count);
 		// Read the attribute from the stream
-		attrStream.read(attribute.data_vector().data(), actualCount * sizeof(Type));
+		attribute.restore(attrStream, static_cast<std::size_t>(startVertex.idx()), actualCount);
 		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
 		return actuallyRead;
 	}
@@ -208,15 +233,15 @@ public:
 	 * The number of read values will be capped by the number of faces present
 	 * after the starting position.
 	 */
-	template < template < class > class Attribute, class Type >
-	std::size_t add_bulk(const Attribute<Type>& attribute, const FaceHandle& startFace,
+	template < class Type >
+	std::size_t add_bulk(Attribute<Type>& attribute, const FaceHandle& startFace,
 						 std::size_t count, std::istream& attrStream) {
 		mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData.n_faces());
 		// Cap the number of attributes
 		std::size_t actualCount = std::min(m_meshData.n_faces() - static_cast<std::size_t>(startFace.idx()),
 										   count);
 		// Read the attribute from the stream
-		attrStream.read(attribute.data_vector().data(), actualCount * sizeof(Type));
+		attribute.restore(attrStream, static_cast<std::size_t>(startFace.idx()), actualCount);
 		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
 		return actuallyRead;
 	}
@@ -239,18 +264,36 @@ public:
 		return add_bulk(attribute, startFace, count, attrStream);
 	}
 
+	const VertexAttributeHandle<OpenMesh::Vec3f>& get_points_handle() const {
+		return m_pointsHdl;
+	}
+
+	const VertexAttributeHandle<OpenMesh::Vec3f>& get_normals_handle() const {
+		return m_normalsHdl;
+	}
+
+	const VertexAttributeHandle<OpenMesh::Vec2f>& get_uvs_handle() const {
+		return m_uvsHdl;
+	}
+
+	const FaceAttributeHandle<MaterialIndex>& get_mat_indices_handle() const {
+		return m_matIndexHdl;
+	}
+
+	Attribute<MaterialIndex>& get_mat_indices() {
+		return m_matIndexAttr;
+	}
+
 	// Synchronizes the default attributes position, normal, uv, matindex 
 	template < Device dev >
 	void synchronize() {
-		m_attributes.synchronize<dev>();
+		m_vertexAttributes.synchronize<dev>();
 	}
 
 	template < Device dev >
 	void unload() {
-		m_attributes.unload<dev>();
+		m_vertexAttributes.unload<dev>();
 	}
-
-	// TODO: unload
 
 	// Implements tessellation for uniform subdivision.
 	void tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
@@ -268,36 +311,77 @@ public:
 	}
 
 private:
+	// Helper struct for adding attributes since functions cannot be partially specialized
+	template < class AttributeHandle >
+	struct AttributeHelper;
+
+	template < class T >
+	struct AttributeHelper<VertexAttributeHandle<T>> {
+		static AttributeHandle<T> add(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name, OpenMesh::PropertyT<T>& prop) {
+			return vertexList.add<T>(name, prop);
+		}
+
+		static std::optional<AttributeHandle<T>> find(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name) {
+			return vertexList.find<T>(name);
+		}
+
+		static void remove(AttributeListType& vertexList, AttributeListType& faceList, AttributeHandle<T>& hdl) {
+			vertexList.remove(hdl);
+		}
+	};
+
+	template < class T >
+	struct AttributeHelper<FaceAttributeHandle<T>> {
+		static AttributeHandle<T> add(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name, OpenMesh::PropertyT<T>& prop) {
+			return faceList.add<T>(name, prop);
+		}
+
+		static std::optional<AttributeHandle<T>> find(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name) {
+			return faceList.find<T>(name);
+		}
+
+		static void remove(AttributeListType& vertexList, AttributeListType& faceList, AttributeHandle<T>& hdl) {
+			faceList.remove(hdl);
+		}
+	};
+
 	// These methods simply create references to the attributes
-	// TODO: by holding references to them, if they ever get removed, we're in a bad pot
-	Attribute<OpenMesh::Vec3f>& create_points_attribute() {
-		OpenMesh::VPropHandleT<OpenMesh::Vec3f> pointsHdl = m_meshData.points_pph();
-		mAssert(pointsHdl.is_valid());
-		OpenMesh::PropertyT<OpenMesh::Vec3f>& pointsProp = m_meshData.property(pointsHdl);
-		return m_attributes.aquire(m_attributes.add<OpenMesh::Vec3f>(pointsProp.name(), pointsProp));
+	// TODO: by holding references to them, if they ever get removed, we're in a bad spot
+	VertexAttributeHandle<OpenMesh::Vec3f> create_points_handle() {
+		OpenMesh::VPropHandleT<OpenMesh::Vec3f> omHandle = m_meshData.points_pph();
+		mAssert(omHandle.is_valid());
+		OpenMesh::PropertyT<OpenMesh::Vec3f>& pointsProp = m_meshData.property(omHandle);
+		AttributeHandle<OpenMesh::Vec3f> customHandle = m_vertexAttributes.add<OpenMesh::Vec3f>(pointsProp.name(), pointsProp);
+		return { std::move(omHandle), std::move(customHandle) };
 	}
 
-	Attribute<OpenMesh::Vec3f>& create_normals_attribute() {
-		OpenMesh::VPropHandleT<OpenMesh::Vec3f> normalsHdl = m_meshData.vertex_normals_pph();
-		mAssert(normalsHdl.is_valid());
-		OpenMesh::PropertyT<OpenMesh::Vec3f>& normalsProp = m_meshData.property(normalsHdl);
-		return m_attributes.aquire(m_attributes.add<OpenMesh::Vec3f>(normalsProp.name(), normalsProp));
+	VertexAttributeHandle<OpenMesh::Vec3f> create_normals_handle() {
+		OpenMesh::VPropHandleT<OpenMesh::Vec3f> omHandle = m_meshData.vertex_normals_pph();
+		mAssert(omHandle.is_valid());
+		OpenMesh::PropertyT<OpenMesh::Vec3f>& normalsProp = m_meshData.property(omHandle);
+		AttributeHandle<OpenMesh::Vec3f> customHandle = m_vertexAttributes.add<OpenMesh::Vec3f>(normalsProp.name(), normalsProp);
+		return { std::move(omHandle), std::move(customHandle) };
 	}
 
-	Attribute<OpenMesh::Vec2f>& create_uvs_attribute() {
-		OpenMesh::VPropHandleT<OpenMesh::Vec2f> uvsHdl = m_meshData.vertex_texcoords2D_pph();
-		mAssert(uvsHdl.is_valid());
-		OpenMesh::PropertyT<OpenMesh::Vec2f>& uvsProp = m_meshData.property(uvsHdl);
-		return m_attributes.aquire(m_attributes.add<OpenMesh::Vec2f>(uvsProp.name(), uvsProp));
+	VertexAttributeHandle<OpenMesh::Vec2f> create_uvs_handle() {
+		OpenMesh::VPropHandleT<OpenMesh::Vec2f> omHandle = m_meshData.vertex_texcoords2D_pph();
+		mAssert(omHandle.is_valid());
+		OpenMesh::PropertyT<OpenMesh::Vec2f>& uvsProp = m_meshData.property(omHandle);
+		AttributeHandle<OpenMesh::Vec2f> customHandle = m_vertexAttributes.add<OpenMesh::Vec2f>(uvsProp.name(), uvsProp);
+		return { std::move(omHandle), std::move(customHandle) };
 	}
 
-	Attribute<MaterialIndex>& create_mat_index_attribute() {
-		auto handle = this->request<FaceAttributeHandle<MaterialIndex>>("materialIndex");
-		return m_attributes.aquire(handle.customHandle);
+	FaceAttributeHandle<MaterialIndex> create_mat_index_handle() {
+		return this->request<FaceAttributeHandle<MaterialIndex>>("materialIndex");
 	}
 
 	MeshType m_meshData;
-	AttributeListType m_attributes;
+	AttributeListType m_vertexAttributes;
+	AttributeListType m_faceAttributes;
+	VertexAttributeHandle<OpenMesh::Vec3f> m_pointsHdl;
+	VertexAttributeHandle<OpenMesh::Vec3f> m_normalsHdl;
+	VertexAttributeHandle<OpenMesh::Vec2f> m_uvsHdl;
+	FaceAttributeHandle<MaterialIndex> m_matIndexHdl;
 	Attribute<OpenMesh::Vec3f>& m_pointsAttr;
 	Attribute<OpenMesh::Vec3f>& m_normalsAttr;
 	Attribute<OpenMesh::Vec2f>& m_uvsAttr;

@@ -5,6 +5,7 @@
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
 #include <string>
+#include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace textures {
 
