@@ -144,6 +144,27 @@
     <Compile Include="View\Light\SpotLightView.xaml.cs">
       <DependentUpon>SpotLightView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Material\BlendMaterialView.xaml.cs">
+      <DependentUpon>BlendMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\EmissiveMaterialView.xaml.cs">
+      <DependentUpon>EmissiveMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\FresnelMaterialView.xaml.cs">
+      <DependentUpon>FresnelMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\LambertMaterialView.xaml.cs">
+      <DependentUpon>LambertMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\OrennayarMaterialView.xaml.cs">
+      <DependentUpon>OrennayarMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\TorranceMaterialView.xaml.cs">
+      <DependentUpon>TorranceMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\WalterMaterialView.xaml.cs">
+      <DependentUpon>WalterMaterialView.xaml</DependentUpon>
+    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -186,6 +207,34 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Light\SpotLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\BlendMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\EmissiveMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\FresnelMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\LambertMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\OrennayarMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\TorranceMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\WalterMaterialView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -236,8 +285,6 @@
     <Resource Include="Icons\save.png" />
     <Resource Include="Icons\zoom.png" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="View\Material\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
