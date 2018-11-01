@@ -26,6 +26,9 @@ namespace gui.ViewModel.Camera
                 case nameof(CameraModel.Type):
                     OnPropertyChanged(nameof(Type));
                     break;
+                case nameof(CameraModel.IsSelected):
+                    OnPropertyChanged(nameof(IsSelected));
+                    break;
             }
         }
 
@@ -35,6 +38,12 @@ namespace gui.ViewModel.Camera
         {
             get => m_parent.Name;
             set => m_parent.Name = value;
+        }
+
+        public bool IsSelected
+        {
+            get => m_parent.IsSelected;
+            set => m_parent.IsSelected = value;
         }
 
         /// <summary>

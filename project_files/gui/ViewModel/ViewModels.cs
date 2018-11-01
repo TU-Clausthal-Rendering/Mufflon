@@ -37,8 +37,7 @@ namespace gui.ViewModel
 
             // test cameras
             m_models.Cameras.Models.Add(new PinholeCameraModel());
-            m_models.Cameras.Models.Add(new PinholeCameraModel());
-            m_models.Cameras.Models.Add(new PinholeCameraModel());
+            m_models.Cameras.Models.Add(new FocusCameraModel());
 
             // command initialization
         }

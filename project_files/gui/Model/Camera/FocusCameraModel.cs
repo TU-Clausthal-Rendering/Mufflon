@@ -13,7 +13,7 @@ namespace gui.Model.Camera
 
         public override CameraViewModel CreateViewModel()
         {
-            throw new NotImplementedException();
+            return new FocusCameraViewModel(this);
         }
 
         private float m_focalLength = 35.0f;

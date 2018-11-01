@@ -35,6 +35,9 @@ namespace gui.Model.Camera
             }
         }
 
+        // indicates if this camera should be used for the renderer
+        public bool IsSelected { get; set; } = false;
+
         /// <summary>
         /// creates a new view model based on this model
         /// </summary>
