@@ -15,7 +15,7 @@ namespace gui.Model.Light
 
         public override LightViewModel CreateViewModel()
         {
-            throw new NotImplementedException();
+            return new SpotLightViewModel(this);
         }
 
         private Vec3<float> m_position;
@@ -61,14 +61,9 @@ namespace gui.Model.Light
 
         public float Exponent
         {
-            get
-            {
-                Debug.Assert(Type == LightType.Spot);
-                return m_exponent;
-            }
+            get => m_exponent;
             set
             {
-                Debug.Assert(Type == LightType.Spot);
                 if (Equals(value, m_exponent)) return;
                 m_exponent = value;
                 OnPropertyChanged(nameof(Exponent));
@@ -79,14 +74,9 @@ namespace gui.Model.Light
 
         public float Width
         {
-            get
-            {
-                Debug.Assert(Type == LightType.Spot);
-                return m_width;
-            }
+            get => m_width;
             set
             {
-                Debug.Assert(Type == LightType.Spot);
                 if (Equals(value, m_width)) return;
                 m_width = value;
                 OnPropertyChanged(nameof(Width));

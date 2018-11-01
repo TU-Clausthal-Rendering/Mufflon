@@ -97,9 +97,13 @@
     <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
+    <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\GoniometricLightViewModel.cs" />
     <Compile Include="ViewModel\Light\LightsViewModel.cs" />
     <Compile Include="ViewModel\Light\LightViewModel.cs" />
     <Compile Include="ViewModel\Light\PointLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\SpotLightViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
@@ -112,8 +116,17 @@
       <DependentUpon>PinholeCameraView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\Helper\EnterTextBox.cs" />
+    <Compile Include="View\Light\DirectionalLightView.xaml.cs">
+      <DependentUpon>DirectionalLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\EnvmapLightView.xaml.cs">
+      <DependentUpon>EnvmapLightView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Light\PointLightView.xaml.cs">
       <DependentUpon>PointLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\SpotLightView.xaml.cs">
+      <DependentUpon>SpotLightView.xaml</DependentUpon>
     </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -144,7 +157,19 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="View\Light\DirectionalLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\EnvmapLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="View\Light\PointLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\SpotLightView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
