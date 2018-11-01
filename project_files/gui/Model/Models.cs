@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using gui.Model.Camera;
+using gui.Model.Light;
 using gui.Utility;
 
 namespace gui.Model
@@ -16,12 +17,14 @@ namespace gui.Model
         public AppModel App { get; }
         public ViewportModel Viewport { get; }
         public SynchronizedModelList<CameraModel> Cameras { get; }
+        public SynchronizedModelList<LightModel> Lights { get; }
 
         public Models(MainWindow window)
         {
             Viewport = new ViewportModel();
             App = new AppModel(window, Viewport);
             Cameras = new SynchronizedModelList<CameraModel>();
+            Lights = new SynchronizedModelList<LightModel>();
         }
     }
 }

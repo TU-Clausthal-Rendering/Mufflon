@@ -4,6 +4,8 @@
              xmlns:local="clr-namespace:gui"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <!-- Property Window Resources (Lights, Materials...) -->
+        <Thickness x:Key="LeftPropertyMargin" Bottom="2" Right="3"/>
+        <Thickness x:Key="RightPropertyMargin" Bottom="2"/>
     </Application.Resources>
 </Application>

@@ -8,15 +8,12 @@
              mc:Ignorable="d" 
              d:DesignHeight="100"
              d:DesignWidth="160">
-    <UserControl.Resources>
-        <Thickness x:Key="DefaultMargin" Bottom="5" Right="5"/>
-    </UserControl.Resources>
     <GroupBox>
         <GroupBox.Header>
             <StackPanel Orientation="Horizontal">
                 <RadioButton
                     GroupName="RadioCamera"
-                    Margin="{StaticResource DefaultMargin}"
+                    Margin="{StaticResource LeftPropertyMargin}"
                     IsChecked="{Binding IsSelected}"/>
 
                 <TextBox 
@@ -38,22 +35,22 @@
                 Grid.Column="0"
                 Grid.Row="0"
                 Text="Type:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <TextBlock
                 Grid.Column="1"
                 Grid.Row="0"
                 Text="{Binding Type}"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource RightPropertyMargin}"/>
             
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="1"
                 Text="Fov:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <helper:EnterTextBox
                 Grid.Column="1"
                 Grid.Row="1"
-                Margin="{StaticResource DefaultMargin}"
+                Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Fov}"/>
         </Grid>
     </GroupBox>

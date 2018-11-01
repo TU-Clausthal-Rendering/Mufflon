@@ -1,17 +1,17 @@
-﻿<UserControl x:Class="gui.View.Camera.OrthoCameraView"
+﻿<UserControl x:Class="gui.View.Light.PointLightView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:gui.View.Camera"
+             xmlns:local="clr-namespace:gui.View.Light"
              xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d" 
-             d:DesignHeight="150" d:DesignWidth="160">
+             d:DesignHeight="200" 
+             d:DesignWidth="160">
     <GroupBox>
         <GroupBox.Header>
             <StackPanel Orientation="Horizontal">
-                <RadioButton
-                    GroupName="RadioCamera"
+                <CheckBox
                     Margin="{StaticResource LeftPropertyMargin}"
                     IsChecked="{Binding IsSelected}"/>
 
@@ -22,6 +22,7 @@
         </GroupBox.Header>
         <Grid>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -45,24 +46,64 @@
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="1"
-                Text="Width:"
+                Text="Scale:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
             <helper:EnterTextBox
                 Grid.Column="1"
                 Grid.Row="1"
                 Margin="{StaticResource RightPropertyMargin}"
-                Text="{Binding Width}"/>
+                Text="{Binding Scale}"/>
 
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="2"
-                Text="Height:"
+                Text="Position:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+            <Grid
                 Grid.Column="1"
                 Grid.Row="2"
-                Margin="{StaticResource RightPropertyMargin}"
-                Text="{Binding Height}"/>
+                Margin="{StaticResource RightPropertyMargin}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding PositionX}"/>
+                <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding PositionY}"/>
+                <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding PositionZ}"/>
+            </Grid>
+            
+
+            <TextBlock
+                Grid.Column="0"
+                Grid.Row="3"
+                Text="Intensity:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+            <Grid
+                Grid.Column="1"
+                Grid.Row="3"
+                Margin="{StaticResource RightPropertyMargin}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding IntensityX}"/>
+                <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding IntensityY}"/>
+                <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding IntensityZ}"/>
+            </Grid>
         </Grid>
     </GroupBox>
 </UserControl>

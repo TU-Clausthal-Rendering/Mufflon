@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using gui.Model.Light;
 using gui.Utility;
+using gui.View.Light;
 
 namespace gui.ViewModel.Light
 {
@@ -38,7 +39,7 @@ namespace gui.ViewModel.Light
 
         public override object CreateView()
         {
-            throw new NotImplementedException();
+            return new PointLightView(this);
         }
 
         public float PositionX

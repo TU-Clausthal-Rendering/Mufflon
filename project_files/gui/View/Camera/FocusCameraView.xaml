@@ -8,15 +8,12 @@
              mc:Ignorable="d" 
              d:DesignHeight="200" 
              d:DesignWidth="160">
-    <UserControl.Resources>
-        <Thickness x:Key="DefaultMargin" Bottom="5" Right="5"/>
-    </UserControl.Resources>
     <GroupBox>
         <GroupBox.Header>
             <StackPanel Orientation="Horizontal">
                 <RadioButton
                     GroupName="RadioCamera"
-                    Margin="{StaticResource DefaultMargin}"
+                    Margin="{StaticResource LeftPropertyMargin}"
                     IsChecked="{Binding IsSelected}"/>
 
                 <TextBox 
@@ -41,55 +38,55 @@
                 Grid.Column="0"
                 Grid.Row="0"
                 Text="Type:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <TextBlock
                 Grid.Column="1"
                 Grid.Row="0"
                 Text="{Binding Type}"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource RightPropertyMargin}"/>
 
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="1"
                 Text="Focal Length:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <helper:EnterTextBox
                 Grid.Column="1"
                 Grid.Row="1"
-                Margin="{StaticResource DefaultMargin}"
+                Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding FocalLength}"/>
 
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="2"
                 Text="Chip Height:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <helper:EnterTextBox
                 Grid.Column="1"
                 Grid.Row="2"
-                Margin="{StaticResource DefaultMargin}"
+                Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding ChipHeight}"/>
 
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="3"
                 Text="Focus Distance:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <helper:EnterTextBox
                 Grid.Column="1"
                 Grid.Row="3"
-                Margin="{StaticResource DefaultMargin}"
+                Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding FocusDistance}"/>
 
             <TextBlock
                 Grid.Column="0"
                 Grid.Row="4"
                 Text="Aperture:"
-                Margin="{StaticResource DefaultMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"/>
             <helper:EnterTextBox
                 Grid.Column="1"
                 Grid.Row="4"
-                Margin="{StaticResource DefaultMargin}"
+                Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Aperture}"/>
         </Grid>
     </GroupBox>

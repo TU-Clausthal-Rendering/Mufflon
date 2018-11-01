@@ -116,7 +116,11 @@
 
                     </TabItem>
                     <TabItem Header="Light">
-
+                        <ScrollViewer 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Lights.Views}"/>
+                        </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Camera">
                         <ScrollViewer 
