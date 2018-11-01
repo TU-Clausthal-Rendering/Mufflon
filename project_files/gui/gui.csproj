@@ -84,7 +84,14 @@
     <Compile Include="Model\Light\LightModel.cs" />
     <Compile Include="Model\Light\PointLightModel.cs" />
     <Compile Include="Model\Light\SpotLightModel.cs" />
-    <Compile Include="Model\MaterialModel.cs" />
+    <Compile Include="Model\Material\BlendMaterialModel.cs" />
+    <Compile Include="Model\Material\EmissiveMaterialModel.cs" />
+    <Compile Include="Model\Material\FresnelMaterialModel.cs" />
+    <Compile Include="Model\Material\LambertMaterialModel.cs" />
+    <Compile Include="Model\Material\MaterialModel.cs" />
+    <Compile Include="Model\Material\OrennayarMaterialModel.cs" />
+    <Compile Include="Model\Material\TorranceMaterialModel.cs" />
+    <Compile Include="Model\Material\WalterMaterialModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\SynchronizedModelList.cs" />
@@ -104,6 +111,7 @@
     <Compile Include="ViewModel\Light\LightViewModel.cs" />
     <Compile Include="ViewModel\Light\PointLightViewModel.cs" />
     <Compile Include="ViewModel\Light\SpotLightViewModel.cs" />
+    <Compile Include="ViewModel\Material\MaterialViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
