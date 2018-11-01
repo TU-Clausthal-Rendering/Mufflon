@@ -13,7 +13,7 @@ namespace gui.Model.Camera
 
         public override CameraViewModel CreateViewModel()
         {
-            throw new NotImplementedException();
+            return new OrthoCameraViewModel(this);
         }
 
         private float m_width;

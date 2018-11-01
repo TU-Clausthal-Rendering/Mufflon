@@ -89,12 +89,16 @@
     <Compile Include="ViewModel\Camera\CamerasViewModel.cs" />
     <Compile Include="ViewModel\Camera\CameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\FocusCameraViewModel.cs" />
+    <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
       <DependentUpon>FocusCameraView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Camera\OrthoCameraView.xaml.cs">
+      <DependentUpon>OrthoCameraView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\Camera\PinholeCameraView.xaml.cs">
       <DependentUpon>PinholeCameraView.xaml</DependentUpon>
@@ -118,6 +122,10 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="View\Camera\FocusCameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Camera\OrthoCameraView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
