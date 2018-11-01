@@ -78,7 +78,12 @@
     <Compile Include="Model\Camera\FocusCameraModel.cs" />
     <Compile Include="Model\Camera\OrthoCameraModel.cs" />
     <Compile Include="Model\Camera\PinholeCameraModel.cs" />
-    <Compile Include="Model\LightModel.cs" />
+    <Compile Include="Model\Light\DirectionalLightModel.cs" />
+    <Compile Include="Model\Light\EnvmapLightModel.cs" />
+    <Compile Include="Model\Light\GoniometricLightModel.cs" />
+    <Compile Include="Model\Light\LightModel.cs" />
+    <Compile Include="Model\Light\PointLightModel.cs" />
+    <Compile Include="Model\Light\SpotLightModel.cs" />
     <Compile Include="Model\MaterialModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
@@ -92,6 +97,8 @@
     <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
     <Compile Include="ViewModel\ConsoleViewModel.cs" />
+    <Compile Include="ViewModel\Light\LightViewModel.cs" />
+    <Compile Include="ViewModel\Light\PointLightViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">

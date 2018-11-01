@@ -3,24 +3,23 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using gui.Annotations;
-using gui.ViewModel;
-using gui.ViewModel.Camera;
+using gui.Utility;
+using gui.ViewModel.Light;
 
-namespace gui.Model.Camera
+namespace gui.Model.Light
 {
-    /// <summary>
-    /// Base class for camera models
-    /// </summary>
-    public abstract class CameraModel : INotifyPropertyChanged
+    public abstract class LightModel : INotifyPropertyChanged
     {
-        public enum CameraType
+        public enum LightType
         {
-            Pinhole,
-            Focus,
-            Ortho
+            Point,
+            Directional,
+            Spot,
+            Envmap,
+            Goniometric
         }
 
-        public abstract CameraType Type { get; }
+        public abstract LightType Type { get; }
 
         private string m_name = String.Empty;
 
@@ -35,8 +34,23 @@ namespace gui.Model.Camera
             }
         }
 
+        private float m_scale = 1.0f;
+
+        public float Scale
+        {
+            get => m_scale;
+            set
+            {
+                Debug.Assert(Scale >= 0.0f);
+                // ReSharper disable once CompareOfFloatsByEqualityOperator
+                if (value == m_scale) return;
+                m_scale = value;
+                OnPropertyChanged(nameof(Scale));
+            }
+        }
+
         private bool m_isSelected = false;
-        // indicates if this camera should be used for the renderer
+        // indicates if this light should be used for the renderer
         public bool IsSelected
         {
             get => m_isSelected;
@@ -52,7 +66,7 @@ namespace gui.Model.Camera
         /// creates a new view model based on this model
         /// </summary>
         /// <returns></returns>
-        public abstract CameraViewModel CreateViewModel();
+        public abstract LightViewModel CreateViewModel();
 
         #region PropertyChanged
 
