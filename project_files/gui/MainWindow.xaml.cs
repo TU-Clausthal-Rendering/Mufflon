@@ -32,7 +32,7 @@ namespace gui
         public void GlHostOnError(string message)
         {
             MessageBox.Show(this, message, "OpenGL Thread Error");
-            Close();
+            //Close();
         }
     }
 }
