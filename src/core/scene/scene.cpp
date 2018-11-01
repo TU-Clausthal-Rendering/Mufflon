@@ -30,17 +30,17 @@ MaterialIndex Scene::get_material_slot_index(std::string_view binaryName) {
 }
 
 void Scene::assign_material(MaterialIndex index, material::MaterialHandle material) {
-	// TODO
+	// TODO: check if a renderer is active?
+	m_materialAssignment[index].material = material;
 }
 
 material::MaterialHandle Scene::get_assigned_material(MaterialIndex index) const {
-	// TODO
-	return nullptr;
+	return m_materialAssignment[index].material;
 }
 
 material::MaterialHandle Scene::add_material(std::unique_ptr<material::IMaterial> material) {
-	// TODO
-	return nullptr;
+	m_materials.push_back(move(material));
+	return m_materials.back().get();
 }
 
 } // namespace mufflon::scene
