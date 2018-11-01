@@ -46,6 +46,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
+    <ClInclude Include="..\..\src\core\math\sampling.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />
     <ClInclude Include="..\..\src\core\scene\accessor.hpp" />
     <ClInclude Include="..\..\src\core\scene\allocator.hpp" />

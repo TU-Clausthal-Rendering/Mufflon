@@ -35,6 +35,9 @@
     <Filter Include="Source Files\core\scene\textures">
       <UniqueIdentifier>{f4a4e5ef-3dd4-457b-b188-4f02684ed554}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\math">
+      <UniqueIdentifier>{4f239cea-46d0-47e5-aff6-18adb0327e19}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -212,6 +215,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\cuda\error.hpp">
       <Filter>Source Files\core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\math\sampling.hpp">
+      <Filter>Source Files\core\math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
