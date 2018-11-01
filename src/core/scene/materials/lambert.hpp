@@ -2,12 +2,13 @@
 
 #include "types.hpp"
 #include "material.hpp"
+#include "core/math/sampling.hpp"
 
 namespace mufflon { namespace scene { namespace material {
 
 template<Device dev>
 struct LambertHandlePack : public HandlePack {
-	LambertHandlePack(const HandlePack & baseProperties,
+	LambertHandlePack(const HandlePack& baseProperties,
 					  ConstAccessor<textures::DeviceTextureHandle<dev>> albedoTex) :
 		HandlePack(baseProperties),
 		albedoTex(albedoTex)
@@ -17,13 +18,10 @@ struct LambertHandlePack : public HandlePack {
 };
 
 struct LambertParameterPack : public ParameterPack {
-	LambertParameterPack(Spectrum albedo, MediumHandle innerMedium, MediumHandle outerMedium) :
+	LambertParameterPack(const ParameterPack& baseParameters, Spectrum albedo) :
+		ParameterPack(baseParameters),
 		albedo(albedo)
-	{
-		type = Materials::LAMBERT;
-		this->innerMedium = innerMedium;
-		this->outerMedium = outerMedium;
-	}
+	{}
 	Spectrum albedo;
 };
 
@@ -43,14 +41,45 @@ private:
 	textures::TextureHandle m_albedo;
 };
 
+
+
 // The importance sampling routine
 __host__ __device__ Sample
 lambert_sample(const LambertParameterPack& params,
 			   const Direction& incidentTS,
 			   const RndSet& rndSet) {
-	return Sample{};
+	// Importance sampling for lambert: BRDF * cos(theta)
+	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1);
+	// Copy the sign for two sided diffuse
+	return Sample {
+		Spectrum{params.albedo},
+		excidentTS * ei::sgn(incidentTS.z),
+		excidentTS.z / ei::PI,
+		ei::abs(incidentTS.z) / ei::PI,
+		Sample::Type::REFLECTED
+	};
 }
 
 // The evaluation routine
+__host__ __device__ EvalValue
+lambert_evaluate(const LambertParameterPack& params,
+				 const Direction& incidentTS,
+				 const Direction& excidentTS) {
+	// No transmission - already checked by material, but in a combined model we might get a call
+	if(incidentTS.z * excidentTS.z < 0.0f) return EvalValue{};
+	// Two sided diffuse (therefore the abs())
+	return EvalValue {
+		params.albedo / ei::PI,
+		ei::abs(excidentTS.z),
+		ei::abs(excidentTS.z) / ei::PI,
+		ei::abs(incidentTS.z) / ei::PI
+	};
+}
+
+// The albedo routine
+__host__ __device__ Spectrum
+lambert_albedo(const LambertParameterPack& params) {
+	return params.albedo;
+}
 
 }}} // namespace mufflon::scene::material

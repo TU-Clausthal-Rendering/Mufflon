@@ -41,7 +41,7 @@ namespace mufflon { namespace scene { namespace material {
 			} break;
 			default: ;
 #ifndef __CUDA_ARCH__
-				logWarning("Trying to evaluate unimplemented material type ", params.type);
+				logWarning("[material::sample] Trying to evaluate unimplemented material type ", params.type);
 #endif
 		}
 
@@ -64,6 +64,27 @@ namespace mufflon { namespace scene { namespace material {
 			 bool merge) {
 		return EvalValue{};
 	}
+
+	/*
+	 * Get the average color of the material (integral over all view direction in
+	 * a white furnace environment. Not necessarily the correct value - approximations
+	 * suffice.
+	 */
+	__host__ __device__ Spectrum
+	albedo(const ParameterPack& params) {
+		switch(params.type)
+		{
+			case Materials::LAMBERT: return lambert_albedo(static_cast<const LambertParameterPack&>(params));
+			default:
+#ifndef __CUDA_ARCH__
+				logWarning("[material::albedo] Trying to evaluate unimplemented material type ", params.type);
+#endif
+				return Spectrum{0.0f};
+		}
+	}
+
+	// Would be necessary for regularization
+	//virtual Spectrum get_maximum() const = 0;
 }
 
 }}} // namespace mufflon::scene::material

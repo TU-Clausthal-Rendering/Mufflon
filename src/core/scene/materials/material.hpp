@@ -122,17 +122,6 @@ public:
 
 	MaterialPropertyFlags get_property_flags() const noexcept;
 
-	// TODO: move to sample
-	/*
-	 * Get the average color of the material (integral over all view direction in
-	 * a white furnace environment. Not necessarily the correct value - approximations
-	 * suffice.
-	 */
-	//virtual Spectrum get_albedo() const = 0;
-
-	// Would be necessary for regularization
-	//virtual Spectrum get_maximum() const = 0;
-
 protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;

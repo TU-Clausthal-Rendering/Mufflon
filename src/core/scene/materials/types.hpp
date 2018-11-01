@@ -11,8 +11,8 @@ namespace mufflon { namespace scene { namespace material {
 	 * The third value is open to additional requirements as layer decisions.
 	 */
 	struct RndSet {
-		float x0;	// In [0,1)
-		float x1;	// In [0,1)
+		float u0;	// In [0,1)
+		float u1;	// In [0,1)
 		u32 i0;		// Full 32 bit random information
 	};
 
@@ -31,10 +31,10 @@ namespace mufflon { namespace scene { namespace material {
 	
 	// Return value of a BxDF evaluation function
 	struct EvalValue {
-		Spectrum bxdf;			// BRDF or BTDF value
-		float cosThetaOut;		// Outgoing cosine
-		float pdfF;				// Sampling PDF in forward direction 
-		float pdfB;				// Sampling PDF with reversed incident and excident directions
+		Spectrum bxdf {0.0f};			// BRDF or BTDF value
+		float cosThetaOut {1.0f};		// Outgoing cosine
+		float pdfF {0.0f};				// Sampling PDF in forward direction 
+		float pdfB {0.0f};				// Sampling PDF with reversed incident and excident directions
 	};
 
 }}} // namespace mufflon::scene::material

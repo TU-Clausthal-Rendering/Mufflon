@@ -15,7 +15,7 @@ std::size_t Lambert::get_handle_pack_size(Device device) const {
 }
 
 void Lambert::get_handle_pack(Device device, HandlePack* outBuffer) const {
-	HandlePack matProps{ Materials::LAMBERT, get_property_flags() };
+	HandlePack matProps{ Materials::LAMBERT, get_property_flags(), m_innerMedium, m_outerMedium };
 	switch(device) {
 		case Device::CPU: {
 			*reinterpret_cast<LambertHandlePack<Device::CPU>*>(outBuffer) =
@@ -36,8 +36,8 @@ void Lambert::get_parameter_pack_cpu(const HandlePack* handles, const UvCoordina
 	auto* in = reinterpret_cast<const LambertHandlePack<Device::CPU>*>(handles);
 	auto* out = reinterpret_cast<LambertParameterPack*>(outBuffer);
 	*out = LambertParameterPack{
-		Spectrum{(*in->albedoTex)->sample(uvCoordinate)},
-		in->innerMedium, in->outerMedium
+		ParameterPack{ Materials::LAMBERT, in->innerMedium, in->outerMedium },
+		Spectrum{(*in->albedoTex)->sample(uvCoordinate)}
 	};
 }
 
