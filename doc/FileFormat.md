@@ -26,6 +26,8 @@ The names must match the names stored in the binary itself.
                 "path": [[x1,y1,z1], ...],    // List of vec3 (at least 1)
                 "viewDir": [[x1,y1,z1], ...], // List of vec3 with the same length as "path", not necessarily normalized
                 "up": [[x1,y1,z1], ...],      // OPTIONAL [0,1,0], must have the same length as "path" if defined, not necessarily normalized
+                "near": float,                // OPTIONAL >0 near clipping plane, Default: 1/10000 * scene size (diagonal of BB)
+                "far": float,                 // OPTIONAL >"near" far clipping plane, Default: 2 * scene size (diagonal of BB)
                 ...
             },
             "<name2>": {
