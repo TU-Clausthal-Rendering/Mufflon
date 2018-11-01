@@ -213,6 +213,12 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Resource Include="Icons\cancel.png" />
+    <Resource Include="Icons\help.png" />
+    <Resource Include="Icons\open.png" />
+    <Resource Include="Icons\save.png" />
+    <Resource Include="Icons\zoom.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

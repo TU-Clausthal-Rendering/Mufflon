@@ -71,10 +71,13 @@
                     Grid.Column="0"
                     IsEnabled="False"
                     Text="{Binding MapShort}"
-                    ToolTip="{Binding MapFull}"/>
+                    ToolTip="{Binding MapFull}"
+                    Margin="0 0 1 0"/>
                 <Button
-                    Grid.Column="1"
-                    Width="16"/>
+                    Grid.Column="1">
+                    <Image
+                        Source="../../Icons/open.png"/>    
+                </Button>
             </Grid>
         </Grid>
     </GroupBox>
