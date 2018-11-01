@@ -24,9 +24,11 @@
     <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
+    <ClCompile Include="..\..\src\core\scene\scenario.cpp" />
     <ClCompile Include="..\..\src\core\scene\scene.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp" />
+    <ClCompile Include="..\..\src\core\scene\world_container.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -62,11 +64,13 @@
     <ClInclude Include="..\..\src\core\scene\materials\types.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\residency.hpp" />
+    <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
     <ClInclude Include="..\..\src\core\scene\types.hpp" />
+    <ClInclude Include="..\..\src\core\scene\world_container.hpp" />
     <ClInclude Include="..\..\src\export\dll_export.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
     <ClInclude Include="..\..\src\util\flag.hpp" />

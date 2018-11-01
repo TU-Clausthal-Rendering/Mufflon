@@ -9,7 +9,7 @@
 #include <cuda_runtime.h>
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
-//#include "core/scene/object.hpp"
+#include "core/scene/object.hpp"
 
 using namespace mufflon::scene;
 using namespace mufflon::scene::geometry;
@@ -186,7 +186,7 @@ void test_sphere() {
 }
 
 void test_object() {
-	/*
+	
 	Object obj;
 
 	// Polygon interface
@@ -215,9 +215,17 @@ void test_object() {
 
 	// Sphere interface
 	{
+		std::vector<Spheres::Sphere> radPos{ {Point(0,0,1), 5.f}, {Point(1,0,1), 1.f}, {Point(0,1,1), 7.f}, {Point(1,1,1), 3.f} };
+		std::vector<MaterialIndex> mats{ 1u, 3u, 27u, 15u };
+		VectorStream radPosBuffer(radPos);
+		VectorStream matBuffer(mats);
+		std::istream radPosStream(&radPosBuffer);
+		std::istream matStream(&matBuffer);
 
+		auto bs0 = obj.add_bulk<Spheres>(radPos.size(), radPosStream);
+		obj.add_bulk<Spheres>(obj.get_mat_indices<Spheres>(), bs0.handle, mats.size(), matStream);
 	}
-	*/
+	
 }
 
 
@@ -228,6 +236,7 @@ int main() {
 	test_synchronize_unload();
 	test_object();
 
+	std::cout << "All tests successful" << std::endl;
 	std::cin.get();
 	return 0;
 }

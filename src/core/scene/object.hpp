@@ -27,12 +27,6 @@ class LIBRARY_API Object {
 public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
-
-	// Object representation in device memory
-	struct DeviceObject {
-		// TODO: grab from polygons/spheres
-	};
-	
 	static constexpr std::size_t NO_ANIMATION_FRAME = std::numeric_limits<std::size_t>::max();
 	static constexpr std::size_t DEFAULT_LOD_LEVEL = 0u;
 

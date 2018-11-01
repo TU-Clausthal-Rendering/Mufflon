@@ -94,6 +94,12 @@
     <ClCompile Include="..\..\src\core\scene\attribute.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\world_container.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\scenario.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -224,6 +230,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\export\dll_export.hpp">
       <Filter>Source Files\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\world_container.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\scenario.hpp">
+      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
