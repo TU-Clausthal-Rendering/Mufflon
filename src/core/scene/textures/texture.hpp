@@ -17,7 +17,7 @@ struct DeviceTextureHandle;
 
 template<>
 struct DeviceTextureHandle<Device::CPU> :
-	public DeviceHandle<Device::CPU, textures::CpuTexture*> {
+	public DeviceHandle<Device::CPU, textures::CpuTexture*, const textures::CpuTexture*> {
 };
 template<>
 struct DeviceTextureHandle<Device::CUDA> :

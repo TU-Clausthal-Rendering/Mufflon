@@ -8,8 +8,11 @@
 
 #include <cuda_runtime.h>
 #include "core/scene/geometry/polygon.hpp"
+#include "core/scene/geometry/sphere.hpp"
+//#include "core/scene/object.hpp"
 
 using namespace mufflon::scene;
+using namespace mufflon::scene::geometry;
 
 class VectorStream : public std::basic_streambuf<char, std::char_traits<char>> {
 public:
@@ -20,38 +23,211 @@ public:
 	}
 };
 
-void test_polygon() {
-	using namespace geometry;
+void test_custom_attributes() {
+	std::cout << "Testing custom attributes (on polygon)" << std::endl;
 
 	Polygons poly;
-	auto impHandle = poly.request<Polygons::VertexAttributeHandle<float>>("importance");
-	auto indexHandle = poly.request<Polygons::FaceAttributeHandle<unsigned int>>("index");
+	
+	{
+		// Empty request->remove
+		auto hdl0 = poly.request<Polygons::VertexAttributeHandle<float>>("test0");
+		auto hdl1 = poly.request<Polygons::VertexAttributeHandle<short>>("test1");
+		auto hdl2 = poly.request<Polygons::FaceAttributeHandle<double>>("test2");
+		auto& attr1 = poly.aquire(hdl1);
+		std::cout << "Attribute size: " << attr1.get_size() << " " << attr1.get_elem_size() << std::endl;
+		poly.remove(hdl0);
 
-	auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
-	auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
-	auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
-	auto f0 = poly.add(v0, v1, v2, 0u);
-	std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
-	std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
-	std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
-	std::vector<MaterialIndex> mats{ 5u };
+		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
+		auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
+		auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
+		auto f0 = poly.add(v0, v1, v2);
+		(*poly.get_mat_indices().aquire<>())[0u] = 3u;
 
-	VectorStream pointBuffer(points);
-	VectorStream normalBuffer(normals);
-	VectorStream uvBuffer(uvs);
-	VectorStream matBuffer(mats);
-	std::istream pointStream(&pointBuffer);
-	std::istream normalStream(&normalBuffer);
-	std::istream uvStream(&uvBuffer);
-	std::istream matStream(&matBuffer);
+		std::cout << "Attribute size after remove and insert: " << attr1.get_size() << " " << attr1.get_elem_size() << std::endl;
+		(*attr1.aquire())[1] = 5;
+		auto& attr2 = poly.aquire(hdl2);
+		(*attr2.aquire())[0] = 0.4;
+		std::cout << "Attribute 1 values:" << std::endl;
+		for(std::size_t i = 0; i < attr1.get_size(); ++i) {
+			std::cout << (*attr1.aquire())[i] << std::endl;
+		}
+		std::cout << "Attribute 2 values:" << std::endl;
+		for(std::size_t i = 0; i < attr2.get_size(); ++i) {
+			std::cout << (*attr2.aquire())[i] << std::endl;
+		}
 
-	auto f1 = poly.add_bulk(points.size(), pointStream, normalStream, uvStream);
-	poly.add_bulk<>(poly.get_mat_indices(), f1.handle, mats.size(), matStream);
+		poly.remove(hdl0);
+		poly.remove(hdl1);
+		poly.remove(hdl2);
+	}
 }
 
+void test_synchronize_unload() {
+	std::cout << "Testing synchronize/unload (for polygons)" << std::endl;
+
+	Polygons poly;
+
+	{
+		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
+		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
+		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
+		std::vector<MaterialIndex> mats{ 5u };
+		VectorStream pointBuffer(points);
+		VectorStream normalBuffer(normals);
+		VectorStream uvBuffer(uvs);
+		VectorStream matBuffer(mats);
+		std::istream pointStream(&pointBuffer);
+		std::istream normalStream(&normalBuffer);
+		std::istream uvStream(&uvBuffer);
+		std::istream matStream(&matBuffer);
+
+		auto bv0 = poly.add_bulk(points.size(), pointStream, normalStream, uvStream);
+		auto f1 = poly.add(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
+						   OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 1),
+						   OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 2),
+						   OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 3));
+		poly.add_bulk<>(poly.get_mat_indices(), f1, mats.size(), matStream);
+	}
+
+	{
+		poly.synchronize<Device::CUDA>();
+		std::cout << "Synchronized to CUDA" << std::endl;
+		poly.unload<Device::CUDA>();
+		std::cout << "Unloaded from CUDA" << std::endl;
+	}
+}
+
+void test_polygon() {
+	std::cout << "Testing polygons" << std::endl;
+
+	Polygons poly;
+
+	{
+		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
+		auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
+		auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
+		auto f0 = poly.add(v0, v1, v2);
+		(*poly.get_mat_indices().aquire<>())[0u] = 2u;
+
+		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
+		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
+		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
+		std::vector<MaterialIndex> mats{ 5u };
+		VectorStream pointBuffer(points);
+		VectorStream normalBuffer(normals);
+		VectorStream uvBuffer(uvs);
+		VectorStream matBuffer(mats);
+		std::istream pointStream(&pointBuffer);
+		std::istream normalStream(&normalBuffer);
+		std::istream uvStream(&uvBuffer);
+		std::istream matStream(&matBuffer);
+
+		auto bv0 = poly.add_bulk(points.size(), pointStream, normalStream, uvStream);
+		auto f1 = poly.add(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
+							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())+1),
+							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())+2),
+							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())+3));
+		poly.add_bulk<>(poly.get_mat_indices(), f1, mats.size(), matStream);
+	}
+
+	{
+		auto points = *poly.get_points().aquireConst();
+		auto normals = *poly.get_normals().aquireConst();
+		auto uvs = *poly.get_uvs().aquireConst();
+		auto matIndices = *poly.get_mat_indices().aquireConst();
+		std::cout << "Points:" << std::endl;
+		for(std::size_t i = 0u; i < poly.get_points().get_size(); ++i)
+			std::cout << "  [" << points[i][0] << '|' << points[i][1] << '|' << points[i][2] << ']' << std::endl;
+		std::cout << "Normals:" << std::endl;
+		for(std::size_t i = 0u; i < poly.get_normals().get_size(); ++i)
+			std::cout << "  [" << normals[i][0] << '|' << normals[i][1] << '|' << normals[i][2] << ']' << std::endl;
+		std::cout << "Normals:" << std::endl;
+		for(std::size_t i = 0u; i < poly.get_uvs().get_size(); ++i)
+			std::cout << "  [" << uvs[i][0] << '|' << uvs[i][1] << ']' << std::endl;
+		std::cout << "Material indices:" << std::endl;
+		for(std::size_t i = 0u; i < poly.get_mat_indices().get_size(); ++i)
+			std::cout << "  " << matIndices[i] << std::endl;
+	}
+}
+
+void test_sphere() {
+	std::cout << "Testing spheres" << std::endl;
+
+	Spheres spheres;
+
+	{
+		auto impHandle = spheres.request<int>("importance");
+		auto s0 = spheres.add(Point(0, 0, 0), 55.f);
+		(*spheres.get_mat_indices().aquire<>())[s0] = 13u;
+
+		std::vector<Spheres::Sphere> radPos{ {Point(0,0,1), 5.f}, {Point(1,0,1), 1.f}, {Point(0,1,1), 7.f}, {Point(1,1,1), 3.f} };
+		std::vector<MaterialIndex> mats{ 1u, 3u, 27u, 15u };
+		VectorStream radPosBuffer(radPos);
+		VectorStream matBuffer(mats);
+		std::istream radPosStream(&radPosBuffer);
+		std::istream matStream(&matBuffer);
+
+		auto bs0 = spheres.add_bulk(radPos.size(), radPosStream);
+		spheres.add_bulk(spheres.get_mat_indices(), bs0.handle, mats.size(), matStream);
+	}
+
+	{
+		auto radPos = *spheres.get_spheres().aquireConst();
+		auto matIndices = *spheres.get_mat_indices().aquireConst();
+		std::cout << "Spheres:" << std::endl;
+		for(std::size_t i = 0u; i < spheres.get_spheres().get_size(); ++i)
+			std::cout << "  [" << radPos[i].m_radPos.position[0] << '|'
+			<< radPos[i].m_radPos.position[1] << '|' << radPos[i].m_radPos.position[2]
+			<< "] - " << radPos[i].m_radPos.radius << std::endl;
+		std::cout << "Material indices:" << std::endl;
+		for(std::size_t i = 0u; i < spheres.get_mat_indices().get_size(); ++i)
+			std::cout << "  " << matIndices[i] << std::endl;
+	}
+}
+
+void test_object() {
+	/*
+	Object obj;
+
+	// Polygon interface
+	{
+		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
+		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
+		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
+		std::vector<MaterialIndex> mats{ 5u };
+		VectorStream pointBuffer(points);
+		VectorStream normalBuffer(normals);
+		VectorStream uvBuffer(uvs);
+		VectorStream matBuffer(mats);
+		std::istream pointStream(&pointBuffer);
+		std::istream normalStream(&normalBuffer);
+		std::istream uvStream(&uvBuffer);
+		std::istream matStream(&matBuffer);
+
+		auto bv0 = obj.add_bulk<Polygons>(points.size(), pointStream, normalStream, uvStream);
+		auto bf0 = obj.add<Polygons>(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
+							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 1),
+							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 2),
+							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 3));
+		auto matIndexAttr = obj.get_mat_indices<Polygons>();
+		obj.add_bulk<Polygons>(matIndexAttr, bf0, mats.size(), matStream);
+	}
+
+	// Sphere interface
+	{
+
+	}
+	*/
+}
 
 
 int main() {
 	test_polygon();
+	test_sphere();
+	test_custom_attributes();
+	test_synchronize_unload();
+	test_object();
+
+	std::cin.get();
 	return 0;
 }

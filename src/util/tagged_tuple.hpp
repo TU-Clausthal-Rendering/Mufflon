@@ -109,12 +109,16 @@ public:
 		return get_index<T>() < size;
 	}
 
-	template < class Op >
+	template < class Op, std::size_t I = 0u >
 	void for_each(Op&& op) {
-
+		if constexpr(I < size) {
+			op(I, get<I>());
+			for_each<Op, I + 1u>(std::move(op));
+		}
 	}
 
 private:
+
 	// Helper class for finding the index of a type for tuple lookup
 	template < class... T >
 	struct Index;

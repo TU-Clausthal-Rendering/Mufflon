@@ -15,10 +15,11 @@ enum class Device : unsigned char {
 };
 
 // Generic type-trait for device-something-handles
-template < Device dev, class H >
+template < Device dev, class H, class CH = H >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
 	using HandleType = H;
+	using ConstHandleType = CH;
 
 	HandleType handle;
 };
@@ -29,7 +30,7 @@ struct DeviceArrayHandle;
 
 template < class T >
 struct DeviceArrayHandle<Device::CPU, T> :
-	public DeviceHandle<Device::CPU, T*> {
+	public DeviceHandle<Device::CPU, T*, const T*> {
 	using Type = T;
 	using ValueType = T*;
 
@@ -41,7 +42,7 @@ struct DeviceArrayHandle<Device::CPU, T> :
 // TODO: what's wrong with device vector?
 template < class T >
 struct DeviceArrayHandle<Device::CUDA, T> :
-	public DeviceHandle<Device::CUDA, T*> {
+	public DeviceHandle<Device::CUDA, T*, const T*> {
 	using Type = T;
 	using ValueType = T*;
 

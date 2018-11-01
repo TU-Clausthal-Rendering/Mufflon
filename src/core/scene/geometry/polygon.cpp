@@ -9,103 +9,116 @@
 
 namespace mufflon::scene::geometry {
 
+void Polygons::resize(std::size_t vertices, std::size_t edges, std::size_t faces) {
+	m_meshData.resize(vertices, edges, faces);
+	m_vertexAttributes.resize(vertices);
+	m_faceAttributes.resize(faces);
+}
+
 Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 								   const UvCoordinate& uv) {
 	mAssert(m_meshData.has_vertex_normals());
 	mAssert(m_meshData.has_vertex_texcoords2D());
 	VertexHandle vh = m_meshData.add_vertex(util::pun<OpenMesh::Vec3f>(point));
-	// TODO: can we do this? Should work, right?
+	// Resize the attribute and set the vertex data
+	m_vertexAttributes.resize(m_vertexAttributes.get_size() + 1u);
 	(*m_pointsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
 	(*m_normalsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
 	(*m_uvsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
 	return vh;
 }
 
-Polygons::TriangleHandle Polygons::add(const Triangle& tri, MaterialIndex idx) {
-	mAssert(tri[0u] < m_meshData.n_vertices()
-			&& tri[1u] < m_meshData.n_vertices()
-			&& tri[2u] < m_meshData.n_vertices());
-	// TODO: do we need different types or identifications for triangle or quad types?
-	FaceHandle hdl = m_meshData.add_face(VertexHandle(tri[0u]), VertexHandle(tri[1u]),
-										 VertexHandle(tri[2u]));
-	mAssert(hdl.is_valid());
-	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
-	return hdl;
-}
-
-Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
-									   MaterialIndex idx) {
+Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
+									   const VertexHandle& v2) {
 	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData.n_vertices());
 	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData.n_vertices());
 	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData.n_vertices());
-	// TODO: do we need different types or identifications for triangle or quad types?
 	FaceHandle hdl = m_meshData.add_face(v0, v1, v2);
 	mAssert(hdl.is_valid());
+	// TODO: slow, hence replace with reserve
+	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
+	return hdl;
+}
+
+Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
+									   const VertexHandle& v2, MaterialIndex idx) {
+	TriangleHandle hdl = this->add(v0, v1, v2);
 	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
 
-Polygons::TriangleHandle Polygons::add(const std::array<VertexHandle, 3u>& vertices, MaterialIndex idx) {
-	mAssert(vertices[0u].is_valid() && static_cast<std::size_t>(vertices[0u].idx()) < m_meshData.n_vertices());
-	mAssert(vertices[1u].is_valid() && static_cast<std::size_t>(vertices[1u].idx()) < m_meshData.n_vertices());
-	mAssert(vertices[2u].is_valid() && static_cast<std::size_t>(vertices[2u].idx()) < m_meshData.n_vertices());
-	// TODO: do we need different types or identifications for triangle or quad types?
-	FaceHandle hdl = m_meshData.add_face(vertices[0u], vertices[1u], vertices[2u]);
-	mAssert(hdl.is_valid());
-	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
-	return hdl;
+Polygons::TriangleHandle Polygons::add(const Triangle& tri) {
+	return this->add(VertexHandle(tri[0u]), VertexHandle(tri[1u]), VertexHandle(tri[2u]));
 }
 
-Polygons::QuadHandle Polygons::add(const Quad& quad, MaterialIndex idx) {
-	mAssert(quad[0u] < m_meshData.n_vertices()
-			&& quad[1u] < m_meshData.n_vertices()
-			&& quad[2u] < m_meshData.n_vertices()
-			&& quad[3u] < m_meshData.n_vertices());
-	// TODO: do we need different types or identifications for triangle or quad types?
-	FaceHandle hdl = m_meshData.add_face(VertexHandle(quad[0u]), VertexHandle(quad[1u]),
-							   VertexHandle(quad[2u]), VertexHandle(quad[3u]));
-	mAssert(hdl.is_valid());
-	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
-	return hdl;
+Polygons::TriangleHandle Polygons::add(const Triangle& tri, MaterialIndex idx) {
+	return this->add(VertexHandle(tri[0u]), VertexHandle(tri[1u]),
+					 VertexHandle(tri[2u]), idx);
 }
 
-Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
-								   const VertexHandle& v3, MaterialIndex idx) {
+Polygons::TriangleHandle Polygons::add(const std::array<VertexHandle, 3u>& vertices) {
+	return this->add(vertices[0u], vertices[1u], vertices[2u]);
+}
+
+Polygons::TriangleHandle Polygons::add(const std::array<VertexHandle, 3u>& vertices,
+									   MaterialIndex idx) {
+	return this->add(vertices[0u], vertices[1u], vertices[2u], idx);
+}
+
+Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
+								   const VertexHandle& v2, const VertexHandle& v3) {
 	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData.n_vertices());
 	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData.n_vertices());
 	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData.n_vertices());
 	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData.n_vertices());
-	// TODO: do we need different types or identifications for triangle or quad types?
 	FaceHandle hdl = m_meshData.add_face(v0, v1, v2, v3);
+	// TODO: slow, hence replace with reserve
+	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
 	mAssert(hdl.is_valid());
+	return hdl;
+}
+
+Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
+								   const VertexHandle& v2, const VertexHandle& v3,
+								   MaterialIndex idx) {
+	QuadHandle hdl = this->add(v0, v1, v2, v1);
 	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
 
-Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices, MaterialIndex idx) {
-	mAssert(vertices[0u].is_valid() && static_cast<std::size_t>(vertices[0u].idx()) < m_meshData.n_vertices());
-	mAssert(vertices[1u].is_valid() && static_cast<std::size_t>(vertices[1u].idx()) < m_meshData.n_vertices());
-	mAssert(vertices[2u].is_valid() && static_cast<std::size_t>(vertices[2u].idx()) < m_meshData.n_vertices());
-	mAssert(vertices[3u].is_valid() && static_cast<std::size_t>(vertices[3u].idx()) < m_meshData.n_vertices());
-	// TODO: do we need different types or identifications for triangle or quad types?
-	FaceHandle hdl = m_meshData.add_face(vertices[0u], vertices[1u], vertices[2u], vertices[3u]);
-	mAssert(hdl.is_valid());
-	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
-	return hdl;
+Polygons::QuadHandle Polygons::add(const Quad& quad) {
+	return this->add(VertexHandle(quad[0u]), VertexHandle(quad[1u]),
+					 VertexHandle(quad[2u]), VertexHandle(quad[3u]));
+}
+
+Polygons::QuadHandle Polygons::add(const Quad& quad, MaterialIndex idx) {
+	return this->add(VertexHandle(quad[0u]), VertexHandle(quad[1u]),
+					 VertexHandle(quad[2u]), VertexHandle(quad[3u]), idx);
+}
+
+Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices) {
+	return this->add(vertices[0u], vertices[1u], vertices[2u], vertices[3u]);
+}
+
+Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices,
+								   MaterialIndex idx) {
+	return this->add(vertices[0u], vertices[1u], vertices[2u],
+					 vertices[3u], idx);
 }
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& pointStream,
 											  std::istream& normalStream, std::istream& uvStream) {
 	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	VertexHandle hdl(static_cast<int>(m_meshData.n_vertices()));
+	std::size_t start = m_meshData.n_vertices();
+	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	m_vertexAttributes.resize(m_vertexAttributes.get_size() + count);
+	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
 
 	// Read the attributes
-	std::size_t readPoints = m_pointsAttr.restore(pointStream, 0u, count);
-	std::size_t readNormals = m_normalsAttr.restore(normalStream, 0u, count);
-	std::size_t readUvs = m_uvsAttr.restore(uvStream, 0u, count);
+	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
+	std::size_t readNormals = m_normalsAttr.restore(normalStream, start, count);
+	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
 
 	return {hdl, readPoints, readNormals, readUvs};
 }

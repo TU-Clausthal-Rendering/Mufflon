@@ -1,10 +1,11 @@
 #pragma once
 
+#include "export/dll_export.hpp"
+#include "ei/vector.hpp"
 #include "util/types.hpp"
 #include "util/flag.hpp"
-#include "ei/vector.hpp"
-#include "../attribute_list.hpp"
-#include "../residency.hpp"
+#include "core/scene/attribute_list.hpp"
+#include "core/scene/residency.hpp"
 #include "core/scene/types.hpp"
 #include <istream>
 #include <tuple>
@@ -16,7 +17,7 @@ namespace mufflon::scene::geometry {
  * Instantiation of geometry class.
  * Can store spheres only.
  */
-class Spheres {
+class LIBRARY_API Spheres {
 public:
 	// Basic type definitions
 	using Index = u32;
@@ -69,24 +70,25 @@ public:
 	}
 
 	// Requests a new per-sphere attribute.
-	template < class Attr >
-	AttributeHandle<Attr> request(const std::string& name) {
-		return m_attributes.add<Attr>(name);
+	template < class T >
+	AttributeHandle<T> request(const std::string& name) {
+		return m_attributes.add<T>(name);
 	}
 
 	// Removes a per-sphere attribute.
-	template < class Attr >
-	void remove(const AttributeHandle<Attr> &attr) {
-		m_attributes.remove(attr);
+	template < class T >
+	void remove(const AttributeHandle<T> &attr) {
+		m_attributes.remove<T>(attr);
 	}
 
 	// Finds a per-sphere attribute by name.
-	template < class Attr >
-	std::optional<AttributeHandle<Attr>> find(const std::string& name) {
-		return m_attributes.find(name);
+	template < class T >
+	std::optional<AttributeHandle<T>> find(const std::string& name) {
+		return m_attributes.find<T>(name);
 	}
 
 	// Adds a sphere.
+	SphereHandle add(const Point& point, float radius);
 	SphereHandle add(const Point& point, float radius, MaterialIndex idx);
 	/**
 	 * Adds a bulk of spheres.
@@ -99,33 +101,46 @@ public:
 	 * The number of read values will be capped by the number of spheres present
 	 * after the starting position.
 	 */
-	template < class Type >
-	std::size_t add_bulk(Attribute<Type>& attribute, const SphereHandle& startSphere,
+	template < class T >
+	std::size_t add_bulk(Attribute<T>& attribute, const SphereHandle& startSphere,
 						 std::size_t count, std::istream& attrStream) {
 		std::size_t start = startSphere;
 		if(start >= m_attributes.get_size())
 			return 0u;
-		if(start + count >= m_attributes.get_size())
+		if(start + count > m_attributes.get_size())
 			m_attributes.resize(start + count);
 		return attribute.restore(attrStream, start, count);
 	}
 	// Also performs bulk-load for an attribute, but aquires it first.
-	template < class Attr >
-	std::size_t add_bulk(const AttributeHandle<Attr>& attrHandle,
+	template < class Type >
+	std::size_t add_bulk(const AttributeHandle<Attribute<Type>>& attrHandle,
 						 const SphereHandle& startSphere, std::size_t count,
 						 std::istream& attrStream) {
-		Attr& attribute = m_attributes.aquire(attrHandle);
-		return this->add_bulk(attribute, startSphere, count, attrStream);
+		return this->add_bulk(m_attributes.aquire(attrHandle), startSphere, count, attrStream);
 	}
 
-	template < class Attr >
-	Attr &aquire(const AttributeHandle<Attr>& attrHandle) {
+	template < class T >
+	Attribute<T>& aquire(const AttributeHandle<T>& attrHandle) {
 		m_attributes.aquire(attrHandle);
 	}
 
-	template < class Attr >
-	const Attr &aquire(const AttributeHandle<Attr>& attrHandle) const {
+	template < class T >
+	const Attribute<T>& aquire(const AttributeHandle<T>& attrHandle) const {
 		m_attributes.aquire(attrHandle);
+	}
+
+	Attribute<Sphere>& get_spheres() {
+		return m_sphereData;
+	}
+	const Attribute<Sphere>& get_spheres() const {
+		return m_sphereData;
+	}
+
+	Attribute<MaterialIndex>& get_mat_indices() {
+		return m_matIndex;
+	}
+	const Attribute<MaterialIndex>& get_mat_indices() const {
+		return m_matIndex;
 	}
 	
 	// Synchronizes the default attributes position, normal, uv, matindex 

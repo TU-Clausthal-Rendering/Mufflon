@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "export/dll_export.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
 #include "util/assert.hpp"
@@ -9,6 +10,7 @@
 #include "ei/3dtypes.hpp"
 #include "util/log.hpp"
 #include "util/tagged_tuple.hpp"
+#include "accel_struct.hpp"
 #include <climits>
 #include <cstdint>
 #include <memory>
@@ -16,15 +18,12 @@
 
 namespace mufflon::scene {
 
-// Forward declarations
-class IAccelerationStructure;
-
 /**
  * Representation of a scene object.
  * It contains the geometric data as well as any custom attribute such as normals, importance, etc.
  * It is also responsible for storing meta-data such as animations and LoD levels.
  */
-class Object {
+class LIBRARY_API Object {
 public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
@@ -38,9 +37,9 @@ public:
 	static constexpr std::size_t DEFAULT_LOD_LEVEL = 0u;
 
 	Object() = default;
-	Object(const Object&) = default;
+	Object(const Object&) = delete;
 	Object(Object&&) = default;
-	Object& operator=(const Object&) = default;
+	Object& operator=(const Object&) = delete;
 	Object& operator=(Object&&) = default;
 	~Object();
 
@@ -115,10 +114,22 @@ public:
 		return temp;
 	}
 
+	// Grants access to the material-index attribute (required for ALL geometry types)
+	template < class Geom >
+	auto& get_mat_indices() {
+		return geometryData.get<Geom>().get_mat_indices();
+	}
+
+	// Grants access to the material-index attribute (required for ALL geometry types)
+	template < class Geom >
+	const auto& get_mat_indices() const {
+		return geometryData.get<Geom>().get_mat_indices();
+	}
+
 	// Grants direct access to the mesh data (const only).
-	template < class Geom, class... Args >
-	const auto& native(Args&& ...args) {
-		return geometryData.get<Geom>().native(std::forward<Args>(args)...);
+	template < class Geom >
+	const auto& get_geometry() {
+		return geometryData.get<Geom>();
 	}
 
 	// Returns the object's animation frame.
@@ -144,9 +155,9 @@ public:
 		mAssert(this->has_accel_structure());
 		return *m_accel_struct;
 	}
-	/// Clears the BVH of this object.
+	// Clears the BVH of this object.
 	void clear_accel_structutre();
-	/// Initializes the acceleration structure to a given implementation.
+	// Initializes the acceleration structure to a given implementation.
 	template < class Accel, class... Args >
 	void set_accel_structure(Args&& ...args) {
 		m_accel_struct = std::make_unique<Accel>(std::forward<Args>(args)...);
@@ -165,13 +176,12 @@ public:
 	void unload_resident(Device);
 
 private:
-
 	GeometryTuple geometryData;
 
 	bool m_accelDirty = false;
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; // Current level-of-detail
-	std::unique_ptr<IAccelerationStructure > m_accel_struct = nullptr;
+	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
 
 	// TODO: how to handle the LoDs?
 	// TODO: non-CPU memory

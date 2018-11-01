@@ -2,6 +2,7 @@
 
 #include "allocator.hpp"
 #include "residency.hpp"
+#include "export/dll_export.hpp"
 #include "util/array_wrapper.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -17,7 +18,7 @@ namespace pool_detail {
 struct MemoryArea {
 	std::size_t offset = std::numeric_limits<std::size_t>::max();
 	std::size_t length = 0u;
-	std::size_t elem_size = 0u;
+	std::size_t elemSize = 0u;
 };
 
 } // namespace pool_detail
@@ -95,7 +96,7 @@ public:
 		mAssert(removedBytes <= m_size);
 
 		// Either entirely remove or mark as hole
-		if(hdl.index == m_attribs.size() - 1u) {
+		if(hdl.index() == m_attribs.size() - 1u) {
 			// Is at the back -> we can reallocate
 			m_attribs.pop_back();
 			this->realloc(m_size - removedBytes);
@@ -151,7 +152,10 @@ public:
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return nullptr;
 
-		return util::ArrayWrapper<T>{ reinterpret_cast<T*>(m_memoryBlock), m_attribs[hdl.index()].length / sizeof(T) };
+		return util::ArrayWrapper<T>{
+			reinterpret_cast<T*>(&m_memoryBlock[m_attribs[hdl.index()].offset]),
+			m_attribs[hdl.index()].length / sizeof(T)
+		};
 	}
 
 	// Aquires the given attribute for read-only access
@@ -162,7 +166,10 @@ public:
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return nullptr;
 
-		return util::ConstArrayWrapper<T>{ reinterpret_cast<T*>(m_memoryBlock), m_attribs[hdl.index()].length / sizeof(T) };
+		return util::ConstArrayWrapper<T>{
+			reinterpret_cast<const T*>(&m_memoryBlock[m_attribs[hdl.index()].offset]),
+				m_attribs[hdl.index()].length / sizeof(T)
+		};
 	}
 
 	// Resizes all attributes to the given length
@@ -174,7 +181,7 @@ public:
 				if(length != 0u) {
 					for(const auto& area : m_attribs) {
 						if(area.offset != std::numeric_limits<std::size_t>::max())
-							newSize += area.elem_size;
+							newSize += area.elemSize;
 					}
 					newSize *= length;
 				}
@@ -190,15 +197,20 @@ public:
 						area.length = 0u;
 					}
 				}
-				this->unload();
+				if(m_memoryBlock != nullptr) {
+					delete[] m_memoryBlock;
+					m_memoryBlock = nullptr;
+				}
 			} else {
 				char* newBlock = nullptr;
+				bool realloced = false;
 				if(m_present) {
 					// Can only reallocate if we're growing in size
-					if(length > m_attribLength) {
+					if(length > m_attribLength && m_memoryBlock != nullptr) {
 						newBlock = Allocator::realloc(m_memoryBlock, m_size, newSize);
+						realloced = true;
 					} else {
-						newBlock = Allocator::alloc(newSize);
+						newBlock = Allocator::template alloc<char>(newSize);
 					}
 				}
 
@@ -206,21 +218,21 @@ public:
 				std::size_t currEnd = newSize;
 				for(auto iter = m_attribs.rbegin(); iter != m_attribs.rend(); ++iter) {
 					if(iter->offset != std::numeric_limits<std::size_t>::max()) {
-						const std::size_t elemSize = iter->length / m_attribLength;
+						const std::size_t elemSize = iter->elemSize;
 						mAssert(elemSize != 0u);
-						iter->length = elemSize * length;
-						currEnd -= iter->length;
+						currEnd -= elemSize * length;
 						// Copy the still-valid attribute values
-						if(m_present) {
+						if(m_present && m_size != 0) {
 							mAssert(newBlock != nullptr);
 							mAssert(m_memoryBlock != nullptr);
 							Allocator::copy(&newBlock[currEnd], &m_memoryBlock[iter->offset], iter->length);
 						}
+						iter->length = elemSize * length;
 						iter->offset = currEnd;
 					}
 				}
 
-				if(newBlock != m_memoryBlock)
+				if(!realloced && m_memoryBlock != nullptr)
 					Allocator::free(m_memoryBlock, m_size);
 				m_memoryBlock = newBlock;
 				m_attribLength = length;
@@ -237,8 +249,8 @@ public:
 			return 0u;
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return 0u;
-		std::size_t bytes = std::min(sizeof(T) * count, m_attribs[hdl.index()].length) - sizeof(T)*start;
-		stream.read(&m_memoryBlock[m_attribs[hdl.index()].offset], bytes);
+		std::size_t bytes = std::min(sizeof(T) * count, m_attribs[hdl.index()].length - sizeof(T)*start);
+		stream.read(&m_memoryBlock[m_attribs[hdl.index()].offset + sizeof(T)*start], bytes);
 		return static_cast<std::size_t>(stream.gcount()) / sizeof(T);
 	}
 
@@ -250,8 +262,8 @@ public:
 			return 0u;
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return 0u;
-		std::size_t bytes = std::min(sizeof(T) * count, m_attribs[hdl.index()].length) - sizeof(T)*start;
-		stream.write(&m_memoryBlock[m_attribs[hdl.index()].offset], bytes);
+		std::size_t bytes = std::min(sizeof(T) * count, m_attribs[hdl.index()].length - sizeof(T)*start);
+		stream.write(&m_memoryBlock[m_attribs[hdl.index()].offset + sizeof(T)*start], bytes);
 		return bytes / sizeof(T);
 	}
 
@@ -279,7 +291,6 @@ public:
 		return m_present;
 	}
 
-protected:
 	// Makes the memory buffer present (but does not sync!)
 	void make_present() {
 		// Since attributes are always changed for all pools, we only need to allocate the necessary space
@@ -290,6 +301,7 @@ protected:
 		}
 	}
 
+protected:
 	// Gain access to the raw memory block for syncing
 	char* get_pool_data() {
 		return m_memoryBlock;
@@ -310,8 +322,11 @@ private:
 		// Only resize if we're present on the device
 		if(m_present) {
 			if(newSize == 0u) {
-				// Remove from device
-				this->unload();
+				// Remove, but don't mark as unloaded since that is an explicit intent!
+				if(m_memoryBlock != nullptr) {
+					Allocator::free(m_memoryBlock, m_size);
+					m_memoryBlock = nullptr;
+				}
 			} else if(newSize != m_size) {
 				if(m_memoryBlock == nullptr)
 					m_memoryBlock = Allocator::template alloc<char>(newSize);
@@ -439,11 +454,11 @@ public:
 	bool remove(const AttributeHandle<T>& hdl) {
 		if(hdl.index() >= m_attributes.size())
 			return false;
-		if(m_attributes[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
+		if(m_attributes[hdl.index()] == nullptr)
 			return false;
 
 		// Either entirely remove or mark as hole
-		if(hdl.index == m_attributes.size() - 1u) {
+		if(hdl.index() == m_attributes.size() - 1u) {
 			m_attributes.pop_back();
 			m_accessors.pop_back();
 		} else {
@@ -480,8 +495,10 @@ public:
 
 	// Resizes all attributes to the given length
 	void resize(std::size_t length) {
-		for(auto& attrib : m_attributes)
-			attrib->resize(length);
+		for(auto& attrib : m_attributes) {
+			if(attrib != nullptr)
+				attrib->resize(length);
+		}
 		m_attribLength = length;
 	}
 
@@ -494,8 +511,8 @@ public:
 		if(m_attributes[hdl.index()]== nullptr)
 			return 0u;
 		auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
-		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength) - start);
-		stream.read(reinterpret_cast<char*>(prop.data_vector().data()), bytes);
+		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
+		stream.read(reinterpret_cast<char*>(&prop.data_vector().data()[start]), bytes);
 		return static_cast<std::size_t>(stream.gcount()) / sizeof(T);
 	}
 
@@ -508,8 +525,8 @@ public:
 		if(m_attributes[hdl.index()] == nullptr)
 			return 0u;
 		const auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
-		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength) - start);
-		stream.write(reinterpret_cast<const char*>(prop.data_vector().data()), bytes);
+		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
+		stream.write(reinterpret_cast<const char*>(&prop.data_vector().data()[start]), bytes);
 		return bytes / sizeof(T);
 	}
 
@@ -548,6 +565,10 @@ public:
 		return true;
 	}
 
+	void make_present() {
+		// TODO
+	}
+
 private:
 	std::size_t m_attribLength;
 	std::vector<OpenMesh::BaseProperty*> m_attributes; // Non-owning pointer to OpenMesh attribute
@@ -556,12 +577,12 @@ private:
 
 
 template <>
-void AttributePool<Device::CPU, true>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
+void LIBRARY_API AttributePool<Device::CPU, true>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
 template <>
-void AttributePool<Device::CPU, false>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
+void LIBRARY_API AttributePool<Device::CPU, false>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
 template <>
-void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(AttributePool<Device::CPU, true>& pool);
+void LIBRARY_API AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(AttributePool<Device::CPU, true>& pool);
 template <>
-void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool);
+void LIBRARY_API AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool);
 
 } // namespace mufflon::scene

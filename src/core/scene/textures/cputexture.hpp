@@ -20,7 +20,7 @@ public:
 	 * The border handling mode is always wrap. I.e. modulu operation is performed on the
 	 * texture coordinates.
 	 */
-	ei::Vec4 sample(const UvCoordinate& uv);
+	ei::Vec4 sample(const UvCoordinate& uv) const;
 
 	i32 get_width() const noexcept { return m_width; }
 	i32 get_height() const noexcept { return m_height; }

@@ -123,10 +123,7 @@ public:
 	Polygons& operator=(Polygons&&) = delete;
 	~Polygons() = default;
 
-	void resize(std::size_t vertices, std::size_t edges, std::size_t faces) {
-		// TODO
-		m_meshData.resize(vertices, edges, faces);
-	}
+	void resize(std::size_t vertices, std::size_t edges, std::size_t faces);
 
 	// Requests a new attribute, either for face or vertex.
 	template < class AttributeHandle >
@@ -151,7 +148,7 @@ public:
 	}
 
 	template < class AttributeHandle >
-	void remove(const AttributeHandle &attr) {
+	void remove(AttributeHandle &attr) {
 		// Remove from both lists
 		m_meshData.remove_property(attr.omHandle);
 		AttributeHelper<AttributeHandle>::remove(m_vertexAttributes, m_faceAttributes, attr.customHandle);
@@ -195,14 +192,21 @@ public:
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
 	// Adds a new triangle.
+	TriangleHandle add(const Triangle& tri);
+	TriangleHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2);
+	TriangleHandle add(const std::array<VertexHandle, 3u>& vertices);
 	TriangleHandle add(const Triangle& tri, MaterialIndex idx);
 	TriangleHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
 					   MaterialIndex idx);
 	TriangleHandle add(const std::array<VertexHandle, 3u>& vertices, MaterialIndex idx);
 	// Adds a new quad.
+	QuadHandle add(const Quad& quad);
+	QuadHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
+				   const VertexHandle& v3);
+	QuadHandle add(const std::array<VertexHandle, 4u>& vertices);
 	QuadHandle add(const Quad& quad, MaterialIndex idx);
 	QuadHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
-					   const VertexHandle& v3, MaterialIndex idx);
+				   const VertexHandle& v3, MaterialIndex idx);
 	QuadHandle add(const std::array<VertexHandle, 4u>& vertices, MaterialIndex idx);
 
 	/**
@@ -222,11 +226,11 @@ public:
 						 std::size_t count, std::istream& attrStream) {
 		mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData.n_vertices());
 		// Cap the number of attributes
-		std::size_t actualCount = std::min(m_meshData.n_vertices() - static_cast<std::size_t>(startVertex.idx()),
-										   count);
+		const std::size_t actualCount = std::min(m_meshData.n_vertices() - static_cast<std::size_t>(startVertex.idx()),
+												 count);
 		// Read the attribute from the stream
 		attribute.restore(attrStream, static_cast<std::size_t>(startVertex.idx()), actualCount);
-		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
+		const std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
 		return actuallyRead;
 	}
 	/**
@@ -265,23 +269,31 @@ public:
 		return add_bulk(attribute, startFace, count, attrStream);
 	}
 
-	const VertexAttributeHandle<OpenMesh::Vec3f>& get_points_handle() const {
-		return m_pointsHdl;
+	Attribute<OpenMesh::Vec3f>& get_points() {
+		return m_pointsAttr;
+	}
+	const Attribute<OpenMesh::Vec3f>& get_points() const {
+		return m_pointsAttr;
 	}
 
-	const VertexAttributeHandle<OpenMesh::Vec3f>& get_normals_handle() const {
-		return m_normalsHdl;
+	Attribute<OpenMesh::Vec3f>& get_normals() {
+		return m_normalsAttr;
+	}
+	const Attribute<OpenMesh::Vec3f>& get_normals() const {
+		return m_normalsAttr;
 	}
 
-	const VertexAttributeHandle<OpenMesh::Vec2f>& get_uvs_handle() const {
-		return m_uvsHdl;
+	Attribute<OpenMesh::Vec2f>& get_uvs() {
+		return m_uvsAttr;
 	}
-
-	const FaceAttributeHandle<MaterialIndex>& get_mat_indices_handle() const {
-		return m_matIndexHdl;
+	const Attribute<OpenMesh::Vec2f>& get_uvs() const {
+		return m_uvsAttr;
 	}
 
 	Attribute<MaterialIndex>& get_mat_indices() {
+		return m_matIndexAttr;
+	}
+	const Attribute<MaterialIndex>& get_mat_indices() const {
 		return m_matIndexAttr;
 	}
 

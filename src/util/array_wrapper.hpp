@@ -58,7 +58,7 @@ public:
 		return m_ptr;
 	}
 
-	explicit operator const T*() const {
+	explicit operator T* const() const {
 		return m_ptr;
 	}
 
@@ -99,7 +99,7 @@ public:
 		return m_ptr[idx];
 	}
 
-	explicit operator const T*() const {
+	operator const T* () const {
 		return m_ptr;
 	}
 

@@ -109,8 +109,8 @@ public:
 
 	// Marks a value as absent on a device
 	void unload(Enum check) noexcept {
-		EnumType value = get_value(check);
-		if(this->is_present(value)) {
+		if(this->is_present(check)) {
+			EnumType value = get_value(check);
 			// Mark as absent as well as in need of sync if it was ever present
 			m_isPresent &= ~value;
 			m_needsSyncing |= value;

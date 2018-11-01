@@ -2,6 +2,7 @@
 
 #include "accessor.hpp"
 #include "attribute.hpp"
+#include "export/dll_export.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
 #include <istream>
@@ -27,6 +28,20 @@ public:
 	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	using AttributePools = util::TaggedTuple<AttributePool<Device::CPU, !USES_OPENMESH>,
 		AttributePool<Device::CUDA, true>>;
+
+	AttributeList() {
+		// Evaluate if we use OpenMesh and if the default device uses OpenMesh
+		constexpr bool openMeshForDefDevice = std::conditional_t<DEFAULT_DEVICE == Device::CPU,
+			std::bool_constant<useOpenMesh>, std::bool_constant<!useOpenMesh>>::value;
+		// The default device gets to be present in the beginning
+		m_attributePools.get<AttributePool<DEFAULT_DEVICE, !openMeshForDefDevice>>().make_present();
+	}
+
+	AttributeList(const AttributeList&) = delete;
+	AttributeList(AttributeList&&) = default;
+	AttributeList& operator=(const AttributeList&) = delete;
+	AttributeList& operator=(AttributeList&&) = default;
+	~AttributeList() = default;
 
 	template < class T >
 	class AttributeHandle {
@@ -76,10 +91,7 @@ public:
 		}
 
 		~Attribute() {
-			m_pools.for_each([](std::size_t i, auto& pool) {
-				pool.remove<Type>();
-				return false;
-			});
+			this->destroy_impl<0u>();
 		}
 
 		// Aquires a read-write accessor to the attribute
@@ -96,14 +108,12 @@ public:
 
 		// Aquires a read-only accessor to the attribute
 		template < Device dev = DEFAULT_DEVICE >
-		auto aquireConst() const {
+		auto aquireConst() {
 			using DeviceHdl = DeviceArrayHandle<dev, Type>;
 			this->synchronize<dev>();
 			const auto& pool = m_pools.get<AttributePool<dev, stores_itself<dev>()>>();
 			const auto& handle = m_handles.get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
-			const auto attr = pool.aquire(handle);
-
-			return ConstAccessor<DeviceHdl>{ static_cast<const typename DeviceHdl::HandleType>(attr), m_flags };
+			return ConstAccessor<DeviceHdl>{ static_cast<typename DeviceHdl::ConstHandleType>(pool.aquireConst(handle)) };
 		}
 
 		// Synchronizes the attribute pool to the given device
@@ -117,10 +127,25 @@ public:
 			}
 		}
 
+		std::size_t get_size() const noexcept {
+			return m_pools.get<0>().get_size();
+		}
+
+		constexpr std::size_t get_elem_size() const noexcept {
+			return sizeof(T);
+		}
+
+		std::size_t get_byte_count() const noexcept {
+			return this->get_size() * this->get_elem_size();
+		}
+
 		// Restore the attribute from a stream (CPU only)
 		std::size_t restore(std::istream& stream, std::size_t start, std::size_t count) {
 			auto& handle = m_handles.get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
-			return m_pools.get<AttributePool<Device::CPU, !USES_OPENMESH>>().restore(handle, stream, start, count);
+			std::size_t read = m_pools.get<AttributePool<Device::CPU, !USES_OPENMESH>>().restore(handle, stream, start, count);
+			if(read > 0u)
+				m_flags.mark_changed(Device::CPU);
+			return read;
 		}
 
 		// Store the attribute into a stream (CPU only)
@@ -131,26 +156,34 @@ public:
 
 	private:
 		// Initializes the attribute for all devices
-		template < std::size_t I >
+		template < std::size_t I = 0u >
 		void init_impl() {
 			if constexpr(I < AttributePools::size) {
-				m_handles.get<I>() = m_pools.get<I>().add<T>();
+				m_handles.get<I>() = m_pools.get<I>().add<Type>();
 				this->init_impl<I + 1u>();
 			}
 		}
 
 		// Initializes the attribute for all devices
-		template < std::size_t I >
+		template < std::size_t I = 0u >
 		void init_impl(OpenMesh::PropertyT<T>& prop) {
 			if constexpr(I < AttributePools::size) {
 				auto& pool = m_pools.get<I>();
 				constexpr Device DEVICE = std::decay_t<decltype(pool)>::DEVICE;
 				if constexpr(DEVICE == Device::CPU) {
-					m_handles.get<I>() = pool.add<T>(prop);
+					m_handles.get<I>() = pool.add<Type>(prop);
 				} else {
-					m_handles.get<I>() = pool.add<T>();
+					m_handles.get<I>() = pool.add<Type>();
 				}
 				this->init_impl<I + 1u>();
+			}
+		}
+
+		// Removes the attribute from all devices
+		template < std::size_t I = 0u >
+		void destroy_impl() {
+			if constexpr(I < AttributePools::size) {
+				m_pools.get<I>().remove<Type>(m_handles.get<I>());
 			}
 		}
 
@@ -268,7 +301,9 @@ public:
 	// Unloads all attributes from the given device
 	template < Device dev = DEFAULT_DEVICE >
 	void unload() {
+		// TODO: make sure that we have at least one loaded device
 		m_attributePools.get<AttributePool<dev>>().unload();
+		m_flags.unload(dev);
 	}
 
 	template < Device dev = DEFAULT_DEVICE >

@@ -3,15 +3,19 @@
 
 namespace mufflon::scene::geometry {
 
-Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
+Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 	std::size_t newIndex = m_attributes.get_size();
 	SphereHandle hdl(newIndex);
 	m_attributes.resize(newIndex + 1u);
 	auto posRadAccessor = m_sphereData.aquire<>();
-	auto matIndexAccessor = m_matIndex.aquire<>();
 	(*posRadAccessor)[newIndex].m_radPos.position = point;
 	(*posRadAccessor)[newIndex].m_radPos.radius = radius;
-	(*matIndexAccessor)[newIndex] = idx;
+	return hdl;
+}
+
+Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
+	SphereHandle hdl = this->add(point, radius);
+	(*m_matIndex.aquire<>())[hdl] = idx;
 	return hdl;
 }
 

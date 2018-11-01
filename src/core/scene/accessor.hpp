@@ -30,10 +30,10 @@ template < class DH >
 class ConstAccessor {
 public:
 	using DeviceHandle = DH;
-	using HandleType = typename DH::HandleType;
+	using ConstHandleType = typename DH::ConstHandleType;
 	static constexpr Device DEVICE = DH::DEVICE;
 
-	ConstAccessor(const HandleType handle) :
+	ConstAccessor(ConstHandleType handle) :
 		m_handle(handle) {}
 	ConstAccessor(const ConstAccessor&) = default;
 	ConstAccessor(ConstAccessor&&) = default;
@@ -41,16 +41,16 @@ public:
 	ConstAccessor& operator=(ConstAccessor&&) = default;
 	~ConstAccessor() = default;
 
-	const HandleType& operator*() const {
+	const ConstHandleType& operator*() const {
 		return m_handle;
 	}
 
-	const HandleType* operator->() const {
+	const ConstHandleType* operator->() const {
 		return &m_handle;
 	}
 
 private:
-	HandleType m_handle;
+	ConstHandleType m_handle;
 };
 
 // Provides read-and-write access to the attribute data. Flags as dirty upon destruction
