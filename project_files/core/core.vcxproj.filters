@@ -38,6 +38,9 @@
     <Filter Include="Source Files\core\math">
       <UniqueIdentifier>{4f239cea-46d0-47e5-aff6-18adb0327e19}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\export">
+      <UniqueIdentifier>{2985f6a7-0844-4d94-af66-3eb5b7eecec3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -218,6 +221,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\math\sampling.hpp">
       <Filter>Source Files\core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\export\dll_export.hpp">
+      <Filter>Source Files\export</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

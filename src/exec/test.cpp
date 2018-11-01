@@ -11,12 +11,6 @@
 
 using namespace mufflon::scene;
 
-int main() {
-
-	return 0;
-}
-
-
 class VectorStream : public std::basic_streambuf<char, std::char_traits<char>> {
 public:
 	template < class U >
@@ -53,4 +47,11 @@ void test_polygon() {
 
 	auto f1 = poly.add_bulk(points.size(), pointStream, normalStream, uvStream);
 	poly.add_bulk<>(poly.get_mat_indices(), f1.handle, mats.size(), matStream);
+}
+
+
+
+int main() {
+	test_polygon();
+	return 0;
 }

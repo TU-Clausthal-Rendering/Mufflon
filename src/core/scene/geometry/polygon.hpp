@@ -1,5 +1,6 @@
 #pragma once
 
+#include "export/dll_export.hpp"
 #include "ei/vector.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
@@ -36,7 +37,7 @@ struct PolygonTraits : public OpenMesh::DefaultTraits {
  * Can store both triangles and quads.
  * Can be extended to work with any polygon type.
  */
-class Polygons {
+class LIBRARY_API Polygons {
 public:
 	// Basic type definitions
 	using Index = u32;
@@ -116,7 +117,7 @@ public:
 		m_matIndexAttr(this->aquire(m_matIndexHdl))
 	{}
 
-	Polygons(const Polygons&) = default;
+	Polygons(const Polygons&) = delete;
 	Polygons(Polygons&&) = default;
 	Polygons& operator=(const Polygons&) = delete;
 	Polygons& operator=(Polygons&&) = delete;
