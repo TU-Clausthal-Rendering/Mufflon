@@ -2,6 +2,7 @@
 
 #include "export/dll_export.hpp"
 #include "ei/vector.hpp"
+#include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
 #include "core/scene/types.hpp"
@@ -93,29 +94,9 @@ public:
 				  "Normal type must be compatible to OpenMesh");
 
 	// Default construction, creates material-index attribute.
-	Polygons() :
-		m_meshData(),
-		m_pointsHdl(this->create_points_handle()),
-		m_normalsHdl(this->create_normals_handle()),
-		m_uvsHdl(this->create_uvs_handle()),
-		m_matIndexHdl(this->create_mat_index_handle()),
-		m_pointsAttr(this->aquire(m_pointsHdl)),
-		m_normalsAttr(this->aquire(m_normalsHdl)),
-		m_uvsAttr(this->aquire(m_uvsHdl)),
-		m_matIndexAttr(this->aquire(m_matIndexHdl))
-	{}
+	Polygons();
 	// Creates polygon from already-created mesh.
-	Polygons(MeshType&& mesh) :
-		m_meshData(mesh),
-		m_pointsHdl(this->create_points_handle()),
-		m_normalsHdl(this->create_normals_handle()),
-		m_uvsHdl(this->create_uvs_handle()),
-		m_matIndexHdl(this->create_mat_index_handle()),
-		m_pointsAttr(this->aquire(m_pointsHdl)),
-		m_normalsAttr(this->aquire(m_normalsHdl)),
-		m_uvsAttr(this->aquire(m_uvsHdl)),
-		m_matIndexAttr(this->aquire(m_matIndexHdl))
-	{}
+	Polygons(MeshType&& mesh);
 
 	Polygons(const Polygons&) = delete;
 	Polygons(Polygons&&) = default;
@@ -216,6 +197,9 @@ public:
 	 */
 	VertexBulkReturn add_bulk(std::size_t count, std::istream& pointStream,
 							  std::istream& normalStream, std::istream& uvStream);
+	VertexBulkReturn add_bulk(std::size_t count, std::istream& pointStream,
+							  std::istream& normalStream, std::istream& uvStream,
+							  const ei::Box& boundingBox);
 	/**
 	 * Bulk-loads the given attribute starting at the given vertex.
 	 * The number of read values will be capped by the number of vertice present
@@ -323,6 +307,10 @@ public:
 		return m_meshData;
 	}
 
+	const ei::Box& get_bounding_box() const noexcept {
+		return m_boundingBox;
+	}
+
 private:
 	// Helper struct for adding attributes since functions cannot be partially specialized
 	template < class AttributeHandle >
@@ -391,14 +379,11 @@ private:
 	MeshType m_meshData;
 	AttributeListType m_vertexAttributes;
 	AttributeListType m_faceAttributes;
-	VertexAttributeHandle<OpenMesh::Vec3f> m_pointsHdl;
-	VertexAttributeHandle<OpenMesh::Vec3f> m_normalsHdl;
-	VertexAttributeHandle<OpenMesh::Vec2f> m_uvsHdl;
-	FaceAttributeHandle<MaterialIndex> m_matIndexHdl;
 	Attribute<OpenMesh::Vec3f>& m_pointsAttr;
 	Attribute<OpenMesh::Vec3f>& m_normalsAttr;
 	Attribute<OpenMesh::Vec2f>& m_uvsAttr;
 	Attribute<MaterialIndex>& m_matIndexAttr;
+	ei::Box m_boundingBox;
 };
 
 } // namespace mufflon::scene::geometry

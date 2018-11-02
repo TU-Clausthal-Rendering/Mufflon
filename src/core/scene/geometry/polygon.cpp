@@ -9,6 +9,46 @@
 
 namespace mufflon::scene::geometry {
 
+// Default construction, creates material-index attribute.
+Polygons::Polygons() :
+	m_meshData(),
+	m_pointsAttr(this->aquire(create_points_handle())),
+	m_normalsAttr(this->aquire(create_normals_handle())),
+	m_uvsAttr(this->aquire(create_uvs_handle())),
+	m_matIndexAttr(this->aquire(create_mat_index_handle())) {
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		std::numeric_limits<float>::min(),
+		std::numeric_limits<float>::min(),
+		std::numeric_limits<float>::min()
+	};
+}
+
+// Creates polygon from already-created mesh.
+Polygons::Polygons(MeshType&& mesh) :
+	m_meshData(mesh),
+	m_pointsAttr(this->aquire(create_points_handle())),
+	m_normalsAttr(this->aquire(create_normals_handle())),
+	m_uvsAttr(this->aquire(create_uvs_handle())),
+	m_matIndexAttr(this->aquire(create_mat_index_handle())) {
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		std::numeric_limits<float>::min(),
+		std::numeric_limits<float>::min(),
+		std::numeric_limits<float>::min()
+	};
+}
+
 void Polygons::resize(std::size_t vertices, std::size_t edges, std::size_t faces) {
 	m_meshData.resize(vertices, edges, faces);
 	m_vertexAttributes.resize(vertices);
@@ -25,6 +65,8 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	(*m_pointsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
 	(*m_normalsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
 	(*m_uvsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
+	// Expand the mesh's bounding box
+	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
 	return vh;
 }
 
@@ -119,8 +161,35 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& p
 	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
 	std::size_t readNormals = m_normalsAttr.restore(normalStream, start, count);
 	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	// Expand the bounding box
+	const OpenMesh::Vec3f* points = *m_pointsAttr.aquireConst();
+	for(std::size_t i = start; i < start + readPoints; ++i) {
+		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
+		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
+	}
 
 	return {hdl, readPoints, readNormals, readUvs};
+}
+
+Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& pointStream,
+											  std::istream& normalStream, std::istream& uvStream,
+											  const ei::Box& boundingBox) {
+	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData.n_vertices();
+	VertexHandle hdl(static_cast<int>(start));
+
+	// Resize the attributes prior
+	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+
+	// Read the attributes
+	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
+	std::size_t readNormals = m_normalsAttr.restore(normalStream, start, count);
+	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	// Expand the bounding box
+	m_boundingBox.max = ei::max(boundingBox.max, m_boundingBox.max);
+	m_boundingBox.min = ei::min(boundingBox.min, m_boundingBox.min);
+
+	return { hdl, readPoints, readNormals, readUvs };
 }
 
 void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,

@@ -3,6 +3,7 @@
 #include "accel_struct.hpp"
 #include "instance.hpp"
 #include "materials/material.hpp"
+#include "ei/3dtypes.hpp"
 #include <memory>
 #include <vector>
 
@@ -26,6 +27,11 @@ public:
 	// Adds a new instance.
 	void add_instance(Instance &&instance) {
 		m_instances.push_back(std::move(instance));
+		m_boundingBox = ei::Box(m_boundingBox, m_instances.back().get_bounding_box());
+	}
+
+	const ei::Box& get_bounding_box() const noexcept {
+		return m_boundingBox;
 	}
 
 private:
@@ -34,6 +40,7 @@ private:
 	std::vector<Instance> m_instances;
 	// Acceleration structure over all instances
 	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
+	ei::Box m_boundingBox;
 };
 
 } // namespace mufflon::scene

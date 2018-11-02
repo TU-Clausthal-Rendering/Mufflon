@@ -34,7 +34,8 @@ void test_custom_attributes() {
 		auto hdl1 = poly.request<Polygons::VertexAttributeHandle<short>>("test1");
 		auto hdl2 = poly.request<Polygons::FaceAttributeHandle<double>>("test2");
 		auto& attr1 = poly.aquire(hdl1);
-		std::cout << "Attribute size: " << attr1.get_size() << " " << attr1.get_elem_size() << std::endl;
+		mAssert(attr1.get_size() == 0);
+		mAssert(attr1.get_elem_size() == sizeof(short));
 		poly.remove(hdl0);
 
 		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
@@ -43,57 +44,17 @@ void test_custom_attributes() {
 		auto f0 = poly.add(v0, v1, v2);
 		(*poly.get_mat_indices().aquire<>())[0u] = 3u;
 
-		std::cout << "Attribute size after remove and insert: " << attr1.get_size() << " " << attr1.get_elem_size() << std::endl;
-		(*attr1.aquire())[1] = 5;
 		auto& attr2 = poly.aquire(hdl2);
+		(*attr1.aquire())[1] = 5;
 		(*attr2.aquire())[0] = 0.4;
-		std::cout << "Attribute 1 values:" << std::endl;
-		for(std::size_t i = 0; i < attr1.get_size(); ++i) {
-			std::cout << (*attr1.aquire())[i] << std::endl;
-		}
-		std::cout << "Attribute 2 values:" << std::endl;
-		for(std::size_t i = 0; i < attr2.get_size(); ++i) {
-			std::cout << (*attr2.aquire())[i] << std::endl;
-		}
+		mAssert(attr1.get_size() == 3);
+		mAssert(attr2.get_size() == 1);
+		mAssert((*attr1.aquireConst())[1] == 5);
+		mAssert((*attr2.aquireConst())[0] == 0.4);
 
 		poly.remove(hdl0);
 		poly.remove(hdl1);
 		poly.remove(hdl2);
-	}
-}
-
-void test_synchronize_unload() {
-	std::cout << "Testing synchronize/unload (for polygons)" << std::endl;
-
-	Polygons poly;
-
-	{
-		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
-		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
-		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
-		std::vector<MaterialIndex> mats{ 5u };
-		VectorStream pointBuffer(points);
-		VectorStream normalBuffer(normals);
-		VectorStream uvBuffer(uvs);
-		VectorStream matBuffer(mats);
-		std::istream pointStream(&pointBuffer);
-		std::istream normalStream(&normalBuffer);
-		std::istream uvStream(&uvBuffer);
-		std::istream matStream(&matBuffer);
-
-		auto bv0 = poly.add_bulk(points.size(), pointStream, normalStream, uvStream);
-		auto f1 = poly.add(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
-						   OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 1),
-						   OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 2),
-						   OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 3));
-		poly.add_bulk<>(poly.get_mat_indices(), f1, mats.size(), matStream);
-	}
-
-	{
-		poly.synchronize<Device::CUDA>();
-		std::cout << "Synchronized to CUDA" << std::endl;
-		poly.unload<Device::CUDA>();
-		std::cout << "Unloaded from CUDA" << std::endl;
 	}
 }
 
@@ -148,6 +109,9 @@ void test_polygon() {
 		for(std::size_t i = 0u; i < poly.get_mat_indices().get_size(); ++i)
 			std::cout << "  " << matIndices[i] << std::endl;
 	}
+
+	poly.synchronize<Device::CUDA>();
+	poly.unload<Device::CUDA>();
 }
 
 void test_sphere() {
@@ -183,6 +147,11 @@ void test_sphere() {
 		for(std::size_t i = 0u; i < spheres.get_mat_indices().get_size(); ++i)
 			std::cout << "  " << matIndices[i] << std::endl;
 	}
+
+	spheres.synchronize<Device::CUDA>();
+	spheres.unload<Device::CPU>();
+	spheres.synchronize<Device::CPU>();
+	spheres.unload<Device::CUDA>();
 }
 
 void test_object() {
@@ -225,7 +194,15 @@ void test_object() {
 		auto bs0 = obj.add_bulk<Spheres>(radPos.size(), radPosStream);
 		obj.add_bulk<Spheres>(obj.get_mat_indices<Spheres>(), bs0.handle, mats.size(), matStream);
 	}
+
+	const ei::Box& aabb = obj.get_bounding_box();
+	std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
+		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
+		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 	
+	// Syncing
+	obj.synchronize<Device::CUDA>();
+	obj.unload<Device::CUDA>();
 }
 
 
@@ -233,7 +210,6 @@ int main() {
 	test_polygon();
 	test_sphere();
 	test_custom_attributes();
-	test_synchronize_unload();
 	test_object();
 
 	std::cout << "All tests successful" << std::endl;

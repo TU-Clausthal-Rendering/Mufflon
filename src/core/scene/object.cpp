@@ -3,6 +3,20 @@
 
 namespace mufflon::scene {
 
+Object::Object() {
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		std::numeric_limits<float>::min(),
+		std::numeric_limits<float>::min(),
+		std::numeric_limits<float>::min()
+	};
+}
+
 Object::~Object() = default;
 
 bool Object::is_accel_dirty(Device res) const noexcept {

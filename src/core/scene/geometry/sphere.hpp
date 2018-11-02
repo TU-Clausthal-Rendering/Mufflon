@@ -1,6 +1,7 @@
 #pragma once
 
 #include "export/dll_export.hpp"
+#include "ei/3dtypes.hpp"
 #include "ei/vector.hpp"
 #include "util/types.hpp"
 #include "util/flag.hpp"
@@ -54,11 +55,7 @@ public:
 	};
 
 	// Default construction, creates material-index attribute.
-	Spheres() :
-		m_attributes(),
-		m_sphereData(m_attributes.aquire(m_attributes.add<Sphere>("radius-position"))),
-		m_matIndex(m_attributes.aquire(m_attributes.add<MaterialIndex>("materialIdx")))
-	{}
+	Spheres();
 	Spheres(const Spheres&) = default;
 	Spheres(Spheres&&) = default;
 	Spheres& operator=(const Spheres&) = delete;
@@ -96,6 +93,8 @@ public:
 	 * read spheres.
 	 */
 	BulkReturn add_bulk(std::size_t count, std::istream& radPosStream);
+	BulkReturn add_bulk(std::size_t count, std::istream& radPosStream,
+						const ei::Box& boundingBox);
 	/**
 	 * Bulk-loads the given attribute starting at the given sphere.
 	 * The number of read values will be capped by the number of spheres present
@@ -154,10 +153,15 @@ public:
 		m_attributes.unload<dev>();
 	}
 
+	const ei::Box& get_bounding_box() const noexcept {
+		return m_boundingBox;
+	}
+
 private:
 	AttributeListType m_attributes;
 	Attribute<Sphere>& m_sphereData;
 	Attribute<MaterialIndex>& m_matIndex;
+	ei::Box m_boundingBox;
 };
 
 } // namespace mufflon::scene::geometry
