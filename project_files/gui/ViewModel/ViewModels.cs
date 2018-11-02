@@ -51,6 +51,7 @@ namespace gui.ViewModel
             m_models.Lights.Models.Add(new DirectionalLightModel());
             m_models.Lights.Models.Add(new SpotLightModel());
             m_models.Lights.Models.Add(new EnvmapLightModel());
+            m_models.Lights.Models.Add(new GoniometricLightModel());
 
             // command initialization
         }

@@ -14,7 +14,7 @@ namespace gui.Model.Light
 
         public override LightViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new GoniometricLightViewModel(models, this);
         }
 
         private Vec3<float> m_position;
