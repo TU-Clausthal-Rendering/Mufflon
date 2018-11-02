@@ -15,7 +15,7 @@ namespace gui.Model.Material
 
         public override MaterialViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new TorranceMaterialViewModel(models, this);
         }
 
         private Vec3<float> m_albedo = new Vec3<float>(0.5f);
@@ -44,8 +44,21 @@ namespace gui.Model.Material
             }
         }
 
+        private bool m_useAlbedoTexture = false;
+
+        public bool UseAlbedoTexture
+        {
+            get => m_useAlbedoTexture;
+            set
+            {
+                if (value == m_useAlbedoTexture) return;
+                m_useAlbedoTexture = value;
+                OnPropertyChanged(nameof(UseAlbedoTexture));
+            }
+        }
+
         private float m_roughness = 0.5f;
-        // isotrophic roughness value
+        // isotropic roughness value
         public float Roughness
         {
             get => m_roughness;
@@ -83,6 +96,20 @@ namespace gui.Model.Material
             }
         }
 
+        private float m_roughnessAnisotropic = 0.0f;
+
+        public float RoughnessAnisotropic
+        {
+            get => m_roughnessAnisotropic;
+            set
+            {
+                // ReSharper disable once CompareOfFloatsByEqualityOperator
+                if (value == m_roughnessAnisotropic) return;
+                m_roughnessAnisotropic = value;
+                OnPropertyChanged(nameof(RoughnessAnisotropic));
+            }
+        }
+
         private string m_roughnessTex = String.Empty;
 
         public string RoughnessTex
@@ -93,6 +120,19 @@ namespace gui.Model.Material
                 if (Equals(value, m_roughnessTex)) return;
                 m_roughnessTex = value;
                 OnPropertyChanged(nameof(RoughnessTex));
+            }
+        }
+
+        private RoughnessType m_selectedRoughness = RoughnessType.Isotropic;
+
+        public RoughnessType SelectedRoughness
+        {
+            get => m_selectedRoughness;
+            set
+            {
+                if (value == m_selectedRoughness) return;
+                m_selectedRoughness = value;
+                OnPropertyChanged(nameof(SelectedRoughness));
             }
         }
     }

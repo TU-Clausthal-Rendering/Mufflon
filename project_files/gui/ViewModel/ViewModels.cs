@@ -55,6 +55,7 @@ namespace gui.ViewModel
             m_models.Lights.Models.Add(new GoniometricLightModel());
 
             m_models.Materials.Models.Add(new LambertMaterialModel());
+            m_models.Materials.Models.Add(new TorranceMaterialModel());
 
             // command initialization
         }

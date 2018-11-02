@@ -20,6 +20,16 @@ namespace gui.Model.Material
             Blend,
             Fresnel
         }
+
+        /// <summary>
+        /// required for torrance and walter roughness
+        /// </summary>
+        public enum RoughnessType
+        {
+            Isotropic,
+            Anisotropic,
+            Texture
+        }
         
         public abstract MaterialType Type { get; }
 
