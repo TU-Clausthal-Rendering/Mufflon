@@ -4,8 +4,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using gui.Command;
+using gui.Model;
 using gui.Model.Material;
 using gui.Utility;
+using gui.View.Material;
 
 namespace gui.ViewModel.Material
 {
@@ -13,9 +18,10 @@ namespace gui.ViewModel.Material
     {
         private readonly WalterMaterialModel m_parent;
 
-        public WalterMaterialViewModel(WalterMaterialModel parent) : base(parent)
+        public WalterMaterialViewModel(Models models, WalterMaterialModel parent) : base(parent)
         {
             m_parent = parent;
+            SelectRoughnessCommand = new SelectTextureCommand(models, () => m_parent.RoughnessTex, val => m_parent.RoughnessTex = val);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -37,15 +43,24 @@ namespace gui.ViewModel.Material
                 case nameof(WalterMaterialModel.RoughnessAngleY):
                     OnPropertyChanged(nameof(RoughnessAngleY));
                     break;
+                case nameof(WalterMaterialModel.RoughnessAnisotropic):
+                    OnPropertyChanged(nameof(RoughnessAnisotropic));
+                    break;
                 case nameof(WalterMaterialModel.RoughnessTex):
-
+                    OnPropertyChanged(nameof(RoughnessTex));
+                    break;
+                case nameof(WalterMaterialModel.SelectedRoughness):
+                    OnPropertyChanged(nameof(RoughnessVisibility));
+                    OnPropertyChanged(nameof(RoughnessAnisotropicVisibility));
+                    OnPropertyChanged(nameof(RoughnessTexVisibility));
+                    OnPropertyChanged(nameof(SelectedRoughness));
                     break;
             }
         }
 
         public override object CreateView()
         {
-            throw new NotImplementedException();
+            return new WalterMaterialView(this);
         }
 
         public float AbsorptionX
@@ -84,6 +99,36 @@ namespace gui.ViewModel.Material
             set => m_parent.RoughnessAngleY = value;
         }
 
-        // TODO roughness texture
+        public float RoughnessAnisotropic
+        {
+            get => m_parent.RoughnessAnisotropic;
+            set => m_parent.RoughnessAnisotropic = value;
+        }
+
+        public string RoughnessTex
+        {
+            get => m_parent.RoughnessTex;
+            set => m_parent.RoughnessTex = value;
+        }
+
+        public ICommand SelectRoughnessCommand { get; }
+
+        public Visibility RoughnessVisibility => m_parent.SelectedRoughness == MaterialModel.RoughnessType.Isotropic
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility RoughnessAnisotropicVisibility => m_parent.SelectedRoughness == MaterialModel.RoughnessType.Anisotropic
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility RoughnessTexVisibility => m_parent.SelectedRoughness == MaterialModel.RoughnessType.Texture
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public int SelectedRoughness
+        {
+            get => (int)m_parent.SelectedRoughness;
+            set => m_parent.SelectedRoughness = (MaterialModel.RoughnessType)Math.Max(value, 0);
+        }
     }
 }

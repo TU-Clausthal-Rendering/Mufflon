@@ -61,16 +61,71 @@
                     Text="{Binding AbsorptionZ}"/>
             </Grid>
 
-            <TextBlock 
+            <ComboBox 
                 Grid.Column="0"
                 Grid.Row="2"
-                Text="Roughness:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
+                Width="86"
+                SelectedIndex="{Binding SelectedRoughness, FallbackValue=0}"
+                Margin="{StaticResource LeftPropertyMargin}"
+                HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="Roughness"/>
+                <ComboBoxItem Content="Roughness Anisotropic"/>
+                <ComboBoxItem Content="Roughness Texture"/>
+            </ComboBox>
+
             <TextBox
                 Grid.Column="1"
                 Grid.Row="2"
                 Text="{Binding Roughness}"
-                Margin="{StaticResource RightPropertyMargin}"/>
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding RoughnessVisibility}"/>
+
+            <!-- RGB Grid -->
+            <Grid
+                Grid.Column="1"
+                Grid.Row="2"
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding RoughnessAnisotropicVisibility, FallbackValue=Hidden}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding RoughnessAngleX}"/>
+                <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding RoughnessAngleY}"/>
+                <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding RoughnessAnisotropic}"/>
+            </Grid>
+
+            <!-- Texture Grid -->
+            <Grid
+                Grid.Column="1"
+                Grid.Row="2"
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding RoughnessTexVisibility, FallbackValue=Hidden}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox
+                    Grid.Column="0"
+                    Text="{Binding RoughnessTex}"
+                    Margin="0 0 1 0"/>
+                <Button
+                    Grid.Column="1"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Command="{Binding SelectRoughnessCommand}">
+                    <Image
+                        Source="../../Icons/open.png"/>
+                </Button>
+            </Grid>
 
         </Grid>
     </GroupBox>

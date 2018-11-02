@@ -38,6 +38,8 @@ namespace gui.ViewModel.Material
             set => m_parent.Name = value;
         }
 
+        public string Type => m_parent.Type.ToString();
+
         #region PropertyChanged
 
         public event PropertyChangedEventHandler PropertyChanged;
