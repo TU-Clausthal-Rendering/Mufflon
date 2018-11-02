@@ -10,6 +10,7 @@
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/object.hpp"
+#include "core/scene/world_container.hpp"
 
 using namespace mufflon::scene;
 using namespace mufflon::scene::geometry;
@@ -195,14 +196,73 @@ void test_object() {
 		obj.add_bulk<Spheres>(obj.get_mat_indices<Spheres>(), bs0.handle, mats.size(), matStream);
 	}
 
+	// AABB
 	const ei::Box& aabb = obj.get_bounding_box();
 	std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
 		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
 		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
+
+	// 
 	
 	// Syncing
 	obj.synchronize<Device::CUDA>();
 	obj.unload<Device::CUDA>();
+}
+
+void test_scene_creation() {
+	WorldContainer container;
+	Object* obj = container.create_object();
+	
+	{
+		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
+		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
+		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
+		std::vector<MaterialIndex> mats{ 5u };
+		VectorStream pointBuffer(points);
+		VectorStream normalBuffer(normals);
+		VectorStream uvBuffer(uvs);
+		VectorStream matBuffer(mats);
+		std::istream pointStream(&pointBuffer);
+		std::istream normalStream(&normalBuffer);
+		std::istream uvStream(&uvBuffer);
+		std::istream matStream(&matBuffer);
+
+		auto bv0 = obj->add_bulk<Polygons>(points.size(), pointStream, normalStream, uvStream);
+		auto bf0 = obj->add<Polygons>(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
+									 OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 1),
+									 OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 2),
+									 OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 3));
+		auto matIndexAttr = obj->get_mat_indices<Polygons>();
+		obj->add_bulk<Polygons>(matIndexAttr, bf0, mats.size(), matStream);
+	}
+
+	// Sphere interface
+	{
+		std::vector<Spheres::Sphere> radPos{ {Point(0,0,1), 5.f}, {Point(1,0,1), 1.f}, {Point(0,1,1), 7.f}, {Point(1,1,1), 3.f} };
+		std::vector<MaterialIndex> mats{ 1u, 3u, 27u, 15u };
+		VectorStream radPosBuffer(radPos);
+		VectorStream matBuffer(mats);
+		std::istream radPosStream(&radPosBuffer);
+		std::istream matStream(&matBuffer);
+
+		auto bs0 = obj->add_bulk<Spheres>(radPos.size(), radPosStream);
+		obj->add_bulk<Spheres>(obj->get_mat_indices<Spheres>(), bs0.handle, mats.size(), matStream);
+	}
+
+	Instance* inst = container.create_instance(obj);
+	inst->set_transformation_matrix(ei::Matrix<float, 4, 3>{
+		1.f,2.f,3.f,
+		4.f,5.f,6.f,
+		7.f,8.f,9.f,
+		10.f,11.f,12.f
+	});
+	auto scenarioHdl = container.create_scenario();
+	auto* sceneHdl = container.load_scene(scenarioHdl);
+
+	const ei::Box& aabb = sceneHdl->get_bounding_box();
+	std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
+		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
+		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 }
 
 
@@ -211,6 +271,7 @@ int main() {
 	test_sphere();
 	test_custom_attributes();
 	test_object();
+	test_scene_creation();
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();

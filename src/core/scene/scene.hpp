@@ -2,6 +2,7 @@
 
 #include "accel_struct.hpp"
 #include "instance.hpp"
+#include "export/dll_export.hpp"
 #include "materials/material.hpp"
 #include "ei/3dtypes.hpp"
 #include <memory>
@@ -15,7 +16,7 @@ namespace mufflon::scene {
  * Main class on the data side.
  * Holds all data related to a scene: materials, cameras and their paths, geometry etc.
  */
-class Scene {
+class LIBRARY_API Scene {
 public:
 	Scene() = default;
 	Scene(const Scene&) = default;
@@ -24,11 +25,11 @@ public:
 	Scene& operator=(Scene&&) = default;
 	~Scene() = default;
 
-	// Adds a new instance.
-	void add_instance(Instance &&instance) {
-		m_instances.push_back(std::move(instance));
+	// Add an instance to be rendered
+	void add_instance(InstanceHandle hdl) {
+		m_instances.push_back(hdl);
+		m_boundingBox = ei::Box(m_boundingBox, hdl->get_bounding_box());
 		m_accelDirty = true;
-		m_boundingBox = ei::Box(m_boundingBox, m_instances.back().get_bounding_box());
 	}
 
 	// Synchronizes entire scene to the device
@@ -76,12 +77,14 @@ public:
 	void build_accel_structure();
 
 private:
-	// TODO: cameras, lights, materials
 	// List of instances and thus objects to-be-rendered
-	std::vector<Instance> m_instances;
+	std::vector<InstanceHandle> m_instances;
+
+	// TODO: cameras, lights, materials
 	// Acceleration structure over all instances
 	bool m_accelDirty = false;
 	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
+
 	ei::Box m_boundingBox;
 };
 

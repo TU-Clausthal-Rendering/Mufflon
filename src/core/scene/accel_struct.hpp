@@ -1,5 +1,6 @@
 #pragma once
 
+#include "instance.hpp"
 #include "residency.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
@@ -10,16 +11,9 @@
 namespace ei {
 struct Ray;
 } // namespace ei
-namespace OpenMesh {
-
-} // namespace OpenMesh
 
 
 namespace mufflon::scene {
-
-// Forward declarations
-class Instance;
-
 
 /**
  * Interface for generic accelleration structure.
@@ -40,7 +34,7 @@ public:
 	// Removes the structure from the given system, if present.
 	virtual void unload_resident(Device res) = 0;
 	// Builds or rebuilds the structure.
-	virtual void build(const std::vector<Instance>&) = 0;
+	virtual void build(const std::vector<InstanceHandle>&) = 0;
 	// TODO: should this be put into a different class?
 	virtual void build(const ei::Box& boundingBox,
 					   util::Range<geometry::Polygons::FaceIterator> faces,

@@ -1,7 +1,11 @@
 #pragma once
 
+#include "object.hpp"
+#include "export/dll_export.hpp"
 #include "materials/material.hpp"
 #include <map>
+#include <string_view>
+#include <tuple>
 
 namespace mufflon::scene {
 
@@ -9,11 +13,14 @@ namespace mufflon::scene {
  * This class represents a scenario, meaning a subset of world features.
  * It contains mappings for instances/objects and materials.
  */
-class Scenario {
+class LIBRARY_API Scenario {
 public:
+	using ObjectHandle = Object*;
+	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
+
 	/*
 	 * Add a new material entry to the table. The index of the material depends on the
-	 * order of dedclarations and is unchanging for a scene.
+	 * order of declarations and is unchanging for a scene.
 	 */
 	MaterialIndex declare_material_slot(std::string_view binaryName);
 	// Get the index of a slot from its name.
@@ -28,10 +35,46 @@ public:
 	// Find out if and which material is assigned to a slot. Returns nullptr if nothing is assigned.
 	material::MaterialHandle get_assigned_material(MaterialIndex index) const;
 
+	// Getter/setters for global LoD level
+	std::size_t get_global_lod_level() const noexcept {
+		return m_globalLodLevel;
+	}
+	void set_global_lod_level(std::size_t level) noexcept {
+		m_globalLodLevel = level;
+	}
+
+	// Getter/setters for resolution
+	const std::pair<std::size_t, std::size_t>& get_resolution() const noexcept {
+		return m_resolution;
+	}
+	void set_resolution(std::pair<std::size_t, std::size_t> res) noexcept {
+		m_resolution = res;
+	}
+
+	// Getter/setters for camera name
+	std::string_view get_camera_name() const noexcept {
+		return m_cameraName;
+	}
+	void set_camera_name(std::string_view name) noexcept {
+		m_cameraName = std::move(name);
+	}
+
+	// Getter/setter for per-object properties
+	bool is_masked(ObjectHandle hdl) const;
+	std::size_t get_custom_lod(ObjectHandle hdl) const;
+	void mask_object(ObjectHandle hdl);
+	void set_custom_lod(ObjectHandle hdl, std::size_t level);
+
+
 private:
 	struct MaterialDesc {
 		std::string binaryName;
 		material::MaterialHandle material;
+	};
+
+	struct ObjectProperty {
+		bool masked = false;
+		std::size_t lod = NO_CUSTOM_LOD;
 	};
 
 	// Map from binaryName to a material index (the key-string_views are views
@@ -39,6 +82,15 @@ private:
 	std::map<std::string, MaterialIndex, std::less<>> m_materialIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
+	// TODO: list of light mappings
+
+	std::size_t m_globalLodLevel;
+	std::pair<std::size_t, std::size_t> m_resolution;
+	std::string_view m_cameraName; // TODO: replace with camera handle?
+	// TODO: material properties
+
+	// Object blacklisting and other custom traits
+	std::map<ObjectHandle, ObjectProperty> m_perObjectCustomization;
 };
 
 } // namespace mufflon::scene

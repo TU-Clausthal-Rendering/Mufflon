@@ -39,4 +39,26 @@ material::MaterialHandle Scenario::get_assigned_material(MaterialIndex index) co
 	return m_materialAssignment[index].material;
 }
 
+bool Scenario::is_masked(ObjectHandle hdl) const {
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter != m_perObjectCustomization.end())
+		return iter->second.masked;
+	return false;
+}
+
+std::size_t Scenario::get_custom_lod(ObjectHandle hdl) const {
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter != m_perObjectCustomization.end())
+		return iter->second.lod;
+	return NO_CUSTOM_LOD;
+}
+
+void Scenario::mask_object(ObjectHandle hdl) {
+	m_perObjectCustomization[hdl].masked = true;
+}
+
+void Scenario::set_custom_lod(ObjectHandle hdl, std::size_t level) {
+	m_perObjectCustomization[hdl].lod = level;
+}
+
 } // namespace mufflon::scene
