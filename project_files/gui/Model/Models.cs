@@ -17,17 +17,23 @@ namespace gui.Model
     {
         public AppModel App { get; }
         public ViewportModel Viewport { get; }
+
+        public SceneModel Scene { get; }
         public SynchronizedModelList<CameraModel> Cameras { get; }
         public SynchronizedModelList<LightModel> Lights { get; }
         public SynchronizedModelList<MaterialModel> Materials { get; }
+
+        public RendererModel Renderer { get; }
 
         public Models(MainWindow window)
         {
             Viewport = new ViewportModel();
             App = new AppModel(window, Viewport);
+            Scene = new SceneModel();
             Cameras = new SynchronizedModelList<CameraModel>();
             Lights = new SynchronizedModelList<LightModel>();
             Materials = new SynchronizedModelList<MaterialModel>();
+            Renderer = new RendererModel();
         }
     }
 }

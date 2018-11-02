@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using gui.ViewModel.Light;
 
 namespace gui.View.Light
 {
@@ -20,9 +21,10 @@ namespace gui.View.Light
     /// </summary>
     public partial class EnvmapLightView : UserControl
     {
-        public EnvmapLightView()
+        public EnvmapLightView(EnvmapLightViewModel envmapLightViewModel)
         {
             InitializeComponent();
+            DataContext = envmapLightViewModel;
         }
     }
 }

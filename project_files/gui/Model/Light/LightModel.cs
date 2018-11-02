@@ -65,8 +65,9 @@ namespace gui.Model.Light
         /// <summary>
         /// creates a new view model based on this model
         /// </summary>
+        /// <param name="models"></param>
         /// <returns></returns>
-        public abstract LightViewModel CreateViewModel();
+        public abstract LightViewModel CreateViewModel(Models models);
 
         #region PropertyChanged
 

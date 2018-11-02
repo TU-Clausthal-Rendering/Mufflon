@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model;
 using gui.Model.Material;
 
 namespace gui.ViewModel.Material
@@ -11,18 +12,20 @@ namespace gui.ViewModel.Material
     public class FresnelMaterialViewModel : MaterialViewModel
     {
         private readonly FresnelMaterialModel m_parent;
+        private readonly Models m_models;
 
-        public FresnelMaterialViewModel(FresnelMaterialModel parent) : base(parent)
+        public FresnelMaterialViewModel(FresnelMaterialModel parent, Models models) : base(parent)
         {
             m_parent = parent;
+            m_models = models;
             if (m_parent.LayerRefraction != null)
             {
-                var vm = m_parent.LayerRefraction.CreateViewModel();
+                var vm = m_parent.LayerRefraction.CreateViewModel(m_models);
                 LayerRefraction = vm.CreateView();
             }
             if (m_parent.LayerReflection != null)
             {
-                var vm = m_parent.LayerReflection.CreateViewModel();
+                var vm = m_parent.LayerReflection.CreateViewModel(m_models);
                 LayerReflection = vm.CreateView();
             }
         }
@@ -42,7 +45,7 @@ namespace gui.ViewModel.Material
                     // create new view
                     if (m_parent.LayerReflection != null)
                     {
-                        var vm = m_parent.LayerReflection.CreateViewModel();
+                        var vm = m_parent.LayerReflection.CreateViewModel(m_models);
                         LayerReflection = vm.CreateView();
                     }
                     else
@@ -55,7 +58,7 @@ namespace gui.ViewModel.Material
                     // create new view
                     if (m_parent.LayerRefraction != null)
                     {
-                        var vm = m_parent.LayerRefraction.CreateViewModel();
+                        var vm = m_parent.LayerRefraction.CreateViewModel(m_models);
                         LayerRefraction = vm.CreateView();
                     }
                     else

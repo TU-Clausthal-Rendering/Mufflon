@@ -69,12 +69,13 @@
 
                 <TextBox
                     Grid.Column="0"
-                    IsEnabled="False"
-                    Text="{Binding MapShort}"
-                    ToolTip="{Binding MapFull}"
+                    Text="{Binding Map}"
                     Margin="0 0 1 0"/>
                 <Button
-                    Grid.Column="1">
+                    Grid.Column="1"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Command="{Binding SelectMapCommand}">
                     <Image
                         Source="../../Icons/open.png"/>    
                 </Button>

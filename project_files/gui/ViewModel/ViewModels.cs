@@ -48,6 +48,9 @@ namespace gui.ViewModel
             m_models.Cameras.Models.Add(new OrthoCameraModel());
 
             m_models.Lights.Models.Add(new PointLightModel());
+            m_models.Lights.Models.Add(new DirectionalLightModel());
+            m_models.Lights.Models.Add(new SpotLightModel());
+            m_models.Lights.Models.Add(new EnvmapLightModel());
 
             // command initialization
         }

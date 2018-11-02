@@ -12,7 +12,7 @@ namespace gui.Model.Material
     {
         public override MaterialType Type => MaterialType.Blend;
 
-        public override MaterialViewModel CreateViewModel()
+        public override MaterialViewModel CreateViewModel(Models models)
         {
             throw new NotImplementedException();
         }

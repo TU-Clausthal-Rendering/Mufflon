@@ -3,56 +3,26 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using gui.Command;
 using gui.Model;
 using gui.Model.Light;
+using gui.View.Light;
 
 namespace gui.ViewModel.Light
 {
     public class EnvmapLightViewModel : LightViewModel
     {
-        private class SelectMapCommand : ICommand
-        {
-            private readonly EnvmapLightModel m_model;
-            private readonly Models m_models;
-
-            public SelectMapCommand(EnvmapLightModel model, Models models)
-            {
-                m_model = model;
-                m_models = models;
-            }
-   
-            public bool CanExecute(object parameter)
-            {
-                return true;
-            }
-
-            public void Execute(object parameter)
-            {
-                var ofd = new Microsoft.Win32.OpenFileDialog
-                {
-                    Multiselect = false,
-                    InitialDirectory = Properties.Settings.Default.ImagePath
-                };
-
-                if (ofd.ShowDialog(m_models.App.Window) != true) return;
-
-                Properties.Settings.Default.ImagePath = System.IO.Path.GetDirectoryName(ofd.FileName);
-                // TODO file name relative?
-                m_model.Map = ofd.FileName;
-            }
-
-            public event EventHandler CanExecuteChanged;
-        }
-
         private readonly EnvmapLightModel m_parent;
 
-        public EnvmapLightViewModel(EnvmapLightModel parent) : base(parent)
+        public EnvmapLightViewModel(Models models, EnvmapLightModel parent) : base(parent)
         {
             m_parent = parent;
+            SelectMapCommand = new SelectTextureCommand(models, () => m_parent.Map, val => m_parent.Map = val);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -61,24 +31,23 @@ namespace gui.ViewModel.Light
             switch (args.PropertyName)
             {
                 case nameof(EnvmapLightModel.Map):
-                    OnPropertyChanged(nameof(MapFull));
-                    OnPropertyChanged(nameof(MapShort));
+                    OnPropertyChanged(nameof(Map));
                     break;
             }
         }
 
         public override object CreateView()
         {
-            throw new NotImplementedException();
+            return new EnvmapLightView(this);
         }
 
         // readonly property
-        public string MapFull => m_parent.Map;
-
-        public string MapShort
+        public string Map
         {
-            get => Path.GetFileName(m_parent.Map);
-            set { } // dummy setter because of textbox (requires setter but is disabled)
+            get => m_parent.Map;
+            set => m_parent.Map = value;
         }
+
+        public ICommand SelectMapCommand { get; }
     }
 }

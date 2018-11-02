@@ -13,7 +13,7 @@ namespace gui.Model.Material
     {
         public override MaterialType Type => MaterialType.Orennayar;
 
-        public override MaterialViewModel CreateViewModel()
+        public override MaterialViewModel CreateViewModel(Models models)
         {
             throw new NotImplementedException();
         }

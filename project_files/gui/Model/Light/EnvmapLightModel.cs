@@ -11,9 +11,9 @@ namespace gui.Model.Light
     {
         public override LightType Type => LightType.Envmap;
 
-        public override LightViewModel CreateViewModel()
+        public override LightViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new EnvmapLightViewModel(models, this);
         }
 
         private string m_map = String.Empty;

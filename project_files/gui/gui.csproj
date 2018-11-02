@@ -73,6 +73,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
     <Compile Include="Model\Camera\FocusCameraModel.cs" />
@@ -92,6 +93,8 @@
     <Compile Include="Model\Material\OrennayarMaterialModel.cs" />
     <Compile Include="Model\Material\TorranceMaterialModel.cs" />
     <Compile Include="Model\Material\WalterMaterialModel.cs" />
+    <Compile Include="Model\RendererModel.cs" />
+    <Compile Include="Model\SceneModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\SynchronizedModelList.cs" />

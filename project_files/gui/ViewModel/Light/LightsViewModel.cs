@@ -11,13 +11,16 @@ namespace gui.ViewModel.Light
 {
     public class LightsViewModel : SynchronizedViewModelList<LightModel, LightViewModel, object>
     {
+        private readonly Models m_models;
+
         public LightsViewModel(Models models) : base(models.Lights)
         {
+            m_models = models;
         }
 
         protected override LightViewModel CreateViewModel(LightModel model)
         {
-            return model.CreateViewModel();
+            return model.CreateViewModel(m_models);
         }
 
         protected override object CreateView(LightViewModel viewModel)

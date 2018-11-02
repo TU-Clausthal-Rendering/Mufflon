@@ -13,7 +13,7 @@ namespace gui.Model.Light
     {
         public override LightType Type => LightType.Directional;
 
-        public override LightViewModel CreateViewModel()
+        public override LightViewModel CreateViewModel(Models models)
         {
             return new DirectionalLightViewModel(this);
         }

@@ -12,7 +12,7 @@ namespace gui.Model.Light
     {
         public override LightType Type => LightType.Goniometric;
 
-        public override LightViewModel CreateViewModel()
+        public override LightViewModel CreateViewModel(Models models)
         {
             throw new NotImplementedException();
         }

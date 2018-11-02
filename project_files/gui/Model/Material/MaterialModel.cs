@@ -39,8 +39,9 @@ namespace gui.Model.Material
         /// <summary>
         /// creates a new view model based on this model
         /// </summary>
+        /// <param name="models"></param>
         /// <returns></returns>
-        public abstract MaterialViewModel CreateViewModel();
+        public abstract MaterialViewModel CreateViewModel(Models models);
 
         #region PropertyChanged
 

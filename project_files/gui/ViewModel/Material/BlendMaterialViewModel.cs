@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using gui.Model;
 using gui.Model.Material;
 
 namespace gui.ViewModel.Material
@@ -12,18 +13,20 @@ namespace gui.ViewModel.Material
     public class BlendMaterialViewModel : MaterialViewModel
     {
         private readonly BlendMaterialModel m_parent;
+        private readonly Models m_models;
 
-        public BlendMaterialViewModel(BlendMaterialModel parent) : base(parent)
+        public BlendMaterialViewModel(Models models, BlendMaterialModel parent) : base(parent)
         {
             m_parent = parent;
+            m_models = models;
             if (m_parent.LayerA != null)
             {
-                var vm = m_parent.LayerA.CreateViewModel();
+                var vm = m_parent.LayerA.CreateViewModel(models);
                 LayerA = vm.CreateView();
             }
             if (m_parent.LayerB != null)
             {
-                var vm = m_parent.LayerB.CreateViewModel();
+                var vm = m_parent.LayerB.CreateViewModel(models);
                 LayerB = vm.CreateView();
             }
         }
@@ -42,7 +45,7 @@ namespace gui.ViewModel.Material
                 case nameof(BlendMaterialModel.LayerA):
                     if (m_parent.LayerA != null)
                     {
-                        var vm = m_parent.LayerA.CreateViewModel();
+                        var vm = m_parent.LayerA.CreateViewModel(m_models);
                         LayerA = vm.CreateView();
                     }
                     else
@@ -54,7 +57,7 @@ namespace gui.ViewModel.Material
                 case nameof(BlendMaterialModel.LayerB):
                     if (m_parent.LayerB != null)
                     {
-                        var vm = m_parent.LayerB.CreateViewModel();
+                        var vm = m_parent.LayerB.CreateViewModel(m_models);
                         LayerB = vm.CreateView();
                     }
                     else

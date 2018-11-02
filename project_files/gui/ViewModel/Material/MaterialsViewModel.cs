@@ -11,14 +11,16 @@ namespace gui.ViewModel.Material
 {
     public class MaterialsViewModel : SynchronizedViewModelList<MaterialModel, MaterialViewModel, object>
     {
+        private readonly Models m_models;
+
         public MaterialsViewModel(Models models) : base(models.Materials)
         {
-
+            m_models = models;
         }
 
         protected override MaterialViewModel CreateViewModel(MaterialModel model)
         {
-            return model.CreateViewModel();
+            return model.CreateViewModel(m_models);
         }
 
         protected override object CreateView(MaterialViewModel viewModel)
