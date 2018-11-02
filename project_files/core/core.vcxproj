@@ -78,6 +78,7 @@
     <ClInclude Include="..\..\src\util\array_wrapper.hpp" />
     <ClInclude Include="..\..\src\util\log.hpp" />
     <ClInclude Include="..\..\src\util\punning.hpp" />
+    <ClInclude Include="..\..\src\util\range.hpp" />
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />
   </ItemGroup>

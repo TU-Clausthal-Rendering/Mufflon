@@ -7,6 +7,7 @@
 #include "util/types.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/attribute_list.hpp"
+#include "util/range.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <optional>
 #include <tuple>
@@ -81,6 +82,55 @@ public:
 		using OmAttrHandle = OpenMesh::FPropHandleT<Type>;
 		OmAttrHandle omHandle;
 		AttributeHandle<Type> customHandle;
+	};
+
+	class FaceIterator {
+	public:
+		static FaceIterator cbegin(const MeshType& mesh) {
+			return FaceIterator(mesh, mesh.faces().begin());
+		}
+
+		static FaceIterator cend(const MeshType& mesh) {
+			return FaceIterator(mesh, mesh.faces().end());
+		}
+
+		FaceIterator& operator++() {
+			++m_faceIter;
+			return *this;
+		}
+
+		FaceIterator operator++(int) {
+			FaceIterator temp(*this);
+			++(*this);
+			return temp;
+		}
+
+		std::size_t get_vertex_count() const {
+			mAssert(m_faceIter != m_mesh.faces().end());
+			mAssert(m_faceIter->is_valid());
+			mAssert(static_cast<std::size_t>(m_faceIter->idx()) < m_mesh.n_faces());
+			return std::distance(m_mesh.cfv_ccwbegin(*m_faceIter), m_mesh.cfv_ccwend(*m_faceIter));
+		}
+
+		OpenMesh::PolyConnectivity::ConstFaceVertexRange operator*() const {
+			mAssert(m_faceIter != m_mesh.faces().end());
+			mAssert(m_faceIter->is_valid());
+			mAssert(static_cast<std::size_t>(m_faceIter->idx()) < m_mesh.n_faces());
+			return m_mesh.fv_range(*m_faceIter);
+		}
+
+		const OpenMesh::PolyConnectivity::ConstFaceIter& operator->() const noexcept {
+			return m_faceIter;
+		}
+
+	private:
+		FaceIterator(const MeshType& mesh, OpenMesh::PolyConnectivity::ConstFaceIter iter) :
+			m_mesh(mesh),
+			m_faceIter(std::move(iter))
+		{}
+
+		const MeshType& m_mesh;
+		OpenMesh::PolyConnectivity::ConstFaceIter m_faceIter;
 	};
 
 	// Ensure matching data types
@@ -305,6 +355,14 @@ public:
 	// Gets a constant handle to the underlying mesh data.
 	const MeshType& native() const {
 		return m_meshData;
+	}
+
+	// Get iterator over all faces (and vertices for the faces)
+	util::Range<FaceIterator> faces() const {
+		return util::Range<FaceIterator>{
+			FaceIterator::cbegin(m_meshData),
+			FaceIterator::cend(m_meshData)
+		};
 	}
 
 	const ei::Box& get_bounding_box() const noexcept {

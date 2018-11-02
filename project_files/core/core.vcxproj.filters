@@ -240,6 +240,9 @@
     <ClInclude Include="..\..\src\core\scene\scenario.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\range.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
