@@ -36,15 +36,22 @@
                 Text="{Binding Type}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
-            <TextBlock
+            <ComboBox 
                 Grid.Column="0"
                 Grid.Row="1"
-                Text="Radiance:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
+                Width="76"
+                SelectedIndex="{Binding SelectedRadiance, FallbackValue=0}"
+                Margin="{StaticResource LeftPropertyMargin}">
+                <ComboBoxItem Content="Radiance RGB"/>
+                <ComboBoxItem Content="Radiance Texture"/>
+            </ComboBox>
+
+            <!-- RGB Grid -->
             <Grid
                 Grid.Column="1"
                 Grid.Row="1"
-                Margin="{StaticResource RightPropertyMargin}">
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding RadianceVisibility, FallbackValue=Visible}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -59,6 +66,31 @@
                 <helper:EnterTextBox
                     Grid.Column="2"
                     Text="{Binding RadianceZ}"/>
+            </Grid>
+
+            <!-- Texture Grid -->
+            <Grid
+                Grid.Column="1"
+                Grid.Row="1"
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding RadianceTexVisibility, FallbackValue=Hidden}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox
+                    Grid.Column="0"
+                    Text="{Binding RadianceTex}"
+                    Margin="0 0 1 0"/>
+                <Button
+                    Grid.Column="1"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Command="{Binding SelectRadianceCommand}">
+                    <Image
+                        Source="../../Icons/open.png"/>
+                </Button>
             </Grid>
 
             <TextBlock 

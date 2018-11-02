@@ -15,7 +15,7 @@ namespace gui.Model.Material
 
         public override MaterialViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new EmissiveMaterialViewModel(models, this);
         }
 
         private Vec3<float> m_radiance;
@@ -41,6 +41,19 @@ namespace gui.Model.Material
                 if (Equals(m_radianceTex, value)) return;
                 m_radianceTex = value;
                 OnPropertyChanged(nameof(RadianceTex));
+            }
+        }
+
+        private bool m_useRadianceTexture = false;
+
+        public bool UseRadianceTexture
+        {
+            get => m_useRadianceTexture;
+            set
+            {
+                if(value == m_useRadianceTexture) return;
+                m_useRadianceTexture = value;
+                OnPropertyChanged(nameof(UseRadianceTexture));
             }
         }
 

@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using gui.ViewModel.Material;
 
 namespace gui.View.Material
 {
@@ -20,9 +21,10 @@ namespace gui.View.Material
     /// </summary>
     public partial class EmissiveMaterialView : UserControl
     {
-        public EmissiveMaterialView()
+        public EmissiveMaterialView(EmissiveMaterialViewModel emissiveMaterialViewModel)
         {
             InitializeComponent();
+            DataContext = emissiveMaterialViewModel;
         }
     }
 }
