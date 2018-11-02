@@ -39,7 +39,7 @@
                 Grid.Column="0"
                 Grid.Row="1"
                 Width="68"
-                SelectedIndex="{Binding SelectedAlbedo}"
+                SelectedIndex="{Binding SelectedAlbedo, FallbackValue=0}"
                 Margin="{StaticResource LeftPropertyMargin}">
                 <ComboBoxItem Content="Albedo RGB"/>
                 <ComboBoxItem Content="Albedo Texture"/>

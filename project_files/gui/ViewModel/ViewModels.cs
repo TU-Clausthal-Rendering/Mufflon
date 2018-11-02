@@ -58,6 +58,7 @@ namespace gui.ViewModel
             m_models.Materials.Models.Add(new TorranceMaterialModel());
             m_models.Materials.Models.Add(new WalterMaterialModel());
             m_models.Materials.Models.Add(new EmissiveMaterialModel());
+            m_models.Materials.Models.Add(new OrennayarMaterialModel());
 
             // command initialization
         }

@@ -4,8 +4,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using gui.Command;
+using gui.Model;
 using gui.Model.Material;
 using gui.Utility;
+using gui.View.Material;
 
 namespace gui.ViewModel.Material
 {
@@ -13,9 +18,10 @@ namespace gui.ViewModel.Material
     {
         private readonly OrennayarMaterialModel m_parent;
 
-        public OrennayarMaterialViewModel(OrennayarMaterialModel parent) : base(parent)
+        public OrennayarMaterialViewModel(Models models ,OrennayarMaterialModel parent) : base(parent)
         {
             m_parent = parent;
+            SelectAlbedoCommand = new SelectTextureCommand(models, () => m_parent.AlbedoTex, val => m_parent.AlbedoTex = val);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -29,7 +35,12 @@ namespace gui.ViewModel.Material
                     OnPropertyChanged(nameof(AlbedoZ));
                     break;
                 case nameof(OrennayarMaterialModel.AlbedoTex):
-
+                    OnPropertyChanged(nameof(AlbedoTex));
+                    break;
+                case nameof(OrennayarMaterialModel.UseAlbedoTexture):
+                    OnPropertyChanged(nameof(AlbedoVisibility));
+                    OnPropertyChanged(nameof(AlbedoTexVisibility));
+                    OnPropertyChanged(nameof(SelectedAlbedo));
                     break;
                 case nameof(OrennayarMaterialModel.Roughness):
                     OnPropertyChanged(nameof(Roughness));
@@ -39,7 +50,7 @@ namespace gui.ViewModel.Material
 
         public override object CreateView()
         {
-            throw new NotImplementedException();
+            return new OrennayarMaterialView(this);
         }
 
         public float AlbedoX
@@ -58,6 +69,28 @@ namespace gui.ViewModel.Material
         {
             get => m_parent.Albedo.Z;
             set => m_parent.Albedo = new Vec3<float>(m_parent.Albedo.X, m_parent.Albedo.Y, value);
+        }
+
+        public string AlbedoTex
+        {
+            get => m_parent.AlbedoTex;
+            set => m_parent.AlbedoTex = value;
+        }
+
+        public ICommand SelectAlbedoCommand { get; }
+
+        public Visibility AlbedoVisibility => m_parent.UseAlbedoTexture ? Visibility.Collapsed : Visibility.Visible;
+
+        public Visibility AlbedoTexVisibility => m_parent.UseAlbedoTexture ? Visibility.Visible : Visibility.Collapsed;
+
+        public int SelectedAlbedo
+        {
+            get => m_parent.UseAlbedoTexture ? 1 : 0;
+            set
+            {
+                if (value == 0) m_parent.UseAlbedoTexture = false;
+                if (value == 1) m_parent.UseAlbedoTexture = true;
+            }
         }
 
         public float Roughness

@@ -15,7 +15,7 @@ namespace gui.Model.Material
 
         public override MaterialViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new OrennayarMaterialViewModel(models, this);
         }
 
         private Vec3<float> m_albedo = new Vec3<float>(0.5f);
@@ -41,6 +41,19 @@ namespace gui.Model.Material
                 if (Equals(value, m_albedoTex)) return;
                 m_albedoTex = value;
                 OnPropertyChanged(nameof(AlbedoTex));
+            }
+        }
+
+        private bool m_useAlbedoTexture = false;
+
+        public bool UseAlbedoTexture
+        {
+            get => m_useAlbedoTexture;
+            set
+            {
+                if (value == m_useAlbedoTexture) return;
+                m_useAlbedoTexture = value;
+                OnPropertyChanged(nameof(UseAlbedoTexture));
             }
         }
 
