@@ -35,15 +35,22 @@
                 Text="{Binding Type}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
-            <TextBlock
+            <ComboBox 
                 Grid.Column="0"
                 Grid.Row="1"
-                Text="Albedo:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
+                Width="68"
+                SelectedIndex="{Binding SelectedAlbedo}"
+                Margin="{StaticResource LeftPropertyMargin}">
+                <ComboBoxItem Content="Albedo RGB"/>
+                <ComboBoxItem Content="Albedo Texture"/>
+            </ComboBox>
+
+            <!-- RGB Grid -->
             <Grid
                 Grid.Column="1"
                 Grid.Row="1"
-                Margin="{StaticResource RightPropertyMargin}">
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding AlbedoVisibility, FallbackValue=Visible}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -59,7 +66,31 @@
                     Grid.Column="2"
                     Text="{Binding AlbedoZ}"/>
             </Grid>
+            
+            <!-- Texture Grid -->
+            <Grid
+                Grid.Column="1"
+                Grid.Row="1"
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding AlbedoTexVisibility, FallbackValue=Hidden}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
+                <TextBox
+                    Grid.Column="0"
+                    Text="{Binding AlbedoTex}"
+                    Margin="0 0 1 0"/>
+                <Button
+                    Grid.Column="1"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Command="{Binding SelectAlbedoCommand}">
+                    <Image
+                        Source="../../Icons/open.png"/>
+                </Button>
+            </Grid>
         </Grid>
     </GroupBox>
 </UserControl>

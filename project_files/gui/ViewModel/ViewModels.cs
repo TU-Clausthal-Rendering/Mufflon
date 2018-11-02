@@ -10,6 +10,7 @@ using gui.Annotations;
 using gui.Model;
 using gui.Model.Camera;
 using gui.Model.Light;
+using gui.Model.Material;
 using gui.Utility;
 using gui.ViewModel.Camera;
 using gui.ViewModel.Light;
@@ -52,6 +53,8 @@ namespace gui.ViewModel
             m_models.Lights.Models.Add(new SpotLightModel());
             m_models.Lights.Models.Add(new EnvmapLightModel());
             m_models.Lights.Models.Add(new GoniometricLightModel());
+
+            m_models.Materials.Models.Add(new LambertMaterialModel());
 
             // command initialization
         }

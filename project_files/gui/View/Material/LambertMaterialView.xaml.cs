@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using gui.ViewModel.Material;
 
 namespace gui.View.Material
 {
@@ -20,9 +21,10 @@ namespace gui.View.Material
     /// </summary>
     public partial class LambertMaterialView : UserControl
     {
-        public LambertMaterialView()
+        public LambertMaterialView(LambertMaterialViewModel lambertMaterialViewModel)
         {
             InitializeComponent();
+            DataContext = lambertMaterialViewModel;
         }
     }
 }
