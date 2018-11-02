@@ -47,6 +47,7 @@ public:
 	template < class Geom, class... Args >
 	auto add(Args&& ...args) {
 		auto hdl = m_geometryData.get<Geom>().add(std::forward<Args>(args)...);
+		m_accelDirty = true;
 		// Expand the object's bounding box
 		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.get<Geom>().get_bounding_box().max);
 		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.get<Geom>().get_bounding_box().min);
@@ -56,6 +57,7 @@ public:
 	template < class Geom, class... Args >
 	auto add_bulk(Args&& ...args) {
 		auto hdl = m_geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
+		m_accelDirty = true;
 		// Expand the object's bounding box
 		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.get<Geom>().get_bounding_box().max);
 		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.get<Geom>().get_bounding_box().min);
@@ -99,6 +101,7 @@ public:
 	template < class Geom, class Tessellater, class... Args >
 	void tessellate(Tessellater& tessellater, Args&& ...args) {
 		m_geometryData.get<Geom>().tessellate(tessellater,std::forward<Args>(args)...);
+		m_accelDirty = true;
 	}
 	// Creates a new LoD by applying a decimater to the geomtry type.
 	template < class Geom, class Decimater, class... Args >
@@ -150,7 +153,7 @@ public:
 		return *m_accel_struct;
 	}
 	// Clears the BVH of this object.
-	void clear_accel_structutre();
+	void clear_accel_structure();
 	// Initializes the acceleration structure to a given implementation.
 	template < class Accel, class... Args >
 	void set_accel_structure(Args&& ...args) {

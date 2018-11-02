@@ -311,6 +311,14 @@ public:
 		return m_boundingBox;
 	}
 
+	std::size_t get_triangle_count() const noexcept {
+		return m_triangles;
+	}
+
+	std::size_t get_quad_count() const noexcept {
+		return m_quads;
+	}
+
 private:
 	// Helper struct for adding attributes since functions cannot be partially specialized
 	template < class AttributeHandle >
@@ -384,6 +392,8 @@ private:
 	Attribute<OpenMesh::Vec2f>& m_uvsAttr;
 	Attribute<MaterialIndex>& m_matIndexAttr;
 	ei::Box m_boundingBox;
+	std::size_t m_triangles;
+	std::size_t m_quads;
 };
 
 } // namespace mufflon::scene::geometry

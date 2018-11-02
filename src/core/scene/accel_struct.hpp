@@ -1,13 +1,23 @@
 #pragma once
 
 #include "residency.hpp"
+#include "geometry/sphere.hpp"
+#include <OpenMesh/Core/Mesh/PolyConnectivity.hh>
 
-// forward declaration
+// Forward declarations
 namespace ei {
 struct Ray;
 } // namespace ei
+namespace OpenMesh {
+
+} // namespace OpenMesh
+
 
 namespace mufflon::scene {
+
+// Forward declarations
+class Instance;
+
 
 /**
  * Interface for generic accelleration structure.
@@ -28,7 +38,12 @@ public:
 	// Removes the structure from the given system, if present.
 	virtual void unload_resident(Device res) = 0;
 	// Builds or rebuilds the structure.
-	virtual void build() = 0;
+	virtual void build(const std::vector<Instance>&) = 0;
+	// TODO: should this be put into a different class?
+	virtual void build(const ei::Box& boundingBox,
+					   OpenMesh::PolyConnectivity::ConstFaceRangeSkipping,
+					   const AttributeList<false>::Attribute<geometry::Spheres::Sphere>&,
+					   std::size_t triangles, std::size_t quads) = 0;
 	// Checks whether the data on a given system has been modified and is out of sync.
 	virtual bool is_dirty(Device res) const = 0;
 

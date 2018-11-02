@@ -79,6 +79,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 	mAssert(hdl.is_valid());
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
+	++m_triangles;
 	return hdl;
 }
 
@@ -114,9 +115,10 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData.n_vertices());
 	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData.n_vertices());
 	FaceHandle hdl = m_meshData.add_face(v0, v1, v2, v3);
+	mAssert(hdl.is_valid());
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
-	mAssert(hdl.is_valid());
+	++m_quads;
 	return hdl;
 }
 
@@ -195,6 +197,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& p
 void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
 				std::size_t divisions) {
 	tessellater(m_meshData, divisions);
+	// TODO: change number of triangles/quads!
 	// Flag the entire polygon as dirty
 	m_vertexAttributes.mark_changed<>();
 	logInfo("Uniformly tessellated polygon mesh with ", divisions, " subdivisions");
@@ -203,6 +206,7 @@ void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& 
 				std::size_t divisions) {
 	// TODO
 	throw std::runtime_error("Adaptive tessellation isn't implemented yet");
+	// TODO: change number of triangles/quads!
 	// Flag the entire polygon as dirty
 	m_vertexAttributes.mark_changed<>();
 	logInfo("Adaptively tessellated polygon mesh with ", divisions, " subdivisions");
@@ -214,6 +218,7 @@ void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 	std::size_t targetDecimations = m_meshData.n_vertices() - target_vertices;
 	std::size_t actualDecimations = decimater.decimate_to(target_vertices);
 	// Flag the entire polygon as dirty
+	// TODO: change number of triangles/quads!
 	m_vertexAttributes.mark_changed<>();
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
 			" decimations performed");
