@@ -28,6 +28,10 @@ struct CameraParams {
  */
 class Camera {
 public:
+	// The name of the camera as used by the scenario setup.
+	const std::string& get_name() const noexcept { return m_name; }
+	void set_name(std::string_view name) { m_name = name; }
+
 	const scene::Direction get_x_dir() const noexcept { return {m_viewSpace.m00, m_viewSpace.m01, m_viewSpace.m02}; }
 	// The y-axis is up
 	const scene::Direction get_up_dir() const noexcept { return {m_viewSpace.m10, m_viewSpace.m11, m_viewSpace.m12}; }
@@ -81,6 +85,8 @@ protected:
 	scene::Point m_position;	// The central position for any projection
 	float m_near {1e-10f};		// Optional near clipping distance
 	float m_far {1e10f};		// Optional far clipping distance
+private:
+	std::string m_name;
 };
 
 /*

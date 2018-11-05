@@ -3,11 +3,17 @@
 #include "object.hpp"
 #include "export/dll_export.hpp"
 #include "materials/material.hpp"
+#include "core/cameras/camera.hpp"
 #include <map>
 #include <string_view>
 #include <tuple>
 
 namespace mufflon::scene {
+
+using ObjectHandle = Object*;
+using InstanceHandle = Instance*;
+using MaterialHandle = material::IMaterial*;
+using CameraHandle = cameras::Camera*;
 
 /**
  * This class represents a scenario, meaning a subset of world features.
@@ -15,7 +21,6 @@ namespace mufflon::scene {
  */
 class LIBRARY_API Scenario {
 public:
-	using ObjectHandle = Object*;
 	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
 
 	/*
@@ -31,9 +36,9 @@ public:
 	 * index: the index of the material slot (used in the binary data).
 	 * material: The ready to use material
 	 */
-	void assign_material(MaterialIndex index, material::MaterialHandle material);
+	void assign_material(MaterialIndex index, MaterialHandle material);
 	// Find out if and which material is assigned to a slot. Returns nullptr if nothing is assigned.
-	material::MaterialHandle get_assigned_material(MaterialIndex index) const;
+	MaterialHandle get_assigned_material(MaterialIndex index) const;
 
 	// Getter/setters for global LoD level
 	std::size_t get_global_lod_level() const noexcept {
@@ -44,19 +49,19 @@ public:
 	}
 
 	// Getter/setters for resolution
-	const std::pair<std::size_t, std::size_t>& get_resolution() const noexcept {
+	const ei::IVec2& get_resolution() const noexcept {
 		return m_resolution;
 	}
-	void set_resolution(std::pair<std::size_t, std::size_t> res) noexcept {
+	void set_resolution(ei::IVec2 res) noexcept {
 		m_resolution = res;
 	}
 
 	// Getter/setters for camera name
-	std::string_view get_camera_name() const noexcept {
-		return m_cameraName;
+	CameraHandle get_camera() const noexcept {
+		return m_camera;
 	}
-	void set_camera_name(std::string_view name) noexcept {
-		m_cameraName = std::move(name);
+	void set_camera(CameraHandle camera) noexcept {
+		m_camera = camera;
 	}
 
 	// Getter/setter for per-object properties
@@ -69,7 +74,7 @@ public:
 private:
 	struct MaterialDesc {
 		std::string binaryName;
-		material::MaterialHandle material;
+		MaterialHandle material;
 	};
 
 	struct ObjectProperty {
@@ -77,16 +82,16 @@ private:
 		std::size_t lod = NO_CUSTOM_LOD;
 	};
 
-	// Map from binaryName to a material index (the key-string_views are views
-	// to the stringsstored in m_materialAssignment.
+	// Map from binaryName to a material index (may use string_views as keys
+	// for lookups -> uses a map).
 	std::map<std::string, MaterialIndex, std::less<>> m_materialIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// TODO: list of light mappings
 
 	std::size_t m_globalLodLevel;
-	std::pair<std::size_t, std::size_t> m_resolution;
-	std::string_view m_cameraName; // TODO: replace with camera handle?
+	ei::IVec2 m_resolution;
+	CameraHandle m_camera;
 	// TODO: material properties
 
 	// Object blacklisting and other custom traits

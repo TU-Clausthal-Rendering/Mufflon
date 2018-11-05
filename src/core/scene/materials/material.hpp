@@ -129,6 +129,4 @@ private:
 	std::string m_name;
 };
 
-using MaterialHandle = IMaterial*;
-
 }}} // namespace mufflon::scene::material

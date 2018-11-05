@@ -3,22 +3,17 @@
 
 namespace mufflon::scene {
 
-material::MaterialHandle WorldContainer::add_material(std::unique_ptr<material::IMaterial> material) {
-	m_materials.push_back(move(material));
-	return m_materials.back().get();
-}
-
-WorldContainer::ObjectHandle WorldContainer::create_object() {
+ObjectHandle WorldContainer::create_object() {
 	m_objects.emplace_back();
 	return &m_objects.back();
 }
 
-WorldContainer::ObjectHandle WorldContainer::add_object(Object&& obj) {
+ObjectHandle WorldContainer::add_object(Object&& obj) {
 	m_objects.emplace_back(std::move(obj));
 	return &m_objects.back();
 }
 
-WorldContainer::InstanceHandle WorldContainer::create_instance(ObjectHandle obj) {
+InstanceHandle WorldContainer::create_instance(ObjectHandle obj) {
 	if(obj == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid object handle");
 		return nullptr;
@@ -28,7 +23,7 @@ WorldContainer::InstanceHandle WorldContainer::create_instance(ObjectHandle obj)
 }
 
 // Adds a new instance.
-WorldContainer::InstanceHandle WorldContainer::add_instance(Instance &&instance) {
+InstanceHandle WorldContainer::add_instance(Instance &&instance) {
 	m_instances.emplace_back(std::move(instance));
 	return &m_instances.back();
 }
@@ -44,6 +39,28 @@ WorldContainer::ScenarioHandle WorldContainer::add_scenario(Scenario&& scenario)
 	return &m_scenarios.back();
 }
 
+MaterialHandle WorldContainer::add_material(std::unique_ptr<material::IMaterial> material) {
+	m_materials.push_back(move(material));
+	return m_materials.back().get();
+}
+
+CameraHandle WorldContainer::add_camera(std::unique_ptr<cameras::Camera> camera) {
+	std::string_view name = camera->get_name();
+	CameraHandle handle = camera.get();
+	m_cameras.emplace(name, move(camera));
+	return handle;
+}
+
+CameraHandle WorldContainer::get_camera(std::string_view name) {
+	auto it = m_cameras.find(name);
+	if(it == m_cameras.end()) {
+		logError("[WorldContainer::get_camera] Cannot find a camera with name '", name, "'");
+		return nullptr;
+	}
+	return it->second.get();
+}
+
+
 WorldContainer::SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
 	if(hdl == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid scenario handle");
@@ -56,8 +73,8 @@ WorldContainer::SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
 			m_scene->add_instance(&instance);
 	}
 
-	// TODO: load the materials
-	// TODO: camera, light, etc.
+	// TODO: load the materials (make something resident?)
+	// TODO: cameras light, etc.
 
 	// Assign the newly created scene and destroy the old one?
 	return m_scene.get();

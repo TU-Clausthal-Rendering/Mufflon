@@ -30,12 +30,12 @@ MaterialIndex Scenario::get_material_slot_index(std::string_view binaryName) {
 	return it->second;
 }
 
-void Scenario::assign_material(MaterialIndex index, material::MaterialHandle material) {
+void Scenario::assign_material(MaterialIndex index, MaterialHandle material) {
 	// TODO: check if a renderer is active?
 	m_materialAssignment[index].material = material;
 }
 
-material::MaterialHandle Scenario::get_assigned_material(MaterialIndex index) const {
+MaterialHandle Scenario::get_assigned_material(MaterialIndex index) const {
 	return m_materialAssignment[index].material;
 }
 

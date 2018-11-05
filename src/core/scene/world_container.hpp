@@ -4,6 +4,7 @@
 #include "scenario.hpp"
 #include "scene.hpp"
 #include "materials/material.hpp"
+#include "core/cameras/camera.hpp"
 #include "export/dll_export.hpp"
 #include <map>
 #include <memory>
@@ -18,10 +19,8 @@ namespace mufflon::scene {
  */
 class LIBRARY_API WorldContainer {
 public:
-	using ObjectHandle = Object*;
 	using ScenarioHandle = Scenario*;
 	using SceneHandle = Scene*;
-	using InstanceHandle = Instance*;
 
 	// Creates a new, empty object and returns a handle to it
 	ObjectHandle create_object();
@@ -43,7 +42,13 @@ public:
 	 * (whenever the materaial changes).
 	 * material: the complete material, ownership is taken.
 	 */
-	material::MaterialHandle add_material(std::unique_ptr<material::IMaterial> material);
+	MaterialHandle add_material(std::unique_ptr<material::IMaterial> material);
+
+	// Add a fully specfied camera to the pool of all cameras.
+	CameraHandle add_camera(std::unique_ptr<cameras::Camera> camera);
+
+	// Find a camera dependent on its name.
+	CameraHandle get_camera(std::string_view name);
 
 	/**
 	 * Loads the specified scenario.
@@ -66,6 +71,8 @@ private:
 	std::vector<Scenario> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<material::IMaterial>> m_materials;
+	// All available cameras mapped to their name.
+	std::unordered_map<std::string_view, std::unique_ptr<cameras::Camera>> m_cameras;
 	
 
 	// TODO: cameras, lights, materials
