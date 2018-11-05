@@ -18,6 +18,8 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dfunctions.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp" />
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
+    <ClCompile Include="..\..\src\core\cameras\camera.cpp" />
+    <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
@@ -49,6 +51,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
+    <ClInclude Include="..\..\src\core\cameras\sample.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />

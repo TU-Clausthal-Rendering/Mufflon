@@ -4,6 +4,22 @@
 
 namespace mufflon { namespace cameras {
 
+enum class CameraModel: i32 {
+	PINHOLE,			// Infinite sharp pinhole camera
+	FOCUS,				// Thin-lens physical related camera model
+	ORTHOGRAPHIC,		// Orthographic projection
+
+	NUM
+};
+#ifndef __CUDA_ARCH__
+const std::string& to_string(CameraModel type);
+#endif
+
+// Basic header for camera parameter packs.
+struct CameraParams {
+	CameraModel type;
+};
+
 /*
  * Base class for all kinds of cameras. The basic camera includes an orthonormal
  * system for its view space and the position, but no ray logic.
@@ -49,6 +65,17 @@ public:
 	void roll(Radians a) noexcept {
 		m_viewSpace = ei::rotationZ(a) * m_viewSpace;
 	}
+
+	/*
+	 * Interface to obtain the architecture independent parameters required for sampling
+	 * and evaluation. The outBuffer must have a size of at least get_parameter_pack_size().
+	 * Each camera must implement a sample_ray and a project method (see cameras/sample.hpp
+	 * for details).
+	 */
+	virtual void get_parameter_pack(CameraParams* outBuffer) const = 0;
+
+	// Get the required size of a parameter bundle.
+	virtual std::size_t get_parameter_pack_size() const = 0;
 protected:
 	ei::Mat3x3 m_viewSpace;		// Orthonormal world->camera matrix (rows are axis, view direction is the third axis)
 	scene::Point m_position;	// The central position for any projection
@@ -58,7 +85,8 @@ protected:
 
 /*
  * A RndSet is a fixed size set of random numbers which may be consumed by a camera
- * sampler. Note that material samplers have a different kind of RndSet
+ * sampler. Note that material samplers have a different kind of RndSet.
+ * The first pair (u0,u1) should be a high quality stratified sample.
  */
 struct RndSet {
 	float u0;	// In [0,1)

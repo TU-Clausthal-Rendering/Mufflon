@@ -109,6 +109,12 @@
     <ClCompile Include="..\..\src\core\scene\instance.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\cameras\pinhole.cpp">
+      <Filter>Source Files\core\cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\cameras\camera.cpp">
+      <Filter>Source Files\core\cameras</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -262,6 +268,9 @@
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp">
+      <Filter>Source Files\core\cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cameras\sample.hpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
   </ItemGroup>

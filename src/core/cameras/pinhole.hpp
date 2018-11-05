@@ -11,20 +11,27 @@ namespace mufflon { namespace cameras {
  */
 class Pinhole : public Camera {
 public:
-	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; }
+	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = tan(fov / 2); }
+
+	// Get the parameter bundle
+	void get_parameter_pack(CameraParams* outBuffer) const final;
+
+	// Get the required size of a parameter bundle.
+	std::size_t get_parameter_pack_size() const final;
 private:
 	Radians m_vFov;		// Vertical field of view in radiant.
+	float m_tanVFov;	// Tangents of the vfov halfed
 };
 
 // A GPU friendly packing of the camera parameters.
-struct PinholeParams {
+struct PinholeParams : public CameraParams {
+	scene::Point position;
 	scene::Direction xAxis;
 	float near;
 	scene::Direction up;
 	float far;
 	scene::Direction viewDir;
 	float tanVFov;
-	scene::Point position;
 };
 
 __host__ __device__ RaySample
