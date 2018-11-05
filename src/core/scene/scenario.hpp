@@ -12,7 +12,7 @@ namespace mufflon::scene {
 
 using ObjectHandle = Object*;
 using InstanceHandle = Instance*;
-using MaterialHandle = material::IMaterial*;
+using MaterialHandle = materials::IMaterial*;
 using CameraHandle = cameras::Camera*;
 
 /**

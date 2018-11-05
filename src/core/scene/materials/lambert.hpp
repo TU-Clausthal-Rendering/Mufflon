@@ -4,7 +4,7 @@
 #include "material.hpp"
 #include "core/math/sampling.hpp"
 
-namespace mufflon { namespace scene { namespace material {
+namespace mufflon { namespace scene { namespace materials {
 
 template<Device dev>
 struct LambertHandlePack : public HandlePack {
@@ -82,4 +82,4 @@ lambert_albedo(const LambertParameterPack& params) {
 	return params.albedo;
 }
 
-}}} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::materials

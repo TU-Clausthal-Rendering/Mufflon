@@ -42,7 +42,7 @@ public:
 	 * (whenever the materaial changes).
 	 * material: the complete material, ownership is taken.
 	 */
-	MaterialHandle add_material(std::unique_ptr<material::IMaterial> material);
+	MaterialHandle add_material(std::unique_ptr<materials::IMaterial> material);
 
 	// Add a fully specfied camera to the pool of all cameras.
 	CameraHandle add_camera(std::unique_ptr<cameras::Camera> camera);
@@ -70,7 +70,7 @@ private:
 	// List of all scenarios available
 	std::vector<Scenario> m_scenarios;
 	// All materials in the scene.
-	std::vector<std::unique_ptr<material::IMaterial>> m_materials;
+	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
 	// All available cameras mapped to their name.
 	std::unordered_map<std::string_view, std::unique_ptr<cameras::Camera>> m_cameras;
 	

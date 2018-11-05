@@ -2,7 +2,7 @@
 #include "util/log.hpp"
 #include "core/scene/textures/cputexture.hpp"
 
-namespace mufflon { namespace scene { namespace material {
+namespace mufflon { namespace scene { namespace materials {
 
 std::size_t Lambert::get_handle_pack_size(Device device) const {
 	switch(device) {
@@ -42,4 +42,4 @@ void Lambert::get_parameter_pack_cpu(const HandlePack* handles, const UvCoordina
 }
 
 
-}}} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::materials

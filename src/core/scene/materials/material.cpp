@@ -1,6 +1,6 @@
 #include "material.hpp"
 
-namespace mufflon { namespace scene { namespace material {
+namespace mufflon { namespace scene { namespace materials {
 
 const std::string& to_string(Materials type)
 {
@@ -29,4 +29,4 @@ MaterialPropertyFlags IMaterial::get_property_flags() const noexcept {
 }
 
 
-}}} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::materials

@@ -2,7 +2,7 @@
 
 #include "core/scene/types.hpp"
 
-namespace mufflon { namespace scene { namespace material {
+namespace mufflon { namespace scene { namespace materials {
 
 	/*
 	 * A RndSet is a fixed size set of random numbers which may be consumed by a material
@@ -37,4 +37,4 @@ namespace mufflon { namespace scene { namespace material {
 		float pdfB {0.0f};				// Sampling PDF with reversed incident and excident directions
 	};
 
-}}} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::materials

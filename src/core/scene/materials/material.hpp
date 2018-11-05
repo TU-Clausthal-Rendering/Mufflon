@@ -7,7 +7,7 @@
 #include "core/scene/textures/texture.hpp"
 #include "medium.hpp"
 
-namespace mufflon { namespace scene { namespace material {
+namespace mufflon { namespace scene { namespace materials {
 
 /**
  * List of all implemented materials. These materials may form a hierarchy through
@@ -129,4 +129,4 @@ private:
 	std::string m_name;
 };
 
-}}} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::materials

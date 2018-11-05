@@ -6,7 +6,7 @@
 #include "lambert.hpp"
 #include <cuda_runtime.h>
 
-namespace mufflon { namespace scene { namespace material {
+namespace mufflon { namespace scene { namespace materials {
 
 	/*
 	 * Importance sampling of a generic material. This method switches to the specific
@@ -41,7 +41,7 @@ namespace mufflon { namespace scene { namespace material {
 			} break;
 			default: ;
 #ifndef __CUDA_ARCH__
-				logWarning("[material::sample] Trying to evaluate unimplemented material type ", params.type);
+				logWarning("[materials::sample] Trying to evaluate unimplemented material type ", params.type);
 #endif
 		}
 
@@ -77,7 +77,7 @@ namespace mufflon { namespace scene { namespace material {
 			case Materials::LAMBERT: return lambert_albedo(static_cast<const LambertParameterPack&>(params));
 			default:
 #ifndef __CUDA_ARCH__
-				logWarning("[material::albedo] Trying to evaluate unimplemented material type ", params.type);
+				logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", params.type);
 #endif
 				return Spectrum{0.0f};
 		}
@@ -87,4 +87,4 @@ namespace mufflon { namespace scene { namespace material {
 	//virtual Spectrum get_maximum() const = 0;
 }
 
-}}} // namespace mufflon::scene::material
+}}} // namespace mufflon::scene::materials

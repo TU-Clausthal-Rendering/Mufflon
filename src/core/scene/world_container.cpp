@@ -39,7 +39,7 @@ WorldContainer::ScenarioHandle WorldContainer::add_scenario(Scenario&& scenario)
 	return &m_scenarios.back();
 }
 
-MaterialHandle WorldContainer::add_material(std::unique_ptr<material::IMaterial> material) {
+MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial> material) {
 	m_materials.push_back(move(material));
 	return m_materials.back().get();
 }
