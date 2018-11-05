@@ -73,6 +73,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
@@ -125,6 +126,7 @@
     <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
+    <Compile Include="ViewModel\Camera\AddCameraViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
       <DependentUpon>FocusCameraView.xaml</DependentUpon>
     </Compile>
@@ -134,6 +136,10 @@
     <Compile Include="View\Camera\PinholeCameraView.xaml.cs">
       <DependentUpon>PinholeCameraView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Dialog\AddPropertyDialog.xaml.cs">
+      <DependentUpon>AddPropertyDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Helper\ComboBoxItem.cs" />
     <Compile Include="View\Helper\EnterTextBox.cs" />
     <Compile Include="View\Light\DirectionalLightView.xaml.cs">
       <DependentUpon>DirectionalLightView.xaml</DependentUpon>
@@ -197,6 +203,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Camera\PinholeCameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Dialog\AddPropertyDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -295,6 +305,8 @@
     <Resource Include="Icons\save.png" />
     <Resource Include="Icons\zoom.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Resource Include="Icons\add.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

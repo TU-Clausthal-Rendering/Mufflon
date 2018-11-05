@@ -8,11 +8,10 @@
         xmlns:camera="clr-namespace:gui.View.Camera"
         mc:Ignorable="d"
         Title="MainWindow" 
-        Height="450" 
-        Width="800">
+        Height="600" 
+        Width="800"
+        WindowState="Maximized">
     <Window.Resources>
-        <SolidColorBrush x:Key="BorderBrush" Color="#999999"/>
-        <SolidColorBrush x:Key="BackgroundBrush" Color="#eee"/>
         <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
         <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
         <Thickness x:Key="ThinBorder" Bottom="1"/>
@@ -33,7 +32,7 @@
         <Grid DockPanel.Dock="Bottom">
             <Grid.RowDefinitions>
                 <!-- renderer and property pages -->
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="4*"/>
                 <!-- console -->
                 <RowDefinition Height="5"/>
                 <RowDefinition Height="*"/>
@@ -116,21 +115,75 @@
                         <ScrollViewer 
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding Materials.Views}"/>
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Materials.Views}"/>
+                                <Button Command="{Binding AddMaterialCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image 
+                                            Grid.Column="0"
+                                            Source="Icons/add.png"
+                                            Width="16"
+                                            Height="16"/>
+                                        <Label 
+                                            Grid.Column="1"
+                                            Content="Add Material"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
                         </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Light">
                         <ScrollViewer 
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding Lights.Views}"/>
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Lights.Views}"/>
+                                <Button Command="{Binding AddLightCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image 
+                                            Grid.Column="0"
+                                            Source="Icons/add.png"
+                                            Width="16"
+                                            Height="16"/>
+                                        <Label 
+                                            Grid.Column="1"
+                                            Content="Add Light"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
                         </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Camera">
                         <ScrollViewer 
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
+                                <Button Command="{Binding AddCameraCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image 
+                                            Grid.Column="0"
+                                            Source="Icons/add.png"
+                                            Width="16"
+                                            Height="16"/>
+                                        <Label 
+                                            Grid.Column="1"
+                                            Content="Add Camera"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
                         </ScrollViewer>
                     </TabItem>
                 </TabControl>

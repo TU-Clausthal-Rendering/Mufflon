@@ -1,0 +1,66 @@
+﻿<Window x:Class="gui.View.Dialog.AddPropertyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:gui.View.Dialog"
+        xmlns:helper="clr-namespace:gui.View.Helper"
+        mc:Ignorable="d"
+        Title="{Binding WindowTitle}" 
+        Height="130" 
+        Width="220"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Grid.Column="0"
+                Text="{Binding NameName}"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+
+            <helper:EnterTextBox
+                Grid.Row="0"
+                Grid.Column="1"
+                Text="{Binding NameValue}"
+                Margin="{StaticResource RightPropertyMargin}"/>
+
+            <TextBlock
+                Grid.Row="1"
+                Grid.Column="0"
+                Text="{Binding TypeName}"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+            
+            <ComboBox
+                Grid.Row="1"
+                Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                ItemsSource="{Binding TypeList}"
+                SelectedItem="{Binding SelectedType}"/>
+        </Grid>
+        <StackPanel 
+            Orientation="Horizontal"
+            HorizontalAlignment="Right"
+            Margin="0 10 0 0">
+            <Button 
+                Width="60"
+                Content="Add"
+                Margin="{StaticResource LeftPropertyMargin}"
+                Height="20"
+                Click="AddOnClick"/>
+            <Button 
+                Width="60"
+                Content="Cancel"
+                Margin="{StaticResource RightPropertyMargin}"
+                Click="CancelOnClick"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
