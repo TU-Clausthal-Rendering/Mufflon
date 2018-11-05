@@ -55,7 +55,7 @@ The names must match the names stored in the binary itself.
             "<name1>: {
                 "camera": "<name of a camera>",
                 "resolution": [int,int],        // Target image resolution
-                "lights": ["light:name1", ...]  // List of light sources
+                "lights": ["<name of a light>", ...]  // List of light sources
                 "lod": int,             // Global level of detail number [0,...] where 0 has the highest resolution, OPTIONAL 0
                 "[mat:name1]": "<name of a material>",
                 "[mat:name2]": "<name of a material>",
@@ -213,6 +213,7 @@ The binary file (*.mff)
 
 The binary file contains all the geometric and instancing data of a scene with a strict ordering.
 It does not contain textures or ascii headers.
+Binary data is stored in little endian (native on x86_64).
 
 The high level structure is
 
@@ -324,3 +325,41 @@ Objects which are not instanced explicitly will have one instance with the ident
                  u32            // Keyframe of the instance if animated or 0xffffffff
                  u32            // <InstID> of the previous object in an animation sequence or 0xffffffff
                  12*f32         // 3x4 transformation matrix (rotation, scaling, translation)
+
+
+Normal Compression
+--
+Additional to the global DEFLATE compression normals have a custom discretization if `COMPRESSED_NORMALS` is set.
+For compression/decompression the follwing codes is used:
+
+    # map a direction from the sphere to u,v
+    packNormal32(vec3 dir) -> (u32 uv)
+        l1norm = abs(dir.x) + abs(dir.y) + abs(dir.z)
+        if dir.z >= 0:
+            u = dir.x / l1norm
+            v = dir.y / l1norm
+        else # warp lower hemisphere
+            u = (1 - dir.y / l1norm) * (dir.x >= 0 ? 1 : -1)
+            v = (1 - dir.x / l1norm) * (dir.y >= 0 ? 1 : -1)
+        end
+        u = round((u / 2 + 0.5) * (2^16-1))   # from [-1,1] to [0,2^16-1]
+        v = round((v / 2 + 0.5) * (2^16-1))   # from [-1,1] to [0,2^16-1]
+        return u | (v << 16)
+    end
+
+    # map a 32 bit uint back to a normal vector
+    unpackNormal32(u32 uv) -> (vec3 dir)
+        u = (uv & 0xff) / float(2^16-1)
+        v = (uv >> 16) / float(2^16-1)
+        u = u * 2 - 1
+        v = v * 2 - 1
+        z = 1 - abs(u) - abs(v)
+        if z >= 0:
+            x = u
+            y = v
+        else
+            x = (1 - abs(v)) * (u >= 0 ? 1 : -1)
+            y = (1 - abs(u)) * (v >= 0 ? 1 : -1)
+        end
+        return normalize([x,y,z])
+    end
