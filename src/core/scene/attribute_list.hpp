@@ -2,6 +2,7 @@
 
 #include "accessor.hpp"
 #include "attribute.hpp"
+#include "synchronize.hpp"
 #include "export/dll_export.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
@@ -69,11 +70,11 @@ public:
 	/**
 	 * Attribute class granting access to the actual memory.
 	 */
-	template < class T, bool usesOpenMesh = USES_OPENMESH >
+	template < class T >
 	class Attribute : public IBaseAttribute {
 	public:
 		using Type = T;
-		static constexpr bool USES_OPENMESH = usesOpenMesh;
+		static constexpr bool USES_OPENMESH = useOpenMesh;
 
 		template < bool openMesh = USES_OPENMESH, typename = std::enable_if_t<!openMesh> >
 		Attribute(AttributePools& pools, util::DirtyFlags<Device>& flags) :
@@ -119,12 +120,7 @@ public:
 		// Synchronizes the attribute pool to the given device
 		template < Device dev = DEFAULT_DEVICE >
 		void synchronize() {
-			if(m_flags.needs_sync(dev)) {
-				if(m_flags.has_competing_changes())
-					throw std::runtime_error("Competing changes for attribute detected!");
-				// Synchronize
-				this->synchronize_impl<0u, dev>();
-			}
+			mufflon::scene::synchronize<dev>(m_pools, m_flags, m_pools.get<AttributePool<dev, stores_itself<dev>()>>());
 		}
 
 		std::size_t get_size() const noexcept {
@@ -187,31 +183,6 @@ public:
 			}
 		}
 
-		// Checks all devices for changes and syncs upon finding one
-		template < std::size_t I, Device dev >
-		void synchronize_impl() {
-			if constexpr(I < AttributePools::size) {
-				// Workaround for VS2017 bug: otherwise you may use the 'Type' template of the
-				// tagged tuple
-				auto& changed = m_pools.get<I>();
-				constexpr Device CHANGED_DEVICE = std::decay_t<decltype(changed)>::DEVICE;
-				if(m_flags.has_changes(CHANGED_DEVICE)) {
-					changed.synchronize<dev>(m_pools.get<AttributePool<dev, stores_itself<dev>()>>());
-				} else {
-					this->synchronize_impl<I + 1u, dev>();
-				}
-			}
-		}
-
-		// Helper function to shorten template formulation
-		template < Device dev >
-		static constexpr bool stores_itself() {
-			if constexpr(dev == Device::CPU)
-				return !USES_OPENMESH;
-			else
-				return true;
-		}
-
 		AttributePools& m_pools;
 		util::TaggedTuple<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<T>,
 			typename AttributePool<Device::CUDA, true>::template AttributeHandle<T>> m_handles;
@@ -226,7 +197,7 @@ public:
 			return attr.value();
 
 		// Create a new attribute
-		m_attributes.push_back(std::make_unique<Attribute<T, USES_OPENMESH>>(m_attributePools, m_flags));
+		m_attributes.push_back(std::make_unique<Attribute<T>>(m_attributePools, m_flags));
 		return { m_attributes.size() - 1u };
 	}
 
@@ -238,7 +209,7 @@ public:
 			return attr.value();
 
 		// Create a new attribute
-		m_attributes.push_back(std::make_unique<Attribute<T, USES_OPENMESH>>(m_attributePools, m_flags, prop));
+		m_attributes.push_back(std::make_unique<Attribute<T>>(m_attributePools, m_flags, prop));
 		return { m_attributes.size() - 1u };
 	}
 
@@ -290,12 +261,8 @@ public:
 	// Synchronizes all attributes on the given device from the last changed device
 	template < Device dev = DEFAULT_DEVICE >
 	void synchronize() {
-		// TODO
-		if(m_flags.needs_sync(dev)) {
-			if(m_flags.has_competing_changes())
-				throw std::runtime_error("Competing changes for attribute detected!");
-			this->synchronize_impl<0u, dev>();
-		}
+		mufflon::scene::synchronize<dev>(m_attributePools, m_flags,
+						 m_attributePools.get<AttributePool<dev, stores_itself<dev>()>>());
 	}
 
 	// Unloads all attributes from the given device
@@ -313,33 +280,26 @@ public:
 
 	// Aquires an attribute from its handle
 	template < class T >
-	Attribute<T, USES_OPENMESH>& aquire(const AttributeHandle<T>& hdl) {
+	Attribute<T>& aquire(const AttributeHandle<T>& hdl) {
 		mAssert(hdl.index() < m_attributes.size());
-		return dynamic_cast<Attribute<T, USES_OPENMESH>&>(*m_attributes[hdl.index()]);
+		return dynamic_cast<Attribute<T>&>(*m_attributes[hdl.index()]);
 	}
 
 	// Aquires an attribute from its handle
 	template < class T >
-	const Attribute<T, USES_OPENMESH>& aquire(const AttributeHandle<T>& hdl) const {
+	const Attribute<T>& aquire(const AttributeHandle<T>& hdl) const {
 		mAssert(hdl.index() < m_attributes.size());
-		return dynamic_cast<const Attribute<T, USES_OPENMESH>&>(*m_attributes[hdl.index()]);
+		return dynamic_cast<const Attribute<T>&>(*m_attributes[hdl.index()]);
 	}
 
 private:
-	// Recursing implementation for synchronization
-	template < std::size_t I, Device dev >
-	void synchronize_impl() {
-		if constexpr(I < AttributePools::size) {
-			// Workaround for VS2017 bug: otherwise you may use the 'Type' template of the
-			// tagged tuple
-			auto& changed = m_attributePools.get<I>();
-			constexpr Device CHANGED_DEVICE = std::decay_t<decltype(changed)>::DEVICE;
-			if(m_flags.has_changes(CHANGED_DEVICE)) {
-				changed.synchronize<dev>(m_attributePools.get<AttributePool<dev>>());
-			} else {
-				synchronize_impl<I + 1u, dev>();
-			}
-		}
+	// Helper function to shorten template formulation
+	template < Device dev >
+	static constexpr bool stores_itself() {
+		if constexpr(dev == Device::CPU)
+			return !USES_OPENMESH;
+		else
+			return true;
 	}
 
 	AttributePools m_attributePools;

@@ -575,6 +575,11 @@ private:
 	std::vector<std::function<char*(OpenMesh::BaseProperty&)>> m_accessors; // Accessors to attribute
 };
 
+// Function overloads for "unified" call syntay
+template < Device changedDev, Device syncDev, bool changedOwns, bool syncOwns>
+void synchronize(AttributePool<changedDev, changedOwns>& changed, AttributePool<syncDev, syncOwns>& sync) {
+	changed.synchronize<>(sync);
+}
 
 template <>
 void LIBRARY_API AttributePool<Device::CPU, true>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);

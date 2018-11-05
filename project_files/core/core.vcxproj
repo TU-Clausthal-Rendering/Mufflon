@@ -58,6 +58,8 @@
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp" />
     <ClInclude Include="..\..\src\core\scene\instance.hpp" />
+    <ClInclude Include="..\..\src\core\scene\lights\lights.hpp" />
+    <ClInclude Include="..\..\src\core\scene\lights\light_tree.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp" />
@@ -67,6 +69,7 @@
     <ClInclude Include="..\..\src\core\scene\residency.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
+    <ClInclude Include="..\..\src\core\scene\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
@@ -133,6 +136,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;LIBRARY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /D "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
@@ -166,6 +170,7 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;LIBRARY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

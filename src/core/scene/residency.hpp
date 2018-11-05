@@ -1,7 +1,9 @@
 #pragma once
 
+#include "export/dll_export.hpp"
 #include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
+#include <cuda_runtime_api.h>
 #include <algorithm>
 #include <vector>
 
@@ -25,6 +27,7 @@ struct DeviceHandle {
 };
 
 // Handle type exclusively for arrays, i.e. they must support vector-esque operations
+
 template < Device dev, class T >
 struct DeviceArrayHandle;
 
@@ -49,6 +52,24 @@ struct DeviceArrayHandle<Device::CUDA, T> :
 	DeviceArrayHandle(ValueType* hdl) :
 		DeviceHandle<Device::CUDA, ValueType*>{ hdl } {}
 };
+
+// Functions for synchronizing between array handles
+template < class T >
+void synchronize(const DeviceArrayHandle<Device::CPU, T>& changed,
+				 DeviceArrayHandle<Device::CUDA, T>& sync, std::size_t length) {
+	if(sync.handle == nullptr) {
+		cudaMalloc<T>(&sync, sizeof(T) * length);
+	}
+	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice);
+}
+template < class T >
+void synchronize(const DeviceArrayHandle<Device::CUDA, T>& changed,
+				 DeviceArrayHandle<Device::CPU, T>& sync, std::size_t length) {
+	if(sync.handle == nullptr) {
+		sync.handle = new T[length];
+	}
+	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost);
+}
 
 // Operations on the device arrays (override if they differ for some devices)
 template < Device dev, class T, template <Device, class> class H >

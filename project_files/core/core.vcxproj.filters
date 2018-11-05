@@ -41,6 +41,9 @@
     <Filter Include="Source Files\export">
       <UniqueIdentifier>{2985f6a7-0844-4d94-af66-3eb5b7eecec3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\lights">
+      <UniqueIdentifier>{42070a0d-cb5a-4a1b-b82f-20050c68ba0f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -242,6 +245,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\range.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\lights.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\light_tree.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\synchronize.hpp">
+      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

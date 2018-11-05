@@ -11,6 +11,8 @@
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/object.hpp"
 #include "core/scene/world_container.hpp"
+#include "core/scene/lights/lights.hpp"
+#include "core/scene/lights/light_tree.hpp"
 
 using namespace mufflon::scene;
 using namespace mufflon::scene::geometry;
@@ -265,6 +267,17 @@ void test_scene_creation() {
 		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 }
 
+void test_light() {
+	std::cout << "Testing lights" << std::endl;
+	std::cout << sizeof(lights::PointLight) << std::endl;
+	std::cout << sizeof(lights::SpotLight) << std::endl;
+	std::cout << sizeof(lights::DirectionalLight) << std::endl;
+	std::cout << sizeof(lights::EnvMapLight<Device::CPU>) << std::endl;
+	std::cout << sizeof(lights::EnvMapLight<Device::CUDA>) << std::endl;
+
+	std::cout << std::endl << sizeof(lights::LightTree::Node::Child) << std::endl;
+}
+
 
 int main() {
 	test_polygon();
@@ -272,6 +285,7 @@ int main() {
 	test_custom_attributes();
 	test_object();
 	test_scene_creation();
+	test_light();
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();
