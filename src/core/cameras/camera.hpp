@@ -1,0 +1,84 @@
+#pragma once
+
+#include "core/scene/types.hpp"
+
+namespace mufflon { namespace cameras {
+
+/*
+ * Base class for all kinds of cameras. The basic camera includes an orthonormal
+ * system for its view space and the position, but no ray logic.
+ * Other more specific properties like the field of view are contained in the
+ * according camera models.
+ */
+class Camera {
+public:
+	const scene::Direction get_x_dir() const noexcept { return {m_viewSpace.m00, m_viewSpace.m01, m_viewSpace.m02}; }
+	// The y-axis is up
+	const scene::Direction get_up_dir() const noexcept { return {m_viewSpace.m10, m_viewSpace.m11, m_viewSpace.m12}; }
+	// The z-axis is the view direction
+	const scene::Direction get_view_dir() const noexcept { return {m_viewSpace.m20, m_viewSpace.m21, m_viewSpace.m22}; }
+	const scene::Point& get_position() const noexcept { return m_position; }
+	// The near clipping distance (plane)
+	float get_near() const noexcept { return m_near; }
+	void set_near(float n) noexcept { m_near = n; }
+	// The far clipping distance (plane)
+	float get_far() const noexcept { return m_far; }
+	void set_far(float n) noexcept { m_far = n; }
+
+	/*
+	 * Translate the camera along its axis. To be used for interactive cameras
+	 * leftRight: positive values to move right, negative values to move left (x-axis)
+	 * upDown: positive values to move up, negative values to move down (y-axis)
+	 * forBack: positive values to move forward, negative values to move backward (z-axis)
+	 */
+	void move(float leftRight, float upDown, float forBack) noexcept {
+		m_position += leftRight * get_x_dir()
+					+ upDown * get_up_dir()
+					+ forBack * get_view_dir();
+	}
+
+	// Rotate around the x-axis.
+	void rotate_up_down(Radians a) noexcept {
+		m_viewSpace = ei::rotationX(a) * m_viewSpace;
+	}
+	// Rotate around the up direction (y-axis).
+	void rotate_left_right(Radians a) noexcept {
+		m_viewSpace = ei::rotationY(a) * m_viewSpace;
+	}
+	// Rotate around the view direction (z-axis).
+	void roll(Radians a) noexcept {
+		m_viewSpace = ei::rotationZ(a) * m_viewSpace;
+	}
+protected:
+	ei::Mat3x3 m_viewSpace;		// Orthonormal world->camera matrix (rows are axis, view direction is the third axis)
+	scene::Point m_position;	// The central position for any projection
+	float m_near {1e-10f};		// Optional near clipping distance
+	float m_far {1e10f};		// Optional far clipping distance
+};
+
+/*
+ * A RndSet is a fixed size set of random numbers which may be consumed by a camera
+ * sampler. Note that material samplers have a different kind of RndSet
+ */
+struct RndSet {
+	float u0;	// In [0,1)
+	float u1;	// In [0,1)
+	float u2;	// In [0,1)
+	float u3;	// In [0,1)
+};
+
+struct RaySample {
+	// TODO: data layout? (currently set for GPU friendly padding)
+	scene::Point origin;				// Position on the near plane to start the ray
+	float pdf;							// The camera sampling PDF
+	scene::Direction excident {0.0f};	// The sampled direction
+	float w;							// The sensor response (equal to the PDF for some camera models)
+};
+
+struct ProjectionResult {
+	Pixel coord {-1};					// The pixel in which the projection falls
+	float pdf {0.0f};					// The camera sampling PDF
+	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
+};
+
+}} // namespace mufflon::cameras

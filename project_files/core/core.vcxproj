@@ -47,6 +47,8 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
+    <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
+    <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />

@@ -44,6 +44,9 @@
     <Filter Include="Source Files\core\scene\lights">
       <UniqueIdentifier>{42070a0d-cb5a-4a1b-b82f-20050c68ba0f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\cameras">
+      <UniqueIdentifier>{6ee163c8-7702-47ff-8770-fef98b98fcb6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -254,6 +257,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\synchronize.hpp">
       <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cameras\camera.hpp">
+      <Filter>Source Files\core\cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cameras\pinhole.hpp">
+      <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
