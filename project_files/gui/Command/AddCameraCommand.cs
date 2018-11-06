@@ -31,7 +31,7 @@ namespace gui.Command
             var dc = new AddCameraViewModel();
             var dialog = new AddPropertyDialog(dc);
 
-            if (!dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog() != true) return;
 
             CameraModel cm = null;
             switch (dc.TypeValue)
