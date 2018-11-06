@@ -3,7 +3,7 @@
 #include "accel_struct.hpp"
 #include "instance.hpp"
 #include "export/dll_export.hpp"
-#include "materials/material.hpp"
+#include "handles.hpp"
 #include "ei/3dtypes.hpp"
 #include <memory>
 #include <vector>
@@ -35,7 +35,7 @@ public:
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
-		for(Instance& instance : m_instances) {
+		for(InstanceHandle instance : m_instances) {
 			// TODO
 		}
 		// TODO: materials etc.
@@ -43,7 +43,7 @@ public:
 
 	template < Device dev >
 	void unload() {
-		for(Instance& instance : m_instances) {
+		for(InstanceHandle instance : m_instances) {
 			// TODO
 		}
 		// TODO: materials etc.
@@ -76,9 +76,21 @@ public:
 	// (Re-)builds the acceleration structure
 	void build_accel_structure();
 
+	// Overwrite which camera is used of the scene
+	void set_camera(ConstCameraHandle camera) noexcept {
+		mAssert(camera != nullptr);
+		m_camera = camera;
+	}
+	// Access the active camera
+	ConstCameraHandle get_camera() const noexcept {
+		return m_camera;
+	}
+
 private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
+
+	ConstCameraHandle m_camera;	// The single, chosen camera for rendering this scene
 
 	// TODO: cameras, lights, materials
 	// Acceleration structure over all instances

@@ -103,10 +103,10 @@ struct RndSet {
 
 struct RaySample {
 	// TODO: data layout? (currently set for GPU friendly padding)
-	scene::Point origin;				// Position on the near plane to start the ray
-	float pdf;							// The camera sampling PDF
+	scene::Point origin {0.0f};			// Position on the near plane to start the ray
+	float pdf {0.0f};					// The camera sampling PDF
 	scene::Direction excident {0.0f};	// The sampled direction
-	float w;							// The sensor response (equal to the PDF for some camera models)
+	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 
 struct ProjectionResult {

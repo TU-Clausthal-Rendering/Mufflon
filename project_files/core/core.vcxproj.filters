@@ -47,6 +47,9 @@
     <Filter Include="Source Files\core\cameras">
       <UniqueIdentifier>{6ee163c8-7702-47ff-8770-fef98b98fcb6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer">
+      <UniqueIdentifier>{506fd478-9766-443f-bc73-21533eab341c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -114,6 +117,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\cameras\camera.cpp">
       <Filter>Source Files\core\cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -272,6 +278,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\cameras\sample.hpp">
       <Filter>Source Files\core\cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\random_walk.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\handles.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\path_util.hpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

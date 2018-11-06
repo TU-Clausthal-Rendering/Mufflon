@@ -13,6 +13,8 @@
 #include "core/scene/world_container.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/lights/light_tree.hpp"
+#include "core/scene/materials/material.hpp"
+#include "core/cameras/camera.hpp"
 
 using namespace mufflon::scene;
 using namespace mufflon::scene::geometry;

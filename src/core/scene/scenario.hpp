@@ -2,18 +2,12 @@
 
 #include "object.hpp"
 #include "export/dll_export.hpp"
-#include "materials/material.hpp"
-#include "core/cameras/camera.hpp"
+#include "handles.hpp"
 #include <map>
 #include <string_view>
 #include <tuple>
 
 namespace mufflon::scene {
-
-using ObjectHandle = Object*;
-using InstanceHandle = Instance*;
-using MaterialHandle = materials::IMaterial*;
-using CameraHandle = cameras::Camera*;
 
 /**
  * This class represents a scenario, meaning a subset of world features.

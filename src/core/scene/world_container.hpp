@@ -3,8 +3,7 @@
 #include "object.hpp"
 #include "scenario.hpp"
 #include "scene.hpp"
-#include "materials/material.hpp"
-#include "core/cameras/camera.hpp"
+#include "handles.hpp"
 #include "export/dll_export.hpp"
 #include <map>
 #include <memory>
@@ -20,7 +19,6 @@ namespace mufflon::scene {
 class LIBRARY_API WorldContainer {
 public:
 	using ScenarioHandle = Scenario*;
-	using SceneHandle = Scene*;
 
 	// Creates a new, empty object and returns a handle to it
 	ObjectHandle create_object();

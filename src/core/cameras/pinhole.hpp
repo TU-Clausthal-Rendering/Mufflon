@@ -34,8 +34,8 @@ struct PinholeParams : public CameraParams {
 	float tanVFov;
 };
 
-__host__ __device__ RaySample
-sample_ray(const PinholeParams& params, const Pixel& coord, const ei::Vec2& resolution, const RndSet& rndSet) {
+__host__ __device__ inline RaySample
+pinholecam_sample_ray(const PinholeParams& params, const Pixel& coord, const ei::Vec2& resolution, const RndSet& rndSet) {
 	// Get a (randomized) position in [-1,1]²
 	ei::Vec2 subPixel = coord + ei::Vec2(rndSet.u0, rndSet.u1);
 	ei::Vec2 canonicalPos = subPixel / resolution * 2.0f - 1.0f;
@@ -60,8 +60,8 @@ sample_ray(const PinholeParams& params, const Pixel& coord, const ei::Vec2& reso
 
 // Compute pixel position and PDF
 // position: a direction in world space.
-__host__ __device__ ProjectionResult
-project(const PinholeParams& params, const ei::Vec2& resolution, const scene::Point& position) {
+__host__ __device__ inline ProjectionResult
+pinholecam_project(const PinholeParams& params, const ei::Vec2& resolution, const scene::Point& position) {
 	ei::Vec3 camToPosDir = position - params.position;
 	float w = dot(params.viewDir, camToPosDir);
 	// Clip on near plane

@@ -1,5 +1,7 @@
 #include "world_container.hpp"
 #include "util/log.hpp"
+#include "core/cameras/camera.hpp"
+#include "core/scene/materials/material.hpp"
 
 namespace mufflon::scene {
 
@@ -61,7 +63,7 @@ CameraHandle WorldContainer::get_camera(std::string_view name) {
 }
 
 
-WorldContainer::SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
+SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
 	if(hdl == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid scenario handle");
 		return nullptr;

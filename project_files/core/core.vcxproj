@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
     <ClCompile Include="..\..\src\core\cameras\camera.cpp" />
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
@@ -55,6 +56,9 @@
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />
     <ClInclude Include="..\..\src\core\scene\accessor.hpp" />
     <ClInclude Include="..\..\src\core\scene\allocator.hpp" />
@@ -62,6 +66,7 @@
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp" />
+    <ClInclude Include="..\..\src\core\scene\handles.hpp" />
     <ClInclude Include="..\..\src\core\scene\instance.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\lights.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\light_tree.hpp" />
