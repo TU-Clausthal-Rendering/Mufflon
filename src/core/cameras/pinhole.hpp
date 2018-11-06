@@ -14,7 +14,7 @@ public:
 	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = tan(fov / 2); }
 
 	// Get the parameter bundle
-	void get_parameter_pack(CameraParams* outBuffer) const final;
+	void get_parameter_pack(CameraParams& outBuffer) const final;
 
 	// Get the required size of a parameter bundle.
 	std::size_t get_parameter_pack_size() const final;

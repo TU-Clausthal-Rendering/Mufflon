@@ -128,6 +128,7 @@ public:
 template < Device dev >
 class Deleter {
 public:
+	Deleter() :				 m_n(0) {}
 	Deleter(std::size_t n) : m_n(n) {}
 
 	template < typename T >

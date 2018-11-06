@@ -2,8 +2,8 @@
 
 namespace mufflon::cameras {
 
-	void Pinhole::get_parameter_pack(CameraParams* outBuffer) const {
-		*reinterpret_cast<PinholeParams*>(outBuffer) = PinholeParams{
+	void Pinhole::get_parameter_pack(CameraParams& outBuffer) const {
+		as<PinholeParams>(outBuffer) = PinholeParams{
 			CameraModel::PINHOLE,
 			m_position,
 			get_x_dir(),

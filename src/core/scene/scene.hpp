@@ -4,6 +4,7 @@
 #include "instance.hpp"
 #include "export/dll_export.hpp"
 #include "handles.hpp"
+#include "core/cameras/camera.hpp"
 #include "ei/3dtypes.hpp"
 #include <memory>
 #include <vector>
@@ -35,6 +36,23 @@ public:
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
+		// Create camera parameters on CPU side (required for other devices as copy source)
+		m_cameraParams.get<unique_device_ptr<Device::CPU, char>>() =
+			make_udevptr_array<Device::CPU, char>(m_camera->get_parameter_pack_size());
+		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
+		// m_camera->get_parameter_pack(as<cameras::CameraParams>(*m_cameraParams.get<unique_device_ptr<Device::CPU, char>>())); // This line causes the bug
+		auto& pCpu = m_cameraParams.get<unique_device_ptr<Device::CPU, char>>();
+		m_camera->get_parameter_pack(as<cameras::CameraParams>(*pCpu));
+		// Copy to the real target device, if it differs from the CPU
+		if constexpr(dev == Device::CUDA) {
+			m_cameraParams.get<unique_device_ptr<Device::CUDA, char>>() =
+				make_udevptr_array<Device::CUDA, char>(m_camera->get_parameter_pack_size());
+			// [Weird] Again, using the RHS from the next line directly without storing it
+			// in a variable causes very mysterious bugs.
+			auto* pTarget = m_cameraParams.get<unique_device_ptr<Device::CUDA, char>>().get();
+			cudaMemcpy(pTarget, pCpu.get(), m_camera->get_parameter_pack_size(), cudaMemcpyHostToDevice);
+		}
+
 		for(InstanceHandle instance : m_instances) {
 			// TODO
 		}
@@ -43,6 +61,7 @@ public:
 
 	template < Device dev >
 	void unload() {
+		m_cameraParams.get<unique_device_ptr<dev, cameras::CameraParams>>().release();
 		for(InstanceHandle instance : m_instances) {
 			// TODO
 		}
@@ -91,6 +110,8 @@ private:
 	std::vector<InstanceHandle> m_instances;
 
 	ConstCameraHandle m_camera;	// The single, chosen camera for rendering this scene
+	util::TaggedTuple<unique_device_ptr<Device::CPU, char>, // TODO: alias/wrapper type for a TaggedTuple of an identic resource for all devices?
+		unique_device_ptr<Device::CUDA, char>> m_cameraParams;
 
 	// TODO: cameras, lights, materials
 	// Acceleration structure over all instances

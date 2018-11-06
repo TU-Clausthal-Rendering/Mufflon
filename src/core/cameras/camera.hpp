@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/scene/types.hpp"
+#include "util/dyntype_memory.hpp"
+#include "util/assert.hpp"
 #include <string>
 
 namespace mufflon { namespace cameras {
@@ -77,7 +79,7 @@ public:
 	 * Each camera must implement a sample_ray and a project method (see cameras/sample.hpp
 	 * for details).
 	 */
-	virtual void get_parameter_pack(CameraParams* outBuffer) const = 0;
+	virtual void get_parameter_pack(CameraParams& outBuffer) const = 0;
 
 	// Get the required size of a parameter bundle.
 	virtual std::size_t get_parameter_pack_size() const = 0;
@@ -116,4 +118,11 @@ struct ProjectionResult {
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 
-}} // namespace mufflon::cameras
+} // samespace cameras
+
+//template<> inline std::size_t predict_size<cameras::CameraParams>() {
+//	mAssertMsg(false, "An instance of an unspecific camera should never be created!");
+//	return 0;
+//}
+
+} // namespace mufflon
