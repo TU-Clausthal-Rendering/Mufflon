@@ -12,7 +12,10 @@
         Background="{StaticResource BackgroundBrush}"
         ResizeMode="NoResize"
         WindowStartupLocation="{StaticResource DialogStartupLocation}">
-    <StackPanel Margin="{StaticResource DialogMargin}">
+    <StackPanel 
+        Margin="{StaticResource DialogMargin}"
+        FocusManager.FocusedElement="{Binding ElementName=NameBox}">
+
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -32,6 +35,7 @@
             <helper:EnterTextBox
                 Grid.Row="0"
                 Grid.Column="1"
+                x:Name="NameBox"
                 Text="{Binding NameValue}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 

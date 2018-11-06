@@ -73,6 +73,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Command\AddCameraCommand.cs" />
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
@@ -103,6 +104,8 @@
     <Compile Include="Utility\SynchronizedViewModelList.cs" />
     <Compile Include="Utility\Vec2.cs" />
     <Compile Include="Utility\Vec3.cs" />
+    <Compile Include="ViewModel\AddPropertyViewModel.cs" />
+    <Compile Include="ViewModel\Camera\AddCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\CamerasViewModel.cs" />
     <Compile Include="ViewModel\Camera\CameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\FocusCameraViewModel.cs" />
@@ -116,6 +119,7 @@
     <Compile Include="ViewModel\Light\LightViewModel.cs" />
     <Compile Include="ViewModel\Light\PointLightViewModel.cs" />
     <Compile Include="ViewModel\Light\SpotLightViewModel.cs" />
+    <Compile Include="ViewModel\Material\AddMaterialViewModel.cs" />
     <Compile Include="ViewModel\Material\BlendMaterialViewModel.cs" />
     <Compile Include="ViewModel\Material\EmissiveMaterialViewModel.cs" />
     <Compile Include="ViewModel\Material\FresnelMaterialViewModel.cs" />

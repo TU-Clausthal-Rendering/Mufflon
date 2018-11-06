@@ -49,25 +49,10 @@ namespace gui.ViewModel
             Lights = new LightsViewModel(m_models);
             Materials = new MaterialsViewModel(m_models);
 
-            // test cameras
-            m_models.Cameras.Models.Add(new PinholeCameraModel());
-            m_models.Cameras.Models.Add(new FocusCameraModel());
-            m_models.Cameras.Models.Add(new OrthoCameraModel());
-
-            m_models.Lights.Models.Add(new PointLightModel());
-            m_models.Lights.Models.Add(new DirectionalLightModel());
-            m_models.Lights.Models.Add(new SpotLightModel());
-            m_models.Lights.Models.Add(new EnvmapLightModel());
-            m_models.Lights.Models.Add(new GoniometricLightModel());
-
-            m_models.Materials.Models.Add(new LambertMaterialModel());
-            m_models.Materials.Models.Add(new TorranceMaterialModel());
-            m_models.Materials.Models.Add(new WalterMaterialModel());
-            m_models.Materials.Models.Add(new EmissiveMaterialModel());
-            m_models.Materials.Models.Add(new OrennayarMaterialModel());
-
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);
+            AddCameraCommand = new AddCameraCommand(m_models);
+            AddMaterialCommand = new AddMaterialCommand(m_models);
         }
     }
 }
