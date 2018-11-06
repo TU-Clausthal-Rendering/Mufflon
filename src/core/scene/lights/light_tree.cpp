@@ -390,9 +390,9 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 	std::size_t dirNodes = get_num_internal_nodes(dirLights.size());
 	std::size_t posNodes = get_num_internal_nodes(posLights.size());
 	if(dirLights.size() > 0u)
-		tree.dirLights.handle = Allocator<Device::CPU>::alloc<char>(sizeof(DirNode) * dirNodes + sizeof(DirectionalLight) * dirLights.size());
+		tree.dirLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(DirNode) * dirNodes + sizeof(DirectionalLight) * dirLights.size());
 	if(posLights.size() > 0u)
-		tree.posLights.handle = Allocator<Device::CPU>::alloc<char>(sizeof(PosNode) * posNodes + sizeof(PositionalLight) * dirLights.size());
+		tree.posLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(PosNode) * posNodes + sizeof(PositionalLight) * dirLights.size());
 
 	// Get the sum of intensities (added up); might be better to use average?
 	float dirIntensities = 0.f;
@@ -451,7 +451,7 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 }
 
 // TODO
-/*void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<Device::CUDA>& sync,
+void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<Device::CUDA>& sync,
 				 std::optional<textures::TextureHandle> hdl) {
 	// Ensure that the node arrays are in sync (by alloc/realloc if necessary)
 	// First directional lights...
@@ -462,10 +462,10 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 		// Still have data, (re)alloc and copy
 		if(sync.numDirLights == 0u || sync.dirLights.handle == nullptr) {
 			mAssert(sync.dirLights.handle == nullptr);
-			sync.dirLights.handle = Allocator<Device::CUDA>::alloc_array<LightTree::DirNode>(changed.numDirLights);
+			sync.dirLights.handle = Allocator<Device::CUDA>::alloc_array<char>(sizeof(LightTree::DirNode) * changed.numDirLights);
 		} else {
-			sync.dirLights.handle = Allocator<Device::CUDA>::realloc(sync.dirLights.handle, sync.numDirLights,
-																	 changed.numDirLights);
+			sync.dirLights.handle = Allocator<Device::CUDA>::realloc(sync.dirLights.handle, sizeof(LightTree::DirNode) * sync.numDirLights,
+																	 sizeof(LightTree::DirNode) * changed.numDirLights);
 		}
 		// Copy over the data
 		cudaMemcpy(sync.dirLights.handle, changed.dirLights.handle,
@@ -480,10 +480,11 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 		// Still have data, (re)alloc and copy
 		if(sync.numPosLights == 0u || sync.posLights.handle == nullptr) {
 			mAssert(sync.posLights.handle == nullptr);
-			sync.posLights.handle = Allocator<Device::CUDA>::alloc_array<LightTree::PosNode>(changed.numPosLights);
+			sync.posLights.handle = Allocator<Device::CUDA>::alloc_array<char>(sizeof(LightTree::PosNode) * changed.numPosLights);
 		} else {
-			sync.posLights.handle = Allocator<Device::CUDA>::realloc(sync.posLights.handle, sync.numPosLights,
-																	 changed.numPosLights);
+			sync.posLights.handle = Allocator<Device::CUDA>::realloc(sync.posLights.handle,
+																	 sizeof(LightTree::PosNode) * sync.numPosLights,
+																	 sizeof(LightTree::PosNode) * changed.numPosLights);
 		}
 		// Copy over the data
 		cudaMemcpy(sync.posLights.handle, changed.posLights.handle,
@@ -513,7 +514,7 @@ void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<D
 		// Still have data, (re)alloc and copy
 		if(sync.numDirLights == 0u || sync.dirLights.handle == nullptr) {
 			mAssert(sync.dirLights.handle == nullptr);
-			sync.dirLights.handle = Allocator<Device::CPU>::alloc_array<LightTree::DirNode>(changed.numDirLights);
+			sync.dirLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(LightTree::DirNode) * changed.numDirLights);
 		} else {
 			sync.dirLights.handle = Allocator<Device::CPU>::realloc(sync.dirLights.handle, sync.numDirLights,
 																	 changed.numDirLights);
@@ -531,7 +532,7 @@ void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<D
 		// Still have data, (re)alloc and copy
 		if(sync.numPosLights == 0u || sync.posLights.handle == nullptr) {
 			mAssert(sync.posLights.handle == nullptr);
-			sync.posLights.handle = Allocator<Device::CPU>::alloc_array<LightTree::PosNode>(changed.numPosLights);
+			sync.posLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(LightTree::PosNode) * changed.numPosLights);
 		} else {
 			sync.posLights.handle = Allocator<Device::CPU>::realloc(sync.posLights.handle, sync.numPosLights,
 																	 changed.numPosLights);
@@ -561,6 +562,6 @@ void unload(LightTree::Tree<Device::CUDA>& tree) {
 	tree.dirLights.handle = Allocator<Device::CUDA>::free(tree.dirLights.handle, tree.numDirLights);
 	tree.posLights.handle = Allocator<Device::CUDA>::free(tree.posLights.handle, tree.numPosLights);
 	// TODO: unload envmap handle
-}*/
+}
 
 }}} // namespace mufflon::scene::lights
