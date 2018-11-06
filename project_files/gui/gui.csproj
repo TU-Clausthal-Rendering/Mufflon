@@ -73,6 +73,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Model\AppModel.cs" />
@@ -126,7 +127,7 @@
     <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
-    <Compile Include="ViewModel\Camera\AddCameraViewModel.cs" />
+    <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
       <DependentUpon>FocusCameraView.xaml</DependentUpon>
     </Compile>

@@ -9,8 +9,10 @@
         Title="{Binding WindowTitle}" 
         Height="130" 
         Width="220"
-        Background="{StaticResource BackgroundBrush}">
-    <StackPanel>
+        Background="{StaticResource BackgroundBrush}"
+        ResizeMode="NoResize"
+        WindowStartupLocation="{StaticResource DialogStartupLocation}">
+    <StackPanel Margin="{StaticResource DialogMargin}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

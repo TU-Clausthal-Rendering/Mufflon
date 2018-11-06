@@ -6,16 +6,22 @@ using gui.Annotations;
 using gui.Model.Light;
 using gui.View.Helper;
 
-namespace gui.ViewModel.Camera
+namespace gui.ViewModel.Light
 {
-    public class AddCameraViewModel : INotifyPropertyChanged
+    /// <summary>
+    /// view model for the AddPropertyDialog.
+    /// NameValue - final name for the camera
+    /// TypeValue - final type for the camera
+    /// </summary>
+    public class AddLightViewModel : INotifyPropertyChanged
     {
-        public string WindowTitle => "Add Material";
+        public string WindowTitle => "Add Light";
 
-        public string NameName => "Material:";
+        public string NameName => "Light:";
 
         private string m_name = "";
 
+        // public getter for the value (+ setter for the view)
         public string NameValue
         {
             get => m_name;
@@ -44,7 +50,10 @@ namespace gui.ViewModel.Camera
             }
         }
 
-        public AddCameraViewModel()
+        // public getter for the type
+        public LightModel.LightType TypeValue => m_selectedType.Cargo;
+
+        public AddLightViewModel()
         {
             var types = new ObservableCollection<ComboBoxItem<LightModel.LightType>>
             {

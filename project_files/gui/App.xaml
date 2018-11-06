@@ -11,5 +11,11 @@
         <!-- Property Window Resources (Lights, Materials...) -->
         <Thickness x:Key="LeftPropertyMargin" Bottom="2" Right="3"/>
         <Thickness x:Key="RightPropertyMargin" Bottom="2"/>
+        
+        <!-- Dialog Styling -->
+        <Thickness x:Key="DialogMargin" Top="5" Bottom="5" Left="5" Right="5"/>
+        <!-- CenterOwner does not work if window is maximized -->
+        <WindowStartupLocation x:Key="DialogStartupLocation">CenterScreen</WindowStartupLocation>
+
     </Application.Resources>
 </Application>

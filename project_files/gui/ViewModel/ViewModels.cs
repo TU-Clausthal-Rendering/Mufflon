@@ -6,7 +6,9 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using gui.Annotations;
+using gui.Command;
 using gui.Model;
 using gui.Model.Camera;
 using gui.Model.Light;
@@ -28,6 +30,10 @@ namespace gui.ViewModel
         public CamerasViewModel Cameras { get; }
         public LightsViewModel Lights { get; }
         public MaterialsViewModel Materials { get; }
+
+        public ICommand AddLightCommand { get; }
+        public ICommand AddMaterialCommand { get; }
+        public ICommand AddCameraCommand { get; }
 
         private readonly Models m_models;
 
@@ -61,6 +67,7 @@ namespace gui.ViewModel
             m_models.Materials.Models.Add(new OrennayarMaterialModel());
 
             // command initialization
+            AddLightCommand = new AddLightCommand(m_models);
         }
     }
 }
