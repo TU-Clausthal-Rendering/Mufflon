@@ -7,19 +7,24 @@
 #include "core/scene/textures/texture.hpp"
 #include <optional>
 
+// Forward declaration
+namespace ei {
+struct Box;
+} // namespace ei
+
 namespace mufflon { namespace scene { namespace lights {
 
 class LightTree {
 public:
 	/**
 	 * Node of the light tree. Stores the accumulated flux and position of its children.
-	 * Additionally, it stores whether the children are leafs or interior nodes
+	 * Additionally, it stores whether the children are leaves or interior nodes
 	 * and, depending on that information, either the leaf's type or the
 	 * index of the node.
 	 */
 #pragma pack(push, 1)
 	// Node type: either a light-tree node or a light
-	union PosNode {
+	struct alignas(16) PosNode {
 		// Struct holding either a light type or an array index
 		class Child {
 		public:
@@ -50,23 +55,13 @@ public:
 			u32 m_data;
 		};
 
-		struct alignas(16) InteralNode {
-			ei::Vec3 flux;
-			Child left;
-			ei::Vec3 position;
-			Child right;
-		};
-
-		// Union for all lights we handle here (ie. all that have positions)
-		PointLight point;
-		SpotLight spot;
-		AreaLightTriangle areaTri;
-		AreaLightQuad areaQuad;
-		AreaLightSphere areaSphere;
+		ei::Vec3 intensity;
+		Child left;
+		ei::Vec3 position;
+		Child right;
 	};
 
-	// Node type: either a light-tree node or a directional light
-	union DirNode {
+	struct alignas(16) DirNode {
 		// Struct holding an index minus one bit to tell us if a leaf follows
 		class Child {
 		public:
@@ -93,13 +88,10 @@ public:
 			u32 m_data;
 		};
 
-		struct alignas(16) InternalNode {
-			ei::Vec3 flux;
-			Child left;
-			ei::Vec3 direction;
-			Child right;
-		};
-		DirectionalLight light;
+		ei::Vec3 intensity;
+		Child left;
+		ei::Vec3 direction;
+		Child right;
 	};
 #pragma pack(pop)
 	static_assert(sizeof(PosNode) == 32);
@@ -110,13 +102,15 @@ public:
 
 		std::size_t numDirLights;
 		std::size_t numPosLights;
+		LightType singlePosLightType; // If there's only one positional light, this gives us the type
 		EnvMapLight<dev> envLight;
-		DeviceArrayHandle<DEVICE, DirNode> dirLights;
-		DeviceArrayHandle<DEVICE, PosNode> posLights;
+		DeviceArrayHandle<DEVICE, char> dirLights;
+		DeviceArrayHandle<DEVICE, char> posLights;
 	};
 
-	void build(const std::vector<PositionalLights>& posLights,
-			   const std::vector<DirectionalLight>& dirLights = {},
+	void build(std::vector<PositionalLights>&& posLights,
+			   std::vector<DirectionalLight>&& dirLights,
+			   const ei::Box& boundingBox,
 			   std::optional<textures::TextureHandle> envLight = std::nullopt);
 
 	template < Device dev >
@@ -127,8 +121,8 @@ public:
 
 	template < Device dev >
 	void synchronize() {
-		m_envMapTexture.synchronize<dev>();
-		mufflon::scene::synchronize<dev>(m_trees, m_flags, m_trees.get<Tree<dev>>(), m_envMapTexture);
+		//m_envMapTexture.synchronize<dev>();
+		//mufflon::scene::synchronize<dev>(m_trees, m_flags, m_trees.get<Tree<dev>>(), m_envMapTexture);
 	}
 
 	template < Device dev >
@@ -138,14 +132,14 @@ public:
 	}
 
 private:
-	textures::Texture m_envMapTexture;
+	textures::TextureHandle m_envMapTexture;
 	util::DirtyFlags<Device> m_flags;
 	util::TaggedTuple<Tree<Device::CPU>, Tree<Device::CUDA>> m_trees;
 };
 
 // Functions for synchronizing a light tree
-void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<Device::CUDA>& sync);
-void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<Device::CPU>& sync);
+void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<Device::CUDA>& sync, textures::TextureHandle hdl);
+void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<Device::CPU>& sync, textures::TextureHandle hdl);
 void unload(LightTree::Tree<Device::CPU>& tree);
 void unload(LightTree::Tree<Device::CUDA>& tree);
 
