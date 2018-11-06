@@ -123,7 +123,7 @@ auto get_light_type = [](const auto& light) constexpr -> LightType {
 };
 
 void create_positional_light_tree(const std::vector<PositionalLights>& posLights,
-								  char* memory) {
+								  LightTree::Tree<Device::CPU>::PosLightTree& tree) {
 	using PosNode = LightTree::PosNode;
 	if(posLights.size() == 0u)
 		return;
@@ -147,49 +147,49 @@ void create_positional_light_tree(const std::vector<PositionalLights>& posLights
 			mAssert(startLight + 2u * i < posLights.size());
 			const PositionalLights& left = posLights[startLight + 2u * i];
 			const PositionalLights& right = posLights[startLight + 2u * i + 1u];
+			PosNode& interiorNode = tree.nodes[startNode + i];
 
-			PosNode* interiorNode = new (&memory[sizeof(PosNode) * (startNode + i)]) PosNode{
+			interiorNode = PosNode{
 				std::visit(get_pos_light_intensity, left) + std::visit(get_pos_light_intensity, right),
 				PosNode::Child(),
 				(std::visit(get_light_center, left) + std::visit(get_light_center, right)) / 2.f,
 				PosNode::Child()
 			};
-			interiorNode->left.set_type(std::visit(get_light_type, left));
-			interiorNode->right.set_type(std::visit(get_light_type, right));
+			interiorNode.left.set_type(std::visit(get_light_type, left));
+			interiorNode.right.set_type(std::visit(get_light_type, right));
 		}
 
 		// Also merge together inner nodes for last level!
 		// Two cases: Merge two interior nodes each or (for last one) merge interior with light
 		std::size_t startInnerNode = static_cast<std::size_t>(std::pow(2u, height - 1u)) - 1u;
 		for(std::size_t i = 0u; i < extraNodes / 2u; ++i) {
-			const PosNode* left = reinterpret_cast<const PosNode*>(&memory[sizeof(PosNode) * (startNode + 2u * i)]);
-			const PosNode* right = reinterpret_cast<const PosNode*>(&memory[sizeof(PosNode) * (startNode + 2u * i + 1u)]);
-			mAssert(left != nullptr);
-			mAssert(right != nullptr);
+			const PosNode& left = tree.nodes[startNode + 2u * i];
+			const PosNode& right = tree.nodes[startNode + 2u * i + 1u];
+			PosNode& node = tree.nodes[startInnerNode + i];
 
-			PosNode* node = new (&memory[sizeof(PosNode) * (startInnerNode + i)]) PosNode{
-				left->intensity + right->intensity,
+			node =  PosNode{
+				left.intensity + right.intensity,
 				PosNode::Child(),
-				(left->position + right->position) / 2.f,
+				(left.position + right.position) / 2.f,
 				PosNode::Child()
 			};
-			node->left.set_index(0u);
-			node->right.set_index(0u);
+			node.left.set_index(0u);
+			node.right.set_index(0u);
 		}
 		if(extraNodes % 2 != 0u) {
 			// One interior leftover; must be very first light
-			const PosNode* left = reinterpret_cast<const PosNode*>(&memory[sizeof(PosNode) * (startNode + (extraNodes + 1u) / 2u)]);
+			const PosNode& left = tree.nodes[startNode + (extraNodes + 1u) / 2u];
 			const PositionalLights& right = posLights.front();
-			mAssert(left != nullptr);
+			PosNode& node = tree.nodes[startInnerNode + extraNodes / 2u];
 
-			PosNode* node = new (&memory[sizeof(PosNode) * (startInnerNode + extraNodes / 2u)]) PosNode{
-				left->intensity + std::visit(get_pos_light_intensity, right),
+			node = PosNode{
+				left.intensity + std::visit(get_pos_light_intensity, right),
 				PosNode::Child(),
-				(left->position + std::visit(get_light_center, right)) / 2.f,
+				(left.position + std::visit(get_light_center, right)) / 2.f,
 				PosNode::Child()
 			};
-			node->left.set_index(0u);
-			node->right.set_type(std::visit(get_light_type, right));
+			node.left.set_index(0u);
+			node.right.set_type(std::visit(get_light_type, right));
 		}
 	}
 
@@ -202,14 +202,16 @@ void create_positional_light_tree(const std::vector<PositionalLights>& posLights
 	for(std::size_t i = 0u; i < nodeCount; ++i) {
 		const PositionalLights& left = posLights[2u * i + startLight];
 		const PositionalLights& right = posLights[2u * i + startLight + 1u];
-		PosNode* node = new (&memory[sizeof(PosNode) * (lightStartNode + i)]) PosNode{
+		PosNode& node = tree.nodes[lightStartNode + i];
+
+		node = PosNode{
 				std::visit(get_pos_light_intensity, left) + std::visit(get_pos_light_intensity, right),
 				PosNode::Child(),
 				(std::visit(get_light_center, left) + std::visit(get_light_center, right)) / 2.f,
 				PosNode::Child()
 		};
-		node->left.set_type(std::visit(get_light_type, left));
-		node->right.set_type(std::visit(get_light_type, right));
+		node.left.set_type(std::visit(get_light_type, left));
+		node.right.set_type(std::visit(get_light_type, right));
 	}
 
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
@@ -219,26 +221,26 @@ void create_positional_light_tree(const std::vector<PositionalLights>& posLights
 		std::size_t innerNode = static_cast<std::size_t>(std::pow(2u, level - 1u)) - 1u;
 		// Accumulate for higher-up node
 		for(std::size_t i = 0u; i < nodes / 2u; ++i) {
-			const PosNode* left = reinterpret_cast<const PosNode*>(&memory[sizeof(PosNode) * (nodes - 1u + 2 * i)]);
-			const PosNode* right = reinterpret_cast<const PosNode*>(&memory[sizeof(PosNode) * (nodes - 1u + 2 * i + 1u)]);
-			mAssert(left != nullptr);
-			mAssert(right != nullptr);
+			const PosNode& left = tree.nodes[nodes - 1u + 2 * i];
+			const PosNode& right = tree.nodes[nodes - 1u + 2 * i + 1u];
+			PosNode& node = tree.nodes[innerNode + i];
 
-			PosNode* node = new (&memory[sizeof(PosNode) * (innerNode + i)]) PosNode{
-				left->intensity + right->intensity,
+			node = PosNode{
+				left.intensity + right.intensity,
 				PosNode::Child(),
-				(left->position + right->position) / 2.f,
+				(left.position + right.position) / 2.f,
 				PosNode::Child()
 			};
-			node->left.set_index(0u);
-			node->right.set_index(0u);
+			node.left.set_index(0u);
+			node.right.set_index(0u);
 			// TODO: do we even need index?
 		}
 	}
 }
 
 void create_directional_light_tree(const std::vector<DirectionalLight>& dirLights,
-								   char* memory, const ei::Vec3& aabbDiag) {
+								   LightTree::Tree<Device::CPU>::DirLightTree& tree,
+								   const ei::Vec3& aabbDiag) {
 	using DirNode = LightTree::DirNode;
 	if(dirLights.size() == 0u)
 		return;
@@ -262,49 +264,49 @@ void create_directional_light_tree(const std::vector<DirectionalLight>& dirLight
 			mAssert(startLight + 2u * i < dirLights.size());
 			const DirectionalLight& left = dirLights[startLight + 2u * i];
 			const DirectionalLight& right = dirLights[startLight + 2u * i + 1u];
+			DirNode& interiorNode = tree.nodes[startNode + i];
 
-			DirNode* interiorNode = new (&memory[sizeof(DirNode) * (startNode + i)]) DirNode{
+			interiorNode = DirNode{
 				get_dir_light_intensity(left, aabbDiag) + get_dir_light_intensity(right, aabbDiag),
 				DirNode::Child(),
 				(left.direction + right.direction) / 2.f,
 				DirNode::Child()
 			};
-			interiorNode->left.make_leaf();
-			interiorNode->right.make_leaf();
+			interiorNode.left.make_leaf();
+			interiorNode.right.make_leaf();
 		}
 
 		// Also merge together inner nodes for last level!
 		// Two cases: Merge two interior nodes each or (for last one) merge interior with light
 		std::size_t startInnerNode = static_cast<std::size_t>(std::pow(2u, height - 1u)) - 1u;
 		for(std::size_t i = 0u; i < extraNodes / 2u; ++i) {
-			const DirNode* left = reinterpret_cast<const DirNode*>(&memory[sizeof(DirNode) * (startNode + 2u * i)]);
-			const DirNode* right = reinterpret_cast<const DirNode*>(&memory[sizeof(DirNode) * (startNode + 2u * i + 1u)]);
-			mAssert(left != nullptr);
-			mAssert(right != nullptr);
+			const DirNode& left = tree.nodes[startNode + 2u * i];
+			const DirNode& right = tree.nodes[startNode + 2u * i + 1u];
+			DirNode& node = tree.nodes[startInnerNode + i];
 
-			DirNode* node = new (&memory[sizeof(DirNode) * (startInnerNode + i)]) DirNode{
-				left->intensity + right->intensity,
+			node = DirNode{
+				left.intensity + right.intensity,
 				DirNode::Child(),
-				(left->direction + right->direction) / 2.f,
+				(left.direction + right.direction) / 2.f,
 				DirNode::Child()
 			};
-			node->left.set_index(0u);
-			node->right.set_index(0u);
+			node.left.set_index(0u);
+			node.right.set_index(0u);
 		}
 		if(extraNodes % 2 != 0u) {
 			// One interior leftover; must be very first light
-			const DirNode* left = reinterpret_cast<const DirNode*>(&memory[sizeof(DirNode) * (startNode + (extraNodes + 1u) / 2u)]);
+			const DirNode& left = tree.nodes[startNode + (extraNodes + 1u) / 2u];
 			const DirectionalLight& right = dirLights.front();
-			mAssert(left != nullptr);
+			DirNode& node = tree.nodes[startInnerNode + extraNodes / 2u];
 
-			DirNode* node = new (&memory[sizeof(DirNode) * (startInnerNode + extraNodes / 2u)]) DirNode{
-				left->intensity + get_dir_light_intensity(right, aabbDiag),
+			node = DirNode{
+				left.intensity + get_dir_light_intensity(right, aabbDiag),
 				DirNode::Child(),
-				(left->direction + right.direction) / 2.f,
+				(left.direction + right.direction) / 2.f,
 				DirNode::Child()
 			};
-			node->left.set_index(0u);
-			node->right.make_leaf();
+			node.left.set_index(0u);
+			node.right.make_leaf();
 		}
 	}
 
@@ -317,14 +319,16 @@ void create_directional_light_tree(const std::vector<DirectionalLight>& dirLight
 	for(std::size_t i = 0u; i < nodeCount; ++i) {
 		const DirectionalLight& left = dirLights[2u * i + startLight];
 		const DirectionalLight& right = dirLights[2u * i + startLight + 1u];
-		DirNode* node = new (&memory[sizeof(DirNode) * (lightStartNode + i)]) DirNode{
+		DirNode& node = tree.nodes[lightStartNode + i];
+
+		node = DirNode{
 				get_dir_light_intensity(left, aabbDiag) + get_dir_light_intensity(right, aabbDiag),
 				DirNode::Child(),
 				(left.direction + right.direction) / 2.f,
 				DirNode::Child()
 		};
-		node->left.make_leaf();
-		node->right.make_leaf();
+		node.left.make_leaf();
+		node.right.make_leaf();
 	}
 
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
@@ -334,39 +338,70 @@ void create_directional_light_tree(const std::vector<DirectionalLight>& dirLight
 		std::size_t innerNode = static_cast<std::size_t>(std::pow(2u, level - 1u)) - 1u;
 		// Accumulate for higher-up node
 		for(std::size_t i = 0u; i < nodes / 2u; ++i) {
-			const DirNode* left = reinterpret_cast<const DirNode*>(&memory[sizeof(DirNode) * (nodes - 1u + 2 * i)]);
-			const DirNode* right = reinterpret_cast<const DirNode*>(&memory[sizeof(DirNode) * (nodes - 1u + 2 * i + 1u)]);
-			mAssert(left != nullptr);
-			mAssert(right != nullptr);
+			const DirNode& left = tree.nodes[nodes - 1u + 2 * i];
+			const DirNode& right = tree.nodes[nodes - 1u + 2 * i + 1u];
+			DirNode& node = tree.nodes[innerNode + i];
 
-			DirNode* node = new (&memory[sizeof(DirNode) * (innerNode + i)]) DirNode{
-				left->intensity + right->intensity,
+			node = DirNode{
+				left.intensity + right.intensity,
 				DirNode::Child(),
-				(left->direction + right->direction) / 2.f,
+				(left.direction + right.direction) / 2.f,
 				DirNode::Child()
 			};
-			node->left.set_index(0u);
-			node->right.set_index(0u);
+			node.left.set_index(0u);
+			node.right.set_index(0u);
 			// TODO: do we even need index?
 		}
 	}
 }
 
+} // namespace
+
+
+LightTree::LightTree() :
+	m_envMapTexture(nullptr),
+	m_flags(),
+	m_trees{
+		Tree<Device::CPU>{
+			LightType::NUM_LIGHTS,
+			EnvMapLight<Device::CPU>{},
+			{ 0u, nullptr, nullptr },
+			{ 0u, nullptr, nullptr },
+			0u,
+			nullptr
+		},
+		Tree<Device::CUDA>{
+			LightType::NUM_LIGHTS,
+			EnvMapLight<Device::CUDA>{},
+			{ 0u, nullptr, nullptr },
+			{ 0u, nullptr, nullptr },
+			0u,
+			nullptr
+		},
+	}
+{
+
 }
 
+LightTree::~LightTree() {
+
+}
 
 void LightTree::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
 					  const ei::Box& boundingBox,
 					  std::optional<textures::TextureHandle> envLight) {
 	Tree<Device::CPU>& tree = m_trees.get<Tree<Device::CPU>>();
-	tree.dirLights.handle = Allocator<Device::CPU>::free(tree.dirLights.handle, tree.numDirLights);
-	tree.posLights.handle = Allocator<Device::CPU>::free(tree.posLights.handle, tree.numPosLights);
-	if(envLight.has_value())
+
+	// First delete any leftovers
+	tree.memory.handle = Allocator<Device::CPU>::free(tree.memory.handle, tree.length);
+	tree.envLight = EnvMapLight<Device::CPU>{};
+
+	// Construct the environment light
+	if(envLight.has_value()) {
 		tree.envLight = EnvMapLight<Device::CPU>{ *envLight.value()->aquireConst<Device::CPU>() };
-	else
-		tree.envLight = EnvMapLight<Device::CPU>{ textures::ConstDeviceTextureHandle<Device::CPU>{} };
-	// TODO: accumulate flux
+		// TODO: accumulate flux
+	}
 
 	// Create our spatial sorting to get a good tree
 	// TODO: sort the directional lights by direction
@@ -387,61 +422,46 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 	});
 
 	// Allocate enough space to fit all lights - this assumes that the tree will be balanced!
+	// Node memory is easy since fixed size
 	std::size_t dirNodes = get_num_internal_nodes(dirLights.size());
 	std::size_t posNodes = get_num_internal_nodes(posLights.size());
-	if(dirLights.size() > 0u)
-		tree.dirLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(DirNode) * dirNodes + sizeof(DirectionalLight) * dirLights.size());
-	if(posLights.size() > 0u)
-		tree.posLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(PosNode) * posNodes + sizeof(PositionalLight) * dirLights.size());
-
-	// Get the sum of intensities (added up); might be better to use average?
-	float dirIntensities = 0.f;
-	float posIntensities = 0.f;
-	for(const auto& light : dirLights)
-		dirIntensities += ei::sum(get_dir_light_intensity(light, scale));
+	// For light memory we need to iterate the positional lights
+	std::size_t dirLightSize = sizeof(DirectionalLight) * dirLights.size();
+	std::size_t posLightSize = 0u;
 	for(const auto& light : posLights)
-		posIntensities += ei::sum(std::visit(get_pos_light_intensity, light));
+		posLightSize += std::visit([](const auto& posLight) { return sizeof(posLight); }, light);
+
+	tree.length = sizeof(DirNode) * dirNodes + sizeof(PosNode) * posNodes
+		+ dirLightSize + posLightSize;
+	tree.memory.handle = Allocator<Device::CPU>::alloc_array<char>(tree.length);
+	// Set up the node pointers
+	tree.dirLights.nodes = reinterpret_cast<DirNode*>(tree.memory.handle);
+	tree.dirLights.lights = &tree.memory.handle[sizeof(DirNode) * dirNodes];
+	tree.posLights.nodes = reinterpret_cast<PosNode*>(&tree.memory.handle[sizeof(DirNode) * dirNodes
+																		  + dirLightSize]);
+	tree.posLights.lights = &tree.memory.handle[sizeof(DirNode) * dirNodes + dirLightSize
+												+ sizeof(PosNode) * posNodes];
 
 	// Copy the lights into the tree
 	// TODO: how to place this best into memory?
 	// Directional lights are easier, because they have a fixed size
 	{
-		std::memcpy(&tree.dirLights.handle[sizeof(DirNode) * dirNodes], dirLights.data(),
-					sizeof(DirectionalLight) * dirLights.size());
+		std::memcpy(tree.dirLights.lights, dirLights.data(), dirLightSize);
 	}
 	// Positional lights are more difficult since we don't know the concrete size
 	{
-		std::size_t offset = sizeof(PosNode) * posNodes;
-		char* mem = tree.posLights.handle;
+		char* mem = tree.posLights.lights;
 		for(const auto& light : posLights) {
-			std::visit([&mem, &offset](const auto& posLight) {
-				std::memcpy(&mem[offset], &posLight, sizeof(posLight));
-				offset += sizeof(posLight);
-			}, light);
-		}
-	}
-
-	// Directional lights can simply be copied
-	{
-		char* memory = tree.dirLights.handle;
-		std::memcpy(&memory[sizeof(LightTree::DirNode) * dirNodes], dirLights.data(),
-					sizeof(DirectionalLight) * dirLights.size());
-	}
-	// Positional lights can't just be copide since we don't know the concrete size
-	{
-		char* memory = tree.posLights.handle;
-		std::size_t offset = sizeof(PosNode) * posNodes;
-		for(const auto& light : posLights) {
-			std::visit([&memory, &offset](const auto& posLight) {
-				std::memcpy(&memory[offset], &posLight, sizeof(posLight));
-				offset += sizeof(posLight);
+			std::visit([&mem](const auto& posLight) {
+				std::memcpy(mem, &posLight, sizeof(posLight));
+				mem += sizeof(posLight);
 			}, light);
 		}
 	}
 
 	// Now we gotta construct the proper nodes by recursively merging them together
-	create_directional_light_tree(dirLights, tree.dirLights.handle, scale);
-	create_positional_light_tree(posLights, tree.posLights.handle);
+	create_directional_light_tree(dirLights, tree.dirLights, scale);
+	create_positional_light_tree(posLights, tree.posLights);
 
 	// Special casing for singular lights
 	if(posLights.size() == 1u) {
@@ -453,49 +473,26 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 // TODO
 void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<Device::CUDA>& sync,
 				 std::optional<textures::TextureHandle> hdl) {
-	// Ensure that the node arrays are in sync (by alloc/realloc if necessary)
-	// First directional lights...
-	if(changed.numDirLights == 0u) {
+	if(changed.length == 0u) {
 		// Remove all data since there are no lights
-		sync.dirLights.handle = Allocator<Device::CUDA>::free(sync.dirLights.handle, sync.numDirLights);
+		mAssert(changed.memory.handle == nullptr);
+		sync.memory.handle = Allocator<Device::CUDA>::free(sync.memory.handle, sync.length);
 	} else {
 		// Still have data, (re)alloc and copy
-		if(sync.numDirLights == 0u || sync.dirLights.handle == nullptr) {
-			mAssert(sync.dirLights.handle == nullptr);
-			sync.dirLights.handle = Allocator<Device::CUDA>::alloc_array<char>(sizeof(LightTree::DirNode) * changed.numDirLights);
-		} else {
-			sync.dirLights.handle = Allocator<Device::CUDA>::realloc(sync.dirLights.handle, sizeof(LightTree::DirNode) * sync.numDirLights,
-																	 sizeof(LightTree::DirNode) * changed.numDirLights);
+		if(sync.memory.handle == nullptr) {
+			sync.memory.handle = Allocator<Device::CUDA>::alloc_array<char>(changed.length);
+		} else if(sync.length != changed.length) {
+			sync.memory.handle = Allocator<Device::CUDA>::realloc(sync.memory.handle, sync.length,
+																  changed.length);
 		}
-		// Copy over the data
-		cudaMemcpy(sync.dirLights.handle, changed.dirLights.handle,
-				   changed.numDirLights * sizeof(LightTree::DirNode),
-				   cudaMemcpyHostToDevice);
+		cudaMemcpy(sync.memory.handle, changed.memory.handle, changed.length, cudaMemcpyHostToDevice);
 	}
-	// ...then positional lights
-	if(changed.numPosLights == 0u) {
-		// Remove all data since there are no lights
-		sync.posLights.handle = Allocator<Device::CUDA>::free(sync.posLights.handle, sync.numPosLights);
-	} else {
-		// Still have data, (re)alloc and copy
-		if(sync.numPosLights == 0u || sync.posLights.handle == nullptr) {
-			mAssert(sync.posLights.handle == nullptr);
-			sync.posLights.handle = Allocator<Device::CUDA>::alloc_array<char>(sizeof(LightTree::PosNode) * changed.numPosLights);
-		} else {
-			sync.posLights.handle = Allocator<Device::CUDA>::realloc(sync.posLights.handle,
-																	 sizeof(LightTree::PosNode) * sync.numPosLights,
-																	 sizeof(LightTree::PosNode) * changed.numPosLights);
-		}
-		// Copy over the data
-		cudaMemcpy(sync.posLights.handle, changed.posLights.handle,
-				   changed.numPosLights * sizeof(LightTree::PosNode),
-				   cudaMemcpyHostToDevice);
-	}
+	// Equalize bookkeeping
+	sync.length = changed.length;
+	sync.dirLights.lightCount = changed.dirLights.lightCount;
+	sync.posLights.lightCount = changed.posLights.lightCount;
 
-	sync.numDirLights = changed.numDirLights;
-	sync.numPosLights = changed.numPosLights;
 	// Also copy the environment light
-	// TODO: the handle will be invalid!
 	sync.envLight.flux = changed.envLight.flux;
 	if(hdl.has_value())
 		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{ *hdl.value()->aquireConst<Device::CUDA>() };
@@ -505,63 +502,31 @@ void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<De
 
 void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<Device::CPU>& sync,
 				 std::optional<textures::TextureHandle> hdl) {
-	// Ensure that the node arrays are in sync (by alloc/realloc if necessary)
-	// First directional lights...
-	if(changed.numDirLights == 0u) {
+	if(changed.length == 0u) {
 		// Remove all data since there are no lights
-		sync.dirLights.handle = Allocator<Device::CPU>::free(sync.dirLights.handle, sync.numDirLights);
+		mAssert(changed.memory.handle == nullptr);
+		sync.memory.handle = Allocator<Device::CPU>::free(sync.memory.handle, sync.length);
 	} else {
 		// Still have data, (re)alloc and copy
-		if(sync.numDirLights == 0u || sync.dirLights.handle == nullptr) {
-			mAssert(sync.dirLights.handle == nullptr);
-			sync.dirLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(LightTree::DirNode) * changed.numDirLights);
-		} else {
-			sync.dirLights.handle = Allocator<Device::CPU>::realloc(sync.dirLights.handle, sync.numDirLights,
-																	 changed.numDirLights);
+		if(sync.memory.handle == nullptr) {
+			sync.memory.handle = Allocator<Device::CPU>::alloc_array<char>(changed.length);
+		} else if(sync.length != changed.length) {
+			sync.memory.handle = Allocator<Device::CPU>::realloc(sync.memory.handle, sync.length,
+																  changed.length);
 		}
-		// Copy over the data
-		cudaMemcpy(sync.dirLights.handle, changed.dirLights.handle,
-				   changed.numDirLights * sizeof(LightTree::DirNode),
-				   cudaMemcpyDeviceToHost);
+		cudaMemcpy(sync.memory.handle, changed.memory.handle, changed.length, cudaMemcpyHostToDevice);
 	}
-	// ...then positional lights
-	if(changed.numPosLights == 0u) {
-		// Remove all data since there are no lights
-		sync.posLights.handle = Allocator<Device::CPU>::free(sync.posLights.handle, sync.numPosLights);
-	} else {
-		// Still have data, (re)alloc and copy
-		if(sync.numPosLights == 0u || sync.posLights.handle == nullptr) {
-			mAssert(sync.posLights.handle == nullptr);
-			sync.posLights.handle = Allocator<Device::CPU>::alloc_array<char>(sizeof(LightTree::PosNode) * changed.numPosLights);
-		} else {
-			sync.posLights.handle = Allocator<Device::CPU>::realloc(sync.posLights.handle, sync.numPosLights,
-																	 changed.numPosLights);
-		}
-		// Copy over the data
-		cudaMemcpy(sync.posLights.handle, changed.posLights.handle,
-				   changed.numPosLights * sizeof(LightTree::PosNode),
-				   cudaMemcpyDeviceToHost);
-	}
+	// Equalize bookkeeping
+	sync.length = changed.length;
+	sync.dirLights.lightCount = changed.dirLights.lightCount;
+	sync.posLights.lightCount = changed.posLights.lightCount;
 
-	sync.numDirLights = changed.numDirLights;
-	sync.numPosLights = changed.numPosLights;
-	// Also copy the environment light and refresh the handle
+	// Also copy the environment light
 	sync.envLight.flux = changed.envLight.flux;
 	if(hdl.has_value())
 		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{ *hdl.value()->aquireConst<Device::CPU>() };
 	else
 		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{};
-}
-
-void unload(LightTree::Tree<Device::CPU>& tree) {
-	tree.dirLights.handle =	Allocator<Device::CPU>::free(tree.dirLights.handle, tree.numDirLights);
-	tree.posLights.handle = Allocator<Device::CPU>::free(tree.posLights.handle, tree.numPosLights);
-	// TODO: unload envmap handle
-}
-void unload(LightTree::Tree<Device::CUDA>& tree) {
-	tree.dirLights.handle = Allocator<Device::CUDA>::free(tree.dirLights.handle, tree.numDirLights);
-	tree.posLights.handle = Allocator<Device::CUDA>::free(tree.posLights.handle, tree.numPosLights);
-	// TODO: unload envmap handle
 }
 
 }}} // namespace mufflon::scene::lights

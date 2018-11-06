@@ -14,6 +14,7 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/lights/light_tree.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/lights/light_tree.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/memory/allocator.hpp"
 
@@ -30,6 +31,20 @@ public:
 				   reinterpret_cast<char*>(vec.data() + vec.size()));
 	}
 };
+
+void test_lighttree() {
+	using namespace lights;
+	LightTree tree;
+
+	std::vector<PositionalLights> posLights{
+		PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 1, 1} },
+		PointLight{ ei::Vec3{0, 5, 0}, ei::Vec3{1, 1, 1} },
+		PointLight{ ei::Vec3{6, 0, 0}, ei::Vec3{1, 1, 1} },
+	};
+	std::vector<DirectionalLight> dirLights;
+
+	tree.build(std::move(posLights), std::move(dirLights), ei::Box(ei::Vec3(0, 0, 0), ei::Vec3(6, 5, 0)));
+}
 
 void test_allocator() {
 	std::cout << "Testing custom device allocator." << std::endl;
@@ -295,13 +310,6 @@ void test_scene_creation() {
 		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 }
 
-void test_light() {
-	std::cout << "Testing lights" << std::endl;
-	std::cout << sizeof(lights::PointLight) << std::endl;
-	std::cout << sizeof(lights::SpotLight) << std::endl;
-	std::cout << sizeof(lights::DirectionalLight) << std::endl;
-}
-
 
 int main() {
 	test_allocator();
@@ -310,7 +318,7 @@ int main() {
 	test_custom_attributes();
 	test_object();
 	test_scene_creation();
-	test_light();
+	test_lighttree();
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();

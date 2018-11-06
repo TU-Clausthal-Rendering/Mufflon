@@ -1,6 +1,8 @@
 #pragma once
 
 #include "lights.hpp"
+#include "export/dll_export.hpp"
+#include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
 #include "core/scene/types.hpp"
@@ -14,8 +16,11 @@ struct Box;
 
 namespace mufflon { namespace scene { namespace lights {
 
-class LightTree {
+class LIBRARY_API LightTree {
 public:
+	LightTree();
+	~LightTree();
+
 	/**
 	 * Node of the light tree. Stores the accumulated flux and position of its children.
 	 * Additionally, it stores whether the children are leaves or interior nodes
@@ -100,12 +105,22 @@ public:
 	struct Tree {
 		static constexpr Device DEVICE = dev;
 
-		std::size_t numDirLights;
-		std::size_t numPosLights;
 		LightType singlePosLightType; // If there's only one positional light, this gives us the type
 		EnvMapLight<dev> envLight;
-		DeviceArrayHandle<DEVICE, char> dirLights;
-		DeviceArrayHandle<DEVICE, char> posLights;
+		// Pointer to the tree elements
+		struct DirLightTree {
+			std::size_t lightCount;
+			DirNode* nodes;
+			char* lights;
+		} dirLights;
+		struct PosLightTree {
+			std::size_t lightCount;
+			PosNode* nodes;
+			char* lights;
+		} posLights;
+		// Actual memory
+		std::size_t length;
+		DeviceArrayHandle<DEVICE, char> memory;
 	};
 
 	void build(std::vector<PositionalLights>&& posLights,
@@ -127,8 +142,9 @@ public:
 
 	template < Device dev >
 	void unload() {
-		// TODO: m_envMapTexture.unload();
-		unload(m_trees.get<Tree<dev>>());
+		Tree<dev>& tree = m_trees.get<Tree<dev>>();
+		tree.memory.handle = Allocator<dev>::free(tree.memory.handle, tree.length);
+		// TODO: unload envmap handle
 	}
 
 private:
@@ -159,7 +175,9 @@ struct NextEventEstimation {
 };
 
 // Shared code for emitting a single photon from the tree
-__host__ __device__ Photon emit(const LightTree::PosNode* nodes) {
+__host__ __device__ Photon emit(const LightTree::PosNode* nodes, u64 rng) {
+	// Traverse the tree
+
 	// TODO: traverse tree
 	return {};
 }

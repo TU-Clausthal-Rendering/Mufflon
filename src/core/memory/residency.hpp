@@ -44,22 +44,20 @@ template < class T >
 struct DeviceArrayHandle<Device::CPU, T> :
 	public DeviceHandle<Device::CPU, T*> {
 	using Type = T;
-	using ValueType = T*;
 
-	DeviceArrayHandle(ValueType* hdl) :
-		DeviceHandle<Device::CPU, ValueType*>{ hdl }
+	DeviceArrayHandle(Type* hdl) :
+		DeviceHandle<Device::CPU, Type*>{ hdl }
 	{}
 };
 template < class T >
 struct ConstDeviceArrayHandle<Device::CPU, T> :
 	public ConstDeviceHandle<Device::CPU, const T*> {
 	using Type = T;
-	using ValueType = T*;
 
 	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CPU, T> hdl) :
-		ConstDeviceHandle<Device::CPU, const ValueType*>{ hdl.handle } {}
-	ConstDeviceArrayHandle(const ValueType* hdl) :
-		ConstDeviceHandle<Device::CPU, const ValueType*>{ hdl }
+		ConstDeviceHandle<Device::CPU, const Type*>{ hdl.handle } {}
+	ConstDeviceArrayHandle(const Type* hdl) :
+		ConstDeviceHandle<Device::CPU, const Type*>{ hdl }
 	{}
 };
 
@@ -68,22 +66,20 @@ template < class T >
 struct DeviceArrayHandle<Device::CUDA, T> :
 	public DeviceHandle<Device::CUDA, T*> {
 	using Type = T;
-	using ValueType = T*;
 
-	DeviceArrayHandle(ValueType* hdl) :
-		DeviceHandle<Device::CUDA, ValueType*>{ hdl } {}
+	DeviceArrayHandle(Type* hdl) :
+		DeviceHandle<Device::CUDA, Type*>{ hdl } {}
 };
 
 template < class T >
 struct ConstDeviceArrayHandle<Device::CUDA, T> :
 	public ConstDeviceHandle<Device::CUDA, const T*> {
 	using Type = T;
-	using ValueType = T*;
 
 	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CUDA, T> hdl) :
-		ConstDeviceHandle<Device::CUDA, const ValueType*>{ hdl.handle } {}
-	ConstDeviceArrayHandle(const ValueType* hdl) :
-		ConstDeviceHandle<Device::CUDA, const ValueType*>{ hdl } {}
+		ConstDeviceHandle<Device::CUDA, const Type*>{ hdl.handle } {}
+	ConstDeviceArrayHandle(const Type* hdl) :
+		ConstDeviceHandle<Device::CUDA, const Type*>{ hdl } {}
 };
 
 // Functions for synchronizing between array handles
