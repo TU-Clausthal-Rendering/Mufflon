@@ -1,4 +1,6 @@
 #include "material.hpp"
+#include <array>
+#include <string>
 
 namespace mufflon { namespace scene { namespace materials {
 

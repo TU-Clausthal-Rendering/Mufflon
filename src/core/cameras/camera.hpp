@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/scene/types.hpp"
+#include <string>
 
 namespace mufflon { namespace cameras {
 

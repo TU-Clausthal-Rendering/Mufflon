@@ -4,12 +4,16 @@
 #include "core/scene/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
+#include <variant>
 
 namespace mufflon { namespace scene { namespace lights {
 
 enum class LightType : u32 {
 	POINT_LIGHT,
 	SPOT_LIGHT,
+	AREA_LIGHT_TRIANGLE,
+	AREA_LIGHT_QUAD,
+	AREA_LIGHT_SPHERE,
 	DIRECTIONAL_LIGHT,
 	ENVMAP_LIGHT,
 	NUM_LIGHTS
@@ -23,10 +27,8 @@ enum class LightType : u32 {
  * TODO: for measured light sources, we'd need to add a texture handle.
  */
 struct alignas(16) PointLight {
-	ei::Vec3 position;
-	float padding1;
-	ei::Vec3 intensity;
-	float padding2;
+	alignas(16) ei::Vec3 position;
+	alignas(16) ei::Vec3 intensity;
 };
 
 /**
@@ -43,28 +45,51 @@ struct alignas(16) SpotLight {
 };
 
 /**
+ * Area lights. One for every type of geometric primitive.
+ */
+struct alignas(16) AreaLightTriangle {
+	alignas(16) u32 indices[3];
+	alignas(16) ei::Vec3 intensity;
+};
+struct alignas(16) AreaLightQuad {
+	u32 indices[4];
+	alignas(16) ei::Vec3 intensity;
+};
+struct alignas(16) AreaLightSphere {
+	ei::Vec3 position;
+	float radius;
+	alignas(16) ei::Vec3 intensity;
+};
+
+/**
  * Directional light. Doesn't reduce bitness of encoded direction.
  */
 struct alignas(16) DirectionalLight {
 	ei::Vec3 position;
+	float dirA;
 	ei::Vec3 intensity;
-	ei::Vec2 direction;
+	float dirB;
 };
 
 /**
  * Environment-map light.
  */
 template < Device dev >
-struct alignas(16) EnvMapLight {
-	textures::DeviceTextureHandle<dev> envMap;
+struct EnvMapLight {
+	alignas(16) textures::ConstDeviceTextureHandle<dev> texHandle;
+	alignas(16) ei::Vec3 flux;
 };
+
+using PositionalLights = std::variant<PointLight, SpotLight, AreaLightTriangle,
+	AreaLightQuad, AreaLightSphere>;
 
 // Asserts to make sure the compiler actually followed our orders
 static_assert(sizeof(PointLight) == 32 && alignof(PointLight) == 16);
 static_assert(sizeof(SpotLight) == 32 && alignof(SpotLight) == 16);
+static_assert(sizeof(AreaLightTriangle) == 32 && alignof(AreaLightTriangle) == 16);
+static_assert(sizeof(AreaLightQuad) == 32 && alignof(AreaLightQuad) == 16);
+static_assert(sizeof(AreaLightSphere) == 32 && alignof(AreaLightSphere) == 16);
 static_assert(sizeof(DirectionalLight) == 32 && alignof(DirectionalLight) == 16);
-static_assert(sizeof(EnvMapLight<Device::CPU>) == 16 && alignof(EnvMapLight<Device::CPU>) == 16);
-static_assert(sizeof(EnvMapLight<Device::CUDA>) == 16 && alignof(EnvMapLight<Device::CUDA>) == 16);
 
 // Restore default packing alignment
 #pragma pack(pop)

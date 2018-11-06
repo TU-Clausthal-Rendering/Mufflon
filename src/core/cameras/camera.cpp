@@ -1,4 +1,6 @@
 #include "core/cameras/camera.hpp"
+#include <array>
+#include <string>
 
 namespace mufflon::cameras {
 

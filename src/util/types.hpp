@@ -1,6 +1,5 @@
 #pragma once
 
-#include <OpenMesh/Core/Geometry/VectorT.hh> // TODO: remove (leftover, ei::vec replaces this)
 #include <ei/vector.hpp>
 #include <cstdint>
 
@@ -37,6 +36,38 @@ public:
 	explicit Degrees(Radians a)		: a(a / ei::PI * 180.0f) {}
 	operator Radians()				{ return a * ei::PI / 180.0f; }
 	explicit operator float() const { return a; }
+};
+
+class AngularPdf;
+
+// PDF types. Either per area or per steradians
+class AreaPdf {
+public:
+	AreaPdf() = default;
+	explicit AreaPdf(Real pdf) noexcept : m_pdf(pdf) {}
+	explicit operator Real() const noexcept { return m_pdf; }
+	AreaPdf& operator+=(AreaPdf pdf) noexcept;
+	AreaPdf& operator-=(AreaPdf pdf) noexcept;
+	AreaPdf& operator*=(AreaPdf pdf) noexcept;
+	AreaPdf& operator/=(AreaPdf pdf) noexcept;
+	AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
+
+private:
+	Real m_pdf;
+};
+class AngularPdf {
+public:
+	AngularPdf() = default;
+	explicit AngularPdf(Real pdf) noexcept : m_pdf(pdf) {}
+	explicit operator Real() const noexcept { return m_pdf; }
+	AngularPdf& operator+=(AngularPdf pdf) noexcept;
+	AngularPdf& operator-=(AngularPdf pdf) noexcept;
+	AngularPdf& operator*=(AngularPdf pdf) noexcept;
+	AngularPdf& operator/=(AngularPdf pdf) noexcept;
+	AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept;
+
+private:
+	Real m_pdf;
 };
 
 using Pixel = ei::IVec2;

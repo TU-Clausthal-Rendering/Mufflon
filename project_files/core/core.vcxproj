@@ -25,6 +25,7 @@
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
+    <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
@@ -34,6 +35,7 @@
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp" />
     <ClCompile Include="..\..\src\core\scene\world_container.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
+    <ClCompile Include="..\..\src\util\types.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />

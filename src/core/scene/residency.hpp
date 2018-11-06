@@ -17,23 +17,32 @@ enum class Device : unsigned char {
 };
 
 // Generic type-trait for device-something-handles
-template < Device dev, class H, class CH = H >
+template < Device dev, class H >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
 	using HandleType = H;
-	using ConstHandleType = CH;
 
 	HandleType handle;
+};
+
+template < Device dev, class CH >
+struct ConstDeviceHandle {
+	static constexpr Device DEVICE = dev;
+	using ConstHandleType = CH;
+
+	ConstHandleType handle;
 };
 
 // Handle type exclusively for arrays, i.e. they must support vector-esque operations
 
 template < Device dev, class T >
 struct DeviceArrayHandle;
+template < Device dev, class T >
+struct ConstDeviceArrayHandle;
 
 template < class T >
 struct DeviceArrayHandle<Device::CPU, T> :
-	public DeviceHandle<Device::CPU, T*, const T*> {
+	public DeviceHandle<Device::CPU, T*> {
 	using Type = T;
 	using ValueType = T*;
 
@@ -41,11 +50,23 @@ struct DeviceArrayHandle<Device::CPU, T> :
 		DeviceHandle<Device::CPU, ValueType*>{ hdl }
 	{}
 };
+template < class T >
+struct ConstDeviceArrayHandle<Device::CPU, T> :
+	public ConstDeviceHandle<Device::CPU, const T*> {
+	using Type = T;
+	using ValueType = T*;
+
+	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CPU, T> hdl) :
+		ConstDeviceHandle<Device::CPU, const ValueType*>{ hdl.handle } {}
+	ConstDeviceArrayHandle(const ValueType* hdl) :
+		ConstDeviceHandle<Device::CPU, const ValueType*>{ hdl }
+	{}
+};
 
 // TODO: what's wrong with device vector?
 template < class T >
 struct DeviceArrayHandle<Device::CUDA, T> :
-	public DeviceHandle<Device::CUDA, T*, const T*> {
+	public DeviceHandle<Device::CUDA, T*> {
 	using Type = T;
 	using ValueType = T*;
 
@@ -53,9 +74,21 @@ struct DeviceArrayHandle<Device::CUDA, T> :
 		DeviceHandle<Device::CUDA, ValueType*>{ hdl } {}
 };
 
+template < class T >
+struct ConstDeviceArrayHandle<Device::CUDA, T> :
+	public ConstDeviceHandle<Device::CUDA, const T*> {
+	using Type = T;
+	using ValueType = T*;
+
+	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CUDA, T> hdl) :
+		ConstDeviceHandle<Device::CUDA, const ValueType*>{ hdl.handle } {}
+	ConstDeviceArrayHandle(const ValueType* hdl) :
+		ConstDeviceHandle<Device::CUDA, const ValueType*>{ hdl } {}
+};
+
 // Functions for synchronizing between array handles
 template < class T >
-void synchronize(const DeviceArrayHandle<Device::CPU, T>& changed,
+void synchronize(ConstDeviceArrayHandle<Device::CPU, T> changed,
 				 DeviceArrayHandle<Device::CUDA, T>& sync, std::size_t length) {
 	if(sync.handle == nullptr) {
 		cudaMalloc<T>(&sync, sizeof(T) * length);
@@ -63,7 +96,7 @@ void synchronize(const DeviceArrayHandle<Device::CPU, T>& changed,
 	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice);
 }
 template < class T >
-void synchronize(const DeviceArrayHandle<Device::CUDA, T>& changed,
+void synchronize(ConstDeviceArrayHandle<Device::CUDA, T> changed,
 				 DeviceArrayHandle<Device::CPU, T>& sync, std::size_t length) {
 	if(sync.handle == nullptr) {
 		sync.handle = new T[length];
@@ -71,38 +104,18 @@ void synchronize(const DeviceArrayHandle<Device::CUDA, T>& changed,
 	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost);
 }
 
-// Operations on the device arrays (override if they differ for some devices)
-template < Device dev, class T, template <Device, class> class H >
-struct DeviceArrayOps {
-	using Type = T;
-	using HandleType = H<dev, Type>;
-
-	static std::size_t get_size(HandleType sync) {
-		return sync.handle->size();
+// Functions for unloading a handle from the device
+template < class T >
+void unload(DeviceArrayHandle<Device::CPU, T>& hdl) {
+	delete[] hdl.handle;
+	hdl.handle = nullptr;
+}
+template < class T >
+void unload(DeviceArrayHandle<Device::CUDA, T>& hdl) {
+	if(hdl.handle != nullptr) {
+		cudaFree(hdl.handle);
+		hdl.handle = nullptr;
 	}
-
-	static std::size_t get_capacity(HandleType sync) {
-		return sync.handle->capacity();
-	}
-	
-	static void resize(HandleType sync, std::size_t elems) {
-		return sync.handle->resize(elems);
-	}
-
-	static void reserve(HandleType sync, std::size_t elems) {
-		return sync.handle->reserve(elems);
-	}
-
-	static void clear(HandleType sync) {
-		sync.handle->clear();
-	}
-
-	template < Device other >
-	static void copy(const H<other, Type> changed, HandleType sync) {
-		// TODO
-		std::runtime_error("Copy between devices not yet supported!");
-		//std::copy(changed.handle.cbegin(), changed.handle.cend(), sync.handle.begin());
-	}
-};
+}
 
 }} // namespace mufflon::scene

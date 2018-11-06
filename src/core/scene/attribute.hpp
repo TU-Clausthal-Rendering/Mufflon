@@ -269,10 +269,8 @@ public:
 
 	// Unloads the attribute pool from the device
 	void unload() {
-		if(m_memoryBlock != nullptr) {
-			Allocator::free(m_memoryBlock, m_size);
-			m_memoryBlock = nullptr;
-		}
+		if(m_memoryBlock != nullptr)
+			m_memoryBlock = Allocator::free(m_memoryBlock, m_size);
 		m_present = false;
 	}
 
@@ -323,10 +321,8 @@ private:
 		if(m_present) {
 			if(newSize == 0u) {
 				// Remove, but don't mark as unloaded since that is an explicit intent!
-				if(m_memoryBlock != nullptr) {
-					Allocator::free(m_memoryBlock, m_size);
-					m_memoryBlock = nullptr;
-				}
+				if(m_memoryBlock != nullptr)
+					m_memoryBlock = Allocator::free(m_memoryBlock, m_size);
 			} else if(newSize != m_size) {
 				if(m_memoryBlock == nullptr)
 					m_memoryBlock = Allocator::template alloc<char>(newSize);

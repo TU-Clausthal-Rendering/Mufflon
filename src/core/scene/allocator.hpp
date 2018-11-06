@@ -42,8 +42,9 @@ public:
 	}
 
 	template < class T >
-	static void free(T* ptr, std::size_t n) {
+	static T* free(T* ptr, std::size_t n) {
 		delete[] ptr;
+		return nullptr;
 	}
 
 	template < class T >
@@ -76,8 +77,9 @@ public:
 	}
 
 	template < class T >
-	static void free(T* ptr, std::size_t n) {
+	static T* free(T* ptr, std::size_t n) {
 		cuda::check_error(cudaFree(ptr));
+		return nullptr;
 	}
 
 	template < class T >

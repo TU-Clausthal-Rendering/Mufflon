@@ -121,6 +121,12 @@
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\types.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">

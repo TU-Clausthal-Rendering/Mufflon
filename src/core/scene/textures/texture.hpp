@@ -14,18 +14,33 @@ class CpuTexture;
 // Handle type exclusively for textures
 template < Device dev >
 struct DeviceTextureHandle;
+template < Device dev >
+struct ConstDeviceTextureHandle;
 
 template<>
 struct DeviceTextureHandle<Device::CPU> :
-	public DeviceHandle<Device::CPU, textures::CpuTexture*, const textures::CpuTexture*> {
+	public DeviceHandle<Device::CPU, textures::CpuTexture*> {
 };
+template<>
+struct ConstDeviceTextureHandle<Device::CPU> :
+	public ConstDeviceHandle<Device::CPU, const textures::CpuTexture*> {
+};
+// TODO: Const handle and stuff
 template<>
 struct DeviceTextureHandle<Device::CUDA> :
 	public DeviceHandle<Device::CUDA, cudaTextureObject_t> {
 };
 template<>
+struct ConstDeviceTextureHandle<Device::CUDA> :
+	public ConstDeviceHandle<Device::CUDA, cudaTextureObject_t> {
+};
+template<>
 struct DeviceTextureHandle<Device::OPENGL> :
 	public DeviceHandle<Device::OPENGL, u64> {
+};
+template<>
+struct ConstDeviceTextureHandle<Device::OPENGL> :
+	public ConstDeviceHandle<Device::OPENGL, u64> {
 };
 
 /*
@@ -49,9 +64,9 @@ public:
 
 	// Aquire a read-only accessor
 	template < Device dev >
-	ConstAccessor<DeviceTextureHandle<dev>> aquireConst() {
+	ConstAccessor<ConstDeviceTextureHandle<dev>> aquireConst() {
 		this->synchronize<dev>();
-		return ConstAccessor<DeviceTextureHandle<dev>>{m_handles.get<DeviceTextureHandle<dev>>().handle};
+		return ConstAccessor<ConstDeviceTextureHandle<dev>>{m_handles.get<DeviceTextureHandle<dev>>().handle};
 	}
 
 	// Aquire a writing (and thus dirtying) accessor

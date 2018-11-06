@@ -81,8 +81,8 @@ pinholecam_project(const PinholeParams& params, const ei::Vec2& resolution, cons
 	Pixel pixelCoord{ floor((uv * -0.5f + 0.5f) * resolution) };
 	// Need to check the boundaries. In rare cases values like uv.x==-0.999999940
 	// cause pixel coordinates in equal to the resolution.
-	if(pixelCoord.x >= resolution.x) { pixelCoord.x = uint(resolution.x) - 1; }
-	if(pixelCoord.y >= resolution.y) { pixelCoord.y = uint(resolution.y) - 1; }
+	if(pixelCoord.x >= resolution.x) { pixelCoord.x = u32(resolution.x) - 1; }
+	if(pixelCoord.y >= resolution.y) { pixelCoord.y = u32(resolution.y) - 1; }
 
 	float cosAtCam = w / len(camToPosDir);
 	float pixelArea = ei::sq(2.0f * params.tanVFov) * aspectRatio;

@@ -274,10 +274,6 @@ void test_light() {
 	std::cout << sizeof(lights::PointLight) << std::endl;
 	std::cout << sizeof(lights::SpotLight) << std::endl;
 	std::cout << sizeof(lights::DirectionalLight) << std::endl;
-	std::cout << sizeof(lights::EnvMapLight<Device::CPU>) << std::endl;
-	std::cout << sizeof(lights::EnvMapLight<Device::CUDA>) << std::endl;
-
-	std::cout << std::endl << sizeof(lights::LightTree::Node::Child) << std::endl;
 }
 
 

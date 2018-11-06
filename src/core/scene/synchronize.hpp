@@ -24,6 +24,7 @@ void synchronize_impl(Tuple& tuple, util::DirtyFlags<Device>& flags,
 
 } // namespace synchronize_detail
 
+// Synchronizes changes from the tuple to the given class
 template < Device dev, class Tuple, class T, class... Args >
 void synchronize(Tuple& tuple, util::DirtyFlags<Device>& flags, T& sync, Args... args) {
 	if(flags.needs_sync(dev)) {

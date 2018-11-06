@@ -110,7 +110,7 @@ public:
 		// Aquires a read-only accessor to the attribute
 		template < Device dev = DEFAULT_DEVICE >
 		auto aquireConst() {
-			using DeviceHdl = DeviceArrayHandle<dev, Type>;
+			using DeviceHdl = ConstDeviceArrayHandle<dev, Type>;
 			this->synchronize<dev>();
 			const auto& pool = m_pools.get<AttributePool<dev, stores_itself<dev>()>>();
 			const auto& handle = m_handles.get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
