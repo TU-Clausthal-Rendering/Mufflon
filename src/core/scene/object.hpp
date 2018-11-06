@@ -1,6 +1,6 @@
 #pragma once
 
-#include "residency.hpp"
+#include "core/memory/residency.hpp"
 #include "export/dll_export.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"

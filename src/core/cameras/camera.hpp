@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/scene/types.hpp"
-#include "util/dyntype_memory.hpp"
+#include "core/memory/dyntype_memory.hpp"
 #include "util/assert.hpp"
 #include <string>
 

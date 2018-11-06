@@ -4,7 +4,7 @@
 #include "core/cuda/error.hpp"
 #include <stdexcept>
 
-namespace mufflon::scene {
+namespace mufflon { // There is no memory namespace on purpose
 
 // Error class for per-device allocation failure
 
@@ -142,7 +142,7 @@ private:
 // Helper alias to simplyfy the construction of managed (unique_ptr) memory with the
 // custom allocator.
 template < Device dev, typename T >
-using unique_device_ptr = std::unique_ptr<T, scene::Deleter<dev>>;
+using unique_device_ptr = std::unique_ptr<T, Deleter<dev>>;
 
 template < Device dev, typename T, typename... Args > inline unique_device_ptr<dev,T>
 make_udevptr(Args... args) {

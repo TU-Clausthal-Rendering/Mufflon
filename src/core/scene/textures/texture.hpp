@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/scene/residency.hpp"
-#include "core/scene/accessor.hpp"
+#include "core/memory/residency.hpp"
+#include "core/memory/accessor.hpp"
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
 #include <string>

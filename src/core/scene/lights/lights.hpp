@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ei/vector.hpp"
-#include "core/scene/residency.hpp"
+#include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
 #include <variant>

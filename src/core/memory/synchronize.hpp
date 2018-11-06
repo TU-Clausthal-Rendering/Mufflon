@@ -2,7 +2,7 @@
 
 #include "residency.hpp"
 
-namespace mufflon { namespace scene {
+namespace mufflon { // There is no memory namespace on purpose
 
 namespace synchronize_detail {
 
@@ -36,4 +36,4 @@ void synchronize(Tuple& tuple, util::DirtyFlags<Device>& flags, T& sync, Args...
 	}
 }
 
-}} // namespace mufflon::scene
+} // namespace mufflon::scene

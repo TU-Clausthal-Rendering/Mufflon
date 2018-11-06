@@ -50,6 +50,9 @@
     <Filter Include="Source Files\core\renderer">
       <UniqueIdentifier>{506fd478-9766-443f-bc73-21533eab341c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\memory">
+      <UniqueIdentifier>{97993b8b-0988-4b82-9fb7-596de98c790a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
@@ -195,9 +198,6 @@
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\residency.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\instance.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
@@ -237,14 +237,8 @@
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\accessor.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\types.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\allocator.hpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\array_wrapper.hpp">
       <Filter>Source Files\util</Filter>
@@ -273,9 +267,6 @@
     <ClInclude Include="..\..\src\core\scene\lights\light_tree.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\synchronize.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\cameras\camera.hpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
@@ -299,6 +290,21 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\dyntype_memory.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\residency.hpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\allocator.hpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\synchronize.hpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\accessor.hpp">
+      <Filter>Source Files\core\memory</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

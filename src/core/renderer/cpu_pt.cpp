@@ -9,7 +9,7 @@ CpuPathTracer::CpuPathTracer(scene::SceneHandle scene) :
 	m_currentScene(scene)
 {
 	// Make sure the scene is loaded completely for the use on CPU side
-	scene->synchronize<scene::Device::CPU>();
+	scene->synchronize<Device::CPU>();
 
 	// The PT does not need additional memory resources like photon maps.
 }

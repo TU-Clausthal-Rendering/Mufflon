@@ -1,5 +1,5 @@
 #include "light_tree.hpp"
-#include "core/scene/allocator.hpp"
+#include "core/memory/allocator.hpp"
 #include "util/assert.hpp"
 #include "core/cuda/error.hpp"
 #include "ei/3dtypes.hpp"

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "accessor.hpp"
+#include "core/memory/accessor.hpp"
 #include "attribute.hpp"
-#include "synchronize.hpp"
+#include "core/memory/synchronize.hpp"
 #include "export/dll_export.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
@@ -120,7 +120,7 @@ public:
 		// Synchronizes the attribute pool to the given device
 		template < Device dev = DEFAULT_DEVICE >
 		void synchronize() {
-			mufflon::scene::synchronize<dev>(m_pools, m_flags, m_pools.get<AttributePool<dev, stores_itself<dev>()>>());
+			mufflon::synchronize<dev>(m_pools, m_flags, m_pools.get<AttributePool<dev, stores_itself<dev>()>>());
 		}
 
 		std::size_t get_size() const noexcept {
@@ -261,7 +261,7 @@ public:
 	// Synchronizes all attributes on the given device from the last changed device
 	template < Device dev = DEFAULT_DEVICE >
 	void synchronize() {
-		mufflon::scene::synchronize<dev>(m_attributePools, m_flags,
+		mufflon::synchronize<dev>(m_attributePools, m_flags,
 						 m_attributePools.get<AttributePool<dev, stores_itself<dev>()>>());
 	}
 

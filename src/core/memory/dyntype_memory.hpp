@@ -3,7 +3,7 @@
 #include "util/assert.hpp"
 #include <memory>
 
-namespace mufflon {
+namespace mufflon { // There is no memory namespace on purpose
 
 /*
  * Basic size prediction for trivial types.

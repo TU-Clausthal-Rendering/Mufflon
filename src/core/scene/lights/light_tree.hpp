@@ -1,8 +1,8 @@
 #pragma once
 
 #include "lights.hpp"
-#include "core/scene/residency.hpp"
-#include "core/scene/synchronize.hpp"
+#include "core/memory/residency.hpp"
+#include "core/memory/synchronize.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
 #include <optional>

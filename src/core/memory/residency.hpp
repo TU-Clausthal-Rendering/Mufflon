@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace mufflon { namespace scene {
+namespace mufflon { // There is no memory namespace on purpose
 
 // Contains the possible data locations of the scene (logical devices).
 enum class Device : unsigned char {
@@ -118,4 +118,4 @@ void unload(DeviceArrayHandle<Device::CUDA, T>& hdl) {
 	}
 }
 
-}} // namespace mufflon::scene
+} // namespace mufflon::scene

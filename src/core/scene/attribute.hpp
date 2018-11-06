@@ -1,7 +1,7 @@
 #pragma once
 
-#include "allocator.hpp"
-#include "residency.hpp"
+#include "core/memory/allocator.hpp"
+#include "core/memory/residency.hpp"
 #include "export/dll_export.hpp"
 #include "util/array_wrapper.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>

@@ -2,7 +2,7 @@
 
 #include "residency.hpp"
 
-namespace mufflon { namespace scene {
+namespace mufflon { // There is no memory namespace on purpose
 
 /*
  * Accessor classes allow a semi-automatic synchronization of resources over all supported
@@ -85,4 +85,4 @@ private:
 	util::DirtyFlags<Device>& m_flags;
 };
 
-}} // namespace mufflon::scene
+} // namespace mufflon::scene

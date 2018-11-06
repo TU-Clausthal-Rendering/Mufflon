@@ -6,7 +6,7 @@
 #include "util/types.hpp"
 #include "util/flag.hpp"
 #include "core/scene/attribute_list.hpp"
-#include "core/scene/residency.hpp"
+#include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
 #include <istream>
 #include <tuple>
