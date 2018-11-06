@@ -117,7 +117,7 @@ public:
 					mAssert(largest > 0u);
 
 					// Allocate a swap buffer for the realloc
-					char* swapBlock = Allocator::template alloc<char>(largest);
+					char* swapBlock = Allocator::template alloc_array<char>(largest);
 					// Start shifting the later attributes
 					std::size_t currOffset = m_attribs[hdl.index()].offset;
 					for(std::size_t i = hdl.index() + 1u; i < m_attribs.size(); ++i) {
@@ -210,7 +210,7 @@ public:
 						newBlock = Allocator::realloc(m_memoryBlock, m_size, newSize);
 						realloced = true;
 					} else {
-						newBlock = Allocator::template alloc<char>(newSize);
+						newBlock = Allocator::template alloc_array<char>(newSize);
 					}
 				}
 
@@ -294,7 +294,7 @@ public:
 		// Since attributes are always changed for all pools, we only need to allocate the necessary space
 		if(!m_present) {
 			mAssert(m_memoryBlock == nullptr);
-			m_memoryBlock = Allocator::template alloc<char>(m_size);
+			m_memoryBlock = Allocator::template alloc_array<char>(m_size);
 			m_present = true;
 		}
 	}
@@ -325,7 +325,7 @@ private:
 					m_memoryBlock = Allocator::free(m_memoryBlock, m_size);
 			} else if(newSize != m_size) {
 				if(m_memoryBlock == nullptr)
-					m_memoryBlock = Allocator::template alloc<char>(newSize);
+					m_memoryBlock = Allocator::template alloc_array<char>(newSize);
 				else
 					m_memoryBlock = Allocator::realloc(m_memoryBlock, m_size, newSize);
 			}

@@ -24,16 +24,29 @@ class Allocator<Device::CPU> {
 public:
 	static constexpr Device DEVICE = Device::CPU;
 
-	template < class T >
-	static T* alloc(std::size_t n) {
-		T* ptr = new T[n];
+	template < class T, typename... Args >
+	static T* alloc(Args... args) {
+		return alloc_array<T>(1, std::forward<Args>(args)...);
+	}
+
+	template < class T, typename... Args >
+	static T* alloc_array(std::size_t n, Args... args) {
+		// Get the memory
+		T* ptr = reinterpret_cast<T*>(new unsigned char[sizeof(T) * n]);
 		if(ptr == nullptr)
 			throw BadAllocation<DEVICE>();
+		// Initialize it
+		for(std::size_t i = 0; i < n; ++i)
+			new (ptr+i) T {std::forward<Args>(args)...};
 		return ptr;
 	}
 
+	// Danger: realloc does not handle construction/destruction
 	template < class T >
 	static T* realloc(T* ptr, std::size_t prev, std::size_t next) {
+		static_assert(std::is_trivially_copyable<T>::value);
+		static_assert(std::is_trivially_constructible<T>::value);
+		static_assert(std::is_trivially_destructible<T>::value);
 		(void)prev;
 		void* newPtr = std::realloc(ptr, sizeof(T) * next);
 		if(newPtr == nullptr)
@@ -43,7 +56,10 @@ public:
 
 	template < class T >
 	static T* free(T* ptr, std::size_t n) {
-		delete[] ptr;
+		// Call destructors manually, because the memory was allocated raw
+		for(std::size_t i = 0; i < n; ++i)
+			ptr[i].~T();
+		delete[] (unsigned char*)ptr;
 		return nullptr;
 	}
 
@@ -59,18 +75,33 @@ class Allocator<Device::CUDA> {
 public:
 	static constexpr Device DEVICE = Device::CUDA;
 
-	template < class T >
-	static T* alloc(std::size_t n) {
+	template < class T, typename... Args >
+	static T* alloc(Args... args) {
+		return alloc_array<T>(1, std::forward<Args>(args)...);
+	}
+
+	template < class T, typename... Args >
+	static T* alloc_array(std::size_t n, Args... args) {
+		// Get the memory
 		T* ptr = nullptr;
 		cuda::check_error(cudaMalloc(&ptr, sizeof(T) * n));
 		if(ptr == nullptr)
 			throw BadAllocation<DEVICE>();
+		// Initialize it
+		static_assert(std::is_trivially_copyable<T>::value);
+		T prototype { std::forward<Args>(args)... };
+		for(std::size_t i = 0; i < n; ++i)
+			cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyHostToDevice);
 		return ptr;
 	}
 
+	// Danger: realloc does not handle construction/destruction
 	template < class T >
 	static T* realloc(T* ptr, std::size_t prev, std::size_t next) {
-		T* newPtr = alloc<T>(next);
+		static_assert(std::is_trivially_copyable<T>::value);
+		static_assert(std::is_trivially_constructible<T>::value);
+		static_assert(std::is_trivially_destructible<T>::value);
+		T* newPtr = alloc_array<T>(next);
 		copy(newPtr, ptr, prev);
 		free(ptr, prev);
 		return newPtr;
@@ -78,15 +109,55 @@ public:
 
 	template < class T >
 	static T* free(T* ptr, std::size_t n) {
+		// Call destructors manually, because the memory was allocated raw
+		for(std::size_t i = 0; i < n; ++i)
+			ptr[i].~T();
 		cuda::check_error(cudaFree(ptr));
 		return nullptr;
 	}
 
 	template < class T >
 	static void copy(T* dst, const T* src, std::size_t n) {
+		static_assert(std::is_trivially_copyable<T>::value);
 		cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice);
 	}
 };
+
+
+// Deleter for the above custom allocated memories.
+template < Device dev >
+class Deleter {
+public:
+	Deleter(std::size_t n) : m_n(n) {}
+
+	template < typename T >
+	void operator () (T * p) const {
+		Allocator<dev>::template free<T>(p, m_n);
+	}
+private:
+	std::size_t m_n;
+};
+
+// Helper alias to simplyfy the construction of managed (unique_ptr) memory with the
+// custom allocator.
+template < Device dev, typename T >
+using unique_device_ptr = std::unique_ptr<T, scene::Deleter<dev>>;
+
+template < Device dev, typename T, typename... Args > inline unique_device_ptr<dev,T>
+make_udevptr(Args... args) {
+	return unique_device_ptr<dev,T>(
+		Allocator<dev>::template alloc<T>(std::forward<Args>(args)...),
+		Deleter<dev>(1)
+	);
+}
+
+template < Device dev, typename T, typename... Args > inline unique_device_ptr<dev,T>
+make_udevptr_array(std::size_t n, Args... args) {
+	return unique_device_ptr<dev,T>(
+		Allocator<dev>::template alloc_array<std::remove_pointer_t<std::decay_t<T>>>(n, std::forward<Args>(args)...),
+		Deleter<dev>(n)
+	);
+}
 
 
 } // namespace mufflon::util

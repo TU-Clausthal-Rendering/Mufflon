@@ -26,7 +26,7 @@ void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<De
 		// Still have data, (re)alloc and copy
 		if(sync.numDirLights == 0u || sync.dirLights.handle == nullptr) {
 			mAssert(sync.dirLights.handle == nullptr);
-			sync.dirLights.handle = Allocator<Device::CUDA>::alloc<LightTree::DirNode>(changed.numDirLights);
+			sync.dirLights.handle = Allocator<Device::CUDA>::alloc_array<LightTree::DirNode>(changed.numDirLights);
 		} else {
 			sync.dirLights.handle = Allocator<Device::CUDA>::realloc(sync.dirLights.handle, sync.numDirLights,
 																	 changed.numDirLights);
@@ -44,7 +44,7 @@ void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<De
 		// Still have data, (re)alloc and copy
 		if(sync.numPosLights == 0u || sync.posLights.handle == nullptr) {
 			mAssert(sync.posLights.handle == nullptr);
-			sync.posLights.handle = Allocator<Device::CUDA>::alloc<LightTree::PosNode>(changed.numPosLights);
+			sync.posLights.handle = Allocator<Device::CUDA>::alloc_array<LightTree::PosNode>(changed.numPosLights);
 		} else {
 			sync.posLights.handle = Allocator<Device::CUDA>::realloc(sync.posLights.handle, sync.numPosLights,
 																	 changed.numPosLights);
@@ -74,7 +74,7 @@ void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<D
 		// Still have data, (re)alloc and copy
 		if(sync.numDirLights == 0u || sync.dirLights.handle == nullptr) {
 			mAssert(sync.dirLights.handle == nullptr);
-			sync.dirLights.handle = Allocator<Device::CPU>::alloc<LightTree::DirNode>(changed.numDirLights);
+			sync.dirLights.handle = Allocator<Device::CPU>::alloc_array<LightTree::DirNode>(changed.numDirLights);
 		} else {
 			sync.dirLights.handle = Allocator<Device::CPU>::realloc(sync.dirLights.handle, sync.numDirLights,
 																	 changed.numDirLights);
@@ -92,7 +92,7 @@ void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<D
 		// Still have data, (re)alloc and copy
 		if(sync.numPosLights == 0u || sync.posLights.handle == nullptr) {
 			mAssert(sync.posLights.handle == nullptr);
-			sync.posLights.handle = Allocator<Device::CPU>::alloc<LightTree::PosNode>(changed.numPosLights);
+			sync.posLights.handle = Allocator<Device::CPU>::alloc_array<LightTree::PosNode>(changed.numPosLights);
 		} else {
 			sync.posLights.handle = Allocator<Device::CPU>::realloc(sync.posLights.handle, sync.numPosLights,
 																	 changed.numPosLights);

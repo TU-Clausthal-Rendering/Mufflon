@@ -18,6 +18,7 @@
 
 using namespace mufflon::scene;
 using namespace mufflon::scene::geometry;
+using namespace mufflon::cameras;
 
 class VectorStream : public std::basic_streambuf<char, std::char_traits<char>> {
 public:
@@ -27,6 +28,29 @@ public:
 				   reinterpret_cast<char*>(vec.data() + vec.size()));
 	}
 };
+
+void test_allocator() {
+	std::cout << "Testing custom device allocator." << std::endl;
+
+	unique_device_ptr<Device::CPU, CameraParams> p0 =
+		make_udevptr<Device::CPU, CameraParams>(CameraModel::PINHOLE);
+	mAssert(p0 != nullptr);
+	mAssert(p0->type == CameraModel::PINHOLE);
+
+	unique_device_ptr<Device::CPU, CameraParams[]> p1 =
+		make_udevptr_array<Device::CPU, CameraParams[]>(2, CameraModel::FOCUS);
+	mAssert(p1 != nullptr);
+	mAssert(p1[0].type == CameraModel::FOCUS);
+	mAssert(p1[1].type == CameraModel::FOCUS);
+
+	unique_device_ptr<Device::CUDA, CameraParams> p2 =
+		make_udevptr<Device::CUDA, CameraParams>(CameraModel::PINHOLE);
+	mAssert(p2 != nullptr);
+
+	unique_device_ptr<Device::CUDA, CameraParams> p3 =
+		make_udevptr_array<Device::CUDA, CameraParams>(2, CameraModel::FOCUS);
+	mAssert(p3 != nullptr);
+}
 
 void test_custom_attributes() {
 	std::cout << "Testing custom attributes (on polygon)" << std::endl;
@@ -278,6 +302,7 @@ void test_light() {
 
 
 int main() {
+	test_allocator();
 	test_polygon();
 	test_sphere();
 	test_custom_attributes();
