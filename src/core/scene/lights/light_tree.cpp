@@ -12,12 +12,12 @@ namespace {
 
 // Computes the number of nodes of a balanced tree with elems leaves
 std::size_t get_num_internal_nodes(std::size_t elems) {
-	if(elems == 0u)
+	if(elems <= 1u)
 		return 0u;
 	// Height of a balanced binary tree is log2(N) + 1
-	std::size_t height = static_cast<std::size_t>(std::log2(elems)) + 1u;
+	std::size_t height = static_cast<std::size_t>(std::log2(elems));
 	// Interior nodes are then 2^(height-1) - 1u
-	std::size_t nodes = static_cast<std::size_t>(std::pow(2u, height - 1u)) - 1u;
+	std::size_t nodes = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
 	// Check if our tree is "filled" or if we have extra nodes on the bottom level
 	return nodes + (elems - static_cast<std::size_t>(std::pow(2u, height)));
 }
@@ -100,233 +100,149 @@ ei::Vec3 get_dir_light_intensity(const DirectionalLight& light, const ei::Vec3& 
 	return light.radiance * surface;
 }
 
-auto get_light_type = [](const auto& light) constexpr -> LightType {
-	using Type = std::decay_t<decltype(light)>;
-	static_assert(is_light_type<Type>(), "Not a light!");
+// Gets the lights intensity, independent of type
+template < class LightType >
+ei::Vec3 get_light_intensity(const LightType& light, const ei::Vec3& aabbDiag) {
+	static_assert((is_light_type<LightType>() && !is_envmap_light_type<LightType>())
+				  || std::is_same_v<LightType, PositionalLights>,
+				  "Must be non-envmap light");
 
-	if constexpr(std::is_same_v<Type, PointLight>)
-		return LightType::POINT_LIGHT;
-	else if constexpr(std::is_same_v<Type, SpotLight>)
-		return LightType::SPOT_LIGHT;
-	else if constexpr(std::is_same_v<Type, AreaLightTriangle>)
-		return LightType::AREA_LIGHT_TRIANGLE;
-	else if constexpr(std::is_same_v<Type, AreaLightQuad>)
-		return LightType::AREA_LIGHT_QUAD;
-	else if constexpr(std::is_same_v<Type, AreaLightSphere>)
-		return LightType::AREA_LIGHT_SPHERE;
-	else if constexpr(std::is_same_v<Type, DirectionalLight>)
-		return LightType::DIRECTIONAL_LIGHT;
-	else if constexpr(std::is_same_v<Type, EnvMapLight>)
-		return LightType::ENVMAP_LIGHT;
-};
-
-void create_positional_light_tree(const std::vector<PositionalLights>& posLights,
-								  LightTree::Tree<Device::CPU>::PosLightTree& tree) {
-	using PosNode = LightTree::PosNode;
-	if(posLights.size() == 0u)
-		return;
-
-	// Only one light -> no actual tree, only light
-	// TODO: we still need the type...
-	if(posLights.size() == 1u)
-		return;
-
-	// Correctly set the internal nodes
-	// Start with nodes that form the last (incomplete!) level
-	std::size_t height = static_cast<std::size_t>(std::log2(posLights.size()));
-	mAssert(height > 0u);
-	std::size_t extraNodes = posLights.size() - height;
-	if(extraNodes > 0u) {
-		// Compute starting positions for internal nodes and lights
-		std::size_t startNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
-		std::size_t startLight = posLights.size() - 2u * extraNodes;
-		// "Merge" together two nodes
-		for(std::size_t i = 0u; i < extraNodes; ++i) {
-			mAssert(startLight + 2u * i < posLights.size());
-			const PositionalLights& left = posLights[startLight + 2u * i];
-			const PositionalLights& right = posLights[startLight + 2u * i + 1u];
-			PosNode& interiorNode = tree.nodes[startNode + i];
-
-			interiorNode = PosNode{
-				std::visit(get_pos_light_intensity, left) + std::visit(get_pos_light_intensity, right),
-				PosNode::Child(),
-				(std::visit(get_light_center, left) + std::visit(get_light_center, right)) / 2.f,
-				PosNode::Child()
-			};
-			interiorNode.left.set_type(std::visit(get_light_type, left));
-			interiorNode.right.set_type(std::visit(get_light_type, right));
-		}
-
-		// Also merge together inner nodes for last level!
-		// Two cases: Merge two interior nodes each or (for last one) merge interior with light
-		std::size_t startInnerNode = static_cast<std::size_t>(std::pow(2u, height - 1u)) - 1u;
-		for(std::size_t i = 0u; i < extraNodes / 2u; ++i) {
-			const PosNode& left = tree.nodes[startNode + 2u * i];
-			const PosNode& right = tree.nodes[startNode + 2u * i + 1u];
-			PosNode& node = tree.nodes[startInnerNode + i];
-
-			node =  PosNode{
-				left.intensity + right.intensity,
-				PosNode::Child(),
-				(left.position + right.position) / 2.f,
-				PosNode::Child()
-			};
-			node.left.set_index(0u);
-			node.right.set_index(0u);
-		}
-		if(extraNodes % 2 != 0u) {
-			// One interior leftover; must be very first light
-			const PosNode& left = tree.nodes[startNode + (extraNodes + 1u) / 2u];
-			const PositionalLights& right = posLights.front();
-			PosNode& node = tree.nodes[startInnerNode + extraNodes / 2u];
-
-			node = PosNode{
-				left.intensity + std::visit(get_pos_light_intensity, right),
-				PosNode::Child(),
-				(left.position + std::visit(get_light_center, right)) / 2.f,
-				PosNode::Child()
-			};
-			node.left.set_index(0u);
-			node.right.set_type(std::visit(get_light_type, right));
-		}
-	}
-
-	// Now the nodes from the next higher (incomplete) level
-	// Take into account that up to one light has been marged already at the beginning
-	std::size_t startLight = (extraNodes % 2 == 0u) ? 0u : 1u;
-	std::size_t nodeCount = (posLights.size() - 2u * extraNodes - startLight) / 2u;
-	// Start node for completely filled tree, but we may need an offset
-	std::size_t lightStartNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u + extraNodes;
-	for(std::size_t i = 0u; i < nodeCount; ++i) {
-		const PositionalLights& left = posLights[2u * i + startLight];
-		const PositionalLights& right = posLights[2u * i + startLight + 1u];
-		PosNode& node = tree.nodes[lightStartNode + i];
-
-		node = PosNode{
-				std::visit(get_pos_light_intensity, left) + std::visit(get_pos_light_intensity, right),
-				PosNode::Child(),
-				(std::visit(get_light_center, left) + std::visit(get_light_center, right)) / 2.f,
-				PosNode::Child()
-		};
-		node.left.set_type(std::visit(get_light_type, left));
-		node.right.set_type(std::visit(get_light_type, right));
-	}
-
-	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
-	height -= 1u;
-	for(std::size_t level = height; level >= 1u; --level) {
-		std::size_t nodes = static_cast<std::size_t>(std::pow(2u, level));
-		std::size_t innerNode = static_cast<std::size_t>(std::pow(2u, level - 1u)) - 1u;
-		// Accumulate for higher-up node
-		for(std::size_t i = 0u; i < nodes / 2u; ++i) {
-			const PosNode& left = tree.nodes[nodes - 1u + 2 * i];
-			const PosNode& right = tree.nodes[nodes - 1u + 2 * i + 1u];
-			PosNode& node = tree.nodes[innerNode + i];
-
-			node = PosNode{
-				left.intensity + right.intensity,
-				PosNode::Child(),
-				(left.position + right.position) / 2.f,
-				PosNode::Child()
-			};
-			node.left.set_index(0u);
-			node.right.set_index(0u);
-			// TODO: do we even need index?
-		}
-	}
+	if constexpr(std::is_same_v<LightType, DirectionalLight>)
+		return get_dir_light_intensity(light, aabbDiag);
+	else
+		return std::visit(get_pos_light_intensity, light);
 }
 
-void create_directional_light_tree(const std::vector<DirectionalLight>& dirLights,
-								   LightTree::Tree<Device::CPU>::DirLightTree& tree,
-								   const ei::Vec3& aabbDiag) {
-	using DirNode = LightTree::DirNode;
-	if(dirLights.size() == 0u)
+// Computes the cluster centers for the light tree for directional lights/nodes
+template < class DirLeft, class DirRight >
+inline ei::Vec3 compute_cluster_center(const DirLeft& left, const DirRight& right) {
+	return (left.direction + right.direction) / 2.f;
+}
+// Cluster centers for positional lights/nodes need some more finesse
+inline ei::Vec3 compute_cluster_center(const LightTree::PosNode& left, const LightTree::PosNode& right) {
+	return (left.position + right.position) / 2.f;
+}
+inline ei::Vec3 compute_cluster_center(const LightTree::PosNode& left, const PositionalLights& right) {
+	return (left.position + std::visit(get_light_center, right)) / 2.f;
+}
+inline ei::Vec3 compute_cluster_center(const PositionalLights& left, const LightTree::PosNode& right) {
+	return (std::visit(get_light_center, left) + right.position) / 2.f;
+}
+inline ei::Vec3 compute_cluster_center(const PositionalLights& left, const PositionalLights& right) {
+	return (std::visit(get_light_center, left) + std::visit(get_light_center, right)) / 2.f;
+}
+
+// Returns the intensity depending on its type (light or node)
+template < class T >
+inline ei::Vec3 get_cluster_intensity(const T& cluster, const ei::Vec3& aabbDiag) {
+	if constexpr(is_light_type<T>() || std::is_same_v<T, PositionalLights>)
+		return get_light_intensity(cluster, aabbDiag);
+	else
+		return cluster.intensity;
+}
+
+// Computes the light intensities
+template < class ClusterLeft, class ClusterRight >
+inline ei::Vec3 compute_cluster_intensity(const ClusterLeft& left, const ClusterRight& right,
+										  const ei::Vec3& aabbDiag) {
+	return get_cluster_intensity(left, aabbDiag) + get_cluster_intensity(right, aabbDiag);
+}
+
+template < class NodeType, class LightType, class TreeType >
+void create_light_tree(const std::vector<LightType>& lights, TreeType& tree,
+					   const ei::Vec3& aabbDiag) {
+	if(lights.size() == 0u)
 		return;
 
 	// Only one light -> no actual tree, only light
 	// TODO: we still need the type...
-	if(dirLights.size() == 1u)
+	if(lights.size() == 1u)
 		return;
 
 	// Correctly set the internal nodes
 	// Start with nodes that form the last (incomplete!) level
-	std::size_t height = static_cast<std::size_t>(std::log2(dirLights.size()));
+	std::size_t height = static_cast<std::size_t>(std::log2(lights.size()));
 	mAssert(height > 0u);
-	std::size_t extraNodes = dirLights.size() - height;
+	std::size_t extraNodes = lights.size() - static_cast<std::size_t>(std::pow(2u, height));
 	if(extraNodes > 0u) {
 		// Compute starting positions for internal nodes and lights
 		std::size_t startNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
-		std::size_t startLight = dirLights.size() - 2u * extraNodes;
+		std::size_t startLight = lights.size() - 2u * extraNodes;
 		// "Merge" together two nodes
 		for(std::size_t i = 0u; i < extraNodes; ++i) {
-			mAssert(startLight + 2u * i < dirLights.size());
-			const DirectionalLight& left = dirLights[startLight + 2u * i];
-			const DirectionalLight& right = dirLights[startLight + 2u * i + 1u];
-			DirNode& interiorNode = tree.nodes[startNode + i];
+			mAssert(startLight + 2u * i + 1u < lights.size());
+			mAssert(startNode + i < get_num_internal_nodes(lights.size()));
+			const LightType& left = lights[startLight + 2u * i];
+			const LightType& right = lights[startLight + 2u * i + 1u];
+			NodeType& interiorNode = tree.nodes[startNode + i];
 
-			interiorNode = DirNode{
-				get_dir_light_intensity(left, aabbDiag) + get_dir_light_intensity(right, aabbDiag),
-				DirNode::Child(),
-				(left.direction + right.direction) / 2.f,
-				DirNode::Child()
+			interiorNode = NodeType{
+				compute_cluster_intensity(left, right, aabbDiag),
+				LightTree::Child(),
+				compute_cluster_center(left, right),
+				LightTree::Child()
 			};
-			interiorNode.left.make_leaf();
-			interiorNode.right.make_leaf();
+			interiorNode.left.set_type(get_light_type(left));
+			interiorNode.right.set_type(get_light_type(right));
 		}
 
 		// Also merge together inner nodes for last level!
 		// Two cases: Merge two interior nodes each or (for last one) merge interior with light
 		std::size_t startInnerNode = static_cast<std::size_t>(std::pow(2u, height - 1u)) - 1u;
 		for(std::size_t i = 0u; i < extraNodes / 2u; ++i) {
-			const DirNode& left = tree.nodes[startNode + 2u * i];
-			const DirNode& right = tree.nodes[startNode + 2u * i + 1u];
-			DirNode& node = tree.nodes[startInnerNode + i];
+			mAssert(startNode + 2u*i + 1u < get_num_internal_nodes(lights.size()));
+			const NodeType& left = tree.nodes[startNode + 2u * i];
+			const NodeType& right = tree.nodes[startNode + 2u * i + 1u];
+			NodeType& node = tree.nodes[startInnerNode + i];
 
-			node = DirNode{
-				left.intensity + right.intensity,
-				DirNode::Child(),
-				(left.direction + right.direction) / 2.f,
-				DirNode::Child()
+			node =  NodeType{
+				compute_cluster_intensity(left, right, aabbDiag),
+				LightTree::Child(),
+				compute_cluster_center(left, right),
+				LightTree::Child()
 			};
 			node.left.set_index(0u);
 			node.right.set_index(0u);
 		}
 		if(extraNodes % 2 != 0u) {
 			// One interior leftover; must be very first light
-			const DirNode& left = tree.nodes[startNode + (extraNodes + 1u) / 2u];
-			const DirectionalLight& right = dirLights.front();
-			DirNode& node = tree.nodes[startInnerNode + extraNodes / 2u];
+			mAssert(startNode + extraNodes - 1u < get_num_internal_nodes(lights.size()));
+			const NodeType& left = tree.nodes[startNode + extraNodes - 1u];
+			const LightType& right = lights.front();
+			NodeType& node = tree.nodes[startInnerNode + extraNodes / 2u];
 
-			node = DirNode{
-				left.intensity + get_dir_light_intensity(right, aabbDiag),
-				DirNode::Child(),
-				(left.direction + right.direction) / 2.f,
-				DirNode::Child()
+			node = NodeType{
+				compute_cluster_intensity(left, right, aabbDiag),
+				LightTree::Child(),
+				compute_cluster_center(left, right),
+				LightTree::Child()
 			};
 			node.left.set_index(0u);
-			node.right.make_leaf();
+			node.right.set_type(get_light_type(right));
 		}
 	}
 
 	// Now the nodes from the next higher (incomplete) level
 	// Take into account that up to one light has been marged already at the beginning
 	std::size_t startLight = (extraNodes % 2 == 0u) ? 0u : 1u;
-	std::size_t nodeCount = (dirLights.size() - 2u * extraNodes - startLight) / 2u;
+	std::size_t nodeCount = (lights.size() - 2u * extraNodes - startLight) / 2u;
 	// Start node for completely filled tree, but we may need an offset
 	std::size_t lightStartNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u + extraNodes;
 	for(std::size_t i = 0u; i < nodeCount; ++i) {
-		const DirectionalLight& left = dirLights[2u * i + startLight];
-		const DirectionalLight& right = dirLights[2u * i + startLight + 1u];
-		DirNode& node = tree.nodes[lightStartNode + i];
+		mAssert(2u * i + startLight + 1u < lights.size());
+		mAssert(lightStartNode + i < get_num_internal_nodes(lights.size()));
+		const LightType& left = lights[2u * i + startLight];
+		const LightType& right = lights[2u * i + startLight + 1u];
+		NodeType& node = tree.nodes[lightStartNode + i];
 
-		node = DirNode{
-				get_dir_light_intensity(left, aabbDiag) + get_dir_light_intensity(right, aabbDiag),
-				DirNode::Child(),
-				(left.direction + right.direction) / 2.f,
-				DirNode::Child()
+		node = NodeType{
+				compute_cluster_intensity(left, right, aabbDiag),
+				LightTree::Child(),
+				compute_cluster_center(left, right),
+				LightTree::Child()
 		};
-		node.left.make_leaf();
-		node.right.make_leaf();
+		node.left.set_type(get_light_type(left));
+		node.right.set_type(get_light_type(right));
 	}
 
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
@@ -336,15 +252,17 @@ void create_directional_light_tree(const std::vector<DirectionalLight>& dirLight
 		std::size_t innerNode = static_cast<std::size_t>(std::pow(2u, level - 1u)) - 1u;
 		// Accumulate for higher-up node
 		for(std::size_t i = 0u; i < nodes / 2u; ++i) {
-			const DirNode& left = tree.nodes[nodes - 1u + 2 * i];
-			const DirNode& right = tree.nodes[nodes - 1u + 2 * i + 1u];
-			DirNode& node = tree.nodes[innerNode + i];
+			mAssert(innerNode + i < get_num_internal_nodes(lights.size()));
+			mAssert(nodes + 2u * i < get_num_internal_nodes(lights.size()));
+			const NodeType& left = tree.nodes[nodes - 1u + 2u * i];
+			const NodeType& right = tree.nodes[nodes - 1u + 2u * i + 1u];
+			NodeType& node = tree.nodes[innerNode + i];
 
-			node = DirNode{
-				left.intensity + right.intensity,
-				DirNode::Child(),
-				(left.direction + right.direction) / 2.f,
-				DirNode::Child()
+			node = NodeType{
+				compute_cluster_intensity(left, right, aabbDiag),
+				LightTree::Child(),
+				compute_cluster_center(left, right),
+				LightTree::Child()
 			};
 			node.left.set_index(0u);
 			node.right.set_index(0u);
@@ -401,6 +319,13 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 		// TODO: accumulate flux
 	}
 
+	if(posLights.size() == 0u && dirLights.size() == 0u) {
+		// Shortcut if no lights are specified
+		tree.dirLights.lightCount = 0u;
+		tree.posLights.lightCount = 0u;
+		return;
+	}
+
 	// Create our spatial sorting to get a good tree
 	// TODO: sort the directional lights by direction
 	ei::Vec3 scale = boundingBox.max - boundingBox.min;
@@ -422,14 +347,14 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 	// Allocate enough space to fit all lights - this assumes that the tree will be balanced!
 	// Node memory is easy since fixed size
 	std::size_t dirNodes = get_num_internal_nodes(dirLights.size());
-	std::size_t posNodes = get_num_internal_nodes(posLights.size());
+	std::size_t NodeTypes = get_num_internal_nodes(posLights.size());
 	// For light memory we need to iterate the positional lights
 	std::size_t dirLightSize = sizeof(DirectionalLight) * dirLights.size();
 	std::size_t posLightSize = 0u;
 	for(const auto& light : posLights)
 		posLightSize += std::visit([](const auto& posLight) { return sizeof(posLight); }, light);
 
-	tree.length = sizeof(DirNode) * dirNodes + sizeof(PosNode) * posNodes
+	tree.length = sizeof(DirNode) * dirNodes + sizeof(PosNode) * NodeTypes
 		+ dirLightSize + posLightSize;
 	tree.memory.handle = Allocator<Device::CPU>::alloc_array<char>(tree.length);
 	// Set up the node pointers
@@ -438,7 +363,7 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 	tree.posLights.nodes = reinterpret_cast<PosNode*>(&tree.memory.handle[sizeof(DirNode) * dirNodes
 																		  + dirLightSize]);
 	tree.posLights.lights = &tree.memory.handle[sizeof(DirNode) * dirNodes + dirLightSize
-												+ sizeof(PosNode) * posNodes];
+												+ sizeof(PosNode) * NodeTypes];
 
 	// Copy the lights into the tree
 	// TODO: how to place this best into memory?
@@ -458,13 +383,13 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 	}
 
 	// Now we gotta construct the proper nodes by recursively merging them together
-	create_directional_light_tree(dirLights, tree.dirLights, scale);
-	create_positional_light_tree(posLights, tree.posLights);
+	create_light_tree<DirNode>(dirLights, tree.dirLights, scale);
+	create_light_tree<PosNode>(posLights, tree.posLights, scale);
 
 	// Special casing for singular lights
 	if(posLights.size() == 1u) {
 		// It's kind of ugly having to keep this around, but hey...
-		tree.singlePosLightType = std::visit(get_light_type, posLights.front());
+		tree.singlePosLightType = get_light_type(posLights.front());
 	}
 }
 

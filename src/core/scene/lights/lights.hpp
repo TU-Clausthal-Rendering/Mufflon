@@ -134,4 +134,38 @@ inline constexpr bool is_light_type() {
 		|| std::is_same_v<T, DirectionalLight>;
 }
 
+// Gets the light type as an enum value
+template < class LT >
+LightType get_light_type(const LT& light) {
+	static_assert(is_light_type<LT>() || std::is_same_v<LT, PositionalLights>,
+				  "Must be light");
+
+	auto posLightType = [](const auto& posLight) constexpr -> LightType {
+		using Type = std::decay_t<decltype(posLight)>;
+		if constexpr(std::is_same_v<Type, PointLight>)
+			return LightType::POINT_LIGHT;
+		else if constexpr(std::is_same_v<Type, SpotLight>)
+			return LightType::SPOT_LIGHT;
+		else if constexpr(std::is_same_v<Type, AreaLightTriangle>)
+			return LightType::AREA_LIGHT_TRIANGLE;
+		else if constexpr(std::is_same_v<Type, AreaLightQuad>)
+			return LightType::AREA_LIGHT_QUAD;
+		else if constexpr(std::is_same_v<Type, AreaLightSphere>)
+			return LightType::AREA_LIGHT_SPHERE;
+		else
+			return LightType::NUM_LIGHTS;
+	};
+
+	if constexpr(std::is_same_v<LT, PositionalLights>)
+		return std::visit(posLightType, light);
+	else if constexpr(is_positional_light_type<LT>())
+		return posLightType(light);
+	else if constexpr(is_envmap_light_type<LT>())
+		return LightType::ENVMAP_LIGHT;
+	else if constexpr(std::is_same_v<LT, DirectionalLight>)
+		return LightType::DIRECTIONAL_LIGHT;
+	else
+		return LightType::NUM_LIGHTS;
+}
+
 }}} // namespace mufflon::scene::lights

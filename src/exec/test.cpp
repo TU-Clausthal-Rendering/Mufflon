@@ -37,9 +37,13 @@ void test_lighttree() {
 	LightTree tree;
 
 	std::vector<PositionalLights> posLights{
-		PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 1, 1} },
-		PointLight{ ei::Vec3{0, 5, 0}, ei::Vec3{1, 1, 1} },
-		PointLight{ ei::Vec3{6, 0, 0}, ei::Vec3{1, 1, 1} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{6, 0, 0} },
+		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 5, 0} },
 	};
 	std::vector<DirectionalLight> dirLights;
 
