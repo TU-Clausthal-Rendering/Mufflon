@@ -312,6 +312,9 @@
     <ClInclude Include="..\..\src\core\memory\generic_resource.hpp">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\conversions.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">

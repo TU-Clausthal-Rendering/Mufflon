@@ -1,5 +1,6 @@
 #include "cputexture.hpp"
 #include "core/memory/dyntype_memory.hpp"
+#include <ei/conversions.hpp>
 
 using namespace ei;
 
@@ -118,8 +119,7 @@ Vec4 CpuTexture::fetch_RGBA32F(int texelIdx) const {
 Vec4 CpuTexture::fetch_RGB9E5(int texelIdx) const
 {
 	u32 data = as<u32>(m_imageData.data())[texelIdx];
-	float e = pow(2.0f, (data>>27) - 15.0f - 9.0f);
-	return {(data & 0x1ff) * e, ((data>>9) & 0x1ff) * e, ((data>>18) & 0x1ff) * e, 1.0f};
+	return {unpackRGB9E5(data), 1.0f};
 }
 
 
@@ -184,7 +184,7 @@ void CpuTexture::write_RGBA32F(int texelIdx, const Vec4& value) {
 }
 
 void CpuTexture::write_RGB9E5(int texelIdx, const Vec4& value) {
-	mAssert(false); // NOT IMPLEMENTED YET
+	as<u32>(m_imageData.data())[texelIdx] = ei::packRGB9E5(Vec3{value});
 }
 
 

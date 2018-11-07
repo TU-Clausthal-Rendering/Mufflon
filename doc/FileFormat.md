@@ -330,7 +330,7 @@ Objects which are not instanced explicitly will have one instance with the ident
 Normal Compression
 --
 Additional to the global DEFLATE compression normals have a custom discretization if `COMPRESSED_NORMALS` is set.
-For compression/decompression the follwing codes is used:
+For compression/decompression the following codes is used:
 
     # map a direction from the sphere to u,v
     packNormal32(vec3 dir) -> (u32 uv)
@@ -342,8 +342,8 @@ For compression/decompression the follwing codes is used:
             u = (1 - dir.y / l1norm) * (dir.x >= 0 ? 1 : -1)
             v = (1 - dir.x / l1norm) * (dir.y >= 0 ? 1 : -1)
         end
-        u = round((u / 2 + 0.5) * (2^16-1))   # from [-1,1] to [0,2^16-1]
-        v = round((v / 2 + 0.5) * (2^16-1))   # from [-1,1] to [0,2^16-1]
+        u = floor((u / 2 + 0.5) * 65535.49 + 0.5)   # from [-1,1] to [0,2^16-1]
+        v = floor((v / 2 + 0.5) * 65535.49 + 0.5)   # from [-1,1] to [0,2^16-1]
         return u | (v << 16)
     end
 

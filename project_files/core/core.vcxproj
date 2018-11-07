@@ -48,6 +48,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\3dtypes.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\configure.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\conversions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\defaultconfig.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\elementarytypes.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
