@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lights.hpp"
+#include "light_sampling.hpp"
 #include "export/dll_export.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
@@ -79,7 +80,6 @@ public:
 			 const ei::Vec3& aabbDiag);
 
 		// Layout: [4,4,2]=10, [2,4,4]=10, [4,4,4]=12 bytes
-
 		// Necessary duplication due to memory layout (2x32+16 and 16+2x32 bits)
 		struct {
 			__device__ __host__ void set_offset(std::size_t off) noexcept {
@@ -166,77 +166,8 @@ void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<D
 void unload(LightTree::Tree<Device::CPU>& tree);
 void unload(LightTree::Tree<Device::CUDA>& tree);
 
-// TODO: proper type
-struct Photon {
-	ei::Vec3 position;
-	AreaPdf posPdf;
-	ei::Vec3 direction;
-	AngularPdf dirPdf;
-};
-
-struct NextEventEstimation {
-	ei::Vec3 position;
-	AreaPdf posPdf;
-	ei::Vec3 intensity;
-	AngularPdf dirPdf;
-};
-
 // TODO: extract
 namespace lighttree_detail {
-
-// TODO
-// Sample a light source for either one or many photons
-__host__ __device__ inline Photon sample_light(const PointLight& light,
-											   float r0, float r1) {
-	return {};
-}
-__host__ __device__ inline Photon sample_light(const SpotLight& light,
-											   float r0, float r1) {
-	return {};
-}
-__host__ __device__ inline Photon sample_light(const AreaLightTriangle& light,
-											   float r0, float r1) {
-	return {};
-}
-__host__ __device__ inline Photon sample_light(const AreaLightQuad& light,
-											   float r0, float r1) {
-	return {};
-}
-__host__ __device__ inline Photon sample_light(const AreaLightSphere& light,
-											   float r0, float r1) {
-	return {};
-}
-__host__ __device__ inline Photon sample_light(const DirectionalLight& light,
-											   float r0, float r1) {
-	return {};
-}
-template < Device dev >
-__host__ __device__ inline Photon sample_light(const EnvMapLight<dev>& light,
-											   float r0, float r1) {
-	return {};
-}
-__host__ __device__ inline void sample_light(const PointLight& light,
-											 Photon* photons, std::size_t n,
-											 const float* photonRng) {}
-__host__ __device__ inline void sample_light(const SpotLight& light,
-											 Photon* photons, std::size_t n,
-											 const float* photonRng) {}
-__host__ __device__ inline void sample_light(const AreaLightTriangle& light,
-											 Photon* photons, std::size_t n,
-											 const float* photonRng) {}
-__host__ __device__ inline void sample_light(const AreaLightQuad& light,
-											 Photon* photons, std::size_t n,
-											 const float* photonRng) {}
-__host__ __device__ inline void sample_light(const AreaLightSphere& light,
-											 Photon* photons, std::size_t n,
-											 const float* photonRng) {}
-__host__ __device__ inline void sample_light(const DirectionalLight& light,
-											 Photon* photons, std::size_t n,
-											 const float* photonRng) {}
-template < Device dev >
-__host__ __device__ inline void sample_light(const EnvMapLight<dev>& light,
-											   Photon* photons, std::size_t n,
-											 const float* photonRng) {}
 
 // Converts the typeless memory into the given light type and samples it
 __host__ __device__ Photon sample_light(LightType type, const char* light,
@@ -250,25 +181,6 @@ __host__ __device__ Photon sample_light(LightType type, const char* light,
 		case LightType::AREA_LIGHT_SPHERE: return sample_light(*reinterpret_cast<const AreaLightSphere*>(light), r0, r1);
 		case LightType::DIRECTIONAL_LIGHT: return sample_light(*reinterpret_cast<const DirectionalLight*>(light), r0, r1);
 		default: mAssert(false); return {};
-	}
-}
-__host__ __device__ void sample_light(LightType type, const char* light, Photon* photons, std::size_t n,
-									  const float* photonRng) {
-	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
-	switch(type) {
-		case LightType::POINT_LIGHT: sample_light(*reinterpret_cast<const PointLight*>(light),
-												  photons, n, photonRng);
-		case LightType::SPOT_LIGHT: sample_light(*reinterpret_cast<const SpotLight*>(light),
-												 photons, n, photonRng);;
-		case LightType::AREA_LIGHT_TRIANGLE: sample_light(*reinterpret_cast<const AreaLightTriangle*>(light),
-														  photons, n, photonRng);
-		case LightType::AREA_LIGHT_QUAD: sample_light(*reinterpret_cast<const AreaLightQuad*>(light),
-													  photons, n, photonRng);
-		case LightType::AREA_LIGHT_SPHERE: sample_light(*reinterpret_cast<const AreaLightSphere*>(light),
-														photons, n, photonRng);
-		case LightType::DIRECTIONAL_LIGHT: sample_light(*reinterpret_cast<const DirectionalLight*>(light),
-														photons, n, photonRng);
-		default: mAssert(false);
 	}
 }
 
@@ -335,15 +247,46 @@ __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, 
 	return lighttree_detail::sample_light(static_cast<LightType>(type),
 										  &tree.lights[offset], r0, r1);
 }
-/**
- * Shared code for emitting multiple photons from the tree.
- * Takes the light tree, photon buffer, number of photons,
- * initial interval limits, and RNG number as inputs.
- */
-__host__ __device__ void emit(const LightTree::LightTypeTree& tree, Photon* photons,
-							  std::size_t n, u64 left, u64 right, u64 rng,
-							  const float* photonRng) {
-	// TODO: traverse tree
+
+__host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, u64 right,
+								u64 index, u64 rng, float r0, float r1) {
+	// Check: do we have more than one light here?
+	if(tree.lightCount == 1u) {
+		// Nothing to do but sample the photon
+		mAssert(tree.root.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		return lighttree_detail::sample_light(static_cast<LightType>(tree.root.type),
+											  &tree.lights[0u], r0, r1);
+	}
+
+	// Traverse the tree to split chance between lights
+	const LightTree::Node* currentNode = tree.nodes;
+	u16 type = LightTree::Node::INVALID_TYPE;
+	u32 offset = 0u;
+	/**
+	 * Initial interval
+	 * Top level [0, leftFlux0*MAX_INT, MAX_INT]
+	 * Next: left [0, leftFlux1l*leftFlux0*MAX_INT, leftFlux0*MAX_INT]
+	 *		 right [leftFlux0*MAX_INT, leftFlux1r*leftFlux0*MAX_INT, MAX_INT]
+	 * And so on...
+	 */
+	u64 intervalLeft = left;
+	u64 intervalRight = right;
+
+	// Iterate until we hit a leaf
+	while(type == LightTree::Node::INVALID_TYPE) {
+		mAssert(currentNode != nullptr);
+		mAssert(intervalLeft <= intervalRight);
+		mAssert(rng >= intervalLeft && rng <= intervalRight);
+		// Scale the flux up
+		float fluxSum = currentNode->left.flux + currentNode->right.flux;
+		// TODO
+		
+	}
+
+	mAssert(type != LightTree::Node::INVALID_TYPE);
+	// We got a light source! Sample it
+	return lighttree_detail::sample_light(static_cast<LightType>(type),
+										  &tree.lights[offset], r0, r1);
 }
 
  // Emits a single photon from a light source.
@@ -364,7 +307,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng, float
 	if(tree.envLight.texHandle.handle != nullptr)
 		splitEnv = static_cast<u64>(intervalRight * ei::sum(tree.envLight.flux) / fluxSum);
 	if(rng < splitEnv)
-		return lighttree_detail::sample_light(tree.envLight, r0, r1);
+		return sample_light(tree.envLight, r0, r1);
 	// ...then come directional lights...
 	u64 splitDir = splitEnv + static_cast<u64>(intervalRight * tree.dirLights.root.flux / fluxSum);
 	if(rng < splitDir) {
@@ -375,56 +318,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng, float
 	mAssert(tree.posLights.lightCount > 0u);
 	return emit(tree.posLights, splitDir, intervalRight, rng, r0, r1);
 }
-//  Emits a number of photons from the light tree.
-template < Device dev >
-__host__ __device__ void emit(const LightTree::Tree<dev>& tree, Photon* photons,
-							  std::size_t n, u64 rng, const float* photonRng) {
-	// TODO: Device-agnostic type for photon buffer!
-	mAssert(photons != nullptr);
 
-	// Figure out how to split the n photons onto the top-level light types
-	// Implicit left boundary of 0 for the interval
-	u64 intervalRight = std::numeric_limits<u64>::max();
-
-	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
-	// TODO: way to check handle's validity!
-	if(tree.envLight.texHandle.handle != nullptr)
-		fluxSum += ei::sum(tree.envLight.flux);
-
-	// Now split up based on flux
-	// First is envmap...
-	u64 splitEnv = splitEnv = static_cast<u64>(intervalRight * ei::sum(tree.envLight.flux) / fluxSum);
-	u64 envPhotons = static_cast<std::size_t>(n * ei::sum(tree.envLight.flux) / fluxSum);
-	// ...then come directional lights...
-	u64 splitDir = splitEnv + static_cast<u64>(intervalRight * tree.dirLights.root.flux / fluxSum);
-	u64 dirPhotons = static_cast<std::size_t>(n * tree.dirLights.root.flux / fluxSum);
-	// ...and last positional lights
-	u64 posPhotons = static_cast<std::size_t>(n * tree.posLights.root.flux / fluxSum);
-
-	// Now find out where to put the (up to 1) extra photon
-	if(envPhotons + dirPhotons + posPhotons < n) {
-		mAssert(n - (envPhotons + dirPhotons + posPhotons) <= 1u);
-		if(rng < splitEnv)
-			++envPhotons;
-		else if(rng < splitDir)
-			++dirPhotons;
-		else
-			++posPhotons;
-	}
-
-	// Sample the photons from the respective light sources
-	if(envPhotons > 0u && tree.envLight.texHandle.handle != nullptr)
-		lighttree_detail::sample_light(tree.envLight, photons, envPhotons, photonRng);
-	if(dirPhotons > 0u) {
-		mAssert(tree.dirLights.lightCount > 0u);
-		emit(tree.dirLights, &photons[envPhotons], dirPhotons, splitEnv, splitDir,
-			 rng, &photonRng[envPhotons]);
-	}
-	if(posPhotons > 0u) {
-		mAssert(tree.posLights.lightCount > 0u);
-		emit(tree.posLights, &photons[envPhotons + dirPhotons], posPhotons, splitDir,
-			 intervalRight, rng, &photonRng[envPhotons + dirPhotons]);
-	}
-}
+// TODO: code path for RNG + index
 
 }}} // namespace mufflon::scene::lights
