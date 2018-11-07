@@ -5,6 +5,8 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <random>
+#include <chrono>
 
 #include <cuda_runtime.h>
 #include "core/scene/geometry/polygon.hpp"
@@ -36,18 +38,48 @@ void test_lighttree() {
 	using namespace lights;
 	LightTree tree;
 
-	std::vector<PositionalLights> posLights{
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 0, 0} },
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{6, 0, 0} },
-		PointLight{ ei::Vec3{1, 1, 1}, ei::Vec3{0, 5, 0} },
-	};
-	std::vector<DirectionalLight> dirLights;
+	{
+		std::vector<PositionalLights> posLights{
+			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
+			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
+			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
+			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
+			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
+			PointLight{ ei::Vec3{6, 0, 0}, ei::Vec3{1, 0, 0} },
+			PointLight{ ei::Vec3{0, 5, 0}, ei::Vec3{1, 0, 0} },
+		};
+		std::vector<DirectionalLight> dirLights;
 
-	tree.build(std::move(posLights), std::move(dirLights), ei::Box(ei::Vec3(0, 0, 0), ei::Vec3(6, 5, 0)));
+		tree.build(std::move(posLights), std::move(dirLights), ei::Box(ei::Vec3(0, 0, 0), ei::Vec3(6, 5, 0)));
+	}
+	using namespace std::chrono;
+
+	std::mt19937_64 rng(std::random_device{}());
+	std::uniform_int_distribution<std::uint64_t> intDist;
+	std::uniform_real_distribution<float> floatDist;
+	auto& lightTree = tree.aquire_tree<Device::CPU>();
+
+	auto t0 = high_resolution_clock::now();
+	Photon p = emit(lightTree, intDist(rng), floatDist(rng), floatDist(rng));
+	std::cout << "Single photon: " << p.direction[0] << ", "
+		<< duration_cast<milliseconds>(high_resolution_clock::now() - t0).count()
+		<< "ms" << std::endl;
+
+	std::vector<Photon> photons(500000u);
+	std::vector<float> photonRng(2u*500000u);
+	for(float& r : photonRng)
+		r = floatDist(rng);
+
+	t0 = high_resolution_clock::now();
+	emit(lightTree, photons.data(), photons.size(), intDist(rng), photonRng.data());
+	auto t1 = high_resolution_clock::now();
+	ei::Vec3 directions{};
+	for(const auto& p : photons) {
+		directions += p.direction;
+	}
+	std::cout << photons.size() << " photons: " << directions[0] << ", "
+		<< duration_cast<milliseconds>(t1 - t0).count()
+		<< "ms" << std::endl;
 }
 
 void test_allocator() {

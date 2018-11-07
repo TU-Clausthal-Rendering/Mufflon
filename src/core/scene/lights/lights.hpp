@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ei/vector.hpp"
+#include "ei/3dtypes.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
@@ -9,7 +10,7 @@
 
 namespace mufflon { namespace scene { namespace lights {
 
-enum class LightType : u32 {
+enum class LightType : u16 {
 	POINT_LIGHT,
 	SPOT_LIGHT,
 	AREA_LIGHT_TRIANGLE,
@@ -136,7 +137,7 @@ inline constexpr bool is_light_type() {
 
 // Gets the light type as an enum value
 template < class LT >
-LightType get_light_type(const LT& light) {
+inline LightType get_light_type(const LT& light) {
 	static_assert(is_light_type<LT>() || std::is_same_v<LT, PositionalLights>,
 				  "Must be light");
 
@@ -167,5 +168,60 @@ LightType get_light_type(const LT& light) {
 	else
 		return LightType::NUM_LIGHTS;
 }
+
+// Converts the light's inert radiometric property into flux
+// These are not in a CPP file because their small size makes them
+// prime targets for inlining
+inline ei::Vec3 get_flux(const PointLight& light) {
+	return light.intensity * 4.f * ei::PI;
+}
+inline ei::Vec3 get_flux(const SpotLight& light) {
+	// TODO
+	return light.intensity;
+}
+inline ei::Vec3 get_flux(const AreaLightTriangle& light) {
+	return light.radiance * ei::surface(ei::Triangle{
+		light.points[0u], light.points[1u], light.points[2u]
+										});
+}
+inline ei::Vec3 get_flux(const AreaLightQuad& light) {
+	return light.radiance * ei::surface(ei::Tetrahedron{
+		light.points[0u], light.points[1u], light.points[2u], light.points[3u]
+										});
+}
+inline ei::Vec3 get_flux(const AreaLightSphere& light) {
+	return light.radiance * ei::surface(ei::Sphere{ light.position, light.radius });
+}
+
+inline ei::Vec3 get_flux(const PositionalLights& light) {
+	return std::visit([](const auto& posLight) {
+		return get_flux(posLight);
+	}, light);
+}
+
+template < class LT >
+inline ei::Vec3 get_flux(const LT& light, const ei::Vec3& aabbDiag) {
+
+	if constexpr(std::is_same_v<LT, PositionalLights>)
+		return std::visit([](const auto& posLight) {
+			return get_flux(posLight);
+		}, light);
+	else if constexpr(is_envmap_light_type<LT>())
+		return light.flux;
+	else if constexpr(std::is_same_v<LT, DirectionalLight>)
+		return get_flux(light, aabbDiag);
+	else
+		return get_flux(light);
+}
+template <>
+inline ei::Vec3 get_flux<DirectionalLight>(const DirectionalLight& light,
+										   const ei::Vec3& aabbDiag) {
+	mAssert(aabbDiag.x > 0 && aabbDiag.y > 0 && aabbDiag.z > 0);
+	float surface = aabbDiag.y*aabbDiag.z*light.direction.x
+		+ aabbDiag.x*aabbDiag.z*light.direction.y
+		+ aabbDiag.x*aabbDiag.y*light.direction.z;
+	return light.radiance * surface;
+}
+
 
 }}} // namespace mufflon::scene::lights

@@ -45,6 +45,7 @@ struct DeviceArrayHandle<Device::CPU, T> :
 	public DeviceHandle<Device::CPU, T*> {
 	using Type = T;
 
+	DeviceArrayHandle() = default;
 	DeviceArrayHandle(Type* hdl) :
 		DeviceHandle<Device::CPU, Type*>{ hdl }
 	{}
@@ -54,6 +55,7 @@ struct ConstDeviceArrayHandle<Device::CPU, T> :
 	public ConstDeviceHandle<Device::CPU, const T*> {
 	using Type = T;
 
+	ConstDeviceArrayHandle() = default;
 	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CPU, T> hdl) :
 		ConstDeviceHandle<Device::CPU, const Type*>{ hdl.handle } {}
 	ConstDeviceArrayHandle(const Type* hdl) :
@@ -67,6 +69,7 @@ struct DeviceArrayHandle<Device::CUDA, T> :
 	public DeviceHandle<Device::CUDA, T*> {
 	using Type = T;
 
+	DeviceArrayHandle() = default;
 	DeviceArrayHandle(Type* hdl) :
 		DeviceHandle<Device::CUDA, Type*>{ hdl } {}
 };
@@ -76,6 +79,7 @@ struct ConstDeviceArrayHandle<Device::CUDA, T> :
 	public ConstDeviceHandle<Device::CUDA, const T*> {
 	using Type = T;
 
+	ConstDeviceArrayHandle() = default;
 	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CUDA, T> hdl) :
 		ConstDeviceHandle<Device::CUDA, const Type*>{ hdl.handle } {}
 	ConstDeviceArrayHandle(const Type* hdl) :
