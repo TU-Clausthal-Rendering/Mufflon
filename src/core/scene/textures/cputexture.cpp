@@ -57,6 +57,12 @@ ei::Vec4 CpuTexture::read(const Pixel& texel, int layer) const {
 	return (this->*m_fetch)(idx);
 }
 
+void CpuTexture::write(const ei::Vec4& value, const Pixel& texel, int layer) {
+	ei::IVec3 wrappedPixel = mod(ei::IVec3{texel, layer}, m_size);
+	int idx = get_index(wrappedPixel);
+	(this->*m_write)(idx, value);
+}
+
 
 
 
@@ -125,6 +131,89 @@ ei::Vec4 CpuTexture::fetch_RGB9E5(int componentIdx) const
 	u32 data = as<u32>(m_imageData.data())[componentIdx];
 	float e = pow(2.0f, (data>>27) - 15.0f - 9.0f);
 	return {(data & 0x1ff) * e, ((data>>9) & 0x1ff) * e, ((data>>18) & 0x1ff) * e, 1.0f};
+}
+
+
+void CpuTexture::write_R8U(int componentIdx, const ei::Vec4& value) {
+	u8* data = m_imageData.data();
+	data[componentIdx] = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
+}
+
+void CpuTexture::write_RG8U(int componentIdx, const ei::Vec4& value) {
+	u8* data = m_imageData.data();
+	data[componentIdx]   = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
+	data[componentIdx+1] = static_cast<u8>(ei::clamp(value.y, 0.0f, 1.0f) * 255.0f);
+}
+
+void CpuTexture::write_RGB8U(int componentIdx, const ei::Vec4& value) {
+	u8* data = m_imageData.data();
+	data[componentIdx]   = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
+	data[componentIdx+1] = static_cast<u8>(ei::clamp(value.y, 0.0f, 1.0f) * 255.0f);
+	data[componentIdx+2] = static_cast<u8>(ei::clamp(value.z, 0.0f, 1.0f) * 255.0f);
+}
+
+void CpuTexture::write_RGBA8U(int componentIdx, const ei::Vec4& value) {
+	u8* data = m_imageData.data();
+	data[componentIdx]   = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
+	data[componentIdx+1] = static_cast<u8>(ei::clamp(value.y, 0.0f, 1.0f) * 255.0f);
+	data[componentIdx+2] = static_cast<u8>(ei::clamp(value.z, 0.0f, 1.0f) * 255.0f);
+	data[componentIdx+3] = static_cast<u8>(ei::clamp(value.w, 0.0f, 1.0f) * 255.0f);
+}
+
+void CpuTexture::write_R16U(int componentIdx, const ei::Vec4& value) {
+	u16* data = as<u16>(m_imageData.data());
+	data[componentIdx] = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
+}
+
+void CpuTexture::write_RG16U(int componentIdx, const ei::Vec4& value) {
+	u16* data = as<u16>(m_imageData.data());
+	data[componentIdx]   = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
+	data[componentIdx+1] = static_cast<u16>(ei::clamp(value.y, 0.0f, 1.0f) * 65535.0f);
+}
+
+void CpuTexture::write_RGB16U(int componentIdx, const ei::Vec4& value) {
+	u16* data = as<u16>(m_imageData.data());
+	data[componentIdx]   = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
+	data[componentIdx+1] = static_cast<u16>(ei::clamp(value.y, 0.0f, 1.0f) * 65535.0f);
+	data[componentIdx+2] = static_cast<u16>(ei::clamp(value.z, 0.0f, 1.0f) * 65535.0f);
+}
+
+void CpuTexture::write_RGBA16U(int componentIdx, const ei::Vec4& value) {
+	u16* data = as<u16>(m_imageData.data());
+	data[componentIdx]   = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
+	data[componentIdx+1] = static_cast<u16>(ei::clamp(value.y, 0.0f, 1.0f) * 65535.0f);
+	data[componentIdx+2] = static_cast<u16>(ei::clamp(value.z, 0.0f, 1.0f) * 65535.0f);
+	data[componentIdx+3] = static_cast<u16>(ei::clamp(value.w, 0.0f, 1.0f) * 65535.0f);
+}
+
+void CpuTexture::write_R32F(int componentIdx, const ei::Vec4& value) {
+	float* data = as<float>(m_imageData.data());
+	data[componentIdx]   = value.x;
+}
+
+void CpuTexture::write_RG32F(int componentIdx, const ei::Vec4& value) {
+	float* data = as<float>(m_imageData.data());
+	data[componentIdx]   = value.x;
+	data[componentIdx+1] = value.y;
+}
+
+void CpuTexture::write_RGB32F(int componentIdx, const ei::Vec4& value) {
+	float* data = as<float>(m_imageData.data());
+	data[componentIdx]   = value.x;
+	data[componentIdx+1] = value.y;
+	data[componentIdx+2] = value.z;
+}
+
+void CpuTexture::write_RGBA32F(int componentIdx, const ei::Vec4& value) {
+	float* data = as<float>(m_imageData.data());
+	data[componentIdx]   = value.x;
+	data[componentIdx+1] = value.y;
+	data[componentIdx+2] = value.z;
+	data[componentIdx+3] = value.w;
+}
+
+void CpuTexture::write_RGB9E5(int componentIdx, const ei::Vec4& value) {
+	mAssert(false); // NOT IMPLEMENTED YET
 }
 
 

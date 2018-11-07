@@ -6,6 +6,8 @@
 
 namespace mufflon { namespace scene { namespace textures {
 
+// TODO: cubemap access?
+// TODO: Mipmapping?
 class CpuTexture {
 public:
 	// Allocate the texture, data must be filled by using the data() pointer (or writes).
@@ -23,6 +25,15 @@ public:
 	 * is performed on the texture coordinates.
 	 */
 	ei::Vec4 read(const Pixel& texel, int layer = 0) const;
+
+	/*
+	 * Overwrite a texel value.
+	 * The input is converted to the internal format. If necessary this includes clamping
+	 * of the value range.
+	 * The border handling mode is always wrap. I.e. modulu operation is performed on the
+	 * texture coordinates.
+	 */
+	void write(const ei::Vec4& value, const Pixel& texel, int layer = 0);
 
 	/*
 	 * Get an (interpolated) texture sample at the given coordinate.
@@ -59,6 +70,21 @@ private:
 	ei::Vec4 fetch_RGB32F(int componentIdx) const;
 	ei::Vec4 fetch_RGBA32F(int componentIdx) const;
 	ei::Vec4 fetch_RGB9E5(int componentIdx) const;
+
+	void (CpuTexture::* m_write)(int componentIdx, const ei::Vec4& value);
+	void write_R8U(int componentIdx, const ei::Vec4& value);
+	void write_RG8U(int componentIdx, const ei::Vec4& value);
+	void write_RGB8U(int componentIdx, const ei::Vec4& value);
+	void write_RGBA8U(int componentIdx, const ei::Vec4& value);
+	void write_R16U(int componentIdx, const ei::Vec4& value);
+	void write_RG16U(int componentIdx, const ei::Vec4& value);
+	void write_RGB16U(int componentIdx, const ei::Vec4& value);
+	void write_RGBA16U(int componentIdx, const ei::Vec4& value);
+	void write_R32F(int componentIdx, const ei::Vec4& value);
+	void write_RG32F(int componentIdx, const ei::Vec4& value);
+	void write_RGB32F(int componentIdx, const ei::Vec4& value);
+	void write_RGBA32F(int componentIdx, const ei::Vec4& value);
+	void write_RGB9E5(int componentIdx, const ei::Vec4& value);
 
 	ei::Vec4 (CpuTexture::* m_sample)(const UvCoordinate& uv, int layer) const;
 	ei::Vec4 sample_nearest(const UvCoordinate& uv, int layer) const;
