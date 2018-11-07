@@ -36,9 +36,9 @@ void synchronize(Tuple& tuple, util::DirtyFlags<Device>& flags, T& sync, Args...
 	}
 }
 
-// A number of copy primitives which call the internal 
+// A number of copy primitives which call the internal required methods
 // NOTE: There are synchronize() methods in the residency.hpp which have a similar
-// functionallity. However, they are to specialized. MAYBE they can be replaced by
+// functionallity. However, they are too specialized. MAYBE they can be replaced by
 // this one
 template < Device dev >
 using DevPtr = void*;

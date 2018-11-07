@@ -28,7 +28,7 @@ struct ConstDeviceTextureHandle<Device::CPU> :
 // TODO: Const handle and stuff
 template<>
 struct DeviceTextureHandle<Device::CUDA> :
-	public DeviceHandle<Device::CUDA, cudaTextureObject_t> {
+	public DeviceHandle<Device::CUDA, cudaSurfaceObject_t> {
 };
 template<>
 struct ConstDeviceTextureHandle<Device::CUDA> :
@@ -41,6 +41,42 @@ struct DeviceTextureHandle<Device::OPENGL> :
 template<>
 struct ConstDeviceTextureHandle<Device::OPENGL> :
 	public ConstDeviceHandle<Device::OPENGL, u64> {
+};
+
+
+/*
+ * A list of supported texture formats for this renderer.
+ * While Hardware and texture formats may support many more, this list is rather short
+ * because each format must also be implemented in the CpuTexture.
+ * A loader must choose the most appropriate target format which is supported internally.
+ * Also, some of the formats cannot be aquired for write mode (the RGB ones) on GPU side.
+ *
+ * Format semantics:
+ * ...XU	Unsigned int per channel with X bits
+ * ...XF	Float with X bits
+ */
+enum class Format : u16 {
+	R8U,
+	RG8U,
+	RGB8U,
+	RGBA8U,
+	R16U,
+	RG16U,
+	RGB16U,
+	RGBA16U,
+	R32F,
+	RG32F,
+	RGB32F,
+	RGBA32F,
+	RGB9E5,		// Special shared exponent format (9-bit mantissa per channel, 5-bit exponent).
+	// TODO: 16F
+
+	NUM
+};
+
+enum class SamplingMode {
+	NEAREST,
+	LINEAR
 };
 
 /*
