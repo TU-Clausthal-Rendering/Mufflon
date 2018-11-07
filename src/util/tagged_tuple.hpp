@@ -145,15 +145,21 @@ private:
 // Function overloads to use this type instead of a tuple
 template < class T, class... Types >
 constexpr T& get(TaggedTuple<Types...>& tuple) noexcept {
-	return tuple.get<T>();
+	return tuple.template get<T>();
 }
 template < class T, class... Types >
 constexpr const T& get(const TaggedTuple<Types...>& tuple) noexcept {
-	return tuple.get<T>();
+	return tuple.template get<T>();
 }
 
-template < class... Types >
-class std::tuple_size<TaggedTuple<Types...>> :
-	public std::integral_constant<std::size_t, TaggedTuple<Types...>::size> {};
 
 }} // namespace mufflon::util
+
+namespace std {
+
+template < class... Types >
+struct tuple_size<mufflon::util::TaggedTuple<Types...>> :
+	public integral_constant<size_t, mufflon::util::TaggedTuple<Types...>::size> {
+};
+
+} // namespace std

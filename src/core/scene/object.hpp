@@ -40,17 +40,17 @@ public:
 	// Resizes storage of geometry type.
 	template < class Geom, class... Args >
 	void resize(Args&& ...args) {
-		m_geometryData.get<Geom>().resize(std::forward<Args>(args)...);
+		m_geometryData.template get<Geom>().resize(std::forward<Args>(args)...);
 	}
 
 	// Adds a primitive (e.g. vertex, triangle, sphere...) to geometry.
 	template < class Geom, class... Args >
 	auto add(Args&& ...args) {
-		auto hdl = m_geometryData.get<Geom>().add(std::forward<Args>(args)...);
+		auto hdl = m_geometryData.template get<Geom>().add(std::forward<Args>(args)...);
 		m_accelDirty = true;
 		// Expand the object's bounding box
-		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.get<Geom>().get_bounding_box().max);
-		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.get<Geom>().get_bounding_box().min);
+		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.template get<Geom>().get_bounding_box().max);
+		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.template get<Geom>().get_bounding_box().min);
 		return hdl;
 	}
 
@@ -59,25 +59,25 @@ public:
 		auto hdl = m_geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
 		m_accelDirty = true;
 		// Expand the object's bounding box
-		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.get<Geom>().get_bounding_box().max);
-		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.get<Geom>().get_bounding_box().min);
+		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.template get<Geom>().get_bounding_box().max);
+		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.template get<Geom>().get_bounding_box().min);
 		return hdl;
 	}
 
 	// Requests an attribute for the geometry type.
 	template < class Geom, class Type >
 	auto request(const std::string& name) {
-		return m_geometryData.get<Geom>().request(name);
+		return m_geometryData.template get<Geom>().request(name);
 	}
 	// Removes an attribute for the geometry type.
 	template < class Geom, class AttributeHandle >
 	void remove(const AttributeHandle& handle) {
-		m_geometryData.get<Geom>().remove(handle);
+		m_geometryData.template get<Geom>().remove(handle);
 	}
 	// Attempts to find an attribute by name.
 	template < class Geom >
 	auto find(const std::string& name) {
-		m_geometryData.get<Geom>().find(name);
+		m_geometryData.template get<Geom>().find(name);
 	}
 	/**
 	 * Aquires a reference to an attribute, valid until the attribute gets removed.
@@ -86,7 +86,7 @@ public:
 	 */
 	template <  class Geom, class AttributeHandle >
 	auto &aquire(const AttributeHandle& attrHandle) {
-		return m_geometryData.get<Geom>().aquire(attrHandle);
+		return m_geometryData.template get<Geom>().aquire(attrHandle);
 	}
 	/**
 	 * Aquires a reference to an attribute, valid until the attribute gets removed.
@@ -94,13 +94,13 @@ public:
 	 */
 	template < class Geom, class AttributeHandle >
 	const auto &aquire(const AttributeHandle& attrHandle) const {
-		return m_geometryData.get<Geom>().aquire(attrHandle);
+		return m_geometryData.template get<Geom>().aquire(attrHandle);
 	}
 
 	// Applies tessellation to the geometry type.
 	template < class Geom, class Tessellater, class... Args >
 	void tessellate(Tessellater& tessellater, Args&& ...args) {
-		m_geometryData.get<Geom>().tessellate(tessellater,std::forward<Args>(args)...);
+		m_geometryData.template get<Geom>().tessellate(tessellater,std::forward<Args>(args)...);
 		m_accelDirty = true;
 	}
 	// Creates a new LoD by applying a decimater to the geomtry type.
@@ -108,7 +108,7 @@ public:
 	Object create_lod(Decimater& decimater, Args&& ...args) {
 		// TODO: what do we want exactly?
 		Object temp(*this);
-		temp.m_geometryData.get<Geom>().create_lod(decimater, std::forward<Args>(args)...);
+		temp.m_geometryData.template get<Geom>().create_lod(decimater, std::forward<Args>(args)...);
 		temp.m_accelDirty = true;
 		return temp;
 	}
@@ -116,19 +116,19 @@ public:
 	// Grants access to the material-index attribute (required for ALL geometry types)
 	template < class Geom >
 	auto& get_mat_indices() {
-		return m_geometryData.get<Geom>().get_mat_indices();
+		return m_geometryData.template get<Geom>().get_mat_indices();
 	}
 
 	// Grants access to the material-index attribute (required for ALL geometry types)
 	template < class Geom >
 	const auto& get_mat_indices() const {
-		return m_geometryData.get<Geom>().get_mat_indices();
+		return m_geometryData.template get<Geom>().get_mat_indices();
 	}
 
 	// Grants direct access to the mesh data (const only).
 	template < class Geom >
 	const auto& get_geometry() {
-		return m_geometryData.get<Geom>();
+		return m_geometryData.template get<Geom>();
 	}
 
 	// Returns the object's animation frame.
@@ -166,24 +166,24 @@ public:
 	// Eg. position, normal, uv, material index for poly, position, radius, mat index for sphere...
 	template < class Geom, Device dev >
 	void synchronize() {
-		m_geometryData.get<Geom>().synchronize<dev>();
+		m_geometryData.template get<Geom>().template synchronize<dev>();
 	}
 	template < Device dev >
 	void synchronize() {
 		m_geometryData.for_each([](std::size_t i, auto& elem) {
-			elem.synchronize<dev>();
+			elem.template synchronize<dev>();
 		});
 	}
 
 	// Removes this object's data from the given memory system
 	template < class Geom, Device dev >
 	void unload() {
-		m_geometryData.get<Geom>().unload<dev>();
+		m_geometryData.template get<Geom>().template unload<dev>();
 	}
 	template < Device dev >
 	void unload() {
 		m_geometryData.for_each([](std::size_t i, auto& elem) {
-			elem.unload<dev>();
+			elem.template unload<dev>();
 		});
 	}
 
@@ -194,7 +194,7 @@ public:
 	// Gets the bounding box of the sub-mesh
 	template < class Geom >
 	const ei::Box& get_bounding_box() const noexcept {
-		return m_geometryData.get<Geom>().get_bounding_box();
+		return m_geometryData.template get<Geom>().get_bounding_box();
 	}
 
 private:

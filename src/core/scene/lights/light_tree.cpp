@@ -56,6 +56,8 @@ auto get_morton_code = [](const u16 a, const u16 b, const u16 c) constexpr->u64 
 // Extracts the center from a positional light source
 auto get_light_center = [](const auto& light) -> ei::Vec3 {
 	using Type = std::decay_t<decltype(light)>;
+	static_assert(is_positional_light_type<Type>(), "Center only available to positional lights");
+
 	// Compute the center of the light source
 	if constexpr(std::is_same_v<PointLight, Type> || std::is_same_v<SpotLight, Type>
 				 || std::is_same_v<AreaLightSphere, Type>) {
@@ -65,14 +67,13 @@ auto get_light_center = [](const auto& light) -> ei::Vec3 {
 	} else if constexpr(std::is_same_v<AreaLightQuad, Type>) {
 		return ei::center(ei::Tetrahedron(light.points[0u], light.points[1u],
 										  light.points[2u], light.points[3u]));
-	} else {
-		static_assert(false, "Unknown positional light source!");
 	}
 };
 
 // Extracts the intensity from a positional light source
 auto get_pos_light_intensity = [](const auto& light) -> ei::Vec3 {
 	using Type = std::decay_t<decltype(light)>;
+	static_assert(is_positional_light_type<Type>(), "Center only available to positional lights");
 
 	if constexpr(std::is_same_v<PointLight, Type> || std::is_same_v<SpotLight, Type>) {
 		return light.intensity;
@@ -84,8 +85,6 @@ auto get_pos_light_intensity = [](const auto& light) -> ei::Vec3 {
 	} else if constexpr(std::is_same_v<AreaLightQuad, Type>) {
 		return light.radiance * ei::surface(ei::Tetrahedron(light.points[0u], light.points[1u], 
 														   light.points[2u], light.points[3u]));
-	} else {
-		static_assert(false, "Unknown positional light source!");
 	}
 };
 
@@ -103,6 +102,7 @@ ei::Vec3 get_dir_light_intensity(const DirectionalLight& light, const ei::Vec3& 
 
 auto get_light_type = [](const auto& light) constexpr -> LightType {
 	using Type = std::decay_t<decltype(light)>;
+	static_assert(is_light_type<Type>(), "Not a light!");
 
 	if constexpr(std::is_same_v<Type, PointLight>)
 		return LightType::POINT_LIGHT;
@@ -118,8 +118,6 @@ auto get_light_type = [](const auto& light) constexpr -> LightType {
 		return LightType::DIRECTIONAL_LIGHT;
 	else if constexpr(std::is_same_v<Type, EnvMapLight>)
 		return LightType::ENVMAP_LIGHT;
-	else
-		static_assert(false, "Unknown light type");
 };
 
 void create_positional_light_tree(const std::vector<PositionalLights>& posLights,
@@ -399,7 +397,7 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 
 	// Construct the environment light
 	if(envLight.has_value()) {
-		tree.envLight = EnvMapLight<Device::CPU>{ *envLight.value()->aquireConst<Device::CPU>() };
+		tree.envLight = EnvMapLight<Device::CPU>{ {{ *envLight.value()->aquireConst<Device::CPU>() }}, ei::Vec3{0, 0, 0} };
 		// TODO: accumulate flux
 	}
 
@@ -495,7 +493,7 @@ void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<De
 	// Also copy the environment light
 	sync.envLight.flux = changed.envLight.flux;
 	if(hdl.has_value())
-		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{ *hdl.value()->aquireConst<Device::CUDA>() };
+		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{ {*hdl.value()->aquireConst<Device::CUDA>()} };
 	else
 		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{};
 }
@@ -524,7 +522,7 @@ void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<D
 	// Also copy the environment light
 	sync.envLight.flux = changed.envLight.flux;
 	if(hdl.has_value())
-		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{ *hdl.value()->aquireConst<Device::CPU>() };
+		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{ {*hdl.value()->aquireConst<Device::CPU>()} };
 	else
 		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{};
 }

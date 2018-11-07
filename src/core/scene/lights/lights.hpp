@@ -5,6 +5,7 @@
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
 #include <variant>
+#include <type_traits>
 
 namespace mufflon { namespace scene { namespace lights {
 
@@ -101,5 +102,36 @@ static_assert(sizeof(DirectionalLight) == 32 && alignof(DirectionalLight) == 16)
 
 // Restore default packing alignment
 #pragma pack(pop)
+
+// Code to detect if a light is of a given type
+namespace lights_detail {
+// Utility to check if a type is part of a list of types
+template < class T, class H, class... Args >
+struct IsAnyOf {
+	static constexpr bool value = std::is_same_v<T, H> || IsAnyOf<T, Args...>::value;
+};
+template < class T, class H >
+struct IsAnyOf<T, H> {
+	static constexpr bool value = std::is_same_v<T, H>;
+};
+} // namespace lights_detail
+
+template < class T >
+inline constexpr bool is_positional_light_type() {
+	return lights_detail::IsAnyOf<T, PointLight, SpotLight, AreaLightSphere,
+		AreaLightTriangle, AreaLightQuad>::value;
+}
+
+template < class T >
+inline constexpr bool is_envmap_light_type() {
+	return lights_detail::IsAnyOf<T, EnvMapLight<Device::CPU>,
+		EnvMapLight<Device::CUDA>, EnvMapLight<Device::OPENGL>>::value;
+}
+
+template < class T >
+inline constexpr bool is_light_type() {
+	return is_positional_light_type<T>() || is_envmap_light_type<T>()
+		|| std::is_same_v<T, DirectionalLight>;
+}
 
 }}} // namespace mufflon::scene::lights

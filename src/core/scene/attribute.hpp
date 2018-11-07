@@ -363,10 +363,8 @@ public:
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
-		if constexpr(dev != DEVICE || owning != OWNING) {
-			// Needs to be specialized on a per-device basis
-			static_assert(false, "Missing specialization for between-device synchronization");
-		}
+		// Needs to be specialized on a per-device basis
+		throw std::runtime_error("This synchronization is not implemented yet");
 	}
 };
 
@@ -383,10 +381,8 @@ public:
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
-		if constexpr(dev != DEVICE || owning != OWNING) {
-			// Needs to be specialized on a per-device basis
-			static_assert(false, "Missing specialization for between-device synchronization");
-		}
+		// Needs to be specialized on a per-device basis
+		throw std::runtime_error("This synchronization is not implemented yet");
 	}
 };
 
@@ -534,10 +530,8 @@ public:
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
-		if constexpr(dev != DEVICE || owning != OWNING) {
-			// Needs to be specialized on a per-device basis
-			static_assert(false, "Missing specialization for between-device synchronization");
-		}
+		// Needs to be specialized on a per-device basis
+		throw std::runtime_error("This synchronization is not implemented yet");
 	}
 
 	// Returns the length of the attributes
@@ -574,7 +568,7 @@ private:
 // Function overloads for "unified" call syntay
 template < Device changedDev, Device syncDev, bool changedOwns, bool syncOwns>
 void synchronize(AttributePool<changedDev, changedOwns>& changed, AttributePool<syncDev, syncOwns>& sync) {
-	changed.synchronize<>(sync);
+	changed.template synchronize<>(sync);
 }
 
 template <>

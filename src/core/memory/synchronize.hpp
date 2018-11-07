@@ -12,7 +12,7 @@ void synchronize_impl(Tuple& tuple, util::DirtyFlags<Device>& flags,
 	if constexpr(I < Tuple::size) {
 		// Workaround for VS2017 bug: otherwise you may use the 'Type' template of the
 		// tagged tuple
-		auto& changed = tuple.get<I>();
+		auto& changed = tuple.template get<I>();
 		constexpr Device CHANGED_DEVICE = std::decay_t<decltype(changed)>::DEVICE;
 		if(flags.has_changes(CHANGED_DEVICE)) {
 			synchronize(changed, sync, std::forward<Args>(args)...);

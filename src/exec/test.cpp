@@ -87,7 +87,7 @@ void test_custom_attributes() {
 		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
 		auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
 		auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
-		auto f0 = poly.add(v0, v1, v2);
+		poly.add(v0, v1, v2);
 		(*poly.get_mat_indices().aquire<>())[0u] = 3u;
 
 		auto& attr2 = poly.aquire(hdl2);
@@ -113,7 +113,7 @@ void test_polygon() {
 		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
 		auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
 		auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
-		auto f0 = poly.add(v0, v1, v2);
+		poly.add(v0, v1, v2);
 		(*poly.get_mat_indices().aquire<>())[0u] = 2u;
 
 		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
@@ -179,6 +179,7 @@ void test_sphere() {
 
 		auto bs0 = spheres.add_bulk(radPos.size(), radPosStream);
 		spheres.add_bulk(spheres.get_mat_indices(), bs0.handle, mats.size(), matStream);
+		spheres.remove(impHandle);
 	}
 
 	{
