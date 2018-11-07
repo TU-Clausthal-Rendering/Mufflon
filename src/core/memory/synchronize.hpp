@@ -36,4 +36,36 @@ void synchronize(Tuple& tuple, util::DirtyFlags<Device>& flags, T& sync, Args...
 	}
 }
 
-} // namespace mufflon::scene
+// A number of copy primitives which call the internal 
+// NOTE: There are synchronize() methods in the residency.hpp which have a similar
+// functionallity. However, they are to specialized. MAYBE they can be replaced by
+// this one
+template < Device dev >
+using DevPtr = void*;
+template < Device dev >
+using ConstDevPtr = const void*;
+// TODO: OpenGL specialization
+template < Device dstDev, Device srcDev >
+inline void copy(DevPtr<dstDev> dst, ConstDevPtr<srcDev> src, std::size_t size ) {
+	mAssertMsg(false, "Unimplemented copy specialization.");
+}
+
+template <>
+inline void copy<Device::CPU, Device::CPU>(void* dst, const void* src, std::size_t size) {
+	memcpy(dst, src, size);
+}
+template <>
+inline void copy<Device::CUDA, Device::CPU>(void* dst, const void* src, std::size_t size) {
+	cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice);
+}
+template <>
+inline void copy<Device::CPU, Device::CUDA>(void* dst, const void* src, std::size_t size) {
+	cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost);
+}
+template <>
+inline void copy<Device::CUDA, Device::CUDA>(void* dst, const void* src, std::size_t size) {
+	cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice);
+}
+// TODO: OpenGL (glBufferSubData with offset and object handle as target/src types
+
+} // namespace mufflon

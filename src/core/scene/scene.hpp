@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/memory/generic_resource.hpp"
 #include "accel_struct.hpp"
 #include "instance.hpp"
 #include "export/dll_export.hpp"
@@ -36,22 +37,10 @@ public:
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
-		// Create camera parameters on CPU side (required for other devices as copy source)
-		m_cameraParams.get<unique_device_ptr<Device::CPU, char>>() =
-			make_udevptr_array<Device::CPU, char>(m_camera->get_parameter_pack_size());
-		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
-		// m_camera->get_parameter_pack(as<cameras::CameraParams>(*m_cameraParams.get<unique_device_ptr<Device::CPU, char>>())); // This line causes the bug
-		auto& pCpu = m_cameraParams.get<unique_device_ptr<Device::CPU, char>>();
-		m_camera->get_parameter_pack(as<cameras::CameraParams>(*pCpu));
-		// Copy to the real target device, if it differs from the CPU
-		if constexpr(dev == Device::CUDA) {
-			m_cameraParams.get<unique_device_ptr<Device::CUDA, char>>() =
-				make_udevptr_array<Device::CUDA, char>(m_camera->get_parameter_pack_size());
-			// [Weird] Again, using the RHS from the next line directly without storing it
-			// in a variable causes very mysterious bugs.
-			auto* pTarget = m_cameraParams.get<unique_device_ptr<Device::CUDA, char>>().get();
-			cudaMemcpy(pTarget, pCpu.get(), m_camera->get_parameter_pack_size(), cudaMemcpyHostToDevice);
-		}
+		// Refill the camera resource (always, because it is cheap?)
+		m_cameraParams.resize(m_camera->get_parameter_pack_size());
+		auto* pCam = m_cameraParams.template get<dev, cameras::CameraParams>();
+		m_camera->get_parameter_pack(pCam, dev);
 
 		for(InstanceHandle instance : m_instances) {
 			// TODO
@@ -61,7 +50,7 @@ public:
 
 	template < Device dev >
 	void unload() {
-		m_cameraParams.get<unique_device_ptr<dev, cameras::CameraParams>>().release();
+		m_cameraParams.template get<dev>().unload();
 		for(InstanceHandle instance : m_instances) {
 			// TODO
 		}
@@ -109,9 +98,8 @@ private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
 
-	ConstCameraHandle m_camera;	// The single, chosen camera for rendering this scene
-	util::TaggedTuple<unique_device_ptr<Device::CPU, char>, // TODO: alias/wrapper type for a TaggedTuple of an identic resource for all devices?
-		unique_device_ptr<Device::CUDA, char>> m_cameraParams;
+	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
+	GenericResource m_cameraParams;	// Device independent parameter pack of the camera
 
 	// TODO: cameras, lights, materials
 	// Acceleration structure over all instances

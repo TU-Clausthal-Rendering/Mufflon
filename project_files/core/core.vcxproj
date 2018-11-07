@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
     <ClCompile Include="..\..\src\core\cameras\camera.cpp" />
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
+    <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
@@ -61,6 +62,7 @@
     <ClInclude Include="..\..\src\core\memory\accessor.hpp" />
     <ClInclude Include="..\..\src\core\memory\allocator.hpp" />
     <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp" />
+    <ClInclude Include="..\..\src\core\memory\generic_resource.hpp" />
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />

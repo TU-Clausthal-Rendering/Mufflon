@@ -130,6 +130,9 @@
     <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\memory\generic_resource.cpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -304,6 +307,9 @@
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\memory\accessor.hpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\generic_resource.hpp">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
   </ItemGroup>

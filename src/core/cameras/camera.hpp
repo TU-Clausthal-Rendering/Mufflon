@@ -2,6 +2,7 @@
 
 #include "core/scene/types.hpp"
 #include "core/memory/dyntype_memory.hpp"
+#include "core/memory/residency.hpp"
 #include "util/assert.hpp"
 #include <string>
 
@@ -79,7 +80,7 @@ public:
 	 * Each camera must implement a sample_ray and a project method (see cameras/sample.hpp
 	 * for details).
 	 */
-	virtual void get_parameter_pack(CameraParams& outBuffer) const = 0;
+	virtual void get_parameter_pack(CameraParams* outBuffer, Device dev) const = 0;
 
 	// Get the required size of a parameter bundle.
 	virtual std::size_t get_parameter_pack_size() const = 0;
