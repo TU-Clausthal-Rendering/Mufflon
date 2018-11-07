@@ -1,15 +1,9 @@
 #include "cputexture.hpp"
 #include "core/memory/dyntype_memory.hpp"
 
-namespace mufflon::scene::textures {
+using namespace ei;
 
-static constexpr u8 NUM_COMPONENTS[int(Format::NUM)] = {
-	1, 2, 3, 4, // ...8U formats
-	1, 2, 3, 4, // ...16U formats
-	//1, 2, 3, 4, // ...32U formats
-	1, 2, 3, 4, // ...32F formats
-	1			// RGB9E5
-};
+namespace mufflon::scene::textures {
 
 static constexpr u8 PIXEL_SIZE[int(Format::NUM)] = {
 	1, 2, 3, 4, // ...8U formats
@@ -22,8 +16,7 @@ static constexpr u8 PIXEL_SIZE[int(Format::NUM)] = {
 CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode) :
 	m_imageData(width * height * PIXEL_SIZE[int(format)]),
 	m_format(format),
-	m_size(width, height, numLayers),
-	m_numComponents(NUM_COMPONENTS[int(format)])
+	m_size(width, height, numLayers)
 {
 	// Choose an optimized sampling routine
 	if(width * height * numLayers == 1)
@@ -51,14 +44,14 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 
 
 
-ei::Vec4 CpuTexture::read(const Pixel& texel, int layer) const {
-	ei::IVec3 wrappedPixel = mod(ei::IVec3{texel, layer}, m_size);
+Vec4 CpuTexture::read(const Pixel& texel, int layer) const {
+	IVec3 wrappedPixel = mod(IVec3{texel, layer}, m_size);
 	int idx = get_index(wrappedPixel);
 	return (this->*m_fetch)(idx);
 }
 
-void CpuTexture::write(const ei::Vec4& value, const Pixel& texel, int layer) {
-	ei::IVec3 wrappedPixel = mod(ei::IVec3{texel, layer}, m_size);
+void CpuTexture::write(const Vec4& value, const Pixel& texel, int layer) {
+	IVec3 wrappedPixel = mod(IVec3{texel, layer}, m_size);
 	int idx = get_index(wrappedPixel);
 	(this->*m_write)(idx, value);
 }
@@ -66,181 +59,159 @@ void CpuTexture::write(const ei::Vec4& value, const Pixel& texel, int layer) {
 
 
 
-ei::Vec4 CpuTexture::fetch_R8U(int componentIdx) const {
+Vec4 CpuTexture::fetch_R8U(int texelIdx) const {
 	const u8* data = m_imageData.data();
-	return {data[componentIdx] / 255.0f, 0.0f, 0.0f, 1.0f};
+	return {data[texelIdx] / 255.0f, 0.0f, 0.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RG8U(int componentIdx) const {
-	const u8* data = m_imageData.data();
-	return {data[componentIdx] / 255.0f, data[componentIdx+1] / 255.0f, 0.0f, 1.0f};
+Vec4 CpuTexture::fetch_RG8U(int texelIdx) const {
+	const Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.data());
+	return {data[texelIdx] / 255.0f, 0.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RGB8U(int componentIdx) const {
-	const u8* data = m_imageData.data();
-	return {data[componentIdx] / 255.0f, data[componentIdx+1] / 255.0f, data[componentIdx+2] / 255.0f, 1.0f};
+Vec4 CpuTexture::fetch_RGB8U(int texelIdx) const {
+	const Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.data());
+	return {data[texelIdx] / 255.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RGBA8U(int componentIdx) const {
-	const u8* data = m_imageData.data();
-	return ei::Vec4{data[componentIdx], data[componentIdx+1], data[componentIdx+2], data[componentIdx+3]} / 255.0f;
+Vec4 CpuTexture::fetch_RGBA8U(int texelIdx) const {
+	const Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.data());
+	return data[texelIdx] / 255.0f;
 }
 
-ei::Vec4 CpuTexture::fetch_R16U(int componentIdx) const {
+Vec4 CpuTexture::fetch_R16U(int texelIdx) const {
 	const u16* data = as<u16>(m_imageData.data());
-	return {data[componentIdx] / 65535.0f, 0.0f, 0.0f, 1.0f};
+	return {data[texelIdx] / 65535.0f, 0.0f, 0.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RG16U(int componentIdx) const {
-	const u16* data = as<u16>(m_imageData.data());
-	return {data[componentIdx] / 65535.0f, data[componentIdx+1] / 65535.0f, 0.0f, 1.0f};
+Vec4 CpuTexture::fetch_RG16U(int texelIdx) const {
+	const Vec<u16,2>* data = as<Vec<u16,2>>(m_imageData.data());
+	return {data[texelIdx] / 65535.0f, 0.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RGB16U(int componentIdx) const {
-	const u16* data = as<u16>(m_imageData.data());
-	return {data[componentIdx] / 65535.0f, data[componentIdx+1] / 65535.0f, data[componentIdx+2] / 65535.0f, 1.0f};
+Vec4 CpuTexture::fetch_RGB16U(int texelIdx) const {
+	const Vec<u16,3>* data = as<Vec<u16,3>>(m_imageData.data());
+	return {data[texelIdx] / 65535.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RGBA16U(int componentIdx) const {
-	const u16* data = as<u16>(m_imageData.data());
-	return ei::Vec4{data[componentIdx], data[componentIdx+1], data[componentIdx+2], data[componentIdx+3]} / 65535.0f;
+Vec4 CpuTexture::fetch_RGBA16U(int texelIdx) const {
+	const Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.data());
+	return data[texelIdx] / 65535.0f;
 }
 
-ei::Vec4 CpuTexture::fetch_R32F(int componentIdx) const {
-	const float* data = as<float>(m_imageData.data());
-	return {data[componentIdx], data[componentIdx], data[componentIdx], 1.0f};
+Vec4 CpuTexture::fetch_R32F(int texelIdx) const {
+	return {as<float>(m_imageData.data())[texelIdx], 0.0f, 0.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RG32F(int componentIdx) const {
-	const float* data = as<float>(m_imageData.data());
-	return {data[componentIdx], data[componentIdx+1], 0.0f, 1.0f};
+Vec4 CpuTexture::fetch_RG32F(int texelIdx) const {
+	return {as<Vec2>(m_imageData.data()[texelIdx]), 0.0f, 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RGB32F(int componentIdx) const {
-	const float* data = as<float>(m_imageData.data());
-	return {data[componentIdx], data[componentIdx+1], data[componentIdx+2], 1.0f};
+Vec4 CpuTexture::fetch_RGB32F(int texelIdx) const {
+	return {as<Vec3>(m_imageData.data()[texelIdx]), 1.0f};
 }
 
-ei::Vec4 CpuTexture::fetch_RGBA32F(int componentIdx) const {
-	const float* data = as<float>(m_imageData.data());
-	return {data[componentIdx], data[componentIdx+1], data[componentIdx+2], data[componentIdx+3]};
+Vec4 CpuTexture::fetch_RGBA32F(int texelIdx) const {
+	return as<Vec4>(m_imageData.data()[texelIdx]);
 }
 
-ei::Vec4 CpuTexture::fetch_RGB9E5(int componentIdx) const
+Vec4 CpuTexture::fetch_RGB9E5(int texelIdx) const
 {
-	u32 data = as<u32>(m_imageData.data())[componentIdx];
+	u32 data = as<u32>(m_imageData.data())[texelIdx];
 	float e = pow(2.0f, (data>>27) - 15.0f - 9.0f);
 	return {(data & 0x1ff) * e, ((data>>9) & 0x1ff) * e, ((data>>18) & 0x1ff) * e, 1.0f};
 }
 
 
-void CpuTexture::write_R8U(int componentIdx, const ei::Vec4& value) {
+void CpuTexture::write_R8U(int texelIdx, const Vec4& value) {
 	u8* data = m_imageData.data();
-	data[componentIdx] = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
+	data[texelIdx] = static_cast<u8>(clamp(value.x, 0.0f, 1.0f) * 255.0f);
 }
 
-void CpuTexture::write_RG8U(int componentIdx, const ei::Vec4& value) {
-	u8* data = m_imageData.data();
-	data[componentIdx]   = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
-	data[componentIdx+1] = static_cast<u8>(ei::clamp(value.y, 0.0f, 1.0f) * 255.0f);
+void CpuTexture::write_RG8U(int texelIdx, const Vec4& value) {
+	Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.data());
+	data[texelIdx] = Vec<u8,2>{clamp(Vec2{value.x}, 0.0f, 1.0f) * 255.0f};
 }
 
-void CpuTexture::write_RGB8U(int componentIdx, const ei::Vec4& value) {
-	u8* data = m_imageData.data();
-	data[componentIdx]   = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
-	data[componentIdx+1] = static_cast<u8>(ei::clamp(value.y, 0.0f, 1.0f) * 255.0f);
-	data[componentIdx+2] = static_cast<u8>(ei::clamp(value.z, 0.0f, 1.0f) * 255.0f);
+void CpuTexture::write_RGB8U(int texelIdx, const Vec4& value) {
+	Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.data());
+	data[texelIdx] = Vec<u8,3>{clamp(Vec3{value.x}, 0.0f, 1.0f) * 255.0f};
 }
 
-void CpuTexture::write_RGBA8U(int componentIdx, const ei::Vec4& value) {
-	u8* data = m_imageData.data();
-	data[componentIdx]   = static_cast<u8>(ei::clamp(value.x, 0.0f, 1.0f) * 255.0f);
-	data[componentIdx+1] = static_cast<u8>(ei::clamp(value.y, 0.0f, 1.0f) * 255.0f);
-	data[componentIdx+2] = static_cast<u8>(ei::clamp(value.z, 0.0f, 1.0f) * 255.0f);
-	data[componentIdx+3] = static_cast<u8>(ei::clamp(value.w, 0.0f, 1.0f) * 255.0f);
+void CpuTexture::write_RGBA8U(int texelIdx, const Vec4& value) {
+	Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.data());
+	data[texelIdx] = Vec<u8,4>{clamp(value.x, 0.0f, 1.0f) * 255.0f};
 }
 
-void CpuTexture::write_R16U(int componentIdx, const ei::Vec4& value) {
+void CpuTexture::write_R16U(int texelIdx, const Vec4& value) {
 	u16* data = as<u16>(m_imageData.data());
-	data[componentIdx] = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
+	data[texelIdx] = static_cast<u16>(clamp(value.x, 0.0f, 1.0f) * 65535.0f);
 }
 
-void CpuTexture::write_RG16U(int componentIdx, const ei::Vec4& value) {
-	u16* data = as<u16>(m_imageData.data());
-	data[componentIdx]   = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
-	data[componentIdx+1] = static_cast<u16>(ei::clamp(value.y, 0.0f, 1.0f) * 65535.0f);
+void CpuTexture::write_RG16U(int texelIdx, const Vec4& value) {
+	Vec<u16,2>* data = as<Vec<u16,2>>(m_imageData.data());
+	data[texelIdx] = Vec<u16,2>{clamp(Vec2{value}, 0.0f, 1.0f) * 65535.0f};
 }
 
-void CpuTexture::write_RGB16U(int componentIdx, const ei::Vec4& value) {
-	u16* data = as<u16>(m_imageData.data());
-	data[componentIdx]   = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
-	data[componentIdx+1] = static_cast<u16>(ei::clamp(value.y, 0.0f, 1.0f) * 65535.0f);
-	data[componentIdx+2] = static_cast<u16>(ei::clamp(value.z, 0.0f, 1.0f) * 65535.0f);
+void CpuTexture::write_RGB16U(int texelIdx, const Vec4& value) {
+	Vec<u16,3>* data = as<Vec<u16,3>>(m_imageData.data());
+	data[texelIdx] = Vec<u16,3>{clamp(Vec3{value}, 0.0f, 1.0f) * 65535.0f};
 }
 
-void CpuTexture::write_RGBA16U(int componentIdx, const ei::Vec4& value) {
-	u16* data = as<u16>(m_imageData.data());
-	data[componentIdx]   = static_cast<u16>(ei::clamp(value.x, 0.0f, 1.0f) * 65535.0f);
-	data[componentIdx+1] = static_cast<u16>(ei::clamp(value.y, 0.0f, 1.0f) * 65535.0f);
-	data[componentIdx+2] = static_cast<u16>(ei::clamp(value.z, 0.0f, 1.0f) * 65535.0f);
-	data[componentIdx+3] = static_cast<u16>(ei::clamp(value.w, 0.0f, 1.0f) * 65535.0f);
+void CpuTexture::write_RGBA16U(int texelIdx, const Vec4& value) {
+	Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.data());
+	data[texelIdx] = Vec<u16,4>{clamp(value, 0.0f, 1.0f) * 65535.0f};
 }
 
-void CpuTexture::write_R32F(int componentIdx, const ei::Vec4& value) {
+void CpuTexture::write_R32F(int texelIdx, const Vec4& value) {
 	float* data = as<float>(m_imageData.data());
-	data[componentIdx]   = value.x;
+	data[texelIdx]   = value.x;
 }
 
-void CpuTexture::write_RG32F(int componentIdx, const ei::Vec4& value) {
-	float* data = as<float>(m_imageData.data());
-	data[componentIdx]   = value.x;
-	data[componentIdx+1] = value.y;
+void CpuTexture::write_RG32F(int texelIdx, const Vec4& value) {
+	Vec2* data = as<Vec2>(m_imageData.data());
+	data[texelIdx]   = Vec2{value};
 }
 
-void CpuTexture::write_RGB32F(int componentIdx, const ei::Vec4& value) {
-	float* data = as<float>(m_imageData.data());
-	data[componentIdx]   = value.x;
-	data[componentIdx+1] = value.y;
-	data[componentIdx+2] = value.z;
+void CpuTexture::write_RGB32F(int texelIdx, const Vec4& value) {
+	Vec3* data = as<Vec3>(m_imageData.data());
+	data[texelIdx] = Vec3{value};
 }
 
-void CpuTexture::write_RGBA32F(int componentIdx, const ei::Vec4& value) {
-	float* data = as<float>(m_imageData.data());
-	data[componentIdx]   = value.x;
-	data[componentIdx+1] = value.y;
-	data[componentIdx+2] = value.z;
-	data[componentIdx+3] = value.w;
+void CpuTexture::write_RGBA32F(int texelIdx, const Vec4& value) {
+	Vec4* data = as<Vec4>(m_imageData.data());
+	data[texelIdx] = value;
 }
 
-void CpuTexture::write_RGB9E5(int componentIdx, const ei::Vec4& value) {
+void CpuTexture::write_RGB9E5(int texelIdx, const Vec4& value) {
 	mAssert(false); // NOT IMPLEMENTED YET
 }
 
 
-ei::Vec4 CpuTexture::sample_nearest(const UvCoordinate& uv, int layer) const {
-	ei::IVec3 baseCoord {ei::floor(uv.x * m_size.x), ei::floor(uv.y * m_size.y), layer};
+Vec4 CpuTexture::sample_nearest(const UvCoordinate& uv, int layer) const {
+	IVec3 baseCoord {ei::floor(uv.x * m_size.x), ei::floor(uv.y * m_size.y), layer};
 	return (this->*m_fetch)(get_index(mod(baseCoord, m_size)));
 }
 
-ei::Vec4 CpuTexture::sample_linear(const UvCoordinate& uv, int layer) const {
-	ei::Vec2 frac {uv.x * m_size.x, uv.y * m_size.y};
-	ei::IVec3 baseCoord {ei::floor(frac.x), ei::floor(frac.y), layer};
+Vec4 CpuTexture::sample_linear(const UvCoordinate& uv, int layer) const {
+	Vec2 frac {uv.x * m_size.x, uv.y * m_size.y};
+	IVec3 baseCoord {floor(frac), layer};
 	frac.x -= baseCoord.x; frac.y -= baseCoord.y;
 	// Get all 4 texel in the layer and sum them with the interpolation weights (frac)
-	ei::Vec4 sample = (this->*m_fetch)(get_index(mod(baseCoord, m_size))) * (1.0f - frac.x) * (1.0f - frac.y);
-	sample += (this->*m_fetch)(get_index(mod(baseCoord + ei::IVec3(1,0,0), m_size))) * (frac.x) * (1.0f - frac.y);
-	sample += (this->*m_fetch)(get_index(mod(baseCoord + ei::IVec3(0,1,0), m_size))) * (1.0f - frac.x) * (frac.y);
-	sample += (this->*m_fetch)(get_index(mod(baseCoord + ei::IVec3(1,1,0), m_size))) * (frac.x) * (frac.y);
+	Vec4 sample = (this->*m_fetch)(get_index(mod(baseCoord, m_size))) * (1.0f - frac.x) * (1.0f - frac.y);
+	sample += (this->*m_fetch)(get_index(mod(baseCoord + IVec3(1,0,0), m_size))) * (frac.x) * (1.0f - frac.y);
+	sample += (this->*m_fetch)(get_index(mod(baseCoord + IVec3(0,1,0), m_size))) * (1.0f - frac.x) * (frac.y);
+	sample += (this->*m_fetch)(get_index(mod(baseCoord + IVec3(1,1,0), m_size))) * (frac.x) * (frac.y);
 	// TODO: benchmark if replacing all the mod() calls with a single one and conditional
 	// additions for the three new vectors gives some advantage.
 	return sample;
 }
 
-ei::Vec4 CpuTexture::sample111_nearest(const UvCoordinate& uv, int layer) const {
+Vec4 CpuTexture::sample111_nearest(const UvCoordinate& uv, int layer) const {
 	return (this->*m_fetch)(0);
 }
 
-ei::Vec4 CpuTexture::sample111_linear(const UvCoordinate& uv, int layer) const {
+Vec4 CpuTexture::sample111_linear(const UvCoordinate& uv, int layer) const {
 	return (this->*m_fetch)(0);
 }
 

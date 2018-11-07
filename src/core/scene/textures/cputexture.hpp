@@ -54,37 +54,36 @@ private:
 	std::vector<u8> m_imageData;
 	Format m_format;
 	ei::IVec3 m_size;		// width, height, numLayers
-	int m_numComponents;	// Number of components/channels per pixel for the format. Special formats like RGB9E5 have only one component per pixel but multiple channels.
 
-	ei::Vec4 (CpuTexture::* m_fetch)(int componentIdx) const;
-	ei::Vec4 fetch_R8U(int componentIdx) const;
-	ei::Vec4 fetch_RG8U(int componentIdx) const;
-	ei::Vec4 fetch_RGB8U(int componentIdx) const;
-	ei::Vec4 fetch_RGBA8U(int componentIdx) const;
-	ei::Vec4 fetch_R16U(int componentIdx) const;
-	ei::Vec4 fetch_RG16U(int componentIdx) const;
-	ei::Vec4 fetch_RGB16U(int componentIdx) const;
-	ei::Vec4 fetch_RGBA16U(int componentIdx) const;
-	ei::Vec4 fetch_R32F(int componentIdx) const;
-	ei::Vec4 fetch_RG32F(int componentIdx) const;
-	ei::Vec4 fetch_RGB32F(int componentIdx) const;
-	ei::Vec4 fetch_RGBA32F(int componentIdx) const;
-	ei::Vec4 fetch_RGB9E5(int componentIdx) const;
+	ei::Vec4 (CpuTexture::* m_fetch)(int texelIdx) const;
+	ei::Vec4 fetch_R8U(int texelIdx) const;
+	ei::Vec4 fetch_RG8U(int texelIdx) const;
+	ei::Vec4 fetch_RGB8U(int texelIdx) const;
+	ei::Vec4 fetch_RGBA8U(int texelIdx) const;
+	ei::Vec4 fetch_R16U(int texelIdx) const;
+	ei::Vec4 fetch_RG16U(int texelIdx) const;
+	ei::Vec4 fetch_RGB16U(int texelIdx) const;
+	ei::Vec4 fetch_RGBA16U(int texelIdx) const;
+	ei::Vec4 fetch_R32F(int texelIdx) const;
+	ei::Vec4 fetch_RG32F(int texelIdx) const;
+	ei::Vec4 fetch_RGB32F(int texelIdx) const;
+	ei::Vec4 fetch_RGBA32F(int texelIdx) const;
+	ei::Vec4 fetch_RGB9E5(int texelIdx) const;
 
-	void (CpuTexture::* m_write)(int componentIdx, const ei::Vec4& value);
-	void write_R8U(int componentIdx, const ei::Vec4& value);
-	void write_RG8U(int componentIdx, const ei::Vec4& value);
-	void write_RGB8U(int componentIdx, const ei::Vec4& value);
-	void write_RGBA8U(int componentIdx, const ei::Vec4& value);
-	void write_R16U(int componentIdx, const ei::Vec4& value);
-	void write_RG16U(int componentIdx, const ei::Vec4& value);
-	void write_RGB16U(int componentIdx, const ei::Vec4& value);
-	void write_RGBA16U(int componentIdx, const ei::Vec4& value);
-	void write_R32F(int componentIdx, const ei::Vec4& value);
-	void write_RG32F(int componentIdx, const ei::Vec4& value);
-	void write_RGB32F(int componentIdx, const ei::Vec4& value);
-	void write_RGBA32F(int componentIdx, const ei::Vec4& value);
-	void write_RGB9E5(int componentIdx, const ei::Vec4& value);
+	void (CpuTexture::* m_write)(int texelIdx, const ei::Vec4& value);
+	void write_R8U(int texelIdx, const ei::Vec4& value);
+	void write_RG8U(int texelIdx, const ei::Vec4& value);
+	void write_RGB8U(int texelIdx, const ei::Vec4& value);
+	void write_RGBA8U(int texelIdx, const ei::Vec4& value);
+	void write_R16U(int texelIdx, const ei::Vec4& value);
+	void write_RG16U(int texelIdx, const ei::Vec4& value);
+	void write_RGB16U(int texelIdx, const ei::Vec4& value);
+	void write_RGBA16U(int texelIdx, const ei::Vec4& value);
+	void write_R32F(int texelIdx, const ei::Vec4& value);
+	void write_RG32F(int texelIdx, const ei::Vec4& value);
+	void write_RGB32F(int texelIdx, const ei::Vec4& value);
+	void write_RGBA32F(int texelIdx, const ei::Vec4& value);
+	void write_RGB9E5(int texelIdx, const ei::Vec4& value);
 
 	ei::Vec4 (CpuTexture::* m_sample)(const UvCoordinate& uv, int layer) const;
 	ei::Vec4 sample_nearest(const UvCoordinate& uv, int layer) const;
@@ -93,7 +92,7 @@ private:
 	ei::Vec4 sample111_nearest(const UvCoordinate& uv, int layer) const;
 	ei::Vec4 sample111_linear(const UvCoordinate& uv, int layer) const;
 
-	inline int get_index(const ei::IVec3 & texel) const { return (texel.x + (texel.y + texel.z * m_size.y) * m_size.x) * m_numComponents; }
+	inline int get_index(const ei::IVec3 & texel) const { return texel.x + (texel.y + texel.z * m_size.y) * m_size.x; }
 };
 
 }}} // namespace mufflon::scene::textures
