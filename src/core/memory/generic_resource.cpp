@@ -5,7 +5,7 @@ namespace mufflon {
 
 void GenericResource::resize(std::size_t size) {
 	// Release all resources if they have the wrong size.
-	if(m_size = size) {
+	if(m_size == size) {
 		m_mem.template get<unique_device_ptr<Device::CPU, char>>() = nullptr;
 		m_mem.template get<unique_device_ptr<Device::CUDA, char>>() = nullptr;
 	}

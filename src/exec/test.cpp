@@ -110,7 +110,6 @@ void test_lighttree() {
 	}
 	{ // Test triangular area lights
 		for(auto& light : posLights) {
-			float angle = floatDist(rng);
 			light = AreaLightTriangle{
 				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
@@ -123,7 +122,6 @@ void test_lighttree() {
 	}
 	{ // Test quad area lights
 		for(auto& light : posLights) {
-			float angle = floatDist(rng);
 			light = AreaLightQuad{
 				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
@@ -137,7 +135,6 @@ void test_lighttree() {
 	}
 	{ // Test spherical area lights
 		for(auto& light : posLights) {
-			float angle = floatDist(rng);
 			light = AreaLightSphere{
 				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				floatDist(rng),
@@ -149,7 +146,6 @@ void test_lighttree() {
 	}
 	{ // Test directional lights
 		for(auto& light : dirLights) {
-			float angle = floatDist(rng);
 			light = DirectionalLight{
 				ei::normalize(ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }),
 				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }

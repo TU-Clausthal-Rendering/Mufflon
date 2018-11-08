@@ -9,3 +9,5 @@
 #elif
 #    define LIBRARY_API
 #endif
+
+#define CUDA_FUNCTION inline __host__ __device__

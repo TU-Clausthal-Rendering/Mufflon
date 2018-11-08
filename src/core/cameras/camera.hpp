@@ -32,6 +32,9 @@ struct CameraParams {
  */
 class Camera {
 public:
+	// Needs virtual destructor
+	virtual ~Camera() = default;
+
 	// The name of the camera as used by the scenario setup.
 	const std::string& get_name() const noexcept { return m_name; }
 	void set_name(std::string_view name) { m_name = name; }
