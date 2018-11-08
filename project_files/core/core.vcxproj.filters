@@ -315,6 +315,9 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\conversions.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">

@@ -66,13 +66,14 @@ void test_lighttree() {
 		<< "ms" << std::endl;
 
 	std::vector<Photon> photons(500000u);
-	std::vector<float> photonRng(2u*500000u);
-	for(float& r : photonRng)
-		r = floatDist(rng);
 
 	t0 = high_resolution_clock::now();
-	emit(lightTree, photons.data(), photons.size(), intDist(rng), photonRng.data());
+	for(std::size_t i = 0u; i < photons.size(); ++i) {
+		photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
+						  floatDist(rng), floatDist(rng));
+	}
 	auto t1 = high_resolution_clock::now();
+
 	ei::Vec3 directions{};
 	for(const auto& p : photons) {
 		directions += p.direction;

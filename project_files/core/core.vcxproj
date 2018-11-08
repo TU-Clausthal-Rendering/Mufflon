@@ -77,6 +77,7 @@
     <ClInclude Include="..\..\src\core\scene\handles.hpp" />
     <ClInclude Include="..\..\src\core\scene\instance.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\lights.hpp" />
+    <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\light_tree.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />

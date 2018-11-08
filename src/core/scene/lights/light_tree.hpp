@@ -249,7 +249,7 @@ __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, 
 }
 
 __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, u64 right,
-								u64 index, u64 rng, float r0, float r1) {
+								u64 index, u64 indexMax, u64 rng, float r0, float r1) {
 	// Check: do we have more than one light here?
 	if(tree.lightCount == 1u) {
 		// Nothing to do but sample the photon
@@ -276,11 +276,58 @@ __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, 
 	while(type == LightTree::Node::INVALID_TYPE) {
 		mAssert(currentNode != nullptr);
 		mAssert(intervalLeft <= intervalRight);
-		mAssert(rng >= intervalLeft && rng <= intervalRight);
+
 		// Scale the flux up
 		float fluxSum = currentNode->left.flux + currentNode->right.flux;
-		// TODO
-		
+		// Compute the integer bounds: once rounded down, once rounded up
+		u64 leftRight = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
+										 * currentNode->left.flux / fluxSum);
+		u64 rightLeft = static_cast<u64>(std::ceilf(intervalLeft + (intervalRight - intervalLeft)
+													* currentNode->left.flux / fluxSum));
+		// Check if our index falls into one of these
+		if(index < leftRight) {
+			if(currentNode->left.type != LightTree::Node::INVALID_TYPE) {
+				type = currentNode->left.type;
+				offset = currentNode->left.offset;
+				break;
+			}
+			currentNode = &tree.nodes[currentNode->left.offset];
+			intervalRight = leftRight;
+		} else if(index >= rightLeft) {
+			if(currentNode->right.type != LightTree::Node::INVALID_TYPE) {
+				type = currentNode->right.type;
+				offset = currentNode->right.offset;
+				break;
+			}
+			currentNode = &tree.nodes[currentNode->right.offset];
+			intervalLeft = rightLeft;
+		} else {
+			// In the middle: gotta let RNG decide this one
+			intervalLeft = 0u;
+			intervalRight = std::numeric_limits<u64>::max();
+			std::size_t split = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
+												 * currentNode->left.flux / fluxSum);
+			if(rng < split) {
+				if(currentNode->left.type != LightTree::Node::INVALID_TYPE) {
+					type = currentNode->left.type;
+					offset = currentNode->left.offset;
+					break;
+				}
+				currentNode = &tree.nodes[currentNode->left.offset];
+				intervalRight = split;
+			} else {
+				if(currentNode->right.type != LightTree::Node::INVALID_TYPE) {
+					type = currentNode->right.type;
+					offset = currentNode->right.offset;
+					break;
+				}
+				currentNode = &tree.nodes[currentNode->right.offset];
+				intervalLeft = split;
+			}
+
+			// Make sure that for following iterations, we use index as well
+			index = rng;
+		}
 	}
 
 	mAssert(type != LightTree::Node::INVALID_TYPE);
@@ -319,6 +366,64 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng, float
 	return emit(tree.posLights, splitDir, intervalRight, rng, r0, r1);
 }
 
-// TODO: code path for RNG + index
+/**
+ * Emits a single photon from a light source.
+ * To ensure a good distribution, we also take an index, which is used to guide
+ * the descent into the tree when it is possible to do so without using RNG.
+ */
+template < Device dev >
+__host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64 indexMax,
+								u64 rng, float r0, float r1) {
+	// Figure out which of the three top-level light types get the photon
+	// Implicit left boundary of 0 for the interval
+	u64 intervalRight = indexMax;
+
+	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
+	// TODO: way to check handle's validity!
+	if(tree.envLight.texHandle.handle != nullptr)
+		fluxSum += ei::sum(tree.envLight.flux);
+
+	// Now split up based on flux
+	// First is envmap...
+	u64 rightEnv = static_cast<u64>(intervalRight * ei::sum(tree.envLight.flux) / fluxSum);
+	if(index < rightEnv) {
+		mAssert(tree.envLight.texHandle.handle != nullptr);
+		return sample_light(tree.envLight, r0, r1);
+	}
+	// ...then come directional lights...
+	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * (ei::sum(tree.envLight.flux) / fluxSum)));
+	u64 rightDir = static_cast<u64>(intervalRight * (ei::sum(tree.envLight.flux)
+													 + tree.dirLights.root.flux) / fluxSum);
+	if(index >= leftDir && index < rightDir) {
+		mAssert(tree.dirLights.lightCount > 0u);
+		return emit(tree.dirLights, leftDir, rightDir, index,
+					indexMax, rng, r0, r1);
+	}
+	// ...and last positional lights
+	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight * (ei::sum(tree.envLight.flux)
+															   + tree.dirLights.root.flux / fluxSum)));
+	if(index >= leftPos) {
+		mAssert(tree.posLights.lightCount > 0u);
+		return emit(tree.posLights, leftPos, intervalRight,
+					index, indexMax, rng, r0, r1);
+	}
+
+	// If we made it until here, it means that we fell between the integer bounds of photon distribution
+	// Thus we need RNG to decide
+	u64 splitEnv = static_cast<u64>(std::numeric_limits<u64>::max() * ei::sum(tree.envLight.flux) / fluxSum);
+	u64 splitDir = static_cast<u64>(std::numeric_limits<u64>::max() * (ei::sum(tree.envLight.flux)
+																	   + tree.dirLights.root.flux) / fluxSum);
+	if(rng < splitEnv) {
+		mAssert(tree.envLight.texHandle.handle != nullptr);
+		return sample_light(tree.envLight, r0, r1);
+	} else if(rng < splitDir) {
+		mAssert(tree.dirLights.lightCount > 0u);
+		return emit(tree.dirLights, splitEnv, splitDir, rng, r0, r1);
+	} else {
+		mAssert(tree.posLights.lightCount > 0u);
+		return emit(tree.posLights, splitDir, std::numeric_limits<u64>::max(),
+					rng, r0, r1);
+	}
+}
 
 }}} // namespace mufflon::scene::lights
