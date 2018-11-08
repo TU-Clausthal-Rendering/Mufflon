@@ -66,7 +66,7 @@ namespace gui.ViewModel.Camera
 
         public override object CreateView()
         {
-            return new FocusCameraView(this);
+            return new CameraView(this, new FocusCameraView());
         }
     }
 }

@@ -8,50 +8,25 @@
              mc:Ignorable="d" 
              d:DesignHeight="100"
              d:DesignWidth="160">
-    <GroupBox>
-        <GroupBox.Header>
-            <StackPanel Orientation="Horizontal">
-                <RadioButton
-                    GroupName="RadioCamera"
-                    Margin="{StaticResource LeftPropertyMargin}"
-                    IsChecked="{Binding IsSelected}"/>
 
-                <TextBox 
-                    Width="100"
-                    Text="{Binding Name}"/>
-            </StackPanel>
-        </GroupBox.Header>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock 
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock
                 Grid.Column="0"
                 Grid.Row="0"
-                Text="Type:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBlock
-                Grid.Column="1"
-                Grid.Row="0"
-                Text="{Binding Type}"
-                Margin="{StaticResource RightPropertyMargin}"/>
-            
-            <TextBlock
-                Grid.Column="0"
-                Grid.Row="1"
                 Text="Fov:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="1"
+                Grid.Row="0"
                 Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Fov}"/>
-        </Grid>
-    </GroupBox>
+    </Grid>
 </UserControl>

@@ -17,13 +17,20 @@ using gui.ViewModel.Camera;
 namespace gui.View.Camera
 {
     /// <summary>
-    /// Interaction logic for OrthoCameraView.xaml
+    /// Interaction logic for CameraView.xaml
     /// </summary>
-    public partial class OrthoCameraView : UserControl
+    public partial class CameraView : UserControl
     {
-        public OrthoCameraView()
+        /// <summary>
+        /// Creates the base camera view with the internal view
+        /// </summary>
+        /// <param name="dataContext">view model</param>
+        /// <param name="internalView">camera type dependent view</param>
+        public CameraView(CameraViewModel dataContext, UIElement internalView)
         {
             InitializeComponent();
+            DataContext = dataContext;
+            GroupItems.Children.Add(internalView);
         }
     }
 }

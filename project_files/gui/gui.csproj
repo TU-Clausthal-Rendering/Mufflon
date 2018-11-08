@@ -132,6 +132,9 @@
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
+    <Compile Include="View\Camera\CameraView.xaml.cs">
+      <DependentUpon>CameraView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Camera\FocusCameraView.xaml.cs">
       <DependentUpon>FocusCameraView.xaml</DependentUpon>
     </Compile>
@@ -199,6 +202,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="View\Camera\CameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="View\Camera\FocusCameraView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

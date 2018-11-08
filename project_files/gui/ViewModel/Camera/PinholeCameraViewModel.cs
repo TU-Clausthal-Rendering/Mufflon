@@ -37,7 +37,7 @@ namespace gui.ViewModel.Camera
 
         public override object CreateView()
         {
-            return new PinholeCameraView(this);
+            return new CameraView(this, new PinholeCameraView());
         }
     }
 }

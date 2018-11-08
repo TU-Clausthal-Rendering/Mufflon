@@ -21,10 +21,9 @@ namespace gui.View.Camera
     /// </summary>
     public partial class FocusCameraView : UserControl
     {
-        public FocusCameraView(FocusCameraViewModel focusCameraViewModel)
+        public FocusCameraView()
         {
             InitializeComponent();
-            DataContext = focusCameraViewModel;
         }
     }
 }

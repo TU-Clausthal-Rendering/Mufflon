@@ -7,62 +7,37 @@
              xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d" 
              d:DesignHeight="150" d:DesignWidth="160">
-    <GroupBox>
-        <GroupBox.Header>
-            <StackPanel Orientation="Horizontal">
-                <RadioButton
-                    GroupName="RadioCamera"
-                    Margin="{StaticResource LeftPropertyMargin}"
-                    IsChecked="{Binding IsSelected}"/>
 
-                <TextBox 
-                    Width="100"
-                    Text="{Binding Name}"/>
-            </StackPanel>
-        </GroupBox.Header>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-            <TextBlock 
+        <TextBlock
                 Grid.Column="0"
                 Grid.Row="0"
-                Text="Type:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBlock
-                Grid.Column="1"
-                Grid.Row="0"
-                Text="{Binding Type}"
-                Margin="{StaticResource RightPropertyMargin}"/>
-
-            <TextBlock
-                Grid.Column="0"
-                Grid.Row="1"
                 Text="Width:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="1"
+                Grid.Row="0"
                 Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Width}"/>
 
-            <TextBlock
+        <TextBlock
                 Grid.Column="0"
-                Grid.Row="2"
+                Grid.Row="1"
                 Text="Height:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="2"
+                Grid.Row="1"
                 Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Height}"/>
-        </Grid>
-    </GroupBox>
+    </Grid>
 </UserControl>

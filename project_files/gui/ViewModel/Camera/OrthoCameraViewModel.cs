@@ -19,7 +19,7 @@ namespace gui.ViewModel.Camera
 
         public override object CreateView()
         {
-            return new OrthoCameraView(this);
+            return new CameraView(this, new OrthoCameraView());
         }
 
         public float Width
