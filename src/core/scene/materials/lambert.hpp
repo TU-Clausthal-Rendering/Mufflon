@@ -49,7 +49,7 @@ lambert_sample(const LambertParameterPack& params,
 			   const Direction& incidentTS,
 			   const RndSet& rndSet) {
 	// Importance sampling for lambert: BRDF * cos(theta)
-	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1);
+	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1).direction;
 	// Copy the sign for two sided diffuse
 	return Sample {
 		Spectrum{params.albedo},

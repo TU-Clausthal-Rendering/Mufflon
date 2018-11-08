@@ -1,6 +1,6 @@
 #pragma once
 
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
 #include <cuda_runtime_api.h>

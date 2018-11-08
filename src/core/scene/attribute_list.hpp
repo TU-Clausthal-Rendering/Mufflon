@@ -3,7 +3,7 @@
 #include "core/memory/accessor.hpp"
 #include "attribute.hpp"
 #include "core/memory/synchronize.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
 #include <istream>

@@ -4,7 +4,7 @@
 #include "scenario.hpp"
 #include "scene.hpp"
 #include "handles.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include <map>
 #include <memory>
 #include <vector>

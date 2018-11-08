@@ -1,6 +1,6 @@
 #pragma once
 
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"

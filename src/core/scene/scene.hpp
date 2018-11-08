@@ -3,7 +3,7 @@
 #include "core/memory/generic_resource.hpp"
 #include "accel_struct.hpp"
 #include "instance.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "handles.hpp"
 #include "core/cameras/camera.hpp"
 #include "ei/3dtypes.hpp"

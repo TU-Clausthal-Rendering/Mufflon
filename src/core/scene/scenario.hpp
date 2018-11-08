@@ -1,7 +1,7 @@
 #pragma once
 
 #include "object.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "handles.hpp"
 #include <map>
 #include <string_view>

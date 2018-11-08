@@ -252,9 +252,6 @@
     <ClInclude Include="..\..\src\core\math\sampling.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\export\dll_export.hpp">
-      <Filter>Source Files\export</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\world_container.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
@@ -317,6 +314,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\export\api.hpp">
+      <Filter>Source Files\export</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -23,7 +23,6 @@ std::size_t get_num_internal_nodes(std::size_t elems) {
 }
 
 // The following functions are taken from (taken from https://github.com/Jojendersie/Bim/blob/master/src/bim_sbvh.cpp)
-
 // Two sources to derive the z-order comparator
 // (floats - unused) http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.150.9547&rep=rep1&type=pdf
 // (ints - the below one uses this int-algorithm on floats) http://dl.acm.org/citation.cfm?id=545444
@@ -175,24 +174,6 @@ void create_light_tree(const std::vector<LightType>& lights, LightTree::LightTyp
 			node.left.set_offset(startNode + extraNodes - 1u);
 			node.right.set_offset(lightOffsets[startInnerNode + extraNodes / 2u]);
 		}
-	}
-
-	// Now the nodes from the next higher (incomplete) level
-	// Take into account that up to one light has been marged already at the beginning
-	std::size_t startLight = (extraNodes % 2 == 0u) ? 0u : 1u;
-	std::size_t nodeCount = (lights.size() - 2u * extraNodes - startLight) / 2u;
-	// Start node for completely filled tree, but we may need an offset
-	std::size_t lightStartNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u + extraNodes;
-	for(std::size_t i = 0u; i < nodeCount; ++i) {
-		mAssert(startLight + 2u * i + 1u < lights.size());
-		mAssert(lightStartNode + i < get_num_internal_nodes(lights.size()));
-		const LightType& left = lights[startLight + 2u * i];
-		const LightType& right = lights[startLight + 2u * i + 1u];
-		Node& node = tree.nodes[lightStartNode + i];
-
-		node = Node{ left, right, aabbDiag };
-		node.left.set_offset(lightOffsets[startLight + 2u * i]);
-		node.right.set_offset(lightOffsets[startLight + 2u * i + 1u]);
 	}
 
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)

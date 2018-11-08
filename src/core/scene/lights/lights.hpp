@@ -5,6 +5,7 @@
 #include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
+#include <cuda_fp16.h>
 #include <variant>
 #include <type_traits>
 
@@ -43,7 +44,8 @@ struct alignas(16) SpotLight {
 	ei::Vec3 position;
 	u32 direction;
 	ei::Vec3 intensity;
-	u32 angles;
+	half cosThetaMax;
+	half falloffStart;
 };
 
 /**
@@ -217,9 +219,9 @@ template <>
 inline ei::Vec3 get_flux<DirectionalLight>(const DirectionalLight& light,
 										   const ei::Vec3& aabbDiag) {
 	mAssert(aabbDiag.x > 0 && aabbDiag.y > 0 && aabbDiag.z > 0);
-	float surface = aabbDiag.y*aabbDiag.z*light.direction.x
-		+ aabbDiag.x*aabbDiag.z*light.direction.y
-		+ aabbDiag.x*aabbDiag.y*light.direction.z;
+	float surface = aabbDiag.y*aabbDiag.z*std::abs(light.direction.x)
+		+ aabbDiag.x*aabbDiag.z*std::abs(light.direction.y)
+		+ aabbDiag.x*aabbDiag.y*std::abs(light.direction.z);
 	return light.radiance * surface;
 }
 

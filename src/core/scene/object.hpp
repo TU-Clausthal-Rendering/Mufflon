@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/memory/residency.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
 #include "util/assert.hpp"

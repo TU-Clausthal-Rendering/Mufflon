@@ -9,6 +9,7 @@
 #include <chrono>
 
 #include <cuda_runtime.h>
+#include "ei/conversions.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/object.hpp"
@@ -36,51 +37,128 @@ public:
 
 void test_lighttree() {
 	using namespace lights;
-	LightTree tree;
-
-	{
-		std::vector<PositionalLights> posLights{
-			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
-			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
-			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
-			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
-			PointLight{ ei::Vec3{0, 0, 0}, ei::Vec3{1, 0, 0} },
-			PointLight{ ei::Vec3{6, 0, 0}, ei::Vec3{1, 0, 0} },
-			PointLight{ ei::Vec3{0, 5, 0}, ei::Vec3{1, 0, 0} },
-		};
-		std::vector<DirectionalLight> dirLights;
-
-		tree.build(std::move(posLights), std::move(dirLights), ei::Box(ei::Vec3(0, 0, 0), ei::Vec3(6, 5, 0)));
-	}
-	using namespace std::chrono;
 
 	std::mt19937_64 rng(std::random_device{}());
 	std::uniform_int_distribution<std::uint64_t> intDist;
 	std::uniform_real_distribution<float> floatDist;
-	auto& lightTree = tree.aquire_tree<Device::CPU>();
+	std::vector<Photon> photons(1000000u);
 
-	auto t0 = high_resolution_clock::now();
-	Photon p = emit(lightTree, intDist(rng), floatDist(rng), floatDist(rng));
-	std::cout << "Single photon: " << p.direction[0] << ", "
-		<< duration_cast<milliseconds>(high_resolution_clock::now() - t0).count()
-		<< "ms" << std::endl;
+	auto testLights = [&rng, &photons, intDist, floatDist](std::vector<PositionalLights> posLights,
+									   std::vector<DirectionalLight> dirLights,
+									   const ei::Box& bounds,
+									   std::optional<textures::TextureHandle> envLight = std::nullopt)
+	{
+		LightTree tree;
+		tree.build(std::move(posLights), std::move(dirLights), bounds, envLight);
 
-	std::vector<Photon> photons(500000u);
+		using namespace std::chrono;
+		auto& lightTree = tree.aquire_tree<Device::CPU>();
+		auto t0 = high_resolution_clock::now();
+		for(std::size_t i = 0u; i < photons.size(); ++i) {
+			photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
+							  bounds, { floatDist(rng), floatDist(rng),
+							  floatDist(rng), floatDist(rng) });
+		}
+		auto t1 = high_resolution_clock::now();
 
-	t0 = high_resolution_clock::now();
-	for(std::size_t i = 0u; i < photons.size(); ++i) {
-		photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
-						  floatDist(rng), floatDist(rng));
+		ei::Vec3 positions{};
+		ei::Vec3 directions{};
+		for(const auto& p : photons) {
+			positions += p.pos.position;
+			directions += p.dir.direction;
+		}
+
+		positions /= static_cast<float>(photons.size());
+		directions /= static_cast<float>(photons.size());
+
+		std::cout << "[" << positions[0]
+			<< '|' << positions[1] << '|' << positions[2] << "] ["
+			<< directions[0] << '|' << directions[1] << '|'
+			<< directions[2] << "] (" << photons.size() << " photons, "
+			<< duration_cast<milliseconds>(t1 - t0).count()
+			<< "ms)" << std::endl;
+	};
+	
+	float posScale = 10.f;
+	float intensityScale = 20.f;
+	ei::Box bounds{ posScale * ei::Vec3{-1, -1, -1}, posScale * ei::Vec3{1, 1, 1} };
+	std::vector<PositionalLights> posLights(10000);
+	std::vector<DirectionalLight> dirLights(1);
+
+	{ // Test point lights
+		for(auto& light : posLights) {
+			light = PointLight{
+				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+			};
+		}
+		std::cout << "Point lights: ";
+		testLights(posLights, {}, bounds);
 	}
-	auto t1 = high_resolution_clock::now();
-
-	ei::Vec3 directions{};
-	for(const auto& p : photons) {
-		directions += p.direction;
+	{ // Test spot lights
+		for(auto& light : posLights) {
+			float angle = floatDist(rng);
+			light = SpotLight{
+				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				ei::packOctahedral32(ei::normalize(ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) })),
+				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				__float2half(floatDist(rng)), __float2half(std::min(angle, floatDist(rng)))
+			};
+		}
+		std::cout << "Spot lights: ";
+		testLights(posLights, {}, bounds);
 	}
-	std::cout << photons.size() << " photons: " << directions[0] << ", "
-		<< duration_cast<milliseconds>(t1 - t0).count()
-		<< "ms" << std::endl;
+	{ // Test triangular area lights
+		for(auto& light : posLights) {
+			float angle = floatDist(rng);
+			light = AreaLightTriangle{
+				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) } },
+				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
+			};
+		}
+		std::cout << "Triangular area lights: ";
+		testLights(posLights, {}, bounds);
+	}
+	{ // Test quad area lights
+		for(auto& light : posLights) {
+			float angle = floatDist(rng);
+			light = AreaLightQuad{
+				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) } },
+				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
+			};
+		}
+		std::cout << "Quad area lights: ";
+		testLights(posLights, {}, bounds);
+	}
+	{ // Test spherical area lights
+		for(auto& light : posLights) {
+			float angle = floatDist(rng);
+			light = AreaLightSphere{
+				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
+				floatDist(rng),
+				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
+			};
+		}
+		std::cout << "Spherical lights: ";
+		testLights(posLights, {}, bounds);
+	}
+	{ // Test directional lights
+		for(auto& light : dirLights) {
+			float angle = floatDist(rng);
+			light = DirectionalLight{
+				ei::normalize(ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }),
+				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
+			};
+		}
+		std::cout << "Directional lights: ";
+		testLights({}, dirLights, bounds);
+	}
+	// TODO: Test envmap light
 }
 
 void test_allocator() {

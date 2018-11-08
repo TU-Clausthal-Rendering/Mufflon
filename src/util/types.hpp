@@ -1,6 +1,7 @@
 #pragma once
 
-#include <ei/vector.hpp>
+#include "ei/vector.hpp"
+#include <limits>
 #include <cstdint>
 
 namespace mufflon {
@@ -43,32 +44,44 @@ class AngularPdf;
 // PDF types. Either per area or per steradians
 class AreaPdf {
 public:
-	AreaPdf() = default;
-	explicit AreaPdf(Real pdf) noexcept : m_pdf(pdf) {}
-	explicit operator Real() const noexcept { return m_pdf; }
+	constexpr AreaPdf() = default;
+	explicit constexpr AreaPdf(Real pdf) noexcept : m_pdf(pdf) {}
+	explicit constexpr operator Real() const noexcept { return m_pdf; }
 	AreaPdf& operator+=(AreaPdf pdf) noexcept;
 	AreaPdf& operator-=(AreaPdf pdf) noexcept;
 	AreaPdf& operator*=(AreaPdf pdf) noexcept;
 	AreaPdf& operator/=(AreaPdf pdf) noexcept;
-	AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
+	constexpr AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
+	static constexpr AreaPdf infinite() {
+		return AreaPdf{ std::numeric_limits<float>::infinity() };
+	}
 
 private:
-	Real m_pdf;
+	Real m_pdf = 0.f;
 };
 class AngularPdf {
 public:
-	AngularPdf() = default;
-	explicit AngularPdf(Real pdf) noexcept : m_pdf(pdf) {}
-	explicit operator Real() const noexcept { return m_pdf; }
+	constexpr AngularPdf() = default;
+	explicit constexpr AngularPdf(Real pdf) noexcept : m_pdf(pdf) {}
+	explicit constexpr operator Real() const noexcept { return m_pdf; }
 	AngularPdf& operator+=(AngularPdf pdf) noexcept;
 	AngularPdf& operator-=(AngularPdf pdf) noexcept;
 	AngularPdf& operator*=(AngularPdf pdf) noexcept;
 	AngularPdf& operator/=(AngularPdf pdf) noexcept;
-	AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept;
+	constexpr AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
+		return AreaPdf{ m_pdf * cos / distSqr };
+	}
+	static constexpr AngularPdf infinite() {
+		return AngularPdf{std::numeric_limits<float>::infinity()};
+	}
 
 private:
-	Real m_pdf;
+	Real m_pdf = 0.f;
 };
+
+inline constexpr AngularPdf AreaPdf::to_angular_pdf(Real cos, Real distSqr) const noexcept {
+	return AngularPdf{ m_pdf * distSqr / cos };
+}
 
 using Pixel = ei::IVec2;
 using Voxel = ei::IVec3;

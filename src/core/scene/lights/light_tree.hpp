@@ -2,7 +2,7 @@
 
 #include "lights.hpp"
 #include "light_sampling.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
@@ -67,17 +67,17 @@ public:
 
 		Node(const Node& left, const Node& right);
 		Node(const Node& left, const PositionalLights& right,
-			 const ei::Vec3& aabbDiag);
+			 const ei::Vec3& bounds);
 		Node(const Node& left, const DirectionalLight& right,
-			 const ei::Vec3& aabbDiag);
+			 const ei::Vec3& bounds);
 		Node(const PositionalLights& left, const Node& right,
-			 const ei::Vec3& aabbDiag);
+			 const ei::Vec3& bounds);
 		Node(const DirectionalLight& left, const Node& right,
-			 const ei::Vec3& aabbDiag);
+			 const ei::Vec3& bounds);
 		Node(const PositionalLights& left, const PositionalLights& right,
-			 const ei::Vec3& aabbDiag);
+			 const ei::Vec3& bounds);
 		Node(const DirectionalLight& left, const DirectionalLight& right,
-			 const ei::Vec3& aabbDiag);
+			 const ei::Vec3& bounds);
 
 		// Layout: [4,4,2]=10, [2,4,4]=10, [4,4,4]=12 bytes
 		// Necessary duplication due to memory layout (2x32+16 and 16+2x32 bits)
@@ -171,15 +171,16 @@ namespace lighttree_detail {
 
 // Converts the typeless memory into the given light type and samples it
 __host__ __device__ Photon sample_light(LightType type, const char* light,
-										float r0, float r1) {
+										const ei::Box& bounds,
+										const RndSet& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
-		case LightType::POINT_LIGHT: return sample_light(*reinterpret_cast<const PointLight*>(light), r0, r1);
-		case LightType::SPOT_LIGHT: return sample_light(*reinterpret_cast<const SpotLight*>(light), r0, r1);
-		case LightType::AREA_LIGHT_TRIANGLE: return sample_light(*reinterpret_cast<const AreaLightTriangle*>(light), r0, r1);
-		case LightType::AREA_LIGHT_QUAD: return sample_light(*reinterpret_cast<const AreaLightQuad*>(light), r0, r1);
-		case LightType::AREA_LIGHT_SPHERE: return sample_light(*reinterpret_cast<const AreaLightSphere*>(light), r0, r1);
-		case LightType::DIRECTIONAL_LIGHT: return sample_light(*reinterpret_cast<const DirectionalLight*>(light), r0, r1);
+		case LightType::POINT_LIGHT: return sample_light(*reinterpret_cast<const PointLight*>(light), rnd);
+		case LightType::SPOT_LIGHT: return sample_light(*reinterpret_cast<const SpotLight*>(light), rnd);
+		case LightType::AREA_LIGHT_TRIANGLE: return sample_light(*reinterpret_cast<const AreaLightTriangle*>(light), rnd);
+		case LightType::AREA_LIGHT_QUAD: return sample_light(*reinterpret_cast<const AreaLightQuad*>(light), rnd);
+		case LightType::AREA_LIGHT_SPHERE: return sample_light(*reinterpret_cast<const AreaLightSphere*>(light), rnd);
+		case LightType::DIRECTIONAL_LIGHT: return sample_light(*reinterpret_cast<const DirectionalLight*>(light), bounds, rnd);
 		default: mAssert(false); return {};
 	}
 }
@@ -190,13 +191,13 @@ __host__ __device__ Photon sample_light(LightType type, const char* light,
  * Takes the light tree, initial interval limits, and RNG number as inputs.
  */
 __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, u64 right,
-								u64 rng, float r0, float r1) {
+								u64 rng, const ei::Box& bounds, const RndSet& rnd) {
 	// Check: do we have more than one light here?
 	if(tree.lightCount == 1u) {
 		// Nothing to do but sample the photon
 		mAssert(tree.root.type < static_cast<u16>(LightType::NUM_LIGHTS));
 		return lighttree_detail::sample_light(static_cast<LightType>(tree.root.type),
-											  &tree.lights[0u], r0, r1);
+											  &tree.lights[0u], bounds, rnd);
 	}
 
 	// Traverse the tree to split chance between lights
@@ -245,17 +246,18 @@ __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, 
 	mAssert(type != LightTree::Node::INVALID_TYPE);
 	// We got a light source! Sample it
 	return lighttree_detail::sample_light(static_cast<LightType>(type),
-										  &tree.lights[offset], r0, r1);
+										  &tree.lights[offset], bounds, rnd);
 }
 
 __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, u64 right,
-								u64 index, u64 indexMax, u64 rng, float r0, float r1) {
+								u64 index, u64 indexMax, u64 rng, const ei::Box& bounds,
+								const RndSet& rnd) {
 	// Check: do we have more than one light here?
 	if(tree.lightCount == 1u) {
 		// Nothing to do but sample the photon
 		mAssert(tree.root.type < static_cast<u16>(LightType::NUM_LIGHTS));
 		return lighttree_detail::sample_light(static_cast<LightType>(tree.root.type),
-											  &tree.lights[0u], r0, r1);
+											  &tree.lights[0u], bounds, rnd);
 	}
 
 	// Traverse the tree to split chance between lights
@@ -333,12 +335,13 @@ __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, 
 	mAssert(type != LightTree::Node::INVALID_TYPE);
 	// We got a light source! Sample it
 	return lighttree_detail::sample_light(static_cast<LightType>(type),
-										  &tree.lights[offset], r0, r1);
+										  &tree.lights[offset], bounds, rnd);
 }
 
  // Emits a single photon from a light source.
 template < Device dev >
-__host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng, float r0, float r1) {
+__host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng,
+								const ei::Box& bounds, const RndSet& rnd) {
 	// Figure out which of the three top-level light types get the photon
 	// Implicit left boundary of 0 for the interval
 	u64 intervalRight = std::numeric_limits<u64>::max();
@@ -354,16 +357,16 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng, float
 	if(tree.envLight.texHandle.handle != nullptr)
 		splitEnv = static_cast<u64>(intervalRight * ei::sum(tree.envLight.flux) / fluxSum);
 	if(rng < splitEnv)
-		return sample_light(tree.envLight, r0, r1);
+		return sample_light(tree.envLight, rnd);
 	// ...then come directional lights...
 	u64 splitDir = splitEnv + static_cast<u64>(intervalRight * tree.dirLights.root.flux / fluxSum);
 	if(rng < splitDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
-		return emit(tree.dirLights, splitEnv, splitDir, rng, r0, r1);
+		return emit(tree.dirLights, splitEnv, splitDir, rng, bounds, rnd);
 	}
 	// ...and last positional lights
 	mAssert(tree.posLights.lightCount > 0u);
-	return emit(tree.posLights, splitDir, intervalRight, rng, r0, r1);
+	return emit(tree.posLights, splitDir, intervalRight, rng, bounds, rnd);
 }
 
 /**
@@ -373,7 +376,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 rng, float
  */
 template < Device dev >
 __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64 indexMax,
-								u64 rng, float r0, float r1) {
+								u64 rng, const ei::Box& bounds, const RndSet& rnd) {
 	// Figure out which of the three top-level light types get the photon
 	// Implicit left boundary of 0 for the interval
 	u64 intervalRight = indexMax;
@@ -388,7 +391,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64
 	u64 rightEnv = static_cast<u64>(intervalRight * ei::sum(tree.envLight.flux) / fluxSum);
 	if(index < rightEnv) {
 		mAssert(tree.envLight.texHandle.handle != nullptr);
-		return sample_light(tree.envLight, r0, r1);
+		return sample_light(tree.envLight, rnd);
 	}
 	// ...then come directional lights...
 	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * (ei::sum(tree.envLight.flux) / fluxSum)));
@@ -397,7 +400,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64
 	if(index >= leftDir && index < rightDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
 		return emit(tree.dirLights, leftDir, rightDir, index,
-					indexMax, rng, r0, r1);
+					indexMax, rng, bounds, rnd);
 	}
 	// ...and last positional lights
 	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight * (ei::sum(tree.envLight.flux)
@@ -405,7 +408,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64
 	if(index >= leftPos) {
 		mAssert(tree.posLights.lightCount > 0u);
 		return emit(tree.posLights, leftPos, intervalRight,
-					index, indexMax, rng, r0, r1);
+					index, indexMax, rng, bounds, rnd);
 	}
 
 	// If we made it until here, it means that we fell between the integer bounds of photon distribution
@@ -415,14 +418,14 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64
 																	   + tree.dirLights.root.flux) / fluxSum);
 	if(rng < splitEnv) {
 		mAssert(tree.envLight.texHandle.handle != nullptr);
-		return sample_light(tree.envLight, r0, r1);
+		return sample_light(tree.envLight, rnd);
 	} else if(rng < splitDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
-		return emit(tree.dirLights, splitEnv, splitDir, rng, r0, r1);
+		return emit(tree.dirLights, splitEnv, splitDir, rng, bounds, rnd);
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
 		return emit(tree.posLights, splitDir, std::numeric_limits<u64>::max(),
-					rng, r0, r1);
+					rng, bounds, rnd);
 	}
 }
 

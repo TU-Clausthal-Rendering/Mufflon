@@ -2,7 +2,7 @@
 
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
-#include "export/dll_export.hpp"
+#include "export/api.hpp"
 #include "util/array_wrapper.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
