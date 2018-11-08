@@ -170,7 +170,7 @@ public:
 	}
 	template < Device dev >
 	void synchronize() {
-		m_geometryData.for_each([](std::size_t i, auto& elem) {
+		m_geometryData.for_each([](auto& elem) {
 			elem.template synchronize<dev>();
 		});
 	}
@@ -182,7 +182,7 @@ public:
 	}
 	template < Device dev >
 	void unload() {
-		m_geometryData.for_each([](std::size_t i, auto& elem) {
+		m_geometryData.for_each([](auto& elem) {
 			elem.template unload<dev>();
 		});
 	}

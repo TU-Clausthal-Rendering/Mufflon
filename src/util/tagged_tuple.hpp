@@ -112,8 +112,10 @@ public:
 	template < class Op, std::size_t I = 0u >
 	void for_each(Op&& op) {
 		if constexpr(I < size) {
-			op(I, get<I>());
+			op(get<I>());
 			for_each<Op, I + 1u>(std::move(op));
+		} else {
+			(void)op;
 		}
 	}
 

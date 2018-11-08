@@ -80,7 +80,10 @@ ei::Vec3 get_light_center(const T& light) {
 template < class LT >
 class LightOffset {
 public:
-	LightOffset(const std::vector<LT>& lights) {}
+	LightOffset(const std::vector<LT>& lights)
+	{
+		(void)lights;
+	}
 	
 	constexpr u32 operator[](std::size_t lightIndex) const noexcept {
 		return static_cast<u32>(sizeof(LT) * lightIndex);
@@ -214,7 +217,9 @@ LightTree::Node::Node(const Node& left, const PositionalLights& right,
 	left{ left.left.flux + left.right.flux, 0u, Node::INVALID_TYPE },
 	right{ static_cast<u16>(get_light_type(right)), 0u, ei::sum(get_flux(right)) },
 	center{ (left.center + get_light_center(right)) / 2.f }
-{}
+{
+	(void)aabbDiag;
+}
 LightTree::Node::Node(const Node& left, const DirectionalLight& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ left.left.flux + left.right.flux, 0u, Node::INVALID_TYPE },
@@ -226,7 +231,9 @@ LightTree::Node::Node(const PositionalLights& left, const Node& right,
 	left{ ei::sum(get_flux(left)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ Node::INVALID_TYPE, 0u, right.left.flux + right.right.flux  },
 	center{ (get_light_center(left) + right.center) / 2.f }
-{}
+{
+	(void)aabbDiag;
+}
 LightTree::Node::Node(const DirectionalLight& left, const Node& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ ei::sum(get_flux(left, aabbDiag)), 0u, static_cast<u16>(get_light_type(left)) },
@@ -238,13 +245,17 @@ LightTree::Node::Node(const PositionalLights& left, const PositionalLights& righ
 	left{ ei::sum(get_flux(left)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ static_cast<u16>(get_light_type(right)), 0u,  ei::sum(get_flux(right)) },
 	center{ (get_light_center(left) + get_light_center(right)) / 2.f }
-{}
+{
+	(void)aabbDiag;
+}
 LightTree::Node::Node(const DirectionalLight& left, const DirectionalLight& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ ei::sum(get_flux(left, aabbDiag)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ static_cast<u16>(get_light_type(right)), 0u,  ei::sum(get_flux(right, aabbDiag)) },
 	center{ (left.direction + right.direction) / 2.f }
-{}
+{
+	(void)aabbDiag;
+}
 
 
 LightTree::LightTree() :

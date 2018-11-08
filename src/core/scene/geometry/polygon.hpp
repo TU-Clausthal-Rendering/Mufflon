@@ -157,21 +157,20 @@ public:
 	void resize(std::size_t vertices, std::size_t edges, std::size_t faces);
 
 	// Requests a new attribute, either for face or vertex.
-	template < class AttributeHandle >
-	AttributeHandle request(const std::string& name) {
-		using Type = typename AttributeHandle::Type;
+	template < class AttrHandle >
+	AttrHandle request(const std::string& name) {
+		using Type = typename AttrHandle::Type;
 
-		typename AttributeHandle::OmAttrHandle attrHandle;
+		typename AttrHandle::OmAttrHandle attrHandle;
 		if(!m_meshData.get_property_handle(attrHandle, name)) {
 			// Add the attribute to OpenMesh...
 			m_meshData.add_property(attrHandle, name);
 			// ...as well as our attribute list
 			OpenMesh::PropertyT<Type> &omAttr = m_meshData.property(attrHandle);
-			return { attrHandle, AttributeHelper<AttributeHandle>::add(m_vertexAttributes,
-																	   m_faceAttributes, name, omAttr) };
+			return { attrHandle, select_list<AttrHandle>().add(name, omAttr) };
 		} else {
 			// Found in OpenMesh already, now find it in our list
-			auto opt = AttributeHelper<AttributeHandle>::find(m_vertexAttributes, m_faceAttributes, name);
+			auto opt = select_list<AttrHandle>().find<Type>(name);
 			mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
 					   "property in OpenMesh but not in our custom list");
 			return { attrHandle, opt.value() };
@@ -182,19 +181,19 @@ public:
 	void remove(AttributeHandle &attr) {
 		// Remove from both lists
 		m_meshData.remove_property(attr.omHandle);
-		AttributeHelper<AttributeHandle>::remove(m_vertexAttributes, m_faceAttributes, attr.customHandle);
+		select_list<AttributeHandle>().remove(attr.customHandle);
 	}
 
-	template < class AttributeHandle >
-	std::optional<AttributeHandle> find(const std::string& name) {
-		using Type = typename AttributeHandle::Type;
-		using Attribute = typename AttributeHandle::Attribute;
+	template < class AttrHandle >
+	std::optional<AttrHandle> find(const std::string& name) {
+		using Type = typename AttrHandle::Type;
+		using Attribute = typename AttrHandle::Attribute;
 
-		typename AttributeHandle::OmAttrHandle attrHandle;
+		typename AttrHandle::OmAttrHandle attrHandle;
 		if(!m_meshData.get_property_handle(attrHandle, name))
 			return std::nullopt;
 		// Find attribute in custom list as 
-		auto opt = AttributeHelper<AttributeHandle>::find(m_vertexAttributes, m_faceAttributes, name);
+		auto opt = select_list<AttrHandle>().find<Type>(name);
 		mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
 				   "property in OpenMesh but not in our custom list");
 		return { attrHandle, opt.value() };
@@ -346,8 +345,8 @@ public:
 	void tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
 					std::size_t divisions);
 	// Implements tessellation for adaptive subdivision.
-	void tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
-					std::size_t divisions);
+	/*void tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
+					std::size_t divisions);*/
 	// Implements decimation.
 	void create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 					std::size_t target_vertices);
@@ -378,39 +377,20 @@ public:
 	}
 
 private:
-	// Helper struct for adding attributes since functions cannot be partially specialized
+	// Helper struct for identifying handle type
+	template < class >
+	struct IsvertexHandleType : std::false_type {};
+	template < class T >
+	struct IsvertexHandleType<VertexAttributeHandle<T>> : std::true_type {};
+
+	// Helper function for adding attributes since functions cannot be partially specialized
 	template < class AttributeHandle >
-	struct AttributeHelper;
-
-	template < class T >
-	struct AttributeHelper<VertexAttributeHandle<T>> {
-		static AttributeHandle<T> add(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name, OpenMesh::PropertyT<T>& prop) {
-			return vertexList.add<T>(name, prop);
-		}
-
-		static std::optional<AttributeHandle<T>> find(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name) {
-			return vertexList.find<T>(name);
-		}
-
-		static void remove(AttributeListType& vertexList, AttributeListType& faceList, AttributeHandle<T>& hdl) {
-			vertexList.remove(hdl);
-		}
-	};
-
-	template < class T >
-	struct AttributeHelper<FaceAttributeHandle<T>> {
-		static AttributeHandle<T> add(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name, OpenMesh::PropertyT<T>& prop) {
-			return faceList.add<T>(name, prop);
-		}
-
-		static std::optional<AttributeHandle<T>> find(AttributeListType& vertexList, AttributeListType& faceList, const std::string& name) {
-			return faceList.find<T>(name);
-		}
-
-		static void remove(AttributeListType& vertexList, AttributeListType& faceList, AttributeHandle<T>& hdl) {
-			faceList.remove(hdl);
-		}
-	};
+	AttributeListType& select_list() {
+		if constexpr(IsvertexHandleType<AttributeHandle>::value)
+			return m_vertexAttributes;
+		else
+			return m_faceAttributes;
+	}
 
 	// These methods simply create references to the attributes
 	// TODO: by holding references to them, if they ever get removed, we're in a bad spot

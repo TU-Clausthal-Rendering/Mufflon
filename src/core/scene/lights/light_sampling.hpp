@@ -110,6 +110,8 @@ inline __host__ __device__ __forceinline__ Photon sample_light(const Directional
 template < Device dev >
 inline __host__ __device__ __forceinline__ Photon sample_light(const EnvMapLight<dev>& light,
 															   const RndSet& rnd) {
+	(void)light;
+	(void)rnd;
 	// TODO
 	return {};
 }

@@ -159,6 +159,7 @@ inline LightType get_light_type(const LT& light) {
 			return LightType::NUM_LIGHTS;
 	};
 
+	(void)light;
 	if constexpr(std::is_same_v<LT, PositionalLights>)
 		return std::visit(posLightType, light);
 	else if constexpr(is_positional_light_type<LT>())
@@ -203,7 +204,7 @@ inline ei::Vec3 get_flux(const PositionalLights& light) {
 
 template < class LT >
 inline ei::Vec3 get_flux(const LT& light, const ei::Vec3& aabbDiag) {
-
+	(void)aabbDiag;
 	if constexpr(std::is_same_v<LT, PositionalLights>)
 		return std::visit([](const auto& posLight) {
 			return get_flux(posLight);

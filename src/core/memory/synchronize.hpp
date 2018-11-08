@@ -19,6 +19,10 @@ void synchronize_impl(Tuple& tuple, util::DirtyFlags<Device>& flags,
 		} else {
 			synchronize_impl<I + 1u, dev>(tuple, flags, sync);
 		}
+	} else {
+		(void)sync;
+		(void)flags;
+		(void)tuple;
 	}
 }
 

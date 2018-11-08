@@ -43,6 +43,7 @@ public:
 		m_camera->get_parameter_pack(pCam, dev);
 
 		for(InstanceHandle instance : m_instances) {
+			(void)instance;
 			// TODO
 		}
 		// TODO: materials etc.
@@ -52,6 +53,7 @@ public:
 	void unload() {
 		m_cameraParams.template get<dev>().unload();
 		for(InstanceHandle instance : m_instances) {
+			(void)instance;
 			// TODO
 		}
 		// TODO: materials etc.

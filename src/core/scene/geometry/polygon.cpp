@@ -125,7 +125,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 								   const VertexHandle& v2, const VertexHandle& v3,
 								   MaterialIndex idx) {
-	QuadHandle hdl = this->add(v0, v1, v2, v1);
+	QuadHandle hdl = this->add(v0, v1, v2, v3);
 	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
@@ -202,15 +202,16 @@ void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, R
 	m_vertexAttributes.mark_changed<>();
 	logInfo("Uniformly tessellated polygon mesh with ", divisions, " subdivisions");
 }
-void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
+/*void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
 				std::size_t divisions) {
 	// TODO
+	(void)tessellater;
 	throw std::runtime_error("Adaptive tessellation isn't implemented yet");
 	// TODO: change number of triangles/quads!
 	// Flag the entire polygon as dirty
 	m_vertexAttributes.mark_changed<>();
 	logInfo("Adaptively tessellated polygon mesh with ", divisions, " subdivisions");
-}
+}*/
 
 void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 				std::size_t target_vertices) {

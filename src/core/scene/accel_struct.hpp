@@ -39,8 +39,7 @@ public:
 	virtual void build(const ei::Box& boundingBox,
 					   util::Range<geometry::Polygons::FaceIterator> faces,
 					   const AttributeList<false>::Attribute<geometry::Spheres::Sphere>&,
-					   std::size_t triangles, std::size_t quads) {
-	}
+					   std::size_t triangles, std::size_t quads) = 0;
 	// Checks whether the data on a given system has been modified and is out of sync.
 	virtual bool is_dirty(Device res) const = 0;
 

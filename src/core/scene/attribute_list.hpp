@@ -252,7 +252,7 @@ public:
 
 	// Resizes all attributes on all devices (only reallocs if present)
 	void resize(std::size_t n) {
-		m_attributePools.for_each([n](std::size_t i, auto& elem) {
+		m_attributePools.for_each([n](auto& elem) {
 			elem.resize(n);
 			return false;
 		});

@@ -87,6 +87,8 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\include;$(CudaToolkitIncludeDir);$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps;$(SolutionDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DiagnosticsFormat>Classic</DiagnosticsFormat>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\lib;$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -126,6 +128,8 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\include;$(CudaToolkitIncludeDir);$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps;$(SolutionDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DiagnosticsFormat>Classic</DiagnosticsFormat>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

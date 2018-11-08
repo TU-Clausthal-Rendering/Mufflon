@@ -250,7 +250,7 @@ __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, 
 }
 
 __host__ __device__ Photon emit(const LightTree::LightTypeTree& tree, u64 left, u64 right,
-								u64 index, u64 indexMax, u64 rng, const ei::Box& bounds,
+								u64 index, u64 rng, const ei::Box& bounds,
 								const RndSet& rnd) {
 	// Check: do we have more than one light here?
 	if(tree.lightCount == 1u) {
@@ -399,8 +399,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64
 													 + tree.dirLights.root.flux) / fluxSum);
 	if(index >= leftDir && index < rightDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
-		return emit(tree.dirLights, leftDir, rightDir, index,
-					indexMax, rng, bounds, rnd);
+		return emit(tree.dirLights, leftDir, rightDir, index, rng, bounds, rnd);
 	}
 	// ...and last positional lights
 	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight * (ei::sum(tree.envLight.flux)
@@ -408,7 +407,7 @@ __host__ __device__ Photon emit(const LightTree::Tree<dev>& tree, u64 index, u64
 	if(index >= leftPos) {
 		mAssert(tree.posLights.lightCount > 0u);
 		return emit(tree.posLights, leftPos, intervalRight,
-					index, indexMax, rng, bounds, rnd);
+					index, rng, bounds, rnd);
 	}
 
 	// If we made it until here, it means that we fell between the integer bounds of photon distribution

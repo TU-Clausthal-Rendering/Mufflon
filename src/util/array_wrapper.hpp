@@ -20,7 +20,9 @@ public:
 		m_length(length),
 #endif // DEBUG_ENABLED
 		m_ptr(ptr)
-	{}
+	{
+		(void)length;
+	}
 
 	T& operator*() {
 		mAssert(m_ptr != nullptr);
@@ -81,7 +83,9 @@ public:
 		m_length(length),
 #endif // DEBUG_ENABLED
 		m_ptr(ptr)
-	{}
+	{
+		(void)length;
+	}
 
 	const T& operator*() const {
 		mAssert(m_ptr != nullptr);

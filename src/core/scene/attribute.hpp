@@ -363,6 +363,7 @@ public:
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
+		(void)pool;
 		// Needs to be specialized on a per-device basis
 		throw std::runtime_error("This synchronization is not implemented yet");
 	}
@@ -381,6 +382,7 @@ public:
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
+		(void)pool;
 		// Needs to be specialized on a per-device basis
 		throw std::runtime_error("This synchronization is not implemented yet");
 	}
@@ -530,6 +532,7 @@ public:
 
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
+		(void)pool;
 		// Needs to be specialized on a per-device basis
 		throw std::runtime_error("This synchronization is not implemented yet");
 	}
