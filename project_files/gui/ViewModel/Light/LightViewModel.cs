@@ -5,7 +5,10 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using gui.Annotations;
+using gui.Command;
+using gui.Model;
 using gui.Model.Light;
 
 namespace gui.ViewModel.Light
@@ -14,9 +17,10 @@ namespace gui.ViewModel.Light
     {
         private readonly LightModel m_parent;
 
-        protected LightViewModel(LightModel parent)
+        protected LightViewModel(Models models, LightModel parent)
         {
             m_parent = parent;
+            RemoveCommand = new RemoveLightCommand(models, parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
         }
 
@@ -55,6 +59,8 @@ namespace gui.ViewModel.Light
             get => m_parent.IsSelected;
             set => m_parent.IsSelected = value;
         }
+
+        public ICommand RemoveCommand { get; }
 
         /// <summary>
         /// create a new view based on this view model

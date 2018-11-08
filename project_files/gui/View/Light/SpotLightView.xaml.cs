@@ -21,10 +21,9 @@ namespace gui.View.Light
     /// </summary>
     public partial class SpotLightView : UserControl
     {
-        public SpotLightView(SpotLightViewModel spotLightViewModel)
+        public SpotLightView()
         {
             InitializeComponent();
-            DataContext = spotLightViewModel;
         }
     }
 }

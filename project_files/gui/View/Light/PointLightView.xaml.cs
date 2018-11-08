@@ -21,10 +21,9 @@ namespace gui.View.Light
     /// </summary>
     public partial class PointLightView : UserControl
     {
-        public PointLightView(PointLightViewModel pointLightViewModel)
+        public PointLightView()
         {
             InitializeComponent();
-            DataContext = pointLightViewModel;
         }
     }
 }

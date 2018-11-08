@@ -21,10 +21,9 @@ namespace gui.View.Light
     /// </summary>
     public partial class EnvmapLightView : UserControl
     {
-        public EnvmapLightView(EnvmapLightViewModel envmapLightViewModel)
+        public EnvmapLightView()
         {
             InitializeComponent();
-            DataContext = envmapLightViewModel;
         }
     }
 }

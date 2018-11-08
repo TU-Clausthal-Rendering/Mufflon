@@ -21,10 +21,9 @@ namespace gui.View.Light
     /// </summary>
     public partial class DirectionalLightView : UserControl
     {
-        public DirectionalLightView(DirectionalLightViewModel directionalLightViewModel)
+        public DirectionalLightView()
         {
             InitializeComponent();
-            DataContext = directionalLightViewModel;
         }
     }
 }

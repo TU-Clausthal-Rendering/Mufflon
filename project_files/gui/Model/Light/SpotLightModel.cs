@@ -15,7 +15,7 @@ namespace gui.Model.Light
 
         public override LightViewModel CreateViewModel(Models models)
         {
-            return new SpotLightViewModel(this);
+            return new SpotLightViewModel(models, this);
         }
 
         private Vec3<float> m_position;

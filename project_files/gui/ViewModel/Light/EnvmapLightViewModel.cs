@@ -19,7 +19,7 @@ namespace gui.ViewModel.Light
     {
         private readonly EnvmapLightModel m_parent;
 
-        public EnvmapLightViewModel(Models models, EnvmapLightModel parent) : base(parent)
+        public EnvmapLightViewModel(Models models, EnvmapLightModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectMapCommand = new SelectTextureCommand(models, () => m_parent.Map, val => m_parent.Map = val);
@@ -38,7 +38,7 @@ namespace gui.ViewModel.Light
 
         public override object CreateView()
         {
-            return new EnvmapLightView(this);
+            return new LightView(this, new EnvmapLightView());
         }
 
         // readonly property

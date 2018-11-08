@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model;
 using gui.Model.Light;
 using gui.Utility;
 using gui.View.Light;
@@ -14,7 +15,7 @@ namespace gui.ViewModel.Light
     {
         private readonly PointLightModel m_parent;
 
-        public PointLightViewModel(PointLightModel parent) : base(parent)
+        public PointLightViewModel(Models models, PointLightModel parent) : base(models, parent)
         {
             m_parent = parent;
         }
@@ -39,7 +40,7 @@ namespace gui.ViewModel.Light
 
         public override object CreateView()
         {
-            return new PointLightView(this);
+            return new LightView(this, new PointLightView());
         }
 
         public float PositionX

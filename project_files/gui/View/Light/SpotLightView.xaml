@@ -8,164 +8,139 @@
              mc:Ignorable="d" 
              d:DesignHeight="200" 
              d:DesignWidth="160">
-    <GroupBox>
-        <GroupBox.Header>
-            <StackPanel Orientation="Horizontal">
-                <CheckBox
-                    Margin="{StaticResource LeftPropertyMargin}"
-                    IsChecked="{Binding IsSelected}"/>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-                <TextBox 
-                    Width="100"
-                    Text="{Binding Name}"/>
-            </StackPanel>
-        </GroupBox.Header>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <TextBlock 
+        <TextBlock
                 Grid.Column="0"
                 Grid.Row="0"
-                Text="Type:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBlock
-                Grid.Column="1"
-                Grid.Row="0"
-                Text="{Binding Type}"
-                Margin="{StaticResource RightPropertyMargin}"/>
-
-            <TextBlock
-                Grid.Column="0"
-                Grid.Row="1"
                 Text="Scale:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="1"
+                Grid.Row="0"
                 Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Scale}"/>
 
-            <TextBlock
+        <TextBlock
                 Grid.Column="0"
-                Grid.Row="2"
+                Grid.Row="1"
                 Text="Position:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <Grid
+        <Grid
+                Grid.Column="1"
+                Grid.Row="1"
+                Margin="{StaticResource RightPropertyMargin}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding PositionX}"/>
+            <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding PositionY}"/>
+            <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding PositionZ}"/>
+        </Grid>
+
+        <TextBlock
+                Grid.Column="0"
+                Grid.Row="2"
+                Text="Direction:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <Grid
                 Grid.Column="1"
                 Grid.Row="2"
                 Margin="{StaticResource RightPropertyMargin}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <helper:EnterTextBox
-                    Grid.Column="0"
-                    Text="{Binding PositionX}"/>
-                <helper:EnterTextBox
-                    Grid.Column="1"
-                    Text="{Binding PositionY}"/>
-                <helper:EnterTextBox
-                    Grid.Column="2"
-                    Text="{Binding PositionZ}"/>
-            </Grid>
-
-            <TextBlock
-                Grid.Column="0"
-                Grid.Row="3"
-                Text="Direction:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-            <Grid
-                Grid.Column="1"
-                Grid.Row="3"
-                Margin="{StaticResource RightPropertyMargin}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <helper:EnterTextBox
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
                     Grid.Column="0"
                     Text="{Binding DirectionX}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="1"
                     Text="{Binding DirectionY}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="2"
                     Text="{Binding DirectionZ}"/>
-            </Grid>
+        </Grid>
 
 
-            <TextBlock
+        <TextBlock
                 Grid.Column="0"
-                Grid.Row="4"
+                Grid.Row="3"
                 Text="Intensity:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <Grid
+        <Grid
                 Grid.Column="1"
-                Grid.Row="4"
+                Grid.Row="3"
                 Margin="{StaticResource RightPropertyMargin}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <helper:EnterTextBox
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
                     Grid.Column="0"
                     Text="{Binding IntensityX}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="1"
                     Text="{Binding IntensityY}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="2"
                     Text="{Binding IntensityZ}"/>
-            </Grid>
+        </Grid>
 
-            <TextBlock 
+        <TextBlock 
                 Grid.Column="0"
-                Grid.Row="5"
+                Grid.Row="4"
                 Text="Exponent:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="5"
+                Grid.Row="4"
                 Text="{Binding Exponent}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
-            <TextBlock 
+        <TextBlock 
                 Grid.Column="0"
-                Grid.Row="6"
+                Grid.Row="5"
                 Text="Width:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="6"
+                Grid.Row="5"
                 Text="{Binding Width}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
-            <TextBlock 
+        <TextBlock 
                 Grid.Column="0"
-                Grid.Row="7"
+                Grid.Row="6"
                 Text="Falloff Start:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <helper:EnterTextBox
+        <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="7"
+                Grid.Row="6"
                 Text="{Binding FalloffStart}"
                 Margin="{StaticResource RightPropertyMargin}"/>
-        </Grid>
-    </GroupBox>
+    </Grid>
 </UserControl>

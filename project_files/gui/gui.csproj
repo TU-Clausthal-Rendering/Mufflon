@@ -161,6 +161,9 @@
     <Compile Include="View\Light\GoniometricLightView.xaml.cs">
       <DependentUpon>GoniometricLightView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Light\LightView.xaml.cs">
+      <DependentUpon>LightView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Light\PointLightView.xaml.cs">
       <DependentUpon>PointLightView.xaml</DependentUpon>
     </Compile>
@@ -237,6 +240,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Light\GoniometricLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\LightView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

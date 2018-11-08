@@ -15,7 +15,7 @@ namespace gui.Model.Light
 
         public override LightViewModel CreateViewModel(Models models)
         {
-            return new DirectionalLightViewModel(this);
+            return new DirectionalLightViewModel(models, this);
         }
 
         private Vec3<float> m_direction;

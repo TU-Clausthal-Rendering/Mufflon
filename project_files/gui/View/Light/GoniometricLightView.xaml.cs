@@ -21,10 +21,9 @@ namespace gui.View.Light
     /// </summary>
     public partial class GoniometricLightView : UserControl
     {
-        public GoniometricLightView(GoniometricLightViewModel goniometricLightViewModel)
+        public GoniometricLightView()
         {
             InitializeComponent();
-            DataContext = goniometricLightViewModel;
         }
     }
 }

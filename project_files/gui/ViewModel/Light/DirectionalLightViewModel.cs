@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model;
 using gui.Model.Light;
 using gui.Utility;
 using gui.View.Light;
@@ -14,7 +15,7 @@ namespace gui.ViewModel.Light
     {
         private readonly DirectionalLightModel m_parent;
 
-        public DirectionalLightViewModel(DirectionalLightModel parent) : base(parent)
+        public DirectionalLightViewModel(Models models, DirectionalLightModel parent) : base(models, parent)
         {
             m_parent = parent;
         }
@@ -39,7 +40,7 @@ namespace gui.ViewModel.Light
 
         public override object CreateView()
         {
-            return new DirectionalLightView(this);
+            return new LightView(this, new DirectionalLightView());
         }
 
         public float DirectionX

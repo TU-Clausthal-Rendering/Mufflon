@@ -17,7 +17,7 @@ namespace gui.ViewModel.Light
     {
         private readonly GoniometricLightModel m_parent;
 
-        public GoniometricLightViewModel(Models models, GoniometricLightModel parent) : base(parent)
+        public GoniometricLightViewModel(Models models, GoniometricLightModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectMapCommand = new SelectTextureCommand(models, () => m_parent.Map, val => m_parent.Map = val);
@@ -41,7 +41,7 @@ namespace gui.ViewModel.Light
 
         public override object CreateView()
         {
-            return new GoniometricLightView(this);
+            return new LightView(this, new GoniometricLightView());
         }
 
         public string Map
