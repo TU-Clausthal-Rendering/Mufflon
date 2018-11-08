@@ -11,9 +11,9 @@ namespace gui.Model.Camera
     {
         public override CameraType Type => CameraType.Pinhole;
 
-        public override CameraViewModel CreateViewModel()
+        public override CameraViewModel CreateViewModel(Models models)
         {
-            return new PinholeCameraViewModel(this);
+            return new PinholeCameraViewModel(models, this);
         }
 
         private float m_fov = 25.0f;

@@ -51,8 +51,9 @@ namespace gui.Model.Camera
         /// <summary>
         /// creates a new view model based on this model
         /// </summary>
+        /// <param name="models"></param>
         /// <returns></returns>
-        public abstract CameraViewModel CreateViewModel();
+        public abstract CameraViewModel CreateViewModel(Models models);
 
         #region PropertyChanged
 

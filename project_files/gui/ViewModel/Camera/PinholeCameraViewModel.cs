@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model;
 using gui.Model.Camera;
 using gui.View.Camera;
 
@@ -13,7 +14,7 @@ namespace gui.ViewModel.Camera
     {
         private readonly PinholeCameraModel m_parent;
 
-        public PinholeCameraViewModel(PinholeCameraModel parent) : base(parent)
+        public PinholeCameraViewModel(Models models, PinholeCameraModel parent) : base(models, parent)
         {
             m_parent = parent;
         }

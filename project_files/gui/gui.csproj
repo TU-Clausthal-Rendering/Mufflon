@@ -76,6 +76,7 @@
     <Compile Include="Command\AddCameraCommand.cs" />
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
+    <Compile Include="Command\RemoveCameraCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />

@@ -7,43 +7,15 @@
              xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d" 
              d:DesignHeight="200" 
-             d:DesignWidth="160">
+             d:DesignWidth="160"
+             SizeChanged="OnSizeChanged">
     <GroupBox>
         <GroupBox.Header>
-            <!--<DockPanel>
-                <Grid DockPanel.Dock="Left" HorizontalAlignment="Stretch">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <RadioButton
-                        Grid.Column="0"
-                        GroupName="RadioCamera"
-                        Margin="{StaticResource LeftPropertyMargin}"
-                        IsChecked="{Binding IsSelected}"/>
-
-                    <TextBox 
-                        Grid.Column="1"
-                        HorizontalContentAlignment="Stretch"
-                        HorizontalAlignment="Stretch"
-                        MinWidth="80"
-                        Text="{Binding Name}"/>
-                </Grid>
-
-                <Button
-                    DockPanel.Dock="Right"
-                    Margin="10 0 5 0">
-                    <Image 
-                        Source="../../Icons/cancel.png"
-                        Width="16"
-                        Height="16"/>
-                </Button>
-            </DockPanel>-->
-            <Grid>
+            <Grid x:Name="GroupHeaderGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <RadioButton
@@ -52,25 +24,26 @@
                     Margin="{StaticResource LeftPropertyMargin}"
                     IsChecked="{Binding IsSelected}"/>
 
-                <Button
+                <TextBox 
                     Grid.Column="1"
+                    HorizontalContentAlignment="Stretch"
+                    HorizontalAlignment="Stretch"
+                    Text="{Binding Name}"/>
+
+                <Button
+                    Grid.Column="2"
                     DockPanel.Dock="Right"
-                    Margin="0 0 5 0">
+                    Margin="5 0 0 0"
+                    Command="{Binding RemoveCommand}">
                     <Image 
                         Source="../../Icons/cancel.png"
                         Width="16"
                         Height="16"/>
                 </Button>
-
-                <TextBox 
-                    Grid.Column="2"
-                    HorizontalContentAlignment="Stretch"
-                    HorizontalAlignment="Stretch"
-                    MinWidth="80"
-                    Text="{Binding Name}"/>
             </Grid>
         </GroupBox.Header>
-        <StackPanel x:Name="GroupItems">
+        <StackPanel 
+                x:Name="GroupItems">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -85,15 +58,15 @@
                 </Grid.ColumnDefinitions>
 
                 <TextBlock 
-                    Grid.Column="0"
-                    Grid.Row="0"
-                    Text="Type:"
-                    Margin="{StaticResource LeftPropertyMargin}"/>
+                        Grid.Column="0"
+                        Grid.Row="0"
+                        Text="Type:"
+                        Margin="{StaticResource LeftPropertyMargin}"/>
                 <TextBlock
-                    Grid.Column="1"
-                    Grid.Row="0"
-                    Text="{Binding Type}"
-                    Margin="{StaticResource RightPropertyMargin}"/>
+                        Grid.Column="1"
+                        Grid.Row="0"
+                        Text="{Binding Type}"
+                        Margin="{StaticResource RightPropertyMargin}"/>
             </Grid>
         </StackPanel>
     </GroupBox>

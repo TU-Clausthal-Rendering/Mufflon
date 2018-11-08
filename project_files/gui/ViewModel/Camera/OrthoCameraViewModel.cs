@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model;
 using gui.Model.Camera;
 using gui.View.Camera;
 
@@ -12,7 +13,7 @@ namespace gui.ViewModel.Camera
     {
         private readonly OrthoCameraModel m_parent;
 
-        public OrthoCameraViewModel(OrthoCameraModel parent) : base(parent)
+        public OrthoCameraViewModel(Models models, OrthoCameraModel parent) : base(models, parent)
         {
             m_parent = parent;
         }

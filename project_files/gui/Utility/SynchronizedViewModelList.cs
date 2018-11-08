@@ -75,7 +75,7 @@ namespace gui.Utility
                     break;
                 case NotifyCollectionChangedAction.Remove:
                     // delete old items
-                    for (var i = args.OldItems.Count - 1; i >= 0; ++i)
+                    for (var i = args.OldItems.Count - 1; i >= 0; --i)
                     {
                         OnDeletion(m_viewModels[args.OldStartingIndex + i] ,m_views[args.OldStartingIndex + i]);
                         m_views.RemoveAt(args.OldStartingIndex + i);

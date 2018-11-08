@@ -11,9 +11,9 @@ namespace gui.Model.Camera
     {
         public override CameraType Type => CameraType.Ortho;
 
-        public override CameraViewModel CreateViewModel()
+        public override CameraViewModel CreateViewModel(Models models)
         {
-            return new OrthoCameraViewModel(this);
+            return new OrthoCameraViewModel(models, this);
         }
 
         private float m_width;

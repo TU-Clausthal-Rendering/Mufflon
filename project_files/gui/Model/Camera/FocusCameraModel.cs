@@ -11,9 +11,9 @@ namespace gui.Model.Camera
     {
         public override CameraType Type => CameraType.Focus;
 
-        public override CameraViewModel CreateViewModel()
+        public override CameraViewModel CreateViewModel(Models models)
         {
-            return new FocusCameraViewModel(this);
+            return new FocusCameraViewModel(models, this);
         }
 
         private float m_focalLength = 35.0f;

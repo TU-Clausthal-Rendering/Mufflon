@@ -1,7 +1,10 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using gui.Annotations;
+using gui.Command;
+using gui.Model;
 using gui.Model.Camera;
 
 namespace gui.ViewModel.Camera
@@ -10,9 +13,10 @@ namespace gui.ViewModel.Camera
     {
         private readonly CameraModel m_parent;
 
-        protected CameraViewModel(CameraModel parent)
+        protected CameraViewModel(Models models, CameraModel parent)
         {
             m_parent = parent;
+            RemoveCommand = new RemoveCameraCommand(models, parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
         }
 
@@ -45,6 +49,8 @@ namespace gui.ViewModel.Camera
             get => m_parent.IsSelected;
             set => m_parent.IsSelected = value;
         }
+
+        public ICommand RemoveCommand { get; }
 
         /// <summary>
         /// create a new view based on this view model

@@ -32,5 +32,10 @@ namespace gui.View.Camera
             DataContext = dataContext;
             GroupItems.Children.Add(internalView);
         }
+
+        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            GroupHeaderGrid.Width = Math.Max(e.NewSize.Width - 20.0, 0.0);
+        }
     }
 }

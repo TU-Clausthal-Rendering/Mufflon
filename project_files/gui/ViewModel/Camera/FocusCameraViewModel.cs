@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model;
 using gui.Model.Camera;
 using gui.View.Camera;
 
@@ -15,7 +16,7 @@ namespace gui.ViewModel.Camera
     {
         private readonly FocusCameraModel m_parent;
 
-        public FocusCameraViewModel(FocusCameraModel parent) : base(parent)
+        public FocusCameraViewModel(Models models, FocusCameraModel parent) : base(models, parent)
         {
             m_parent = parent;
         }
