@@ -7,8 +7,10 @@ Decision
 We support multiple types, because they all have different small advantages. A single one would rise the question if we realy want this feature, but in sum it seams to be a good idea which worth the overhead.
 
 * Spheres: required by Feng, qualitative area lights (better NEE sampling)
-* Triangles: just everything
-* Quads: better interpolation of surface properties, better subdivision, less memory
+* Triangles: just everything. Their vertices are in counter-clockwise order, ie. cross(v2-v0, v1-v0) gives you the surface normal.
+* Quads: better interpolation of surface properties, better subdivision, less memory. Their vertices are to be in the following order:
+	* First triangle: counter-clockwise, vertices 0, 1, and 2
+	* Second triangle: counter-clockwise, vertices 0, 2, and 3. This implies that the ridge of a quad has to be the edge between vertex 0 and 2
 
 Not supported:
 
