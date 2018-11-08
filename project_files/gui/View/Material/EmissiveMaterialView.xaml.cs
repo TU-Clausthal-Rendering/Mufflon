@@ -21,10 +21,9 @@ namespace gui.View.Material
     /// </summary>
     public partial class EmissiveMaterialView : UserControl
     {
-        public EmissiveMaterialView(EmissiveMaterialViewModel emissiveMaterialViewModel)
+        public EmissiveMaterialView()
         {
             InitializeComponent();
-            DataContext = emissiveMaterialViewModel;
         }
     }
 }

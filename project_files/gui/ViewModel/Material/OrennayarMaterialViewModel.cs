@@ -18,7 +18,7 @@ namespace gui.ViewModel.Material
     {
         private readonly OrennayarMaterialModel m_parent;
 
-        public OrennayarMaterialViewModel(Models models ,OrennayarMaterialModel parent) : base(parent)
+        public OrennayarMaterialViewModel(Models models ,OrennayarMaterialModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectAlbedoCommand = new SelectTextureCommand(models, () => m_parent.AlbedoTex, val => m_parent.AlbedoTex = val);
@@ -50,7 +50,7 @@ namespace gui.ViewModel.Material
 
         public override object CreateView()
         {
-            return new OrennayarMaterialView(this);
+            return new MaterialView(this, new OrennayarMaterialView());
         }
 
         public float AlbedoX

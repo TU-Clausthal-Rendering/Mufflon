@@ -77,6 +77,8 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\RemoveCameraCommand.cs" />
+    <Compile Include="Command\RemoveLightCommand.cs" />
+    <Compile Include="Command\RemoveMaterialCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
@@ -177,6 +179,9 @@
     <Compile Include="View\Material\LambertMaterialView.xaml.cs">
       <DependentUpon>LambertMaterialView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Material\MaterialView.xaml.cs">
+      <DependentUpon>MaterialView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Material\OrennayarMaterialView.xaml.cs">
       <DependentUpon>OrennayarMaterialView.xaml</DependentUpon>
     </Compile>
@@ -256,6 +261,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Material\LambertMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\MaterialView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

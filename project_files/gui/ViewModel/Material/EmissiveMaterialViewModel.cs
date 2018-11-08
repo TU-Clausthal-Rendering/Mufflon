@@ -18,7 +18,7 @@ namespace gui.ViewModel.Material
     {
         private readonly EmissiveMaterialModel m_parent;
 
-        public EmissiveMaterialViewModel(Models models, EmissiveMaterialModel parent) : base(parent)
+        public EmissiveMaterialViewModel(Models models, EmissiveMaterialModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectRadianceCommand = new SelectTextureCommand(models, () => m_parent.RadianceTex, val => m_parent.RadianceTex = val);
@@ -50,7 +50,7 @@ namespace gui.ViewModel.Material
 
         public override object CreateView()
         {
-            return new EmissiveMaterialView(this);
+            return new MaterialView(this, new EmissiveMaterialView());
         }
 
         public float RadianceX

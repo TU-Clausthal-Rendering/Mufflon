@@ -8,125 +8,106 @@
              mc:Ignorable="d" 
              d:DesignHeight="150" 
              d:DesignWidth="160">
-    <GroupBox>
-        <GroupBox.Header>
-            <TextBox 
-                Width="100"
-                Text="{Binding Name}"/>
-        </GroupBox.Header>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-            <TextBlock 
+        <TextBlock
                 Grid.Column="0"
                 Grid.Row="0"
-                Text="Type:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBlock
-                Grid.Column="1"
-                Grid.Row="0"
-                Text="{Binding Type}"
-                Margin="{StaticResource RightPropertyMargin}"/>
-
-            <TextBlock
-                Grid.Column="0"
-                Grid.Row="1"
                 Text="Absorption:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <Grid
+        <Grid
                 Grid.Column="1"
-                Grid.Row="1"
+                Grid.Row="0"
                 Margin="{StaticResource RightPropertyMargin}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <helper:EnterTextBox
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
                     Grid.Column="0"
                     Text="{Binding AbsorptionX}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="1"
                     Text="{Binding AbsorptionY}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="2"
                     Text="{Binding AbsorptionZ}"/>
-            </Grid>
+        </Grid>
 
-            <ComboBox 
+        <ComboBox 
                 Grid.Column="0"
-                Grid.Row="2"
+                Grid.Row="1"
                 Width="86"
                 SelectedIndex="{Binding SelectedRoughness, FallbackValue=0}"
                 Margin="{StaticResource LeftPropertyMargin}"
                 HorizontalAlignment="Stretch">
-                <ComboBoxItem Content="Roughness"/>
-                <ComboBoxItem Content="Roughness Anisotropic"/>
-                <ComboBoxItem Content="Roughness Texture"/>
-            </ComboBox>
+            <ComboBoxItem Content="Roughness"/>
+            <ComboBoxItem Content="Roughness Anisotropic"/>
+            <ComboBoxItem Content="Roughness Texture"/>
+        </ComboBox>
 
-            <TextBox
+        <TextBox
                 Grid.Column="1"
-                Grid.Row="2"
+                Grid.Row="1"
                 Text="{Binding Roughness}"
                 Margin="{StaticResource RightPropertyMargin}"
                 Visibility="{Binding RoughnessVisibility}"/>
 
-            <!-- RGB Grid -->
-            <Grid
+        <!-- RGB Grid -->
+        <Grid
                 Grid.Column="1"
-                Grid.Row="2"
+                Grid.Row="1"
                 Margin="{StaticResource RightPropertyMargin}"
                 Visibility="{Binding RoughnessAnisotropicVisibility, FallbackValue=Hidden}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <helper:EnterTextBox
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
                     Grid.Column="0"
                     Text="{Binding RoughnessAngleX}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="1"
                     Text="{Binding RoughnessAngleY}"/>
-                <helper:EnterTextBox
+            <helper:EnterTextBox
                     Grid.Column="2"
                     Text="{Binding RoughnessAnisotropic}"/>
-            </Grid>
+        </Grid>
 
-            <!-- Texture Grid -->
-            <Grid
+        <!-- Texture Grid -->
+        <Grid
                 Grid.Column="1"
-                Grid.Row="2"
+                Grid.Row="1"
                 Margin="{StaticResource RightPropertyMargin}"
                 Visibility="{Binding RoughnessTexVisibility, FallbackValue=Hidden}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <TextBox
+            <TextBox
                     Grid.Column="0"
                     Text="{Binding RoughnessTex}"
                     Margin="0 0 1 0"/>
-                <Button
+            <Button
                     Grid.Column="1"
                     VerticalContentAlignment="Center"
                     HorizontalAlignment="Center"
                     Command="{Binding SelectRoughnessCommand}">
-                    <Image
+                <Image
                         Source="../../Icons/open.png"/>
-                </Button>
-            </Grid>
-
+            </Button>
         </Grid>
-    </GroupBox>
+
+    </Grid>
 </UserControl>

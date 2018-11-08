@@ -21,10 +21,9 @@ namespace gui.View.Material
     /// </summary>
     public partial class OrennayarMaterialView : UserControl
     {
-        public OrennayarMaterialView(OrennayarMaterialViewModel orennayarMaterialViewModel)
+        public OrennayarMaterialView()
         {
             InitializeComponent();
-            DataContext = orennayarMaterialViewModel;
         }
     }
 }

@@ -18,7 +18,7 @@ namespace gui.ViewModel.Material
     {
         private readonly LambertMaterialModel m_parent;
 
-        public LambertMaterialViewModel(Models models, LambertMaterialModel parent) : base(parent)
+        public LambertMaterialViewModel(Models models, LambertMaterialModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectAlbedoCommand = new SelectTextureCommand(models, () => m_parent.AlbedoTex, val => m_parent.AlbedoTex = val);
@@ -47,7 +47,7 @@ namespace gui.ViewModel.Material
 
         public override object CreateView()
         {
-            return new LambertMaterialView(this);
+            return new MaterialView(this, new LambertMaterialView());
         }
 
         public float AlbedoX

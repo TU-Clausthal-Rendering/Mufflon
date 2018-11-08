@@ -21,10 +21,9 @@ namespace gui.View.Material
     /// </summary>
     public partial class TorranceMaterialView : UserControl
     {
-        public TorranceMaterialView(TorranceMaterialViewModel torranceMaterialViewModel)
+        public TorranceMaterialView()
         {
             InitializeComponent();
-            DataContext = torranceMaterialViewModel;
         }
     }
 }

@@ -21,10 +21,9 @@ namespace gui.View.Material
     /// </summary>
     public partial class LambertMaterialView : UserControl
     {
-        public LambertMaterialView(LambertMaterialViewModel lambertMaterialViewModel)
+        public LambertMaterialView()
         {
             InitializeComponent();
-            DataContext = lambertMaterialViewModel;
         }
     }
 }

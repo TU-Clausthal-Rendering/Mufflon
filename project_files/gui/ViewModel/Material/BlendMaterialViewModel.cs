@@ -15,7 +15,7 @@ namespace gui.ViewModel.Material
         private readonly BlendMaterialModel m_parent;
         private readonly Models m_models;
 
-        public BlendMaterialViewModel(Models models, BlendMaterialModel parent) : base(parent)
+        public BlendMaterialViewModel(Models models, BlendMaterialModel parent) : base(models, parent)
         {
             m_parent = parent;
             m_models = models;

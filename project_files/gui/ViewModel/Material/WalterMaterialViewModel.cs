@@ -18,7 +18,7 @@ namespace gui.ViewModel.Material
     {
         private readonly WalterMaterialModel m_parent;
 
-        public WalterMaterialViewModel(Models models, WalterMaterialModel parent) : base(parent)
+        public WalterMaterialViewModel(Models models, WalterMaterialModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectRoughnessCommand = new SelectTextureCommand(models, () => m_parent.RoughnessTex, val => m_parent.RoughnessTex = val);
@@ -60,7 +60,7 @@ namespace gui.ViewModel.Material
 
         public override object CreateView()
         {
-            return new WalterMaterialView(this);
+            return new MaterialView(this, new WalterMaterialView());
         }
 
         public float AbsorptionX

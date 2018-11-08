@@ -14,7 +14,7 @@ namespace gui.ViewModel.Material
         private readonly FresnelMaterialModel m_parent;
         private readonly Models m_models;
 
-        public FresnelMaterialViewModel(FresnelMaterialModel parent, Models models) : base(parent)
+        public FresnelMaterialViewModel(FresnelMaterialModel parent, Models models) : base(models, parent)
         {
             m_parent = parent;
             m_models = models;

@@ -7,57 +7,38 @@
              mc:Ignorable="d" 
              d:DesignHeight="160" 
              d:DesignWidth="160">
-    <GroupBox>
-        <GroupBox.Header>
-            <TextBox 
-                Width="100"
-                Text="{Binding Name}"/>
-        </GroupBox.Header>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-            <TextBlock 
+        <TextBlock 
                 Grid.Column="0"
                 Grid.Row="0"
-                Text="Type:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBlock
-                Grid.Column="1"
-                Grid.Row="0"
-                Text="{Binding Type}"
-                Margin="{StaticResource RightPropertyMargin}"/>
-
-            <TextBlock 
-                Grid.Column="0"
-                Grid.Row="1"
                 Text="factor A:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBox
+        <TextBox
                 Grid.Column="1"
-                Grid.Row="1"
+                Grid.Row="0"
                 Text="{Binding FactorA}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
-            <TextBlock 
+        <TextBlock 
                 Grid.Column="0"
-                Grid.Row="2"
+                Grid.Row="1"
                 Text="factor B:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-            <TextBox
+        <TextBox
                 Grid.Column="1"
-                Grid.Row="2"
+                Grid.Row="1"
                 Text="{Binding FactorB}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
 
-        </Grid>
-    </GroupBox>
+    </Grid>
 </UserControl>

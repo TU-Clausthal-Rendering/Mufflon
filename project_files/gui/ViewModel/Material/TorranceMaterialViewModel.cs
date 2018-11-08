@@ -18,7 +18,7 @@ namespace gui.ViewModel.Material
     {
         private readonly TorranceMaterialModel m_parent;
 
-        public TorranceMaterialViewModel(Models models, TorranceMaterialModel parent) : base(parent)
+        public TorranceMaterialViewModel(Models models, TorranceMaterialModel parent) : base(models, parent)
         {
             m_parent = parent;
             SelectAlbedoCommand = new SelectTextureCommand(models, () => m_parent.AlbedoTex, val => m_parent.AlbedoTex = val);
@@ -69,7 +69,7 @@ namespace gui.ViewModel.Material
 
         public override object CreateView()
         {
-            return new TorranceMaterialView(this);
+            return new MaterialView(this, new TorranceMaterialView());
         }
 
         public float AlbedoX
