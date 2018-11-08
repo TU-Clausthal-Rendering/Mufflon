@@ -14,7 +14,7 @@ namespace gui.Model.Material
 
         public override MaterialViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new BlendMaterialViewModel(models, this);
         }
 
         private MaterialModel m_layerA = null;

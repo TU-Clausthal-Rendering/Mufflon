@@ -11,6 +11,8 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -39,6 +41,38 @@
                 Text="{Binding FactorB}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
+        <Button
+            Grid.Column="0"
+            Grid.Row="2"
+            Grid.ColumnSpan="2"
+            Command="{Binding AddLayerACommand}"
+            Margin="{StaticResource RightPropertyMargin}"
+            Visibility="{Binding ButtonAVisibility}">
+            Add LayerA
+        </Button>
 
+        <Border 
+            Grid.Column="0"
+            Grid.Row="2"
+            Grid.ColumnSpan="2"
+            Visibility="{Binding LayerAVisibility, FallbackValue=Collapsed}"
+            x:Name="LayerAHost"/>
+        
+        <Button
+            Grid.Column="0"
+            Grid.Row="3"
+            Grid.ColumnSpan="2"
+            Command="{Binding AddLayerBCommand}"
+            Margin="{StaticResource RightPropertyMargin}"
+            Visibility="{Binding ButtonBVisibility}">
+            Add LayerB
+        </Button>
+
+        <Border 
+            Grid.Column="0"
+            Grid.Row="3"
+            Grid.ColumnSpan="2"
+            Visibility="{Binding LayerBVisibility, FallbackValue=Collapsed}"
+            x:Name="LayerBHost"/>
     </Grid>
 </UserControl>

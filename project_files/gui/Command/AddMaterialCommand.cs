@@ -26,38 +26,37 @@ namespace gui.Command
             return true;
         }
 
-        public void Execute(object parameter)
+        protected MaterialModel GetModel(MaterialModel.MaterialType type)
+        {
+            switch (type)
+            {
+                case MaterialModel.MaterialType.Lambert:
+                    return new LambertMaterialModel();
+                case MaterialModel.MaterialType.Torrance:
+                    return new TorranceMaterialModel();
+                case MaterialModel.MaterialType.Walter:
+                    return new WalterMaterialModel();
+                case MaterialModel.MaterialType.Emissive:
+                    return new EmissiveMaterialModel();
+                case MaterialModel.MaterialType.Orennayar:
+                    return new OrennayarMaterialModel();
+                case MaterialModel.MaterialType.Blend:
+                    return new BlendMaterialModel();
+                case MaterialModel.MaterialType.Fresnel:
+                    return new FresnelMaterialModel();
+            }
+
+            return null;
+        }
+
+        public virtual void Execute(object parameter)
         {
             var dc = new AddMaterialViewModel();
             var dialog = new AddPropertyDialog(dc);
 
             if (dialog.ShowDialog() != true) return;
 
-            MaterialModel mm = null;
-            switch (dc.TypeValue)
-            {
-                case MaterialModel.MaterialType.Lambert:
-                    mm = new LambertMaterialModel();
-                    break;
-                case MaterialModel.MaterialType.Torrance:
-                    mm = new TorranceMaterialModel();
-                    break;
-                case MaterialModel.MaterialType.Walter:
-                    mm = new WalterMaterialModel();
-                    break;
-                case MaterialModel.MaterialType.Emissive:
-                    mm = new EmissiveMaterialModel();
-                    break;
-                case MaterialModel.MaterialType.Orennayar:
-                    mm = new OrennayarMaterialModel();
-                    break;
-                case MaterialModel.MaterialType.Blend:
-                    mm = new BlendMaterialModel();
-                    break;
-                case MaterialModel.MaterialType.Fresnel:
-                    mm = new FresnelMaterialModel();
-                    break;
-            }
+            MaterialModel mm = GetModel(dc.TypeValue);
             Debug.Assert(mm != null);
 
             mm.Name = dc.NameValue;

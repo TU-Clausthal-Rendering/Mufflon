@@ -4,9 +4,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using gui.Command;
 using gui.Model;
 using gui.Model.Material;
+using gui.View.Material;
 
 namespace gui.ViewModel.Material
 {
@@ -29,6 +33,8 @@ namespace gui.ViewModel.Material
                 var vm = m_parent.LayerB.CreateViewModel(models);
                 LayerB = vm.CreateView();
             }
+            AddLayerACommand = new AddRecursiveMaterialCommand(models, model => parent.LayerA = model);
+            AddLayerBCommand = new AddRecursiveMaterialCommand(models, model => parent.LayerB = model);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -53,6 +59,8 @@ namespace gui.ViewModel.Material
                         LayerA = null;
                     }
                     OnPropertyChanged(nameof(LayerA));
+                    OnPropertyChanged(nameof(LayerAVisibility));
+                    OnPropertyChanged(nameof(ButtonAVisibility));
                     break;
                 case nameof(BlendMaterialModel.LayerB):
                     if (m_parent.LayerB != null)
@@ -65,13 +73,15 @@ namespace gui.ViewModel.Material
                         LayerB = null;
                     }
                     OnPropertyChanged(nameof(LayerB));
+                    OnPropertyChanged(nameof(LayerBVisibility));
+                    OnPropertyChanged(nameof(ButtonBVisibility));
                     break;
             }
         }
 
         public override object CreateView()
         {
-            throw new NotImplementedException();
+            return new MaterialView(this, new BlendMaterialView(this));
         }
 
         public float FactorA
@@ -88,6 +98,18 @@ namespace gui.ViewModel.Material
 
         public object LayerA { get; private set; } = null;
 
+        public ICommand AddLayerACommand { get; }
+
+        public Visibility ButtonAVisibility => LayerA == null ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility LayerAVisibility => LayerA != null ? Visibility.Visible : Visibility.Collapsed;
+
         public object LayerB { get; private set; } = null;
+
+        public ICommand AddLayerBCommand { get; }
+
+        public Visibility ButtonBVisibility => LayerB == null ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility LayerBVisibility => LayerB != null ? Visibility.Visible : Visibility.Collapsed;
     }
 }
