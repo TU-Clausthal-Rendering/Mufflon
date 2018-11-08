@@ -257,7 +257,8 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                <STRING>         // The name, used as [obj:name] in the above JSON specification
                u32              // Keyframe of the object if animated or 0xffffffff
                u32              // <OBJID> of the previous object in an animation sequence or 0xffffffff
-			   6*f32			// Bounding box (min, max, each 3x1 matrices) for the object 
+               3*f32            // Bounding box min for the object (in object space)
+               3*f32            // Bounding box max for the object (in object space)
                <JUMP_TABLE>     // Jump table over LODs (number = D)
                D*<LOD>
 
