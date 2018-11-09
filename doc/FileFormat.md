@@ -260,7 +260,7 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                3*f32            // Bounding box min for the object (in object space)
                3*f32            // Bounding box max for the object (in object space)
                <JUMP_TABLE>     // Jump table over LODs (number = D)
-               D*<LOD>
+               D*<LOD>          // LODs sorted after detail (0 has the highest detail)
 
 LODs contain the real geometry. It must have sorted geometry, because attributes (like count of indices) differ per geometry.
 
