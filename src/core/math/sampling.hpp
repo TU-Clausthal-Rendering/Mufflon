@@ -28,7 +28,7 @@ CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_cosine(float u0, float 
 
 // Sample a uniformly distributed direction (full sphere) from two random numbers in [0,1)
 CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_sphere_uniform(float u0, float u1) {
-	// u0 should include 
+	// u0 should include 1
 	float cosTheta = u0 * 2.0f - 1.0f;
 	float sinTheta = sqrt((1.0f - cosTheta) * (1.0f + cosTheta));
 	float phi = u1 * 2.0f * ei::PI;
