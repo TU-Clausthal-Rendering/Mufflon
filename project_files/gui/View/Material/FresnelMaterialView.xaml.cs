@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using gui.ViewModel.Material;
 
 namespace gui.View.Material
 {
@@ -20,9 +22,26 @@ namespace gui.View.Material
     /// </summary>
     public partial class FresnelMaterialView : UserControl
     {
-        public FresnelMaterialView()
+        private readonly FresnelMaterialViewModel m_vm;
+
+        public FresnelMaterialView(FresnelMaterialViewModel vm)
         {
+            m_vm = vm;
             InitializeComponent();
+            vm.PropertyChanged += VmOnPropertyChanged;
+        }
+
+        private void VmOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(FresnelMaterialViewModel.LayerReflection):
+                    LayerAHost.Child = m_vm.LayerReflection as UIElement;
+                    break;
+                case nameof(FresnelMaterialViewModel.LayerRefraction):
+                    LayerBHost.Child = m_vm.LayerRefraction as UIElement;
+                    break;
+            }
         }
     }
 }

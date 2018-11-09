@@ -15,33 +15,33 @@ namespace gui.Model.Material
 
         public override MaterialViewModel CreateViewModel(Models models)
         {
-            throw new NotImplementedException();
+            return new FresnelMaterialViewModel(this, models);
         }
 
-        private float m_refractionIndex;
+        private float m_dielecticRefraction;
 
-        public float RefractionIndex
+        public float DielectricRefraction
         {
-            get => m_refractionIndex;
+            get => m_dielecticRefraction;
             set
             {
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_refractionIndex) return;
-                m_refractionIndex = value;
-                OnPropertyChanged(nameof(RefractionIndex));
+                if (value == m_dielecticRefraction) return;
+                m_dielecticRefraction = value;
+                OnPropertyChanged(nameof(DielectricRefraction));
             }
         }
 
-        private Vec2<float> m_refractionComplex;
+        private Vec2<float> m_conductorRefraction;
 
-        public Vec2<float> RefractionComplex
+        public Vec2<float> ConductorRefraction
         {
-            get => m_refractionComplex;
+            get => m_conductorRefraction;
             set
             {
-                if (Equals(value, m_refractionComplex)) return;
-                m_refractionComplex = value;
-                OnPropertyChanged(nameof(RefractionComplex));
+                if (Equals(value, m_conductorRefraction)) return;
+                m_conductorRefraction = value;
+                OnPropertyChanged(nameof(ConductorRefraction));
             }
         }
 
@@ -68,6 +68,19 @@ namespace gui.Model.Material
                 if (ReferenceEquals(value, m_layerRefraction)) return;
                 m_layerRefraction = value;
                 OnPropertyChanged(nameof(LayerRefraction));
+            }
+        }
+
+        private bool m_isDielectric = true;
+
+        public bool IsDielectric
+        {
+            get => m_isDielectric;
+            set
+            {
+                if(value == m_isDielectric) return;
+                m_isDielectric = value;
+                OnPropertyChanged(nameof(IsDielectric));
             }
         }
 
