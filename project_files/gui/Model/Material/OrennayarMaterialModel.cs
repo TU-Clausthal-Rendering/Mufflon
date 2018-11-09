@@ -69,5 +69,9 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(Roughness));
             }
         }
+
+        public OrennayarMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

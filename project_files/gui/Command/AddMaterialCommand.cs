@@ -26,24 +26,24 @@ namespace gui.Command
             return true;
         }
 
-        protected MaterialModel GetModel(MaterialModel.MaterialType type)
+        protected MaterialModel GetModel(MaterialModel.MaterialType type, bool isRecursive, Action<MaterialModel> removeAction)
         {
             switch (type)
             {
                 case MaterialModel.MaterialType.Lambert:
-                    return new LambertMaterialModel();
+                    return new LambertMaterialModel(isRecursive, removeAction);
                 case MaterialModel.MaterialType.Torrance:
-                    return new TorranceMaterialModel();
+                    return new TorranceMaterialModel(isRecursive, removeAction);
                 case MaterialModel.MaterialType.Walter:
-                    return new WalterMaterialModel();
+                    return new WalterMaterialModel(isRecursive, removeAction);
                 case MaterialModel.MaterialType.Emissive:
-                    return new EmissiveMaterialModel();
+                    return new EmissiveMaterialModel(isRecursive, removeAction);
                 case MaterialModel.MaterialType.Orennayar:
-                    return new OrennayarMaterialModel();
+                    return new OrennayarMaterialModel(isRecursive, removeAction);
                 case MaterialModel.MaterialType.Blend:
-                    return new BlendMaterialModel();
+                    return new BlendMaterialModel(isRecursive, removeAction);
                 case MaterialModel.MaterialType.Fresnel:
-                    return new FresnelMaterialModel();
+                    return new FresnelMaterialModel(isRecursive, removeAction);
             }
 
             return null;
@@ -51,12 +51,12 @@ namespace gui.Command
 
         public virtual void Execute(object parameter)
         {
-            var dc = new AddMaterialViewModel();
+            var dc = new AddMaterialViewModel(true);
             var dialog = new AddPropertyDialog(dc);
 
             if (dialog.ShowDialog() != true) return;
 
-            MaterialModel mm = GetModel(dc.TypeValue);
+            MaterialModel mm = GetModel(dc.TypeValue, false, model => m_models.Materials.Models.Remove(model));
             Debug.Assert(mm != null);
 
             mm.Name = dc.NameValue;

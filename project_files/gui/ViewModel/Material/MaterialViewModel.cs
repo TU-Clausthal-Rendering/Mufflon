@@ -5,11 +5,13 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using gui.Annotations;
 using gui.Command;
 using gui.Model;
 using gui.Model.Material;
+using gui.View.Material;
 
 namespace gui.ViewModel.Material
 {
@@ -20,7 +22,7 @@ namespace gui.ViewModel.Material
         protected MaterialViewModel(Models models, MaterialModel parent)
         {
             this.m_parent = parent;
-            RemoveCommand = new RemoveMaterialCommand(models, parent);
+            RemoveCommand = new RemoveMaterialCommand(parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
         }
 
@@ -34,7 +36,14 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public abstract object CreateView();
+        public UIElement CreateView()
+        {
+            if (m_parent.IsRecursive)
+                return new RecursiveMaterialView(this, CreateInternalView());
+            return new MaterialView(this, CreateInternalView());
+        }
+
+        protected abstract UIElement CreateInternalView();
 
         public string Name
         {

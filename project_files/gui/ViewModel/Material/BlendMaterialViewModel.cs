@@ -33,8 +33,8 @@ namespace gui.ViewModel.Material
                 var vm = m_parent.LayerB.CreateViewModel(models);
                 LayerB = vm.CreateView();
             }
-            AddLayerACommand = new AddRecursiveMaterialCommand(models, model => parent.LayerA = model);
-            AddLayerBCommand = new AddRecursiveMaterialCommand(models, model => parent.LayerB = model);
+            AddLayerACommand = new AddRecursiveMaterialCommand(models, model => parent.LayerA = model, model => parent.LayerA = null, "LayerA");
+            AddLayerBCommand = new AddRecursiveMaterialCommand(models, model => parent.LayerB = model, model => parent.LayerB = null, "LayerB");
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -79,9 +79,9 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
-            return new MaterialView(this, new BlendMaterialView(this));
+            return new BlendMaterialView(this);
         }
 
         public float FactorA

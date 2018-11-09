@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using gui.Model;
 using gui.Model.Material;
 
@@ -70,7 +71,7 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
             throw new NotImplementedException();
         }

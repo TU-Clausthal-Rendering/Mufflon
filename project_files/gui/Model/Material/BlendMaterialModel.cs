@@ -70,5 +70,10 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(FactorB));
             }
         }
+
+
+        public BlendMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

@@ -70,5 +70,9 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(LayerRefraction));
             }
         }
+
+        public FresnelMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

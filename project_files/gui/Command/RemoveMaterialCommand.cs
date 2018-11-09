@@ -11,12 +11,10 @@ namespace gui.Command
 {
     public class RemoveMaterialCommand : ICommand
     {
-        private readonly Models m_models;
         private readonly MaterialModel m_model;
 
-        public RemoveMaterialCommand(Models models, MaterialModel model)
+        public RemoveMaterialCommand(MaterialModel model)
         {
-            m_models = models;
             m_model = model;
         }
 
@@ -27,7 +25,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            m_models.Materials.Models.Remove(m_model);
+            m_model.Remove();
         }
 
         public event EventHandler CanExecuteChanged

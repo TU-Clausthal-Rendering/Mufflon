@@ -69,5 +69,9 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(Scale));
             }
         }
+
+        public EmissiveMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

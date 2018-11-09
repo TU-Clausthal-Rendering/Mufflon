@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using gui.Annotations;
 using gui.Model.Light;
 using gui.View.Helper;
@@ -23,6 +24,8 @@ namespace gui.ViewModel
         public abstract string WindowTitle { get; }
 
         public abstract string NameName { get; }
+
+        public Visibility NameVisibility { get; }
 
         private string m_name = "";
 
@@ -58,10 +61,13 @@ namespace gui.ViewModel
         // public getter for the type
         public T TypeValue => m_selectedType.Cargo;
 
-        protected AddPropertyViewModel(ReadOnlyObservableCollection<ComboBoxItem<T>> types)
+        /// <param name="types">items for the combo box</param>
+        /// <param name="isNameVisible">indicates if the name property should be shown</param>
+        protected AddPropertyViewModel(ReadOnlyObservableCollection<ComboBoxItem<T>> types, bool isNameVisible = true)
         {
             Debug.Assert(types.Count > 0);
             TypeList = types;
+            NameVisibility = isNameVisible ? Visibility.Visible : Visibility.Hidden;
             m_selectedType = types.First();
         }
 

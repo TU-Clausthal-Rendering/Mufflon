@@ -189,6 +189,9 @@
     <Compile Include="View\Material\OrennayarMaterialView.xaml.cs">
       <DependentUpon>OrennayarMaterialView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Material\RecursiveMaterialView.xaml.cs">
+      <DependentUpon>RecursiveMaterialView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Material\TorranceMaterialView.xaml.cs">
       <DependentUpon>TorranceMaterialView.xaml</DependentUpon>
     </Compile>
@@ -277,6 +280,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Material\OrennayarMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\RecursiveMaterialView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

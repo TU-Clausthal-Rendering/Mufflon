@@ -58,9 +58,9 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
-            return new MaterialView(this, new WalterMaterialView());
+            return new WalterMaterialView();
         }
 
         public float AbsorptionX

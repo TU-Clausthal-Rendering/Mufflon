@@ -48,9 +48,9 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
-            return new MaterialView(this, new EmissiveMaterialView());
+            return new EmissiveMaterialView();
         }
 
         public float RadianceX

@@ -30,7 +30,23 @@ namespace gui.Model.Material
             Anisotropic,
             Texture
         }
-        
+
+        /// <param name="isRecursive">indicates if this material is included in another material (i.e. blend or fresnel)</param>
+        /// <param name="removeAction">
+        /// action that removes the material (either from the model list or from another material model if it was recursive)
+        /// The MaterialModel parameter will be the this pointer
+        /// </param>
+        protected MaterialModel(bool isRecursive, Action<MaterialModel> removeAction)
+        {
+            IsRecursive = isRecursive;
+            m_removeAction = removeAction;
+        }
+
+        public void Remove()
+        {
+            m_removeAction.Invoke(this);
+        }
+
         public abstract MaterialType Type { get; }
 
         private string m_name = String.Empty;
@@ -45,6 +61,11 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(Name));
             }
         }
+
+        // indicates if this material is included in another material (i.e. blend or fresnel)
+        public bool IsRecursive { get; }
+
+        private readonly Action<MaterialModel> m_removeAction;
 
         /// <summary>
         /// creates a new view model based on this model

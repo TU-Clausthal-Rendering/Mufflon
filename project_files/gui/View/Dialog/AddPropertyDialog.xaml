@@ -30,14 +30,16 @@
                 Grid.Row="0"
                 Grid.Column="0"
                 Text="{Binding NameName}"
-                Margin="{StaticResource LeftPropertyMargin}"/>
+                Margin="{StaticResource LeftPropertyMargin}"
+                Visibility="{Binding NameVisibility}"/>
 
             <helper:EnterTextBox
                 Grid.Row="0"
                 Grid.Column="1"
                 x:Name="NameBox"
                 Text="{Binding NameValue}"
-                Margin="{StaticResource RightPropertyMargin}"/>
+                Margin="{StaticResource RightPropertyMargin}"
+                Visibility="{Binding NameVisibility}"/>
 
             <TextBlock
                 Grid.Row="1"

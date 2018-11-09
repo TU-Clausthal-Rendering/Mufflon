@@ -67,9 +67,9 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
-            return new MaterialView(this, new TorranceMaterialView());
+            return new TorranceMaterialView();
         }
 
         public float AlbedoX

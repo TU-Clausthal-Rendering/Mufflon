@@ -48,9 +48,9 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
-            return new MaterialView(this, new OrennayarMaterialView());
+            return new OrennayarMaterialView();
         }
 
         public float AlbedoX

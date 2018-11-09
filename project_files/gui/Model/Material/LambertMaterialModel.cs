@@ -56,5 +56,9 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(UseAlbedoTexture));
             }
         }
+
+        public LambertMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

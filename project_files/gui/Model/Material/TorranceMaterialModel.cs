@@ -135,5 +135,9 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(SelectedRoughness));
             }
         }
+
+        public TorranceMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

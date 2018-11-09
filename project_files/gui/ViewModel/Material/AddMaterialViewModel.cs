@@ -16,7 +16,8 @@ namespace gui.ViewModel.Material
         public override string NameName => "Material Name:";
         public override string TypeName => "Type:";
 
-        public AddMaterialViewModel() : base(
+        /// <param name="isNameVisible">indicates if the name property should be shown</param>
+        public AddMaterialViewModel(bool isNameVisible) : base(
             new ReadOnlyObservableCollection<ComboBoxItem<MaterialModel.MaterialType>>(
             new ObservableCollection<ComboBoxItem<MaterialModel.MaterialType>>
             {
@@ -27,7 +28,7 @@ namespace gui.ViewModel.Material
                 new ComboBoxItem<MaterialModel.MaterialType>(MaterialModel.MaterialType.Orennayar),           
                 new ComboBoxItem<MaterialModel.MaterialType>(MaterialModel.MaterialType.Blend),           
                 new ComboBoxItem<MaterialModel.MaterialType>(MaterialModel.MaterialType.Fresnel)           
-            }))
+            }), isNameVisible)
         {}
     }
 }

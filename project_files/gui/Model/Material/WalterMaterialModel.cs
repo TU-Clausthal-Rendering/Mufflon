@@ -109,5 +109,9 @@ namespace gui.Model.Material
                 OnPropertyChanged(nameof(Absorption));
             }
         }
+
+        public WalterMaterialModel(bool isRecursive, Action<MaterialModel> removeAction) : base(isRecursive, removeAction)
+        {
+        }
     }
 }

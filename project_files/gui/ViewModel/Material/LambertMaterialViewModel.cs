@@ -45,9 +45,9 @@ namespace gui.ViewModel.Material
             }
         }
 
-        public override object CreateView()
+        protected override UIElement CreateInternalView()
         {
-            return new MaterialView(this, new LambertMaterialView());
+            return new LambertMaterialView();
         }
 
         public float AlbedoX
