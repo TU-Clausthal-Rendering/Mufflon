@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
 using gui.Model;
 
 namespace gui.Dll
@@ -19,7 +20,7 @@ namespace gui.Dll
         public delegate void ErrorEvent(string message);
         public event ErrorEvent Error;
 
-        public delegate void LogEvent(string message);
+        public delegate void LogEvent(string message, Brush color);
         public event LogEvent Log;
 
         // host of the HwndHost
@@ -123,7 +124,7 @@ namespace gui.Dll
 
         private void LogCallback(string message, int severity)
         {
-            Dispatcher.BeginInvoke(Log, message);
+            Dispatcher.BeginInvoke(Log, message, Brushes.White);
         }
 
         /// <summary>

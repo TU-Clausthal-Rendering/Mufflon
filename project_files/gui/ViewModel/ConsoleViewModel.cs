@@ -2,15 +2,18 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Drawing;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using gui.Annotations;
 using gui.Model;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
 
 namespace gui.ViewModel
 {
@@ -19,7 +22,7 @@ namespace gui.ViewModel
     /// </summary>
     public class ConsoleViewModel : INotifyPropertyChanged
     {
-        public ObservableCollection<string> Output { get; } = new ObservableCollection<string>() { "line 1", "more code..." };
+        public ObservableCollection<TextBox> Output { get; } = new ObservableCollection<TextBox>();
 
         private string m_input = "";
         public string Input
@@ -40,12 +43,29 @@ namespace gui.ViewModel
             m_models = models;
             m_models.App.Window.ConsoleInputBox.KeyDown += ConsoleInputBoxOnKeyDown;
             m_models.App.GlHost.Log += GlHostOnLog;
+
+            //AddText("im white", Brushes.White);
+            //AddText("im red", Brushes.Red);
         }
 
-        private void GlHostOnLog(string message)
+        private void GlHostOnLog(string message, Brush color)
         {
-            Output.Add(message);
+            AddText(message, color);
             m_models.App.Window.ConsoleScrollViewer.ScrollToBottom();
+        }
+
+        private void AddText(string text, Brush color)
+        {
+            Output.Add(new TextBox
+            {
+                Background = Brushes.Transparent,
+                Foreground = color,
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                Text = text,
+                BorderThickness = new Thickness(0.0),
+                FontFamily = new FontFamily("Consolas")
+            });
         }
 
         private void ConsoleInputBoxOnKeyDown(object sender, KeyEventArgs e)
@@ -53,7 +73,7 @@ namespace gui.ViewModel
             if (e.Key != Key.Enter || Input.Length == 0) return;
             
             // use input as command
-            Output.Add(Input);
+            AddText(Input, Brushes.White);
             m_models.App.GlHost.QueueCommand(Input);
             Input = "";
 

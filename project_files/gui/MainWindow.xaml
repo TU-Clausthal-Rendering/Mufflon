@@ -285,16 +285,7 @@
                     x:Name="ConsoleScrollViewer">
                     <!-- stack panel of messages -->
                     <StackPanel>
-                        <ItemsControl ItemsSource="{Binding Console.Output, Mode=OneWay}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock 
-                                        Text="{Binding Path=.}"
-                                        Foreground="{StaticResource ConsoleFontBrush}"
-                                        FontFamily="Consolas"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding Console.Output, Mode=OneWay}"/>
                     </StackPanel>
                 </ScrollViewer>
                 <!-- console input box -->
