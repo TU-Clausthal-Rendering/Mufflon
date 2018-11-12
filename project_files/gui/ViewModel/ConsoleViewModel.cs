@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -38,6 +39,13 @@ namespace gui.ViewModel
         {
             m_models = models;
             m_models.App.Window.ConsoleInputBox.KeyDown += ConsoleInputBoxOnKeyDown;
+            m_models.App.GlHost.Log += GlHostOnLog;
+        }
+
+        private void GlHostOnLog(string message)
+        {
+            Output.Add(message);
+            m_models.App.Window.ConsoleScrollViewer.ScrollToBottom();
         }
 
         private void ConsoleInputBoxOnKeyDown(object sender, KeyEventArgs e)

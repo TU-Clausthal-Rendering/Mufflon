@@ -19,6 +19,9 @@ namespace gui.Dll
         public delegate void ErrorEvent(string message);
         public event ErrorEvent Error;
 
+        public delegate void LogEvent(string message);
+        public event LogEvent Log;
+
         // host of the HwndHost
         private readonly Border m_parent;
         // information about the viewport
@@ -38,6 +41,9 @@ namespace gui.Dll
         private int m_renderHeight = 0;
         private int m_renderOffsetX = 0;
         private int m_renderOffsetY = 0;
+
+        // this is required to prevent the callback from getting garbage collected
+        private Core.LogCallback m_logCallbackPointer = null;
 
         public OpenGLHost(Border parent, ViewportModel viewport)
         {
@@ -110,8 +116,14 @@ namespace gui.Dll
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
             // dll call: initialize glad etc.
-            if (!Core.initialize())
+            m_logCallbackPointer = new Core.LogCallback(LogCallback);
+            if (!Core.initialize(m_logCallbackPointer))
                 throw new Exception(Core.GetDllError());
+        }
+
+        private void LogCallback(string message, int severity)
+        {
+            Dispatcher.BeginInvoke(Log, message);
         }
 
         /// <summary>

@@ -2,6 +2,7 @@
 #include <glad/glad.h>
 
 static std::string s_lastError;
+static void(*s_logCallback)(const char*, int);
 
 const char* get_error(int& length)
 {
@@ -14,8 +15,9 @@ void set_error(std::string error)
 	s_lastError = move(error);
 }
 
-bool initialize()
+bool initialize(void(*logCallback)(const char*, int))
 {
+	s_logCallback = logCallback;
 	if (!gladLoadGL())
 	{
 		set_error("gladLoadGL failed");
