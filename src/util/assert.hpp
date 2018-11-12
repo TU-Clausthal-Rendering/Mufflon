@@ -22,6 +22,20 @@
 #else // NO_BREAK_ON_ASSERT
 #define mDebugBreak ((void)0)
 #endif // NO_BREAK_ON_ASSERT
+#ifdef __CUDACC__
+#define mAssert(cond)																													\
+	do {																																\
+		if(!(cond))																														\
+			printf("Assertion '" #cond "' (%s, line %d) failed\n", __FILE__, __LINE__);													\
+	} while(0)
+#define mAssertMsg(cond, msg)																											\
+	do {																																\
+		if(!(cond)) {																													\
+			printf("Assertion '" #cond "' (%s, line %d) failed: %s\n", __FILE__, __LINE__, msg);										\
+			mDebugBreak();																												\
+		}																																\
+	} while(0)
+#else // __CUDACC__
 #define mAssert(cond)																													\
 	do {																																\
 		if(!(cond)) {																													\
@@ -36,6 +50,7 @@
 			mDebugBreak();																												\
 		}																																\
 	} while(0)
+#endif // __CUDACC__
 #else // NDEBUG
 #define mAssert(cond) ((void)0)
 #define mAssertMsg(cond, msg) ((void)0)

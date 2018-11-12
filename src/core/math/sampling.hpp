@@ -17,13 +17,24 @@ struct PositionSample {
 	AreaPdf pdf;
 };
 
+// Evaluate PDF
+CUDA_FUNCTION constexpr AngularPdf get_uniform_dir_pdf() {
+	return AngularPdf{ 1.f / (4.f * ei::PI) };
+}
+CUDA_FUNCTION constexpr AngularPdf get_uniform_cone_pdf(float cosThetaMax) {
+	return AngularPdf{ 1.f / (2.f * ei::PI * (1.f - cosThetaMax)) };
+}
+CUDA_FUNCTION constexpr AngularPdf get_cosine_dir_pdf(float cosTheta) {
+	return AngularPdf{ cosTheta / ei::PI };
+}
+
 // Sample a cosine distributed direction from two random numbers in [0,1)
 CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_cosine(float u0, float u1) {
 	float cosTheta = sqrt(u0);			// cos(acos(sqrt(x))) = sqrt(x)
 	float sinTheta = sqrt(1.0f - u0);	// sqrt(1-cos(theta)^2)
 	float phi = u1 * 2 * ei::PI;
 	return DirectionSample{ scene::Direction { sinTheta * sin(phi), sinTheta * cos(phi), cosTheta },
-					AngularPdf{1.f / (2.f * ei::PI * ei::PI)} };
+							get_cosine_dir_pdf(cosTheta) };
 }
 
 // Sample a uniformly distributed direction (full sphere) from two random numbers in [0,1)
@@ -34,16 +45,17 @@ CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_sphere_uniform(float u0
 	float phi = u1 * 2.0f * ei::PI;
 	return DirectionSample{ scene::Direction{ sinTheta * sin(phi),
 											  sinTheta * cos(phi), cosTheta },
-							AngularPdf{1.f / (4.f * ei::PI)} };
+							get_uniform_dir_pdf() };
 }
 
-CUDA_FUNCTION __forceinline__ DirectionSample sample_cone(float maxCosTheta,
+// Sample a cone uniformly; TODO: importance sampling?
+CUDA_FUNCTION __forceinline__ DirectionSample sample_cone_uniform(float maxCosTheta,
 														  float u0, float u1) {
 	float cosTheta = (1.f - u0) + u0 * maxCosTheta;
 	float sinTheta = sqrtf(1.f - cosTheta * cosTheta);
 	float phi = 2.f * u1 * ei::PI;
 	return DirectionSample{ scene::Direction{ cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta },
-							AngularPdf{1.f / (2.f * ei::PI * (1.f - maxCosTheta))} };
+							get_uniform_cone_pdf(maxCosTheta) };
 }
 
 // Samples a position on a triangle
@@ -76,10 +88,7 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 		position = ei::Vec3{ u1, (dir.y < 0.f) ? 1.f : 0.f, u2 };
 	else
 		position = ei::Vec3{ u1, u2, (dir.z < 0.f) ? 1.f : 0.f };
-	return PositionSample{ bounds.min + position * sides, AreaPdf(1.f / area) };
+	return PositionSample{ bounds.min + position * sides, AreaPdf{ 1.f / area } };
 }
-
-// TODO: evaluate PDF
-
 
 }} // namespace mufflon::math

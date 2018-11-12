@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
+#include <execution>
 
 #include <cuda_runtime.h>
 #include "ei/conversions.hpp"
@@ -21,6 +22,8 @@
 #include "core/scene/lights/light_tree.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/memory/allocator.hpp"
+
+#pragma warning(disable:4251)
 
 using mufflon::Device;
 using namespace mufflon::scene;
@@ -37,8 +40,8 @@ public:
 };
 
 void test_renderer() {
-	mufflon::renderer::GpuPathTracer gpu;
-	gpu.run();
+	//mufflon::renderer::GpuPathTracer gpu;
+	//gpu.run();
 }
 
 void test_lighttree() {
@@ -48,9 +51,10 @@ void test_lighttree() {
 	std::uniform_int_distribution<std::uint64_t> intDist;
 	std::uniform_real_distribution<float> floatDist;
 	std::vector<Photon> photons(1000000u);
+	std::vector<NextEventEstimation> nees(1000000u);
 	std::size_t lightCount = 10000u;
 
-	auto testLights = [&rng, &photons, intDist, floatDist](std::vector<PositionalLights> posLights,
+	auto testLights = [&rng, &photons, &nees, intDist, floatDist](std::vector<PositionalLights> posLights,
 									   std::vector<DirectionalLight> dirLights,
 									   const ei::Box& bounds,
 									   std::optional<textures::TextureHandle> envLight = std::nullopt)
@@ -60,28 +64,46 @@ void test_lighttree() {
 
 		using namespace std::chrono;
 		const auto& lightTree = tree.aquire_tree<Device::CPU>();
+
 		auto t0 = high_resolution_clock::now();
-		for(std::size_t i = 0u; i < photons.size(); ++i) {
+		for(long long i = 0u; i < static_cast<long long>(photons.size()); ++i) {
 			photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
 							  bounds, { floatDist(rng), floatDist(rng),
 							  floatDist(rng), floatDist(rng) });
 		}
 		auto t1 = high_resolution_clock::now();
 
-		ei::Vec3 positions{};
-		ei::Vec3 directions{};
-		for(const auto& p : photons) {
-			positions += p.pos.position;
-			directions += p.dir.direction;
+		auto t2 = high_resolution_clock::now();
+		for(long long i = 0u; i < static_cast<long long>(nees.size()); ++i) {
+			nees[i] = connect(lightTree, i, photons.size(), intDist(rng),
+							  ei::Vec3{floatDist(rng), floatDist(rng), floatDist(rng)},
+							  bounds, { floatDist(rng), floatDist(rng),
+										floatDist(rng), floatDist(rng) },
+							  [](const ei::Vec3& pos, const ei::Vec3& leftPos, const ei::Vec3& rightPos,
+								 const float leftFlux, const float rightFlux) {
+									return leftFlux / (leftFlux + rightFlux);
+								});
 		}
+		auto t3 = high_resolution_clock::now();
 
-		positions /= static_cast<float>(photons.size());
-		directions /= static_cast<float>(photons.size());
+		Photon positions = std::reduce(std::execution::par_unseq, photons.cbegin(), photons.cend(), Photon{ {}, {}, {} },
+										 [](Photon init, const Photon& photon) {
+			init.pos.position += photon.pos.position;
+			return init;
+		});
+		Photon directions = std::reduce(std::execution::par_unseq, photons.cbegin(), photons.cend(), Photon{ {}, {}, {} },
+										  [](Photon init, const Photon& photon) {
+			init.dir.direction += photon.dir.direction;
+			return init;
+		});
 
-		std::cout << "[" << positions[0]
-			<< '|' << positions[1] << '|' << positions[2] << "] ["
-			<< directions[0] << '|' << directions[1] << '|'
-			<< directions[2] << "] (" << photons.size() << " photons, "
+		positions.pos.position /= static_cast<float>(photons.size());
+		directions.dir.direction /= static_cast<float>(photons.size());
+
+		std::cout << "[" << positions.pos.position[0]
+			<< '|' << positions.pos.position[1] << '|' << positions.pos.position[2] << "] ["
+			<< directions.dir.direction[0] << '|' << directions.dir.direction[1] << '|'
+			<< directions.dir.direction[2] << "] (" << photons.size() << " photons, "
 			<< duration_cast<milliseconds>(t1 - t0).count()
 			<< "ms)" << std::endl;
 	};

@@ -237,6 +237,29 @@ inline ei::Vec3 get_flux<DirectionalLight>(const DirectionalLight& light,
 	return light.radiance * surface;
 }
 
+// Return the center of the light (for area lights averaged position,
+// for directional light direction)
+inline const ei::Vec3& get_center(const PointLight& light) {
+	return light.position;
+}
+inline const ei::Vec3& get_center(const SpotLight& light) {
+	return light.position;
+}
+inline ei::Vec3 get_center(const AreaLightTriangle& light) {
+	return ei::center(ei::Triangle{ light.points[0u], light.points[1u],
+									light.points[2u] });
+}
+inline ei::Vec3 get_center(const AreaLightQuad& light) {
+	return ei::center(ei::Tetrahedron{ light.points[0u], light.points[1u],
+									   light.points[2u], light.points[3u] });
+}
+inline const ei::Vec3& get_center(const AreaLightSphere& light) {
+	return light.position;
+}
+inline const ei::Vec3& get_center(const DirectionalLight& light) {
+	return light.direction;
+}
+
 #endif // __CUDACC__
 
 }}} // namespace mufflon::scene::lights

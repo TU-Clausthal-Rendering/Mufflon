@@ -54,26 +54,10 @@ auto get_morton_code = [](const u16 a, const u16 b, const u16 c) constexpr->u64 
 
 template < class T >
 ei::Vec3 get_light_center(const T& light) {
-	auto getCenter = [](const auto& posLight) constexpr {
-		using Type = std::decay_t<decltype(posLight)>;
-		if constexpr(std::is_same_v<PointLight, Type> || std::is_same_v<SpotLight, Type>
-					 || std::is_same_v<AreaLightSphere, Type>) {
-			return posLight.position;
-		} else if constexpr(std::is_same_v<AreaLightTriangle, Type>) {
-			return ei::center(ei::Triangle(posLight.points[0u], posLight.points[1u],
-										   posLight.points[2u]));
-		} else if constexpr(std::is_same_v<AreaLightQuad, Type>) {
-			static_assert(std::is_same_v<AreaLightQuad, Type>,
-						  "Unknown positional light type");
-			return ei::center(ei::Tetrahedron(posLight.points[0u], posLight.points[1u],
-											  posLight.points[2u], posLight.points[3u]));
-		}
-	};
-
 	if constexpr(std::is_same_v<T, PositionalLights>)
-		return std::visit(getCenter, light);
+		return std::visit([](const auto& posLight) { return get_center(posLight); }, light);
 	else
-		return getCenter(light);
+		return get_center(light);
 }
 
 // Computes the offset of the i-th point light - positional ones need a sum table!
@@ -124,6 +108,7 @@ void create_light_tree(const std::vector<LightType>& lights, LightSubTree& tree,
 	if(lights.size() == 1u) {
 		tree.root.type = static_cast<u16>(get_light_type(lights.front()));
 		tree.root.flux = ei::sum(get_flux(lights.front(), aabbDiag));
+		tree.root.center = get_light_center(lights.front());
 		return;
 	}
 
@@ -201,6 +186,7 @@ void create_light_tree(const std::vector<LightType>& lights, LightSubTree& tree,
 	// Last, set the root properties: guaranteed two lights
 	tree.root.type = Node::INVALID_TYPE;
 	tree.root.flux = tree.nodes[0u].left.flux + tree.nodes[0u].right.flux;
+	tree.root.center = tree.nodes[0u].center;
 }
 
 } // namespace

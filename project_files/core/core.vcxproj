@@ -175,7 +175,7 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</KeepDir>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</CompileOut>
+      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
     </CudaCompile>
