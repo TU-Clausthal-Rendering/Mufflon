@@ -32,20 +32,6 @@ namespace gui.Model
             }
         }
 
-        private bool m_isRendering = false;
-
-        public bool IsRendering
-        {
-            get => m_isRendering;
-            set
-            {
-                // TODO add validation (is scene loaded etc.)
-                if (value == m_isRendering) return;
-                m_isRendering = value;
-                OnPropertyChanged(nameof(IsRendering));
-            }
-        }
-
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

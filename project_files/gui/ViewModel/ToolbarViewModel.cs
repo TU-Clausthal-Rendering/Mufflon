@@ -21,14 +21,14 @@ namespace gui.ViewModel
         {
             m_models = models;
             PlayPauseCommand = new PlayPauseCommand(models);
-            m_models.Toolbar.PropertyChanged += ToolbarOnPropertyChanged;
+            m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
         }
 
-        private void ToolbarOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        private void RendererOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
             switch (args.PropertyName)
             {
-                case nameof(ToolbarModel.IsRendering):
+                case nameof(RendererModel.IsRendering):
                     OnPropertyChanged(nameof(PauseIconVisibility));
                     OnPropertyChanged(nameof(PlayIconVisibility));
                     break;
@@ -36,10 +36,10 @@ namespace gui.ViewModel
         }
 
         public Visibility PlayIconVisibility =>
-            m_models.Toolbar.IsRendering ? Visibility.Collapsed : Visibility.Visible;
+            m_models.Renderer.IsRendering ? Visibility.Collapsed : Visibility.Visible;
 
         public Visibility PauseIconVisibility =>
-            m_models.Toolbar.IsRendering ? Visibility.Visible : Visibility.Collapsed;
+            m_models.Renderer.IsRendering ? Visibility.Visible : Visibility.Collapsed;
 
         public ICommand PlayPauseCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;

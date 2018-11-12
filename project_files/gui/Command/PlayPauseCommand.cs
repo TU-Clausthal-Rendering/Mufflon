@@ -25,9 +25,13 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            m_models.Toolbar.IsRendering = !m_models.Toolbar.IsRendering;
+            m_models.Renderer.IsRendering = !m_models.Renderer.IsRendering;
         }
 
-        public event EventHandler CanExecuteChanged;
+        public event EventHandler CanExecuteChanged
+        {
+            add { }
+            remove { }
+        }
     }
 }
