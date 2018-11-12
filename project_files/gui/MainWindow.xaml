@@ -17,18 +17,91 @@
         <Thickness x:Key="ThinBorder" Bottom="1"/>
     </Window.Resources>
     <DockPanel Background="{StaticResource BackgroundBrush}">
-        <Menu 
-            DockPanel.Dock="Top"
-            BorderThickness="{StaticResource ThinBorder}"
-            BorderBrush="{StaticResource BorderBrush}">
-            <MenuItem Header="File">
-                <MenuItem Header="Load Renderer"/>
-                <MenuItem Header="Load Scene"/>
-            </MenuItem>
-            <MenuItem Header="Help">
-                <MenuItem Header="About"/>
-            </MenuItem>
-        </Menu>
+        <!-- Menu Bar and Status bar grid -->
+        <Grid
+            DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <!-- status bar always in the center -->
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Menu 
+                DockPanel.Dock="Top"
+                BorderThickness="{StaticResource ThinBorder}"
+                BorderBrush="{StaticResource BorderBrush}">
+                <MenuItem Header="File">
+                    <MenuItem Header="Load Renderer"/>
+                    <MenuItem Header="Load Scene"/>
+                </MenuItem>
+                <MenuItem Header="Help">
+                    <MenuItem Header="About"/>
+                </MenuItem>
+            </Menu>
+
+            <StatusBar 
+                Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                BorderThickness="{StaticResource ThinBorder}"
+                BorderBrush="{StaticResource BorderBrush}"
+                HorizontalContentAlignment="Center">
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button Command="{Binding Toolbar.PlayPauseCommand}">
+                        <StackPanel>
+                            <Image 
+                                Source="Icons/play.png"
+                                Width="16"
+                                Height="16"
+                                Visibility="{Binding Toolbar.PlayIconVisibility}"/>
+                            <Image 
+                                Source="Icons/pause.png"
+                                Width="16"
+                                Height="16"
+                                Visibility="{Binding Toolbar.PauseIconVisibility, FallbackValue=Collapsed}"/>
+                        </StackPanel>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/restart.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/inspect_instance.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/inspect_material.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/inspect_light.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+            </StatusBar>
+
+            <Border
+                Grid.Column="2"
+                BorderThickness="{StaticResource ThinBorder}"
+                BorderBrush="{StaticResource BorderBrush}"/>
+        </Grid>
+        
         <Grid DockPanel.Dock="Bottom">
             <Grid.RowDefinitions>
                 <!-- renderer and property pages -->

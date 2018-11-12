@@ -77,6 +77,7 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
+    <Compile Include="Command\PlayPauseCommand.cs" />
     <Compile Include="Command\RemoveCameraCommand.cs" />
     <Compile Include="Command\RemoveLightCommand.cs" />
     <Compile Include="Command\RemoveMaterialCommand.cs" />
@@ -102,6 +103,7 @@
     <Compile Include="Model\Material\WalterMaterialModel.cs" />
     <Compile Include="Model\RendererModel.cs" />
     <Compile Include="Model\SceneModel.cs" />
+    <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\SynchronizedModelList.cs" />
@@ -133,6 +135,7 @@
     <Compile Include="ViewModel\Material\OrennayarMaterialViewModel.cs" />
     <Compile Include="ViewModel\Material\TorranceMaterialViewModel.cs" />
     <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
+    <Compile Include="ViewModel\ToolbarViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
@@ -344,6 +347,15 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\add.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\inspect_instance.png" />
+    <Resource Include="Icons\inspect_light.png" />
+    <Resource Include="Icons\inspect_material.png" />
+    <Resource Include="Icons\pause.png" />
+    <Resource Include="Icons\play.png" />
+    <Resource Include="Icons\restart.png" />
+    <Resource Include="Icons\stop.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

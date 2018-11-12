@@ -31,6 +31,8 @@ namespace gui.ViewModel
         public LightsViewModel Lights { get; }
         public MaterialsViewModel Materials { get; }
 
+        public ToolbarViewModel Toolbar { get; }
+
         public ICommand AddLightCommand { get; }
         public ICommand AddMaterialCommand { get; }
         public ICommand AddCameraCommand { get; }
@@ -48,6 +50,8 @@ namespace gui.ViewModel
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);
             Materials = new MaterialsViewModel(m_models);
+
+            Toolbar = new ToolbarViewModel(m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

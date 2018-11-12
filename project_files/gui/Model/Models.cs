@@ -23,6 +23,8 @@ namespace gui.Model
         public SynchronizedModelList<LightModel> Lights { get; }
         public SynchronizedModelList<MaterialModel> Materials { get; }
 
+        public ToolbarModel Toolbar { get; }
+
         public RendererModel Renderer { get; }
 
         public Models(MainWindow window)
@@ -34,6 +36,7 @@ namespace gui.Model
             Lights = new SynchronizedModelList<LightModel>();
             Materials = new SynchronizedModelList<MaterialModel>();
             Renderer = new RendererModel();
+            Toolbar = new ToolbarModel();
         }
     }
 }
