@@ -32,7 +32,7 @@ namespace gui.Model.Material
             }
         }
 
-        private Vec2<float> m_conductorRefraction;
+        private Vec2<float> m_conductorRefraction = new Vec2<float>(0.0f);
 
         public Vec2<float> ConductorRefraction
         {

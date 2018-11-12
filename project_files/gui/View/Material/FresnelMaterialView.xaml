@@ -36,7 +36,7 @@
             Grid.Row="0"
             Text="{Binding RefractionIndex}"
             Margin="{StaticResource RightPropertyMargin}"
-            Visibility="{Binding DielectricVisibility}"/>
+            Visibility="{Binding DielectricVisibility, FallbackValue=Hidden}"/>
 
         <!-- conductor case -->
         <Grid
@@ -44,7 +44,23 @@
             Grid.Row="0"
             Margin="{StaticResource RightPropertyMargin}"
             Visibility="{Binding ConductorVisibility}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
+            <TextBox
+                Grid.Column="0"
+                Text="{Binding RefractionComplexX}"/>
+
+            <TextBlock 
+                Grid.Column="1"
+                Text="+i "/>
+
+            <TextBox 
+                Grid.Column="2"
+                Text="{Binding RefractionComplexY}"/>
         </Grid>
 
         <Button
