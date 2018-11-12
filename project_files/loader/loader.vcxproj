@@ -83,10 +83,6 @@
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp" />
-    <ClCompile Include="..\..\deps\epsilon\src\2dintersection.cpp" />
-    <ClCompile Include="..\..\deps\epsilon\src\3dfunctions.cpp" />
-    <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp" />
-    <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />

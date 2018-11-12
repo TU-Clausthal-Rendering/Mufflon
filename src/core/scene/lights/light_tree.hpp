@@ -246,7 +246,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 		}
 	}
 
-	mAssert(type != LightTree::Node::INVALID_TYPE);
+	mAssert(type != LightSubTree::Node::INVALID_TYPE);
 	// We got a light source! Sample it
 	using namespace lighttree_detail;
 	return adjustPdf(sample_light(static_cast<LightType>(type),
@@ -281,7 +281,7 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 	// First is envmap...
 	u64 rightEnv = static_cast<u64>(intervalRight * envPdf);
 	if(index < rightEnv) {
-		mAssert(tree.envLight.texHandle.handle.is_valid());
+		mAssert(tree.envLight.texHandle.is_valid());
 		return lighttree_detail::adjustPdf(sample_light(tree.envLight,
 														rnd), envPdf);
 	}

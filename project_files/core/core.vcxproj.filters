@@ -55,18 +55,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\deps\epsilon\src\3dintersection.cpp">
-      <Filter>Source Files\deps\epsilon</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\deps\epsilon\src\3dtypes.cpp">
-      <Filter>Source Files\deps\epsilon</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\deps\epsilon\src\2dintersection.cpp">
-      <Filter>Source Files\deps\epsilon</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\deps\epsilon\src\3dfunctions.cpp">
-      <Filter>Source Files\deps\epsilon</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
       <Filter>Source Files\deps\chinoise</Filter>
     </ClCompile>
