@@ -112,9 +112,9 @@ private:
 
 
 template < class LightType >
-void create_light_tree(const std::vector<LightType>& lights, LightTree::LightTypeTree& tree,
+void create_light_tree(const std::vector<LightType>& lights, LightSubTree& tree,
 					   const ei::Vec3& aabbDiag) {
-	using Node = LightTree::Node;
+	using Node = LightSubTree::Node;
 
 	tree.lightCount = lights.size();
 	if(lights.size() == 0u)
@@ -207,12 +207,12 @@ void create_light_tree(const std::vector<LightType>& lights, LightTree::LightTyp
 
 
 // Node constructors
-LightTree::Node::Node(const Node& left, const Node& right) :
+LightSubTree::Node::Node(const Node& left, const Node& right) :
 	left{ left.left.flux + left.right.flux, 0u, Node::INVALID_TYPE },
 	right{ Node::INVALID_TYPE, 0u, right.left.flux + right.right.flux },
 	center{ (left.center + right.center) / 2.f }
 {}
-LightTree::Node::Node(const Node& left, const PositionalLights& right,
+LightSubTree::Node::Node(const Node& left, const PositionalLights& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ left.left.flux + left.right.flux, 0u, Node::INVALID_TYPE },
 	right{ static_cast<u16>(get_light_type(right)), 0u, ei::sum(get_flux(right)) },
@@ -220,13 +220,13 @@ LightTree::Node::Node(const Node& left, const PositionalLights& right,
 {
 	(void)aabbDiag;
 }
-LightTree::Node::Node(const Node& left, const DirectionalLight& right,
+LightSubTree::Node::Node(const Node& left, const DirectionalLight& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ left.left.flux + left.right.flux, 0u, Node::INVALID_TYPE },
 	right{ static_cast<u16>(get_light_type(right)), 0u, ei::sum(get_flux(right, aabbDiag)) },
 	center{ (left.center + right.direction) / 2.f }
 {}
-LightTree::Node::Node(const PositionalLights& left, const Node& right,
+LightSubTree::Node::Node(const PositionalLights& left, const Node& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ ei::sum(get_flux(left)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ Node::INVALID_TYPE, 0u, right.left.flux + right.right.flux  },
@@ -234,13 +234,13 @@ LightTree::Node::Node(const PositionalLights& left, const Node& right,
 {
 	(void)aabbDiag;
 }
-LightTree::Node::Node(const DirectionalLight& left, const Node& right,
+LightSubTree::Node::Node(const DirectionalLight& left, const Node& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ ei::sum(get_flux(left, aabbDiag)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ Node::INVALID_TYPE, 0u, right.left.flux + right.right.flux },
 	center{ (left.direction + right.center) / 2.f }
 {}
-LightTree::Node::Node(const PositionalLights& left, const PositionalLights& right,
+LightSubTree::Node::Node(const PositionalLights& left, const PositionalLights& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ ei::sum(get_flux(left)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ static_cast<u16>(get_light_type(right)), 0u,  ei::sum(get_flux(right)) },
@@ -248,7 +248,7 @@ LightTree::Node::Node(const PositionalLights& left, const PositionalLights& righ
 {
 	(void)aabbDiag;
 }
-LightTree::Node::Node(const DirectionalLight& left, const DirectionalLight& right,
+LightSubTree::Node::Node(const DirectionalLight& left, const DirectionalLight& right,
 					  const ei::Vec3& aabbDiag) :
 	left{ ei::sum(get_flux(left, aabbDiag)), 0u, static_cast<u16>(get_light_type(left)) },
 	right{ static_cast<u16>(get_light_type(right)), 0u,  ei::sum(get_flux(right, aabbDiag)) },
@@ -258,18 +258,18 @@ LightTree::Node::Node(const DirectionalLight& left, const DirectionalLight& righ
 }
 
 
-LightTree::LightTree() :
+LightTreeBuilder::LightTreeBuilder() :
 	m_envMapTexture(nullptr),
 	m_flags(),
 	m_trees{
-		Tree<Device::CPU>{
+		LightTree<Device::CPU>{
 			EnvMapLight<Device::CPU>{},
 			{ {}, 0u, nullptr, nullptr },
 			{ {}, 0u, nullptr, nullptr },
 			0u,
 			nullptr
 		},
-		Tree<Device::CUDA>{
+		LightTree<Device::CUDA>{
 			EnvMapLight<Device::CUDA>{},
 			{ {}, 0u, nullptr, nullptr },
 			{ {}, 0u, nullptr, nullptr },
@@ -281,15 +281,19 @@ LightTree::LightTree() :
 
 }
 
-LightTree::~LightTree() {
-
+LightTreeBuilder::~LightTreeBuilder() {
+	// TODO: free the tree
+	m_trees.for_each([](auto& tree) {
+		using TreeType = std::decay_t<decltype(tree)>;
+		Allocator<TreeType::DEVICE>::free(tree.memory.handle, tree.length);
+	});
 }
 
-void LightTree::build(std::vector<PositionalLights>&& posLights,
+void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
 					  const ei::Box& boundingBox,
 					  std::optional<textures::TextureHandle> envLight) {
-	Tree<Device::CPU>& tree = m_trees.get<Tree<Device::CPU>>();
+	LightTree<Device::CPU>& tree = m_trees.get<LightTree<Device::CPU>>();
 
 	// First delete any leftovers
 	tree.memory.handle = Allocator<Device::CPU>::free(tree.memory.handle, tree.length);
@@ -336,17 +340,17 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 	for(const auto& light : posLights)
 		posLightSize += std::visit([](const auto& posLight) { return sizeof(posLight); }, light);
 
-	tree.length = sizeof(Node) * (dirNodes + posNodes)
+	tree.length = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightSize + posLightSize;
 	tree.memory.handle = Allocator<Device::CPU>::alloc_array<char>(tree.length);
 	// Set up the node pointers
-	tree.dirLights.nodes = reinterpret_cast<Node*>(tree.memory.handle);
-	tree.dirLights.lights = &tree.memory.handle[sizeof(Node) * dirNodes];
-	tree.posLights.nodes = reinterpret_cast<Node*>(&tree.memory.handle[sizeof(Node) * dirNodes
-																		  + dirLightSize]);
-	tree.posLights.lights = &tree.memory.handle[sizeof(Node) * dirNodes
+	tree.dirLights.nodes = reinterpret_cast<LightSubTree::Node*>(tree.memory.handle);
+	tree.dirLights.lights = &tree.memory.handle[sizeof(LightSubTree::Node) * dirNodes];
+	tree.posLights.nodes = reinterpret_cast<LightSubTree::Node*>(
+		&tree.memory.handle[sizeof(LightSubTree::Node) * dirNodes + dirLightSize]);
+	tree.posLights.lights = &tree.memory.handle[sizeof(LightSubTree::Node) * dirNodes
 												+ dirLightSize
-												+ sizeof(Node) * posNodes];
+												+ sizeof(LightSubTree::Node) * posNodes];
 
 	// Copy the lights into the tree
 	// TODO: how to place this best into memory?
@@ -371,7 +375,7 @@ void LightTree::build(std::vector<PositionalLights>&& posLights,
 }
 
 // TODO
-void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<Device::CUDA>& sync,
+void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync,
 				 std::optional<textures::TextureHandle> hdl) {
 	if(changed.length == 0u) {
 		// Remove all data since there are no lights
@@ -400,7 +404,7 @@ void synchronize(const LightTree::Tree<Device::CPU>& changed, LightTree::Tree<De
 		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{};
 }
 
-void synchronize(const LightTree::Tree<Device::CUDA>& changed, LightTree::Tree<Device::CPU>& sync,
+void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync,
 				 std::optional<textures::TextureHandle> hdl) {
 	if(changed.length == 0u) {
 		// Remove all data since there are no lights

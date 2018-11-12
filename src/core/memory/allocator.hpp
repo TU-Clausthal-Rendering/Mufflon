@@ -44,9 +44,12 @@ public:
 	// Danger: realloc does not handle construction/destruction
 	template < class T >
 	static T* realloc(T* ptr, std::size_t prev, std::size_t next) {
-		static_assert(std::is_trivially_copyable<T>::value);
-		static_assert(std::is_trivially_constructible<T>::value);
-		static_assert(std::is_trivially_destructible<T>::value);
+		static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
+		static_assert(std::is_trivially_constructible<T>::value,
+					  "Must be trivially constructible");
+		static_assert(std::is_trivially_destructible<T>::value,
+					  "Must be trivially destructible");
 		(void)prev;
 		void* newPtr = std::realloc(ptr, sizeof(T) * next);
 		if(newPtr == nullptr)
@@ -88,7 +91,8 @@ public:
 		if(ptr == nullptr)
 			throw BadAllocation<DEVICE>();
 		// Initialize it
-		static_assert(std::is_trivially_copyable<T>::value);
+		static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
 		T prototype { std::forward<Args>(args)... };
 		for(std::size_t i = 0; i < n; ++i)
 			cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyHostToDevice);
@@ -98,9 +102,12 @@ public:
 	// Danger: realloc does not handle construction/destruction
 	template < class T >
 	static T* realloc(T* ptr, std::size_t prev, std::size_t next) {
-		static_assert(std::is_trivially_copyable<T>::value);
-		static_assert(std::is_trivially_constructible<T>::value);
-		static_assert(std::is_trivially_destructible<T>::value);
+		static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
+		static_assert(std::is_trivially_constructible<T>::value,
+					  "Must be trivially constructible");
+		static_assert(std::is_trivially_destructible<T>::value,
+					  "Must be trivially destructible");
 		T* newPtr = alloc_array<T>(next);
 		copy(newPtr, ptr, prev);
 		free(ptr, prev);
@@ -118,7 +125,8 @@ public:
 
 	template < class T >
 	static void copy(T* dst, const T* src, std::size_t n) {
-		static_assert(std::is_trivially_copyable<T>::value);
+		static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
 		cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice);
 	}
 };

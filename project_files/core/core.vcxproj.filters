@@ -124,9 +124,6 @@
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\util\types.cpp">
-      <Filter>Source Files\util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
@@ -318,6 +315,9 @@
     <ClInclude Include="..\..\src\export\api.hpp">
       <Filter>Source Files\export</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\gpu_pt.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
@@ -329,5 +329,10 @@
     <ClInclude Include="..\..\src\core\scene\attribute.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">
+      <Filter>Source Files\core\renderer</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

@@ -45,7 +45,7 @@ struct alignas(16) SpotLight {
 	u32 direction;
 	ei::Vec3 intensity;
 	half cosThetaMax;
-	half falloffStart;
+	half cosFalloffStart;
 };
 
 /**
@@ -91,20 +91,29 @@ union PositionalLight {
 	AreaLightSphere areaSphere;
 };
 
+// Asserts to make sure the compiler actually followed our orders
+static_assert(sizeof(PointLight) == 32 && alignof(PointLight) == 16,
+			  "Wrong struct packing");
+static_assert(sizeof(SpotLight) == 32 && alignof(SpotLight) == 16,
+			  "Wrong struct packing");
+static_assert(sizeof(AreaLightTriangle) == 64 && alignof(AreaLightTriangle) == 16,
+			  "Wrong struct packing");
+static_assert(sizeof(AreaLightQuad) == 64 && alignof(AreaLightQuad) == 16,
+			  "Wrong struct packing");
+static_assert(sizeof(AreaLightSphere) == 32 && alignof(AreaLightSphere) == 16,
+			  "Wrong struct packing");
+static_assert(sizeof(DirectionalLight) == 32 && alignof(DirectionalLight) == 16,
+			  "Wrong struct packing");
+
+// Restore default packing alignment
+#pragma pack(pop)
+
+
+#ifndef __CUDACC__
 // Kind of code duplication, but for type-safety use this when constructing a light tree
 using PositionalLights = std::variant<PointLight, SpotLight, AreaLightTriangle,
 	AreaLightQuad, AreaLightSphere>;
 
-// Asserts to make sure the compiler actually followed our orders
-static_assert(sizeof(PointLight) == 32 && alignof(PointLight) == 16);
-static_assert(sizeof(SpotLight) == 32 && alignof(SpotLight) == 16);
-static_assert(sizeof(AreaLightTriangle) == 64 && alignof(AreaLightTriangle) == 16);
-static_assert(sizeof(AreaLightQuad) == 64 && alignof(AreaLightQuad) == 16);
-static_assert(sizeof(AreaLightSphere) == 32 && alignof(AreaLightSphere) == 16);
-static_assert(sizeof(DirectionalLight) == 32 && alignof(DirectionalLight) == 16);
-
-// Restore default packing alignment
-#pragma pack(pop)
 
 // Code to detect if a light is of a given type
 namespace lights_detail {
@@ -179,18 +188,20 @@ inline ei::Vec3 get_flux(const PointLight& light) {
 	return light.intensity * 4.f * ei::PI;
 }
 inline ei::Vec3 get_flux(const SpotLight& light) {
-	// TODO
-	return light.intensity;
+	// Flux for the PBRT spotlight version with falloff ((cos(t)-cos(t_w))/(cos(t_f)-cos(t_w)))^4
+	float cosFalloff = __half2float(light.cosFalloffStart);
+	float cosWidth = __half2float(light.cosThetaMax);
+	return light.intensity * (2.f * ei::PI * (1.f - cosFalloff) + (cosFalloff - cosWidth)/ 5.f);
 }
 inline ei::Vec3 get_flux(const AreaLightTriangle& light) {
 	return light.radiance * ei::surface(ei::Triangle{
 		light.points[0u], light.points[1u], light.points[2u]
-										});
+	});
 }
 inline ei::Vec3 get_flux(const AreaLightQuad& light) {
 	return light.radiance * ei::surface(ei::Tetrahedron{
 		light.points[0u], light.points[1u], light.points[2u], light.points[3u]
-										});
+	});
 }
 inline ei::Vec3 get_flux(const AreaLightSphere& light) {
 	return light.radiance * ei::surface(ei::Sphere{ light.position, light.radius });
@@ -226,5 +237,6 @@ inline ei::Vec3 get_flux<DirectionalLight>(const DirectionalLight& light,
 	return light.radiance * surface;
 }
 
+#endif // __CUDACC__
 
 }}} // namespace mufflon::scene::lights

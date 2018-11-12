@@ -8,7 +8,7 @@
 #include "export/api.hpp"
 #include <cuda_runtime.h>
 
-namespace mufflon::scene::lights {
+namespace mufflon { namespace scene { namespace lights {
 
 struct Photon {
 	math::PositionSample pos;
@@ -37,17 +37,17 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 tangent2world(const ei::Vec3& dir,
 													 const ei::Vec3& tangentX,
 													 const ei::Vec3& tangentY,
 													 const ei::Vec3& normal) {
-	return ei::Vec3{ dir.x * tangentY, dir.z * normal, dir.y * tangentY };
+	return dir.x * tangentY + dir.z * normal + dir.y * tangentY;
 }
 
 // Sample a light source
 CUDA_FUNCTION __forceinline__ Photon sample_light(const PointLight& light,
-															   const RndSet& rnd) {
+												  const RndSet& rnd) {
 	return Photon{ { light.position, AreaPdf(std::numeric_limits<float>::infinity()) },
-				   math::sample_dir_sphere_uniform(rnd.u0, rnd.u1)};
+				   math::sample_dir_sphere_uniform(rnd.u0, rnd.u1) };
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const SpotLight& light,
-															   const RndSet& rnd) {
+												  const RndSet& rnd) {
 	float cosThetaMax = __half2float(light.cosThetaMax);
 	// Sample direction in the cone
 	math::DirectionSample dir = math::sample_cone(rnd.u0, rnd.u1, cosThetaMax);
@@ -68,12 +68,12 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const SpotLight& light,
 				   dir };
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightTriangle& light,
-															   const RndSet& rnd) {
+												  const RndSet& rnd) {
 	ei::Triangle triangle = ei::Triangle(light.points[0u], light.points[1u],
-											 light.points[2u]);
+										 light.points[2u]);
 	// The normal of the triangle is implicit due to counter-clockwise vertex ordering
 	ei::Vec3 tangentX = triangle.v2 - triangle.v0;
-	ei::Vec3 tangentY = triangle.v2 - triangle.v0;
+	ei::Vec3 tangentY = triangle.v1 - triangle.v0;
 	ei::Vec3 normal = ei::normalize(ei::cross(tangentX, tangentY));
 	// Sample the direction (lambertian model)
 	math::DirectionSample dir = math::sample_dir_cosine(rnd.u2, rnd.u3);
@@ -85,7 +85,7 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightTriangle& light
 	};
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightQuad& light,
-															   const RndSet& rnd) {
+												  const RndSet& rnd) {
 	// Two-split decision: first select triangle, then use triangle sampling
 	ei::Triangle first = ei::Triangle(light.points[0u], light.points[1u], light.points[2u]);
 	ei::Triangle second = ei::Triangle(light.points[0u], light.points[2u], light.points[3u]);
@@ -121,7 +121,7 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightQuad& light,
 	return Photon{ pos, dir };
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightSphere& light,
-															   const RndSet& rnd) {
+												  const RndSet& rnd) {
 	// We don't need to convert the "normal" due to sphere symmetry
 	math::DirectionSample normal = math::sample_dir_sphere_uniform(rnd.u0, rnd.u1);
 	return Photon{
@@ -131,8 +131,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightSphere& light,
 	};
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const DirectionalLight& light,
-															   const ei::Box& bounds,
-															   const RndSet& rnd) {
+												  const ei::Box& bounds,
+												  const RndSet& rnd) {
 	return Photon{
 		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1, rnd.u2),
 		math::DirectionSample{ light.direction, AngularPdf::infinite() }
@@ -140,11 +140,11 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const DirectionalLight& light,
 }
 template < Device dev >
 CUDA_FUNCTION __forceinline__ Photon sample_light(const EnvMapLight<dev>& light,
-															   const RndSet& rnd) {
+												  const RndSet& rnd) {
 	(void)light;
 	(void)rnd;
 	// TODO
 	return {};
 }
 
-} // namespace mufflon::scene::lights
+}}} // namespace mufflon::scene::lights

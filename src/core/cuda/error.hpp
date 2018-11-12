@@ -4,13 +4,12 @@
 #include <stdexcept>
 #include <string>
 
-namespace mufflon::cuda {
+namespace mufflon { namespace cuda {
 
 class CudaException : public std::exception {
 public:
 	CudaException(cudaError_t error) :
-		m_errCode(error)
-	{}
+		m_errCode(error) {}
 
 	virtual const char *what() const noexcept override {
 		return (std::string(cudaGetErrorName(m_errCode)) + std::string(": ") + std::string(cudaGetErrorString(m_errCode))).c_str();
@@ -25,4 +24,4 @@ inline void check_error(cudaError_t err) {
 		throw CudaException(err);
 }
 
-} // mufflon::cuda
+}} // mufflon::cuda

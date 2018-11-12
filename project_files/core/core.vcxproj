@@ -36,7 +36,6 @@
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp" />
     <ClCompile Include="..\..\src\core\scene\world_container.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
-    <ClCompile Include="..\..\src\util\types.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />
@@ -67,6 +66,7 @@
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\gpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />
@@ -102,6 +102,9 @@
     <ClInclude Include="..\..\src\util\range.hpp" />
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -177,7 +180,12 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</KeepDir>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</CompileOut>
+      <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
+      <NvccCompilation>compile</NvccCompilation>
     </CudaCompile>
+    <CudaLink>
+      <PerformDeviceLink>true</PerformDeviceLink>
+    </CudaLink>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -208,7 +216,9 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <HostDebugInfo>true</HostDebugInfo>
       <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</KeepDir>
-      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</CompileOut>
+      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).obj</CompileOut>
+      <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
+      <NvccCompilation>compile</NvccCompilation>
     </CudaCompile>
     <PostBuildEvent>
       <Message>Copies the necessary .dll's into the execution directory</Message>
@@ -216,6 +226,9 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
 xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCore.dll" "$(OutDir)"
 xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
+    <CudaLink>
+      <PerformDeviceLink>true</PerformDeviceLink>
+    </CudaLink>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

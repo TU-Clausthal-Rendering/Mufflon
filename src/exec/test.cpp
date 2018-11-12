@@ -10,6 +10,7 @@
 
 #include <cuda_runtime.h>
 #include "ei/conversions.hpp"
+#include "core/renderer/gpu_pt.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/object.hpp"
@@ -35,6 +36,11 @@ public:
 	}
 };
 
+void test_renderer() {
+	mufflon::renderer::GpuPathTracer gpu;
+	gpu.run();
+}
+
 void test_lighttree() {
 	using namespace lights;
 
@@ -42,17 +48,18 @@ void test_lighttree() {
 	std::uniform_int_distribution<std::uint64_t> intDist;
 	std::uniform_real_distribution<float> floatDist;
 	std::vector<Photon> photons(1000000u);
+	std::size_t lightCount = 10000u;
 
 	auto testLights = [&rng, &photons, intDist, floatDist](std::vector<PositionalLights> posLights,
 									   std::vector<DirectionalLight> dirLights,
 									   const ei::Box& bounds,
 									   std::optional<textures::TextureHandle> envLight = std::nullopt)
 	{
-		LightTree tree;
+		LightTreeBuilder tree;
 		tree.build(std::move(posLights), std::move(dirLights), bounds, envLight);
 
 		using namespace std::chrono;
-		auto& lightTree = tree.aquire_tree<Device::CPU>();
+		const auto& lightTree = tree.aquire_tree<Device::CPU>();
 		auto t0 = high_resolution_clock::now();
 		for(std::size_t i = 0u; i < photons.size(); ++i) {
 			photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
@@ -82,21 +89,25 @@ void test_lighttree() {
 	float posScale = 10.f;
 	float intensityScale = 20.f;
 	ei::Box bounds{ posScale * ei::Vec3{-1, -1, -1}, posScale * ei::Vec3{1, 1, 1} };
-	std::vector<PositionalLights> posLights(10000);
-	std::vector<DirectionalLight> dirLights(1);
+	std::vector<PositionalLights> pointLights(lightCount);
+	std::vector<PositionalLights> spotLights(lightCount);
+	std::vector<PositionalLights> areaTriLights(lightCount);
+	std::vector<PositionalLights> areaQuadLights(lightCount);
+	std::vector<PositionalLights> areaSphereLights(lightCount);
+	std::vector<DirectionalLight> dirLights(lightCount);
 
 	{ // Test point lights
-		for(auto& light : posLights) {
+		for(auto& light : pointLights) {
 			light = PointLight{
 				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 			};
 		}
 		std::cout << "Point lights: ";
-		testLights(posLights, {}, bounds);
+		testLights(pointLights, {}, bounds);
 	}
 	{ // Test spot lights
-		for(auto& light : posLights) {
+		for(auto& light : spotLights) {
 			float angle = floatDist(rng);
 			light = SpotLight{
 				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
@@ -106,10 +117,10 @@ void test_lighttree() {
 			};
 		}
 		std::cout << "Spot lights: ";
-		testLights(posLights, {}, bounds);
+		testLights(spotLights, {}, bounds);
 	}
 	{ // Test triangular area lights
-		for(auto& light : posLights) {
+		for(auto& light : areaTriLights) {
 			light = AreaLightTriangle{
 				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
@@ -118,10 +129,10 @@ void test_lighttree() {
 			};
 		}
 		std::cout << "Triangular area lights: ";
-		testLights(posLights, {}, bounds);
+		testLights(areaTriLights, {}, bounds);
 	}
 	{ // Test quad area lights
-		for(auto& light : posLights) {
+		for(auto& light : areaQuadLights) {
 			light = AreaLightQuad{
 				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
@@ -131,10 +142,10 @@ void test_lighttree() {
 			};
 		}
 		std::cout << "Quad area lights: ";
-		testLights(posLights, {}, bounds);
+		testLights(areaQuadLights, {}, bounds);
 	}
 	{ // Test spherical area lights
-		for(auto& light : posLights) {
+		for(auto& light : areaSphereLights) {
 			light = AreaLightSphere{
 				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
 				floatDist(rng),
@@ -142,7 +153,7 @@ void test_lighttree() {
 			};
 		}
 		std::cout << "Spherical lights: ";
-		testLights(posLights, {}, bounds);
+		testLights(areaSphereLights, {}, bounds);
 	}
 	{ // Test directional lights
 		for(auto& light : dirLights) {
@@ -155,6 +166,18 @@ void test_lighttree() {
 		testLights({}, dirLights, bounds);
 	}
 	// TODO: Test envmap light
+
+	// All together
+	std::vector<PositionalLights> posLights(pointLights.size() + spotLights.size()
+											+ areaTriLights.size() + areaQuadLights.size()
+											+ areaSphereLights.size());
+	auto insert = posLights.insert(posLights.begin(), pointLights.cbegin(), pointLights.cend()) + pointLights.size();
+	insert = posLights.insert(insert, spotLights.cbegin(), spotLights.cend()) + pointLights.size();
+	insert = posLights.insert(insert, areaTriLights.cbegin(), areaTriLights.cend()) + spotLights.size();
+	insert = posLights.insert(insert, areaQuadLights.cbegin(), areaQuadLights.cend()) + areaTriLights.size();
+	posLights.insert(insert, areaSphereLights.cbegin(), areaSphereLights.cend());
+	std::cout << "All combined: ";
+	testLights(posLights, dirLights, bounds);
 }
 
 void test_allocator() {
@@ -431,6 +454,7 @@ int main() {
 	test_object();
 	test_scene_creation();
 	test_lighttree();
+	test_renderer();
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();

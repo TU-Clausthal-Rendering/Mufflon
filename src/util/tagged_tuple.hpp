@@ -64,8 +64,7 @@ public:
 	static constexpr std::size_t size = sizeof...(Args);
 
 	TaggedTuple(Args&& ...args) :
-		m_tuple(std::forward<Args>(args)...)
-	{}
+		m_tuple(std::forward<Args>(args)...) {}
 	TaggedTuple() = default;
 	TaggedTuple(const TaggedTuple&) = default;
 	TaggedTuple(TaggedTuple&&) = default;
@@ -111,7 +110,11 @@ public:
 
 	template < class Op, std::size_t I = 0u >
 	void for_each(Op&& op) {
+#ifdef __CUDACC__
+		if(I < size) {
+#else // __CUDACC__
 		if constexpr(I < size) {
+#endif // __CUDACC__
 			op(get<I>());
 			for_each<Op, I + 1u>(std::move(op));
 		} else {
@@ -120,7 +123,6 @@ public:
 	}
 
 private:
-
 	// Helper class for finding the index of a type for tuple lookup
 	template < class... T >
 	struct Index;
@@ -132,14 +134,6 @@ private:
 	// Recurse until we find the type and count the recursions
 	template < class T, class H, class... Tails >
 	struct Index<T, H, Tails...> : public std::integral_constant<std::size_t, 1 + Index<T, Tails...>::value> {};
-
-	template < std::size_t I, class Op >
-	void for_each_impl(Op& op) {
-		if constexpr(I < size) {
-			if(!op(I, this->get<I>()))
-				for_each_impl<I + 1u>(op);
-		}
-	}
 
 	TupleType m_tuple;
 };

@@ -1,6 +1,8 @@
 #pragma once
 
+#include "export/api.hpp"
 #include "ei/vector.hpp"
+#include <cuda_runtime.h>
 #include <limits>
 #include <cstdint>
 
@@ -42,36 +44,60 @@ public:
 class AngularPdf;
 
 // PDF types. Either per area or per steradians
-class AreaPdf {
+class LIBRARY_API AreaPdf {
 public:
-	constexpr AreaPdf() = default;
-	explicit constexpr AreaPdf(Real pdf) noexcept : m_pdf(pdf) {}
-	explicit constexpr operator Real() const noexcept { return m_pdf; }
-	AreaPdf& operator+=(AreaPdf pdf) noexcept;
-	AreaPdf& operator-=(AreaPdf pdf) noexcept;
-	AreaPdf& operator*=(AreaPdf pdf) noexcept;
-	AreaPdf& operator/=(AreaPdf pdf) noexcept;
-	constexpr AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
-	static constexpr AreaPdf infinite() {
+	__host__ __device__ constexpr AreaPdf() : m_pdf{ 0 } {}
+	__host__ __device__ explicit constexpr AreaPdf(Real pdf) noexcept : m_pdf(pdf) {}
+	__host__ __device__ explicit constexpr operator Real() const noexcept { return m_pdf; }
+	__host__ __device__ AreaPdf& operator+=(AreaPdf pdf) noexcept {
+		m_pdf += pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ AreaPdf& operator-=(AreaPdf pdf) noexcept {
+		m_pdf -= pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ AreaPdf& operator*=(AreaPdf pdf) noexcept {
+		m_pdf *= pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ AreaPdf& operator/=(AreaPdf pdf) noexcept {
+		m_pdf /= pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ constexpr AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
+	__host__ __device__ static constexpr AreaPdf infinite() {
 		return AreaPdf{ std::numeric_limits<float>::infinity() };
 	}
 
 private:
 	Real m_pdf = 0.f;
 };
-class AngularPdf {
+class LIBRARY_API AngularPdf {
 public:
-	constexpr AngularPdf() = default;
-	explicit constexpr AngularPdf(Real pdf) noexcept : m_pdf(pdf) {}
-	explicit constexpr operator Real() const noexcept { return m_pdf; }
-	AngularPdf& operator+=(AngularPdf pdf) noexcept;
-	AngularPdf& operator-=(AngularPdf pdf) noexcept;
-	AngularPdf& operator*=(AngularPdf pdf) noexcept;
-	AngularPdf& operator/=(AngularPdf pdf) noexcept;
-	constexpr AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
+	__host__ __device__ constexpr AngularPdf() : m_pdf{ 0 } {}
+	__host__ __device__ explicit constexpr AngularPdf(Real pdf) noexcept : m_pdf(pdf) {}
+	__host__ __device__ explicit constexpr operator Real() const noexcept { return m_pdf; }
+	__host__ __device__ AngularPdf& operator+=(AngularPdf pdf) noexcept {
+		m_pdf += pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ AngularPdf& operator-=(AngularPdf pdf) noexcept {
+		m_pdf -= pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ AngularPdf& operator*=(AngularPdf pdf) noexcept {
+		m_pdf *= pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ AngularPdf& operator/=(AngularPdf pdf) noexcept {
+		m_pdf /= pdf.m_pdf;
+		return *this;
+	}
+	__host__ __device__ constexpr AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
 		return AreaPdf{ m_pdf * cos / distSqr };
 	}
-	static constexpr AngularPdf infinite() {
+	__host__ __device__ static constexpr AngularPdf infinite() {
 		return AngularPdf{std::numeric_limits<float>::infinity()};
 	}
 
@@ -79,7 +105,7 @@ private:
 	Real m_pdf = 0.f;
 };
 
-inline constexpr AngularPdf AreaPdf::to_angular_pdf(Real cos, Real distSqr) const noexcept {
+__host__ __device__ constexpr AngularPdf AreaPdf::to_angular_pdf(Real cos, Real distSqr) const noexcept {
 	return AngularPdf{ m_pdf * distSqr / cos };
 }
 

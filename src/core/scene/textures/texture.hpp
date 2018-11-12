@@ -20,27 +20,45 @@ struct ConstDeviceTextureHandle;
 template<>
 struct DeviceTextureHandle<Device::CPU> :
 	public DeviceHandle<Device::CPU, textures::CpuTexture*> {
+	__host__ __device__ constexpr bool is_valid() const noexcept {
+		return handle != nullptr;
+	}
 };
 template<>
 struct ConstDeviceTextureHandle<Device::CPU> :
 	public ConstDeviceHandle<Device::CPU, const textures::CpuTexture*> {
+	__host__ __device__ constexpr bool is_valid() const noexcept {
+		return handle != nullptr;
+	}
 };
 // TODO: Const handle and stuff
 template<>
 struct DeviceTextureHandle<Device::CUDA> :
 	public DeviceHandle<Device::CUDA, cudaSurfaceObject_t> {
+	__host__ __device__ constexpr bool is_valid() const noexcept {
+		return handle != 0u;
+	}
 };
 template<>
 struct ConstDeviceTextureHandle<Device::CUDA> :
 	public ConstDeviceHandle<Device::CUDA, cudaTextureObject_t> {
+	__host__ __device__ constexpr bool is_valid() const noexcept {
+		return handle != 0u;
+	}
 };
 template<>
 struct DeviceTextureHandle<Device::OPENGL> :
 	public DeviceHandle<Device::OPENGL, u64> {
+	__host__ __device__ constexpr bool is_valid() const noexcept {
+		return handle != 0u;
+	}
 };
 template<>
 struct ConstDeviceTextureHandle<Device::OPENGL> :
 	public ConstDeviceHandle<Device::OPENGL, u64> {
+	__host__ __device__ constexpr bool is_valid() const noexcept {
+		return handle != 0u;
+	}
 };
 
 
@@ -91,7 +109,9 @@ public:
 								DeviceTextureHandle<Device::OPENGL>>;
 
 	// Loads a texture into the CPU-RAM
+#ifndef __CUDACC__
 	Texture(std::string_view fileName);
+#endif // __CUDACC__
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
