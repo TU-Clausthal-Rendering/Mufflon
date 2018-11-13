@@ -11,7 +11,7 @@ namespace mufflon { namespace scene { namespace textures {
 class CpuTexture {
 public:
 	// Allocate the texture, data must be filled by using the data() pointer (or writes).
-	CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode);
+	CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb);
 	CpuTexture(const CpuTexture&) = delete;
 	CpuTexture(CpuTexture&&) = default;
 	CpuTexture& operator=(const CpuTexture&) = delete;
@@ -60,6 +60,10 @@ private:
 	ei::Vec4 fetch_RG8U(int texelIdx) const;
 	ei::Vec4 fetch_RGB8U(int texelIdx) const;
 	ei::Vec4 fetch_RGBA8U(int texelIdx) const;
+	ei::Vec4 fetch_sR8U(int texelIdx) const;
+	ei::Vec4 fetch_sRG8U(int texelIdx) const;
+	ei::Vec4 fetch_sRGB8U(int texelIdx) const;
+	ei::Vec4 fetch_sRGBA8U(int texelIdx) const;
 	ei::Vec4 fetch_R16U(int texelIdx) const;
 	ei::Vec4 fetch_RG16U(int texelIdx) const;
 	ei::Vec4 fetch_RGB16U(int texelIdx) const;
@@ -75,6 +79,10 @@ private:
 	void write_RG8U(int texelIdx, const ei::Vec4& value);
 	void write_RGB8U(int texelIdx, const ei::Vec4& value);
 	void write_RGBA8U(int texelIdx, const ei::Vec4& value);
+	void write_sR8U(int texelIdx, const ei::Vec4& value);
+	void write_sRG8U(int texelIdx, const ei::Vec4& value);
+	void write_sRGB8U(int texelIdx, const ei::Vec4& value);
+	void write_sRGBA8U(int texelIdx, const ei::Vec4& value);
 	void write_R16U(int texelIdx, const ei::Vec4& value);
 	void write_RG16U(int texelIdx, const ei::Vec4& value);
 	void write_RGB16U(int texelIdx, const ei::Vec4& value);

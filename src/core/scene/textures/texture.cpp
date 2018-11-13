@@ -98,7 +98,7 @@ template void Texture::unload<Device::OPENGL>();
 
 
 void Texture::create_texture_cpu() {
-	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format, m_mode);
+	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format, m_mode, m_sRgb);
 	m_handles.get<TextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
 	m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
 }
