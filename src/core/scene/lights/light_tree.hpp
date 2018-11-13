@@ -503,7 +503,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
 	// TODO: way to check handle's validity!
 	float envPdf = 0.f;
-	if(tree.envLight.texHandle.is_valid()) {
+	if(is_valid(tree.envLight.texHandle)) {
 		fluxSum += ei::sum(tree.envLight.flux);
 		envPdf = ei::sum(tree.envLight.flux) / fluxSum;
 	}
@@ -514,7 +514,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
 	// First is envmap...
 	u64 rightEnv = static_cast<u64>(intervalRight * envPdf);
 	if(index < rightEnv) {
-		mAssert(tree.envLight.texHandle.is_valid());
+		mAssert(is_valid(tree.envLight.texHandle));
 		// TODO: adjust light probability
 		return connect_light(tree.envLight, position, rnd);
 	}
