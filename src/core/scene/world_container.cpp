@@ -30,15 +30,15 @@ InstanceHandle WorldContainer::add_instance(Instance &&instance) {
 	return &m_instances.back();
 }
 
-
-WorldContainer::ScenarioHandle WorldContainer::create_scenario() {
-	m_scenarios.emplace_back();
-	return &m_scenarios.back();
+WorldContainer::ScenarioHandle WorldContainer::add_scenario(Scenario&& scenario) {
+	return m_scenarios.emplace(scenario.get_name(), std::move(scenario)).first;
 }
 
-WorldContainer::ScenarioHandle WorldContainer::add_scenario(Scenario&& scenario) {
-	m_scenarios.emplace_back(std::move(scenario));
-	return &m_scenarios.back();
+std::optional<WorldContainer::ScenarioHandle> WorldContainer::get_scenario(const std::string_view& name) {
+	auto iter = m_scenarios.find(name);
+	if(iter != m_scenarios.end())
+		return iter;
+	return std::nullopt;
 }
 
 MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial> material) {
@@ -62,18 +62,137 @@ CameraHandle WorldContainer::get_camera(std::string_view name) {
 	return it->second.get();
 }
 
+std::optional<WorldContainer::PointLightHandle> WorldContainer::add_light(std::string name,
+																		  lights::PointLight&& light) {
+	if(m_pointLights.find(name) != m_pointLights.cend()) {
+		logError("[WorldContainer::add_light] Point light with name '", name, "' already exists");
+		return std::nullopt;
+	}
+	return m_pointLights.insert({ std::move(name), std::move(light) }).first;
+
+}
+
+std::optional<WorldContainer::SpotLightHandle> WorldContainer::add_light(std::string name,
+																		 lights::SpotLight&& light) {
+	if(m_spotLights.find(name) != m_spotLights.cend()) {
+		logError("[WorldContainer::add_light] Spot light with name '", name, "' already exists");
+		return std::nullopt;
+	}
+	return m_spotLights.insert({ std::move(name), std::move(light) }).first;
+
+}
+
+std::optional<WorldContainer::DirLightHandle> WorldContainer::add_light(std::string name,
+																		lights::DirectionalLight&& light) {
+	if(m_dirLights.find(name) != m_dirLights.cend()) {
+		logError("[WorldContainer::add_light] Directional light with name '", name, "' already exists");
+		return std::nullopt;
+	}
+	return m_dirLights.insert({ std::move(name), std::move(light) }).first;
+}
+std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::string name,
+																		textures::TextureHandle env) {
+	if(m_envLights.find(name) != m_envLights.cend()) {
+		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
+		return std::nullopt;
+	}
+	return m_envLights.insert({ std::move(name), env }).first;
+}
+
+std::optional<WorldContainer::PointLightHandle> WorldContainer::get_point_light(const std::string_view& name) {
+	auto light = m_pointLights.find(name);
+	if(light == m_pointLights.end()) {
+		logError("[WorldContainer::get_point_light] Unknown point light '", name, "'");
+		return std::nullopt;
+	}
+	return light;
+}
+
+std::optional<WorldContainer::SpotLightHandle> WorldContainer::get_spot_light(const std::string_view& name) {
+	auto light = m_spotLights.find(name);
+	if(light == m_spotLights.end()) {
+		logError("[WorldContainer::get_spot_light] Unknown spot light '", name, "'");
+		return std::nullopt;
+	}
+	return light;
+}
+
+std::optional<WorldContainer::DirLightHandle> WorldContainer::get_dir_light(const std::string_view& name) {
+	auto light = m_dirLights.find(name);
+	if(light == m_dirLights.end()) {
+		logError("[WorldContainer::get_dir_light] Unknown directional light '", name, "'");
+		return std::nullopt;
+	}
+	return light;
+}
+
+std::optional<WorldContainer::EnvLightHandle> WorldContainer::get_env_light(const std::string_view& name) {
+	auto light = m_envLights.find(name);
+	if(light == m_envLights.end()) {
+		logError("[WorldContainer::get_env_light] Unknown env light '", name, "'");
+		return std::nullopt;
+	}
+	return light;
+}
+
+bool WorldContainer::is_point_light(const std::string_view& name) const {
+	return m_pointLights.find(name) != m_pointLights.cend();
+}
+
+bool WorldContainer::is_spot_light(const std::string_view& name) const {
+	return m_spotLights.find(name) != m_spotLights.cend();
+}
+
+bool WorldContainer::is_dir_light(const std::string_view& name) const {
+	return m_dirLights.find(name) != m_dirLights.cend();
+}
+
+bool WorldContainer::is_env_light(const std::string_view& name) const {
+	return m_envLights.find(name) != m_envLights.cend();
+}
 
 SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
-	if(hdl == nullptr) {
-		logError("[WorldContainer::create_instance] Invalid scenario handle");
-		return nullptr;
-	}
-	Scenario& scenario = *hdl;
+	Scenario& scenario = hdl->second;
+
+	std::vector<lights::PositionalLights> posLights;
+	std::vector<lights::DirectionalLight> dirLights;
+	std::optional<EnvLightHandle> envLightTex;
+	posLights.reserve(m_pointLights.size() + m_spotLights.size());
+	dirLights.reserve(m_dirLights.size());
+
 	m_scene = std::make_unique<Scene>();
 	for(auto& instance : m_instances) {
-		if(!scenario.is_masked(&instance.get_object()))
+		if(!scenario.is_masked(&instance.get_object())) {
 			m_scene->add_instance(&instance);
+			// TODO: add area light here!
+		}
 	}
+
+	// Add regular lights
+	for(const std::string_view& name : scenario.get_light_names()) {
+		if(auto pointLight = get_point_light(name); pointLight.has_value()) {
+			posLights.push_back(pointLight.value()->second);
+		} else if(auto spotLight = get_spot_light(name); spotLight.has_value()) {
+			posLights.push_back(spotLight.value()->second);
+		} else if(auto dirLight = get_dir_light(name); dirLight.has_value()) {
+			dirLights.push_back(dirLight.value()->second);
+		} else if(auto envLight = get_env_light(name); envLight.has_value()) {
+			if(envLightTex.has_value())
+				logWarning("[WorldContainer::load_scene] Multiple envmap lights are not supported; replacing '",
+						   envLightTex.value()->first, "' with '",
+						   envLight.value()->first);
+			envLightTex = envLight;
+		} else {
+			logWarning("[WorldContainer::load_scene] Unknown light source '", name, "' in scenario '",
+					   scenario.get_name(), "'");
+		}
+	}
+
+	if(envLightTex.has_value())
+		m_scene->set_lights(std::move(posLights), std::move(dirLights),
+							envLightTex.value()->second);
+	else
+		m_scene->set_lights(std::move(posLights), std::move(dirLights));
 
 	// TODO: load the materials (make something resident?)
 	// TODO: cameras light, etc.

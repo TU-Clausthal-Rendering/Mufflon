@@ -66,6 +66,7 @@ void test_lighttree() {
 		const auto& lightTree = tree.aquire_tree<Device::CPU>();
 
 		auto t0 = high_resolution_clock::now();
+#pragma omp parallel for
 		for(long long i = 0u; i < static_cast<long long>(photons.size()); ++i) {
 			photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
 							  bounds, { floatDist(rng), floatDist(rng),
@@ -74,6 +75,7 @@ void test_lighttree() {
 		auto t1 = high_resolution_clock::now();
 
 		auto t2 = high_resolution_clock::now();
+#pragma omp parallel for
 		for(long long i = 0u; i < static_cast<long long>(nees.size()); ++i) {
 			nees[i] = connect(lightTree, i, photons.size(), intDist(rng),
 							  ei::Vec3{floatDist(rng), floatDist(rng), floatDist(rng)},
@@ -86,26 +88,23 @@ void test_lighttree() {
 		}
 		auto t3 = high_resolution_clock::now();
 
-		Photon positions = std::reduce(std::execution::par_unseq, photons.cbegin(), photons.cend(), Photon{ {}, {}, {} },
+		Photon posPhotons = std::reduce(std::execution::par_unseq, photons.cbegin(),
+										photons.cend(), Photon{ {}, {}, {} },
 										 [](Photon init, const Photon& photon) {
 			init.pos.position += photon.pos.position;
 			return init;
 		});
-		Photon directions = std::reduce(std::execution::par_unseq, photons.cbegin(), photons.cend(), Photon{ {}, {}, {} },
-										  [](Photon init, const Photon& photon) {
-			init.dir.direction += photon.dir.direction;
+		NextEventEstimation posNees = std::reduce(std::execution::par_unseq, nees.cbegin(),
+												  nees.cend(), NextEventEstimation{ {}, {}, {} },
+											   [](NextEventEstimation init,
+												  const NextEventEstimation& photon) {
+			init.pos.position += photon.pos.position;
 			return init;
 		});
 
-		positions.pos.position /= static_cast<float>(photons.size());
-		directions.dir.direction /= static_cast<float>(photons.size());
-
-		std::cout << "[" << positions.pos.position[0]
-			<< '|' << positions.pos.position[1] << '|' << positions.pos.position[2] << "] ["
-			<< directions.dir.direction[0] << '|' << directions.dir.direction[1] << '|'
-			<< directions.dir.direction[2] << "] (" << photons.size() << " photons, "
-			<< duration_cast<milliseconds>(t1 - t0).count()
-			<< "ms)" << std::endl;
+		std::cout << "[" << (posPhotons.pos.position[0] + posNees.pos.position[0]) << "] (" << photons.size() << " photons, "
+			<< duration_cast<milliseconds>(t1 - t0).count() << "|"
+			<< duration_cast<milliseconds>(t3 - t2).count() << "ms)" << std::endl;
 	};
 	
 	float posScale = 10.f;
@@ -413,7 +412,7 @@ void test_object() {
 
 void test_scene_creation() {
 	WorldContainer container;
-	Object* obj = container.create_object();
+	Object *obj = container.create_object();
 	
 	{
 		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
@@ -458,7 +457,8 @@ void test_scene_creation() {
 		7.f,8.f,9.f,
 		10.f,11.f,12.f
 	});
-	auto scenarioHdl = container.create_scenario();
+	Scenario scenario{ "testScenario", {800, 600}, nullptr };
+	auto scenarioHdl = container.add_scenario(std::move(scenario));
 	auto* sceneHdl = container.load_scene(scenarioHdl);
 
 	const ei::Box& aabb = sceneHdl->get_bounding_box();

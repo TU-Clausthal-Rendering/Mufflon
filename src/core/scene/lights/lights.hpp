@@ -82,15 +82,6 @@ struct EnvMapLight {
 	alignas(16) ei::Vec3 flux;
 };
 
-// Encodes all possibilities for light sources which have a spatial location
-union PositionalLight {
-	PointLight point;
-	SpotLight spot;
-	AreaLightTriangle areaTri;
-	AreaLightQuad areaQuad;
-	AreaLightSphere areaSphere;
-};
-
 // Asserts to make sure the compiler actually followed our orders
 static_assert(sizeof(PointLight) == 32 && alignof(PointLight) == 16,
 			  "Wrong struct packing");
@@ -109,10 +100,71 @@ static_assert(sizeof(DirectionalLight) == 32 && alignof(DirectionalLight) == 16,
 #pragma pack(pop)
 
 
+
+// Return the center of the light (for area lights averaged position,
+// for directional light direction)
+CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const PointLight& light) {
+	return light.position;
+}
+CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const SpotLight& light) {
+	return light.position;
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_center(const AreaLightTriangle& light) {
+	return ei::center(ei::Triangle{ light.points[0u], light.points[1u],
+									light.points[2u] });
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_center(const AreaLightQuad& light) {
+	return ei::center(ei::Tetrahedron{ light.points[0u], light.points[1u],
+									   light.points[2u], light.points[3u] });
+}
+CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const AreaLightSphere& light) {
+	return light.position;
+}
+CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const DirectionalLight& light) {
+	return light.direction;
+}
+
+// Converts the light's inert radiometric property into flux
+// These are not in a CPP file because their small size makes them
+// prime targets for inlining
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const PointLight& light) {
+	return light.intensity * 4.f * ei::PI;
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const SpotLight& light) {
+	// Flux for the PBRT spotlight version with falloff ((cos(t)-cos(t_w))/(cos(t_f)-cos(t_w)))^4
+	float cosFalloff = __half2float(light.cosFalloffStart);
+	float cosWidth = __half2float(light.cosThetaMax);
+	return light.intensity * (2.f * ei::PI * (1.f - cosFalloff) + (cosFalloff - cosWidth) / 5.f);
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightTriangle& light) {
+	return light.radiance * ei::surface(ei::Triangle{
+		light.points[0u], light.points[1u], light.points[2u]
+										});
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightQuad& light) {
+	return light.radiance * ei::surface(ei::Tetrahedron{
+		light.points[0u], light.points[1u], light.points[2u], light.points[3u]
+										});
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightSphere& light) {
+	return light.radiance * ei::surface(ei::Sphere{ light.position, light.radius });
+}
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const DirectionalLight& light,
+												const ei::Vec3& aabbDiag) {
+	mAssert(aabbDiag.x > 0 && aabbDiag.y > 0 && aabbDiag.z > 0);
+	float surface = aabbDiag.y*aabbDiag.z*std::abs(light.direction.x)
+		+ aabbDiag.x*aabbDiag.z*std::abs(light.direction.y)
+		+ aabbDiag.x*aabbDiag.y*std::abs(light.direction.z);
+	return light.radiance * surface;
+}
+
+
 #ifndef __CUDACC__
 // Kind of code duplication, but for type-safety use this when constructing a light tree
 using PositionalLights = std::variant<PointLight, SpotLight, AreaLightTriangle,
 	AreaLightQuad, AreaLightSphere>;
+using Light = std::variant<PointLight, SpotLight, AreaLightTriangle,
+	AreaLightQuad, AreaLightSphere, DirectionalLight, EnvMapLight<Device::CPU>>;
 
 
 // Code to detect if a light is of a given type
@@ -181,32 +233,6 @@ inline LightType get_light_type(const LT& light) {
 		return LightType::NUM_LIGHTS;
 }
 
-// Converts the light's inert radiometric property into flux
-// These are not in a CPP file because their small size makes them
-// prime targets for inlining
-inline ei::Vec3 get_flux(const PointLight& light) {
-	return light.intensity * 4.f * ei::PI;
-}
-inline ei::Vec3 get_flux(const SpotLight& light) {
-	// Flux for the PBRT spotlight version with falloff ((cos(t)-cos(t_w))/(cos(t_f)-cos(t_w)))^4
-	float cosFalloff = __half2float(light.cosFalloffStart);
-	float cosWidth = __half2float(light.cosThetaMax);
-	return light.intensity * (2.f * ei::PI * (1.f - cosFalloff) + (cosFalloff - cosWidth)/ 5.f);
-}
-inline ei::Vec3 get_flux(const AreaLightTriangle& light) {
-	return light.radiance * ei::surface(ei::Triangle{
-		light.points[0u], light.points[1u], light.points[2u]
-	});
-}
-inline ei::Vec3 get_flux(const AreaLightQuad& light) {
-	return light.radiance * ei::surface(ei::Tetrahedron{
-		light.points[0u], light.points[1u], light.points[2u], light.points[3u]
-	});
-}
-inline ei::Vec3 get_flux(const AreaLightSphere& light) {
-	return light.radiance * ei::surface(ei::Sphere{ light.position, light.radius });
-}
-
 inline ei::Vec3 get_flux(const PositionalLights& light) {
 	return std::visit([](const auto& posLight) {
 		return get_flux(posLight);
@@ -218,46 +244,14 @@ inline ei::Vec3 get_flux(const LT& light, const ei::Vec3& aabbDiag) {
 	(void)aabbDiag;
 	if constexpr(std::is_same_v<LT, PositionalLights>)
 		return std::visit([](const auto& posLight) {
-			return get_flux(posLight);
-		}, light);
+		return get_flux(posLight);
+	}, light);
 	else if constexpr(is_envmap_light_type<LT>())
 		return light.flux;
 	else if constexpr(std::is_same_v<LT, DirectionalLight>)
 		return get_flux(light, aabbDiag);
 	else
 		return get_flux(light);
-}
-template <>
-inline ei::Vec3 get_flux<DirectionalLight>(const DirectionalLight& light,
-										   const ei::Vec3& aabbDiag) {
-	mAssert(aabbDiag.x > 0 && aabbDiag.y > 0 && aabbDiag.z > 0);
-	float surface = aabbDiag.y*aabbDiag.z*std::abs(light.direction.x)
-		+ aabbDiag.x*aabbDiag.z*std::abs(light.direction.y)
-		+ aabbDiag.x*aabbDiag.y*std::abs(light.direction.z);
-	return light.radiance * surface;
-}
-
-// Return the center of the light (for area lights averaged position,
-// for directional light direction)
-inline const ei::Vec3& get_center(const PointLight& light) {
-	return light.position;
-}
-inline const ei::Vec3& get_center(const SpotLight& light) {
-	return light.position;
-}
-inline ei::Vec3 get_center(const AreaLightTriangle& light) {
-	return ei::center(ei::Triangle{ light.points[0u], light.points[1u],
-									light.points[2u] });
-}
-inline ei::Vec3 get_center(const AreaLightQuad& light) {
-	return ei::center(ei::Tetrahedron{ light.points[0u], light.points[1u],
-									   light.points[2u], light.points[3u] });
-}
-inline const ei::Vec3& get_center(const AreaLightSphere& light) {
-	return light.position;
-}
-inline const ei::Vec3& get_center(const DirectionalLight& light) {
-	return light.direction;
 }
 
 #endif // __CUDACC__

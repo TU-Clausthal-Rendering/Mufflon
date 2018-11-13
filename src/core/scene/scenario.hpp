@@ -17,6 +17,15 @@ class LIBRARY_API Scenario {
 public:
 	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
 
+	Scenario(std::string name, ei::IVec2 resolution, CameraHandle camera) :
+		m_name(name), m_resolution(resolution), m_camera(camera)
+	{}
+	Scenario(const Scenario&) = delete;
+	Scenario(Scenario&&) = default;
+	Scenario& operator=(const Scenario&) = delete;
+	Scenario& operator=(Scenario&&) = delete;
+	~Scenario() = default;
+
 	/*
 	 * Add a new material entry to the table. The index of the material depends on the
 	 * order of declarations and is unchanging for a scene.
@@ -64,6 +73,15 @@ public:
 	void mask_object(ObjectHandle hdl);
 	void set_custom_lod(ObjectHandle hdl, std::size_t level);
 
+	std::string_view get_name() const noexcept {
+		return m_name;
+	}
+	// Note: no method to change name! because it is being used as
+	// key in worldcontainer
+
+	const std::vector<std::string_view>& get_light_names() const noexcept {
+		return m_lightNames;
+	}
 
 private:
 	struct MaterialDesc {
@@ -76,14 +94,16 @@ private:
 		std::size_t lod = NO_CUSTOM_LOD;
 	};
 
+	const std::string m_name;
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
 	std::map<std::string, MaterialIndex, std::less<>> m_materialIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
-	// TODO: list of light mappings
+	// All lights which are enabled in this scenario
+	std::vector<std::string_view> m_lightNames;
 
-	std::size_t m_globalLodLevel;
+	std::size_t m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution;
 	CameraHandle m_camera;
 	// TODO: material properties

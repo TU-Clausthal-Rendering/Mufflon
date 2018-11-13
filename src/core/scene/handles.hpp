@@ -12,6 +12,10 @@ class Scene;
 namespace materials {
 	class IMaterial;
 }
+namespace lights {
+struct PointLight;
+struct SpotLight;
+}
 
 
 using ObjectHandle = Object*;

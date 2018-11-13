@@ -3,6 +3,7 @@
 #include "object.hpp"
 #include "scenario.hpp"
 #include "scene.hpp"
+#include "lights/lights.hpp"
 #include "handles.hpp"
 #include "export/api.hpp"
 #include <map>
@@ -18,9 +19,13 @@ namespace mufflon::scene {
  */
 class LIBRARY_API WorldContainer {
 public:
-	using ScenarioHandle = Scenario*;
+	using ScenarioHandle = std::unordered_map<std::string_view, Scenario>::iterator;
+	using PointLightHandle = std::map<std::string, lights::PointLight, std::less<>>::iterator;
+	using SpotLightHandle = std::map<std::string, lights::SpotLight, std::less<>>::iterator;
+	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
+	using EnvLightHandle = std::map<std::string, textures::TextureHandle, std::less<>>::iterator;
 
-	// Creates a new, empty object and returns a handle to it
+	// Create a new object to be filled
 	ObjectHandle create_object();
 	// Adds an already created object and takes ownership of it
 	ObjectHandle add_object(Object&& obj);
@@ -28,10 +33,10 @@ public:
 	InstanceHandle create_instance(ObjectHandle hdl);
 	// Adds a new instance.
 	InstanceHandle add_instance(Instance &&instance);
-	// Create a new scenario
-	ScenarioHandle create_scenario();
 	// Add a created scenario and take ownership
 	ScenarioHandle add_scenario(Scenario&& scenario);
+	// Finds a scenario by its name
+	std::optional<ScenarioHandle> get_scenario(const std::string_view& name);
 
 	/*
 	 * Add a ready to use material to the scene. The material must be loaded completely.
@@ -47,6 +52,23 @@ public:
 
 	// Find a camera dependent on its name.
 	CameraHandle get_camera(std::string_view name);
+
+	// Adds a new light to the scene
+	std::optional<PointLightHandle> add_light(std::string name, lights::PointLight&& light);
+	std::optional<SpotLightHandle> add_light(std::string name, lights::SpotLight&& light);
+	std::optional<DirLightHandle> add_light(std::string name, lights::DirectionalLight&& light);
+	std::optional<EnvLightHandle> add_light(std::string name, textures::TextureHandle env);
+	// Finds a light by name
+	std::optional<PointLightHandle> get_point_light(const std::string_view& name);
+	std::optional<SpotLightHandle> get_spot_light(const std::string_view& name);
+	std::optional<DirLightHandle> get_dir_light(const std::string_view& name);
+	std::optional<EnvLightHandle> get_env_light(const std::string_view& name);
+	// Checks the type of a light by name
+	bool is_point_light(const std::string_view& name) const;
+	bool is_spot_light(const std::string_view& name) const;
+	bool is_dir_light(const std::string_view& name) const;
+	bool is_env_light(const std::string_view& name) const;
+
 
 	/**
 	 * Loads the specified scenario.
@@ -65,13 +87,17 @@ private:
 	std::vector<Object> m_objects;
 	// All instances of the world
 	std::vector<Instance> m_instances;
-	// List of all scenarios available
-	std::vector<Scenario> m_scenarios;
+	// List of all scenarios available (mapped to their names)
+	std::unordered_map<std::string_view, Scenario> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
 	// All available cameras mapped to their name.
 	std::unordered_map<std::string_view, std::unique_ptr<cameras::Camera>> m_cameras;
-	
+	// All light sources of the scene
+	std::map<std::string, lights::PointLight, std::less<>> m_pointLights;
+	std::map<std::string, lights::SpotLight, std::less<>> m_spotLights;
+	std::map<std::string, lights::DirectionalLight, std::less<>> m_dirLights;
+	std::map<std::string, textures::TextureHandle, std::less<>> m_envLights;
 
 	// TODO: cameras, lights, materials
 

@@ -284,6 +284,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	// First delete any leftovers
 	tree.memory = Allocator<Device::CPU>::free(tree.memory, tree.length);
 	tree.envLight = EnvMapLight<Device::CPU>{};
+	tree.envLight.flux = ei::Vec3{0.f, 0.f, 0.f};
 
 	// Construct the environment light
 	if(envLight.has_value()) {
@@ -358,6 +359,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	// Now we gotta construct the proper nodes by recursively merging them together
 	create_light_tree(dirLights, tree.dirLights, scale);
 	create_light_tree(posLights, tree.posLights, scale);
+	m_flags.mark_changed(Device::CPU);
 }
 
 // TODO

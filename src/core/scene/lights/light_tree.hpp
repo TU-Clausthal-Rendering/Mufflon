@@ -41,9 +41,25 @@ struct LightSubTree {
 		// Layout: [4,4,2]=10, [2,4,4]=10, [4,4,4]=12 bytes
 		// Necessary duplication due to memory layout (2x32+16 and 16+2x32 bits)
 		struct {
-			__device__ __host__ void set_offset(std::size_t off) noexcept {
+			CUDA_FUNCTION __forceinline__ void set_offset(std::size_t off) noexcept {
 				mAssert(off < std::numeric_limits<u32>::max());
 				offset = static_cast<u32>(off);
+			}
+			CUDA_FUNCTION __forceinline__ void mark_node() noexcept {
+				type = INVALID_TYPE;
+			}
+			CUDA_FUNCTION __forceinline__ void set_light_type(LightType t) noexcept {
+				mAssert(static_cast<u16>(t) < static_cast<u16>(LightType::NUM_LIGHTS));
+				type = static_cast<u16>(t);
+			}
+			CUDA_FUNCTION __forceinline__ constexpr bool is_node() const noexcept {
+				return type == INVALID_TYPE;
+			}
+			CUDA_FUNCTION __forceinline__ constexpr bool is_light() const noexcept {
+				return !is_node();
+			}
+			CUDA_FUNCTION __forceinline__ constexpr LightType get_light_type() const noexcept {
+				return static_cast<LightType>(type);
 			}
 
 			float flux;
@@ -51,9 +67,25 @@ struct LightSubTree {
 			u16 type;
 		} left;
 		struct {
-			__device__ __host__ void set_offset(std::size_t off) noexcept {
+			CUDA_FUNCTION __forceinline__ void set_offset(std::size_t off) noexcept {
 				mAssert(off < std::numeric_limits<u32>::max());
 				offset = static_cast<u32>(off);
+			}
+			CUDA_FUNCTION __forceinline__ void mark_node() noexcept {
+				type = INVALID_TYPE;
+			}
+			CUDA_FUNCTION __forceinline__ void set_light_type(LightType t) noexcept {
+				mAssert(static_cast<u16>(t) < static_cast<u16>(LightType::NUM_LIGHTS));
+				type = static_cast<u16>(t);
+			}
+			CUDA_FUNCTION __forceinline__ constexpr bool is_node() const noexcept {
+				return type == INVALID_TYPE;
+			}
+			CUDA_FUNCTION __forceinline__ constexpr bool is_light() const noexcept {
+				return !is_node();
+			}
+			CUDA_FUNCTION __forceinline__ constexpr LightType get_light_type() const noexcept {
+				return static_cast<LightType>(type);
 			}
 
 			u16 type;
@@ -95,7 +127,11 @@ class LIBRARY_API LightTreeBuilder {
 public:
 	LightTreeBuilder();
 	~LightTreeBuilder();
+	LightTreeBuilder(LightTreeBuilder&&) = default;
+	LightTreeBuilder& operator=(LightTreeBuilder&&) = default;
 
+	// Builds the light tree from lists of positional and directional lights and
+	// optionally an envmap light
 	void build(std::vector<PositionalLights>&& posLights,
 			   std::vector<DirectionalLight>&& dirLights,
 			   const ei::Box& boundingBox,
@@ -145,13 +181,13 @@ CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
 template < class ChildType >
 CUDA_FUNCTION __forceinline__ ei::Vec3 get_cluster_center(const ChildType& child,
 														  const LightSubTree& tree) {
-	if(child.type == LightSubTree::Node::INVALID_TYPE) {
+	if(child.is_node()) {
 		// Look up node
 		return tree.nodes[child.offset].center;
 	} else {
-		mAssert(child.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		mAssert(child.is_light());
 		const char* light = &tree.lights[child.offset];
-		switch(static_cast<LightType>(child.type)) {
+		switch(child.get_light_type()) {
 			case LightType::POINT_LIGHT: return get_center(*reinterpret_cast<const PointLight*>(light));
 			case LightType::SPOT_LIGHT: return get_center(*reinterpret_cast<const SpotLight*>(light));
 			case LightType::AREA_LIGHT_TRIANGLE: return get_center(*reinterpret_cast<const AreaLightTriangle*>(light));
@@ -160,6 +196,31 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_cluster_center(const ChildType& child
 			case LightType::DIRECTIONAL_LIGHT: return get_center(*reinterpret_cast<const DirectionalLight*>(light));
 			default: mAssert(false); return {};
 		}
+	}
+}
+
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const char* light, LightType type, const ei::Vec3& aabbDiag) {
+	switch(type) {
+		case LightType::POINT_LIGHT: return get_flux(*reinterpret_cast<const PointLight*>(light));
+		case LightType::SPOT_LIGHT: return get_flux(*reinterpret_cast<const SpotLight*>(light));
+		case LightType::AREA_LIGHT_TRIANGLE: return get_flux(*reinterpret_cast<const AreaLightTriangle*>(light));
+		case LightType::AREA_LIGHT_QUAD: return get_flux(*reinterpret_cast<const AreaLightQuad*>(light));
+		case LightType::AREA_LIGHT_SPHERE: return get_flux(*reinterpret_cast<const AreaLightSphere*>(light));
+		case LightType::DIRECTIONAL_LIGHT: return get_flux(*reinterpret_cast<const DirectionalLight*>(light), aabbDiag);
+		default: mAssert(false); return {};
+	}
+}
+
+template < class ChildType >
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_cluster_flux(const ChildType& child,
+														const LightSubTree& tree,
+														const ei::Vec3& aabbDiag) {
+	if(child.is_node()) {
+		// Look up node
+		return tree.nodes[child.offset].flux;
+	} else {
+		mAssert(child.is_light());
+		return ei::sum(get_flux(&tree.lights[child.offset], child.get_light_type(), aabbDiag));
 	}
 }
 
@@ -238,7 +299,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 		// Check if our index falls into one of these
 		if(index < leftRight) {
 			lightPdf *= probLeft;
-			if(currentNode->left.type != LightSubTree::Node::INVALID_TYPE) {
+			if(currentNode->left.is_light()) {
 				type = currentNode->left.type;
 				offset = currentNode->left.offset;
 				break;
@@ -247,7 +308,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 			intervalRight = leftRight;
 		} else if(index >= rightLeft) {
 			lightPdf *= 1.f - probLeft;
-			if(currentNode->right.type != LightSubTree::Node::INVALID_TYPE) {
+			if(currentNode->right.is_light()) {
 				type = currentNode->right.type;
 				offset = currentNode->right.offset;
 				break;
@@ -262,7 +323,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 												 * probLeft);
 			if(rng < split) {
 				lightPdf *= probLeft;
-				if(currentNode->left.type != LightSubTree::Node::INVALID_TYPE) {
+				if(currentNode->left.is_light()) {
 					type = currentNode->left.type;
 					offset = currentNode->left.offset;
 					break;
@@ -271,7 +332,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 				intervalRight = split;
 			} else {
 				lightPdf *= 1.f - probLeft;
-				if(currentNode->right.type != LightSubTree::Node::INVALID_TYPE) {
+				if(currentNode->right.is_light()) {
 					type = currentNode->right.type;
 					offset = currentNode->right.offset;
 					break;
@@ -344,7 +405,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		// Check if our index falls into one of these
 		if(index < leftRight) {
 			lightPdf *= probLeft;
-			if(currentNode->left.type != LightSubTree::Node::INVALID_TYPE) {
+			if(currentNode->left.is_light()) {
 				type = currentNode->left.type;
 				offset = currentNode->left.offset;
 				break;
@@ -353,7 +414,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 			intervalRight = leftRight;
 		} else if(index >= rightLeft) {
 			lightPdf *= 1.f - probLeft;
-			if(currentNode->right.type != LightSubTree::Node::INVALID_TYPE) {
+			if(currentNode->right.is_light()) {
 				type = currentNode->right.type;
 				offset = currentNode->right.offset;
 				break;
@@ -368,7 +429,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 												 * probLeft);
 			if(rng < split) {
 				lightPdf *= probLeft;
-				if(currentNode->left.type != LightSubTree::Node::INVALID_TYPE) {
+				if(currentNode->left.is_light()) {
 					type = currentNode->left.type;
 					offset = currentNode->left.offset;
 					break;
@@ -377,7 +438,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 				intervalRight = split;
 			} else {
 				lightPdf *= 1.f - probLeft;
-				if(currentNode->right.type != LightSubTree::Node::INVALID_TYPE) {
+				if(currentNode->right.is_light()) {
 					type = currentNode->right.type;
 					offset = currentNode->right.offset;
 					break;
@@ -414,25 +475,24 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
 	// TODO: way to check handle's validity!
-	float envPdf = 0.f;
+	float envProb = 0.f;
 	if(is_valid(tree.envLight.texHandle)) {
 		fluxSum += ei::sum(tree.envLight.flux);
-		envPdf = ei::sum(tree.envLight.flux) / fluxSum;
+		envProb = ei::sum(tree.envLight.flux) / fluxSum;
 	}
-	float dirPdf = tree.dirLights.root.flux / fluxSum;
-	float posPdf = tree.posLights.root.flux / fluxSum;
+	float dirProb = tree.dirLights.root.flux / fluxSum;
+	float posProb = tree.posLights.root.flux / fluxSum;
 
 	// Now split up based on flux
 	// First is envmap...
-	u64 rightEnv = static_cast<u64>(intervalRight * envPdf);
+	u64 rightEnv = static_cast<u64>(intervalRight * envProb);
 	if(index < rightEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
 		return lighttree_detail::adjustPdf(sample_light(tree.envLight,
-														rnd), envPdf);
+														rnd), envProb);
 	}
 	// ...then come directional lights...
-	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight
-											  * (ei::sum(tree.envLight.flux) / fluxSum)));
+	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * envProb));
 	u64 rightDir = static_cast<u64>(intervalRight
 									* (ei::sum(tree.envLight.flux)
 									   + tree.dirLights.root.flux) / fluxSum);
@@ -440,7 +500,7 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 		mAssert(tree.dirLights.lightCount > 0u);
 		return lighttree_detail::adjustPdf(emit(tree.dirLights, leftDir,
 												rightDir, index, rng,
-												bounds, rnd), dirPdf);
+												bounds, rnd), dirProb);
 	}
 	// ...and last positional lights
 	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight
@@ -450,31 +510,32 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 		mAssert(tree.posLights.lightCount > 0u);
 		return lighttree_detail::adjustPdf(emit(tree.posLights, leftPos,
 												intervalRight, index, rng,
-												bounds, rnd), posPdf);
+												bounds, rnd), posProb);
 	}
 
 	// If we made it until here, it means that we fell between
 	// the integer bounds of photon distribution
 	// Thus we need RNG to decide
+	// TODO: it could fall onto a boundary repeatedly
 	u64 splitEnv = static_cast<u64>(std::numeric_limits<u64>::max()
-									* ei::sum(tree.envLight.flux) / fluxSum);
+									* envProb);
 	u64 splitDir = static_cast<u64>(std::numeric_limits<u64>::max()
 									* (ei::sum(tree.envLight.flux)
 									   + tree.dirLights.root.flux) / fluxSum);
 	if(rng < splitEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
 		return lighttree_detail::adjustPdf(sample_light(tree.envLight, rnd),
-										   envPdf);
+										   envProb);
 	} else if(rng < splitDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
 		return lighttree_detail::adjustPdf(emit(tree.dirLights, splitEnv,
 												splitDir, rng, rng, bounds, rnd),
-										   dirPdf);
+										   dirProb);
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
 		return lighttree_detail::adjustPdf(emit(tree.posLights, splitDir,
 												std::numeric_limits<u64>::max(),
-												rng, rng, bounds, rnd), posPdf);
+												rng, rng, bounds, rnd), posProb);
 	}
 }
 
@@ -502,25 +563,24 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
 
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
 	// TODO: way to check handle's validity!
-	float envPdf = 0.f;
+	float envProb = 0.f;
 	if(is_valid(tree.envLight.texHandle)) {
 		fluxSum += ei::sum(tree.envLight.flux);
-		envPdf = ei::sum(tree.envLight.flux) / fluxSum;
+		envProb = ei::sum(tree.envLight.flux) / fluxSum;
 	}
-	float dirPdf = tree.dirLights.root.flux / fluxSum;
-	float posPdf = tree.posLights.root.flux / fluxSum;
+	float dirProb = tree.dirLights.root.flux / fluxSum;
+	float posProb = tree.posLights.root.flux / fluxSum;
 
 	// Now split up based on flux
 	// First is envmap...
-	u64 rightEnv = static_cast<u64>(intervalRight * envPdf);
+	u64 rightEnv = static_cast<u64>(intervalRight * envProb);
 	if(index < rightEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
 		// TODO: adjust light probability
 		return connect_light(tree.envLight, position, rnd);
 	}
 	// ...then come directional lights...
-	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight
-											  * (ei::sum(tree.envLight.flux) / fluxSum)));
+	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * envProb));
 	u64 rightDir = static_cast<u64>(intervalRight
 									* (ei::sum(tree.envLight.flux)
 									   + tree.dirLights.root.flux) / fluxSum);
@@ -544,7 +604,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
 	// the integer bounds of photon distribution
 	// Thus we need RNG to decide
 	u64 splitEnv = static_cast<u64>(std::numeric_limits<u64>::max()
-									* ei::sum(tree.envLight.flux) / fluxSum);
+									* envProb);
 	u64 splitDir = static_cast<u64>(std::numeric_limits<u64>::max()
 									* (ei::sum(tree.envLight.flux)
 									   + tree.dirLights.root.flux) / fluxSum);

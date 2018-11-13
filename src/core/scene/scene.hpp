@@ -7,6 +7,7 @@
 #include "handles.hpp"
 #include "core/cameras/camera.hpp"
 #include "ei/3dtypes.hpp"
+#include "lights/light_tree.hpp"
 #include <memory>
 #include <vector>
 
@@ -86,6 +87,13 @@ public:
 	// (Re-)builds the acceleration structure
 	void build_accel_structure();
 
+	void set_lights(std::vector<lights::PositionalLights>&& posLights,
+					std::vector<lights::DirectionalLight>&& dirLights,
+					std::optional<textures::TextureHandle> envLightTexture = std::nullopt) {
+		m_lightTree.build(std::move(posLights), std::move(dirLights),
+						  m_boundingBox, std::move(envLightTexture));
+	}
+
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
 		mAssert(camera != nullptr);
@@ -103,6 +111,8 @@ private:
 	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 	GenericResource m_cameraParams;	// Device independent parameter pack of the camera
 
+	// Light tree containing all light sources enabled for the scene
+	lights::LightTreeBuilder m_lightTree;
 	// TODO: cameras, lights, materials
 	// Acceleration structure over all instances
 	bool m_accelDirty = false;
