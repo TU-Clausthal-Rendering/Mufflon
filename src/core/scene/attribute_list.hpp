@@ -98,23 +98,19 @@ public:
 		// Aquires a read-write accessor to the attribute
 		template < Device dev = DEFAULT_DEVICE >
 		auto aquire() {
-			using DeviceHdl = DeviceArrayHandle<dev, Type>;
 			this->synchronize<dev>();
 			auto& pool = m_pools.template get<AttributePool<dev, stores_itself<dev>()>>();
 			auto& handle = m_handles.template get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
-			auto attr = pool.aquire(handle);
-
-			return Accessor<DeviceHdl>{ static_cast<typename DeviceHdl::HandleType>(attr), m_flags };
+			return Accessor<ArrayDevHandle<dev, Type>>{ static_cast<ArrayDevHandle_t<dev, Type>>(pool.aquire(handle)), m_flags };
 		}
 
 		// Aquires a read-only accessor to the attribute
 		template < Device dev = DEFAULT_DEVICE >
 		auto aquireConst() {
-			using DeviceHdl = ConstDeviceArrayHandle<dev, Type>;
 			this->synchronize<dev>();
 			const auto& pool = m_pools.template get<AttributePool<dev, stores_itself<dev>()>>();
 			const auto& handle = m_handles.template get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
-			return ConstAccessor<DeviceHdl>{ static_cast<typename DeviceHdl::ConstHandleType>(pool.aquireConst(handle)) };
+			return ConstAccessor<ArrayDevHandle<dev, Type>>{ pool.aquireConst(handle) };
 		}
 
 		// Synchronizes the attribute pool to the given device

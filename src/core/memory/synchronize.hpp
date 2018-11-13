@@ -44,10 +44,44 @@ void synchronize(Tuple& tuple, util::DirtyFlags<Device>& flags, T& sync, Args...
 	}
 }
 
+
+// Functions for synchronizing between array handles
+template < class T >
+void synchronize(ConstArrayDevHandle_t<Device::CPU, T> changed,
+				 ArrayDevHandle_t<Device::CUDA, T>& sync, std::size_t length) {
+	if(sync.handle == nullptr) {
+		cudaMalloc<T>(&sync, sizeof(T) * length);
+	}
+	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice);
+}
+template < class T >
+void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
+				 ArrayDevHandle_t<Device::CPU, T>& sync, std::size_t length) {
+	if(sync.handle == nullptr) {
+		sync.handle = new T[length];
+	}
+	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost);
+}
+
+// Functions for unloading a handle from the device
+template < class T >
+void unload(ArrayDevHandle_t<Device::CPU, T>& hdl) {
+	delete[] hdl.handle;
+	hdl.handle = nullptr;
+}
+template < class T >
+void unload(ArrayDevHandle_t<Device::CUDA, T>& hdl) {
+	if(hdl.handle != nullptr) {
+		cudaFree(hdl.handle);
+		hdl.handle = nullptr;
+	}
+}
+
+
 // A number of copy primitives which call the internal required methods
-// NOTE: There are synchronize() methods in the residency.hpp which have a similar
-// functionallity. However, they are too specialized. MAYBE they can be replaced by
-// this one
+// NOTE: There are synchronize() methods above which have a similar
+// functionallity. However, they are too specialized (include allocations).
+// MAYBE they can be replaced by this one
 template < Device dev >
 using DevPtr = void*;
 template < Device dev >

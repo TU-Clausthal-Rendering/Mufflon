@@ -17,105 +17,36 @@ enum class Device : unsigned char {
 };
 
 // Generic type-trait for device-something-handles
-template < Device dev, class H >
+template < Device dev >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
-	using HandleType = H;
-
-	HandleType handle;
+	DeviceHandle() = delete; // No instanciation (pure type trait).
 };
 
-template < Device dev, class CH >
-struct ConstDeviceHandle {
-	static constexpr Device DEVICE = dev;
-	using ConstHandleType = CH;
-
-	ConstHandleType handle;
-};
 
 // Handle type exclusively for arrays, i.e. they must support vector-esque operations
-
 template < Device dev, class T >
-struct DeviceArrayHandle;
-template < Device dev, class T >
-struct ConstDeviceArrayHandle;
+struct ArrayDevHandle;
 
 template < class T >
-struct DeviceArrayHandle<Device::CPU, T> :
-	public DeviceHandle<Device::CPU, T*> {
+struct ArrayDevHandle<Device::CPU, T> : public DeviceHandle<Device::CPU> {
+	using HandleType = T*;
+	using ConstHandleType = const T*;
 	using Type = T;
-
-	DeviceArrayHandle() = default;
-	DeviceArrayHandle(Type* hdl) :
-		DeviceHandle<Device::CPU, Type*>{ hdl }
-	{}
-};
-template < class T >
-struct ConstDeviceArrayHandle<Device::CPU, T> :
-	public ConstDeviceHandle<Device::CPU, const T*> {
-	using Type = T;
-
-	ConstDeviceArrayHandle() = default;
-	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CPU, T> hdl) :
-		ConstDeviceHandle<Device::CPU, const Type*>{ hdl.handle } {}
-	ConstDeviceArrayHandle(const Type* hdl) :
-		ConstDeviceHandle<Device::CPU, const Type*>{ hdl }
-	{}
 };
 
 // TODO: what's wrong with device vector?
 template < class T >
-struct DeviceArrayHandle<Device::CUDA, T> :
-	public DeviceHandle<Device::CUDA, T*> {
+struct ArrayDevHandle<Device::CUDA, T> : public DeviceHandle<Device::CUDA> {
+	using HandleType = T*;
+	using ConstHandleType = const T*;
 	using Type = T;
-
-	DeviceArrayHandle() = default;
-	DeviceArrayHandle(Type* hdl) :
-		DeviceHandle<Device::CUDA, Type*>{ hdl } {}
 };
 
-template < class T >
-struct ConstDeviceArrayHandle<Device::CUDA, T> :
-	public ConstDeviceHandle<Device::CUDA, const T*> {
-	using Type = T;
+// Short type alias
+template < Device dev, class T >
+using ArrayDevHandle_t = typename ArrayDevHandle<dev, T>::HandleType;
+template < Device dev, class T >
+using ConstArrayDevHandle_t = typename ArrayDevHandle<dev, T>::ConstHandleType;
 
-	ConstDeviceArrayHandle() = default;
-	ConstDeviceArrayHandle(DeviceArrayHandle<Device::CUDA, T> hdl) :
-		ConstDeviceHandle<Device::CUDA, const Type*>{ hdl.handle } {}
-	ConstDeviceArrayHandle(const Type* hdl) :
-		ConstDeviceHandle<Device::CUDA, const Type*>{ hdl } {}
-};
-
-// Functions for synchronizing between array handles
-template < class T >
-void synchronize(ConstDeviceArrayHandle<Device::CPU, T> changed,
-				 DeviceArrayHandle<Device::CUDA, T>& sync, std::size_t length) {
-	if(sync.handle == nullptr) {
-		cudaMalloc<T>(&sync, sizeof(T) * length);
-	}
-	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice);
-}
-template < class T >
-void synchronize(ConstDeviceArrayHandle<Device::CUDA, T> changed,
-				 DeviceArrayHandle<Device::CPU, T>& sync, std::size_t length) {
-	if(sync.handle == nullptr) {
-		sync.handle = new T[length];
-	}
-	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost);
-}
-
-// Functions for unloading a handle from the device
-template < class T >
-void unload(DeviceArrayHandle<Device::CPU, T>& hdl) {
-	delete[] hdl.handle;
-	hdl.handle = nullptr;
-}
-template < class T >
-void unload(DeviceArrayHandle<Device::CUDA, T>& hdl) {
-	if(hdl.handle != nullptr) {
-		cudaFree(hdl.handle);
-		hdl.handle = nullptr;
-	}
-}
-
-} // namespace mufflon::scene
+} // namespace mufflon

@@ -87,7 +87,7 @@ struct LightTree {
 	LightSubTree posLights;
 	// Actual memory
 	std::size_t length;
-	DeviceArrayHandle<DEVICE, char> memory;
+	ArrayDevHandle_t<DEVICE, char> memory;
 };
 
 #ifndef __CUDACC__
@@ -426,7 +426,7 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 	// First is envmap...
 	u64 rightEnv = static_cast<u64>(intervalRight * envPdf);
 	if(index < rightEnv) {
-		mAssert(tree.envLight.texHandle.is_valid());
+		mAssert(is_valid(tree.envLight.texHandle));
 		return lighttree_detail::adjustPdf(sample_light(tree.envLight,
 														rnd), envPdf);
 	}
@@ -462,7 +462,7 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 									* (ei::sum(tree.envLight.flux)
 									   + tree.dirLights.root.flux) / fluxSum);
 	if(rng < splitEnv) {
-		mAssert(tree.envLight.texHandle.is_valid());
+		mAssert(is_valid(tree.envLight.texHandle));
 		return lighttree_detail::adjustPdf(sample_light(tree.envLight, rnd),
 										   envPdf);
 	} else if(rng < splitDir) {
@@ -549,7 +549,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
 									* (ei::sum(tree.envLight.flux)
 									   + tree.dirLights.root.flux) / fluxSum);
 	if(rng < splitEnv) {
-		mAssert(tree.envLight.texHandle.is_valid());
+		mAssert(is_valid(tree.envLight.texHandle));
 		// TODO: adjust light probability
 		return connect_light(tree.envLight, position, rnd);
 	} else if(rng < splitDir) {

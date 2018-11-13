@@ -24,8 +24,8 @@ namespace mufflon { // There is no memory namespace on purpose
  */
 
 // Provides read-only access
-// Type: The type of the underlying accessed data. The handle types are different
-//		for each type (defined by DeviceHandle).
+// DH: The type-trait of the underlying accessed data. The handle types are different
+//		for each type (defined by DeviceHandle and its inherited forms).
 template < class DH >
 class ConstAccessor {
 public:

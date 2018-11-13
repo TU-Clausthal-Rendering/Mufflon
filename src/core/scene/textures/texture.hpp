@@ -15,16 +15,9 @@ class CpuTexture;
 template < Device dev >
 struct TextureDevHandle;
 
-// TODO: use this one globally
-template < Device dev >
-struct DeviceHandle2 {
-	static constexpr Device DEVICE = dev;
-	DeviceHandle2() = delete; // No instanciation (pure type trait).
-};
-
 // CPU
 template<>
-struct TextureDevHandle<Device::CPU> : public DeviceHandle2<Device::CPU> {
+struct TextureDevHandle<Device::CPU> : public DeviceHandle<Device::CPU> {
 	using HandleType = textures::CpuTexture*;
 	using ConstHandleType = const textures::CpuTexture*;
 };
@@ -60,7 +53,7 @@ struct CudaSurfaceHandle {
 };
 
 template<>
-struct TextureDevHandle<Device::CUDA> : public DeviceHandle2<Device::CUDA> {
+struct TextureDevHandle<Device::CUDA> : public DeviceHandle<Device::CUDA> {
 	using HandleType = CudaSurfaceHandle;
 	using ConstHandleType = CudaTextureHandle;
 };
@@ -73,7 +66,7 @@ __host__ __device__ constexpr bool is_valid(typename TextureDevHandle<Device::CU
 
 // OPENGL
 template<>
-struct TextureDevHandle<Device::OPENGL> : public DeviceHandle2<Device::OPENGL> {
+struct TextureDevHandle<Device::OPENGL> : public DeviceHandle<Device::OPENGL> {
 	using HandleType = u64;
 	using ConstHandleType = u64;
 };

@@ -271,7 +271,7 @@ LightTreeBuilder::~LightTreeBuilder() {
 	// TODO: free the tree
 	m_trees.for_each([](auto& tree) {
 		using TreeType = std::decay_t<decltype(tree)>;
-		Allocator<TreeType::DEVICE>::free(tree.memory.handle, tree.length);
+		Allocator<TreeType::DEVICE>::free(tree.memory, tree.length);
 	});
 }
 
@@ -282,7 +282,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	LightTree<Device::CPU>& tree = m_trees.get<LightTree<Device::CPU>>();
 
 	// First delete any leftovers
-	tree.memory.handle = Allocator<Device::CPU>::free(tree.memory.handle, tree.length);
+	tree.memory = Allocator<Device::CPU>::free(tree.memory, tree.length);
 	tree.envLight = EnvMapLight<Device::CPU>{};
 
 	// Construct the environment light
@@ -328,13 +328,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	tree.length = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightSize + posLightSize;
-	tree.memory.handle = Allocator<Device::CPU>::alloc_array<char>(tree.length);
+	tree.memory = Allocator<Device::CPU>::alloc_array<char>(tree.length);
 	// Set up the node pointers
-	tree.dirLights.nodes = reinterpret_cast<LightSubTree::Node*>(tree.memory.handle);
-	tree.dirLights.lights = &tree.memory.handle[sizeof(LightSubTree::Node) * dirNodes];
+	tree.dirLights.nodes = reinterpret_cast<LightSubTree::Node*>(tree.memory);
+	tree.dirLights.lights = &tree.memory[sizeof(LightSubTree::Node) * dirNodes];
 	tree.posLights.nodes = reinterpret_cast<LightSubTree::Node*>(
-		&tree.memory.handle[sizeof(LightSubTree::Node) * dirNodes + dirLightSize]);
-	tree.posLights.lights = &tree.memory.handle[sizeof(LightSubTree::Node) * dirNodes
+		&tree.memory[sizeof(LightSubTree::Node) * dirNodes + dirLightSize]);
+	tree.posLights.lights = &tree.memory[sizeof(LightSubTree::Node) * dirNodes
 												+ dirLightSize
 												+ sizeof(LightSubTree::Node) * posNodes];
 
@@ -365,17 +365,17 @@ void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>&
 				 std::optional<textures::TextureHandle> hdl) {
 	if(changed.length == 0u) {
 		// Remove all data since there are no lights
-		mAssert(changed.memory.handle == nullptr);
-		sync.memory.handle = Allocator<Device::CUDA>::free(sync.memory.handle, sync.length);
+		mAssert(changed.memory == nullptr);
+		sync.memory = Allocator<Device::CUDA>::free(sync.memory, sync.length);
 	} else {
 		// Still have data, (re)alloc and copy
-		if(sync.memory.handle == nullptr) {
-			sync.memory.handle = Allocator<Device::CUDA>::alloc_array<char>(changed.length);
+		if(sync.memory == nullptr) {
+			sync.memory = Allocator<Device::CUDA>::alloc_array<char>(changed.length);
 		} else if(sync.length != changed.length) {
-			sync.memory.handle = Allocator<Device::CUDA>::realloc(sync.memory.handle, sync.length,
-																  changed.length);
+			sync.memory = Allocator<Device::CUDA>::realloc(sync.memory, sync.length,
+														   changed.length);
 		}
-		cudaMemcpy(sync.memory.handle, changed.memory.handle, changed.length, cudaMemcpyHostToDevice);
+		cudaMemcpy(sync.memory, changed.memory, changed.length, cudaMemcpyHostToDevice);
 	}
 	// Equalize bookkeeping
 	sync.length = changed.length;
@@ -394,17 +394,17 @@ void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>&
 				 std::optional<textures::TextureHandle> hdl) {
 	if(changed.length == 0u) {
 		// Remove all data since there are no lights
-		mAssert(changed.memory.handle == nullptr);
-		sync.memory.handle = Allocator<Device::CPU>::free(sync.memory.handle, sync.length);
+		mAssert(changed.memory == nullptr);
+		sync.memory = Allocator<Device::CPU>::free(sync.memory, sync.length);
 	} else {
 		// Still have data, (re)alloc and copy
-		if(sync.memory.handle == nullptr) {
-			sync.memory.handle = Allocator<Device::CPU>::alloc_array<char>(changed.length);
+		if(sync.memory == nullptr) {
+			sync.memory = Allocator<Device::CPU>::alloc_array<char>(changed.length);
 		} else if(sync.length != changed.length) {
-			sync.memory.handle = Allocator<Device::CPU>::realloc(sync.memory.handle, sync.length,
-																  changed.length);
+			sync.memory = Allocator<Device::CPU>::realloc(sync.memory, sync.length,
+														  changed.length);
 		}
-		cudaMemcpy(sync.memory.handle, changed.memory.handle, changed.length, cudaMemcpyHostToDevice);
+		cudaMemcpy(sync.memory, changed.memory, changed.length, cudaMemcpyHostToDevice);
 	}
 	// Equalize bookkeeping
 	sync.length = changed.length;
