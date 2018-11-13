@@ -4,7 +4,6 @@
 #include "core/memory/accessor.hpp"
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
-#include <string>
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace textures {
@@ -143,9 +142,7 @@ public:
 											   ConstTextureDevHandle_t<Device::OPENGL>>;
 
 	// Loads a texture into the CPU-RAM
-#ifndef __CUDACC__
-	Texture(std::string_view fileName, SamplingMode mode);
-#endif // __CUDACC__
+	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb, void* data);
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
@@ -177,12 +174,12 @@ public:
 
 private:
 	// Information
-	std::string m_srcFileName;
 	u16 m_width;
 	u16 m_height;
 	u16 m_numLayers;
 	Format m_format;
 	SamplingMode m_mode;
+	bool m_sRgb;
 	// Handles and resources
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<CpuTexture> m_cpuTexture;

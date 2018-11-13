@@ -5,29 +5,19 @@
 
 namespace mufflon::scene::textures {
 
-Texture::Texture(std::string_view fileName, SamplingMode mode) :
-	m_srcFileName(fileName)
+Texture::Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb, void* data) :
+	m_width(width),
+	m_height(height),
+	m_numLayers(numLayers),
+	m_format(format),
+	m_mode(mode),
+	m_sRgb(sRgb),
+	m_cudaTexture(nullptr)
 {
 	// A file loader provides an array with pixel data. This is loaded into
 	// a CPUTexture per default.
-	// TODO create texture resource
-	//create_texture_cpu();
-
-	// Switch format and use an image loader library to fill the texture resource.
-	// TODO load
-
-
-	// REMOVE (this dump is only for compile checks)
-	using t = decltype(m_handles.get<TextureDevHandle_t<Device::CPU>>());
-	auto x = *aquireConst<Device::CPU>();
-	auto y = *aquireConst<Device::CUDA>();
-	auto z = *aquireConst<Device::OPENGL>();
-	auto x2 = *aquire<Device::CPU>();
-	auto y2 = *aquire<Device::CUDA>();
-	auto z2 = *aquire<Device::OPENGL>();
-	unload<Device::CPU>();
-	unload<Device::CUDA>();
-	unload<Device::OPENGL>();
+	create_texture_cpu();
+	copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
 }
 
 Texture::~Texture() {
@@ -142,7 +132,7 @@ void Texture::create_texture_cuda() {
 	texDesc.addressMode[0] = texDesc.addressMode[1] = texDesc.addressMode[2] = cudaAddressModeWrap;
 	texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
 	texDesc.readMode = cudaReadModeNormalizedFloat;
-	texDesc.sRGB = false;	// TODO: will need this later...
+	texDesc.sRGB = m_sRgb;
 	texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] = texDesc.borderColor[3] = 0.0f;
 	texDesc.normalizedCoords = true;
 	texDesc.maxAnisotropy = 0;
