@@ -6,16 +6,8 @@ using namespace ei;
 
 namespace mufflon::scene::textures {
 
-static constexpr u8 PIXEL_SIZE[int(Format::NUM)] = {
-	1, 2, 3, 4, // ...8U formats
-	2, 4, 6, 8, // ...16U formats
-	//4, 8, 12, 16, // ...32U formats
-	4, 8, 12, 16, // ...32F formats
-	4			// RGB9E5
-};
-
 CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode) :
-	m_imageData(width * height * PIXEL_SIZE[int(format)]),
+	m_imageData(width * height * PIXEL_SIZE(format)),
 	m_format(format),
 	m_size(width, height, numLayers)
 {

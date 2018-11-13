@@ -112,6 +112,17 @@ enum class Format : u16 {
 	NUM
 };
 
+inline constexpr int PIXEL_SIZE(Format format) {
+	constexpr u8 PIXEL_SIZES[int(Format::NUM)] = {
+		1, 2, 3, 4, // ...8U formats
+		2, 4, 6, 8, // ...16U formats
+		//4, 8, 12, 16, // ...32U formats
+		4, 8, 12, 16, // ...32F formats
+		4			// RGB9E5
+	};
+	return PIXEL_SIZES[int(format)];
+}
+
 enum class SamplingMode {
 	NEAREST,
 	LINEAR
@@ -133,13 +144,13 @@ public:
 
 	// Loads a texture into the CPU-RAM
 #ifndef __CUDACC__
-	Texture(std::string_view fileName);
+	Texture(std::string_view fileName, SamplingMode mode);
 #endif // __CUDACC__
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
 	Texture& operator=(Texture&&) = default;
-	~Texture() = default;
+	~Texture();
 
 	// Aquire a read-only accessor
 	template < Device dev >
@@ -157,28 +168,30 @@ public:
 
 	// Explicitly synchronize the given device
 	template < Device dev >
-	void synchronize() {
-		if(m_dirty.has_competing_changes())
-			throw std::runtime_error("Failure: competing changes for this texture");
-		if(m_dirty.needs_sync(dev)) {
-			// TODO create texture resources if necessary
-		}
-		m_dirty.mark_synced(dev);
-	}
+	void synchronize();
 
-	// Remove a texture from one device. An error is issued if the target
-	// is the last device in which case the resource is not released.
+	// Remove a texture from one device.
+	// If the resource is the last one, an error is issued and the ressource is not unloaded.
 	template < Device dev >
-	void release() {
-
-	}
+	void unload();
 
 private:
+	// Information
 	std::string m_srcFileName;
+	u16 m_width;
+	u16 m_height;
+	u16 m_numLayers;
+	Format m_format;
+	SamplingMode m_mode;
+	// Handles and resources
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<CpuTexture> m_cpuTexture;
+	cudaArray* m_cudaTexture;
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
+
+	void create_texture_cpu();
+	void create_texture_cuda();
 };
 
 using TextureHandle = std::shared_ptr<Texture>;
