@@ -16,7 +16,19 @@ enum class Device : unsigned char {
 	OPENGL	= 4u
 };
 
-// Generic type-trait for device-something-handles
+/*
+ * Generic type-trait for device-something-handles.
+ * The idea is to have custom types per device which can be set dependent on a
+ * Device template parameter.
+ * The DeviceHandle itself is only a raw helper to avoid wrong usage of the
+ * actual types (no construction).
+ * The intention is to provide type-traits ...DevHandle<> which inherit from DeviceHandle.
+ * Those type-traits are used to map a Device to the specific type. Each custom type must
+ * provide a HandleType and a ConstHandleType which can be fundamentally different.
+ * Finally, there are type alias using the type-traits:
+ * ...DevHandle_t<..>       = typename ...DevHandle<..>::HandleType;
+ * Const...DevHandle_t<..>  = typename ...DevHandle<..>::ConstHandleType;
+ */
 template < Device dev >
 struct DeviceHandle {
 	static constexpr Device DEVICE = dev;
