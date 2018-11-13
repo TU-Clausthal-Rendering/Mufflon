@@ -415,7 +415,7 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
 	// TODO: way to check handle's validity!
 	float envPdf = 0.f;
-	if(tree.envLight.texHandle.is_valid()) {
+	if(is_valid(tree.envLight.texHandle)) {
 		fluxSum += ei::sum(tree.envLight.flux);
 		envPdf = ei::sum(tree.envLight.flux) / fluxSum;
 	}

@@ -85,6 +85,7 @@
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\interface.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
     <ClInclude Include="..\..\src\core\scene\types.hpp" />
     <ClInclude Include="..\..\src\core\scene\world_container.hpp" />

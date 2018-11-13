@@ -287,7 +287,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Construct the environment light
 	if(envLight.has_value()) {
-		tree.envLight = EnvMapLight<Device::CPU>{ {{ *envLight.value()->aquireConst<Device::CPU>() }}, ei::Vec3{0, 0, 0} };
+		tree.envLight = EnvMapLight<Device::CPU>{ *envLight.value()->aquireConst<Device::CPU>(), ei::Vec3{0, 0, 0} };
 		// TODO: accumulate flux
 	}
 
@@ -385,9 +385,9 @@ void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>&
 	// Also copy the environment light
 	sync.envLight.flux = changed.envLight.flux;
 	if(hdl.has_value())
-		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{ {*hdl.value()->aquireConst<Device::CUDA>()} };
+		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CUDA>{ *hdl.value()->aquireConst<Device::CUDA>() };
 	else
-		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CUDA>{};
+		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CUDA>{};
 }
 
 void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync,
@@ -414,9 +414,9 @@ void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>&
 	// Also copy the environment light
 	sync.envLight.flux = changed.envLight.flux;
 	if(hdl.has_value())
-		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{ {*hdl.value()->aquireConst<Device::CPU>()} };
+		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CPU>{ *hdl.value()->aquireConst<Device::CPU>() };
 	else
-		sync.envLight.texHandle = textures::ConstDeviceTextureHandle<Device::CPU>{};
+		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CPU>{};
 }
 
 }}} // namespace mufflon::scene::lights

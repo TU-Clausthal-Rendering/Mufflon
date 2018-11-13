@@ -78,7 +78,7 @@ struct alignas(16) DirectionalLight {
  */
 template < Device dev >
 struct EnvMapLight {
-	alignas(16) textures::ConstDeviceTextureHandle<dev> texHandle;
+	alignas(16) textures::ConstTextureDevHandle_t<dev> texHandle;
 	alignas(16) ei::Vec3 flux;
 };
 

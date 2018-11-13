@@ -9,12 +9,12 @@ namespace mufflon { namespace scene { namespace materials {
 template<Device dev>
 struct LambertHandlePack : public HandlePack {
 	LambertHandlePack(const HandlePack& baseProperties,
-					  ConstAccessor<textures::ConstDeviceTextureHandle<dev>> albedoTex) :
+					  textures::ConstTextureDevHandle_t<dev> albedoTex) :
 		HandlePack(baseProperties),
 		albedoTex(albedoTex)
 	{}
 
-	ConstAccessor<textures::ConstDeviceTextureHandle<dev>> albedoTex;
+	textures::ConstTextureDevHandle_t<dev> albedoTex;
 };
 
 struct LambertParameterPack : public ParameterPack {

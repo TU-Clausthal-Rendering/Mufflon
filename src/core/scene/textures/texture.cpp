@@ -15,7 +15,7 @@ Texture::Texture(std::string_view fileName) :
 
 
 	// REMOVE (this dump is only for compile checks)
-	using t = decltype(m_handles.get<DeviceTextureHandle<Device::CPU>>().handle);
+	using t = decltype(m_handles.get<TextureDevHandle_t<Device::CPU>>());
 	auto x = *aquireConst<Device::CPU>();
 	auto y = *aquireConst<Device::CUDA>();
 	auto z = *aquireConst<Device::OPENGL>();
