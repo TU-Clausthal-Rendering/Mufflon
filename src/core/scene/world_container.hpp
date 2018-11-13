@@ -69,6 +69,11 @@ public:
 	bool is_dir_light(const std::string_view& name) const;
 	bool is_env_light(const std::string_view& name) const;
 
+	// Singleton, creating our global world object
+	static WorldContainer& instance() {
+		static WorldContainer inst;
+		return inst;
+	}
 
 	/**
 	 * Loads the specified scenario.
