@@ -9,35 +9,10 @@
 #include <chrono>
 #include <execution>
 
-#include <cuda_runtime.h>
-#include "ei/conversions.hpp"
-#include "core/renderer/gpu_pt.hpp"
-#include "core/scene/geometry/polygon.hpp"
-#include "core/scene/geometry/sphere.hpp"
-#include "core/scene/object.hpp"
-#include "core/scene/world_container.hpp"
-#include "core/scene/lights/lights.hpp"
-#include "core/scene/lights/light_tree.hpp"
-#include "core/scene/materials/material.hpp"
-#include "core/scene/lights/light_tree.hpp"
-#include "core/cameras/camera.hpp"
 #include "core/memory/allocator.hpp"
+#include "export/interface.h"
 
 #pragma warning(disable:4251)
-
-using mufflon::Device;
-using namespace mufflon::scene;
-using namespace mufflon::scene::geometry;
-using namespace mufflon::cameras;
-
-class VectorStream : public std::basic_streambuf<char, std::char_traits<char>> {
-public:
-	template < class U >
-	VectorStream(std::vector<U>& vec) {
-		this->setg(reinterpret_cast<char*>(vec.data()), reinterpret_cast<char*>(vec.data()),
-				   reinterpret_cast<char*>(vec.data() + vec.size()));
-	}
-};
 
 /*
 void test_renderer() {
@@ -228,6 +203,7 @@ void test_allocator() {
 void test_custom_attributes() {
 	std::cout << "Testing custom attributes (on polygon)" << std::endl;
 
+
 	Polygons poly;
 	
 	{
@@ -258,65 +234,51 @@ void test_custom_attributes() {
 		poly.remove(hdl1);
 		poly.remove(hdl2);
 	}
-}
+}*/
 
 void test_polygon() {
 	std::cout << "Testing polygons" << std::endl;
 
-	Polygons poly;
-
+	ObjectHdl obj = world_create_object();
 	{
-		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
-		auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
-		auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
-		poly.add(v0, v1, v2);
-		(*poly.get_mat_indices().aquire<>())[0u] = 2u;
+		auto v0 = polygon_add_vertex(obj, { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 0.f });
+		auto v1 = polygon_add_vertex(obj, { 1.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 1.f, 0.f });
+		auto v2 = polygon_add_vertex(obj, { 0.f, 1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 1.f });
+		mAssert(v0 >= 0 && v1 >= 0 && v2 >= 0);
+		FaceHdl f0 = polygon_add_triangle_material(obj, {
+			static_cast<uint32_t>(v0),
+			static_cast<uint32_t>(v1),
+			static_cast<uint32_t>(v2)
+		}, 2u);
+		mAssert(f0 >= 0);
+		bool success = polygon_set_material_idx(obj, f0, 3u);
+		mAssert(success);
 
-		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
-		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
-		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
-		std::vector<MaterialIndex> mats{ 5u };
-		VectorStream pointBuffer(points);
-		VectorStream normalBuffer(normals);
-		VectorStream uvBuffer(uvs);
-		VectorStream matBuffer(mats);
-		std::istream pointStream(&pointBuffer);
-		std::istream normalStream(&normalBuffer);
-		std::istream uvStream(&uvBuffer);
-		std::istream matStream(&matBuffer);
+		// TODO: test bulk functions as well
+		FILE* pointStream = nullptr;
+		FILE* normalStream = nullptr;
+		FILE* uvStream = nullptr;
+		FILE* matStream = nullptr;
+		std::size_t vertexCount = 4u;
+		std::size_t faceCount = 1u;
+		std::size_t pointsRead, normalsRead, uvsRead;
 
-		auto bv0 = poly.add_bulk(points.size(), pointStream, normalStream, uvStream);
-		auto f1 = poly.add(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
-							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())+1),
-							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())+2),
-							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())+3));
-		poly.add_bulk<>(poly.get_mat_indices(), f1, mats.size(), matStream);
+		VertexHdl bv0 = polygon_add_vertex_bulk(obj, vertexCount, pointStream, normalStream, uvStream,
+								&pointsRead, &normalsRead, &uvsRead);
+		mAssert(bv0 >= 0);
+		FaceHdl f1 = polygon_add_quad(obj, {
+			static_cast<uint32_t>(bv0),
+			static_cast<uint32_t>(bv0 + 1),
+			static_cast<uint32_t>(bv0 + 2),
+			static_cast<uint32_t>(bv0 + 3),
+		});
+		std::size_t count = polygon_set_material_idx_bulk(obj, f1, faceCount,
+														  matStream);
+		mAssert(count != INVALID_SIZE);
 	}
-
-	{
-		auto points = *poly.get_points().aquireConst();
-		auto normals = *poly.get_normals().aquireConst();
-		auto uvs = *poly.get_uvs().aquireConst();
-		auto matIndices = *poly.get_mat_indices().aquireConst();
-		std::cout << "Points:" << std::endl;
-		for(std::size_t i = 0u; i < poly.get_points().get_size(); ++i)
-			std::cout << "  [" << points[i][0] << '|' << points[i][1] << '|' << points[i][2] << ']' << std::endl;
-		std::cout << "Normals:" << std::endl;
-		for(std::size_t i = 0u; i < poly.get_normals().get_size(); ++i)
-			std::cout << "  [" << normals[i][0] << '|' << normals[i][1] << '|' << normals[i][2] << ']' << std::endl;
-		std::cout << "Normals:" << std::endl;
-		for(std::size_t i = 0u; i < poly.get_uvs().get_size(); ++i)
-			std::cout << "  [" << uvs[i][0] << '|' << uvs[i][1] << ']' << std::endl;
-		std::cout << "Material indices:" << std::endl;
-		for(std::size_t i = 0u; i < poly.get_mat_indices().get_size(); ++i)
-			std::cout << "  " << matIndices[i] << std::endl;
-	}
-
-	poly.synchronize<Device::CUDA>();
-	poly.unload<Device::CUDA>();
 }
 
-void test_sphere() {
+/*void test_sphere() {
 	std::cout << "Testing spheres" << std::endl;
 
 	Spheres spheres;
@@ -470,8 +432,8 @@ void test_scene_creation() {
 */
 
 int main() {
-	/*test_allocator();
 	test_polygon();
+	/*test_allocator();
 	test_sphere();
 	test_custom_attributes();
 	test_object();

@@ -121,12 +121,12 @@ public:
 
 	template < class T >
 	Attribute<T>& aquire(const AttributeHandle<T>& attrHandle) {
-		m_attributes.aquire(attrHandle);
+		return m_attributes.aquire(attrHandle);
 	}
 
 	template < class T >
 	const Attribute<T>& aquire(const AttributeHandle<T>& attrHandle) const {
-		m_attributes.aquire(attrHandle);
+		return m_attributes.aquire(attrHandle);
 	}
 
 	Attribute<Sphere>& get_spheres() {

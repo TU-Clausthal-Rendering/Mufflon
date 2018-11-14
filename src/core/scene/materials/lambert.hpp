@@ -2,6 +2,7 @@
 
 #include "types.hpp"
 #include "material.hpp"
+#include "export/api.hpp"
 #include "core/math/sampling.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
@@ -44,7 +45,7 @@ private:
 
 
 // The importance sampling routine
-__host__ __device__ Sample
+CUDA_FUNCTION Sample
 lambert_sample(const LambertParameterPack& params,
 			   const Direction& incidentTS,
 			   const RndSet& rndSet) {
@@ -61,7 +62,7 @@ lambert_sample(const LambertParameterPack& params,
 }
 
 // The evaluation routine
-__host__ __device__ EvalValue
+CUDA_FUNCTION EvalValue
 lambert_evaluate(const LambertParameterPack& params,
 				 const Direction& incidentTS,
 				 const Direction& excidentTS) {
@@ -77,7 +78,7 @@ lambert_evaluate(const LambertParameterPack& params,
 }
 
 // The albedo routine
-__host__ __device__ Spectrum
+CUDA_FUNCTION Spectrum
 lambert_albedo(const LambertParameterPack& params) {
 	return params.albedo;
 }

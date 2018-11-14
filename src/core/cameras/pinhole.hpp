@@ -1,6 +1,7 @@
 #pragma once
 
 #include "camera.hpp"
+#include "export/api.hpp"
 #include <ei/3dtypes.hpp>
 #include <cuda_runtime.h>
 
@@ -34,7 +35,7 @@ struct PinholeParams : public CameraParams {
 	float tanVFov;
 };
 
-__host__ __device__ inline RaySample
+CUDA_FUNCTION RaySample
 pinholecam_sample_ray(const PinholeParams& params, const Pixel& coord, const ei::Vec2& resolution, const RndSet& rndSet) {
 	// Get a (randomized) position in [-1,1]²
 	ei::Vec2 subPixel = coord + ei::Vec2(rndSet.u0, rndSet.u1);
@@ -60,7 +61,7 @@ pinholecam_sample_ray(const PinholeParams& params, const Pixel& coord, const ei:
 
 // Compute pixel position and PDF
 // position: a direction in world space.
-__host__ __device__ inline ProjectionResult
+CUDA_FUNCTION ProjectionResult
 pinholecam_project(const PinholeParams& params, const ei::Vec2& resolution, const scene::Point& position) {
 	ei::Vec3 camToPosDir = position - params.position;
 	float w = dot(params.viewDir, camToPosDir);
@@ -97,7 +98,7 @@ pinholecam_project(const PinholeParams& params, const ei::Vec2& resolution, cons
 
 // Compute the PDF value only
 // direction: a direction in world space.
-/*__host__ __device__ float
+/*CUDA_FUNCTION float
 evaluate_pdf(const PinholeParams& params, const ei::Vec2& resolution, const scene::Direction& direction) {
 	// TODO: only if inside frustum
 	float aspectRatio = resolution.x / resolution.y;

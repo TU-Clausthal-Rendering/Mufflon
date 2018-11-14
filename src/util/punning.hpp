@@ -5,6 +5,16 @@
 
 namespace mufflon::util {
 
+// Helper functions to print the sizes/alignment on mismatch in a static_assert
+template < class U, class V, std::size_t US = sizeof(U), std::size_t VS = sizeof(V) >
+inline constexpr void check_size() {
+	static_assert(US == VS, "Object size mismatch");
+}
+template < class U, class V, std::size_t US = alignof(U), std::size_t VS = alignof(V) >
+inline constexpr void check_alignment() {
+	static_assert(US == VS, "Object alignment mismatch");
+}
+
 /**
  * Performs type punning for general types.
  * The types must match in size and alignment.
@@ -13,8 +23,8 @@ namespace mufflon::util {
  */
 template < class U, class V >
 inline U pun(const V& val, U punnedFrom = U()) {
-	static_assert(sizeof(U) == sizeof(V), "Punned type must match size");
-	static_assert(alignof(U) == alignof(V), "Punned type must match alignment");
+	check_size<U, V>();
+	check_alignment<U, V>();
 	
 	std::memcpy(&punnedFrom, &val, sizeof(U));
 	return punnedFrom;

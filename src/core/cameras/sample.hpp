@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/log.hpp"
+#include "export/api.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
 #include <cuda_runtime.h>
@@ -14,7 +15,7 @@ namespace mufflon { namespace cameras {
  * resolution: total framebuffer resolution (integral, but converted to float)
  * rndSet: a set with 4 random numbers for the camera sampling.
  */
-__host__ __device__ RaySample
+CUDA_FUNCTION RaySample
 camera_sample_ray(const CameraParams& params, const Pixel& coord, const ei::Vec2& resolution, const RndSet& rndSet) {
 	switch(params.type) {
 		case CameraModel::PINHOLE: {
@@ -30,7 +31,7 @@ camera_sample_ray(const CameraParams& params, const Pixel& coord, const ei::Vec2
 
 // Compute pixel position and PDF
 // position: a direction in world space.
-__host__ __device__ ProjectionResult
+CUDA_FUNCTION ProjectionResult
 camera_project(const CameraParams& params, const ei::Vec2& resolution, const scene::Point& position) {
 	switch(params.type) {
 		case CameraModel::PINHOLE: {

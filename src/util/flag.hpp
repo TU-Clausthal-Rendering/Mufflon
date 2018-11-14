@@ -132,9 +132,9 @@ private:
 		return value;
 	}
 
-	EnumType m_needsSyncing;
-	EnumType m_hasChanges;
-	EnumType m_isPresent;
+	EnumType m_needsSyncing = static_cast<EnumType>(0u);
+	EnumType m_hasChanges = static_cast<EnumType>(0u);
+	EnumType m_isPresent = static_cast<EnumType>(0u);
 };
 
 }} // namespace mufflon::util
