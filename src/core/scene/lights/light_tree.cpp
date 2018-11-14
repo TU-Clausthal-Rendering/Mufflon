@@ -268,7 +268,6 @@ LightTreeBuilder::LightTreeBuilder() :
 }
 
 LightTreeBuilder::~LightTreeBuilder() {
-	// TODO: free the tree
 	m_trees.for_each([](auto& tree) {
 		using TreeType = std::decay_t<decltype(tree)>;
 		Allocator<TreeType::DEVICE>::free(tree.memory, tree.length);
@@ -302,6 +301,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	// Create our spatial sorting to get a good tree
 	// TODO: sort the directional lights by direction
 	ei::Vec3 scale = boundingBox.max - boundingBox.min;
+	std::sort(dirLights.begin(), dirLights.end(), [&scale](const DirectionalLight& a, const DirectionalLight& b) {
+		// TODO: better sorting scheme!
+		constexpr ei::Vec3 BASE_DIRECTION{ 1.f, 0.f, 0.f };
+		float distA = -ei::dot(a.direction, BASE_DIRECTION);
+		float distB = -ei::dot(b.direction, BASE_DIRECTION);
+		return distA < distB;
+	});
 	std::sort(posLights.begin(), posLights.end(), [&scale](const PositionalLights& a, const PositionalLights& b) {
 		// Rescale and round the light centers to fall onto positive integers
 		ei::UVec3 x = ei::UVec3(get_light_center(a) * scale);
@@ -340,7 +346,6 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 												+ sizeof(LightSubTree::Node) * posNodes];
 
 	// Copy the lights into the tree
-	// TODO: how to place this best into memory?
 	// Directional lights are easier, because they have a fixed size
 	{
 		std::memcpy(tree.dirLights.lights, dirLights.data(), dirLightSize);
@@ -362,7 +367,6 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	m_flags.mark_changed(Device::CPU);
 }
 
-// TODO
 void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync,
 				 std::optional<textures::TextureHandle> hdl) {
 	if(changed.length == 0u) {

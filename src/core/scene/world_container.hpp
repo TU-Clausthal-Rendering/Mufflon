@@ -69,6 +69,9 @@ public:
 	bool is_dir_light(const std::string_view& name) const;
 	bool is_env_light(const std::string_view& name) const;
 
+	// Useful only when storing light names
+	std::optional<std::string_view> get_light_name_ref(const std::string_view& name) const noexcept;
+
 	// Singleton, creating our global world object
 	static WorldContainer& instance() {
 		static WorldContainer inst;
@@ -80,6 +83,7 @@ public:
 	 * This destroys the currently loaded scene and overwrites it with a new one.
 	 * Returns nullptr if something goes wrong.
 	 */
+	SceneHandle load_scene(const Scenario& scenario);
 	SceneHandle load_scene(ScenarioHandle hdl);
 
 	// Returns the currently loaded scene, if present

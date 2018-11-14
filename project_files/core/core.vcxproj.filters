@@ -201,9 +201,6 @@
     <ClInclude Include="..\..\src\util\flag.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\cuda\memory.hpp">
-      <Filter>Source Files\core\cuda</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>

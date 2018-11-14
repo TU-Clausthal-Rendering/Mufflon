@@ -4,6 +4,7 @@
 #include "material.hpp"
 #include "export/api.hpp"
 #include "core/math/sampling.hpp"
+#include "core/scene/textures/texture.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -30,6 +31,8 @@ struct LambertParameterPack : public ParameterPack {
 class Lambert :
 	public IMaterial {
 public:
+	// TODO: constructor
+
 	std::size_t get_handle_pack_size(Device device) const final;
 	std::size_t get_parameter_pack_size() const final { return sizeof(LambertParameterPack); }
 	void get_handle_pack(Device device, HandlePack* outBuffer) const final;

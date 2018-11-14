@@ -12,8 +12,8 @@
 #include "util/byte_io.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <cstdio>
-#include <optional>
 #include <tuple>
+#include <optional>
 
 // Forward declarations
 namespace OpenMesh::Subdivider::Uniform {
@@ -410,7 +410,8 @@ private:
 	}
 
 	// These methods simply create references to the attributes
-	// TODO: by holding references to them, if they ever get removed, we're in a bad spot
+	// By holding references to them, if they ever get removed, we're in a bad spot
+	// So you BETTER not remove the standard attributes
 	VertexAttributeHandle<OpenMesh::Vec3f> create_points_handle() {
 		OpenMesh::VPropHandleT<OpenMesh::Vec3f> omHandle = m_meshData.points_pph();
 		mAssert(omHandle.is_valid());

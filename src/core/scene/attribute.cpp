@@ -38,7 +38,7 @@ void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(Attribute
 // Synchronization specialization from CUDA to CPU (non-owning)
 template <>
 void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool) {
-	// TODO: make present
+	pool.make_present();
 	std::size_t currOffset = 0u;
 
 	// Loop to copy the attributes
@@ -52,8 +52,6 @@ void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(Attribut
 			currOffset += currLength;
 		}
 	}
-
-	throw std::runtime_error("Synchronize between CPU and CUDA not yet implemented");
 }
 
 } // namespace mufflon::scene

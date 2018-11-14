@@ -25,8 +25,8 @@ public:
 	using Index = u32;
 	using SphereHandle = std::size_t;
 	using AttributeListType = AttributeList<false>;
-	template < class Attr >
-	using AttributeHandle = typename AttributeListType::template AttributeHandle<Attr>;
+	template < class T >
+	using AttributeHandle = typename AttributeListType::template AttributeHandle<T>;
 	template < class T >
 	using Attribute = typename AttributeListType::template Attribute<T>;
 
@@ -113,7 +113,7 @@ public:
 	}
 	// Also performs bulk-load for an attribute, but aquires it first.
 	template < class Type >
-	std::size_t add_bulk(const AttributeHandle<Attribute<Type>>& attrHandle,
+	std::size_t add_bulk(const AttributeHandle<Type>& attrHandle,
 						 const SphereHandle& startSphere, std::size_t count,
 						 util::IByteReader& attrStream) {
 		return this->add_bulk(m_attributes.aquire(attrHandle), startSphere, count, attrStream);

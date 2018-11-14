@@ -6,8 +6,11 @@
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
 #include <cuda_fp16.h>
-#include <variant>
 #include <type_traits>
+
+#ifndef __CUDACC__
+#include <variant>
+#endif // __CUDACC__
 
 namespace mufflon { namespace scene { namespace lights {
 

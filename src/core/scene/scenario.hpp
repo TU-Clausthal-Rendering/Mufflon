@@ -32,7 +32,7 @@ public:
 	 */
 	MaterialIndex declare_material_slot(std::string_view binaryName);
 	// Get the index of a slot from its name.
-	MaterialIndex get_material_slot_index(std::string_view binaryName);
+	MaterialIndex get_material_slot_index(std::string_view binaryName) const;
 	/*
 	 * Assigns a ready loaded material to a material entry.
 	 * The assignment can be changed if no renderer is in a running state.
@@ -68,16 +68,23 @@ public:
 	}
 
 	// Getter/setter for per-object properties
-	bool is_masked(ObjectHandle hdl) const;
-	std::size_t get_custom_lod(ObjectHandle hdl) const;
-	void mask_object(ObjectHandle hdl);
-	void set_custom_lod(ObjectHandle hdl, std::size_t level);
+	bool is_masked(ConstObjectHandle hdl) const;
+	std::size_t get_custom_lod(ConstObjectHandle hdl) const;
+	void mask_object(ConstObjectHandle hdl);
+	void set_custom_lod(ConstObjectHandle hdl, std::size_t level);
 
-	std::string_view get_name() const noexcept {
+	const std::string& get_name() const noexcept {
 		return m_name;
 	}
 	// Note: no method to change name! because it is being used as
 	// key in worldcontainer
+
+	void add_light(std::string_view name) {
+		m_lightNames.push_back(name);
+	}
+
+	void remove_light(std::size_t index);
+	void remove_light(const std::string_view& name);
 
 	const std::vector<std::string_view>& get_light_names() const noexcept {
 		return m_lightNames;
@@ -106,10 +113,9 @@ private:
 	std::size_t m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution = {};
 	CameraHandle m_camera = nullptr;
-	// TODO: material properties
 
 	// Object blacklisting and other custom traits
-	std::map<ObjectHandle, ObjectProperty> m_perObjectCustomization;
+	std::map<ConstObjectHandle, ObjectProperty> m_perObjectCustomization;
 };
 
 } // namespace mufflon::scene

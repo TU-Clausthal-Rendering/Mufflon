@@ -32,6 +32,26 @@ struct CameraParams {
  */
 class Camera {
 public:
+	Camera() = default;
+	Camera(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
+		   float near = 1e-10f, float far = 1e10f) :
+		m_position(std::move(position)),
+		m_near(near),
+		m_far(far)
+	{
+		dir = ei::normalize(dir);
+		up = ei::normalize(up);
+		if(ei::dot(dir, up) > 0.999f)
+			throw std::runtime_error("View direction and up-vector are too close to each other");
+		// Create orthonormal basis to determine view matrix
+		const ei::Vec3 right = ei::normalize(ei::cross(up, dir));
+
+		m_viewSpace = ei::Mat3x3{
+			right.x, right.y, right.z,
+			dir.x, dir.y, dir.z,
+			up.x, up.y, up.z
+		};
+	}
 	// Needs virtual destructor
 	virtual ~Camera() = default;
 

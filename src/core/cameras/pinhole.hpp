@@ -12,7 +12,17 @@ namespace mufflon { namespace cameras {
  */
 class Pinhole : public Camera {
 public:
-	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = tan(fov / 2); }
+	Pinhole() = default;
+	Pinhole(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
+			Radians vFov, float near = 1e-10f,
+			float far = 1e10f) :
+		Camera(std::move(position), std::move(dir),
+			   std::move(up), near, far),
+		m_vFov(vFov),
+		m_tanVFov(std::tan(m_vFov / 2.f))
+	{}
+
+	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = std::tan(fov / 2); }
 
 	// Get the parameter bundle
 	void get_parameter_pack(CameraParams* outBuffer, Device dev) const final;

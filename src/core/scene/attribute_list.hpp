@@ -7,6 +7,7 @@
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/byte_io.hpp"
+#include "util/log.hpp"
 #include <istream>
 #include <ostream>
 #include <cstdlib>
@@ -266,8 +267,12 @@ public:
 	template < Device dev = DEFAULT_DEVICE >
 	void unload() {
 		// TODO: make sure that we have at least one loaded device
-		m_attributePools.template get<AttributePool<dev>>().unload();
-		m_flags.unload(dev);
+		if(m_flags.is_last_present(dev)) {
+			logError("[AttributeList::unload] Cannot unload the last present device");
+		} else {
+			m_attributePools.template get<AttributePool<dev>>().unload();
+			m_flags.unload(dev);
+		}
 	}
 
 	template < Device dev = DEFAULT_DEVICE >

@@ -11,6 +11,7 @@ extern "C" {
 
 #define INVALID_INDEX int32_t{-1}
 #define INVALID_SIZE ULLONG_MAX
+#define INVALID_MATERIAL USHRT_MAX
 
 typedef struct  {
 	float x;
@@ -100,6 +101,7 @@ typedef void* MaterialHdl;
 typedef void* CameraHdl;
 typedef void* LightHdl;
 typedef void* TextureHdl;
+typedef const void* ConstCameraHdl;
 
 // TODO: how to handle errors
 
@@ -203,7 +205,7 @@ LIBRARY_API MaterialHdl world_add_lambert_material(const char* name);
 // TODO: add more cameras
 LIBRARY_API CameraHdl world_add_pinhole_camera(const char* name, Vec3 position,
 											   Vec3 dir, Vec3 up, float near,
-											   float far, float tanVFov);
+											   float far, float vFov);
 LIBRARY_API LightHdl world_add_point_light(const char* name, Vec3 position,
 										   Vec3 intensity);
 LIBRARY_API LightHdl world_add_spot_light(const char* name, Vec3 position,
@@ -216,38 +218,59 @@ LIBRARY_API LightHdl world_add_directional_light(const char* name,
 LIBRARY_API LightHdl world_add_envmap_light(const char* name, TextureHdl envmap);
 LIBRARY_API CameraHdl world_get_camera(const char* name);
 LIBRARY_API LightHdl world_get_light(const char* name, LightType type);
-// TODO: how to communicate light and material values to the GUI? As a struct?
 LIBRARY_API SceneHdl world_load_scenario(ScenarioHdl scenario);
 LIBRARY_API SceneHdl world_get_current_scene();
 
 // Scenario interface
 LIBRARY_API const char* scenario_get_name(ScenarioHdl scenario);
-LIBRARY_API size_t scenario_get_global_lod_level(ScenarioHdl scenario);
-LIBRARY_API void scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level);
+LIBRARY_API LodLevel scenario_get_global_lod_level(ScenarioHdl scenario);
+LIBRARY_API bool scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level);
 LIBRARY_API IVec2 scenario_get_resolution(ScenarioHdl scenario);
-LIBRARY_API void scenario_set_resolution(ScenarioHdl scenario, IVec2 res);
+LIBRARY_API bool scenario_set_resolution(ScenarioHdl scenario, IVec2 res);
 LIBRARY_API CameraHdl scenario_get_camera(ScenarioHdl scenario);
-LIBRARY_API void scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
+LIBRARY_API bool scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
 LIBRARY_API bool scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj);
-LIBRARY_API void scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj);
+LIBRARY_API bool scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj);
 LIBRARY_API LodLevel scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj);
-LIBRARY_API void scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
+LIBRARY_API bool scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 										 LodLevel level);
-LIBRARY_API size_t scenario_get_light_count(ScenarioHdl scenario);
+LIBRARY_API IndexType scenario_get_light_count(ScenarioHdl scenario);
 LIBRARY_API const char* scenario_get_light_name(ScenarioHdl scenario, size_t index);
-LIBRARY_API void scenario_add_light(ScenarioHdl scenario, const char* name);
-LIBRARY_API void scenario_remove_light_by_index(ScenarioHdl scenario, size_t index);
-LIBRARY_API void scenario_remove_light_by_named(ScenarioHdl scenario, const char* name);
+LIBRARY_API bool scenario_add_light(ScenarioHdl scenario, const char* name);
+LIBRARY_API bool scenario_remove_light_by_index(ScenarioHdl scenario, size_t index);
+LIBRARY_API bool scenario_remove_light_by_named(ScenarioHdl scenario, const char* name);
 LIBRARY_API MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
 														 const char* name);
 LIBRARY_API MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 													 const char* name);
 LIBRARY_API MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 														  MatIdx index);
-LIBRARY_API void scenario_assign_material(ScenarioHdl scenario, MatIdx index,
+LIBRARY_API bool scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 										  MaterialHdl handle);
 
 // Scene interface
-LIBRARY_API void scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max);
+LIBRARY_API bool scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max);
+LIBRARY_API ConstCameraHdl scene_get_camera(SceneHdl scene);
+
+// Light interface
+LIBRARY_API bool world_get_point_light_position(LightHdl hdl, Vec3* pos);
+LIBRARY_API bool world_get_point_light_intensity(LightHdl hdl, Vec3* intensity);
+LIBRARY_API bool world_set_point_light_position(LightHdl hdl, Vec3 pos);
+LIBRARY_API bool world_set_point_light_intensity(LightHdl hdl, Vec3 intensity);
+LIBRARY_API bool world_get_spot_light_position(LightHdl hdl, Vec3* pos);
+LIBRARY_API bool world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity);
+LIBRARY_API bool world_get_spot_light_direction(LightHdl hdl, Vec3* direction);
+LIBRARY_API bool world_get_spot_light_angle(LightHdl hdl, float* angle);
+LIBRARY_API bool world_get_spot_light_falloff(LightHdl hdl, float* falloff);
+LIBRARY_API bool world_set_spot_light_position(LightHdl hdl, Vec3 pos);
+LIBRARY_API bool world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity);
+LIBRARY_API bool world_set_spot_light_direction(LightHdl hdl, Vec3 direction);
+LIBRARY_API bool world_set_spot_light_angle(LightHdl hdl, float angle);
+LIBRARY_API bool world_set_spot_light_falloff(LightHdl hdl, float fallof);
+LIBRARY_API bool world_get_dir_light_direction(LightHdl hdl, Vec3* direction);
+LIBRARY_API bool world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance);
+LIBRARY_API bool world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
+LIBRARY_API bool world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
+// TODO: interface for envmap light
 
 }

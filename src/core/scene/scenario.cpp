@@ -20,7 +20,7 @@ MaterialIndex Scenario::declare_material_slot(std::string_view binaryName) {
 	return newIndex;
 }
 
-MaterialIndex Scenario::get_material_slot_index(std::string_view binaryName) {
+MaterialIndex Scenario::get_material_slot_index(std::string_view binaryName) const {
 	auto it = m_materialIndices.find(binaryName);
 	if(it == m_materialIndices.end()) {
 		logError("[Scene::get_material_slot_index] Cannot find the material slot '", binaryName, "'");
@@ -39,26 +39,38 @@ MaterialHandle Scenario::get_assigned_material(MaterialIndex index) const {
 	return m_materialAssignment[index].material;
 }
 
-bool Scenario::is_masked(ObjectHandle hdl) const {
+bool Scenario::is_masked(ConstObjectHandle hdl) const {
 	auto iter = m_perObjectCustomization.find(hdl);
 	if(iter != m_perObjectCustomization.end())
 		return iter->second.masked;
 	return false;
 }
 
-std::size_t Scenario::get_custom_lod(ObjectHandle hdl) const {
+std::size_t Scenario::get_custom_lod(ConstObjectHandle hdl) const {
 	auto iter = m_perObjectCustomization.find(hdl);
 	if(iter != m_perObjectCustomization.end())
 		return iter->second.lod;
 	return NO_CUSTOM_LOD;
 }
 
-void Scenario::mask_object(ObjectHandle hdl) {
+void Scenario::mask_object(ConstObjectHandle hdl) {
 	m_perObjectCustomization[hdl].masked = true;
 }
 
-void Scenario::set_custom_lod(ObjectHandle hdl, std::size_t level) {
+void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
 	m_perObjectCustomization[hdl].lod = level;
+}
+
+void Scenario::remove_light(std::size_t index) {
+	if(index < m_lightNames.size())
+		m_lightNames.erase(m_lightNames.begin() + index);
+}
+
+void Scenario::remove_light(const std::string_view& name) {
+	m_lightNames.erase(std::remove_if(m_lightNames.begin(), m_lightNames.end(),
+		[&name](const std::string_view& n) {
+			return n == name;
+		}), m_lightNames.end());
 }
 
 } // namespace mufflon::scene

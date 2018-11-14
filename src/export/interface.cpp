@@ -78,7 +78,6 @@ struct TypeHolder {
 template < class L1, class L2 >
 inline auto switchAttributeType(AttributeType type, L1&& regular, L2&& noMatch) {
 	switch(type) {
-		// TODO: why not declval?
 		case AttributeType::ATTR_INT:
 			return regular(TypeHolder<int32_t>{});
 		case AttributeType::ATTR_IVEC2:
@@ -736,11 +735,9 @@ size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* at
 	return switchAttributeType(type, [&object, attr, type, startSphere, count, &attrStream](const auto& val) {
 		using Type = std::decay_t<decltype(val)>::Type;
 		SphereAttr<Type> sphereAttr{ static_cast<size_t>(attr->index) };
-		return INVALID_SIZE;
-		/*return object.add_bulk<Spheres>(sphereAttr,
-										SphereHdl{ static_cast<size_t>(startSphere) },
-										count, attrStream);*/
-		// TODO
+		return object.add_bulk<Spheres>(sphereAttr,
+										SphereVHdl{ static_cast<size_t>(startSphere) },
+										count, attrStream);
 	}, []() {
 		logError("[", FUNCTION_NAME, "] Unknown attribute type");
 		return INVALID_SIZE;
@@ -761,10 +758,9 @@ size_t sphere_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere, size_t
 	}
 	util::FileReader matStream{ stream };
 
-	// TODO
-	/*return object.add_bulk<Spheres>(object.get_mat_indices<Spheres>(),
-									SphereHdl{ static_cast<size_t>(startSphere) },
-									count, matStream);*/
+	return object.add_bulk<Spheres>(object.get_mat_indices<Spheres>(),
+									SphereVHdl{ static_cast<size_t>(startSphere) },
+									count, matStream);
 	return INVALID_SIZE;
 }
 
@@ -797,10 +793,8 @@ InstanceHdl world_create_instance(ObjectHdl obj) {
 
 ScenarioHdl world_create_scenario(const char* name) {
 	CHECK_NULLPTR(name, "scenario name", nullptr);
-	auto hdl = WorldContainer::instance().add_scenario(Scenario{ name });
-	// TODO
-	//return static_cast<ScenarioHdl>(hdl);
-	return nullptr;
+	const auto& hdl = WorldContainer::instance().add_scenario(Scenario{ name });
+	return static_cast<ScenarioHdl>(&hdl->second);
 }
 
 MaterialHdl world_add_lambert_material(const char* name) {
@@ -817,20 +811,16 @@ MaterialHdl world_add_lambert_material(const char* name) {
 }
 
 CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
-								   Vec3 up, float near, float far, float tanVFov) {
+								   Vec3 up, float near, float far, float vFov) {
 	CHECK_NULLPTR(name, "camera name", nullptr);
-	CameraHandle hdl = WorldContainer::instance().add_camera(std::make_unique<cameras::Pinhole>());
+	CameraHandle hdl = WorldContainer::instance().add_camera(std::make_unique<cameras::Pinhole>(
+		util::pun<ei::Vec3>(position), util::pun<ei::Vec3>(dir),
+		util::pun<ei::Vec3>(up), vFov, near, far
+	));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating pinhole camera");
 		return nullptr;
 	}
-	// TODO: how about we add an actual constructor
-	hdl->set_name(name);
-	hdl->set_near(near);
-	hdl->set_far(far);
-	hdl->move(position.x, position.y, position.z);
-	// TODO: set direction and up-vector
-
 	return static_cast<CameraHdl>(hdl);
 }
 
@@ -839,9 +829,11 @@ LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) 
 	auto hdl = WorldContainer::instance().add_light(name, lights::PointLight{
 													util::pun<ei::Vec3>(position),
 													util::pun<ei::Vec3>(intensity) });
-	// TODO
-	//return static_cast<LightHdl>(hdl);
-	return nullptr;
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Error adding point light");
+		return nullptr;
+	}
+	return static_cast<LightHdl>(&hdl.value()->second);
 }
 
 LightHdl world_add_spot_light(const char* name, Vec3 position, Vec3 direction,
@@ -849,15 +841,39 @@ LightHdl world_add_spot_light(const char* name, Vec3 position, Vec3 direction,
 							  float falloffStart) {
 	CHECK_NULLPTR(name, "spotlight name", nullptr);
 	ei::Vec3 dir = ei::normalize(util::pun<ei::Vec3>(direction));
+	if(!ei::approx(ei::len(dir), 1.0f)) {
+		logError("[", FUNCTION_NAME, "] Spotlight direction cannot be a null vector");
+		return nullptr;
+	}
+	float actualAngle = std::fmod(openingAngle, 2.f * ei::PI);
+	float actualFalloff = std::fmod(falloffStart, 2.f * ei::PI);
+	if(actualAngle < 0.f)
+		actualAngle += 2.f*ei::PI;
+	if(actualFalloff < 0.f)
+		actualFalloff += 2.f*ei::PI;
+	if(actualAngle > ei::PI / 2.f) {
+		logWarning("[", FUNCTION_NAME, "] Spotlight angle will be clamped between 0°-180°");
+		actualAngle = ei::PI / 2.f;
+	}
+	float cosAngle = std::cos(actualAngle);
+	float cosFalloff = std::cos(actualFalloff);
+	if(cosAngle > cosFalloff) {
+		logWarning("[", FUNCTION_NAME, "] Spotlight falloff angle cannot be larger than"
+				   " its opening angle");
+		cosFalloff = cosAngle;
+	}
+
 	auto hdl = WorldContainer::instance().add_light(name, lights::SpotLight{
 													util::pun<ei::Vec3>(position),
 													ei::packOctahedral32(dir),
 													util::pun<ei::Vec3>(intensity),
-													__float2half(openingAngle),
-													__float2half(falloffStart) });
-	// TODO
-	//return static_cast<LightHdl>(hdl);
-	return nullptr;
+													__float2half(cosAngle),
+													__float2half(cosFalloff) });
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Error adding point light");
+		return nullptr;
+	}
+	return static_cast<LightHdl>(&hdl.value()->second);
 }
 
 LightHdl world_add_directional_light(const char* name, Vec3 direction,
@@ -866,9 +882,11 @@ LightHdl world_add_directional_light(const char* name, Vec3 direction,
 	auto hdl = WorldContainer::instance().add_light(name, lights::DirectionalLight{
 													util::pun<ei::Vec3>(direction),
 													util::pun<ei::Vec3>(radiance) });
-	// TODO
-	//return static_cast<LightHdl>(hdl);
-	return nullptr;
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Error adding directional light");
+		return nullptr;
+	}
+	return static_cast<LightHdl>(&hdl.value()->second);
 }
 
 LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
@@ -887,23 +905,35 @@ LightHdl world_get_light(const char* name, LightType type) {
 	switch(type) {
 		case LightType::LIGHT_POINT: {
 			auto hdl = WorldContainer::instance().get_point_light(name);
-			// TODO
-			return nullptr;
+			if(!hdl.has_value()) {
+				logError("[", FUNCTION_NAME, "] Error getting point light");
+				return nullptr;
+			}
+			return static_cast<LightHdl>(&hdl.value()->second);
 		}
 		case LightType::LIGHT_SPOT: {
 			auto hdl = WorldContainer::instance().get_spot_light(name);
-			// TODO
-			return nullptr;
+			if(!hdl.has_value()) {
+				logError("[", FUNCTION_NAME, "] Error getting spot light");
+				return nullptr;
+			}
+			return static_cast<LightHdl>(&hdl.value()->second);
 		}
 		case LightType::LIGHT_DIRECTIONAL: {
 			auto hdl = WorldContainer::instance().get_dir_light(name);
-			// TODO
-			return nullptr;
+			if(!hdl.has_value()) {
+				logError("[", FUNCTION_NAME, "] Error getting directional light");
+				return nullptr;
+			}
+			return static_cast<LightHdl>(&hdl.value()->second);
 		}
 		case LightType::LIGHT_ENVMAP: {
 			auto hdl = WorldContainer::instance().get_env_light(name);
-			// TODO
-			return nullptr;
+			if(!hdl.has_value()) {
+				logError("[", FUNCTION_NAME, "] Error geting envmap light");
+				return nullptr;
+			}
+			return static_cast<LightHdl>(&hdl.value()->second);
 		}
 		default: {
 			logError("[", FUNCTION_NAME, "] Unknown light type");
@@ -914,16 +944,342 @@ LightHdl world_get_light(const char* name, LightType type) {
 
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	// TODO
-	/*SceneHandle hdl = WorldContainer::instance().load_scene(scenario);
+	SceneHandle hdl = WorldContainer::instance().load_scene(*static_cast<const Scenario*>(scenario));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
 		return nullptr;
 	}
-	return static_cast<SceneHdl>(hdl);*/
-	return nullptr;
+	return static_cast<SceneHdl>(hdl);
 }
 
 SceneHdl world_get_current_scene() {
 	return static_cast<SceneHdl>(WorldContainer::instance().get_current_scene());
+}
+
+const char* scenario_get_name(ScenarioHdl scenario) {
+	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	return static_cast<const Scenario*>(scenario)->get_name().c_str();
+}
+
+size_t scenario_get_global_lod_level(ScenarioHdl scenario) {
+	CHECK_NULLPTR(scenario, "scenario handle", Scenario::NO_CUSTOM_LOD);
+	return static_cast<const Scenario*>(scenario)->get_global_lod_level();
+}
+
+bool scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	static_cast<Scenario*>(scenario)->set_global_lod_level(level);
+	return true;
+}
+
+IVec2 scenario_get_resolution(ScenarioHdl scenario) {
+	CHECK_NULLPTR(scenario, "scenario handle", (IVec2{ 0, 0 }));
+	return util::pun<IVec2>(static_cast<const Scenario*>(scenario)->get_resolution());
+}
+
+bool scenario_set_resolution(ScenarioHdl scenario, IVec2 res) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	static_cast<Scenario*>(scenario)->set_resolution(util::pun<ei::IVec2>(res));
+	return true;
+}
+
+CameraHdl scenario_get_camera(ScenarioHdl scenario) {
+	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	return static_cast<CameraHdl>(static_cast<const Scenario*>(scenario)->get_camera());
+}
+
+bool scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	static_cast<Scenario*>(scenario)->set_camera(static_cast<CameraHandle>(cam));
+	return true;
+}
+
+bool scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(obj, "object handle", false);
+	return static_cast<const Scenario*>(scenario)->is_masked(static_cast<const Object*>(obj));
+}
+
+bool scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(obj, "object handle", false);
+	static_cast<Scenario*>(scenario)->mask_object(static_cast<const Object*>(obj));
+	return true;
+}
+
+LodLevel scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj) {
+	CHECK_NULLPTR(scenario, "scenario handle", Scenario::NO_CUSTOM_LOD);
+	CHECK_NULLPTR(obj, "object handle", Scenario::NO_CUSTOM_LOD);
+	return static_cast<const Scenario*>(scenario)->get_custom_lod(static_cast<const Object*>(obj));
+}
+
+bool scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
+							 LodLevel level) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(obj, "object handle", false);
+	static_cast<Scenario*>(scenario)->set_custom_lod(static_cast<const Object*>(obj),
+													 level);
+	return true;
+}
+
+IndexType scenario_get_light_count(ScenarioHdl scenario) {
+	CHECK_NULLPTR(scenario, "scenario handle", INVALID_INDEX);
+	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_light_names().size());
+}
+
+const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
+	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	const Scenario& scen = *static_cast<const Scenario*>(scenario);
+	if(index >= scen.get_light_names().size()) {
+		logError("[", FUNCTION_NAME, "] Light index out of bounds (",
+				 index, " >= ", scen.get_light_names().size(), ")");
+		return nullptr;
+	}
+	// The underlying string_view is guaranteed to be null-terminated since it
+	// references a std::string object in WorldContainer. Should that ever
+	// change we'll need to perform a copy here instead
+	return &scen.get_light_names()[index][0u];
+}
+
+bool scenario_add_light(ScenarioHdl scenario, const char* name) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(name, "light name", false);
+	// Indirection via world container because we store string_views
+	std::optional<std::string_view> resolvedName = WorldContainer::instance().get_light_name_ref(name);
+	if(!resolvedName.has_value()) {
+		logError("[", FUNCTION_NAME, "] Light source '", name, "' does not exist");
+		return false;
+	}
+	static_cast<Scenario*>(scenario)->add_light(resolvedName.value());
+	return true;
+}
+
+bool scenario_remove_light_by_index(ScenarioHdl scenario, size_t index) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	Scenario& scen = *static_cast<Scenario*>(scenario);
+	if(index >= scen.get_light_names().size()) {
+		logError("[", FUNCTION_NAME, "] Light index out of bounds (",
+				 index, " >= ", scen.get_light_names().size(), ")");
+		return false;
+	}
+	scen.remove_light(index);
+	return true;
+}
+
+bool scenario_remove_light_by_named(ScenarioHdl scenario, const char* name) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(name, "light name", false);
+	Scenario& scen = *static_cast<Scenario*>(scenario);
+	scen.remove_light(name);
+	return true;
+}
+
+MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
+									  const char* name) {
+	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
+	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
+	return static_cast<Scenario*>(scenario)->declare_material_slot(name);
+}
+
+MatIdx scenario_get_material_slot(ScenarioHdl scenario,
+								  const char* name) {
+	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
+	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
+	return static_cast<const Scenario*>(scenario)->get_material_slot_index(name);
+}
+
+MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
+										   MatIdx index) {
+	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	CHECK(index < INVALID_MATERIAL, "Invalid material index", nullptr);
+	return static_cast<MaterialHdl>(static_cast<const Scenario*>(scenario)->get_assigned_material(index));
+}
+
+bool scenario_assign_material(ScenarioHdl scenario, MatIdx index,
+							  MaterialHdl handle) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(handle, "material handle", false);
+	CHECK(index < INVALID_MATERIAL, "Invalid material index", false);
+	static_cast<Scenario*>(scenario)->assign_material(index, static_cast<MaterialHandle>(handle));
+	return true;
+}
+
+bool scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
+	CHECK_NULLPTR(scene, "scene handle", false);
+	const Scene& scen = *static_cast<const Scene*>(scene);
+	if(min != nullptr)
+		*min = util::pun<Vec3>(scen.get_bounding_box().min);
+	if(max != nullptr)
+		*max = util::pun<Vec3>(scen.get_bounding_box().max);
+	return true;
+}
+
+ConstCameraHdl scene_get_camera(SceneHdl scene) {
+	CHECK_NULLPTR(scene, "scene handle", nullptr);
+	return static_cast<ConstCameraHdl>(static_cast<const Scene*>(scene)->get_camera());
+}
+
+bool world_get_point_light_position(LightHdl hdl, Vec3* pos) {
+	CHECK_NULLPTR(hdl, "pointlight handle", false);
+	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
+	if(pos != nullptr)
+		*pos = util::pun<Vec3>(light.position);
+	return true;
+}
+
+bool world_get_point_light_intensity(LightHdl hdl, Vec3* intensity) {
+	CHECK_NULLPTR(hdl, "pointlight handle", false);
+	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
+	if(intensity != nullptr)
+		*intensity = util::pun<Vec3>(light.intensity);
+	return true;
+}
+
+bool world_set_point_light_position(LightHdl hdl, Vec3 pos) {
+	CHECK_NULLPTR(hdl, "pointlight handle", false);
+	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
+	light.position = util::pun<ei::Vec3>(pos);
+	return true;
+}
+
+bool world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
+	CHECK_NULLPTR(hdl, "pointlight handle", false);
+	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
+	light.intensity = util::pun<ei::Vec3>(intensity);
+	return true;
+}
+
+bool world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	if(pos != nullptr)
+		*pos = util::pun<Vec3>(light.position);
+	return true;
+}
+
+bool world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	if(intensity != nullptr)
+		*intensity = util::pun<Vec3>(light.intensity);
+	return true;
+}
+
+bool world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	if(direction != nullptr)
+		*direction = util::pun<Vec3>(ei::unpackOctahedral32(light.direction));
+	return true;
+}
+
+bool world_get_spot_light_angle(LightHdl hdl, float* angle) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	if(angle != nullptr)
+		*angle = std::acos(__half2float(light.cosThetaMax));
+	return true;
+}
+
+bool world_get_spot_light_falloff(LightHdl hdl, float* falloff) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	if(falloff != nullptr)
+		*falloff = std::acos(__half2float(light.cosFalloffStart));
+	return true;
+}
+
+bool world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	light.position = util::pun<ei::Vec3>(pos);
+	return true;
+}
+
+bool world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	light.intensity = util::pun<ei::Vec3>(intensity);
+	return true;
+}
+
+bool world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
+	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
+		logError("[", FUNCTION_NAME, "] Spotlight direction cannot be a null vector");
+		return false;
+	}
+	// TODO: check direction
+	light.direction = ei::packOctahedral32(util::pun<ei::Vec3>(actualDirection));
+	return true;
+}
+
+bool world_set_spot_light_angle(LightHdl hdl, float angle) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+
+	float actualAngle = std::fmod(angle, 2.f * ei::PI);
+	if(actualAngle < 0.f)
+		actualAngle += 2.f*ei::PI;
+	if(actualAngle > ei::PI / 2.f) {
+		logWarning("[", FUNCTION_NAME, "] Spotlight angle will be clamped between 0°-180°");
+		actualAngle = ei::PI / 2.f;
+	}
+	light.cosThetaMax = __float2half(std::cos(actualAngle));
+	return true;
+}
+
+bool world_set_spot_light_falloff(LightHdl hdl, float falloff) {
+	CHECK_NULLPTR(hdl, "spotlight handle", false);
+	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	// Clamp it to the opening angle!
+	float actualFalloff = std::fmod(falloff, 2.f * ei::PI);
+	if(actualFalloff < 0.f)
+		actualFalloff += 2.f*ei::PI;
+	float cosFalloff = std::cos(actualFalloff);
+	if(__half2float(light.cosThetaMax) > cosFalloff) {
+		logWarning("[", FUNCTION_NAME, "] Spotlight falloff angle cannot be larger than"
+				   " its opening angle");
+		light.cosFalloffStart = light.cosThetaMax;
+	} else {
+		light.cosFalloffStart = __float2half(cosFalloff);
+	}
+	return true;
+}
+
+bool world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
+	CHECK_NULLPTR(hdl, "directional light handle", false);
+	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
+	if(direction != nullptr)
+		*direction = util::pun<Vec3>(light.direction);
+	return true;
+}
+
+bool world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance) {
+	CHECK_NULLPTR(hdl, "directional light handle", false);
+	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
+	if(radiance != nullptr)
+		*radiance = util::pun<Vec3>(light.radiance);
+	return true;
+}
+
+bool world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
+	CHECK_NULLPTR(hdl, "directional light handle", false);
+	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
+	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
+	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
+		logError("[", FUNCTION_NAME, "] Directional light direction cannot be a null vector");
+		return false;
+	}
+	light.direction = util::pun<ei::Vec3>(actualDirection);
+	return true;
+}
+
+bool world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
+	CHECK_NULLPTR(hdl, "directional light handle", false);
+	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
+	light.radiance = util::pun<ei::Vec3>(radiance);
+	return true;
 }

@@ -8,7 +8,10 @@
 #include "core/memory/synchronize.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
+
+#ifndef __CUDACC__
 #include <optional>
+#endif // __CUDACC__
 
 // Forward declaration
 namespace ei {
@@ -167,9 +170,9 @@ void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>&
 void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync, textures::TextureHandle hdl);
 void unload(LightTree<Device::CPU>& tree);
 void unload(LightTree<Device::CUDA>& tree);
+
 #endif // __CUDACC__
 
-// TODO: extract
 namespace lighttree_detail {
 
 // Helper to adjust PDF by the chance to pick light type
@@ -395,7 +398,6 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		const ei::Vec3 rightCenter = get_cluster_center(currentNode->right, tree);
 
 		// Scale the flux up
-		// TODO: use position instead of flux!
 		float probLeft = guide(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
 		// Compute the integer bounds: once rounded down, once rounded up
 		u64 leftRight = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
@@ -474,7 +476,6 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 	u64 intervalRight = indexMax;
 
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
-	// TODO: way to check handle's validity!
 	float envProb = 0.f;
 	if(is_valid(tree.envLight.texHandle)) {
 		fluxSum += ei::sum(tree.envLight.flux);
@@ -516,7 +517,8 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
 	// If we made it until here, it means that we fell between
 	// the integer bounds of photon distribution
 	// Thus we need RNG to decide
-	// TODO: it could fall onto a boundary repeatedly
+	// TODO: it could fall onto a boundary repeatedly, but that costs
+	// performance (even more divergence)
 	u64 splitEnv = static_cast<u64>(std::numeric_limits<u64>::max()
 									* envProb);
 	u64 splitDir = static_cast<u64>(std::numeric_limits<u64>::max()
@@ -562,7 +564,6 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
 	u64 intervalRight = indexMax;
 
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
-	// TODO: way to check handle's validity!
 	float envProb = 0.f;
 	if(is_valid(tree.envLight.texHandle)) {
 		fluxSum += ei::sum(tree.envLight.flux);

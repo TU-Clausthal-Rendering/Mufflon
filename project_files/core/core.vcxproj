@@ -55,7 +55,6 @@
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
     <ClInclude Include="..\..\src\core\cameras\sample.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
-    <ClInclude Include="..\..\src\core\cuda\memory.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
     <ClInclude Include="..\..\src\core\memory\accessor.hpp" />
     <ClInclude Include="..\..\src\core\memory\allocator.hpp" />
@@ -178,9 +177,9 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <Include>
       </Include>
       <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
-      <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</KeepDir>
+      <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).obj</CompileOut>
+      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
     </CudaCompile>
@@ -216,8 +215,8 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       </Include>
       <HostDebugInfo>true</HostDebugInfo>
       <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
-      <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</KeepDir>
-      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).obj</CompileOut>
+      <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
+      <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
     </CudaCompile>

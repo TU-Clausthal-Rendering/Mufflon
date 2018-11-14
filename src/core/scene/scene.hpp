@@ -113,7 +113,7 @@ private:
 
 	// Light tree containing all light sources enabled for the scene
 	lights::LightTreeBuilder m_lightTree;
-	// TODO: cameras, lights, materials
+	// TODO: materials
 	// Acceleration structure over all instances
 	bool m_accelDirty = false;
 	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;

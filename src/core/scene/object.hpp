@@ -130,6 +130,10 @@ public:
 	const auto& get_geometry() const {
 		return m_geometryData.template get<Geom>();
 	}
+	template < class Geom >
+	auto& get_geometry() {
+		return m_geometryData.template get<Geom>();
+	}
 
 	// Returns the object's animation frame.
 	std::size_t get_animation_frame() const noexcept {
@@ -207,7 +211,6 @@ private:
 	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
 
 	// TODO: how to handle the LoDs?
-	// TODO: non-CPU memory
 };
 
 } // namespace mufflon::scene

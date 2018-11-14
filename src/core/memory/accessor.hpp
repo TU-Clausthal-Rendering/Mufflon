@@ -68,7 +68,6 @@ public:
 	Accessor& operator=(const Accessor&) = delete;
 	Accessor& operator=(Accessor&&) = default;
 	~Accessor() {
-		// TODO: would we like lazy copying?
 		m_flags.mark_changed(DEVICE);
 	}
 

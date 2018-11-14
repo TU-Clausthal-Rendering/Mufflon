@@ -101,37 +101,29 @@ std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::str
 
 std::optional<WorldContainer::PointLightHandle> WorldContainer::get_point_light(const std::string_view& name) {
 	auto light = m_pointLights.find(name);
-	if(light == m_pointLights.end()) {
-		logError("[WorldContainer::get_point_light] Unknown point light '", name, "'");
+	if(light == m_pointLights.end())
 		return std::nullopt;
-	}
 	return light;
 }
 
 std::optional<WorldContainer::SpotLightHandle> WorldContainer::get_spot_light(const std::string_view& name) {
 	auto light = m_spotLights.find(name);
-	if(light == m_spotLights.end()) {
-		logError("[WorldContainer::get_spot_light] Unknown spot light '", name, "'");
+	if(light == m_spotLights.end()) 
 		return std::nullopt;
-	}
 	return light;
 }
 
 std::optional<WorldContainer::DirLightHandle> WorldContainer::get_dir_light(const std::string_view& name) {
 	auto light = m_dirLights.find(name);
-	if(light == m_dirLights.end()) {
-		logError("[WorldContainer::get_dir_light] Unknown directional light '", name, "'");
+	if(light == m_dirLights.end())
 		return std::nullopt;
-	}
 	return light;
 }
 
 std::optional<WorldContainer::EnvLightHandle> WorldContainer::get_env_light(const std::string_view& name) {
 	auto light = m_envLights.find(name);
-	if(light == m_envLights.end()) {
-		logError("[WorldContainer::get_env_light] Unknown env light '", name, "'");
+	if(light == m_envLights.end())
 		return std::nullopt;
-	}
 	return light;
 }
 
@@ -151,9 +143,24 @@ bool WorldContainer::is_env_light(const std::string_view& name) const {
 	return m_envLights.find(name) != m_envLights.cend();
 }
 
-SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
-	Scenario& scenario = hdl->second;
+std::optional<std::string_view> WorldContainer::get_light_name_ref(const std::string_view& name) const noexcept {
+	auto pointLight = m_pointLights.find(name);
+	if(pointLight != m_pointLights.cend())
+		return pointLight->first;
+	auto spotLight = m_spotLights.find(name);
+	if(spotLight != m_spotLights.cend())
+		return spotLight->first;
+	auto dirLight = m_dirLights.find(name);
+	if(dirLight != m_dirLights.cend())
+		return dirLight->first;
+	auto envLight = m_envLights.find(name);
+	if(envLight != m_envLights.cend())
+		return envLight->first;
+	logError("[WorldContainer::get_light_name_ref] Unknown light '", name, "'");
+	return std::nullopt;
+}
 
+SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	std::vector<lights::PositionalLights> posLights;
 	std::vector<lights::DirectionalLight> dirLights;
 	std::optional<EnvLightHandle> envLightTex;
@@ -199,6 +206,10 @@ SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
 
 	// Assign the newly created scene and destroy the old one?
 	return m_scene.get();
+}
+
+SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
+	return load_scene(hdl->second);
 }
 
 } // namespace mufflon::scene

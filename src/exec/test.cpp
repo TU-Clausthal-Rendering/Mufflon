@@ -14,13 +14,122 @@
 
 #pragma warning(disable:4251)
 
+namespace {
+
+constexpr const char* ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+bool is_between(char x, char a, char b) {
+	return (x >= a) && (x <= b);
+}
+
+void increment_string(std::string& str) {
+	if(str.length() == 0u) {
+		str = "A";
+	} else if(str[str.length() - 1u] < 'A') {
+		str[str.length() - 1u] = 'A';
+	} else if(str[str.length() - 1u] >= 'z') {
+		str[str.length() - 1u] = 'A';
+		std::size_t index = str.length() - 1u;
+		for(; index > 0u; --index) {
+			if(str[index - 1u] < 'z') {
+				if(str[index - 1u] < 'Z')
+					++str[index - 1u];
+				else if(str[index - 1u] < 'a')
+					str[index - 1u] = 'a';
+				else
+					++str[index - 1u];
+				return;
+			} else {
+				str[index - 1u] = 'A';
+			}
+		}
+		// Went to the very beginning -> append new letter
+		str += 'A';
+	} else if(is_between(str[str.length() - 1u], 'Z'+1, 'a'-1)) {
+		str[str.length() - 1u] = 'a';
+	} else {
+		++str[str.length() - 1u];
+	}
+}
+
+}
+
 /*
 void test_renderer() {
 	//mufflon::renderer::GpuPathTracer gpu;
 	//gpu.run();
-}
+}*/
 
 void test_lighttree() {
+	auto errorCheck = [](bool cond) {
+		if(!cond)
+			throw std::runtime_error("Failed condition");
+	};
+
+	std::mt19937_64 rng(std::random_device{}());
+	std::uniform_int_distribution<std::uint64_t> intDist;
+	std::uniform_real_distribution<float> floatDist;
+	std::size_t lightCount = 10000u;
+	float posScale = 10.f;
+	float intenScale = 20.f;
+
+	std::string pointName = "PointLightA";
+	std::string spotName = "SpotLightA";
+	std::string dirName = "DirLightA";
+
+	ScenarioHdl scenario = world_create_scenario("TestScenario");
+
+	for(std::size_t i = 0u; i < lightCount; ++i) {
+		LightHdl point = world_add_point_light(pointName.c_str(),
+											   { 0.f, 0.f, 0.f },
+											   { 0.f, 0.f, 0.f });
+		errorCheck(point != nullptr);
+		LightHdl spot = world_add_spot_light(spotName.c_str(),
+											  { 0.f, 0.f, 0.f },
+											  { 1.f, 0.f, 0.f },
+											  { 0.f, 0.f, 0.f },
+											  0.f, 0.f);
+		errorCheck(spot != nullptr);
+		LightHdl dir = world_add_directional_light(dirName.c_str(),
+											   { 1.f, 0.f, 0.f },
+											   { 0.f, 0.f, 0.f });
+		errorCheck(dir != nullptr);
+		float openingAngle = 1.5f * floatDist(rng);
+		errorCheck(world_set_point_light_position(point, { posScale*floatDist(rng),
+									   posScale*floatDist(rng),
+									   posScale*floatDist(rng) }));
+		errorCheck(world_set_point_light_intensity(point, { intenScale*floatDist(rng),
+									   intenScale*floatDist(rng),
+									   intenScale*floatDist(rng) }));
+		errorCheck(world_set_spot_light_position(spot, { posScale*floatDist(rng),
+									   posScale*floatDist(rng),
+									   posScale*floatDist(rng) }));
+		errorCheck(world_set_spot_light_direction(spot, { floatDist(rng),
+									   floatDist(rng),
+									   floatDist(rng) }));
+		errorCheck(world_set_spot_light_angle(spot, openingAngle));
+		errorCheck(world_set_spot_light_falloff(spot, openingAngle * floatDist(rng)));
+		errorCheck(world_set_dir_light_direction(dir, { posScale*floatDist(rng),
+									   posScale*floatDist(rng),
+									   posScale*floatDist(rng) }));
+		errorCheck(world_set_dir_light_radiance(point, { intenScale*floatDist(rng),
+									   intenScale*floatDist(rng),
+									   intenScale*floatDist(rng) }));
+
+		errorCheck(scenario_add_light(scenario, pointName.c_str()));
+		errorCheck(scenario_add_light(scenario, spotName.c_str()));
+		errorCheck(scenario_add_light(scenario, dirName.c_str()));
+		increment_string(pointName);
+		increment_string(spotName);
+		increment_string(dirName);
+	}
+
+	SceneHdl scene = world_load_scenario(scenario);
+	mAssert(scene != nullptr);
+	std::cout << "Scene camera: " << scene_get_camera(scene) << std::endl;
+}
+
+/*void test_lighttree() {
 	using namespace lights;
 
 	std::mt19937_64 rng(std::random_device{}());
@@ -432,13 +541,13 @@ void test_scene_creation() {
 */
 
 int main() {
+	test_lighttree();
 	test_polygon();
 	/*test_allocator();
 	test_sphere();
 	test_custom_attributes();
 	test_object();
 	test_scene_creation();
-	test_lighttree();
 	test_renderer();*/
 
 	std::cout << "All tests successful" << std::endl;
