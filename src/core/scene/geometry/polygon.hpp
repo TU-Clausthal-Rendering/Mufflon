@@ -176,7 +176,7 @@ public:
 			return { attrHandle, select_list<AttrHandle>().add(name, omAttr) };
 		} else {
 			// Found in OpenMesh already, now find it in our list
-			auto opt = select_list<AttrHandle>().find<Type>(name);
+			auto opt = select_list<AttrHandle>().template find<Type>(name);
 			mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
 					   "property in OpenMesh but not in our custom list");
 			return { attrHandle, opt.value() };
@@ -198,7 +198,7 @@ public:
 		if(!m_meshData.get_property_handle(attrHandle, name))
 			return std::nullopt;
 		// Find attribute in custom list as 
-		auto opt = select_list<AttrHandle>().find<Type>(name);
+		auto opt = select_list<AttrHandle>().template find<Type>(name);
 		mAssert(opt.has_value());
 		return AttrHandle{
 			attrHandle,

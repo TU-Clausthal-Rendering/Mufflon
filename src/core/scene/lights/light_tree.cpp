@@ -301,7 +301,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	// Create our spatial sorting to get a good tree
 	// TODO: sort the directional lights by direction
 	ei::Vec3 scale = boundingBox.max - boundingBox.min;
-	std::sort(dirLights.begin(), dirLights.end(), [&scale](const DirectionalLight& a, const DirectionalLight& b) {
+	std::sort(dirLights.begin(), dirLights.end(), [](const DirectionalLight& a, const DirectionalLight& b) {
 		// TODO: better sorting scheme!
 		constexpr ei::Vec3 BASE_DIRECTION{ 1.f, 0.f, 0.f };
 		float distA = -ei::dot(a.direction, BASE_DIRECTION);

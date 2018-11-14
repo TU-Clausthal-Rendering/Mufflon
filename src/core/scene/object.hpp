@@ -67,7 +67,7 @@ public:
 	// Requests an attribute for the geometry type.
 	template < class Geom, class Type >
 	auto request(const std::string& name) {
-		return m_geometryData.template get<Geom>().request<Type>(name);
+		return m_geometryData.template get<Geom>().template request<Type>(name);
 	}
 	// Removes an attribute for the geometry type.
 	template < class Geom, class AttributeHandle >
@@ -77,7 +77,7 @@ public:
 	// Attempts to find an attribute by name.
 	template < class Geom, class T >
 	auto find(const std::string& name) {
-		return m_geometryData.template get<Geom>().find<T>(name);
+		return m_geometryData.template get<Geom>().template find<T>(name);
 	}
 	/**
 	 * Aquires a reference to an attribute, valid until the attribute gets removed.
