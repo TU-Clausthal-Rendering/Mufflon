@@ -5,6 +5,7 @@
 #include "ei/vector.hpp"
 #include "util/types.hpp"
 #include "util/flag.hpp"
+#include "util/byte_io.hpp"
 #include "core/scene/attribute_list.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
@@ -18,7 +19,7 @@ namespace mufflon::scene::geometry {
  * Instantiation of geometry class.
  * Can store spheres only.
  */
-class LIBRARY_API Spheres {
+class Spheres {
 public:
 	// Basic type definitions
 	using Index = u32;
@@ -92,8 +93,8 @@ public:
 	 * Returns both a handle to the first added sphere as well as the number of
 	 * read spheres.
 	 */
-	BulkReturn add_bulk(std::size_t count, std::istream& radPosStream);
-	BulkReturn add_bulk(std::size_t count, std::istream& radPosStream,
+	BulkReturn add_bulk(std::size_t count, util::IByteReader& radPosStream);
+	BulkReturn add_bulk(std::size_t count, util::IByteReader& radPosStream,
 						const ei::Box& boundingBox);
 	/**
 	 * Bulk-loads the given attribute starting at the given sphere.
@@ -102,7 +103,7 @@ public:
 	 */
 	template < class T >
 	std::size_t add_bulk(Attribute<T>& attribute, const SphereHandle& startSphere,
-						 std::size_t count, std::istream& attrStream) {
+						 std::size_t count, util::IByteReader& attrStream) {
 		std::size_t start = startSphere;
 		if(start >= m_attributes.get_size())
 			return 0u;
@@ -114,7 +115,7 @@ public:
 	template < class Type >
 	std::size_t add_bulk(const AttributeHandle<Attribute<Type>>& attrHandle,
 						 const SphereHandle& startSphere, std::size_t count,
-						 std::istream& attrStream) {
+						 util::IByteReader& attrStream) {
 		return this->add_bulk(m_attributes.aquire(attrHandle), startSphere, count, attrStream);
 	}
 
@@ -155,6 +156,10 @@ public:
 
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;
+	}
+
+	std::size_t get_sphere_count() const noexcept {
+		return m_attributes.get_size();
 	}
 
 private:

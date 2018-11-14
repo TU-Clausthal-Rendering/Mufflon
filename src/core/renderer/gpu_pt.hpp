@@ -3,7 +3,7 @@
 #include "export/api.hpp"
 #include "core/scene/lights/light_tree.hpp"
 
-extern "C" LIBRARY_API void test_gpu_pt();
+//extern "C" LIBRARY_API void test_gpu_pt();
 
 namespace mufflon { namespace renderer {
 

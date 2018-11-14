@@ -17,7 +17,7 @@ namespace mufflon::scene {
  * This means it stores objects, cameras, materials etc. However, instances and material mappings
  * are being instantiated by a scene object, created based on information from a scenario.
  */
-class LIBRARY_API WorldContainer {
+class WorldContainer {
 public:
 	using ScenarioHandle = std::unordered_map<std::string_view, Scenario>::iterator;
 	using PointLightHandle = std::map<std::string, lights::PointLight, std::less<>>::iterator;

@@ -94,6 +94,7 @@
     <ClInclude Include="..\..\src\export\api.hpp" />
     <ClInclude Include="..\..\src\export\interface.h" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
+    <ClInclude Include="..\..\src\util\byte_io.hpp" />
     <ClInclude Include="..\..\src\util\dyntype_memory.hpp" />
     <ClInclude Include="..\..\src\util\flag.hpp" />
     <ClInclude Include="..\..\src\util\array_wrapper.hpp" />

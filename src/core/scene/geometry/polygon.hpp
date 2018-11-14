@@ -5,10 +5,13 @@
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
+#include "util/byte_io.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/attribute_list.hpp"
 #include "util/range.hpp"
+#include "util/byte_io.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
+#include <cstdio>
 #include <optional>
 #include <tuple>
 
@@ -39,7 +42,7 @@ struct PolygonTraits : public OpenMesh::DefaultTraits {
  * Can store both triangles and quads.
  * Can be extended to work with any polygon type.
  */
-class LIBRARY_API Polygons {
+class Polygons {
 public:
 	// Basic type definitions
 	using Index = u32;
@@ -71,8 +74,10 @@ public:
 	struct VertexAttributeHandle {
 		using Type = T;
 		using OmAttrHandle = OpenMesh::VPropHandleT<Type>;
+		using CustomAttrHandle = AttributeHandle<Type>;
+
 		OmAttrHandle omHandle;
-		AttributeHandle<Type> customHandle;
+		CustomAttrHandle customHandle;
 	};
 
 	// Struct containing handles to both OpenMesh and custom attributes (faces)
@@ -80,8 +85,9 @@ public:
 	struct FaceAttributeHandle {
 		using Type = T;
 		using OmAttrHandle = OpenMesh::FPropHandleT<Type>;
+		using CustomAttrHandle = AttributeHandle<Type>;
 		OmAttrHandle omHandle;
-		AttributeHandle<Type> customHandle;
+		CustomAttrHandle customHandle;
 	};
 
 	class FaceIterator {
@@ -178,7 +184,7 @@ public:
 	}
 
 	template < class AttributeHandle >
-	void remove(AttributeHandle &attr) {
+	void remove(AttributeHandle& attr) {
 		// Remove from both lists
 		m_meshData.remove_property(attr.omHandle);
 		select_list<AttributeHandle>().remove(attr.customHandle);
@@ -187,16 +193,17 @@ public:
 	template < class AttrHandle >
 	std::optional<AttrHandle> find(const std::string& name) {
 		using Type = typename AttrHandle::Type;
-		using Attribute = typename AttrHandle::Attribute;
 
 		typename AttrHandle::OmAttrHandle attrHandle;
 		if(!m_meshData.get_property_handle(attrHandle, name))
 			return std::nullopt;
 		// Find attribute in custom list as 
 		auto opt = select_list<AttrHandle>().find<Type>(name);
-		mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
-				   "property in OpenMesh but not in our custom list");
-		return { attrHandle, opt.value() };
+		mAssert(opt.has_value());
+		return AttrHandle{
+			attrHandle,
+			opt.value()
+		};
 	}
 
 	template < class T >
@@ -244,10 +251,10 @@ public:
 	 * Returns both a handle to the first added vertex as well as the number of
 	 * read vertices.
 	 */
-	VertexBulkReturn add_bulk(std::size_t count, std::istream& pointStream,
-							  std::istream& normalStream, std::istream& uvStream);
-	VertexBulkReturn add_bulk(std::size_t count, std::istream& pointStream,
-							  std::istream& normalStream, std::istream& uvStream,
+	VertexBulkReturn add_bulk(std::size_t count, util::IByteReader& pointStream,
+							  util::IByteReader& normalStream, util::IByteReader& uvStream);
+	VertexBulkReturn add_bulk(std::size_t count, util::IByteReader& pointStream,
+							  util::IByteReader& normalStream, util::IByteReader& uvStream,
 							  const ei::Box& boundingBox);
 	/**
 	 * Bulk-loads the given attribute starting at the given vertex.
@@ -256,15 +263,14 @@ public:
 	 */
 	template < class Type >
 	std::size_t add_bulk(Attribute<Type>& attribute, const VertexHandle& startVertex,
-						 std::size_t count, std::istream& attrStream) {
+						 std::size_t count, util::IByteReader& attrStream) {
 		mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData.n_vertices());
 		// Cap the number of attributes
 		const std::size_t actualCount = std::min(m_meshData.n_vertices() - static_cast<std::size_t>(startVertex.idx()),
 												 count);
 		// Read the attribute from the stream
-		attribute.restore(attrStream, static_cast<std::size_t>(startVertex.idx()), actualCount);
-		const std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
-		return actuallyRead;
+		return attribute.restore(attrStream,
+								 static_cast<std::size_t>(startVertex.idx()), actualCount);
 	}
 	/**
 	 * Bulk-loads the given attribute starting at the given face.
@@ -273,21 +279,20 @@ public:
 	 */
 	template < class Type >
 	std::size_t add_bulk(Attribute<Type>& attribute, const FaceHandle& startFace,
-						 std::size_t count, std::istream& attrStream) {
+						 std::size_t count, util::IByteReader& attrStream) {
 		mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData.n_faces());
 		// Cap the number of attributes
 		std::size_t actualCount = std::min(m_meshData.n_faces() - static_cast<std::size_t>(startFace.idx()),
 										   count);
 		// Read the attribute from the stream
-		attribute.restore(attrStream, static_cast<std::size_t>(startFace.idx()), actualCount);
-		std::size_t actuallyRead = static_cast<std::size_t>(attrStream.gcount()) / sizeof(Type);
-		return actuallyRead;
+		return attribute.restore(attrStream,
+								 static_cast<std::size_t>(startFace.idx()), actualCount);
 	}
 	// Also performs bulk-load for an attribute, but aquires it first.
 	template < class T >
 	std::size_t add_bulk(const VertexAttributeHandle<T>& attrHandle,
 						 const VertexHandle& startVertex, std::size_t count,
-						 std::istream& attrStream) {
+						 util::IByteReader& attrStream) {
 		mAssert(attrHandle.omHandle.is_valid());
 		Attribute<T>& attribute = this->aquire(attrHandle);
 		return add_bulk(attribute, startVertex, count, attrStream);
@@ -296,8 +301,8 @@ public:
 	template < class T >
 	std::size_t add_bulk(const FaceAttributeHandle<T>& attrHandle,
 						 const FaceHandle& startFace, std::size_t count,
-						 std::istream& attrStream) {
-		mAssert(attrHandle.is_valid());
+						 util::IByteReader& attrStream) {
+		mAssert(attrHandle.omHandle.is_valid());
 		Attribute<T>& attribute = this->aquire(attrHandle);
 		return add_bulk(attribute, startFace, count, attrStream);
 	}
@@ -368,12 +373,24 @@ public:
 		return m_boundingBox;
 	}
 
+	std::size_t get_vertex_count() const noexcept {
+		return m_meshData.n_vertices();
+	}
+
+	std::size_t get_edge_count() const noexcept {
+		return m_meshData.n_edges();
+	}
+
 	std::size_t get_triangle_count() const noexcept {
 		return m_triangles;
 	}
 
 	std::size_t get_quad_count() const noexcept {
 		return m_quads;
+	}
+
+	std::size_t get_face_count() const noexcept {
+		return m_meshData.n_faces();
 	}
 
 private:

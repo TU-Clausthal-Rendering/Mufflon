@@ -38,7 +38,7 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialInd
 	return hdl;
 }
 
-Spheres::BulkReturn Spheres::add_bulk(std::size_t count, std::istream& radPosStream) {
+Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radPosStream) {
 	std::size_t start = m_attributes.get_size();
 	SphereHandle hdl(start);
 	m_attributes.resize(start + count);
@@ -54,7 +54,7 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, std::istream& radPosStr
 	return { hdl, readRadPos };
 }
 
-Spheres::BulkReturn Spheres::add_bulk(std::size_t count, std::istream& radPosStream,
+Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radPosStream,
 									  const ei::Box& boundingBox) {
 	std::size_t start = m_attributes.get_size();
 	SphereHandle hdl(start);

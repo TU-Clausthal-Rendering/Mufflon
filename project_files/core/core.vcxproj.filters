@@ -318,6 +318,9 @@
     <ClInclude Include="..\..\src\export\interface.h">
       <Filter>Source Files\export</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\byte_io.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">

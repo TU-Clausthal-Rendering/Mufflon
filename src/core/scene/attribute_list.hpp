@@ -6,6 +6,7 @@
 #include "export/api.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
+#include "util/byte_io.hpp"
 #include <istream>
 #include <ostream>
 #include <cstdlib>
@@ -46,10 +47,9 @@ public:
 
 	template < class T >
 	class AttributeHandle {
+	public:
 		using Type = T;
-		friend class AttributeList<USES_OPENMESH, DEFAULT_DEVICE>;
 
-	private:
 		AttributeHandle(std::size_t idx) :
 			m_index(idx)
 		{}
@@ -58,6 +58,7 @@ public:
 			return m_index;
 		}
 
+	private:
 		std::size_t m_index;
 	};
 
@@ -132,7 +133,7 @@ public:
 		}
 
 		// Restore the attribute from a stream (CPU only)
-		std::size_t restore(std::istream& stream, std::size_t start, std::size_t count) {
+		std::size_t restore(util::IByteReader& stream, std::size_t start, std::size_t count) {
 			auto& handle = m_handles.template get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
 			std::size_t read = m_pools.template get<AttributePool<Device::CPU, !USES_OPENMESH>>().restore(handle, stream, start, count);
 			if(read > 0u)
@@ -141,7 +142,7 @@ public:
 		}
 
 		// Store the attribute into a stream (CPU only)
-		std::size_t store(std::ostream& stream, std::size_t start, std::size_t count) const {
+		std::size_t store(util::IByteWriter& stream, std::size_t start, std::size_t count) const {
 			const auto& handle = m_handles.template get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
 			return m_pools.template get<AttributePool<Device::CPU, !USES_OPENMESH>>().store(handle, stream, start, count);
 		}

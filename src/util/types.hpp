@@ -44,7 +44,7 @@ public:
 class AngularPdf;
 
 // PDF types. Either per area or per steradians
-class LIBRARY_API AreaPdf {
+class AreaPdf {
 public:
 	__host__ __device__ constexpr AreaPdf() : m_pdf{ 0 } {}
 	__host__ __device__ explicit constexpr AreaPdf(Real pdf) noexcept : m_pdf(pdf) {}
@@ -73,7 +73,7 @@ public:
 private:
 	Real m_pdf = 0.f;
 };
-class LIBRARY_API AngularPdf {
+class AngularPdf {
 public:
 	__host__ __device__ constexpr AngularPdf() : m_pdf{ 0 } {}
 	__host__ __device__ explicit constexpr AngularPdf(Real pdf) noexcept : m_pdf(pdf) {}

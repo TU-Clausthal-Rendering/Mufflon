@@ -150,8 +150,8 @@ Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices,
 					 vertices[3u], idx);
 }
 
-Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& pointStream,
-											  std::istream& normalStream, std::istream& uvStream) {
+Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
+											  util::IByteReader& normalStream, util::IByteReader& uvStream) {
 	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
 	std::size_t start = m_meshData.n_vertices();
 	VertexHandle hdl(static_cast<int>(start));
@@ -173,8 +173,8 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& p
 	return {hdl, readPoints, readNormals, readUvs};
 }
 
-Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, std::istream& pointStream,
-											  std::istream& normalStream, std::istream& uvStream,
+Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
+											  util::IByteReader& normalStream, util::IByteReader& uvStream,
 											  const ei::Box& boundingBox) {
 	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
 	std::size_t start = m_meshData.n_vertices();

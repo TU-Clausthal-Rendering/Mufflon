@@ -13,12 +13,12 @@ namespace mufflon::scene {
  * This class represents a scenario, meaning a subset of world features.
  * It contains mappings for instances/objects and materials.
  */
-class LIBRARY_API Scenario {
+class Scenario {
 public:
 	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
 
-	Scenario(std::string name, ei::IVec2 resolution, CameraHandle camera) :
-		m_name(name), m_resolution(resolution), m_camera(camera)
+	Scenario(std::string name) :
+		m_name(name)
 	{}
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
@@ -104,8 +104,8 @@ private:
 	std::vector<std::string_view> m_lightNames;
 
 	std::size_t m_globalLodLevel = 0u;
-	ei::IVec2 m_resolution;
-	CameraHandle m_camera;
+	ei::IVec2 m_resolution = {};
+	CameraHandle m_camera = nullptr;
 	// TODO: material properties
 
 	// Object blacklisting and other custom traits

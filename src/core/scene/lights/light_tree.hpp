@@ -123,7 +123,7 @@ struct LightTree {
 };
 
 #ifndef __CUDACC__
-class LIBRARY_API LightTreeBuilder {
+class LightTreeBuilder {
 public:
 	LightTreeBuilder();
 	~LightTreeBuilder();

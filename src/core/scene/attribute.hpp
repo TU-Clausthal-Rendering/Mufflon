@@ -3,6 +3,7 @@
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "export/api.hpp"
+#include "util/byte_io.hpp"
 #include "util/array_wrapper.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -243,28 +244,32 @@ public:
 
 	// Read the attribute between start and start+count from the stream
 	template < class T >
-	std::size_t restore(const AttributeHandle<T>& hdl, std::istream& stream, std::size_t start, std::size_t count) {
+	std::size_t restore(const AttributeHandle<T>& hdl, util::IByteReader& stream,
+						std::size_t start, std::size_t count) {
 		mAssert(hdl.index() < m_attribs.size());
 		if(start >= m_attribLength)
 			return 0u;
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return 0u;
-		std::size_t bytes = std::min(sizeof(T) * count, m_attribs[hdl.index()].length - sizeof(T)*start);
-		stream.read(&m_memoryBlock[m_attribs[hdl.index()].offset + sizeof(T)*start], bytes);
-		return static_cast<std::size_t>(stream.gcount()) / sizeof(T);
+		std::size_t bytes = std::min(sizeof(T) * count,
+									 m_attribs[hdl.index()].length - sizeof(T)*start);
+		return stream.read(&m_memoryBlock[m_attribs[hdl.index()].offset + sizeof(T)*start],
+						   bytes) / sizeof(T);
 	}
 
 	// Write the attribute to the stream
 	template < class T >
-	std::size_t store(const AttributeHandle<T>& hdl, std::ostream& stream, std::size_t start, std::size_t count) const {
+	std::size_t store(const AttributeHandle<T>& hdl, util::IByteWriter& stream,
+					  std::size_t start, std::size_t count) const {
 		mAssert(hdl.index() < m_attribs.size());
 		if(start >= m_attribLength)
 			return 0u;
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return 0u;
-		std::size_t bytes = std::min(sizeof(T) * count, m_attribs[hdl.index()].length - sizeof(T)*start);
-		stream.write(&m_memoryBlock[m_attribs[hdl.index()].offset + sizeof(T)*start], bytes);
-		return bytes / sizeof(T);
+		std::size_t bytes = std::min(sizeof(T) * count,
+									 m_attribs[hdl.index()].length - sizeof(T)*start);
+		return stream.write(&m_memoryBlock[m_attribs[hdl.index()].offset + sizeof(T)*start],
+							bytes) / sizeof(T);
 	}
 
 	// Unloads the attribute pool from the device
@@ -498,7 +503,8 @@ public:
 
 	// Read the attribute between start and start+count from the stream
 	template < class T >
-	std::size_t restore(const AttributeHandle<T>& hdl, std::istream& stream, std::size_t start, std::size_t count) {
+	std::size_t restore(const AttributeHandle<T>& hdl, util::IByteReader& stream,
+						std::size_t start, std::size_t count) {
 		mAssert(hdl.index() < m_attributes.size());
 		if(start >= m_attribLength)
 			return 0u;
@@ -506,13 +512,14 @@ public:
 			return 0u;
 		auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
 		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
-		stream.read(reinterpret_cast<char*>(&prop.data_vector().data()[start]), bytes);
-		return static_cast<std::size_t>(stream.gcount()) / sizeof(T);
+		return stream.read(reinterpret_cast<char*>(&prop.data_vector().data()[start]),
+						   bytes) / sizeof(T);
 	}
 
 	// Write the attribute to the stream
 	template < class T >
-	std::size_t store(const AttributeHandle<T>& hdl, std::ostream& stream, std::size_t start, std::size_t count) const {
+	std::size_t store(const AttributeHandle<T>& hdl, util::IByteWriter& stream,
+					  std::size_t start, std::size_t count) const {
 		mAssert(hdl.index() < m_attributes.size());
 		if(start >= m_attribLength)
 			return 0u;
@@ -520,8 +527,8 @@ public:
 			return 0u;
 		const auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
 		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
-		stream.write(reinterpret_cast<const char*>(&prop.data_vector().data()[start]), bytes);
-		return bytes / sizeof(T);
+		return stream.write(reinterpret_cast<const char*>(&prop.data_vector().data()[start]),
+							bytes) / sizeof(T);
 	}
 
 	// Unloads the attribute pool from the device
@@ -575,12 +582,12 @@ void synchronize(AttributePool<changedDev, changedOwns>& changed, AttributePool<
 }
 
 template <>
-void LIBRARY_API AttributePool<Device::CPU, true>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
+void AttributePool<Device::CPU, true>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
 template <>
-void LIBRARY_API AttributePool<Device::CPU, false>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
+void AttributePool<Device::CPU, false>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
 template <>
-void LIBRARY_API AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(AttributePool<Device::CPU, true>& pool);
+void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(AttributePool<Device::CPU, true>& pool);
 template <>
-void LIBRARY_API AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool);
+void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool);
 
 } // namespace mufflon::scene

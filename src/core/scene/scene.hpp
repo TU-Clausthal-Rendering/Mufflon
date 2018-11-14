@@ -19,7 +19,7 @@ namespace mufflon::scene {
  * Main class on the data side.
  * Holds all data related to a scene: materials, cameras and their paths, geometry etc.
  */
-class LIBRARY_API Scene {
+class Scene {
 public:
 	Scene() = default;
 	Scene(const Scene&) = default;

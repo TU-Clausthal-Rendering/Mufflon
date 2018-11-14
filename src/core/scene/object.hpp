@@ -23,7 +23,7 @@ namespace mufflon::scene {
  * It contains the geometric data as well as any custom attribute such as normals, importance, etc.
  * It is also responsible for storing meta-data such as animations and LoD levels.
  */
-class LIBRARY_API Object {
+class Object {
 public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
@@ -67,17 +67,17 @@ public:
 	// Requests an attribute for the geometry type.
 	template < class Geom, class Type >
 	auto request(const std::string& name) {
-		return m_geometryData.template get<Geom>().request(name);
+		return m_geometryData.template get<Geom>().request<Type>(name);
 	}
 	// Removes an attribute for the geometry type.
 	template < class Geom, class AttributeHandle >
-	void remove(const AttributeHandle& handle) {
+	void remove(AttributeHandle& handle) {
 		m_geometryData.template get<Geom>().remove(handle);
 	}
 	// Attempts to find an attribute by name.
-	template < class Geom >
+	template < class Geom, class T >
 	auto find(const std::string& name) {
-		m_geometryData.template get<Geom>().find(name);
+		return m_geometryData.template get<Geom>().find<T>(name);
 	}
 	/**
 	 * Aquires a reference to an attribute, valid until the attribute gets removed.
@@ -127,7 +127,7 @@ public:
 
 	// Grants direct access to the mesh data (const only).
 	template < class Geom >
-	const auto& get_geometry() {
+	const auto& get_geometry() const {
 		return m_geometryData.template get<Geom>();
 	}
 

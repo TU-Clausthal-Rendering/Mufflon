@@ -39,6 +39,7 @@ public:
 	}
 };
 
+/*
 void test_renderer() {
 	//mufflon::renderer::GpuPathTracer gpu;
 	//gpu.run();
@@ -466,17 +467,17 @@ void test_scene_creation() {
 		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
 		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 }
-
+*/
 
 int main() {
-	test_allocator();
+	/*test_allocator();
 	test_polygon();
 	test_sphere();
 	test_custom_attributes();
 	test_object();
 	test_scene_creation();
 	test_lighttree();
-	test_renderer();
+	test_renderer();*/
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();
