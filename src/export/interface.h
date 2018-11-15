@@ -43,18 +43,16 @@ typedef struct {
 } IVec2;
 
 typedef enum {
+	ATTR_CHAR,
+	ATTR_UCHAR,
+	ATTR_SHORT,
+	ATTR_USHORT,
 	ATTR_INT,
-	ATTR_IVEC2,
-	ATTR_IVEC3,
-	ATTR_IVEC4,
 	ATTR_UINT,
-	ATTR_UVEC2,
-	ATTR_UVEC3,
-	ATTR_UVEC4,
+	ATTR_LONG,
+	ATTR_ULONG,
 	ATTR_FLOAT,
-	ATTR_VEC2,
-	ATTR_VEC3,
-	ATTR_VEC4,
+	ATTR_DOUBLE,
 	ATTR_COUNT
 } AttributeType;
 
@@ -74,15 +72,21 @@ typedef enum {
 } LightType;
 
 typedef struct {
+	AttributeType type;
+	uint32_t rows;
+	uint32_t columns;
+} AttribDesc;
+
+typedef struct {
 	int32_t openMeshIndex;
 	int32_t customIndex;
-	AttributeType type;
+	AttribDesc type;
 	bool face;
 } PolygonAttributeHandle;
 
 typedef struct {
 	int32_t index;
-	AttributeType type;
+	AttribDesc type;
 } SphereAttributeHandle;
 
 // Typedefs for return values
@@ -110,20 +114,20 @@ LIBRARY_API bool polygon_resize(ObjectHdl obj, size_t vertices, size_t edges,
 								size_t faces);
 LIBRARY_API PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj,
 																	const char* name,
-																	AttributeType type);
+																	AttribDesc type);
 LIBRARY_API PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 																  const char* name,
-																  AttributeType type);
+																  AttribDesc type);
 LIBRARY_API bool polygon_remove_vertex_attribute(ObjectHdl obj,
 												 const PolygonAttributeHandle* hdl);
 LIBRARY_API bool polygon_remove_face_attribute(ObjectHdl obj,
 											   const PolygonAttributeHandle* hdl);
 LIBRARY_API PolygonAttributeHandle polygon_find_vertex_attribute(ObjectHdl obj,
 																 const char* name,
-																 AttributeType type);
+																 AttribDesc type);
 LIBRARY_API PolygonAttributeHandle polygon_find_face_attribute(ObjectHdl obj,
 															   const char* name,
-															   AttributeType type);
+															   AttribDesc type);
 LIBRARY_API VertexHdl polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv);
 LIBRARY_API FaceHdl polygon_add_triangle(ObjectHdl obj, UVec3 vertices);
 LIBRARY_API FaceHdl polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
@@ -140,22 +144,18 @@ LIBRARY_API VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, 
 										Vec3 min, Vec3 max, size_t* pointsRead,
 										size_t* normalsRead, size_t* uvsRead);
 LIBRARY_API bool polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-											  VertexHdl vertex, AttributeType type,
-											  void* value);
+											  VertexHdl vertex, void* value);
 LIBRARY_API bool polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-											FaceHdl face, AttributeType type,
-											void* value);
+											FaceHdl face, void* value);
 LIBRARY_API bool polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx);
 LIBRARY_API size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj,
 													 const PolygonAttributeHandle* attr,
-													 VertexHdl startVertex,
-													 AttributeType type,
+													 VertexHdl startVertex, AttribDesc type,
 													 size_t count, FILE* stream);
 LIBRARY_API size_t polygon_set_face_attribute_bulk(ObjectHdl obj,
 												   const PolygonAttributeHandle* attr,
-												   FaceHdl startFace,
-												   AttributeType type,
-												   size_t count, FILE* stream);
+												   FaceHdl startFace, size_t count,
+												   FILE* stream);
 LIBRARY_API size_t polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t count,
 												 FILE* stream);
 LIBRARY_API size_t polygon_get_vertex_count(ObjectHdl obj);
@@ -169,11 +169,11 @@ LIBRARY_API bool polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
 LIBRARY_API bool spheres_resize(ObjectHdl obj, size_t count);
 LIBRARY_API SphereAttributeHandle spheres_request_attribute(ObjectHdl obj,
 															const char* name,
-															AttributeType type);
+															AttribDesc type);
 LIBRARY_API bool spheres_remove_attribute(ObjectHdl obj, const SphereAttributeHandle* hdl);
 LIBRARY_API SphereAttributeHandle spheres_find_attribute(ObjectHdl obj,
 														 const char* name,
-														 AttributeType type);
+														 AttribDesc type);
 LIBRARY_API SphereHdl spheres_add_sphere(ObjectHdl obj, Vec3 point, float radius);
 LIBRARY_API SphereHdl spheres_add_sphere_material(ObjectHdl obj, Vec3 point,
 													 float radius, MatIdx idx);
@@ -183,13 +183,11 @@ LIBRARY_API SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 													  FILE* stream, Vec3 min, Vec3 max,
 													  size_t* readSpheres);
 LIBRARY_API bool spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
-									   SphereHdl sphere, AttributeType type,
-									   void* value);
+									   SphereHdl sphere, void* value);
 LIBRARY_API bool spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere,
 										  MatIdx idx);
 LIBRARY_API size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* attr,
-											  SphereHdl startSphere,
-											  AttributeType type, size_t count,
+											  SphereHdl startSphere, size_t count,
 											  FILE* stream);
 LIBRARY_API size_t spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere,
 												 size_t count, FILE* stream);
@@ -200,6 +198,7 @@ LIBRARY_API bool spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
 LIBRARY_API ObjectHdl world_create_object();
 LIBRARY_API InstanceHdl world_create_instance(ObjectHdl obj);
 LIBRARY_API ScenarioHdl world_create_scenario(const char* name);
+LIBRARY_API ScenarioHdl world_find_scenario(const char* name);
 // TODO: add more materials (and material parameters)
 LIBRARY_API MaterialHdl world_add_lambert_material(const char* name);
 // TODO: add more cameras

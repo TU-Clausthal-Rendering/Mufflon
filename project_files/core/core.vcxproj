@@ -152,6 +152,12 @@
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Label="LLVM" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClangClAdditionalOptions>-Wno-comments -Wno-unknown-pragmas</ClangClAdditionalOptions>
+  </PropertyGroup>
+  <PropertyGroup Label="LLVM" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClangClAdditionalOptions>-Wno-comments -Wno-unknown-pragmas</ClangClAdditionalOptions>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -164,6 +170,8 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /D "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
@@ -176,6 +184,7 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
     <Link>
       <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
     </Link>
     <CudaCompile>
       <Include>
@@ -205,6 +214,7 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

@@ -9,6 +9,8 @@
 #include <chrono>
 #include <execution>
 
+#include "ei/3dtypes.hpp"
+#include "ei/vector.hpp"
 #include "core/memory/allocator.hpp"
 #include "export/interface.h"
 
@@ -60,7 +62,8 @@ void test_renderer() {
 	//gpu.run();
 }*/
 
-void test_lighttree() {
+void test_lights() {
+	std::cout << "Testing lights" << std::endl;
 	auto errorCheck = [](bool cond) {
 		if(!cond)
 			throw std::runtime_error("Failed condition");
@@ -123,170 +126,155 @@ void test_lighttree() {
 		increment_string(spotName);
 		increment_string(dirName);
 	}
+}
 
+void test_polygon() {
+	std::cout << "Testing polygons" << std::endl;
+	bool success = false;
+
+	ObjectHdl obj = world_create_object();
+	mAssert(obj != nullptr);
+	{
+		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u, 1u });
+		mAssert(hdl0.customIndex != INVALID_INDEX);
+		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_USHORT, 3u, 3u });
+		mAssert(hdl1.customIndex != INVALID_INDEX);
+		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_DOUBLE, 8u, 1u });
+		mAssert(hdl2.customIndex != INVALID_INDEX);
+		ei::Matrix<float, 1u, 1u> m0{ 25.f };
+		ei::Matrix<unsigned short, 3u, 3u> m1{
+			1, 2, 3,
+			4, 5, 6,
+			7, 8, 9
+		};
+		ei::Matrix<double, 8u, 1u> m2{ 2., 4., 6., 8., 10., 12., 14., 16. };
+
+		auto v0 = polygon_add_vertex(obj, { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 0.f });
+		auto v1 = polygon_add_vertex(obj, { 1.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 1.f, 0.f });
+		auto v2 = polygon_add_vertex(obj, { 0.f, 1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 1.f });
+		mAssert(v0 != INVALID_INDEX && v1 != INVALID_INDEX && v2 != INVALID_INDEX);
+		FaceHdl f0 = polygon_add_triangle_material(obj, {
+			static_cast<uint32_t>(v0),
+			static_cast<uint32_t>(v1),
+			static_cast<uint32_t>(v2)
+		}, 2u);
+		mAssert(f0 >= 0);
+		success = polygon_set_vertex_attribute(obj, &hdl0, v0, &m0);
+		mAssert(success);
+		success = polygon_set_vertex_attribute(obj, &hdl1, v1, &m1);
+		mAssert(success);
+		success = polygon_set_face_attribute(obj, &hdl2, f0, &m2);
+		mAssert(success);
+		success = polygon_set_material_idx(obj, f0, 3u);
+		mAssert(success);
+
+		// TODO: read back attributes
+
+		success = polygon_remove_vertex_attribute(obj, &hdl0);
+		mAssert(success);
+		success = polygon_remove_vertex_attribute(obj, &hdl1);
+		mAssert(success);
+		success = polygon_remove_face_attribute(obj, &hdl2);
+		mAssert(success);
+
+		// TODO: test bulk functions as well
+		FILE* pointStream = nullptr;
+		FILE* normalStream = nullptr;
+		FILE* uvStream = nullptr;
+		FILE* matStream = nullptr;
+		std::size_t vertexCount = 4u;
+		std::size_t faceCount = 1u;
+		std::size_t pointsRead, normalsRead, uvsRead;
+
+		VertexHdl bv0 = polygon_add_vertex_bulk(obj, vertexCount, pointStream, normalStream, uvStream,
+												&pointsRead, &normalsRead, &uvsRead);
+		mAssert(bv0 != INVALID_INDEX);
+		FaceHdl f1 = polygon_add_quad(obj, {
+			static_cast<uint32_t>(bv0),
+			static_cast<uint32_t>(bv0 + 1),
+			static_cast<uint32_t>(bv0 + 2),
+			static_cast<uint32_t>(bv0 + 3),
+		});
+		mAssert(f1 != INVALID_INDEX);
+		std::size_t matCount = polygon_set_material_idx_bulk(obj, f1, faceCount,
+														  matStream);
+		mAssert(matCount != INVALID_SIZE);
+
+		ei::Box aabb;
+		spheres_get_bounding_box(obj, reinterpret_cast<Vec3*>(&aabb.min),
+								 reinterpret_cast<Vec3*>(&aabb.max));
+		std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
+			<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
+			<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
+	}
+
+	success = world_create_instance(obj);
+	mAssert(success);
+}
+
+void test_sphere() {
+	std::cout << "Testing spheres" << std::endl;
+	bool success = false;
+
+	ObjectHdl obj = world_create_object();
+	mAssert(obj != nullptr);
+	{
+		auto hdl0 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_INT, 1u, 1u });
+		mAssert(hdl0.index != INVALID_INDEX);
+		auto hdl1 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_UCHAR, 1u, 4u });
+		mAssert(hdl1.index != INVALID_INDEX);
+		ei::Matrix<int, 1u, 1u> m0{ 25.f };
+		ei::Matrix<unsigned char, 1u, 4u> m1{ 3u, 6u, 9u, 12u };
+		auto s0 = spheres_add_sphere(obj, { 0.f, 0.f, 0.f }, 55.f);
+		mAssert(s0 != INVALID_INDEX);
+
+		success = spheres_set_attribute(obj, &hdl0, s0, &m0);
+		mAssert(success);
+		success = spheres_set_attribute(obj, &hdl1, s0, &m1);
+		mAssert(success);
+		success = spheres_set_material_idx(obj, s0, 13u);
+		mAssert(success);
+
+		FILE* sphereStream = nullptr;
+		FILE* matStream = nullptr;
+		std::size_t sphereCount = 4u;
+		std::size_t spheresRead;
+		SphereHdl bs0 = spheres_add_sphere_bulk(obj, sphereCount, sphereStream, &spheresRead);
+		mAssert(bs0 != INVALID_INDEX);
+		std::size_t matsRead = spheres_set_material_idx_bulk(obj, bs0, sphereCount, matStream);
+		mAssert(matsRead != INVALID_SIZE);
+
+		ei::Box aabb;
+		spheres_get_bounding_box(obj, reinterpret_cast<Vec3*>(&aabb.min),
+								 reinterpret_cast<Vec3*>(&aabb.max));
+		std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
+			<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
+			<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
+	}
+
+	success = world_create_instance(obj);
+	mAssert(success);
+}
+
+void test_scene() {
+	std::cout << "Testing scene" << std::endl;
+	bool success = false;
+
+	ScenarioHdl scenario = world_find_scenario("TestScenario");
+	mAssert(scenario != nullptr);
 	SceneHdl scene = world_load_scenario(scenario);
 	mAssert(scene != nullptr);
-	std::cout << "Scene camera: " << scene_get_camera(scene) << std::endl;
+	ei::Box aabb;
+	success = scene_get_bounding_box(scene, reinterpret_cast<Vec3*>(&aabb.min),
+									 reinterpret_cast<Vec3*>(&aabb.max));
+	mAssert(success);
+
+	std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
+		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
+		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 }
 
-/*void test_lighttree() {
-	using namespace lights;
-
-	std::mt19937_64 rng(std::random_device{}());
-	std::uniform_int_distribution<std::uint64_t> intDist;
-	std::uniform_real_distribution<float> floatDist;
-	std::vector<Photon> photons(1000000u);
-	std::vector<NextEventEstimation> nees(1000000u);
-	std::size_t lightCount = 10000u;
-
-	auto testLights = [&rng, &photons, &nees, intDist, floatDist](std::vector<PositionalLights> posLights,
-									   std::vector<DirectionalLight> dirLights,
-									   const ei::Box& bounds,
-									   std::optional<textures::TextureHandle> envLight = std::nullopt)
-	{
-		LightTreeBuilder tree;
-		tree.build(std::move(posLights), std::move(dirLights), bounds, envLight);
-
-		using namespace std::chrono;
-		const auto& lightTree = tree.aquire_tree<Device::CPU>();
-
-		auto t0 = high_resolution_clock::now();
-#pragma omp parallel for
-		for(long long i = 0u; i < static_cast<long long>(photons.size()); ++i) {
-			photons[i] = emit(lightTree, i, photons.size(), intDist(rng),
-							  bounds, { floatDist(rng), floatDist(rng),
-							  floatDist(rng), floatDist(rng) });
-		}
-		auto t1 = high_resolution_clock::now();
-
-		auto t2 = high_resolution_clock::now();
-#pragma omp parallel for
-		for(long long i = 0u; i < static_cast<long long>(nees.size()); ++i) {
-			nees[i] = connect(lightTree, i, photons.size(), intDist(rng),
-							  ei::Vec3{floatDist(rng), floatDist(rng), floatDist(rng)},
-							  bounds, { floatDist(rng), floatDist(rng),
-										floatDist(rng), floatDist(rng) },
-							  [](const ei::Vec3& pos, const ei::Vec3& leftPos, const ei::Vec3& rightPos,
-								 const float leftFlux, const float rightFlux) {
-									return leftFlux / (leftFlux + rightFlux);
-								});
-		}
-		auto t3 = high_resolution_clock::now();
-
-		Photon posPhotons = std::reduce(std::execution::par_unseq, photons.cbegin(),
-										photons.cend(), Photon{ {}, {}, {} },
-										 [](Photon init, const Photon& photon) {
-			init.pos.position += photon.pos.position;
-			return init;
-		});
-		NextEventEstimation posNees = std::reduce(std::execution::par_unseq, nees.cbegin(),
-												  nees.cend(), NextEventEstimation{ {}, {}, {} },
-											   [](NextEventEstimation init,
-												  const NextEventEstimation& photon) {
-			init.pos.position += photon.pos.position;
-			return init;
-		});
-
-		std::cout << "[" << (posPhotons.pos.position[0] + posNees.pos.position[0]) << "] (" << photons.size() << " photons, "
-			<< duration_cast<milliseconds>(t1 - t0).count() << "|"
-			<< duration_cast<milliseconds>(t3 - t2).count() << "ms)" << std::endl;
-	};
-	
-	float posScale = 10.f;
-	float intensityScale = 20.f;
-	ei::Box bounds{ posScale * ei::Vec3{-1, -1, -1}, posScale * ei::Vec3{1, 1, 1} };
-	std::vector<PositionalLights> pointLights(lightCount);
-	std::vector<PositionalLights> spotLights(lightCount);
-	std::vector<PositionalLights> areaTriLights(lightCount);
-	std::vector<PositionalLights> areaQuadLights(lightCount);
-	std::vector<PositionalLights> areaSphereLights(lightCount);
-	std::vector<DirectionalLight> dirLights(lightCount);
-
-	{ // Test point lights
-		for(auto& light : pointLights) {
-			light = PointLight{
-				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-			};
-		}
-		std::cout << "Point lights: ";
-		testLights(pointLights, {}, bounds);
-	}
-	{ // Test spot lights
-		for(auto& light : spotLights) {
-			float angle = floatDist(rng);
-			light = SpotLight{
-				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				ei::packOctahedral32(ei::normalize(ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) })),
-				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				__float2half(floatDist(rng)), __float2half(std::min(angle, floatDist(rng)))
-			};
-		}
-		std::cout << "Spot lights: ";
-		testLights(spotLights, {}, bounds);
-	}
-	{ // Test triangular area lights
-		for(auto& light : areaTriLights) {
-			light = AreaLightTriangle{
-				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) } },
-				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
-			};
-		}
-		std::cout << "Triangular area lights: ";
-		testLights(areaTriLights, {}, bounds);
-	}
-	{ // Test quad area lights
-		for(auto& light : areaQuadLights) {
-			light = AreaLightQuad{
-				{ posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				  posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) } },
-				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
-			};
-		}
-		std::cout << "Quad area lights: ";
-		testLights(areaQuadLights, {}, bounds);
-	}
-	{ // Test spherical area lights
-		for(auto& light : areaSphereLights) {
-			light = AreaLightSphere{
-				posScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) },
-				floatDist(rng),
-				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
-			};
-		}
-		std::cout << "Spherical lights: ";
-		testLights(areaSphereLights, {}, bounds);
-	}
-	{ // Test directional lights
-		for(auto& light : dirLights) {
-			light = DirectionalLight{
-				ei::normalize(ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }),
-				intensityScale * ei::Vec3{ floatDist(rng), floatDist(rng), floatDist(rng) }
-			};
-		}
-		std::cout << "Directional lights: ";
-		testLights({}, dirLights, bounds);
-	}
-	// TODO: Test envmap light
-
-	// All together
-	std::vector<PositionalLights> posLights(pointLights.size() + spotLights.size()
-											+ areaTriLights.size() + areaQuadLights.size()
-											+ areaSphereLights.size());
-	auto insert = posLights.insert(posLights.begin(), pointLights.cbegin(), pointLights.cend()) + pointLights.size();
-	insert = posLights.insert(insert, spotLights.cbegin(), spotLights.cend()) + pointLights.size();
-	insert = posLights.insert(insert, areaTriLights.cbegin(), areaTriLights.cend()) + spotLights.size();
-	insert = posLights.insert(insert, areaQuadLights.cbegin(), areaQuadLights.cend()) + areaTriLights.size();
-	posLights.insert(insert, areaSphereLights.cbegin(), areaSphereLights.cend());
-	std::cout << "All combined: ";
-	testLights(posLights, dirLights, bounds);
-}
-
-void test_allocator() {
+/*void test_allocator() {
 	std::cout << "Testing custom device allocator." << std::endl;
 
 	mufflon::unique_device_ptr<Device::CPU, CameraParams> p0 =
@@ -309,126 +297,7 @@ void test_allocator() {
 	mAssert(p3 != nullptr);
 }
 
-void test_custom_attributes() {
-	std::cout << "Testing custom attributes (on polygon)" << std::endl;
-
-
-	Polygons poly;
-	
-	{
-		// Empty request->remove
-		auto hdl0 = poly.request<Polygons::VertexAttributeHandle<float>>("test0");
-		auto hdl1 = poly.request<Polygons::VertexAttributeHandle<short>>("test1");
-		auto hdl2 = poly.request<Polygons::FaceAttributeHandle<double>>("test2");
-		auto& attr1 = poly.aquire(hdl1);
-		mAssert(attr1.get_size() == 0);
-		mAssert(attr1.get_elem_size() == sizeof(short));
-		poly.remove(hdl0);
-
-		auto v0 = poly.add(Point(0, 0, 0), Normal(1, 0, 0), UvCoordinate(0, 0));
-		auto v1 = poly.add(Point(1, 0, 0), Normal(1, 0, 0), UvCoordinate(1, 0));
-		auto v2 = poly.add(Point(0, 1, 0), Normal(1, 0, 0), UvCoordinate(0, 1));
-		poly.add(v0, v1, v2);
-		(*poly.get_mat_indices().aquire<>())[0u] = 3u;
-
-		auto& attr2 = poly.aquire(hdl2);
-		(*attr1.aquire())[1] = 5;
-		(*attr2.aquire())[0] = 0.4;
-		mAssert(attr1.get_size() == 3);
-		mAssert(attr2.get_size() == 1);
-		mAssert((*attr1.aquireConst())[1] == 5);
-		mAssert((*attr2.aquireConst())[0] == 0.4);
-
-		poly.remove(hdl0);
-		poly.remove(hdl1);
-		poly.remove(hdl2);
-	}
-}*/
-
-void test_polygon() {
-	std::cout << "Testing polygons" << std::endl;
-
-	ObjectHdl obj = world_create_object();
-	{
-		auto v0 = polygon_add_vertex(obj, { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 0.f });
-		auto v1 = polygon_add_vertex(obj, { 1.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 1.f, 0.f });
-		auto v2 = polygon_add_vertex(obj, { 0.f, 1.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 1.f });
-		mAssert(v0 >= 0 && v1 >= 0 && v2 >= 0);
-		FaceHdl f0 = polygon_add_triangle_material(obj, {
-			static_cast<uint32_t>(v0),
-			static_cast<uint32_t>(v1),
-			static_cast<uint32_t>(v2)
-		}, 2u);
-		mAssert(f0 >= 0);
-		bool success = polygon_set_material_idx(obj, f0, 3u);
-		mAssert(success);
-
-		// TODO: test bulk functions as well
-		FILE* pointStream = nullptr;
-		FILE* normalStream = nullptr;
-		FILE* uvStream = nullptr;
-		FILE* matStream = nullptr;
-		std::size_t vertexCount = 4u;
-		std::size_t faceCount = 1u;
-		std::size_t pointsRead, normalsRead, uvsRead;
-
-		VertexHdl bv0 = polygon_add_vertex_bulk(obj, vertexCount, pointStream, normalStream, uvStream,
-								&pointsRead, &normalsRead, &uvsRead);
-		mAssert(bv0 >= 0);
-		FaceHdl f1 = polygon_add_quad(obj, {
-			static_cast<uint32_t>(bv0),
-			static_cast<uint32_t>(bv0 + 1),
-			static_cast<uint32_t>(bv0 + 2),
-			static_cast<uint32_t>(bv0 + 3),
-		});
-		std::size_t count = polygon_set_material_idx_bulk(obj, f1, faceCount,
-														  matStream);
-		mAssert(count != INVALID_SIZE);
-	}
-}
-
-/*void test_sphere() {
-	std::cout << "Testing spheres" << std::endl;
-
-	Spheres spheres;
-
-	{
-		auto impHandle = spheres.request<int>("importance");
-		auto s0 = spheres.add(Point(0, 0, 0), 55.f);
-		(*spheres.get_mat_indices().aquire<>())[s0] = 13u;
-
-		std::vector<Spheres::Sphere> radPos{ {Point(0,0,1), 5.f}, {Point(1,0,1), 1.f}, {Point(0,1,1), 7.f}, {Point(1,1,1), 3.f} };
-		std::vector<MaterialIndex> mats{ 1u, 3u, 27u, 15u };
-		VectorStream radPosBuffer(radPos);
-		VectorStream matBuffer(mats);
-		std::istream radPosStream(&radPosBuffer);
-		std::istream matStream(&matBuffer);
-
-		auto bs0 = spheres.add_bulk(radPos.size(), radPosStream);
-		spheres.add_bulk(spheres.get_mat_indices(), bs0.handle, mats.size(), matStream);
-		spheres.remove(impHandle);
-	}
-
-	{
-		auto radPos = *spheres.get_spheres().aquireConst();
-		auto matIndices = *spheres.get_mat_indices().aquireConst();
-		std::cout << "Spheres:" << std::endl;
-		for(std::size_t i = 0u; i < spheres.get_spheres().get_size(); ++i)
-			std::cout << "  [" << radPos[i].m_radPos.position[0] << '|'
-			<< radPos[i].m_radPos.position[1] << '|' << radPos[i].m_radPos.position[2]
-			<< "] - " << radPos[i].m_radPos.radius << std::endl;
-		std::cout << "Material indices:" << std::endl;
-		for(std::size_t i = 0u; i < spheres.get_mat_indices().get_size(); ++i)
-			std::cout << "  " << matIndices[i] << std::endl;
-	}
-
-	spheres.synchronize<Device::CUDA>();
-	spheres.unload<Device::CPU>();
-	spheres.synchronize<Device::CPU>();
-	spheres.unload<Device::CUDA>();
-}
-
-void test_object() {
+/*void test_object() {
 	
 	Object obj;
 
@@ -541,8 +410,10 @@ void test_scene_creation() {
 */
 
 int main() {
-	test_lighttree();
 	test_polygon();
+	test_sphere();
+	test_lights();
+	test_scene();
 	/*test_allocator();
 	test_sphere();
 	test_custom_attributes();
