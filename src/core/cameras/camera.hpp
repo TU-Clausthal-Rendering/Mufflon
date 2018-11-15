@@ -1,12 +1,16 @@
 #pragma once
 
 #include "core/scene/types.hpp"
-#include "core/memory/dyntype_memory.hpp"
 #include "core/memory/residency.hpp"
 #include "util/assert.hpp"
 #include <string>
 
-namespace mufflon { namespace cameras {
+namespace mufflon {
+
+// Forward declaration of device
+enum class Device : unsigned char;
+
+namespace cameras {
 
 enum class CameraModel: i32 {
 	PINHOLE,			// Infinite sharp pinhole camera
@@ -142,7 +146,7 @@ struct ProjectionResult {
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 
-} // samespace cameras
+} // namespace cameras
 
 //template<> inline std::size_t predict_size<cameras::CameraParams>() {
 //	mAssertMsg(false, "An instance of an unspecific camera should never be created!");

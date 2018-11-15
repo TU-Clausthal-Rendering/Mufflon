@@ -1,4 +1,5 @@
 #include "scene.hpp"
+#include "accel_struct.hpp"
 
 namespace mufflon::scene {
 

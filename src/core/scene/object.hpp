@@ -1,22 +1,26 @@
 #pragma once
 
-#include "core/memory/residency.hpp"
-#include "export/api.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
+#include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
 #include "util/types.hpp"
-#include "ei/vector.hpp"
-#include "ei/3dtypes.hpp"
 #include "util/log.hpp"
 #include "util/tagged_tuple.hpp"
-#include "accel_struct.hpp"
 #include <climits>
 #include <cstdint>
 #include <memory>
 #include <string>
 
-namespace mufflon::scene {
+namespace mufflon {
+
+// Forward declaration
+enum class Device : unsigned char;
+
+namespace scene {
+
+// Forward declaration
+class IAccelerationStructure;
 
 /**
  * Representation of a scene object.
@@ -100,7 +104,7 @@ public:
 	// Applies tessellation to the geometry type.
 	template < class Geom, class Tessellater, class... Args >
 	void tessellate(Tessellater& tessellater, Args&& ...args) {
-		m_geometryData.template get<Geom>().tessellate(tessellater,std::forward<Args>(args)...);
+		m_geometryData.template get<Geom>().tessellate(tessellater, std::forward<Args>(args)...);
 		m_accelDirty = true;
 	}
 	// Creates a new LoD by applying a decimater to the geomtry type.
@@ -146,7 +150,7 @@ public:
 
 	// Checks if the acceleration structure on one of the system parts has been modified.
 	bool is_accel_dirty(Device res) const noexcept;
-	
+
 	// Checks whether the object currently has a BVH.
 	bool has_accel_structure() const noexcept {
 		return m_accel_struct != nullptr;
@@ -213,4 +217,4 @@ private:
 	// TODO: how to handle the LoDs?
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

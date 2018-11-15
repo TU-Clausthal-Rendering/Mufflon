@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cassert>
-#include <intrin.h>
 #include <iostream>
 
 //#define NO_BREAK_ON_ASSERT
 
 #ifdef _MSC_VER
+#include <intrin.h>
 #ifdef _DEBUG
 #define DEBUG_ENABLED
 #endif // _DEBUG

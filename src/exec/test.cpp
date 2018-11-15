@@ -9,10 +9,11 @@
 #include <chrono>
 #include <execution>
 
+#include "export/interface.h"
 #include "ei/3dtypes.hpp"
 #include "ei/vector.hpp"
 #include "core/memory/allocator.hpp"
-#include "export/interface.h"
+#include "util/assert.hpp"
 
 #define TEST_STREAM false
 
@@ -300,60 +301,6 @@ void test_scene() {
 	mufflon::unique_device_ptr<Device::CUDA, CameraParams> p3 =
 		mufflon::make_udevptr_array<Device::CUDA, CameraParams>(2, CameraModel::FOCUS);
 	mAssert(p3 != nullptr);
-}
-
-/*void test_object() {
-	
-	Object obj;
-
-	// Polygon interface
-	{
-		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
-		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
-		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
-		std::vector<MaterialIndex> mats{ 5u };
-		VectorStream pointBuffer(points);
-		VectorStream normalBuffer(normals);
-		VectorStream uvBuffer(uvs);
-		VectorStream matBuffer(mats);
-		std::istream pointStream(&pointBuffer);
-		std::istream normalStream(&normalBuffer);
-		std::istream uvStream(&uvBuffer);
-		std::istream matStream(&matBuffer);
-
-		auto bv0 = obj.add_bulk<Polygons>(points.size(), pointStream, normalStream, uvStream);
-		auto bf0 = obj.add<Polygons>(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
-							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 1),
-							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 2),
-							OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 3));
-		auto matIndexAttr = obj.get_mat_indices<Polygons>();
-		obj.add_bulk<Polygons>(matIndexAttr, bf0, mats.size(), matStream);
-	}
-
-	// Sphere interface
-	{
-		std::vector<Spheres::Sphere> radPos{ {Point(0,0,1), 5.f}, {Point(1,0,1), 1.f}, {Point(0,1,1), 7.f}, {Point(1,1,1), 3.f} };
-		std::vector<MaterialIndex> mats{ 1u, 3u, 27u, 15u };
-		VectorStream radPosBuffer(radPos);
-		VectorStream matBuffer(mats);
-		std::istream radPosStream(&radPosBuffer);
-		std::istream matStream(&matBuffer);
-
-		auto bs0 = obj.add_bulk<Spheres>(radPos.size(), radPosStream);
-		obj.add_bulk<Spheres>(obj.get_mat_indices<Spheres>(), bs0.handle, mats.size(), matStream);
-	}
-
-	// AABB
-	const ei::Box& aabb = obj.get_bounding_box();
-	std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
-		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
-		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
-
-	// 
-	
-	// Syncing
-	obj.synchronize<Device::CUDA>();
-	obj.unload<Device::CUDA>();
 }*/
 
 int main() {

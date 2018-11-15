@@ -1,17 +1,11 @@
 #pragma once
 
-#include "export/api.hpp"
-#include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
-#include "util/types.hpp"
-#include "util/byte_io.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/attribute_list.hpp"
 #include "util/range.hpp"
-#include "util/byte_io.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
-#include <cstdio>
 #include <tuple>
 #include <optional>
 
@@ -28,6 +22,10 @@ namespace OpenMesh::Decimater{
 template < class Mesh >
 class DecimaterT;
 } // namespace OpenMesh::Decimater
+
+namespace mufflon::util {
+class IByteReader;
+} // namespace mufflon::util
 
 namespace mufflon::scene::geometry {
 

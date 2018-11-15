@@ -3,6 +3,7 @@
 #include "util/types.hpp"
 #include "core/scene/types.hpp"
 #include "texture.hpp"
+#include <vector>
 
 namespace mufflon { namespace scene { namespace textures {
 

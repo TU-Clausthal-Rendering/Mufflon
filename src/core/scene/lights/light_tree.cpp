@@ -4,6 +4,7 @@
 #include "core/cuda/error.hpp"
 #include "ei/3dtypes.hpp"
 #include <cuda_runtime.h>
+#include <algorithm>
 #include <cmath>
 
 namespace mufflon { namespace scene { namespace lights {

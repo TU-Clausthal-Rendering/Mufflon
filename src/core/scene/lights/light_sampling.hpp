@@ -1,11 +1,11 @@
 #pragma once
 
 #include "lights.hpp"
-#include "core/math/sampling.hpp"
+#include "export/api.hpp"
 #include "ei/vector.hpp"
 #include "ei/conversions.hpp"
+#include "core/math/sampling.hpp"
 #include "core/scene/types.hpp"
-#include "export/api.hpp"
 #include <math.h>
 #include <cuda_runtime.h>
 

@@ -1,12 +1,5 @@
 #pragma once
 
-#include "export/api.hpp"
-#include "util/flag.hpp"
-#include "util/tagged_tuple.hpp"
-#include <cuda_runtime_api.h>
-#include <algorithm>
-#include <vector>
-
 namespace mufflon { // There is no memory namespace on purpose
 
 // Contains the possible data locations of the scene (logical devices).

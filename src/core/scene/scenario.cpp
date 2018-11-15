@@ -1,5 +1,6 @@
 #include "scenario.hpp"
 #include "util/log.hpp"
+#include <algorithm>
 
 namespace mufflon::scene {
 

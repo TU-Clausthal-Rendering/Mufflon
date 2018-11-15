@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/scene/types.hpp"
 #include "ei/3dtypes.hpp"
-#include <cuda_runtime.h>
 #include "export/api.hpp"
+#include "core/scene/types.hpp"
+#include <cuda_runtime.h>
 
 namespace mufflon { namespace math {
 

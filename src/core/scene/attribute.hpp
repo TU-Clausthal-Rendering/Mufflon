@@ -34,6 +34,24 @@ public:
 	using Allocator = Alloc;
 
 	MallocAttributePool() = default;
+	MallocAttributePool(const MallocAttributePool&) = delete;
+	MallocAttributePool(MallocAttributePool&& pool) :
+		m_attribs(std::move(pool.m_attribs)),
+		m_size(pool.m_size),
+		m_attribLength(pool.m_attribLength),
+		m_present(pool.m_present),
+		m_memoryBlock(pool.m_memoryBlock)
+	{
+		pool.m_memoryBlock = nullptr;
+	}
+	MallocAttributePool& operator=(const MallocAttributePool&) = delete;
+	MallocAttributePool& operator=(MallocAttributePool&& pool) {
+		m_attribs = pool.m_attribs;
+		m_size = pool.m_size;
+		m_attribLength = pool.m_attribLength;
+		m_present = pool.m_present;
+		std::swap(m_memoryBlock, pool.m_memoryBlock);
+	}
 	virtual ~MallocAttributePool() {
 		if(m_memoryBlock != nullptr)
 			Allocator::free(m_memoryBlock, m_size);
@@ -366,6 +384,13 @@ public:
 	template < class A >
 	friend class MallocAttributePool;
 
+	AttributePool() = default;
+	AttributePool(const AttributePool&) = delete;
+	AttributePool(AttributePool&&) = default;
+	AttributePool& operator=(const AttributePool&) = delete;
+	AttributePool& operator=(AttributePool&&) = default;
+	~AttributePool() = default;
+
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
 		(void)pool;
@@ -385,6 +410,13 @@ public:
 	template < class A >
 	friend class MallocAttributePool;
 
+	AttributePool() = default;
+	AttributePool(const AttributePool&) = delete;
+	AttributePool(AttributePool&&) = default;
+	AttributePool& operator=(const AttributePool&) = delete;
+	AttributePool& operator=(AttributePool&&) = default;
+	~AttributePool() = default;
+
 	template < Device dev, bool owning = true >
 	void synchronize(AttributePool<dev, owning>& pool) {
 		(void)pool;
@@ -403,6 +435,15 @@ public:
 	friend class AttributePool;
 	template < class A >
 	friend class MallocAttributePool;
+
+	AttributePool() = default;
+	AttributePool(const AttributePool&) = delete;
+	AttributePool(AttributePool&&) = default;
+	AttributePool& operator=(const AttributePool&) = delete;
+	AttributePool& operator=(AttributePool&&) = default;
+	~AttributePool() {
+		std::cout << this << std::endl;
+	}
 
 	// Helper class identifying an attribute in the pool
 	template < class T >
@@ -534,7 +575,7 @@ public:
 	// Unloads the attribute pool from the device
 	void unload() {
 		// TODO: is this even possible?
-		throw std::runtime_error("Unloading OpenMesh data is not supported yet");
+		//throw std::runtime_error("Unloading OpenMesh data is not supported yet");
 	}
 
 	template < Device dev, bool owning = true >

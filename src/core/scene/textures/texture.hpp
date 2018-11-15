@@ -4,7 +4,9 @@
 #include "core/memory/accessor.hpp"
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
+#include "util/flag.hpp"
 #include <cuda_runtime.h>
+#include <memory>
 
 namespace mufflon { namespace scene { namespace textures {
 

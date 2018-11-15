@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "util/flag.hpp"
 
 namespace mufflon { // There is no memory namespace on purpose
 

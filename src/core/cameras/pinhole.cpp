@@ -1,4 +1,5 @@
 #include "pinhole.hpp"
+#include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
 
 namespace mufflon::cameras {

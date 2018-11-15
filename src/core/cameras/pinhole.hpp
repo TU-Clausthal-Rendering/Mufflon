@@ -2,6 +2,7 @@
 
 #include "camera.hpp"
 #include "export/api.hpp"
+#include "util/types.hpp"
 #include <ei/3dtypes.hpp>
 #include <cuda_runtime.h>
 

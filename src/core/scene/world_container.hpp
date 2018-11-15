@@ -3,9 +3,8 @@
 #include "object.hpp"
 #include "scenario.hpp"
 #include "scene.hpp"
-#include "lights/lights.hpp"
 #include "handles.hpp"
-#include "export/api.hpp"
+#include "lights/lights.hpp"
 #include <map>
 #include <memory>
 #include <vector>
@@ -24,6 +23,12 @@ public:
 	using SpotLightHandle = std::map<std::string, lights::SpotLight, std::less<>>::iterator;
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, textures::TextureHandle, std::less<>>::iterator;
+
+	WorldContainer(const WorldContainer&) = delete;
+	WorldContainer(WorldContainer&&) = delete;
+	WorldContainer& operator=(const WorldContainer&) = delete;
+	WorldContainer& operator=(WorldContainer&&) = delete;
+	~WorldContainer() = default;
 
 	// Create a new object to be filled
 	ObjectHandle create_object();
@@ -92,6 +97,8 @@ public:
 	}
 
 private:
+	WorldContainer() = default;
+
 	// All objects of the world.
 	std::vector<Object> m_objects;
 	// All instances of the world

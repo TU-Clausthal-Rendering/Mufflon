@@ -22,7 +22,7 @@ using namespace mufflon::scene::geometry;
 #define FUNCTION_NAME __func__
 #define CHECK(x, name, retval)													\
 	do {																		\
-		if(!x) {																	\
+		if(!x) {																\
 			logError("[", FUNCTION_NAME, "] Violated condition (" #name ")");	\
 			return retval;														\
 		}																		\
@@ -439,7 +439,7 @@ bool polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* a
 
 	return switchAttributeType(attr->type, [&object, attr, vertex, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr));
+		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr));
 		(*attribute.template aquire<Device::CPU>())[vertex] = *static_cast<Type*>(value);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
@@ -468,7 +468,7 @@ bool polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* att
 
 	return switchAttributeType(attr->type, [&object, attr, face, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr));
+		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr));
 		(*attribute.template aquire<Device::CPU>())[face] = *static_cast<Type*>(value);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
@@ -742,7 +742,7 @@ bool spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 	return switchAttributeType(attr->type, [&object, attr, sphere, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttr<Type> sphereAttr{ static_cast<size_t>(attr->index) };
-		auto attribute = object.template aquire<Spheres>(sphereAttr);
+		auto& attribute = object.template aquire<Spheres>(sphereAttr);
 		(*attribute.template aquire<Device::CPU>())[sphere] = *static_cast<Type*>(value);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {

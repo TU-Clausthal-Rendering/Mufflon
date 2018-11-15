@@ -1,17 +1,19 @@
 #pragma once
 
-#include "export/api.hpp"
 #include "ei/3dtypes.hpp"
 #include "ei/vector.hpp"
-#include "util/types.hpp"
-#include "util/flag.hpp"
-#include "util/byte_io.hpp"
-#include "core/scene/attribute_list.hpp"
-#include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
-#include <istream>
+#include "core/scene/attribute_list.hpp"
+#include "core/scene/types.hpp"
 #include <tuple>
 #include <vector>
+
+namespace mufflon {
+enum class Device : unsigned char;
+namespace util {
+class IByteReader;
+} // namespace util
+} // namespace mufflon
 
 namespace mufflon::scene::geometry {
 

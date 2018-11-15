@@ -1,13 +1,12 @@
 #pragma once
 
-#include "core/memory/generic_resource.hpp"
-#include "accel_struct.hpp"
 #include "instance.hpp"
-#include "export/api.hpp"
 #include "handles.hpp"
-#include "core/cameras/camera.hpp"
-#include "ei/3dtypes.hpp"
+#include "types.hpp"
+#include "accel_struct.hpp"
 #include "lights/light_tree.hpp"
+#include "core/cameras/camera.hpp"
+#include "core/memory/generic_resource.hpp"
 #include <memory>
 #include <vector>
 
@@ -22,9 +21,9 @@ namespace mufflon::scene {
 class Scene {
 public:
 	Scene() = default;
-	Scene(const Scene&) = default;
+	Scene(const Scene&) = delete;
 	Scene(Scene&&) = default;
-	Scene& operator=(const Scene&) = default;
+	Scene& operator=(const Scene&) = delete;
 	Scene& operator=(Scene&&) = default;
 	~Scene() = default;
 

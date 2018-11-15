@@ -1,11 +1,10 @@
 #pragma once
 
-#include "object.hpp"
-#include "export/api.hpp"
 #include "handles.hpp"
+#include "types.hpp"
 #include <map>
 #include <string_view>
-#include <tuple>
+#include <vector>
 
 namespace mufflon::scene {
 

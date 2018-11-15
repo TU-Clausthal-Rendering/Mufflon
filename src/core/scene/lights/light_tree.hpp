@@ -8,6 +8,8 @@
 #include "core/memory/synchronize.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
+#include "util/flag.hpp"
+#include <vector>
 
 #ifndef __CUDACC__
 #include <optional>

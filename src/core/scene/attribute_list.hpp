@@ -3,17 +3,17 @@
 #include "core/memory/accessor.hpp"
 #include "attribute.hpp"
 #include "core/memory/synchronize.hpp"
-#include "export/api.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
-#include "util/byte_io.hpp"
 #include "util/log.hpp"
-#include <istream>
-#include <ostream>
 #include <cstdlib>
 #include <unordered_map>
 #include <optional>
 #include <vector>
+
+namespace mufflon::util {
+class IByteReader;
+}
 
 namespace mufflon::scene {
 
@@ -41,10 +41,30 @@ public:
 	}
 
 	AttributeList(const AttributeList&) = delete;
-	AttributeList(AttributeList&&) = default;
+	//AttributeList(AttributeList&&) = default;
+	AttributeList(AttributeList&& list) :
+		m_attributes(std::move(list.m_attributes)),
+		m_flags(std::move(list.m_flags)),
+		m_attributePools(std::move(list.m_attributePools)),
+		m_mapping(std::move(list.m_mapping)) {
+		// Manually adjust the attribute references
+		for(auto& attr : m_attributes)
+			if(attr != nullptr)
+				attr->adjust_pool_pointers(m_attributePools);
+	}
 	AttributeList& operator=(const AttributeList&) = delete;
 	AttributeList& operator=(AttributeList&&) = default;
-	~AttributeList() = default;
+	~AttributeList() {
+		// Unload all pools to avoid realloc calls from attribute destructors
+		m_attributePools.for_each([](auto& pool) {
+			pool.unload();
+		});
+		// Ensure that the order of attribute destruction is back-to-front
+		// to avoid unnecessary allocations in the memory pools
+		const std::size_t destroyNAttribs = m_attributes.size();
+		for(std::size_t i = 0; i < destroyNAttribs; ++i)
+			m_attributes.pop_back();
+	}
 
 	template < class T >
 	class AttributeHandle {
@@ -66,7 +86,12 @@ public:
 	// Base type for inheritance
 	class IBaseAttribute {
 	public:
+		friend class AttributeList<USES_OPENMESH, defaultDev>;
 		virtual ~IBaseAttribute() {}
+
+		// Needed to keep the references to moved pools intact
+	protected:
+		virtual void adjust_pool_pointers(AttributePools& pools) noexcept = 0;
 	};
 
 	/**
@@ -77,21 +102,27 @@ public:
 	public:
 		using Type = T;
 		static constexpr bool USES_OPENMESH = useOpenMesh;
+		friend class AttributeList<USES_OPENMESH, defaultDev>;
 
+		// Hide the construction from public eye
 		template < bool openMesh = USES_OPENMESH, typename = std::enable_if_t<!openMesh> >
 		Attribute(AttributePools& pools, util::DirtyFlags<Device>& flags) :
-			m_pools(pools),
+			m_pools(&pools),
 			m_flags(flags) {
 			this->init_impl<0u>();
 		}
-
 		template < bool openMesh = USES_OPENMESH, typename = std::enable_if_t<openMesh> >
 		Attribute(AttributePools& pools, util::DirtyFlags<Device>& flags, OpenMesh::PropertyT<T>& prop) :
-			m_pools(pools),
+			m_pools(&pools),
 			m_handles(),
 			m_flags(flags) {
 			this->init_impl<0u>(prop);
 		}
+
+		Attribute(const Attribute&) = delete;
+		Attribute(Attribute&&) = default;
+		Attribute& operator=(const Attribute&) = delete;
+		Attribute& operator=(Attribute&&) = default;
 
 		~Attribute() {
 			this->destroy_impl<0u>();
@@ -101,7 +132,7 @@ public:
 		template < Device dev = DEFAULT_DEVICE >
 		auto aquire() {
 			this->synchronize<dev>();
-			auto& pool = m_pools.template get<AttributePool<dev, stores_itself<dev>()>>();
+			auto& pool = m_pools->template get<AttributePool<dev, stores_itself<dev>()>>();
 			auto& handle = m_handles.template get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
 			return Accessor<ArrayDevHandle<dev, Type>>{ static_cast<ArrayDevHandle_t<dev, Type>>(pool.aquire(handle)), m_flags };
 		}
@@ -110,7 +141,7 @@ public:
 		template < Device dev = DEFAULT_DEVICE >
 		auto aquireConst() {
 			this->synchronize<dev>();
-			const auto& pool = m_pools.template get<AttributePool<dev, stores_itself<dev>()>>();
+			const auto& pool = m_pools->template get<AttributePool<dev, stores_itself<dev>()>>();
 			const auto& handle = m_handles.template get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
 			return ConstAccessor<ArrayDevHandle<dev, Type>>{ pool.aquireConst(handle) };
 		}
@@ -118,11 +149,11 @@ public:
 		// Synchronizes the attribute pool to the given device
 		template < Device dev = DEFAULT_DEVICE >
 		void synchronize() {
-			mufflon::synchronize<dev>(m_pools, m_flags, m_pools.template get<AttributePool<dev, stores_itself<dev>()>>());
+			mufflon::synchronize<dev>(*m_pools, m_flags, m_pools->template get<AttributePool<dev, stores_itself<dev>()>>());
 		}
 
 		std::size_t get_size() const noexcept {
-			return m_pools.template get<0>().get_size();
+			return m_pools->template get<0>().get_size();
 		}
 
 		constexpr std::size_t get_elem_size() const noexcept {
@@ -136,7 +167,7 @@ public:
 		// Restore the attribute from a stream (CPU only)
 		std::size_t restore(util::IByteReader& stream, std::size_t start, std::size_t count) {
 			auto& handle = m_handles.template get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
-			std::size_t read = m_pools.template get<AttributePool<Device::CPU, !USES_OPENMESH>>().restore(handle, stream, start, count);
+			std::size_t read = m_pools->template get<AttributePool<Device::CPU, !USES_OPENMESH>>().restore(handle, stream, start, count);
 			if(read > 0u)
 				m_flags.mark_changed(Device::CPU);
 			return read;
@@ -145,15 +176,22 @@ public:
 		// Store the attribute into a stream (CPU only)
 		std::size_t store(util::IByteWriter& stream, std::size_t start, std::size_t count) const {
 			const auto& handle = m_handles.template get<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<Type>>();
-			return m_pools.template get<AttributePool<Device::CPU, !USES_OPENMESH>>().store(handle, stream, start, count);
+			return m_pools->template get<AttributePool<Device::CPU, !USES_OPENMESH>>().store(handle, stream, start, count);
+		}
+
+	protected:
+		// We need this for move construction
+		virtual void adjust_pool_pointers(AttributePools& pools) noexcept override {
+			m_pools = &pools;
 		}
 
 	private:
+
 		// Initializes the attribute for all devices
 		template < std::size_t I = 0u >
 		void init_impl() {
 			if constexpr(I < AttributePools::size) {
-				m_handles.template get<I>() = m_pools.template get<I>().template add<Type>();
+				m_handles.template get<I>() = m_pools->template get<I>().template add<Type>();
 				this->init_impl<I + 1u>();
 			}
 		}
@@ -162,7 +200,7 @@ public:
 		template < std::size_t I = 0u >
 		void init_impl(OpenMesh::PropertyT<T>& prop) {
 			if constexpr(I < AttributePools::size) {
-				auto& pool = m_pools.template get<I>();
+				auto& pool = m_pools->template get<I>();
 				constexpr Device DEVICE = std::decay_t<decltype(pool)>::DEVICE;
 				if constexpr(DEVICE == Device::CPU) {
 					m_handles.template get<I>() = pool.template add<Type>(prop);
@@ -177,11 +215,11 @@ public:
 		template < std::size_t I = 0u >
 		void destroy_impl() {
 			if constexpr(I < AttributePools::size) {
-				m_pools.template get<I>().template remove<Type>(m_handles.template get<I>());
+				m_pools->template get<I>().template remove<Type>(m_handles.template get<I>());
 			}
 		}
 
-		AttributePools& m_pools;
+		AttributePools* m_pools;
 		util::TaggedTuple<typename AttributePool<Device::CPU, !USES_OPENMESH>::template AttributeHandle<T>,
 			typename AttributePool<Device::CUDA, true>::template AttributeHandle<T>> m_handles;
 		util::DirtyFlags<Device>& m_flags;
@@ -228,6 +266,7 @@ public:
 	void remove(const AttributeHandle<T>& handle) {
 		if(handle.index() >= m_attributes.size() || m_attributes[handle.index()] == nullptr)
 			return;
+
 		m_attributes[handle.index()].reset();
 		// Since we don't have a bimap, iterate all names
 		for(auto iter = m_mapping.begin(); iter != m_mapping.end(); ++iter) {
@@ -304,9 +343,9 @@ private:
 			return true;
 	}
 
-	AttributePools m_attributePools;
 	std::vector<std::unique_ptr<IBaseAttribute>> m_attributes;
 	util::DirtyFlags<Device> m_flags;
+	AttributePools m_attributePools;
 	std::unordered_map<std::string, std::size_t> m_mapping;
 };
 
