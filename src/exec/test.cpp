@@ -14,7 +14,7 @@
 #include "core/memory/allocator.hpp"
 #include "export/interface.h"
 
-#pragma warning(disable:4251)
+#define TEST_STREAM false
 
 namespace {
 
@@ -139,7 +139,7 @@ void test_polygon() {
 		mAssert(hdl0.customIndex != INVALID_INDEX);
 		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_USHORT, 3u, 3u });
 		mAssert(hdl1.customIndex != INVALID_INDEX);
-		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_DOUBLE, 8u, 1u });
+		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_DOUBLE, 4u, 1u });
 		mAssert(hdl2.customIndex != INVALID_INDEX);
 		ei::Matrix<float, 1u, 1u> m0{ 25.f };
 		ei::Matrix<unsigned short, 3u, 3u> m1{
@@ -147,7 +147,7 @@ void test_polygon() {
 			4, 5, 6,
 			7, 8, 9
 		};
-		ei::Matrix<double, 8u, 1u> m2{ 2., 4., 6., 8., 10., 12., 14., 16. };
+		ei::Matrix<double, 4u, 1u> m2{ 2., 4., 6., 8. };
 
 		auto v0 = polygon_add_vertex(obj, { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 0.f });
 		auto v1 = polygon_add_vertex(obj, { 1.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 1.f, 0.f });
@@ -178,30 +178,32 @@ void test_polygon() {
 		mAssert(success);
 
 		// TODO: test bulk functions as well
-		FILE* pointStream = nullptr;
-		FILE* normalStream = nullptr;
-		FILE* uvStream = nullptr;
-		FILE* matStream = nullptr;
-		std::size_t vertexCount = 4u;
-		std::size_t faceCount = 1u;
-		std::size_t pointsRead, normalsRead, uvsRead;
+		if(TEST_STREAM) {
+			FILE* pointStream = nullptr;
+			FILE* normalStream = nullptr;
+			FILE* uvStream = nullptr;
+			FILE* matStream = nullptr;
+			std::size_t vertexCount = 4u;
+			std::size_t faceCount = 1u;
+			std::size_t pointsRead, normalsRead, uvsRead;
 
-		VertexHdl bv0 = polygon_add_vertex_bulk(obj, vertexCount, pointStream, normalStream, uvStream,
-												&pointsRead, &normalsRead, &uvsRead);
-		mAssert(bv0 != INVALID_INDEX);
-		FaceHdl f1 = polygon_add_quad(obj, {
-			static_cast<uint32_t>(bv0),
-			static_cast<uint32_t>(bv0 + 1),
-			static_cast<uint32_t>(bv0 + 2),
-			static_cast<uint32_t>(bv0 + 3),
-		});
-		mAssert(f1 != INVALID_INDEX);
-		std::size_t matCount = polygon_set_material_idx_bulk(obj, f1, faceCount,
-														  matStream);
-		mAssert(matCount != INVALID_SIZE);
+			VertexHdl bv0 = polygon_add_vertex_bulk(obj, vertexCount, pointStream, normalStream, uvStream,
+													&pointsRead, &normalsRead, &uvsRead);
+			mAssert(bv0 != INVALID_INDEX);
+			FaceHdl f1 = polygon_add_quad(obj, {
+				static_cast<uint32_t>(bv0),
+				static_cast<uint32_t>(bv0 + 1),
+				static_cast<uint32_t>(bv0 + 2),
+				static_cast<uint32_t>(bv0 + 3),
+										  });
+			mAssert(f1 != INVALID_INDEX);
+			std::size_t matCount = polygon_set_material_idx_bulk(obj, f1, faceCount,
+																 matStream);
+			mAssert(matCount != INVALID_SIZE);
+		}
 
 		ei::Box aabb;
-		spheres_get_bounding_box(obj, reinterpret_cast<Vec3*>(&aabb.min),
+		polygon_get_bounding_box(obj, reinterpret_cast<Vec3*>(&aabb.min),
 								 reinterpret_cast<Vec3*>(&aabb.max));
 		std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
 			<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
@@ -235,14 +237,16 @@ void test_sphere() {
 		success = spheres_set_material_idx(obj, s0, 13u);
 		mAssert(success);
 
-		FILE* sphereStream = nullptr;
-		FILE* matStream = nullptr;
-		std::size_t sphereCount = 4u;
-		std::size_t spheresRead;
-		SphereHdl bs0 = spheres_add_sphere_bulk(obj, sphereCount, sphereStream, &spheresRead);
-		mAssert(bs0 != INVALID_INDEX);
-		std::size_t matsRead = spheres_set_material_idx_bulk(obj, bs0, sphereCount, matStream);
-		mAssert(matsRead != INVALID_SIZE);
+		if(TEST_STREAM) {
+			FILE* sphereStream = nullptr;
+			FILE* matStream = nullptr;
+			std::size_t sphereCount = 4u;
+			std::size_t spheresRead;
+			SphereHdl bs0 = spheres_add_sphere_bulk(obj, sphereCount, sphereStream, &spheresRead);
+			mAssert(bs0 != INVALID_INDEX);
+			std::size_t matsRead = spheres_set_material_idx_bulk(obj, bs0, sphereCount, matStream);
+			mAssert(matsRead != INVALID_SIZE);
+		}
 
 		ei::Box aabb;
 		spheres_get_bounding_box(obj, reinterpret_cast<Vec3*>(&aabb.min),
@@ -262,6 +266,7 @@ void test_scene() {
 
 	ScenarioHdl scenario = world_find_scenario("TestScenario");
 	mAssert(scenario != nullptr);
+	scenario_set_resolution(scenario, { 800, 600 });
 	SceneHdl scene = world_load_scenario(scenario);
 	mAssert(scene != nullptr);
 	ei::Box aabb;
@@ -349,65 +354,7 @@ void test_scene() {
 	// Syncing
 	obj.synchronize<Device::CUDA>();
 	obj.unload<Device::CUDA>();
-}
-
-void test_scene_creation() {
-	WorldContainer container;
-	Object *obj = container.create_object();
-	
-	{
-		std::vector<Point> points{ Point(0, 0, 1), Point(1, 0, 1), Point(0, 1, 1), Point(1, 1, 1) };
-		std::vector<Point> normals{ Normal(-1, -1, 0), Normal(1, -1, 0), Normal(-1, 1, 1), Normal(1, 1, 1) };
-		std::vector<UvCoordinate> uvs{ UvCoordinate(0, 0), UvCoordinate(1, 0), UvCoordinate(0, 1), UvCoordinate(1, 1) };
-		std::vector<MaterialIndex> mats{ 5u };
-		VectorStream pointBuffer(points);
-		VectorStream normalBuffer(normals);
-		VectorStream uvBuffer(uvs);
-		VectorStream matBuffer(mats);
-		std::istream pointStream(&pointBuffer);
-		std::istream normalStream(&normalBuffer);
-		std::istream uvStream(&uvBuffer);
-		std::istream matStream(&matBuffer);
-
-		auto bv0 = obj->add_bulk<Polygons>(points.size(), pointStream, normalStream, uvStream);
-		auto bf0 = obj->add<Polygons>(OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx())),
-									 OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 1),
-									 OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 2),
-									 OpenMesh::VertexHandle(static_cast<Polygons::Index>(bv0.handle.idx()) + 3));
-		auto matIndexAttr = obj->get_mat_indices<Polygons>();
-		obj->add_bulk<Polygons>(matIndexAttr, bf0, mats.size(), matStream);
-	}
-
-	// Sphere interface
-	{
-		std::vector<Spheres::Sphere> radPos{ {Point(0,0,1), 5.f}, {Point(1,0,1), 1.f}, {Point(0,1,1), 7.f}, {Point(1,1,1), 3.f} };
-		std::vector<MaterialIndex> mats{ 1u, 3u, 27u, 15u };
-		VectorStream radPosBuffer(radPos);
-		VectorStream matBuffer(mats);
-		std::istream radPosStream(&radPosBuffer);
-		std::istream matStream(&matBuffer);
-
-		auto bs0 = obj->add_bulk<Spheres>(radPos.size(), radPosStream);
-		obj->add_bulk<Spheres>(obj->get_mat_indices<Spheres>(), bs0.handle, mats.size(), matStream);
-	}
-
-	Instance* inst = container.create_instance(obj);
-	inst->set_transformation_matrix(ei::Matrix<float, 4, 3>{
-		1.f,2.f,3.f,
-		4.f,5.f,6.f,
-		7.f,8.f,9.f,
-		10.f,11.f,12.f
-	});
-	Scenario scenario{ "testScenario", {800, 600}, nullptr };
-	auto scenarioHdl = container.add_scenario(std::move(scenario));
-	auto* sceneHdl = container.load_scene(scenarioHdl);
-
-	const ei::Box& aabb = sceneHdl->get_bounding_box();
-	std::cout << "Bounding box: [" << aabb.min[0] << '|' << aabb.min[1]
-		<< '|' << aabb.min[2] << "] - [" << aabb.max[0] << '|'
-		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
-}
-*/
+}*/
 
 int main() {
 	test_polygon();

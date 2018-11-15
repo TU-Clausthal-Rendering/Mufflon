@@ -22,7 +22,7 @@ using namespace mufflon::scene::geometry;
 #define FUNCTION_NAME __func__
 #define CHECK(x, name, retval)													\
 	do {																		\
-		if(x) {																	\
+		if(!x) {																	\
 			logError("[", FUNCTION_NAME, "] Violated condition (" #name ")");	\
 			return retval;														\
 		}																		\
@@ -89,7 +89,8 @@ struct TypeHolder {
 
 // Helper functions to create the proper attribute type
 template < class T, unsigned int M, class L1, class L2 >
-inline auto switchAttributeType(unsigned int columns, L1&& regular, L2&& noMatch) {
+inline auto switchAttributeType(unsigned int columns, L1&& regular,
+								L2&& noMatch) {
 	switch(columns) {
 		case 1u: return regular(TypeHolder<ei::Matrix<T, M, 1>>{});
 		case 2u: return regular(TypeHolder<ei::Matrix<T, M, 2>>{});
@@ -99,7 +100,8 @@ inline auto switchAttributeType(unsigned int columns, L1&& regular, L2&& noMatch
 	}
 }
 template < class T, class L1, class L2 >
-inline auto switchAttributeType(unsigned int rows, unsigned int columns, L1&& regular, L2&& noMatch) {
+inline auto switchAttributeType(unsigned int rows, unsigned int columns,
+								L1&& regular, L2&& noMatch) {
 	switch(rows) {
 		case 1u: return switchAttributeType<T, 1u>(columns, std::move(regular), std::move(noMatch));
 		case 2u: return switchAttributeType<T, 2u>(columns, std::move(regular), std::move(noMatch));
@@ -109,7 +111,8 @@ inline auto switchAttributeType(unsigned int rows, unsigned int columns, L1&& re
 	}
 }
 template < class L1, class L2 >
-inline auto switchAttributeType(const AttribDesc& desc, L1&& regular, L2&& noMatch) {
+inline auto switchAttributeType(const AttribDesc& desc, L1&& regular,
+								L2&& noMatch) {
 	switch(desc.type) {
 		case AttributeType::ATTR_CHAR: return switchAttributeType<int8_t>(desc.rows, desc.columns, std::move(regular), std::move(noMatch));
 		case AttributeType::ATTR_UCHAR: return switchAttributeType<uint8_t>(desc.rows, desc.columns, std::move(regular), std::move(noMatch));
@@ -181,8 +184,8 @@ PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj, const cha
 			static_cast<int32_t>(attr.customHandle.index()),
 			type, false
 		};
-	}, [&type](){
-		logError("[", FUNCTION_NAME, "] Unknown attribute type ", get_attr_type_name(type));
+	}, [&type, name = FUNCTION_NAME](){
+		logError("[", name, "] Unknown attribute type ", get_attr_type_name(type));
 		return INVALID_POLY_VATTR_HANDLE;
 	});
 }
@@ -202,8 +205,8 @@ PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 			static_cast<int32_t>(attr.customHandle.index()),
 			type, true
 		};
-	}, [&type]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type", get_attr_type_name(type));
+	}, [&type, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type", get_attr_type_name(type));
 		return INVALID_POLY_FATTR_HANDLE;
 	});
 }
@@ -221,8 +224,8 @@ bool polygon_remove_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 		PolyVAttr<Type> attr = convert_poly_to_attr<PolyVAttr<Type>>(*hdl);
 		object.template remove<Polygons>(attr);
 		return true;
-	}, [hdl]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [hdl, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(hdl->type));
 		return false;
 	});
@@ -241,8 +244,8 @@ bool polygon_remove_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 		PolyFAttr<Type> attr = convert_poly_to_attr<PolyFAttr<Type>>(*hdl);
 		object.template remove<Polygons>(attr);
 		return true;
-	}, [hdl]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [hdl, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(hdl->type));
 		return false;
 	});
@@ -266,8 +269,8 @@ PolygonAttributeHandle polygon_find_vertex_attribute(ObjectHdl obj,
 			};
 		}
 		return INVALID_POLY_VATTR_HANDLE;
-	}, [&type]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type", get_attr_type_name(type));
+	}, [&type, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type", get_attr_type_name(type));
 		return INVALID_POLY_VATTR_HANDLE;
 	});
 }
@@ -289,8 +292,8 @@ PolygonAttributeHandle polygon_find_face_attribute(ObjectHdl obj, const char* na
 			};
 		}
 		return INVALID_POLY_FATTR_HANDLE;
-	}, [&type]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type", get_attr_type_name(type));
+	}, [&type, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type", get_attr_type_name(type));
 		return INVALID_POLY_FATTR_HANDLE;
 	});
 }
@@ -439,8 +442,8 @@ bool polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* a
 		auto attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr));
 		(*attribute.template aquire<Device::CPU>())[vertex] = *static_cast<Type*>(value);
 		return true;
-	}, [attr]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [attr, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(attr->type));
 		return false;
 	});
@@ -468,8 +471,8 @@ bool polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* att
 		auto attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr));
 		(*attribute.template aquire<Device::CPU>())[face] = *static_cast<Type*>(value);
 		return true;
-	}, [attr]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [attr, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(attr->type));
 		return false;
 	});
@@ -514,8 +517,8 @@ size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHa
 		return object.template add_bulk<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr),
 										 PolyVHdl{ static_cast<int>(startVertex) },
 										 count, attrStream);
-	}, [attr]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [attr, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(attr->type));
 		return INVALID_SIZE;
 	});
@@ -545,8 +548,8 @@ size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHand
 		return object.template add_bulk<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr),
 										 PolyFHdl{ static_cast<int>(startFace) },
 										 count, attrStream);
-	}, [attr]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [attr, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(attr->type));
 		return INVALID_SIZE;
 	});
@@ -630,8 +633,8 @@ SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 			static_cast<int>(object.template request<Spheres, Type>(name).index()),
 			type
 		};
-	}, [&type]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type", get_attr_type_name(type));
+	}, [&type, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type", get_attr_type_name(type));
 		return INVALID_SPHERE_ATTR_HANDLE;
 	});
 }
@@ -647,8 +650,8 @@ bool spheres_remove_attribute(ObjectHdl obj, const SphereAttributeHandle* hdl) {
 		SphereAttr<Type> attr{ static_cast<size_t>(hdl->index) };
 		object.template remove<Spheres>(attr);
 		return true;
-	}, [hdl]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [hdl, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(hdl->type));
 		return false;
 	});
@@ -670,8 +673,8 @@ SphereAttributeHandle spheres_find_attribute(ObjectHdl obj, const char* name,
 			};
 		}
 		return INVALID_SPHERE_ATTR_HANDLE;
-	}, [&type]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type", get_attr_type_name(type));
+	}, [&type, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type", get_attr_type_name(type));
 		return INVALID_SPHERE_ATTR_HANDLE;
 	});
 }
@@ -742,8 +745,8 @@ bool spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 		auto attribute = object.template aquire<Spheres>(sphereAttr);
 		(*attribute.template aquire<Device::CPU>())[sphere] = *static_cast<Type*>(value);
 		return true;
-	}, [attr]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [attr, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(attr->type));
 		return false;
 	});
@@ -787,8 +790,8 @@ size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* at
 		return object.template add_bulk<Spheres>(sphereAttr,
 										SphereVHdl{ static_cast<size_t>(startSphere) },
 										count, attrStream);
-	}, [attr]() {
-		logError("[", FUNCTION_NAME, "] Unknown attribute type",
+	}, [attr, name = FUNCTION_NAME]() {
+		logError("[", name, "] Unknown attribute type",
 				 get_attr_type_name(attr->type));
 		return INVALID_SIZE;
 	});
@@ -1153,7 +1156,7 @@ MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 										   MatIdx index) {
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	CHECK(index < INVALID_MATERIAL, "Invalid material index", nullptr);
+	CHECK((index < INVALID_MATERIAL), "Invalid material index", nullptr);
 	return static_cast<MaterialHdl>(static_cast<const Scenario*>(scenario)->get_assigned_material(index));
 }
 
@@ -1161,7 +1164,7 @@ bool scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 							  MaterialHdl handle) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(handle, "material handle", false);
-	CHECK(index < INVALID_MATERIAL, "Invalid material index", false);
+	CHECK((index < INVALID_MATERIAL), "Invalid material index", false);
 	static_cast<Scenario*>(scenario)->assign_material(index, static_cast<MaterialHandle>(handle));
 	return true;
 }
@@ -1300,13 +1303,15 @@ bool world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 	float actualFalloff = std::fmod(falloff, 2.f * ei::PI);
 	if(actualFalloff < 0.f)
 		actualFalloff += 2.f*ei::PI;
-	float cosFalloff = std::cos(actualFalloff);
-	if(__half2float(light.cosThetaMax) > cosFalloff) {
+	const float cosFalloff = std::cos(actualFalloff);
+	const __half compressedCosFalloff = __float2half(cosFalloff);
+	const float cosThetaMax = __half2float(light.cosThetaMax);
+	if(__half2float(light.cosThetaMax) > __half2float(compressedCosFalloff)) {
 		logWarning("[", FUNCTION_NAME, "] Spotlight falloff angle cannot be larger than"
 				   " its opening angle");
 		light.cosFalloffStart = light.cosThetaMax;
 	} else {
-		light.cosFalloffStart = __float2half(cosFalloff);
+		light.cosFalloffStart = compressedCosFalloff;
 	}
 	return true;
 }

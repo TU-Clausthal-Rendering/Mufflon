@@ -19,7 +19,7 @@ namespace mufflon::scene {
  */
 class WorldContainer {
 public:
-	using ScenarioHandle = std::unordered_map<std::string_view, Scenario>::iterator;
+	using ScenarioHandle = std::map<std::string, Scenario, std::less<>>::iterator;
 	using PointLightHandle = std::map<std::string, lights::PointLight, std::less<>>::iterator;
 	using SpotLightHandle = std::map<std::string, lights::SpotLight, std::less<>>::iterator;
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
@@ -97,7 +97,7 @@ private:
 	// All instances of the world
 	std::vector<Instance> m_instances;
 	// List of all scenarios available (mapped to their names)
-	std::unordered_map<std::string_view, Scenario> m_scenarios;
+	std::map<std::string, Scenario, std::less<>> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
 	// All available cameras mapped to their name.
