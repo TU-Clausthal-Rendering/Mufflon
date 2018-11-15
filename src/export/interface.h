@@ -74,7 +74,6 @@ typedef enum {
 typedef struct {
 	AttributeType type;
 	uint32_t rows;
-	uint32_t columns;
 } AttribDesc;
 
 typedef struct {

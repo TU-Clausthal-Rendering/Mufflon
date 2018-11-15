@@ -136,19 +136,15 @@ void test_polygon() {
 	ObjectHdl obj = world_create_object();
 	mAssert(obj != nullptr);
 	{
-		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u, 1u });
+		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u });
 		mAssert(hdl0.customIndex != INVALID_INDEX);
-		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_USHORT, 3u, 3u });
+		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_USHORT, 3u });
 		mAssert(hdl1.customIndex != INVALID_INDEX);
-		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_DOUBLE, 4u, 1u });
+		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_DOUBLE, 4u });
 		mAssert(hdl2.customIndex != INVALID_INDEX);
-		ei::Matrix<float, 1u, 1u> m0{ 25.f };
-		ei::Matrix<unsigned short, 3u, 3u> m1{
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9
-		};
-		ei::Matrix<double, 4u, 1u> m2{ 2., 4., 6., 8. };
+		float m0{ 25.f };
+		ei::Vec<int, 3u> m1{ 1, 2, 3 };
+		ei::Vec<unsigned char, 4u> m2{ 2, 4, 6, 8 };
 
 		auto v0 = polygon_add_vertex(obj, { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 0.f });
 		auto v1 = polygon_add_vertex(obj, { 1.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 1.f, 0.f });
@@ -222,12 +218,12 @@ void test_sphere() {
 	ObjectHdl obj = world_create_object();
 	mAssert(obj != nullptr);
 	{
-		auto hdl0 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_INT, 1u, 1u });
+		auto hdl0 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_INT, 1u });
 		mAssert(hdl0.index != INVALID_INDEX);
-		auto hdl1 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_UCHAR, 1u, 4u });
+		auto hdl1 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_UCHAR, 4u });
 		mAssert(hdl1.index != INVALID_INDEX);
-		ei::Matrix<int, 1u, 1u> m0{ 25.f };
-		ei::Matrix<unsigned char, 1u, 4u> m1{ 3u, 6u, 9u, 12u };
+		int m0{ 25 };
+		ei::Vec<unsigned char, 4u> m1{ 3u, 6u, 9u, 12u };
 		auto s0 = spheres_add_sphere(obj, { 0.f, 0.f, 0.f }, 55.f);
 		mAssert(s0 != INVALID_INDEX);
 
