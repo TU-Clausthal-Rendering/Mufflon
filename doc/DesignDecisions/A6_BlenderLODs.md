@@ -2,9 +2,9 @@ A6 LODs in Blender
 =
 
 While not part of the project itself, we have a custom format exporter from Blender.
-Unfortunately, Blender doesn't have a convenient LOD system and requires a custom setup.
+Unfortunately, Blenders LOD system has some drawbacks and requires a custom setup.
 
-Intrinsic System (do not use)
+Intrinsic System (in use)
 -
 
 If the renderer is set to "Blender Game" an LOD property panel appears in the object properties.
@@ -12,7 +12,30 @@ Here some other object can be linked.
 However, the two objects remain independent objects which are both rendered/shown and are not transformed together.
 Also, it is unclear for the linked object how it knows to be part of a LOD of some bigger object.
 
-Our Workaround
+To solve this problems we define:
+
+1. LODs are linked in a **ring buffer**
+2. The **least** detailed LOD must have the **highest render distance** (see Blender LOD property)
+3. There is a proxy **without geometry** linking one or multiple LODs.\
+  The proxy is the object which gets instanced
+
+Optionally, the LODs are in a separate layer and only proxies appear in the scene.
+
+Consequence for an exporter: all LODs of one object can be found by following the LOD ring buffer chain. Non-ring buffer LODs are ignored and instanced as usual objects. The highest distance allows to find the least detailed LOD (whose next LOD is the highest detailed one). Instances can be detected by: *they point to a LOD ring buffer, but are not part of the ring* AND *they do not have own geometry*. It should be sufficient to check the second property which must be ensured by a correct workflow.
+
+**Blender Workflow**
+
+* Set renderer to "Blender Game"
+* Create LODs on a separate layer. The objects do not need to have the same translation matrix... (Object space is used from Blender and Exporter).
+* Link all LODs in a big cycle.
+* Adding or removing new LODs is simple by adding/removing an element in the ring.
+* Make sure the least detailed LOD has the highest render distance in the LOD property.
+* Create a proxy: e.g. a box, delete its geometry in edit mode, link one or multiple LODs for the blender scene rendering
+* Create instances of the proxy.
+
+It may happen that different instances link different LODs. This is fine. The exporter does not use the information of the proxy to detect the LODs (it uses the ring-buffer).
+
+[DEPRECATED] Former Decision: our Workaround
 -
 
 Parenting allows to transform multiple objects as if they are one.
