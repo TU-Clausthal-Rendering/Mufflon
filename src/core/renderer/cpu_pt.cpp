@@ -24,7 +24,7 @@ void CpuPathTracer::sample(const Pixel coord, OutputHandler& outputBuffer) const
 	//	coord, outputBuffer->get_resolution(), rndSet);
 	// TODO setup from camera
 	PathHead head{
-		Interaction::CAMERA
+		Throughput{ei::Vec3{1.0f}, 1.0f}
 	};
 
 	int pathLen = 0;

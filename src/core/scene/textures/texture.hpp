@@ -188,6 +188,10 @@ public:
 	template < Device dev >
 	void clear();
 
+	i32 get_width() const noexcept { return m_width; }
+	i32 get_height() const noexcept { return m_height; }
+	i32 get_num_layers() const noexcept { return m_numLayers; }
+
 private:
 	// Information
 	u16 m_width;

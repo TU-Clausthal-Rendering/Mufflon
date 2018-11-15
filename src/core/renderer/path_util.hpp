@@ -12,16 +12,21 @@ enum class Interaction : u8 {
 	LIGHT,			// A light start vertex (on hitting lightsources the SURFACE type is set)
 };
 
+struct Throughput {
+	ei::Vec3 weight;
+	float guideWeight;
+};
+
 // Collection of parameters produced by a random walk
-// TODO: better alignment for GPU
 // TODO: vertex customization?
 struct PathHead {
-	Interaction type;
+	Throughput throughput;			// General throughput with guide heuristics
 	scene::Point position;
+	float prevPdfF;					// Forward PDF of the last sampling PDF
 	scene::Direction incident;		// May be zero-vector for start points
-	float prevPdfF, prevPdfB;		// Forward and backward PDF of the last sampling PDF
+	float prevPdfB;					// Backward PDF of the last sampling PDF
 	// TODO: prevAreaPDF ?
-	ei::Vec3 throughput;			// TODO: general throughput with guide heuristics
+	Interaction type;
 };
 
 }} // namespace mufflon::renderer

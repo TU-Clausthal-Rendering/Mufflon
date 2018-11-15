@@ -19,6 +19,9 @@
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
+    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
+      <FileType>Document</FileType>
+    </CudaCompile>
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
@@ -64,6 +67,7 @@
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\gpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />

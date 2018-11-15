@@ -124,6 +124,9 @@
     <ClCompile Include="..\..\src\export\interface.cpp">
       <Filter>Source Files\export</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\output_handler.cu">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -314,6 +317,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\export\interface.h">
       <Filter>Source Files\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\output_handler.hpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\byte_io.hpp">
       <Filter>Source Files\util</Filter>
