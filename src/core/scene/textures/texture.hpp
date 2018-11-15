@@ -111,7 +111,7 @@ enum class Format : u16 {
 	NUM
 };
 
-inline constexpr int PIXEL_SIZE(Format format) {
+inline constexpr size_t PIXEL_SIZE(Format format) {
 	constexpr u8 PIXEL_SIZES[int(Format::NUM)] = {
 		1, 2, 3, 4, // ...8U formats
 		2, 4, 6, 8, // ...16U formats
@@ -120,6 +120,17 @@ inline constexpr int PIXEL_SIZE(Format format) {
 		4			// RGB9E5
 	};
 	return PIXEL_SIZES[int(format)];
+}
+
+inline constexpr int NUM_CHANNELS(Format format) {
+	constexpr u8 NUM_CHANNELS[int(Format::NUM)] = {
+		1, 2, 3, 4, // ...8U formats
+		1, 2, 3, 4, // ...16U formats
+		//1, 2, 3, 4, // ...32U formats
+		1, 2, 3, 4, // ...32F formats
+		1			// RGB9E5
+	};
+	return NUM_CHANNELS[int(format)];
 }
 
 enum class SamplingMode {
@@ -142,7 +153,7 @@ public:
 											   ConstTextureDevHandle_t<Device::OPENGL>>;
 
 	// Loads a texture into the CPU-RAM
-	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb, void* data);
+	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb, void* data = nullptr);
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
@@ -159,6 +170,7 @@ public:
 	// Aquire a writing (and thus dirtying) accessor
 	template < Device dev >
 	Accessor<TextureDevHandle<dev>> aquire() {
+		mAssertMsg(NUM_CHANNELS(m_format) != 3, "Write access to RGB formats is not possible on the GPU -> not allowed in all our code.");
 		this->synchronize<dev>();
 		return Accessor<TextureDevHandle<dev>>{m_handles.get<TextureDevHandle_t<dev>>(), m_dirty};
 	}
@@ -171,6 +183,10 @@ public:
 	// If the resource is the last one, an error is issued and the ressource is not unloaded.
 	template < Device dev >
 	void unload();
+
+	// Set all values to 0
+	template < Device dev >
+	void clear();
 
 private:
 	// Information

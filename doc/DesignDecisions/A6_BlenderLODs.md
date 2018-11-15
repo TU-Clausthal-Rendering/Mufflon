@@ -15,13 +15,13 @@ Also, it is unclear for the linked object how it knows to be part of a LOD of so
 To solve this problems we define:
 
 1. LODs are linked in a **ring buffer**
-2. The **least** detailed LOD must have the **highest render distance** (see Blender LOD property)
+2. The **least** detailed LOD must have the **highest "Distance"** in the LOD property
 3. There is a proxy **without geometry** linking one or multiple LODs.\
   The proxy is the object which gets instanced
 
 Optionally, the LODs are in a separate layer and only proxies appear in the scene.
 
-Consequence for an exporter: all LODs of one object can be found by following the LOD ring buffer chain. Non-ring buffer LODs are ignored and instanced as usual objects. The highest distance allows to find the least detailed LOD (whose next LOD is the highest detailed one). Instances can be detected by: *they point to a LOD ring buffer, but are not part of the ring* AND *they do not have own geometry*. It should be sufficient to check the second property which must be ensured by a correct workflow.
+Consequence for an exporter: all LODs of one object can be found by following the LOD ring buffer chain. Non-ring buffer LODs are ignored and instanced as usual objects. The highest "Distance" allows to find the least detailed LOD (whose next LOD is the highest detailed one). Instances can be detected by: *they point to a LOD ring buffer, but are not part of the ring* AND *they do not have own geometry*. It should be sufficient to check the second property which must be ensured by a correct workflow.
 
 **Blender Workflow**
 
@@ -29,7 +29,7 @@ Consequence for an exporter: all LODs of one object can be found by following th
 * Create LODs on a separate layer. The objects do not need to have the same translation matrix... (Object space is used from Blender and Exporter).
 * Link all LODs in a big cycle.
 * Adding or removing new LODs is simple by adding/removing an element in the ring.
-* Make sure the least detailed LOD has the highest render distance in the LOD property.
+* Make sure the least detailed LOD has the highest "Distance" in the LOD property.
 * Create a proxy: e.g. a box, delete its geometry in edit mode, link one or multiple LODs for the blender scene rendering
 * Create instances of the proxy.
 

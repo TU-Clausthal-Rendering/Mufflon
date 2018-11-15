@@ -13,7 +13,7 @@ static constexpr bool is_power_of_two(T value) noexcept {
 }
 
 /**
- * Basis type to implement custom flags with usefull operations.
+ * Basis type to implement custom flags with useful operations.
  * Enums (class and legacy) both defy the usecase as flags because they require
  * repeated castings.
  * T: an integer type, requires logic operations

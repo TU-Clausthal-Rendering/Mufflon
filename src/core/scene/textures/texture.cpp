@@ -14,10 +14,12 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMo
 	m_sRgb(sRgb),
 	m_cudaTexture(nullptr)
 {
-	// A file loader provides an array with pixel data. This is loaded into
-	// a CPUTexture per default.
-	create_texture_cpu();
-	copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
+	if(data) {
+		// A file loader provides an array with pixel data. This is loaded into
+		// a CPUTexture per default.
+		create_texture_cpu();
+		copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
+	}
 }
 
 Texture::~Texture() {
@@ -97,6 +99,45 @@ template void Texture::unload<Device::CUDA>();
 template void Texture::unload<Device::OPENGL>();
 
 
+
+template < Device dev >
+void Texture::clear() {
+	// There is no clear-call in cuda. The only possibility is to have a
+	// memory with zeros and to copy it. Therefore here is a static vector
+	// to avoid allocations on each clear call.
+	static std::vector<u8> s_zeroMem;
+	size_t texMemSize = size_t(m_width) * size_t(m_height) * size_t(m_numLayers) * PIXEL_SIZE(m_format);
+	switch(dev) {
+		case Device::CPU: {
+			if(!m_cpuTexture)
+				logError("[Texture::zero] Trying to clear a CPU texture without memory.");
+			else memset(m_cpuTexture->data(), 0, texMemSize);
+		} break;
+		case Device::CUDA: {
+			if(!m_cpuTexture)
+				logError("[Texture::zero] Trying to clear a CUDA texture without memory.");
+			else {
+				// Is the dummy memory to small?
+				if(s_zeroMem.size() < texMemSize) {
+					s_zeroMem.resize(texMemSize);
+					memset(s_zeroMem.data(), 0, texMemSize);
+				}
+				cudaMemcpyToArray(m_cudaTexture, 0, 0, s_zeroMem.data(), texMemSize, cudaMemcpyHostToDevice);
+			}
+		} break;
+		case Device::OPENGL: {
+			// TODO
+		} break;
+	}
+}
+
+template void Texture::clear<Device::CPU>();
+template void Texture::clear<Device::CUDA>();
+template void Texture::clear<Device::OPENGL>();
+
+
+
+
 void Texture::create_texture_cpu() {
 	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format, m_mode, m_sRgb);
 	m_handles.get<TextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
@@ -149,11 +190,14 @@ void Texture::create_texture_cuda() {
 	texHdl.depth = m_numLayers;
 
 	// Fill the handle (surface)
-	auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
-	cudaCreateSurfaceObject(&surfHdl.handle, &resDesc);
-	surfHdl.width = m_width;
-	surfHdl.height = m_height;
-	surfHdl.depth = m_numLayers;
+	if(NUM_CHANNELS(m_format) != 3) // Allow read-only RGB formats without causing errors here
+	{
+		auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
+		cudaCreateSurfaceObject(&surfHdl.handle, &resDesc);
+		surfHdl.width = m_width;
+		surfHdl.height = m_height;
+		surfHdl.depth = m_numLayers;
+	}
 }
 
 } // namespace mufflon::scene::textures
