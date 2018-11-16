@@ -1,19 +1,39 @@
 #pragma once
 
-#include "export/api.hpp"
+#include "renderer.hpp"
+#include "core/scene/handles.hpp"
 #include "core/scene/lights/light_tree.hpp"
 
-//extern "C" LIBRARY_API void test_gpu_pt();
+namespace mufflon {
+
+// Forward declarations
+enum class Device : unsigned char;
+
+namespace scene { namespace lights {
+template < Device >
+struct LightTree;
+}}} // namespace mufflon::scene::lights
 
 namespace mufflon { namespace renderer {
 
-class GpuPathTracer {
+template < Device >
+struct RenderBuffer;
+
+class GpuPathTracer : public IRenderer {
 public:
+	GpuPathTracer(scene::SceneHandle scene);
+
 	// This is just a test method, don't use this as an actual interface
-	__host__ void run();
+	virtual void iterate(OutputHandler& handler) const override;
+	virtual void reset() override;
 
 private:
-	mufflon::scene::lights::LightTree<mufflon::Device::CUDA> m_lights;
+	// Used so that we don't need to include everything in CU files
+	void iterate(Pixel imageDims,
+				 scene::lights::LightTree<Device::CUDA> lightTree,
+				 RenderBuffer<Device::CUDA> outputBuffer) const;
+
+	scene::SceneHandle m_currentScene;
 };
 
 }} // namespace mufflon::renderer

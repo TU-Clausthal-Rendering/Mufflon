@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 // Idea: On device side, Materials, Lights, and Cameras call their own functions in a switch statement
 
@@ -20,7 +20,9 @@ namespace mufflon::scene {
  */
 class Scene {
 public:
-	Scene() = default;
+	Scene(ConstCameraHandle cam, ei::IVec2 resolution) :
+		m_camera(cam),
+		m_resolution(std::move(resolution)) {}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = default;
 	Scene& operator=(const Scene&) = delete;
@@ -93,6 +95,11 @@ public:
 						  m_boundingBox, std::move(envLightTexture));
 	}
 
+	template < Device dev >
+	lights::LightTree<dev> get_light_tree() {
+		return m_lightTree.aquire_tree<dev>();
+	}
+
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
 		mAssert(camera != nullptr);
@@ -101,6 +108,10 @@ public:
 	// Access the active camera
 	ConstCameraHandle get_camera() const noexcept {
 		return m_camera;
+	}
+
+	constexpr const ei::IVec2& get_resolution() const noexcept {
+		return m_resolution;
 	}
 
 private:
@@ -117,7 +128,8 @@ private:
 	bool m_accelDirty = false;
 	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
 
+	const ei::IVec2 m_resolution = {};
 	ei::Box m_boundingBox;
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

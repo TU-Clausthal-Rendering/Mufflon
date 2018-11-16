@@ -118,13 +118,10 @@
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp">
       <Filter>Source Files\core\memory</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\export\interface.cpp">
       <Filter>Source Files\export</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\output_handler.cu">
+    <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
   </ItemGroup>
@@ -234,9 +231,6 @@
     <ClInclude Include="..\..\src\core\scene\materials\types.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\util\array_wrapper.hpp">
-      <Filter>Source Files\util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\cuda\error.hpp">
       <Filter>Source Files\core\cuda</Filter>
     </ClInclude>
@@ -324,6 +318,9 @@
     <ClInclude Include="..\..\src\util\byte_io.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\renderer.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
@@ -340,5 +337,6 @@
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">
       <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
   </ItemGroup>
 </Project>

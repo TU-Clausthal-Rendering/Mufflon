@@ -1,16 +1,16 @@
 #pragma once
 
-namespace mufflon::cameras {
-	class Camera;
-} // namespace mufflon::cameras
+namespace mufflon { namespace cameras {
+class Camera;
+}}// namespace mufflon::cameras
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 class Object;
 class Instance;
 class Scene;
 namespace materials {
-	class IMaterial;
+class IMaterial;
 }
 namespace lights {
 struct PointLight;
@@ -29,4 +29,4 @@ using ConstCameraHandle = const cameras::Camera*;
 using SceneHandle = Scene*;
 using ConstSceneHandle = const Scene*;
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

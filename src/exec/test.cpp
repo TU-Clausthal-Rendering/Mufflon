@@ -138,9 +138,9 @@ void test_polygon() {
 	{
 		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u });
 		mAssert(hdl0.customIndex != INVALID_INDEX);
-		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_USHORT, 3u });
+		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_INT, 3u });
 		mAssert(hdl1.customIndex != INVALID_INDEX);
-		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_DOUBLE, 4u });
+		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_UCHAR, 4u });
 		mAssert(hdl2.customIndex != INVALID_INDEX);
 		float m0{ 25.f };
 		ei::Vec<int, 3u> m1{ 1, 2, 3 };
@@ -276,6 +276,25 @@ void test_scene() {
 		<< aabb.max[1] << '|' << aabb.max[2] << ']' << std::endl;
 }
 
+void test_renderer() {
+	std::cout << "Testing renderer" << std::endl;
+	bool success = false;
+
+	success = render_enable_renderer(RendererType::RENDERER_CPU_PT);
+	mAssert(success);
+	success = render_iterate();
+	mAssert(success);
+	success = render_save_screenshot("test_image_cpu.pfm");
+	mAssert(success);
+
+	success = render_enable_renderer(RendererType::RENDERER_GPU_PT);
+	mAssert(success);
+	success = render_iterate();
+	mAssert(success);
+	success = render_save_screenshot("test_image_cpu.pfm");
+	mAssert(success);
+}
+
 /*void test_allocator() {
 	std::cout << "Testing custom device allocator." << std::endl;
 
@@ -304,12 +323,7 @@ int main() {
 	test_sphere();
 	test_lights();
 	test_scene();
-	/*test_allocator();
-	test_sphere();
-	test_custom_attributes();
-	test_object();
-	test_scene_creation();
-	test_renderer();*/
+	test_renderer();
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();

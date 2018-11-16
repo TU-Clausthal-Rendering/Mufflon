@@ -4,7 +4,7 @@
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 class Object;
 
@@ -42,6 +42,4 @@ private:
 	TransMatrixType m_transMat;
 };
 
-using InstanceHandle = Instance*;
-
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

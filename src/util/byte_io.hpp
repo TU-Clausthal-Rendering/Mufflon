@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <iostream>
 
-namespace mufflon::util {
+namespace mufflon { namespace util {
 
 // Interface abstracting C++ iostream/FILE descriptor into common type
 class IByteReader {
@@ -20,8 +20,7 @@ class IByteIO : public IByteReader, public IByteWriter {};
 class StreamReader : public IByteReader {
 public:
 	StreamReader(std::istream& stream) :
-		m_stream(stream)
-	{}
+		m_stream(stream) {}
 
 	virtual std::size_t read(char* mem, std::size_t bytes) override {
 		m_stream.read(mem, bytes);
@@ -104,4 +103,4 @@ private:
 	std::FILE* m_descriptor;
 };
 
-} // namespace mufflon::util
+}} // namespace mufflon::util

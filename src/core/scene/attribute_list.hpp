@@ -11,11 +11,11 @@
 #include <optional>
 #include <vector>
 
-namespace mufflon::util {
+namespace mufflon { namespace util {
 class IByteReader;
-}
+}}
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 /**
  * Manages attributes and attribute pool access.
@@ -72,8 +72,7 @@ public:
 		using Type = T;
 
 		AttributeHandle(std::size_t idx) :
-			m_index(idx)
-		{}
+			m_index(idx) {}
 
 		constexpr std::size_t index() const noexcept {
 			return m_index;
@@ -134,7 +133,7 @@ public:
 			this->synchronize<dev>();
 			auto& pool = m_pools->template get<AttributePool<dev, stores_itself<dev>()>>();
 			auto& handle = m_handles.template get<typename AttributePool<dev, stores_itself<dev>()>::template AttributeHandle<T>>();
-			return Accessor<ArrayDevHandle<dev, Type>>{ static_cast<ArrayDevHandle_t<dev, Type>>(pool.aquire(handle)), m_flags };
+			return Accessor<ArrayDevHandle<dev, Type>>{ pool.aquire(handle), m_flags };
 		}
 
 		// Aquires a read-only accessor to the attribute
@@ -298,7 +297,7 @@ public:
 	// Synchronizes all attributes on the given device from the last changed device
 	template < Device dev = DEFAULT_DEVICE >
 	void synchronize() {
-		mufflon::synchronize<dev>(m_attributePools, m_flags, 
+		mufflon::synchronize<dev>(m_attributePools, m_flags,
 								  m_attributePools.template get<AttributePool<dev, stores_itself<dev>()>>());
 	}
 
@@ -349,4 +348,4 @@ private:
 	std::unordered_map<std::string, std::size_t> m_mapping;
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

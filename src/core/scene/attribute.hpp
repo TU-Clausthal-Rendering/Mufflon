@@ -3,15 +3,15 @@
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "export/api.hpp"
+#include "util/assert.hpp"
 #include "util/byte_io.hpp"
-#include "util/array_wrapper.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <functional>
 #include <istream>
 #include <ostream>
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 namespace pool_detail {
 
@@ -40,8 +40,7 @@ public:
 		m_size(pool.m_size),
 		m_attribLength(pool.m_attribLength),
 		m_present(pool.m_present),
-		m_memoryBlock(pool.m_memoryBlock)
-	{
+		m_memoryBlock(pool.m_memoryBlock) {
 		pool.m_memoryBlock = nullptr;
 	}
 	MallocAttributePool& operator=(const MallocAttributePool&) = delete;
@@ -61,15 +60,14 @@ public:
 	template < class T >
 	struct AttributeHandle {
 		using Type = T;
-		friend class MallocAttributePool;
+		friend class MallocAttributePool<Allocator>;
 
 		AttributeHandle() :
 			m_index(std::numeric_limits<std::size_t>::max()) {}
 
 	private:
 		AttributeHandle(std::size_t idx) :
-			m_index(idx)
-		{}
+			m_index(idx) {}
 
 		constexpr std::size_t index() const noexcept {
 			return m_index;
@@ -148,7 +146,7 @@ public:
 							currOffset += m_attribs[i].length;
 						}
 					}
-					
+
 					// Clean up
 					Allocator::free(swapBlock, largest);
 					m_size -= removedBytes;
@@ -165,30 +163,24 @@ public:
 
 	// Aquires the given attribute for direct access
 	template < class T >
-	util::ArrayWrapper<T> aquire(const AttributeHandle<T>& hdl) {
+	T* aquire(const AttributeHandle<T>& hdl) {
 		if(hdl.index() >= m_attribs.size())
 			return nullptr;
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return nullptr;
 
-		return util::ArrayWrapper<T>{
-			reinterpret_cast<T*>(&m_memoryBlock[m_attribs[hdl.index()].offset]),
-			m_attribs[hdl.index()].length / sizeof(T)
-		};
+		return reinterpret_cast<T*>(&m_memoryBlock[m_attribs[hdl.index()].offset]);
 	}
 
 	// Aquires the given attribute for read-only access
 	template < class T >
-	util::ConstArrayWrapper<T> aquireConst(const AttributeHandle<T>& hdl) const {
+	const T* aquireConst(const AttributeHandle<T>& hdl) const {
 		if(hdl.index() >= m_attribs.size())
 			return nullptr;
 		if(m_attribs[hdl.index()].offset == std::numeric_limits<std::size_t>::max())
 			return nullptr;
 
-		return util::ConstArrayWrapper<T>{
-			reinterpret_cast<const T*>(&m_memoryBlock[m_attribs[hdl.index()].offset]),
-				m_attribs[hdl.index()].length / sizeof(T)
-		};
+		return reinterpret_cast<const T*>(&m_memoryBlock[m_attribs[hdl.index()].offset]);
 	}
 
 	// Resizes all attributes to the given length
@@ -511,26 +503,26 @@ public:
 
 	// Aquires the given attribute for direct access
 	template < class T >
-	util::ArrayWrapper<T> aquire(const AttributeHandle<T>& hdl) {
+	T* aquire(const AttributeHandle<T>& hdl) {
 		if(hdl.index() >= m_attributes.size())
 			return nullptr;
 		if(m_attributes[hdl.index()] == nullptr)
 			return nullptr;
 
 		auto& prop = dynamic_cast<typename OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
-		return util::ArrayWrapper<T>{ prop.data_vector().data(), prop.n_elements() };
+		return prop.data_vector().data();
 	}
 
 	// Aquires the given attribute for read-only access
 	template < class T >
-	util::ConstArrayWrapper<T> aquireConst(const AttributeHandle<T>& hdl) const {
+	const T* aquireConst(const AttributeHandle<T>& hdl) const {
 		if(hdl.index() >= m_attributes.size())
 			return nullptr;
 		if(m_attributes[hdl.index()] == nullptr)
 			return nullptr;
 
 		const OpenMesh::PropertyT<T>& prop = dynamic_cast<const OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
-		return util::ConstArrayWrapper<T>{ prop.data_vector().data(), prop.n_elements() };
+		return prop.data_vector().data();
 	}
 
 	// Resizes all attributes to the given length
@@ -549,7 +541,7 @@ public:
 		mAssert(hdl.index() < m_attributes.size());
 		if(start >= m_attribLength)
 			return 0u;
-		if(m_attributes[hdl.index()]== nullptr)
+		if(m_attributes[hdl.index()] == nullptr)
 			return 0u;
 		auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
 		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
@@ -631,4 +623,4 @@ void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(Attribute
 template <>
 void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool);
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

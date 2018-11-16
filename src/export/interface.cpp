@@ -4,6 +4,10 @@
 #include "util/punning.hpp"
 #include "util/types.hpp"
 #include "ei/vector.hpp"
+#include "core/renderer/renderer.hpp"
+#include "core/renderer/output_handler.hpp"
+#include "core/renderer/cpu_pt.hpp"
+#include "core/renderer/gpu_pt.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/scene/object.hpp"
 #include "core/scene/world_container.hpp"
@@ -13,6 +17,7 @@
 #include "core/scene/materials/lambert.hpp"
 #include <cuda_runtime.h>
 #include <type_traits>
+#include <fstream>
 
 using namespace mufflon;
 using namespace mufflon::scene;
@@ -55,6 +60,11 @@ using SphereVHdl = Spheres::SphereHandle;
 
 // Return values for invalid handles/attributes
 namespace {
+
+// static variables for interacting with the renderer
+std::unique_ptr<renderer::IRenderer> currentRenderer;
+std::unique_ptr<renderer::OutputHandler> imageOutput;
+renderer::OutputValue outputTargets;
 
 constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX, INVALID_INDEX,
@@ -1347,4 +1357,172 @@ bool world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
 	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
 	light.radiance = util::pun<ei::Vec3>(radiance);
 	return true;
+}
+
+bool render_enable_renderer(RendererType type) {
+	SceneHandle scene = WorldContainer::instance().get_current_scene();
+	if(scene == nullptr) {
+		logError("[", FUNCTION_NAME, "] Cannot enable renderer before scene hasn't been set");
+		return false;
+	}
+	imageOutput = std::make_unique<renderer::OutputHandler>(scene->get_resolution().x,
+															scene->get_resolution().y,
+															outputTargets);
+	switch(type) {
+		case RendererType::RENDERER_CPU_PT: {
+			currentRenderer = std::make_unique<renderer::CpuPathTracer>(
+				WorldContainer::instance().get_current_scene());
+			return true;
+		}
+		case RendererType::RENDERER_GPU_PT: {
+			currentRenderer = std::make_unique<renderer::GpuPathTracer>(
+				WorldContainer::instance().get_current_scene());
+			return true;
+		}
+		default: {
+			logError("[", FUNCTION_NAME, "] Unknown renderer type");
+			return false;
+		}
+	}
+}
+
+bool render_iterate() {
+	if(currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is currently set");
+		return false;
+	}
+	if(imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
+		return false;
+	}
+	currentRenderer->iterate(*imageOutput);
+	return true;
+}
+
+bool render_get_screenshot() {
+	if(currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is currently set");
+		return false;
+	}
+	if(imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
+		return false;
+	}
+	// TODO: this is just for debugging!
+	return false;
+}
+
+bool render_save_screenshot(const char* filename) {
+	if(currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is currently set");
+		return false;
+	}
+
+	renderer::OutputValue dumpVals{};
+	dumpVals.set(renderer::OutputValue::RADIANCE);
+	textures::CpuTexture radiance = imageOutput->get_data(dumpVals, textures::Format::RGB32F, false);
+	
+
+	// TODO: this is just for debugging! This should be done by an image library
+	std::ofstream file(filename, std::ofstream::binary | std::ofstream::out);
+	if(file.bad()) {
+		logError("[", FUNCTION_NAME, "] Failed to open screenshot file '",
+				 filename, "'");
+	}
+	file.write("PF\n", 3);
+	ei::IVec2 res = WorldContainer::instance().get_current_scene()->get_resolution();
+	auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
+	file.write(sizes.c_str(), sizes.length());
+	file.write("\n-1.000000\n", 11);
+
+	const auto pixels = reinterpret_cast<const char *>(radiance.data());
+	for(int y = 0; y < res.y; ++y) {
+		for(int x = 0; x < res.x; ++x) {
+			file.write(&pixels[(y * res.x + x) * 3u * sizeof(float)], 3u * sizeof(float));
+		}
+	}
+
+	return true;
+}
+
+bool render_enable_render_target(RenderTarget target, bool variance) {
+	switch(target) {
+		case RenderTarget::TARGET_RADIANCE:
+			outputTargets.set(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_POSITION:
+			outputTargets.set(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_ALBEDO:
+			outputTargets.set(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_NORMAL:
+			outputTargets.set(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_LIGHTNESS:
+			outputTargets.set(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
+			break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown render target");
+			return false;
+	}
+	return true;
+}
+
+bool render_disable_render_target(RenderTarget target, bool variance) {
+	switch(target) {
+		case RenderTarget::TARGET_RADIANCE:
+			outputTargets.clear(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_POSITION:
+			outputTargets.clear(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_ALBEDO:
+			outputTargets.clear(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_NORMAL:
+			outputTargets.clear(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
+			break;
+		case RenderTarget::TARGET_LIGHTNESS:
+			outputTargets.clear(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
+			break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown render target");
+			return false;
+	}
+	return true;
+}
+
+bool render_enable_variance_render_targets() {
+	for(u32 target : renderer::OutputValue::iterator)
+		outputTargets.set(target << 8u);
+	return true;
+}
+
+bool render_enable_non_variance_render_targets() {
+	for(u32 target : renderer::OutputValue::iterator)
+		outputTargets.set(target);
+	return true;
+}
+
+bool render_enable_all_render_targets() {
+	return render_enable_variance_render_targets()
+		&& render_enable_non_variance_render_targets();
+}
+
+bool render_disable_variance_render_targets() {
+	for(u32 target : renderer::OutputValue::iterator)
+		outputTargets.clear(target << 8u);
+	return true;
+}
+
+bool render_disable_non_variance_render_targets() {
+	for(u32 target : renderer::OutputValue::iterator)
+		outputTargets.clear(target);
+	return true;
+}
+
+bool render_disable_all_render_targets() {
+	return render_disable_variance_render_targets()
+		&& render_disable_non_variance_render_targets();
 }

@@ -3,7 +3,7 @@
 #include <cstring>
 #include <type_traits>
 
-namespace mufflon::util {
+namespace mufflon { namespace util {
 
 // Helper functions to print the sizes/alignment on mismatch in a static_assert
 template < class U, class V, std::size_t US = sizeof(U), std::size_t VS = sizeof(V) >
@@ -25,9 +25,9 @@ template < class U, class V >
 inline U pun(const V& val, U punnedFrom = U()) {
 	check_size<U, V>();
 	check_alignment<U, V>();
-	
+
 	std::memcpy(&punnedFrom, &val, sizeof(U));
 	return punnedFrom;
 }
 
-} // namespace mufflon::util
+}} // namespace mufflon::util

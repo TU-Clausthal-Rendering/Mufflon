@@ -1,6 +1,7 @@
 #pragma once
 
 #include "instance.hpp"
+#include "handles.hpp"
 #include "core/memory/residency.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"

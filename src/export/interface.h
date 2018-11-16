@@ -65,6 +65,19 @@ typedef enum {
 } CameraType;
 
 typedef enum {
+	RENDERER_CPU_PT,
+	RENDERER_GPU_PT,
+} RendererType;
+
+typedef enum {
+	TARGET_RADIANCE,
+	TARGET_POSITION,
+	TARGET_ALBEDO,
+	TARGET_NORMAL,
+	TARGET_LIGHTNESS
+} RenderTarget;
+
+typedef enum {
 	LIGHT_POINT,
 	LIGHT_SPOT,
 	LIGHT_DIRECTIONAL,
@@ -270,5 +283,20 @@ LIBRARY_API bool world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance);
 LIBRARY_API bool world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
 LIBRARY_API bool world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
 // TODO: interface for envmap light
+
+// Interface for rendering
+LIBRARY_API bool render_enable_renderer(RendererType type);
+LIBRARY_API bool render_iterate();
+// TODO: what do we pass to the GUI?
+LIBRARY_API bool render_get_screenshot();
+LIBRARY_API bool render_save_screenshot(const char* filename);
+LIBRARY_API bool render_enable_render_target(RenderTarget target, bool variance);
+LIBRARY_API bool render_disable_render_target(RenderTarget target, bool variance);
+LIBRARY_API bool render_enable_variance_render_targets();
+LIBRARY_API bool render_enable_non_variance_render_targets();
+LIBRARY_API bool render_enable_all_render_targets();
+LIBRARY_API bool render_disable_variance_render_targets();
+LIBRARY_API bool render_disable_non_variance_render_targets();
+LIBRARY_API bool render_disable_all_render_targets();
 
 }

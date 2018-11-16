@@ -1,6 +1,6 @@
 #pragma once
 
-namespace mufflon::util {
+namespace mufflon { namespace util {
 
 /**
  * Represents a range of iterators.
@@ -14,8 +14,7 @@ public:
 
 	Range(Iterator begin, Iterator end) :
 		m_begin(std::move(begin)),
-		m_end(std::move(end))
-	{}
+		m_end(std::move(end)) {}
 
 	Iterator& begin() {
 		return m_begin;
@@ -36,4 +35,4 @@ private:
 	Iterator m_end;
 };
 
-} // namespace mufflon::util
+}} // namespace mufflon::util

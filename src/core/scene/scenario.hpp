@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 /**
  * This class represents a scenario, meaning a subset of world features.
@@ -17,8 +17,7 @@ public:
 	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
 
 	Scenario(std::string name) :
-		m_name(name)
-	{}
+		m_name(name) {}
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
 	Scenario& operator=(const Scenario&) = delete;
@@ -117,4 +116,4 @@ private:
 	std::map<ConstObjectHandle, ObjectProperty> m_perObjectCustomization;
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene
