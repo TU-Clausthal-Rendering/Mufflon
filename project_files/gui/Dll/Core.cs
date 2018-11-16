@@ -19,9 +19,11 @@ namespace gui.Dll
         internal static extern bool iterate();
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
         internal static extern bool initialize(LogCallback logCallback);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
         internal static extern bool resize(int width, int height, int offsetX, int offsetY);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
