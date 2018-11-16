@@ -17,7 +17,14 @@
 #include "core/scene/materials/lambert.hpp"
 #include <cuda_runtime.h>
 #include <type_traits>
+#include <mutex>
 #include <fstream>
+// TODO: remove this (leftover from Felix' prototype)
+#include <glad/glad.h>
+
+// Undefine unnecessary windows macros
+#undef near
+#undef far
 
 using namespace mufflon;
 using namespace mufflon::scene;
@@ -62,9 +69,12 @@ using SphereVHdl = Spheres::SphereHandle;
 namespace {
 
 // static variables for interacting with the renderer
-std::unique_ptr<renderer::IRenderer> currentRenderer;
-std::unique_ptr<renderer::OutputHandler> imageOutput;
-renderer::OutputValue outputTargets;
+std::unique_ptr<renderer::IRenderer> s_currentRenderer;
+std::unique_ptr<renderer::OutputHandler> s_imageOutput;
+renderer::OutputValue s_outputTargets;
+static void(*s_logCallback)(const char*, int);
+// TODO: remove these (leftover from Felix' prototype)
+static std::string s_lastError;
 
 constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX, INVALID_INDEX,
@@ -169,7 +179,55 @@ inline std::string get_attr_type_name(AttribDesc desc) {
 	return typeName;
 }
 
+// Function delegating the logger output to the applications handle, if applicable
+void delegateLog(LogSeverity severity, const std::string& message) {
+	if(s_logCallback != nullptr)
+		s_logCallback(message.c_str(), static_cast<int>(severity));
+}
+
+
 } // namespace
+
+
+bool initialize(void(*logCallback)(const char*, int)) {
+	// Only once per process do we register/unregister the message handler
+	std::once_flag regMsgHdl;
+	std::call_once(regMsgHdl, []() {
+		registerMessageHandler(delegateLog);
+		disableStdHandler();
+	});
+
+	s_logCallback = logCallback;
+	if(!gladLoadGL()) {
+		logError("[", FUNCTION_NAME, "] gladLoadGL failed");
+		return false;
+	}
+	return true;
+}
+
+// TODO: remove, Felix prototype
+const char* get_error(int& length) {
+	length = static_cast<int>(s_lastError.length());
+	return s_lastError.data();
+}
+bool iterate() {
+	static float t = 0.0f;
+	glClearColor(0.0f, t, 0.0f, 1.0f);
+	t += 0.01f;
+	if(t > 1.0f) t -= 1.0f;
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	return true;
+}
+bool resize(int width, int height, int offsetX, int offsetY) {
+	// glViewport should not be called with width or height zero
+	if(width == 0 || height == 0) return true;
+	glViewport(0, 0, width, height);
+	return true;
+}
+void execute_command(const char* command) {
+	// TODO
+}
 
 
 
@@ -855,7 +913,7 @@ InstanceHdl world_create_instance(ObjectHdl obj) {
 
 ScenarioHdl world_create_scenario(const char* name) {
 	CHECK_NULLPTR(name, "scenario name", nullptr);
-	auto hdl = WorldContainer::instance().add_scenario(Scenario{ name });
+	auto hdl = WorldContainer::instance().create_scenario(name);
 	return static_cast<ScenarioHdl>(&hdl->second);
 }
 
@@ -887,9 +945,10 @@ MaterialHdl world_add_lambert_material(const char* name) {
 CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 								   Vec3 up, float near, float far, float vFov) {
 	CHECK_NULLPTR(name, "camera name", nullptr);
-	CameraHandle hdl = WorldContainer::instance().add_camera(std::make_unique<cameras::Pinhole>(
-		util::pun<ei::Vec3>(position), util::pun<ei::Vec3>(dir),
-		util::pun<ei::Vec3>(up), vFov, near, far
+	CameraHandle hdl = WorldContainer::instance().add_camera(name,
+		std::make_unique<cameras::Pinhole>(
+			util::pun<ei::Vec3>(position), util::pun<ei::Vec3>(dir),
+			util::pun<ei::Vec3>(up), vFov, near, far
 	));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating pinhole camera");
@@ -1032,7 +1091,9 @@ SceneHdl world_get_current_scene() {
 
 const char* scenario_get_name(ScenarioHdl scenario) {
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	return static_cast<const Scenario*>(scenario)->get_name().c_str();
+	// This relies on the fact that the string_view in scenario points to
+	// an std::string object, which is null terminated
+	return &static_cast<const Scenario*>(scenario)->get_name()[0u];
 }
 
 size_t scenario_get_global_lod_level(ScenarioHdl scenario) {
@@ -1365,17 +1426,17 @@ bool render_enable_renderer(RendererType type) {
 		logError("[", FUNCTION_NAME, "] Cannot enable renderer before scene hasn't been set");
 		return false;
 	}
-	imageOutput = std::make_unique<renderer::OutputHandler>(scene->get_resolution().x,
+	s_imageOutput = std::make_unique<renderer::OutputHandler>(scene->get_resolution().x,
 															scene->get_resolution().y,
-															outputTargets);
+															s_outputTargets);
 	switch(type) {
 		case RendererType::RENDERER_CPU_PT: {
-			currentRenderer = std::make_unique<renderer::CpuPathTracer>(
+			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>(
 				WorldContainer::instance().get_current_scene());
 			return true;
 		}
 		case RendererType::RENDERER_GPU_PT: {
-			currentRenderer = std::make_unique<renderer::GpuPathTracer>(
+			s_currentRenderer = std::make_unique<renderer::GpuPathTracer>(
 				WorldContainer::instance().get_current_scene());
 			return true;
 		}
@@ -1387,24 +1448,24 @@ bool render_enable_renderer(RendererType type) {
 }
 
 bool render_iterate() {
-	if(currentRenderer == nullptr) {
+	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
-	if(imageOutput == nullptr) {
+	if(s_imageOutput == nullptr) {
 		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 		return false;
 	}
-	currentRenderer->iterate(*imageOutput);
+	s_currentRenderer->iterate(*s_imageOutput);
 	return true;
 }
 
 bool render_get_screenshot() {
-	if(currentRenderer == nullptr) {
+	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
-	if(imageOutput == nullptr) {
+	if(s_imageOutput == nullptr) {
 		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 		return false;
 	}
@@ -1413,32 +1474,42 @@ bool render_get_screenshot() {
 }
 
 bool render_save_screenshot(const char* filename) {
-	if(currentRenderer == nullptr) {
+	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
 
-	renderer::OutputValue dumpVals{};
-	dumpVals.set(renderer::OutputValue::RADIANCE);
-	textures::CpuTexture radiance = imageOutput->get_data(dumpVals, textures::Format::RGB32F, false);
-	
-
 	// TODO: this is just for debugging! This should be done by an image library
-	std::ofstream file(filename, std::ofstream::binary | std::ofstream::out);
-	if(file.bad()) {
-		logError("[", FUNCTION_NAME, "] Failed to open screenshot file '",
-				 filename, "'");
-	}
-	file.write("PF\n", 3);
-	ei::IVec2 res = WorldContainer::instance().get_current_scene()->get_resolution();
-	auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
-	file.write(sizes.c_str(), sizes.length());
-	file.write("\n-1.000000\n", 11);
+	auto dumpPfm = [](std::string fileName, const uint8_t* data) {
+		std::ofstream file(fileName, std::ofstream::binary | std::ofstream::out);
+		if(file.bad()) {
+			logError("[", FUNCTION_NAME, "] Failed to open screenshot file '",
+					 fileName, "'");
+			return;
+		}
+		file.write("PF\n", 3);
+		ei::IVec2 res = WorldContainer::instance().get_current_scene()->get_resolution();
+		auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
+		file.write(sizes.c_str(), sizes.length());
+		file.write("\n-1.000000\n", 11);
 
-	const auto pixels = reinterpret_cast<const char *>(radiance.data());
-	for(int y = 0; y < res.y; ++y) {
-		for(int x = 0; x < res.x; ++x) {
-			file.write(&pixels[(y * res.x + x) * 3u * sizeof(float)], 3u * sizeof(float));
+		const auto pixels = reinterpret_cast<const char *>(data);
+		for(int y = 0; y < res.y; ++y) {
+			for(int x = 0; x < res.x; ++x) {
+				file.write(&pixels[(y * res.x + x) * 4u * sizeof(float)], 3u * sizeof(float));
+			}
+		}
+
+	};
+	const std::string name(filename);
+	for(u32 target : renderer::OutputValue::iterator) {
+		if(s_outputTargets.is_set(target)) {
+			textures::CpuTexture data = s_imageOutput->get_data(renderer::OutputValue{ target }, textures::Format::RGBA32F, false);
+			dumpPfm(name + "_" + std::to_string(target) + ".pfm", data.data());
+		}
+		if(s_outputTargets.is_set(target << 8u)) {
+			textures::CpuTexture data = s_imageOutput->get_data(renderer::OutputValue{ target << 8u }, textures::Format::RGBA32F, false);
+			dumpPfm(name + "_" + std::to_string(target) + "_var.pfm", data.data());
 		}
 	}
 
@@ -1448,19 +1519,19 @@ bool render_save_screenshot(const char* filename) {
 bool render_enable_render_target(RenderTarget target, bool variance) {
 	switch(target) {
 		case RenderTarget::TARGET_RADIANCE:
-			outputTargets.set(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
+			s_outputTargets.set(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_POSITION:
-			outputTargets.set(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
+			s_outputTargets.set(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_ALBEDO:
-			outputTargets.set(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
+			s_outputTargets.set(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_NORMAL:
-			outputTargets.set(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
+			s_outputTargets.set(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_LIGHTNESS:
-			outputTargets.set(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
+			s_outputTargets.set(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
 			break;
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown render target");
@@ -1472,19 +1543,19 @@ bool render_enable_render_target(RenderTarget target, bool variance) {
 bool render_disable_render_target(RenderTarget target, bool variance) {
 	switch(target) {
 		case RenderTarget::TARGET_RADIANCE:
-			outputTargets.clear(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
+			s_outputTargets.clear(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_POSITION:
-			outputTargets.clear(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
+			s_outputTargets.clear(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_ALBEDO:
-			outputTargets.clear(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
+			s_outputTargets.clear(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_NORMAL:
-			outputTargets.clear(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
+			s_outputTargets.clear(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
 			break;
 		case RenderTarget::TARGET_LIGHTNESS:
-			outputTargets.clear(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
+			s_outputTargets.clear(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
 			break;
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown render target");
@@ -1495,13 +1566,13 @@ bool render_disable_render_target(RenderTarget target, bool variance) {
 
 bool render_enable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
-		outputTargets.set(target << 8u);
+		s_outputTargets.set(target << 8u);
 	return true;
 }
 
 bool render_enable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
-		outputTargets.set(target);
+		s_outputTargets.set(target);
 	return true;
 }
 
@@ -1512,13 +1583,13 @@ bool render_enable_all_render_targets() {
 
 bool render_disable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
-		outputTargets.clear(target << 8u);
+		s_outputTargets.clear(target << 8u);
 	return true;
 }
 
 bool render_disable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
-		outputTargets.clear(target);
+		s_outputTargets.clear(target);
 	return true;
 }
 

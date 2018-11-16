@@ -39,7 +39,7 @@ public:
 	// Adds a new instance.
 	InstanceHandle add_instance(Instance &&instance);
 	// Add a created scenario and take ownership
-	ScenarioHandle add_scenario(Scenario&& scenario);
+	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name
 	std::optional<ScenarioHandle> get_scenario(const std::string_view& name);
 
@@ -53,7 +53,7 @@ public:
 	MaterialHandle add_material(std::unique_ptr<materials::IMaterial> material);
 
 	// Add a fully specfied camera to the pool of all cameras.
-	CameraHandle add_camera(std::unique_ptr<cameras::Camera> camera);
+	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
 
 	// Find a camera dependent on its name.
 	CameraHandle get_camera(std::string_view name);
@@ -108,7 +108,7 @@ private:
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
 	// All available cameras mapped to their name.
-	std::unordered_map<std::string_view, std::unique_ptr<cameras::Camera>> m_cameras;
+	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
 	// All light sources of the scene
 	std::map<std::string, lights::PointLight, std::less<>> m_pointLights;
 	std::map<std::string, lights::SpotLight, std::less<>> m_spotLights;

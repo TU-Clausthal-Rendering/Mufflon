@@ -14,13 +14,11 @@
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp" />
+    <ClCompile Include="..\..\deps\glad\glad.c" />
     <ClCompile Include="..\..\src\core\cameras\camera.cpp" />
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
-    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
@@ -54,6 +52,8 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
+    <ClInclude Include="..\..\deps\glad\glad\glad.h" />
+    <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h" />
     <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
     <ClInclude Include="..\..\src\core\cameras\sample.hpp" />
@@ -109,6 +109,7 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -164,14 +165,14 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;LIBRARY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SupportJustMyCode>false</SupportJustMyCode>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <PostBuildEvent>
@@ -209,13 +210,13 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;LIBRARY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>

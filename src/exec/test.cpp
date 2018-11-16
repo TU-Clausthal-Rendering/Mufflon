@@ -257,13 +257,27 @@ void test_sphere() {
 	mAssert(success);
 }
 
+void test_camera() {
+	std::cout << "Testing camera" << std::endl;
+	bool success = false;
+
+	CameraHdl cam = world_add_pinhole_camera("TestPinholeCam", { 0, 0, 0 }, { 0, 0, 1 },
+							 { 0, 1, 0 }, 10e-10f, 10e10f, ei::PI / 2.f);
+	mAssert(cam != nullptr);
+}
+
 void test_scene() {
 	std::cout << "Testing scene" << std::endl;
 	bool success = false;
 
 	ScenarioHdl scenario = world_find_scenario("TestScenario");
 	mAssert(scenario != nullptr);
-	scenario_set_resolution(scenario, { 800, 600 });
+	success = scenario_set_resolution(scenario, { 800, 600 });
+	mAssert(success);
+	CameraHdl cam = world_get_camera("TestPinholeCam");
+	mAssert(cam != nullptr);
+	success = scenario_set_camera(scenario, cam);
+	mAssert(success);
 	SceneHdl scene = world_load_scenario(scenario);
 	mAssert(scene != nullptr);
 	ei::Box aabb;
@@ -280,18 +294,20 @@ void test_renderer() {
 	std::cout << "Testing renderer" << std::endl;
 	bool success = false;
 
+	success = render_enable_render_target(RenderTarget::TARGET_RADIANCE, false);
+	mAssert(success);
 	success = render_enable_renderer(RendererType::RENDERER_CPU_PT);
 	mAssert(success);
 	success = render_iterate();
 	mAssert(success);
-	success = render_save_screenshot("test_image_cpu.pfm");
+	success = render_save_screenshot("test_image_cpu");
 	mAssert(success);
 
 	success = render_enable_renderer(RendererType::RENDERER_GPU_PT);
 	mAssert(success);
 	success = render_iterate();
 	mAssert(success);
-	success = render_save_screenshot("test_image_cpu.pfm");
+	success = render_save_screenshot("test_image_gpu");
 	mAssert(success);
 }
 
@@ -322,6 +338,7 @@ int main() {
 	test_polygon();
 	test_sphere();
 	test_lights();
+	test_camera();
 	test_scene();
 	test_renderer();
 

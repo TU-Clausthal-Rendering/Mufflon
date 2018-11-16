@@ -60,7 +60,7 @@ public:
 	virtual ~Camera() = default;
 
 	// The name of the camera as used by the scenario setup.
-	const std::string& get_name() const noexcept { return m_name; }
+	const std::string_view& get_name() const noexcept { return m_name; }
 	void set_name(std::string_view name) { m_name = name; }
 
 	const scene::Direction get_x_dir() const noexcept { return {m_viewSpace.m00, m_viewSpace.m01, m_viewSpace.m02}; }
@@ -117,7 +117,7 @@ protected:
 	float m_near {1e-10f};		// Optional near clipping distance
 	float m_far {1e10f};		// Optional far clipping distance
 private:
-	std::string m_name;
+	std::string_view m_name;
 };
 
 /*

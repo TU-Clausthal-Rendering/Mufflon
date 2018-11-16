@@ -299,4 +299,11 @@ LIBRARY_API bool render_disable_variance_render_targets();
 LIBRARY_API bool render_disable_non_variance_render_targets();
 LIBRARY_API bool render_disable_all_render_targets();
 
+// TODO
+LIBRARY_API bool initialize(void(*logCallback)(const char*, int));
+LIBRARY_API bool iterate();
+LIBRARY_API bool resize(int width, int height, int offsetX, int offsetY);
+LIBRARY_API void execute_command(const char* command);
+LIBRARY_API const char* get_error(int& length);
+
 }

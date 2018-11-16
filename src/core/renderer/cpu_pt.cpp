@@ -26,12 +26,12 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) const {
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(false);
 
-	const i32 PIXEL_COUNT = ei::sum(resolution);
+	const i32 PIXEL_COUNT = resolution.x * resolution.y;
 	// TODO: better pixel order?
 	// TODO: different scheduling?
-#pragma omp parallel for
+//#pragma omp parallel for
 	for(int pixel = 0; pixel < PIXEL_COUNT; ++pixel) {
-		this->sample(Pixel{ pixel / resolution.x, pixel % resolution.y }, buffer);
+		this->sample(Pixel{ pixel % resolution.x, pixel / resolution.x }, buffer);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();

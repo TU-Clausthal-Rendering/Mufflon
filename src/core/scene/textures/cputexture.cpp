@@ -149,15 +149,15 @@ Vec4 CpuTexture::fetch_R32F(int texelIdx) const {
 }
 
 Vec4 CpuTexture::fetch_RG32F(int texelIdx) const {
-	return {as<Vec2>(m_imageData.data()[texelIdx]), 0.0f, 1.0f};
+	return {as<Vec2>(m_imageData.data())[texelIdx], 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGB32F(int texelIdx) const {
-	return {as<Vec3>(m_imageData.data()[texelIdx]), 1.0f};
+	return {as<Vec3>(m_imageData.data())[texelIdx], 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGBA32F(int texelIdx) const {
-	return as<Vec4>(m_imageData.data()[texelIdx]);
+	return as<Vec4>(m_imageData.data())[texelIdx];
 }
 
 Vec4 CpuTexture::fetch_RGB9E5(int texelIdx) const

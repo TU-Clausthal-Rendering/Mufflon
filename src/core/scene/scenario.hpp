@@ -16,8 +16,7 @@ class Scenario {
 public:
 	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
 
-	Scenario(std::string name) :
-		m_name(name) {}
+	Scenario() = default;
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
 	Scenario& operator=(const Scenario&) = delete;
@@ -71,9 +70,13 @@ public:
 	void mask_object(ConstObjectHandle hdl);
 	void set_custom_lod(ConstObjectHandle hdl, std::size_t level);
 
-	const std::string& get_name() const noexcept {
+	const std::string_view& get_name() const noexcept {
 		return m_name;
 	}
+	void set_name(std::string_view name) noexcept {
+		m_name = name;
+	}
+
 	// Note: no method to change name! because it is being used as
 	// key in worldcontainer
 
@@ -99,7 +102,7 @@ private:
 		std::size_t lod = NO_CUSTOM_LOD;
 	};
 
-	const std::string m_name;
+	std::string_view m_name;
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
 	std::map<std::string, MaterialIndex, std::less<>> m_materialIndices;

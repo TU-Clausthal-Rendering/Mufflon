@@ -59,8 +59,9 @@ void GpuPathTracer::iterate(Pixel imageDims,
 							scene::lights::LightTree<Device::CUDA> lightTree,
 							RenderBuffer<Device::CUDA> outputBuffer) const {
 	// TODO: pass scene data to kernel!
+	// TODO: the kernel doesn't get called
 	sample<<<imageDims.x, imageDims.y>>>(imageDims, std::move(lightTree),
-											  std::move(outputBuffer));
+										 std::move(outputBuffer));
 }
 
 }} // namespace mufflon::renderer

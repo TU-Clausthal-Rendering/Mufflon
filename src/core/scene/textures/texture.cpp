@@ -14,11 +14,12 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMo
 	m_sRgb(sRgb),
 	m_cudaTexture(nullptr)
 {
+	create_texture_cpu();
+	m_dirty.mark_changed(Device::CPU);
 	if(data) {
+		copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
 		// A file loader provides an array with pixel data. This is loaded into
 		// a CPUTexture per default.
-		create_texture_cpu();
-		copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
 	}
 }
 

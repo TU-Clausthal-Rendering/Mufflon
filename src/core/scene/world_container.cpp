@@ -30,8 +30,10 @@ InstanceHandle WorldContainer::add_instance(Instance &&instance) {
 	return &m_instances.back();
 }
 
-WorldContainer::ScenarioHandle WorldContainer::add_scenario(Scenario&& scenario) {
-	return m_scenarios.emplace(scenario.get_name(), std::move(scenario)).first;
+WorldContainer::ScenarioHandle WorldContainer::create_scenario(std::string name) {
+	ScenarioHandle hdl = m_scenarios.emplace(std::move(name), Scenario{}).first;
+	hdl->second.set_name(hdl->first);
+	return hdl;
 }
 
 std::optional<WorldContainer::ScenarioHandle> WorldContainer::get_scenario(const std::string_view& name) {
@@ -46,11 +48,10 @@ MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial
 	return m_materials.back().get();
 }
 
-CameraHandle WorldContainer::add_camera(std::unique_ptr<cameras::Camera> camera) {
-	std::string_view name = camera->get_name();
-	CameraHandle handle = camera.get();
-	m_cameras.emplace(name, move(camera));
-	return handle;
+CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<cameras::Camera> camera) {
+	auto iter = m_cameras.emplace(name, move(camera));
+	iter.first->second->set_name(iter.first->first);
+	return iter.first->second.get();
 }
 
 CameraHandle WorldContainer::get_camera(std::string_view name) {

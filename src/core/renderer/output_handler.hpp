@@ -31,11 +31,11 @@ struct RenderBuffer {
 	// The following texture handles may contain iteration only or all iterations summed
 	// information. The meaning of the variables is only known to the OutputHandler.
 	// The renderbuffer only needs to add values to all defined handles.
-	scene::textures::TextureDevHandle_t<dev> m_radiance;
-	scene::textures::TextureDevHandle_t<dev> m_position;
-	scene::textures::TextureDevHandle_t<dev> m_normal;
-	scene::textures::TextureDevHandle_t<dev> m_albedo;
-	scene::textures::TextureDevHandle_t<dev> m_lightness;
+	scene::textures::TextureDevHandle_t<dev> m_radiance = {};
+	scene::textures::TextureDevHandle_t<dev> m_position = {};
+	scene::textures::TextureDevHandle_t<dev> m_normal = {};
+	scene::textures::TextureDevHandle_t<dev> m_albedo = {};
+	scene::textures::TextureDevHandle_t<dev> m_lightness = {};
 
 	// Handle contribution of connection and merge events
 	__host__ __device__ void contribute(Pixel pixel,

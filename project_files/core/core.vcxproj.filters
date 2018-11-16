@@ -53,6 +53,15 @@
     <Filter Include="Source Files\core\memory">
       <UniqueIdentifier>{97993b8b-0988-4b82-9fb7-596de98c790a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\deps\glad">
+      <UniqueIdentifier>{955150f0-85fa-405c-92b3-050fae4a0c76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\glad\glad">
+      <UniqueIdentifier>{fa881fd1-751f-4c15-b289-7f7785d45484}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\glad\KHR">
+      <UniqueIdentifier>{568fd7ed-385f-4437-b142-527369fb5a2b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -123,6 +132,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp">
       <Filter>Source Files\core\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\deps\glad\glad.c">
+      <Filter>Source Files\deps\glad</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -321,6 +333,12 @@
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\deps\glad\glad\glad.h">
+      <Filter>Source Files\deps\glad\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h">
+      <Filter>Source Files\deps\glad\KHR</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
@@ -337,6 +355,8 @@
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">
       <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
-    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
+      <Filter>Source Files\core\renderer</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>
