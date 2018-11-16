@@ -35,7 +35,9 @@ namespace details {
 	// Dummy conversion methods to make all types compatible
 	inline const char* to_string(const char* _str) { return _str; }
 	inline const std::string& to_string(const std::string& _str) { return _str; }
+#ifndef __CUDACC__
 	inline const std::string_view& to_string(const std::string_view& _str) { return _str; }
+#endif
 	using std::to_string;
 
 	// This one builds the message string

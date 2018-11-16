@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/scene/textures/texture.hpp"
+#include "core/scene/textures/cputexture.hpp"
 #include "core/scene/textures/interface.hpp"
 #include "util/flag.hpp"
 #include "path_util.hpp"
@@ -21,6 +22,8 @@ struct OutputValue : util::Flags<u32> {
 	static constexpr u32 LIGHTNESS_VAR = 0x1000;
 
 	static constexpr u32 iterator[5] = {RADIANCE, POSITION, ALBEDO, NORMAL, LIGHTNESS};
+
+	bool is_variance() const { return (mask & 0xff00) != 0; }
 };
 
 template < Device dev >
@@ -96,11 +99,20 @@ class OutputHandler {
 public:
 	OutputHandler(u16 width, u16 height, OutputValue targets);
 
+	// Allocate and clear the buffers. Which buffers are returned depents on the
+	// 'targets' which where set in the constructor.
 	template < Device dev >
 	RenderBuffer<dev> begin_iteration(bool reset);
 
+	// Do some finalization, like variance computations
 	template < Device dev >
 	void end_iteration();
+
+	// Get the formated output of one quantity for the purpose of exporting screenshots.
+	// which: The quantity to export. Causes an error if the quantity is not recorded.
+	// exportFormat: The format of the pixels in the vector (includes elementary type and number of channels).
+	// exportSRgb: Convert the values from linear to sRGB before packing the data into the exportFormat.
+	scene::textures::CpuTexture get_data(OutputValue which, scene::textures::Format exportFormat, bool exportSRgb);
 private:
 	// In each block either none, m_iter... only, or all three are defined.
 	// If variances is required all three will be used and m_iter resets every iteration.
@@ -110,6 +122,8 @@ private:
 	scene::textures::Texture m_cumulativeVarTex[5];		// Accumulate the variance
 	OutputValue m_targets;
 	int m_iteration;			// Number of completed iterations / index of current one
+	u16 m_width;
+	u16 m_height;
 };
 
 }} // namespace mufflon::renderer

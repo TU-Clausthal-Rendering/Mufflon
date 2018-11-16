@@ -43,6 +43,8 @@ struct Flags {
 	bool is_empty() const noexcept { return mask == 0; }
 	// Check if exactly one flag is set
 	bool is_unique() const noexcept { return is_power_of_two(mask); }
+
+	operator T () const noexcept { return mask; }
 };
 
 /**
