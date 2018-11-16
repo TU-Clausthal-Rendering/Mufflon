@@ -1,0 +1,361 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{92CEF99E-51BB-4733-9AC2-A8E0DBB37E18}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>gui</RootNamespace>
+    <AssemblyName>gui</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <BaseIntermediateOutputPath>..\..\build\temp\gui\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\..\build\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\..\build\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xaml">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Compile Include="Command\AddCameraCommand.cs" />
+    <Compile Include="Command\AddLightCommand.cs" />
+    <Compile Include="Command\AddMaterialCommand.cs" />
+    <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
+    <Compile Include="Command\PlayPauseCommand.cs" />
+    <Compile Include="Command\RemoveCameraCommand.cs" />
+    <Compile Include="Command\RemoveLightCommand.cs" />
+    <Compile Include="Command\RemoveMaterialCommand.cs" />
+    <Compile Include="Command\SelectTextureCommand.cs" />
+    <Compile Include="Model\AppModel.cs" />
+    <Compile Include="Model\Camera\CameraModel.cs" />
+    <Compile Include="Model\Camera\FocusCameraModel.cs" />
+    <Compile Include="Model\Camera\OrthoCameraModel.cs" />
+    <Compile Include="Model\Camera\PinholeCameraModel.cs" />
+    <Compile Include="Model\Light\DirectionalLightModel.cs" />
+    <Compile Include="Model\Light\EnvmapLightModel.cs" />
+    <Compile Include="Model\Light\GoniometricLightModel.cs" />
+    <Compile Include="Model\Light\LightModel.cs" />
+    <Compile Include="Model\Light\PointLightModel.cs" />
+    <Compile Include="Model\Light\SpotLightModel.cs" />
+    <Compile Include="Model\Material\BlendMaterialModel.cs" />
+    <Compile Include="Model\Material\EmissiveMaterialModel.cs" />
+    <Compile Include="Model\Material\FresnelMaterialModel.cs" />
+    <Compile Include="Model\Material\LambertMaterialModel.cs" />
+    <Compile Include="Model\Material\MaterialModel.cs" />
+    <Compile Include="Model\Material\OrennayarMaterialModel.cs" />
+    <Compile Include="Model\Material\TorranceMaterialModel.cs" />
+    <Compile Include="Model\Material\WalterMaterialModel.cs" />
+    <Compile Include="Model\RendererModel.cs" />
+    <Compile Include="Model\SceneModel.cs" />
+    <Compile Include="Model\ToolbarModel.cs" />
+    <Compile Include="Model\ViewportModel.cs" />
+    <Compile Include="Properties\Annotations.cs" />
+    <Compile Include="Utility\SynchronizedModelList.cs" />
+    <Compile Include="Utility\SynchronizedViewModelList.cs" />
+    <Compile Include="Utility\Vec2.cs" />
+    <Compile Include="Utility\Vec3.cs" />
+    <Compile Include="ViewModel\AddPropertyViewModel.cs" />
+    <Compile Include="ViewModel\Camera\AddCameraViewModel.cs" />
+    <Compile Include="ViewModel\Camera\CamerasViewModel.cs" />
+    <Compile Include="ViewModel\Camera\CameraViewModel.cs" />
+    <Compile Include="ViewModel\Camera\FocusCameraViewModel.cs" />
+    <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
+    <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
+    <Compile Include="ViewModel\ConsoleViewModel.cs" />
+    <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\GoniometricLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\LightsViewModel.cs" />
+    <Compile Include="ViewModel\Light\LightViewModel.cs" />
+    <Compile Include="ViewModel\Light\PointLightViewModel.cs" />
+    <Compile Include="ViewModel\Light\SpotLightViewModel.cs" />
+    <Compile Include="ViewModel\Material\AddMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\BlendMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\EmissiveMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\FresnelMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\LambertMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\MaterialsViewModel.cs" />
+    <Compile Include="ViewModel\Material\MaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\OrennayarMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\TorranceMaterialViewModel.cs" />
+    <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
+    <Compile Include="ViewModel\ToolbarViewModel.cs" />
+    <Compile Include="ViewModel\ViewModels.cs" />
+    <Compile Include="ViewModel\ViewportViewModel.cs" />
+    <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
+    <Compile Include="View\Camera\CameraView.xaml.cs">
+      <DependentUpon>CameraView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Camera\FocusCameraView.xaml.cs">
+      <DependentUpon>FocusCameraView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Camera\OrthoCameraView.xaml.cs">
+      <DependentUpon>OrthoCameraView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Camera\PinholeCameraView.xaml.cs">
+      <DependentUpon>PinholeCameraView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Dialog\AddPropertyDialog.xaml.cs">
+      <DependentUpon>AddPropertyDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Helper\ComboBoxItem.cs" />
+    <Compile Include="View\Helper\EnterTextBox.cs" />
+    <Compile Include="View\Light\DirectionalLightView.xaml.cs">
+      <DependentUpon>DirectionalLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\EnvmapLightView.xaml.cs">
+      <DependentUpon>EnvmapLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\GoniometricLightView.xaml.cs">
+      <DependentUpon>GoniometricLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\LightView.xaml.cs">
+      <DependentUpon>LightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\PointLightView.xaml.cs">
+      <DependentUpon>PointLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Light\SpotLightView.xaml.cs">
+      <DependentUpon>SpotLightView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\BlendMaterialView.xaml.cs">
+      <DependentUpon>BlendMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\EmissiveMaterialView.xaml.cs">
+      <DependentUpon>EmissiveMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\FresnelMaterialView.xaml.cs">
+      <DependentUpon>FresnelMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\LambertMaterialView.xaml.cs">
+      <DependentUpon>LambertMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\MaterialView.xaml.cs">
+      <DependentUpon>MaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\OrennayarMaterialView.xaml.cs">
+      <DependentUpon>OrennayarMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\RecursiveMaterialView.xaml.cs">
+      <DependentUpon>RecursiveMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\TorranceMaterialView.xaml.cs">
+      <DependentUpon>TorranceMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Material\WalterMaterialView.xaml.cs">
+      <DependentUpon>WalterMaterialView.xaml</DependentUpon>
+    </Compile>
+    <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Dll\Core.cs" />
+    <Compile Include="Dll\Gdi32.cs" />
+    <Compile Include="Dll\OpenGl32.cs" />
+    <Compile Include="Dll\OpenGLHost.cs" />
+    <Compile Include="Dll\User32.cs" />
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Page Include="View\Camera\CameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Camera\FocusCameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Camera\OrthoCameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Camera\PinholeCameraView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Dialog\AddPropertyDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\DirectionalLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\EnvmapLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\GoniometricLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\LightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\PointLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Light\SpotLightView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\BlendMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\EmissiveMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\FresnelMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\LambertMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\MaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\OrennayarMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\RecursiveMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\TorranceMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Material\WalterMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Model\Models.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include=".NETFramework,Version=v4.6.1">
+      <Visible>False</Visible>
+      <ProductName>Microsoft .NET Framework 4.6.1 %28x86 and x64%29</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\cancel.png" />
+    <Resource Include="Icons\help.png" />
+    <Resource Include="Icons\open.png" />
+    <Resource Include="Icons\save.png" />
+    <Resource Include="Icons\zoom.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\add.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\inspect_instance.png" />
+    <Resource Include="Icons\inspect_light.png" />
+    <Resource Include="Icons\inspect_material.png" />
+    <Resource Include="Icons\pause.png" />
+    <Resource Include="Icons\play.png" />
+    <Resource Include="Icons\restart.png" />
+    <Resource Include="Icons\stop.png" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

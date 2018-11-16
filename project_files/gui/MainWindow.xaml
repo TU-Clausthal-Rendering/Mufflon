@@ -1,0 +1,323 @@
+﻿<Window x:Class="gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:gui"
+        xmlns:view="clr-namespace:gui.View"
+        xmlns:camera="clr-namespace:gui.View.Camera"
+        mc:Ignorable="d"
+        Title="MainWindow" 
+        Height="600" 
+        Width="800"
+        WindowState="Maximized">
+    <Window.Resources>
+        <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
+        <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
+        <Thickness x:Key="ThinBorder" Bottom="1"/>
+    </Window.Resources>
+    <DockPanel Background="{StaticResource BackgroundBrush}">
+        <!-- Menu Bar and Status bar grid -->
+        <Grid
+            DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <!-- status bar always in the center -->
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Menu 
+                DockPanel.Dock="Top"
+                BorderThickness="{StaticResource ThinBorder}"
+                BorderBrush="{StaticResource BorderBrush}">
+                <MenuItem Header="File">
+                    <MenuItem Header="Load Renderer"/>
+                    <MenuItem Header="Load Scene"/>
+                </MenuItem>
+                <MenuItem Header="Help">
+                    <MenuItem Header="About"/>
+                </MenuItem>
+            </Menu>
+
+            <StatusBar 
+                Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                BorderThickness="{StaticResource ThinBorder}"
+                BorderBrush="{StaticResource BorderBrush}"
+                HorizontalContentAlignment="Center">
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button Command="{Binding Toolbar.PlayPauseCommand}">
+                        <StackPanel>
+                            <Image 
+                                Source="Icons/play.png"
+                                Width="16"
+                                Height="16"
+                                Visibility="{Binding Toolbar.PlayIconVisibility}"/>
+                            <Image 
+                                Source="Icons/pause.png"
+                                Width="16"
+                                Height="16"
+                                Visibility="{Binding Toolbar.PauseIconVisibility, FallbackValue=Collapsed}"/>
+                        </StackPanel>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/restart.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/inspect_instance.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/inspect_material.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button>
+                        <Image 
+                            Source="Icons/inspect_light.png"
+                            Width="16"
+                            Height="16"/>
+                    </Button>
+                </StatusBarItem>
+            </StatusBar>
+
+            <Border
+                Grid.Column="2"
+                BorderThickness="{StaticResource ThinBorder}"
+                BorderBrush="{StaticResource BorderBrush}"/>
+        </Grid>
+        
+        <Grid DockPanel.Dock="Bottom">
+            <Grid.RowDefinitions>
+                <!-- renderer and property pages -->
+                <RowDefinition Height="4*"/>
+                <!-- console -->
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="*"/>
+                <!-- status bar -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- renderer and property pages -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <!-- info page -->
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="5"/>
+                    <!-- renderer -->
+                    <ColumnDefinition Width="*"/>
+                    <!-- properties page -->
+                    <ColumnDefinition Width="5"/>
+                    <ColumnDefinition Width="160"/>
+                </Grid.ColumnDefinitions>
+
+                <GridSplitter
+                    Grid.Column="1"
+                    Width="5"
+                    HorizontalAlignment="Stretch"
+                    Background="{StaticResource BorderBrush}"/>
+                
+                <!-- Renderer with scroll bars -->
+                <Grid
+                    Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border 
+                        x:Name="BorderHost"
+                        DockPanel.Dock="Bottom"
+                        Background="Black"
+                        MaxWidth="{Binding Viewport.RenderWidth}"
+                        MaxHeight="{Binding Viewport.RenderHeight}"/>
+
+                    <ScrollBar 
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Minimum="0"
+                        Maximum="{Binding Viewport.ScrollMaximumY}"
+                        Value="{Binding Viewport.OffsetY}"
+                        ViewportSize="{Binding Viewport.ScrollHeight}"/>
+
+                    <ScrollBar
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Orientation="Horizontal"
+                        Minimum="0"
+                        Maximum="{Binding Viewport.ScrollMaximumX}"
+                        Value="{Binding Viewport.OffsetX}"
+                        ViewportSize="{Binding Viewport.ScrollWidth}"/>
+
+                </Grid>
+                
+
+                <GridSplitter
+                    Grid.Column="3"
+                    Width="5"
+                    HorizontalAlignment="Stretch"
+                    Background="{StaticResource BorderBrush}"/>
+
+                <!-- scene and renderer properties -->
+                <TabControl
+                    Grid.Column="4"
+                    Background="{StaticResource BackgroundBrush}">
+                    <TabItem Header="Renderer">
+
+                    </TabItem>
+                    <TabItem Header="Material">
+                        <ScrollViewer 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Materials.Views}"/>
+                                <Button Command="{Binding AddMaterialCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image 
+                                            Grid.Column="0"
+                                            Source="Icons/add.png"
+                                            Width="16"
+                                            Height="16"/>
+                                        <Label 
+                                            Grid.Column="1"
+                                            Content="Add Material"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Light">
+                        <ScrollViewer 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Lights.Views}"/>
+                                <Button Command="{Binding AddLightCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image 
+                                            Grid.Column="0"
+                                            Source="Icons/add.png"
+                                            Width="16"
+                                            Height="16"/>
+                                        <Label 
+                                            Grid.Column="1"
+                                            Content="Add Light"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Camera">
+                        <ScrollViewer 
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
+                                <Button Command="{Binding AddCameraCommand}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Image 
+                                            Grid.Column="0"
+                                            Source="Icons/add.png"
+                                            Width="16"
+                                            Height="16"/>
+                                        <Label 
+                                            Grid.Column="1"
+                                            Content="Add Camera"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+            <GridSplitter
+                ResizeDirection="Rows"
+                Grid.Row="1"
+                Height="5"
+                Width="Auto"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="{StaticResource BorderBrush}"/>
+            
+            <!-- console -->
+            <Grid Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <!-- display box -->
+                <ScrollViewer
+                    Grid.Row="0"
+                    Margin="0"
+                    Background="{StaticResource ConsoleBrush}"
+                    x:Name="ConsoleScrollViewer">
+                    <!-- stack panel of messages -->
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Console.Output, Mode=OneWay}"/>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- console input box -->
+                <TextBox
+                    Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Height="Auto"
+                    Background="{StaticResource ConsoleBrush}"
+                    Foreground="{StaticResource ConsoleFontBrush}"
+                    Text="{Binding Console.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    FontFamily="Consolas"
+                    BorderBrush="{x:Null}"
+                    SelectionBrush="{x:Null}"
+                    x:Name="ConsoleInputBox"/>
+            </Grid>
+            
+
+            <!-- status bar -->
+            <StatusBar
+                Grid.Row="3"
+                Height="18">
+
+                <StatusBarItem
+                    Width="200"
+                    HorizontalAlignment="Right"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Stretch">
+                    <ProgressBar Value="50"/>
+                </StatusBarItem>
+            </StatusBar>
+        </Grid>
+        
+    </DockPanel>
+</Window>
+

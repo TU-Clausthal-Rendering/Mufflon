@@ -1,0 +1,67 @@
+﻿<UserControl x:Class="gui.View.Camera.FocusCameraView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:gui.View.Camera"
+             xmlns:helper="clr-namespace:gui.View.Helper"
+             mc:Ignorable="d" 
+             d:DesignHeight="200" 
+             d:DesignWidth="160">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock
+                Grid.Column="0"
+                Grid.Row="0"
+                Text="Focal Length:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Grid.Column="1"
+                Grid.Row="0"
+                Margin="{StaticResource RightPropertyMargin}"
+                Text="{Binding FocalLength}"/>
+
+        <TextBlock
+                Grid.Column="0"
+                Grid.Row="1"
+                Text="Chip Height:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Grid.Column="1"
+                Grid.Row="1"
+                Margin="{StaticResource RightPropertyMargin}"
+                Text="{Binding ChipHeight}"/>
+
+        <TextBlock
+                Grid.Column="0"
+                Grid.Row="2"
+                Text="Focus Distance:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Grid.Column="1"
+                Grid.Row="2"
+                Margin="{StaticResource RightPropertyMargin}"
+                Text="{Binding FocusDistance}"/>
+
+        <TextBlock
+                Grid.Column="0"
+                Grid.Row="3"
+                Text="Aperture:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Grid.Column="1"
+                Grid.Row="3"
+                Margin="{StaticResource RightPropertyMargin}"
+                Text="{Binding Aperture}"/>
+    </Grid>
+</UserControl>
