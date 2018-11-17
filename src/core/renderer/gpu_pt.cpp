@@ -7,7 +7,7 @@ namespace mufflon::renderer {
 GpuPathTracer::GpuPathTracer(scene::SceneHandle scene) :
 	m_currentScene(scene) {
 	// Make sure the scene is loaded completely for the use on CPU side
-	scene->synchronize<Device::CPU>();
+	scene->synchronize<Device::CUDA>();
 
 	// The PT does not need additional memory resources like photon maps.
 }
@@ -20,6 +20,7 @@ void GpuPathTracer::iterate(OutputHandler& outputBuffer) const {
 		logError("[GpuPathTracer::iterate] Invalid resolution (<= 0)");
 		return;
 	}
+	cuda::check_error(cudaPeekAtLastError());
 
 	// TODO: pass scene data to kernel!
 	this->iterate(m_currentScene->get_resolution(), std::move(m_currentScene->get_light_tree<Device::CUDA>()),

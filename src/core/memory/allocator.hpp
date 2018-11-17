@@ -97,7 +97,7 @@ public:
 					  "Must be trivially copyable");
 		T prototype { std::forward<Args>(args)... };
 		for(std::size_t i = 0; i < n; ++i)
-			cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyHostToDevice);
+			cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyHostToDevice));
 		return ptr;
 	}
 

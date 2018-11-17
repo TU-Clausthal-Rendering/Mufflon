@@ -1,6 +1,7 @@
 #include "texture.hpp"
 #include "cputexture.hpp"
 #include "util/log.hpp"
+#include "core/cuda/error.hpp"
 #include "core/memory/synchronize.hpp"
 
 namespace mufflon::scene::textures {
@@ -26,9 +27,9 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMo
 Texture::~Texture() {
 	m_cpuTexture = nullptr;
 	if(m_cudaTexture) {
-		cudaDestroyTextureObject(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>().handle);
-		cudaDestroySurfaceObject(m_handles.get<TextureDevHandle_t<Device::CUDA>>().handle);
-		cudaFreeArray(m_cudaTexture);
+		cuda::check_error(cudaDestroyTextureObject(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>().handle));
+		cuda::check_error(cudaDestroySurfaceObject(m_handles.get<TextureDevHandle_t<Device::CUDA>>().handle));
+		cuda::check_error(cudaFreeArray(m_cudaTexture));
 	}
 }
 
@@ -46,10 +47,19 @@ void Texture::synchronize() {
 			}
 		}
 		// Copy the memory (wherever it changed)
-		if((dev == Device::CUDA) && m_dirty.has_changes(Device::CPU))
-			copy<dev, Device::CPU>(m_cudaTexture, m_cpuTexture->data(), m_width * m_height * PIXEL_SIZE(m_format));
-		if((dev == Device::CPU) && m_dirty.has_changes(Device::CUDA))
-			copy<dev, Device::CUDA>(m_cpuTexture->data(), m_cudaTexture, m_width * m_height * PIXEL_SIZE(m_format));
+		// TODO: this needs to be memcpyarray?
+		if((dev == Device::CUDA) && m_dirty.has_changes(Device::CPU)) {
+			cuda::check_error(cudaMemcpyToArray(m_cudaTexture, 0u, 0u, m_cpuTexture->data(),
+												m_width * m_height * PIXEL_SIZE(m_format),
+												cudaMemcpyHostToDevice));
+			//copy<dev, Device::CPU>(m_cudaTexture, m_cpuTexture->data(), m_width * m_height * PIXEL_SIZE(m_format));
+		}
+		if((dev == Device::CPU) && m_dirty.has_changes(Device::CUDA)) {
+			cuda::check_error(cudaMemcpyFromArray(m_cpuTexture->data(), m_cudaTexture, 0u, 0u,
+												  m_width * m_height * PIXEL_SIZE(m_format),
+												  cudaMemcpyDeviceToHost));
+			//copy<dev, Device::CUDA>(m_cpuTexture->data(), m_cudaTexture, m_width * m_height * PIXEL_SIZE(m_format));
+		}
 	}
 	m_dirty.mark_synced(dev);
 }
@@ -80,9 +90,9 @@ void Texture::unload() {
 				// Free
 				auto& texHdl = m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>();
 				auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
-				cudaDestroyTextureObject(texHdl.handle);
-				cudaDestroySurfaceObject(surfHdl.handle);
-				cudaFreeArray(m_cudaTexture);
+				cuda::check_error(cudaDestroyTextureObject(texHdl.handle));
+				cuda::check_error(cudaDestroySurfaceObject(surfHdl.handle));
+				cuda::check_error(cudaFreeArray(m_cudaTexture));
 				// Reset handles
 				texHdl.handle = 0;
 				surfHdl.handle = 0;
@@ -123,7 +133,7 @@ void Texture::clear() {
 					s_zeroMem.resize(texMemSize);
 					memset(s_zeroMem.data(), 0, texMemSize);
 				}
-				cudaMemcpyToArray(m_cudaTexture, 0, 0, s_zeroMem.data(), texMemSize, cudaMemcpyHostToDevice);
+				cuda::check_error(cudaMemcpyToArray(m_cudaTexture, 0, 0, s_zeroMem.data(), texMemSize, cudaMemcpyHostToDevice));
 			}
 		} break;
 		case Device::OPENGL: {
@@ -163,17 +173,19 @@ void Texture::create_texture_cuda() {
 		case Format::RGB9E5: channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned); break;
 		default:
 			mAssertMsg(false, "Format not implemented.");
-	} 
-	cudaMallocArray(&m_cudaTexture, &channelDesc, m_width, m_height);
+	}
+	cuda::check_error(cudaGetLastError());
+	cuda::check_error(cudaMallocArray(&m_cudaTexture, &channelDesc, m_width, m_height));
 
 	// Specify the texture view on the memory
-	cudaResourceDesc resDesc;
+	cudaResourceDesc resDesc{};
 	resDesc.resType = cudaResourceTypeArray;
 	resDesc.res.array.array = m_cudaTexture;
 	cudaTextureDesc texDesc;
 	texDesc.addressMode[0] = texDesc.addressMode[1] = texDesc.addressMode[2] = cudaAddressModeWrap;
 	texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
-	texDesc.readMode = cudaReadModeNormalizedFloat;
+	// TODO: why is this invalid?
+	//texDesc.readMode = cudaReadModeNormalizedFloat;
 	texDesc.sRGB = m_sRgb;
 	texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] = texDesc.borderColor[3] = 0.0f;
 	texDesc.normalizedCoords = true;
@@ -185,7 +197,7 @@ void Texture::create_texture_cuda() {
 
 	// Fill the handle (texture)
 	auto& texHdl = m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>();
-	cudaCreateTextureObject(&texHdl.handle, &resDesc, &texDesc, nullptr);
+	cuda::check_error(cudaCreateTextureObject(&texHdl.handle, &resDesc, &texDesc, nullptr));
 	texHdl.width = m_width;
 	texHdl.height = m_height;
 	texHdl.depth = m_numLayers;
@@ -194,7 +206,7 @@ void Texture::create_texture_cuda() {
 	if(NUM_CHANNELS(m_format) != 3) // Allow read-only RGB formats without causing errors here
 	{
 		auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
-		cudaCreateSurfaceObject(&surfHdl.handle, &resDesc);
+		cuda::check_error(cudaCreateSurfaceObject(&surfHdl.handle, &resDesc));
 		surfHdl.width = m_width;
 		surfHdl.height = m_height;
 		surfHdl.depth = m_numLayers;

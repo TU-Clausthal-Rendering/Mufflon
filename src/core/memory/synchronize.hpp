@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "core/cuda/error.hpp"
 #include "util/flag.hpp"
 
 namespace mufflon { // There is no memory namespace on purpose
@@ -51,9 +52,9 @@ template < class T >
 void synchronize(ConstArrayDevHandle_t<Device::CPU, T> changed,
 				 ArrayDevHandle_t<Device::CUDA, T>& sync, std::size_t length) {
 	if(sync.handle == nullptr) {
-		cudaMalloc<T>(&sync, sizeof(T) * length);
+		cuda::check_error(cudaMalloc<T>(&sync, sizeof(T) * length));
 	}
-	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice);
+	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice));
 }
 template < class T >
 void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
@@ -61,7 +62,7 @@ void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
 	if(sync.handle == nullptr) {
 		sync.handle = new T[length];
 	}
-	cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost);
+	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost));
 }
 
 // Functions for unloading a handle from the device
@@ -73,7 +74,7 @@ void unload(ArrayDevHandle_t<Device::CPU, T>& hdl) {
 template < class T >
 void unload(ArrayDevHandle_t<Device::CUDA, T>& hdl) {
 	if(hdl.handle != nullptr) {
-		cudaFree(hdl.handle);
+		cuda::check_error(cudaFree(hdl.handle));
 		hdl.handle = nullptr;
 	}
 }
@@ -95,19 +96,19 @@ inline void copy(DevPtr<dstDev> dst, ConstDevPtr<srcDev> src, std::size_t size )
 
 template <>
 inline void copy<Device::CPU, Device::CPU>(void* dst, const void* src, std::size_t size) {
-	memcpy(dst, src, size);
+	std::memcpy(dst, src, size);
 }
 template <>
 inline void copy<Device::CUDA, Device::CPU>(void* dst, const void* src, std::size_t size) {
-	cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice);
+	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice));
 }
 template <>
 inline void copy<Device::CPU, Device::CUDA>(void* dst, const void* src, std::size_t size) {
-	cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost);
+	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost));
 }
 template <>
 inline void copy<Device::CUDA, Device::CUDA>(void* dst, const void* src, std::size_t size) {
-	cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice);
+	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice));
 }
 // TODO: OpenGL (glBufferSubData with offset and object handle as target/src types
 
