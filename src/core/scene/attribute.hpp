@@ -433,9 +433,7 @@ public:
 	AttributePool(AttributePool&&) = default;
 	AttributePool& operator=(const AttributePool&) = delete;
 	AttributePool& operator=(AttributePool&&) = default;
-	~AttributePool() {
-		std::cout << this << std::endl;
-	}
+	~AttributePool() = default;
 
 	// Helper class identifying an attribute in the pool
 	template < class T >

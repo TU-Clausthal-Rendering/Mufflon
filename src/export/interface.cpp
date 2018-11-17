@@ -189,7 +189,7 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 } // namespace
 
 
-bool initialize(void(*logCallback)(const char*, int)) {
+Boolean initialize(void(*logCallback)(const char*, int)) {
 	// Only once per process do we register/unregister the message handler
 	std::once_flag regMsgHdl;
 	std::call_once(regMsgHdl, []() {
@@ -210,7 +210,7 @@ const char* get_error(int& length) {
 	length = static_cast<int>(s_lastError.length());
 	return s_lastError.data();
 }
-bool iterate() {
+Boolean iterate() {
 	static float t = 0.0f;
 	glClearColor(0.0f, t, 0.0f, 1.0f);
 	t += 0.01f;
@@ -219,7 +219,7 @@ bool iterate() {
 
 	return true;
 }
-bool resize(int width, int height, int offsetX, int offsetY) {
+Boolean resize(int width, int height, int offsetX, int offsetY) {
 	// glViewport should not be called with width or height zero
 	if(width == 0 || height == 0) return true;
 	glViewport(0, 0, width, height);
@@ -231,7 +231,7 @@ void execute_command(const char* command) {
 
 
 
-bool polygon_resize(ObjectHdl obj, size_t vertices, size_t edges, size_t faces) {
+Boolean polygon_resize(ObjectHdl obj, size_t vertices, size_t edges, size_t faces) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Object*>(obj)->template resize<Polygons>(vertices, edges, faces);
 	return true;
@@ -278,7 +278,7 @@ PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 	});
 }
 
-bool polygon_remove_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* hdl) {
+Boolean polygon_remove_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* hdl) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(hdl, "attribute", false);
 	CHECK_GEQ_ZERO(hdl->openMeshIndex, "attribute index (OpenMesh)", false);
@@ -298,7 +298,7 @@ bool polygon_remove_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 	});
 }
 
-bool polygon_remove_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* hdl) {
+Boolean polygon_remove_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* hdl) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(hdl, "attribute", false);
 	CHECK_GEQ_ZERO(hdl->openMeshIndex, "attribute index (OpenMesh)", false);
@@ -487,7 +487,7 @@ VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
 }
 
-bool polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
+Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
 								  VertexHdl vertex, void* value) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
@@ -516,7 +516,7 @@ bool polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* a
 	});
 }
 
-bool polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
+Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
 								FaceHdl face, void* value) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
@@ -545,7 +545,7 @@ bool polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* att
 	});
 }
 
-bool polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
+Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(face, "face index", false);
 	Object& object = *static_cast<Object*>(obj);
@@ -671,7 +671,7 @@ size_t polygon_get_quad_count(ObjectHdl obj) {
 	return object.template get_geometry<Polygons>().get_quad_count();
 }
 
-bool polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
+Boolean polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	const Object& object = *static_cast<const Object*>(obj);
 	const ei::Box& aabb = object.template get_geometry<Polygons>().get_bounding_box();
@@ -682,7 +682,7 @@ bool polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	return true;
 }
 
-bool spheres_resize(ObjectHdl obj, size_t count) {
+Boolean spheres_resize(ObjectHdl obj, size_t count) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Object*>(obj)->template resize<Spheres>(count);
 	return true;
@@ -706,7 +706,7 @@ SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 	});
 }
 
-bool spheres_remove_attribute(ObjectHdl obj, const SphereAttributeHandle* hdl) {
+Boolean spheres_remove_attribute(ObjectHdl obj, const SphereAttributeHandle* hdl) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(hdl, "attribute", false);
 	CHECK_GEQ_ZERO(hdl->index, "attribute index", false);
@@ -791,7 +791,7 @@ SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 	return SphereHdl{ static_cast<IndexType>(info.handle) };
 }
 
-bool spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
+Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 						   SphereHdl sphere, void* value) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
@@ -819,7 +819,7 @@ bool spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 	});
 }
 
-bool spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
+Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(sphere, "sphere index", false);
 	Object& object = *static_cast<Object*>(obj);
@@ -890,7 +890,7 @@ size_t spheres_get_sphere_count(ObjectHdl obj) {
 	return object.template get_geometry<Spheres>().get_sphere_count();
 }
 
-bool spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
+Boolean spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	const Object& object = *static_cast<const Object*>(obj);
 	const ei::Box& aabb = object.get_bounding_box<Spheres>();
@@ -1101,7 +1101,7 @@ size_t scenario_get_global_lod_level(ScenarioHdl scenario) {
 	return static_cast<const Scenario*>(scenario)->get_global_lod_level();
 }
 
-bool scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level) {
+Boolean scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_global_lod_level(level);
 	return true;
@@ -1112,7 +1112,7 @@ IVec2 scenario_get_resolution(ScenarioHdl scenario) {
 	return util::pun<IVec2>(static_cast<const Scenario*>(scenario)->get_resolution());
 }
 
-bool scenario_set_resolution(ScenarioHdl scenario, IVec2 res) {
+Boolean scenario_set_resolution(ScenarioHdl scenario, IVec2 res) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_resolution(util::pun<ei::IVec2>(res));
 	return true;
@@ -1123,19 +1123,19 @@ CameraHdl scenario_get_camera(ScenarioHdl scenario) {
 	return static_cast<CameraHdl>(static_cast<const Scenario*>(scenario)->get_camera());
 }
 
-bool scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
+Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_camera(static_cast<CameraHandle>(cam));
 	return true;
 }
 
-bool scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj) {
+Boolean scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
 	return static_cast<const Scenario*>(scenario)->is_masked(static_cast<const Object*>(obj));
 }
 
-bool scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj) {
+Boolean scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Scenario*>(scenario)->mask_object(static_cast<const Object*>(obj));
@@ -1148,7 +1148,7 @@ LodLevel scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj) {
 	return static_cast<const Scenario*>(scenario)->get_custom_lod(static_cast<const Object*>(obj));
 }
 
-bool scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
+Boolean scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 							 LodLevel level) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
@@ -1176,7 +1176,7 @@ const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
 	return &scen.get_light_names()[index][0u];
 }
 
-bool scenario_add_light(ScenarioHdl scenario, const char* name) {
+Boolean scenario_add_light(ScenarioHdl scenario, const char* name) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(name, "light name", false);
 	// Indirection via world container because we store string_views
@@ -1189,7 +1189,7 @@ bool scenario_add_light(ScenarioHdl scenario, const char* name) {
 	return true;
 }
 
-bool scenario_remove_light_by_index(ScenarioHdl scenario, size_t index) {
+Boolean scenario_remove_light_by_index(ScenarioHdl scenario, size_t index) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
 	if(index >= scen.get_light_names().size()) {
@@ -1201,7 +1201,7 @@ bool scenario_remove_light_by_index(ScenarioHdl scenario, size_t index) {
 	return true;
 }
 
-bool scenario_remove_light_by_named(ScenarioHdl scenario, const char* name) {
+Boolean scenario_remove_light_by_named(ScenarioHdl scenario, const char* name) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(name, "light name", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
@@ -1230,7 +1230,7 @@ MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 	return static_cast<MaterialHdl>(static_cast<const Scenario*>(scenario)->get_assigned_material(index));
 }
 
-bool scenario_assign_material(ScenarioHdl scenario, MatIdx index,
+Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 							  MaterialHdl handle) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(handle, "material handle", false);
@@ -1239,7 +1239,7 @@ bool scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	return true;
 }
 
-bool scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
+Boolean scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
 	CHECK_NULLPTR(scene, "scene handle", false);
 	const Scene& scen = *static_cast<const Scene*>(scene);
 	if(min != nullptr)
@@ -1254,7 +1254,7 @@ ConstCameraHdl scene_get_camera(SceneHdl scene) {
 	return static_cast<ConstCameraHdl>(static_cast<const Scene*>(scene)->get_camera());
 }
 
-bool world_get_point_light_position(LightHdl hdl, Vec3* pos) {
+Boolean world_get_point_light_position(LightHdl hdl, Vec3* pos) {
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
 	if(pos != nullptr)
@@ -1262,7 +1262,7 @@ bool world_get_point_light_position(LightHdl hdl, Vec3* pos) {
 	return true;
 }
 
-bool world_get_point_light_intensity(LightHdl hdl, Vec3* intensity) {
+Boolean world_get_point_light_intensity(LightHdl hdl, Vec3* intensity) {
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
 	if(intensity != nullptr)
@@ -1270,21 +1270,21 @@ bool world_get_point_light_intensity(LightHdl hdl, Vec3* intensity) {
 	return true;
 }
 
-bool world_set_point_light_position(LightHdl hdl, Vec3 pos) {
+Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos) {
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
 	light.position = util::pun<ei::Vec3>(pos);
 	return true;
 }
 
-bool world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
+Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
 	light.intensity = util::pun<ei::Vec3>(intensity);
 	return true;
 }
 
-bool world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
+Boolean world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(pos != nullptr)
@@ -1292,7 +1292,7 @@ bool world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
 	return true;
 }
 
-bool world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
+Boolean world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(intensity != nullptr)
@@ -1300,7 +1300,7 @@ bool world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
 	return true;
 }
 
-bool world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
+Boolean world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(direction != nullptr)
@@ -1308,7 +1308,7 @@ bool world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
 	return true;
 }
 
-bool world_get_spot_light_angle(LightHdl hdl, float* angle) {
+Boolean world_get_spot_light_angle(LightHdl hdl, float* angle) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(angle != nullptr)
@@ -1316,7 +1316,7 @@ bool world_get_spot_light_angle(LightHdl hdl, float* angle) {
 	return true;
 }
 
-bool world_get_spot_light_falloff(LightHdl hdl, float* falloff) {
+Boolean world_get_spot_light_falloff(LightHdl hdl, float* falloff) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(falloff != nullptr)
@@ -1324,21 +1324,21 @@ bool world_get_spot_light_falloff(LightHdl hdl, float* falloff) {
 	return true;
 }
 
-bool world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
+Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	light.position = util::pun<ei::Vec3>(pos);
 	return true;
 }
 
-bool world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
+Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	light.intensity = util::pun<ei::Vec3>(intensity);
 	return true;
 }
 
-bool world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
+Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
@@ -1351,7 +1351,7 @@ bool world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
 	return true;
 }
 
-bool world_set_spot_light_angle(LightHdl hdl, float angle) {
+Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 
@@ -1366,7 +1366,7 @@ bool world_set_spot_light_angle(LightHdl hdl, float angle) {
 	return true;
 }
 
-bool world_set_spot_light_falloff(LightHdl hdl, float falloff) {
+Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	// Clamp it to the opening angle!
@@ -1385,7 +1385,7 @@ bool world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 	return true;
 }
 
-bool world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
+Boolean world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
 	if(direction != nullptr)
@@ -1393,7 +1393,7 @@ bool world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
 	return true;
 }
 
-bool world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance) {
+Boolean world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance) {
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
 	if(radiance != nullptr)
@@ -1401,7 +1401,7 @@ bool world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance) {
 	return true;
 }
 
-bool world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
+Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
@@ -1413,14 +1413,14 @@ bool world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	return true;
 }
 
-bool world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
+Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
 	light.radiance = util::pun<ei::Vec3>(radiance);
 	return true;
 }
 
-bool render_enable_renderer(RendererType type) {
+Boolean render_enable_renderer(RendererType type) {
 	SceneHandle scene = WorldContainer::instance().get_current_scene();
 	if(scene == nullptr) {
 		logError("[", FUNCTION_NAME, "] Cannot enable renderer before scene hasn't been set");
@@ -1447,7 +1447,7 @@ bool render_enable_renderer(RendererType type) {
 	}
 }
 
-bool render_iterate() {
+Boolean render_iterate() {
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -1460,7 +1460,7 @@ bool render_iterate() {
 	return true;
 }
 
-bool render_get_screenshot() {
+Boolean render_get_screenshot() {
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -1473,7 +1473,7 @@ bool render_get_screenshot() {
 	return false;
 }
 
-bool render_save_screenshot(const char* filename) {
+Boolean render_save_screenshot(const char* filename) {
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -1516,7 +1516,7 @@ bool render_save_screenshot(const char* filename) {
 	return true;
 }
 
-bool render_enable_render_target(RenderTarget target, bool variance) {
+Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 	switch(target) {
 		case RenderTarget::TARGET_RADIANCE:
 			s_outputTargets.set(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
@@ -1540,7 +1540,7 @@ bool render_enable_render_target(RenderTarget target, bool variance) {
 	return true;
 }
 
-bool render_disable_render_target(RenderTarget target, bool variance) {
+Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 	switch(target) {
 		case RenderTarget::TARGET_RADIANCE:
 			s_outputTargets.clear(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
@@ -1564,36 +1564,36 @@ bool render_disable_render_target(RenderTarget target, bool variance) {
 	return true;
 }
 
-bool render_enable_variance_render_targets() {
+Boolean render_enable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target << 8u);
 	return true;
 }
 
-bool render_enable_non_variance_render_targets() {
+Boolean render_enable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target);
 	return true;
 }
 
-bool render_enable_all_render_targets() {
+Boolean render_enable_all_render_targets() {
 	return render_enable_variance_render_targets()
 		&& render_enable_non_variance_render_targets();
 }
 
-bool render_disable_variance_render_targets() {
+Boolean render_disable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target << 8u);
 	return true;
 }
 
-bool render_disable_non_variance_render_targets() {
+Boolean render_disable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target);
 	return true;
 }
 
-bool render_disable_all_render_targets() {
+Boolean render_disable_all_render_targets() {
 	return render_disable_variance_render_targets()
 		&& render_disable_non_variance_render_targets();
 }
