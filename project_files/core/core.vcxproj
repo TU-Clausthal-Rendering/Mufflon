@@ -198,6 +198,7 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
+      <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>
     <CudaLink>
       <PerformDeviceLink>true</PerformDeviceLink>
@@ -237,6 +238,7 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
+      <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
       <Message>Copies the necessary .dll's into the execution directory</Message>

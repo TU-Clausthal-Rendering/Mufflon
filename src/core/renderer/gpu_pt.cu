@@ -48,10 +48,9 @@ __global__ static void sample(Pixel imageDims,
 		ei::Vec3 testRadiance = colors[0u] * (1.f - x)*(1.f - y) + colors[1u] * x*(1.f - y)
 			+ colors[2u] * (1.f - x)*y + colors[3u] * x*y;
 		if(coord.x < imageDims.x && coord.y < imageDims.y) {
-			//printf("Color: %f %f %f\n", testRadiance.x, testRadiance.y, testRadiance.z);
-			/*outputBuffer.contribute(coord, head.throughput, testRadiance,
+			outputBuffer.contribute(coord, head.throughput, testRadiance,
 									ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-									ei::Vec3{ 0, 0, 0 });*/
+									ei::Vec3{ 0, 0, 0 });
 		}
 	}
 }
@@ -60,7 +59,6 @@ void GpuPathTracer::iterate(Pixel imageDims,
 							scene::lights::LightTree<Device::CUDA> lightTree,
 							RenderBuffer<Device::CUDA> outputBuffer) const {
 	// TODO: pass scene data to kernel!
-	// TODO: the kernel doesn't get called
 	dim3 blockDims{ 16u, 16u, 1u };
 	dim3 gridDims{
 		1u + static_cast<u32>(imageDims.x - 1) / blockDims.x,
@@ -72,7 +70,7 @@ void GpuPathTracer::iterate(Pixel imageDims,
 	cuda::check_error(cudaPeekAtLastError());
 	sample<<<gridDims, blockDims>>>(imageDims, std::move(lightTree),
 										 std::move(outputBuffer));
-	cuda::check_error(cudaPeekAtLastError());
+	cuda::check_error(cudaGetLastError());
 	cuda::check_error(cudaDeviceSynchronize());
 }
 

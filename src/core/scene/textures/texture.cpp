@@ -175,17 +175,19 @@ void Texture::create_texture_cuda() {
 			mAssertMsg(false, "Format not implemented.");
 	}
 	cuda::check_error(cudaGetLastError());
-	cuda::check_error(cudaMallocArray(&m_cudaTexture, &channelDesc, m_width, m_height));
+
+	// Allocate the CUDA texture array
+	cuda::check_error(cudaMalloc3DArray(&m_cudaTexture, &channelDesc,
+										make_cudaExtent(m_width, m_height, 0u),
+										cudaArraySurfaceLoadStore));
 
 	// Specify the texture view on the memory
-	cudaResourceDesc resDesc{};
+	cudaResourceDesc resDesc;
 	resDesc.resType = cudaResourceTypeArray;
 	resDesc.res.array.array = m_cudaTexture;
 	cudaTextureDesc texDesc;
 	texDesc.addressMode[0] = texDesc.addressMode[1] = texDesc.addressMode[2] = cudaAddressModeWrap;
 	texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
-	// TODO: why is this invalid?
-	//texDesc.readMode = cudaReadModeNormalizedFloat;
 	texDesc.sRGB = m_sRgb;
 	texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] = texDesc.borderColor[3] = 0.0f;
 	texDesc.normalizedCoords = true;
@@ -194,6 +196,13 @@ void Texture::create_texture_cuda() {
 	texDesc.mipmapLevelBias = 0.0f;
 	texDesc.minMipmapLevelClamp = 0;
 	texDesc.maxMipmapLevelClamp = 0;
+	// The texture read mode depends on the type and size of texels
+	// Normalization is only possible for 8- and 16-bit non-floats
+	if(channelDesc.f == cudaChannelFormatKindFloat || channelDesc.x > 16
+	   || channelDesc.y > 16 || channelDesc.z > 16 || channelDesc.w > 16)
+		texDesc.readMode = cudaReadModeElementType;
+	else
+		texDesc.readMode = cudaReadModeNormalizedFloat;
 
 	// Fill the handle (texture)
 	auto& texHdl = m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>();
@@ -201,6 +210,7 @@ void Texture::create_texture_cuda() {
 	texHdl.width = m_width;
 	texHdl.height = m_height;
 	texHdl.depth = m_numLayers;
+	texHdl.format = m_format;
 
 	// Fill the handle (surface)
 	if(NUM_CHANNELS(m_format) != 3) // Allow read-only RGB formats without causing errors here
@@ -210,6 +220,7 @@ void Texture::create_texture_cuda() {
 		surfHdl.width = m_width;
 		surfHdl.height = m_height;
 		surfHdl.depth = m_numLayers;
+		surfHdl.format = m_format;
 	}
 }
 

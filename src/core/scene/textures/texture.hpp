@@ -10,6 +10,36 @@
 
 namespace mufflon { namespace scene { namespace textures {
 
+/*
+ * A list of supported texture formats for this renderer.
+ * While Hardware and texture formats may support many more, this list is rather short
+ * because each format must also be implemented in the CpuTexture.
+ * A loader must choose the most appropriate target format which is supported internally.
+ * Also, some of the formats cannot be aquired for write mode (the RGB ones) on GPU side.
+ *
+ * Format semantics:
+ * ...XU	Unsigned int per channel with X bits
+ * ...XF	Float with X bits
+ */
+enum class Format : u16 {
+	R8U,
+	RG8U,
+	RGB8U,
+	RGBA8U,
+	R16U,
+	RG16U,
+	RGB16U,
+	RGBA16U,
+	R32F,
+	RG32F,
+	RGB32F,
+	RGBA32F,
+	RGB9E5,		// Special shared exponent format (9-bit mantissa per channel, 5-bit exponent).
+	// TODO: 16F
+
+	NUM
+};
+
 class CpuTexture;
 
 // Handle type exclusively for textures
@@ -39,7 +69,7 @@ struct CudaTextureHandle {
 	u16 width;
 	u16 height;
 	u16 depth;
-	u16 padding_;
+	Format format;
 
 	__host__ __device__ operator cudaTextureObject_t () const noexcept { return handle; }
 };
@@ -48,10 +78,14 @@ struct CudaSurfaceHandle {
 	u16 width;
 	u16 height;
 	u16 depth;
-	u16 padding_;
+	Format format;
 
 	__host__ __device__ operator cudaSurfaceObject_t () const noexcept { return handle; }
 };
+
+// Ensure handle sizes
+static_assert(sizeof(CudaTextureHandle) == 2u * 8u, "CUDA texture handle doesn't match expected size");
+static_assert(sizeof(CudaSurfaceHandle) == 2u * 8u, "CUDA surface handle doesn't match expected size");
 
 template<>
 struct TextureDevHandle<Device::CUDA> : public DeviceHandle<Device::CUDA> {
@@ -82,36 +116,6 @@ using TextureDevHandle_t = typename TextureDevHandle<dev>::HandleType;
 template < Device dev >
 using ConstTextureDevHandle_t = typename TextureDevHandle<dev>::ConstHandleType;
 
-
-/*
- * A list of supported texture formats for this renderer.
- * While Hardware and texture formats may support many more, this list is rather short
- * because each format must also be implemented in the CpuTexture.
- * A loader must choose the most appropriate target format which is supported internally.
- * Also, some of the formats cannot be aquired for write mode (the RGB ones) on GPU side.
- *
- * Format semantics:
- * ...XU	Unsigned int per channel with X bits
- * ...XF	Float with X bits
- */
-enum class Format : u16 {
-	R8U,
-	RG8U,
-	RGB8U,
-	RGBA8U,
-	R16U,
-	RG16U,
-	RGB16U,
-	RGBA16U,
-	R32F,
-	RG32F,
-	RGB32F,
-	RGBA32F,
-	RGB9E5,		// Special shared exponent format (9-bit mantissa per channel, 5-bit exponent).
-	// TODO: 16F
-
-	NUM
-};
 
 inline constexpr size_t PIXEL_SIZE(Format format) {
 	constexpr u8 PIXEL_SIZES[int(Format::NUM)] = {
@@ -190,9 +194,13 @@ public:
 	template < Device dev >
 	void clear();
 
-	i32 get_width() const noexcept { return m_width; }
-	i32 get_height() const noexcept { return m_height; }
-	i32 get_num_layers() const noexcept { return m_numLayers; }
+	constexpr i32 get_width() const noexcept { return m_width; }
+	constexpr i32 get_height() const noexcept { return m_height; }
+	constexpr i32 get_num_layers() const noexcept { return m_numLayers; }
+	constexpr Format get_format() const noexcept { return m_format; }
+	constexpr std::size_t get_size() const noexcept {
+		return static_cast<std::size_t>(m_width * m_height * m_numLayers * PIXEL_SIZE(m_format));
+	}
 
 private:
 	// Information
