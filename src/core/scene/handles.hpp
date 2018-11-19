@@ -16,6 +16,9 @@ namespace lights {
 struct PointLight;
 struct SpotLight;
 }
+namespace textures {
+class Texture;
+}
 
 
 using ObjectHandle = Object*;
@@ -28,5 +31,7 @@ using CameraHandle = cameras::Camera*;
 using ConstCameraHandle = const cameras::Camera*;
 using SceneHandle = Scene*;
 using ConstSceneHandle = const Scene*;
+using ConstTextureHandle = const textures::Texture*;
+using TextureHandle = textures::Texture*;
 
 }} // namespace mufflon::scene

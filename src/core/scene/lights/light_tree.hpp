@@ -6,6 +6,7 @@
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
+#include "core/scene/handles.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "util/flag.hpp"
@@ -140,7 +141,7 @@ public:
 	void build(std::vector<PositionalLights>&& posLights,
 			   std::vector<DirectionalLight>&& dirLights,
 			   const ei::Box& boundingBox,
-			   std::optional<textures::TextureHandle> envLight = std::nullopt);
+			   std::optional<TextureHandle> envLight = std::nullopt);
 
 	template < Device dev >
 	const LightTree<dev>& aquire_tree() noexcept {
@@ -162,14 +163,14 @@ public:
 	}
 
 private:
-	textures::TextureHandle m_envMapTexture;
+	TextureHandle m_envMapTexture;
 	util::DirtyFlags<Device> m_flags;
 	util::TaggedTuple<LightTree<Device::CPU>, LightTree<Device::CUDA>> m_trees;
 };
 
 // Functions for synchronizing a light tree
-void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync, textures::TextureHandle hdl);
-void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync, textures::TextureHandle hdl);
+void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync, TextureHandle hdl);
+void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync, TextureHandle hdl);
 void unload(LightTree<Device::CPU>& tree);
 void unload(LightTree<Device::CUDA>& tree);
 

@@ -4,6 +4,10 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
+Lambert::Lambert(TextureHandle albedo) :
+	m_albedo(albedo)
+{}
+
 std::size_t Lambert::get_handle_pack_size(Device device) const {
 	switch(device) {
 		case Device::CPU: return sizeof(LambertHandlePack<Device::CPU>);

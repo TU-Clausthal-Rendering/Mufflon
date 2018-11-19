@@ -929,9 +929,19 @@ ScenarioHdl world_find_scenario(const char* name) {
 	return static_cast<ScenarioHdl>(&hdl.value()->second);
 }
 
-MaterialHdl world_add_lambert_material(const char* name) {
+MaterialHdl world_add_lambert_material(const char* name, Vec3 rgb) {
 	CHECK_NULLPTR(name, "material name", nullptr);
-	MaterialHandle hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>());
+	// Create a texture from the pixel color
+	auto tex = WorldContainer::instance().add_texture(textures::Format::RGB32F, rgb);
+	return world_add_lambert_material_textured(name, static_cast<TextureHdl>(&tex->second));
+}
+
+MaterialHdl world_add_lambert_material_textured(const char* name, TextureHdl texture) {
+	CHECK_NULLPTR(name, "material name", nullptr);
+	CHECK_NULLPTR(texture, "texture handle", nullptr);
+
+	MaterialHandle hdl = WorldContainer::instance().add_material(
+		std::make_unique<materials::Lambert>(static_cast<TextureHandle>(texture)));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating lambert material");
 		return nullptr;
@@ -1025,8 +1035,13 @@ LightHdl world_add_directional_light(const char* name, Vec3 direction,
 LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
 	CHECK_NULLPTR(name, "directional light name", nullptr);
 	CHECK_NULLPTR(envmap, "environment map", nullptr);
-	// TODO
-	return nullptr;
+	TextureHandle hdl = static_cast<TextureHandle>(envmap);
+	auto envLight = WorldContainer::instance().add_light(name, hdl);
+	if(!envLight.has_value()) {
+		logError("[", FUNCTION_NAME, "] Error adding environment-map light");
+		return nullptr;
+	}
+	return envLight.value()->second;
 }
 
 CameraHdl world_get_camera(const char* name) {
@@ -1087,6 +1102,35 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 
 SceneHdl world_get_current_scene() {
 	return static_cast<SceneHdl>(WorldContainer::instance().get_current_scene());
+}
+
+Boolean world_exists_texture(const char* path) {
+	CHECK_NULLPTR(path, "texture path", false);
+	return WorldContainer::instance().has_texture(path);
+}
+
+TextureHdl world_get_texture(const char* path) {
+	CHECK_NULLPTR(path, "texture path", false);
+	auto hdl = WorldContainer::instance().find_texture(path);
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not find texture ",
+				 path);
+		return nullptr;
+	}
+	return static_cast<TextureHdl>(&hdl.value()->second);
+}
+
+TextureHdl world_add_texture(const char* path, uint16_t width,
+							 uint16_t height, uint16_t layers,
+							 TextureFormat format, TextureSampling sampling,
+							 Boolean sRgb, void* data) {
+	CHECK_NULLPTR(path, "texture path", nullptr);
+	CHECK_NULLPTR(data, "texture data", nullptr);
+	auto hdl = WorldContainer::instance().add_texture(path, width, height,
+													  layers, static_cast<textures::Format>(format),
+													  static_cast<textures::SamplingMode>(sampling),
+													  sRgb, data);
+	return static_cast<TextureHdl>(&hdl->second);
 }
 
 const char* scenario_get_name(ScenarioHdl scenario) {

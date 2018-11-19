@@ -92,7 +92,7 @@ std::optional<WorldContainer::DirLightHandle> WorldContainer::add_light(std::str
 	return m_dirLights.insert({ std::move(name), std::move(light) }).first;
 }
 std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::string name,
-																		textures::TextureHandle env) {
+																		TextureHandle env) {
 	if(m_envLights.find(name) != m_envLights.cend()) {
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;
@@ -159,6 +159,27 @@ std::optional<std::string_view> WorldContainer::get_light_name_ref(const std::st
 		return envLight->first;
 	logError("[WorldContainer::get_light_name_ref] Unknown light '", name, "'");
 	return std::nullopt;
+}
+
+bool WorldContainer::has_texture(std::string_view name) const {
+	return m_textures.find(name) != m_textures.cend();
+}
+
+std::optional<WorldContainer::TexCacheHandle> WorldContainer::find_texture(std::string_view name) {
+	auto iter = m_textures.find(name);
+	if(iter != m_textures.end())
+		return iter;
+	return std::nullopt;
+}
+
+WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path, u16 width,
+											  u16 height, u16 numLayers,
+											  textures::Format format, textures::SamplingMode mode,
+											  bool sRgb, void* data) {
+	mAssert(data != nullptr);
+	// TODO: ensure that we have more than 1x1 pixels?
+	return m_textures.emplace(path, textures::Texture{ width, height, numLayers,
+							  format, mode, sRgb, data }).first;
 }
 
 SceneHandle WorldContainer::load_scene(const Scenario& scenario) {

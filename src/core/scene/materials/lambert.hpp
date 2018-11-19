@@ -4,6 +4,7 @@
 #include "material.hpp"
 #include "export/api.hpp"
 #include "core/math/sampling.hpp"
+#include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
@@ -32,6 +33,7 @@ class Lambert :
 	public IMaterial {
 public:
 	// TODO: constructor
+	Lambert(TextureHandle albedo);
 
 	std::size_t get_handle_pack_size(Device device) const final;
 	std::size_t get_parameter_pack_size() const final { return sizeof(LambertParameterPack); }
@@ -42,7 +44,7 @@ public:
 	bool is_btdf() const final { return false; }
 	bool is_halfvector_based() const final { return false; }
 private:
-	textures::TextureHandle m_albedo;
+	TextureHandle m_albedo;
 };
 
 

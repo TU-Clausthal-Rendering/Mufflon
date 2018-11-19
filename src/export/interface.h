@@ -60,16 +60,19 @@ typedef enum {
 } AttributeType;
 
 typedef enum {
-	MAT_LAMBERT
+	MAT_LAMBERT,
+	MAT_COUNT
 } MaterialType;
 
 typedef enum {
-	CAM_PINHOLE
+	CAM_PINHOLE,
+	CAM_COUNT
 } CameraType;
 
 typedef enum {
 	RENDERER_CPU_PT,
 	RENDERER_GPU_PT,
+	RENDERER_COUNT
 } RendererType;
 
 typedef enum {
@@ -77,15 +80,39 @@ typedef enum {
 	TARGET_POSITION,
 	TARGET_ALBEDO,
 	TARGET_NORMAL,
-	TARGET_LIGHTNESS
+	TARGET_LIGHTNESS,
+	TARGET_COUNT
 } RenderTarget;
 
 typedef enum {
 	LIGHT_POINT,
 	LIGHT_SPOT,
 	LIGHT_DIRECTIONAL,
-	LIGHT_ENVMAP
+	LIGHT_ENVMAP,
+	LIGHT_COUNT
 } LightType;
+
+typedef enum {
+	FORMAT_R8U,
+	FORMAT_RG8U,
+	FORMAT_RGB8U,
+	FORMAT_RGBA8U,
+	FORMAT_R16U,
+	FORMAT_RG16U,
+	FORMAT_RGB16U,
+	FORMAT_RGBA16U,
+	FORMAT_R32F,
+	FORMAT_RG32F,
+	FORMAT_RGB32F,
+	FORMAT_RGBA32F,
+	FORMAT_RGB9E5,
+	FORMAT_NUM
+} TextureFormat;
+
+typedef enum {
+	SAMPLING_NEAREST,
+	SAMPLING_LINEAR
+} TextureSampling;
 
 typedef struct {
 	AttributeType type;
@@ -216,6 +243,7 @@ LIBRARY_API ScenarioHdl CDECL world_create_scenario(const char* name);
 LIBRARY_API ScenarioHdl CDECL world_find_scenario(const char* name);
 // TODO: add more materials (and material parameters)
 LIBRARY_API MaterialHdl CDECL world_add_lambert_material(const char* name, Vec3 rgb);
+LIBRARY_API MaterialHdl CDECL world_add_lambert_material_textured(const char* name, TextureHdl texture);
 //LIBRARY_API MaterialHdl CDECL world_add_lambert_material_textured(const char* name, Vec3 rgb);
 // TODO: add more cameras
 LIBRARY_API CameraHdl CDECL world_add_pinhole_camera(const char* name, Vec3 position,
@@ -286,6 +314,12 @@ LIBRARY_API Boolean CDECL world_get_dir_light_direction(LightHdl hdl, Vec3* dire
 LIBRARY_API Boolean CDECL world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance);
 LIBRARY_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
 LIBRARY_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
+LIBRARY_API Boolean CDECL world_exists_texture(const char* path);
+LIBRARY_API TextureHdl CDECL world_get_texture(const char* path);
+LIBRARY_API TextureHdl CDECL world_add_texture(const char* path, uint16_t width,
+											   uint16_t height, uint16_t layers,
+											   TextureFormat format, TextureSampling sampling,
+											   Boolean sRgb, void* data);
 // TODO: interface for envmap light
 
 // Interface for rendering

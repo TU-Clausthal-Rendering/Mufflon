@@ -90,7 +90,7 @@ public:
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights,
-					std::optional<textures::TextureHandle> envLightTexture = std::nullopt) {
+					std::optional<TextureHandle> envLightTexture = std::nullopt) {
 		m_lightTree.build(std::move(posLights), std::move(dirLights),
 						  m_boundingBox, std::move(envLightTexture));
 	}

@@ -1,8 +1,8 @@
 #include "light_tree.hpp"
-#include "core/memory/allocator.hpp"
-#include "util/assert.hpp"
-#include "core/cuda/error.hpp"
 #include "ei/3dtypes.hpp"
+#include "util/assert.hpp"
+#include "core/memory/allocator.hpp"
+#include "core/cuda/error.hpp"
 #include "core/math/sfcurves.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
@@ -249,7 +249,7 @@ LightTreeBuilder::~LightTreeBuilder() {
 void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
 					  const ei::Box& boundingBox,
-					  std::optional<textures::TextureHandle> envLight) {
+					  std::optional<TextureHandle> envLight) {
 	LightTree<Device::CPU>& tree = m_trees.get<LightTree<Device::CPU>>();
 
 	// First delete any leftovers
@@ -340,7 +340,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 }
 
 void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync,
-				 std::optional<textures::TextureHandle> hdl) {
+				 std::optional<TextureHandle> hdl) {
 	if(changed.length == 0u) {
 		// Remove all data since there are no lights
 		mAssert(changed.memory == nullptr);
@@ -369,7 +369,7 @@ void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>&
 }
 
 void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync,
-				 std::optional<textures::TextureHandle> hdl) {
+				 std::optional<TextureHandle> hdl) {
 	if(changed.length == 0u) {
 		// Remove all data since there are no lights
 		mAssert(changed.memory == nullptr);

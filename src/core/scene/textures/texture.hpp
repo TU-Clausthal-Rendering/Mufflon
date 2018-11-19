@@ -7,6 +7,9 @@
 #include "util/flag.hpp"
 #include <cuda_runtime.h>
 #include <memory>
+#ifndef __CUDACC__
+#include <string_view>
+#endif // __CUDACC__
 
 namespace mufflon { namespace scene { namespace textures {
 
@@ -139,6 +142,18 @@ inline constexpr int NUM_CHANNELS(Format format) {
 	return NUM_CHANNELS[int(format)];
 }
 
+#ifndef __CUDACC__
+inline constexpr std::string_view FORMAT_NAME(Format format) {
+	constexpr std::string_view NAMES[static_cast<std::underlying_type_t<Format>>(Format::NUM)] = {
+		"FORMAT_R8U", "FORMAT_RG8U", "FORMAT_RGB8U", "FORMAT_RGBA8U",
+		"FORMAT_R16U", "FORMAT_RG16U", "FORMAT_RGB16U", "FORMAT_RGBA16U",
+		"FORMAT_R32F", "FORMAT_RG32F", "FORMAT_RGB32F", "FORMAT_RGBA32F",
+		"FORMAT_RGB9E5"
+	};
+	return NAMES[static_cast<std::underlying_type_t<Format>>(format)];
+}
+#endif // __CUDACC__
+
 enum class SamplingMode {
 	NEAREST,
 	LINEAR
@@ -159,7 +174,8 @@ public:
 											   ConstTextureDevHandle_t<Device::OPENGL>>;
 
 	// Loads a texture into the CPU-RAM
-	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb, void* data = nullptr);
+	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
+			bool sRgb, const void* data = nullptr);
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
@@ -220,7 +236,5 @@ private:
 	void create_texture_cpu();
 	void create_texture_cuda();
 };
-
-using TextureHandle = std::shared_ptr<Texture>;
 
 }}} // namespace mufflon::scene::textures

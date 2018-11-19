@@ -6,7 +6,8 @@
 
 namespace mufflon::scene::textures {
 
-Texture::Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb, void* data) :
+Texture::Texture(u16 width, u16 height, u16 numLayers, Format format,
+				 SamplingMode mode, bool sRgb, const void* data) :
 	m_width(width),
 	m_height(height),
 	m_numLayers(numLayers),
