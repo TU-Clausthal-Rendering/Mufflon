@@ -36,7 +36,7 @@ void Lambert::get_parameter_pack_cpu(const HandlePack* handles, const UvCoordina
 	auto* in = reinterpret_cast<const LambertHandlePack<Device::CPU>*>(handles);
 	auto* out = reinterpret_cast<LambertParameterPack*>(outBuffer);
 	*out = LambertParameterPack{
-		ParameterPack{ Materials::LAMBERT, in->innerMedium, in->outerMedium },
+		ParameterPack{ Materials::LAMBERT, in->flags, in->innerMedium, in->outerMedium },
 		Spectrum{in->albedoTex->sample(uvCoordinate)}
 	};
 }

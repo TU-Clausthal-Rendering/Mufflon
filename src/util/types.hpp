@@ -114,4 +114,12 @@ __host__ __device__ constexpr AngularPdf AreaPdf::to_angular_pdf(Real cos, Real 
 using Pixel = ei::IVec2;
 using Voxel = ei::IVec3;
 
+
+// Save division (avoids division by 0). Required in robust implementations of materials
+// MIS, ...
+template<typename T, typename D>
+__host__ __device__ inline T sdiv(const T& x, const D& d) {
+	return x / ei::max(d, static_cast<D>(1e-20f));
+}
+
 } // namespace mufflon

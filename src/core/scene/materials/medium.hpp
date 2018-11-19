@@ -10,26 +10,27 @@ namespace mufflon { namespace scene { namespace materials {
 	 * uniform absorption and most important the refraction index of the current volume.
 	 */
 	class Medium {
-		void setRefractionIndex(float n) {
+	public:
+		void set_refraction_index(float n) {
 			m_refractionIndex.x = n;
 			m_refractionIndex.y = 0.0f;
 		}
-		void setRefractionIndex(ei::Vec2 eta) {
+		void set_refraction_index(ei::Vec2 eta) {
 			m_refractionIndex = eta;
 		}
-		void setAbsorptionCoeff(const Spectrum& coeff) {
+		void set_absorption_coeff(const Spectrum& coeff) {
 			m_absorptionCoeff = coeff;
 		}
 
-		ei::Vec2 getRefractionIndex() const {
+		const ei::Vec2& get_refraction_index() const {
 			return m_refractionIndex;
 		}
-		const Spectrum& getAbsorptionCoeff() const {
+		const Spectrum& get_absorption_coeff() const {
 			return m_absorptionCoeff;
 		}
 
 		// Compute the transmission in this medium for the given travel distance.
-		Spectrum getTransmission(float distance) const {
+		Spectrum get_transmission(float distance) const {
 			return exp(m_absorptionCoeff * -distance);
 		}
 	private:

@@ -20,8 +20,8 @@ namespace mufflon { namespace scene { namespace materials {
 	struct Sample {
 		Spectrum throughput {1.0f};		// BxDF * cosθ / pdfF
 		Direction excident {0.0f};		// The sampled direction
-		float pdfF {0.0f};				// Sampling PDF in forward direction (current sampler)
-		float pdfB {0.0f};				// Sampling PDF with reversed incident and excident directions
+		AngularPdf pdfF {0.0f};			// Sampling PDF in forward direction (current sampler)
+		AngularPdf pdfB {0.0f};			// Sampling PDF with reversed incident and excident directions
 		enum class Type: u32 {			// Type of interaction
 			INVALID,
 			REFLECTED,
@@ -33,8 +33,8 @@ namespace mufflon { namespace scene { namespace materials {
 	struct EvalValue {
 		Spectrum bxdf {0.0f};			// BRDF or BTDF value
 		float cosThetaOut {1.0f};		// Outgoing cosine
-		float pdfF {0.0f};				// Sampling PDF in forward direction 
-		float pdfB {0.0f};				// Sampling PDF with reversed incident and excident directions
+		AngularPdf pdfF {0.0f};			// Sampling PDF in forward direction 
+		AngularPdf pdfB {0.0f};			// Sampling PDF with reversed incident and excident directions
 	};
 
 }}} // namespace mufflon::scene::materials

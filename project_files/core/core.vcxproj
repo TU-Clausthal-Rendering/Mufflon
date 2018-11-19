@@ -176,9 +176,9 @@
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <PostBuildEvent>
-      <Command>xcopy /D "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
-xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCored.dll" "$(OutDir)"
-xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToolsd.dll" "$(OutDir)"</Command>
+      <Command>xcopy /D/Y "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
+xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCored.dll" "$(OutDir)"
+xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToolsd.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copies the necessary .dll's into the execution directory</Message>
@@ -239,9 +239,9 @@ xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools
     </CudaCompile>
     <PostBuildEvent>
       <Message>Copies the necessary .dll's into the execution directory</Message>
-      <Command>xcopy /D "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
-xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCore.dll" "$(OutDir)"
-xcopy /D "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)"</Command>
+      <Command>xcopy /D/Y "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
+xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCore.dll" "$(OutDir)"
+xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
     <CudaLink>
       <PerformDeviceLink>true</PerformDeviceLink>

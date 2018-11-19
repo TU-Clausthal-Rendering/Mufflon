@@ -58,8 +58,8 @@ lambert_sample(const LambertParameterPack& params,
 	return Sample {
 		Spectrum{params.albedo},
 		excidentTS * ei::sgn(incidentTS.z),
-		excidentTS.z / ei::PI,
-		ei::abs(incidentTS.z) / ei::PI,
+		AngularPdf(excidentTS.z / ei::PI),
+		AngularPdf(ei::abs(incidentTS.z) / ei::PI),
 		Sample::Type::REFLECTED
 	};
 }
@@ -75,8 +75,8 @@ lambert_evaluate(const LambertParameterPack& params,
 	return EvalValue {
 		params.albedo / ei::PI,
 		ei::abs(excidentTS.z),
-		ei::abs(excidentTS.z) / ei::PI,
-		ei::abs(incidentTS.z) / ei::PI
+		AngularPdf(ei::abs(excidentTS.z) / ei::PI),
+		AngularPdf(ei::abs(incidentTS.z) / ei::PI)
 	};
 }
 
