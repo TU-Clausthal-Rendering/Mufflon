@@ -118,7 +118,7 @@ namespace gui.Dll
 
             // dll call: initialize glad etc.
             m_logCallbackPointer = new Core.LogCallback(LogCallback);
-            if (!Core.initialize(m_logCallbackPointer))
+            if (!Core.mufflon_initialize(m_logCallbackPointer))
                 throw new Exception(Core.GetDllError());
         }
 
@@ -198,6 +198,10 @@ namespace gui.Dll
             // stop render thread
             m_isRunning = false;
             m_renderThread.Join();
+
+            // Destroy the DLLs render resources
+            if (!Core.mufflon_destroy())
+                throw new Exception(Core.GetDllError());
 
             // destroy resources
             User32.DestroyWindow(hwnd.Handle);

@@ -2,8 +2,15 @@
 #include "util/log.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/scene/materials/material.hpp"
+#include <iostream>
 
 namespace mufflon::scene {
+
+WorldContainer WorldContainer::s_container{};
+
+void WorldContainer::clear_instance() {
+	s_container = WorldContainer();
+}
 
 ObjectHandle WorldContainer::create_object() {
 	m_objects.emplace_back();

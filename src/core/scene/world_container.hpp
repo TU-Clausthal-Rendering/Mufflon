@@ -28,10 +28,7 @@ public:
 	using TexCacheHandle = std::map<std::string, textures::Texture, std::less<>>::iterator;
 
 	WorldContainer(const WorldContainer&) = delete;
-	WorldContainer(WorldContainer&&) = delete;
 	WorldContainer& operator=(const WorldContainer&) = delete;
-	WorldContainer& operator=(WorldContainer&&) = delete;
-	~WorldContainer() = default;
 
 	// Create a new object to be filled
 	ObjectHandle create_object();
@@ -99,8 +96,7 @@ public:
 
 	// Singleton, creating our global world object
 	static WorldContainer& instance() {
-		static WorldContainer inst;
-		return inst;
+		return s_container;
 	}
 
 	/**
@@ -116,8 +112,17 @@ public:
 		return m_scene.get();
 	}
 
+	// Clears the world object from all resources
+	static void clear_instance();
+
 private:
 	WorldContainer() = default;
+	WorldContainer(WorldContainer&&) = default;
+	WorldContainer& operator=(WorldContainer&&) = default;
+	~WorldContainer() = default;
+
+	// Global container object for everything
+	static WorldContainer s_container;
 
 	// All objects of the world.
 	std::vector<Object> m_objects;

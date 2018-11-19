@@ -188,23 +188,6 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 
 } // namespace
 
-
-Boolean initialize(void(*logCallback)(const char*, int)) {
-	// Only once per process do we register/unregister the message handler
-	std::once_flag regMsgHdl;
-	std::call_once(regMsgHdl, []() {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
-	});
-
-	s_logCallback = logCallback;
-	if(!gladLoadGL()) {
-		logError("[", FUNCTION_NAME, "] gladLoadGL failed");
-		return false;
-	}
-	return true;
-}
-
 // TODO: remove, Felix prototype
 const char* get_error(int& length) {
 	length = static_cast<int>(s_lastError.length());
@@ -1640,4 +1623,37 @@ Boolean render_disable_non_variance_render_targets() {
 Boolean render_disable_all_render_targets() {
 	return render_disable_variance_render_targets()
 		&& render_disable_non_variance_render_targets();
+}
+
+Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
+	// Only once per process do we register/unregister the message handler
+	static bool initialized = false;
+	s_logCallback = logCallback;
+	if (!initialized) {
+		registerMessageHandler(delegateLog);
+		disableStdHandler();
+
+		if (!gladLoadGL()) {
+			logError("[", FUNCTION_NAME, "] gladLoadGL failed");
+			return false;
+		}
+
+		// Set the CUDA device to initialize the context
+		int count = 0;
+		cuda::check_error(cudaGetDeviceCount(&count));
+		if (count > 0) {
+			logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
+				"devices; initializing device 0");
+			cuda::check_error(cudaSetDevice(0u));
+		}
+		initialized = true;
+	}
+	return initialized;
+}
+
+LIBRARY_API Boolean CDECL mufflon_destroy() {
+	WorldContainer::clear_instance();
+	s_imageOutput.reset();
+	s_currentRenderer.reset();
+	return true;
 }

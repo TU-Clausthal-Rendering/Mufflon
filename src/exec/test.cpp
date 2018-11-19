@@ -335,12 +335,14 @@ void test_renderer() {
 }*/
 
 int main() {
+	mufflon_initialize(nullptr);
 	test_polygon();
 	test_sphere();
 	test_lights();
 	test_camera();
 	test_scene();
 	test_renderer();
+	mufflon_destroy();
 
 	std::cout << "All tests successful" << std::endl;
 	std::cin.get();

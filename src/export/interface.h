@@ -337,8 +337,11 @@ LIBRARY_API Boolean CDECL render_disable_variance_render_targets();
 LIBRARY_API Boolean CDECL render_disable_non_variance_render_targets();
 LIBRARY_API Boolean CDECL render_disable_all_render_targets();
 
+// Interface for initialization and destruction
+LIBRARY_API Boolean CDECL mufflon_initialize(void(*logCallback)(const char*, int));
+LIBRARY_API Boolean CDECL mufflon_destroy();
+
 // TODO
-LIBRARY_API Boolean CDECL initialize(void(*logCallback)(const char*, int));
 LIBRARY_API Boolean CDECL iterate();
 LIBRARY_API Boolean CDECL resize(int width, int height, int offsetX, int offsetY);
 LIBRARY_API void CDECL execute_command(const char* command);
