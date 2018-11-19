@@ -4,10 +4,24 @@ namespace mufflon { // There is no memory namespace on purpose
 
 // Contains the possible data locations of the scene (logical devices).
 enum class Device : unsigned char {
+	NONE    = 0u,
 	CPU		= 1u,
 	CUDA	= 2u,
 	OPENGL	= 4u
 };
+
+// Inline bits operators for Device.
+inline Device operator&(Device a, Device b) {
+	return Device(static_cast<int>(a) & static_cast<int>(b));
+}
+
+inline Device operator|(Device a, Device b) {
+	return Device(static_cast<int>(a) | static_cast<int>(b));
+}
+
+inline Device operator^(Device a, Device b) {
+	return Device(static_cast<int>(a) ^ static_cast<int>(b));
+}
 
 /*
  * Generic type-trait for device-something-handles.

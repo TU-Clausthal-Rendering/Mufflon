@@ -109,6 +109,10 @@ public:
 			return temp;
 		}
 
+		bool operator!=(const FaceIterator &other) {
+			return m_faceIter != other.m_faceIter;
+		}
+
 		std::size_t get_vertex_count() const {
 			mAssert(m_faceIter != m_mesh.faces().end());
 			mAssert(m_faceIter->is_valid());

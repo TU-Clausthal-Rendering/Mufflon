@@ -3,7 +3,7 @@
 #include "instance.hpp"
 #include "handles.hpp"
 #include "types.hpp"
-#include "accel_struct.hpp"
+#include "core/scene/accel_structs/accel_struct.hpp"
 #include "lights/light_tree.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/memory/generic_resource.hpp"

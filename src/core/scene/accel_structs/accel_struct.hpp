@@ -1,10 +1,10 @@
 #pragma once
 
-#include "instance.hpp"
-#include "handles.hpp"
+#include "core/scene/instance.hpp"
+#include "core/scene/handles.hpp"
 #include "core/memory/residency.hpp"
-#include "geometry/polygon.hpp"
-#include "geometry/sphere.hpp"
+#include "core/scene/geometry/polygon.hpp"
+#include "core/scene/geometry/sphere.hpp"
 #include "util/range.hpp"
 #include <OpenMesh/Core/Mesh/PolyConnectivity.hh>
 
@@ -38,9 +38,9 @@ public:
 	virtual void build(const std::vector<InstanceHandle>&) = 0;
 	// TODO: should this be put into a different class?
 	virtual void build(const ei::Box& boundingBox,
-					   util::Range<geometry::Polygons::FaceIterator> faces,
-					   const AttributeList<false>::Attribute<geometry::Spheres::Sphere>&,
-					   std::size_t triangles, std::size_t quads) = 0;
+		util::Range<geometry::Polygons::FaceIterator> faces,
+		const AttributeList<false>::Attribute<geometry::Spheres::Sphere>&,
+		std::size_t triangles, std::size_t quads) = 0;
 	// Checks whether the data on a given system has been modified and is out of sync.
 	virtual bool is_dirty(Device res) const = 0;
 

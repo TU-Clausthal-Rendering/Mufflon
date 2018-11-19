@@ -62,6 +62,9 @@
     <Filter Include="Source Files\deps\glad\KHR">
       <UniqueIdentifier>{568fd7ed-385f-4437-b142-527369fb5a2b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\accel_structs">
+      <UniqueIdentifier>{12f4fde0-5ca0-4a4d-b861-603418b5b36d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -135,6 +138,9 @@
     </ClCompile>
     <ClCompile Include="..\..\deps\glad\glad.c">
       <Filter>Source Files\deps\glad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\accel_structs\lbvh.cpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -342,11 +348,20 @@
     <ClInclude Include="..\..\src\core\math\sfcurves.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_struct\accel_struct.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h">
+      <Filter>Source Files\core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.h">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
@@ -360,6 +375,12 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
       <Filter>Source Files\core\renderer</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
+      <Filter>Source Files\core\cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

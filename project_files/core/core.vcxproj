@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
+    <ClCompile Include="..\..\src\core\scene\accel_structs\lbvh.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
@@ -57,6 +58,7 @@
     <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
     <ClInclude Include="..\..\src\core\cameras\sample.hpp" />
+    <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
     <ClInclude Include="..\..\src\core\math\sfcurves.hpp" />
@@ -72,7 +74,9 @@
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
-    <ClInclude Include="..\..\src\core\scene\accel_struct.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_struct\accel_struct.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.h" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
@@ -109,8 +113,10 @@
     <ClInclude Include="..\..\src\util\types.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
+    <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -196,7 +202,7 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>
@@ -236,7 +242,7 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>
