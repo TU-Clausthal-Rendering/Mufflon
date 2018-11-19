@@ -6,8 +6,10 @@
 #    else
 #        define LIBRARY_API __declspec(dllimport)
 #    endif
+#    define CDECL __cdecl
 #elif
 #    define LIBRARY_API
+#    define CDECL __attribute__((__cdecl__))
 #endif
 
 #ifdef __CUDACC__

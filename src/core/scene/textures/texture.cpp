@@ -15,9 +15,9 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMo
 	m_sRgb(sRgb),
 	m_cudaTexture(nullptr)
 {
-	create_texture_cpu();
-	m_dirty.mark_changed(Device::CPU);
 	if(data) {
+		create_texture_cpu();
+		m_dirty.mark_changed(Device::CPU);
 		copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
 		// A file loader provides an array with pixel data. This is loaded into
 		// a CPUTexture per default.
@@ -59,6 +59,16 @@ void Texture::synchronize() {
 												  m_width * m_height * PIXEL_SIZE(m_format),
 												  cudaMemcpyDeviceToHost));
 			//copy<dev, Device::CUDA>(m_cpuTexture->data(), m_cudaTexture, m_width * m_height * PIXEL_SIZE(m_format));
+		}
+	} else {
+		// Alternative: might be that we weren't allocated yet
+		// Create texture resources if necessary
+		if(!is_valid(m_handles.get<TextureDevHandle_t<dev>>())) {
+			switch(dev) {
+				case Device::CPU: create_texture_cpu(); break;
+				case Device::CUDA: create_texture_cuda(); break;
+				//case Device::OPENGL: create_texture_opengl(); break;
+			}
 		}
 	}
 	m_dirty.mark_synced(dev);
