@@ -1,112 +1,43 @@
 #include "build_lbvh.hpp"
 #include "util/types.hpp"
 #include "core/cuda/cu_lib_wrapper.h"
+#include "core/math/sfcurves.hpp"
 
 #include <cuda_runtime_api.h>
-//#include <device_launch_parameters.h>
+#include <ei/3dtypes.hpp>
+#include <device_launch_parameters.h>
 
 
 namespace mufflon { namespace {//TODO snippers
 
 __host__ __device__ ei::Vec3 get_triangle_centroid(ei::Vec3 v0, ei::Vec3 v1, ei::Vec3 v2) {
-	ei::Vec3 lo;
-	ei::Vec3 hi;
+	ei::Vec3 lo = min(v0, v1, v2);
+	ei::Vec3 hi = max(v0, v1, v2);
 
-	lo.x = min(v0.x, v1.x);
-	lo.x = min(lo.x, v2.x);
-	hi.x = max(v0.x, v1.x);
-	hi.x = max(hi.x, v2.x);
-
-	lo.y = min(v0.y, v1.y);
-	lo.y = min(lo.y, v2.y);
-	hi.y = max(v0.y, v1.y);
-	hi.y = max(hi.y, v2.y);
-
-	lo.z = min(v0.z, v1.z);
-	lo.z = min(lo.z, v2.z);
-	hi.z = max(v0.z, v1.z);
-	hi.z = max(hi.z, v2.z);
-
-	ei::Vec3 centroid;
-	centroid.x = (hi.x + lo.x) * 0.5f;
-	centroid.y = (hi.y + lo.y) * 0.5f;
-	centroid.z = (hi.z + lo.z) * 0.5f;
-
-	return centroid;
+	return (lo + hi) * 0.5f;
 }
 
 __host__ __device__ ei::Vec3 get_quad_centroid(ei::Vec3 v0, ei::Vec3 v1,
 	ei::Vec3 v2, ei::Vec3 v3) {
-	ei::Vec3 lo;
-	ei::Vec3 hi;
+	ei::Vec3 lo = min(v0, v1, v2, v3);
+	ei::Vec3 hi = max(v0, v1, v2, v3);
 
-	lo.x = min(v0.x, v1.x);
-	lo.x = min(lo.x, v2.x);
-	lo.x = min(lo.x, v3.x);
-	hi.x = max(v0.x, v1.x);
-	hi.x = max(hi.x, v2.x);
-	hi.x = max(hi.x, v3.x);
-
-	lo.y = min(v0.y, v1.y);
-	lo.y = min(lo.y, v2.y);
-	lo.y = min(lo.y, v3.y);
-	hi.y = max(v0.y, v1.y);
-	hi.y = max(hi.y, v2.y);
-	hi.y = max(hi.y, v3.y);
-
-	lo.z = min(v0.z, v1.z);
-	lo.z = min(lo.z, v2.z);
-	lo.z = min(lo.z, v3.z);
-	hi.z = max(v0.z, v1.z);
-	hi.z = max(hi.z, v2.z);
-	hi.z = max(hi.z, v3.z);
-
-	ei::Vec3 centroid;
-	centroid.x = (hi.x + lo.x) * 0.5f;
-	centroid.y = (hi.y + lo.y) * 0.5f;
-	centroid.z = (hi.z + lo.z) * 0.5f;
-
-	return centroid;
-}
-
-// Expands a 21-bit integer into 63 bits by inserting 2 zeros after each bit.
-__forceinline__ __host__ __device__ u64 expand_bits64(u64 value)
-{
-	u64 expanded = value;
-	expanded &= 0x1fffff;
-	expanded = (expanded | expanded << 32) & 0x1f00000000ffff;
-	expanded = (expanded | expanded << 16) & 0x1f0000ff0000ff;
-	expanded = (expanded | expanded << 8) & 0x100f00f00f00f00f;
-	expanded = (expanded | expanded << 4) & 0x10c30c30c30c30c3;
-	expanded = (expanded | expanded << 2) & 0x1249249249249249;
-
-	return expanded;
+	return (lo + hi) * 0.5f;
 }
 
 // Calculates the point morton code using 63 bits.
 __forceinline__ __host__ __device__ u64 calculate_morton_code64(ei::Vec3 point)
 {
 	// Discretize the unit cube into a 21 bit integer
-	u64 discretized[3];
-	discretized[0] = (u64)min(max(point.x * 2097152.0f, 0.0f), 2097151.0f);
-	discretized[1] = (u64)min(max(point.y * 2097152.0f, 0.0f), 2097151.0f);
-	discretized[2] = (u64)min(max(point.z * 2097152.0f, 0.0f), 2097151.0f);
+	ei::UVec3 discretized { ei::clamp(point * 2097152.0f, 0.0f, 2097151.0f) };
 
-	discretized[0] = expand_bits64(discretized[0]);
-	discretized[1] = expand_bits64(discretized[1]);
-	discretized[2] = expand_bits64(discretized[2]);
-
-	return discretized[0] * 4 + discretized[1] * 2 + discretized[2];
+	return math::part_by_two21(discretized[0]) * 4
+		 + math::part_by_two21(discretized[1]) * 2
+		 + math::part_by_two21(discretized[2]);
 }
 
 __forceinline__ __host__ __device__
 ei::Vec3 normalize_position(ei::Vec3 pos, ei::Vec3 lo, ei::Vec3 hi) {
-	ei::Vec3 span = hi - lo;
-	return ei::Vec3((pos.x - lo.x) / span.x, (pos.y - lo.y) / span.y, (pos.z - lo.z) / span.z);
-}
-
-__forceinline__ __host__ __device__
-ei::Vec3 normalize_position(ei::Vec4 pos, ei::Vec3 lo, ei::Vec3 hi) {
 	ei::Vec3 span = hi - lo;
 	return ei::Vec3((pos.x - lo.x) / span.x, (pos.y - lo.y) / span.y, (pos.z - lo.z) / span.z);
 }
@@ -323,91 +254,6 @@ template <typename T> __global__ void build_lbvh_treeD(
 	}
 }
 
-__device__ __forceinline__ void calculate_bounding_box_sph(
-	ei::Vec4 pos, ei::Vec4* lo, ei::Vec4* hi)
-{
-	lo->x = pos.x - pos.w;
-	hi->x = pos.x + pos.w;
-
-	lo->y = pos.y - pos.w;
-	hi->y = pos.y + pos.w;
-
-	lo->z = pos.z - pos.w;
-	hi->z = pos.z + pos.w;
-}
-
-__device__ __forceinline__ void calculate_bounding_box_tri(
-	ei::Vec3 v0, ei::Vec3 v1, ei::Vec3 v2, ei::Vec4* lo, ei::Vec4* hi)
-{
-	lo->x = min(v0.x, v1.x);
-	lo->x = min(lo->x, v2.x);
-	hi->x = max(v0.x, v1.x);
-	hi->x = max(hi->x, v2.x);
-
-	lo->y = min(v0.y, v1.y);
-	lo->y = min(lo->y, v2.y);
-	hi->y = max(v0.y, v1.y);
-	hi->y = max(hi->y, v2.y);
-
-	lo->z = min(v0.z, v1.z);
-	lo->z = min(lo->z, v2.z);
-	hi->z = max(v0.z, v1.z);
-	hi->z = max(hi->z, v2.z);
-}
-
-__device__ __forceinline__ void calculate_bounding_box_quad(
-	ei::Vec3 v0, ei::Vec3 v1, ei::Vec3 v2, ei::Vec3 v3, ei::Vec4* lo, ei::Vec4* hi)
-{
-	lo->x = min(v0.x, v1.x);
-	lo->x = min(lo->x, v2.x);
-	lo->x = min(lo->x, v3.x);
-	hi->x = max(v0.x, v1.x);
-	hi->x = max(hi->x, v2.x);
-	hi->x = max(hi->x, v3.x);
-
-	lo->y = min(v0.y, v1.y);
-	lo->y = min(lo->y, v2.y);
-	lo->y = min(lo->y, v3.y);
-	hi->y = max(v0.y, v1.y);
-	hi->y = max(hi->y, v2.y);
-	hi->y = max(hi->y, v3.y);
-
-	lo->z = min(v0.z, v1.z);
-	lo->z = min(lo->z, v2.z);
-	lo->z = min(lo->z, v3.z);
-	hi->z = max(v0.z, v1.z);
-	hi->z = max(hi->z, v2.z);
-	hi->z = max(hi->z, v3.z);
-}
-
-__device__ __forceinline__ void calculate_node_bounding_box(ei::Vec4* bbMin, ei::Vec4* bbMax,
-	ei::Vec4* leftBbMin, ei::Vec4* leftBbMax, ei::Vec4* rightBbMin, ei::Vec4* rightBbMax)
-{
-	ei::Vec4 bboxMin;
-	bboxMin.x = min(leftBbMin->x, rightBbMin->x);
-	bboxMin.y = min(leftBbMin->y, rightBbMin->y);
-	bboxMin.z = min(leftBbMin->z, rightBbMin->z);
-
-	ei::Vec4 bboxMax;
-	bboxMax.x = max(leftBbMax->x, rightBbMax->x);
-	bboxMax.y = max(leftBbMax->y, rightBbMax->y);
-	bboxMax.z = max(leftBbMax->z, rightBbMax->z);
-
-	*bbMin = bboxMin;
-	*bbMax = bboxMax;
-}
-
-// <returns> The calculated bounding box surface area. </returns>
-__forceinline__ __host__ __device__ float calculate_surface_area(ei::Vec4 bbMin,
-	ei::Vec4 bbMax)
-{
-	ei::Vec3 size;
-	size.x = bbMax.x - bbMin.x;
-	size.y = bbMax.y - bbMin.y;
-	size.z = bbMax.z - bbMin.z;
-	return 2.f * (size.x * size.y + size.x * size.z + size.y * size.z);
-}
-
 
 __device__ __forceinline__
 void extract_prim_counts(i32 primitiveCount, ei::IVec4& count) {
@@ -421,6 +267,13 @@ void extract_prim_counts(i32 primitiveCount, ei::IVec4& count) {
 	count.z = (primitiveCount & sphCountMask);
 	count.w = count.x + count.y + count.z;
 }
+
+struct BBCache {
+	ei::Box bb;
+	float cost;
+	i32 primCount;
+};
+static_assert(sizeof(BBCache) == 8*sizeof(float), "Alignment of BBCache will be broken.");
 
 __global__ void calculate_bounding_boxesD(
 	u32 numPrimitives,
@@ -442,14 +295,7 @@ __global__ void calculate_bounding_boxesD(
 	const i32 lastThreadInBlock = firstThreadInBlock + blockDim.x - 1;
 
 	// Initialize cache of bounding boxes in shared memory.
-	extern __shared__ ei::Vec4 sharedBbMin[]; 
-	__shared__ ei::Vec4* sharedBbMax;
-	if (threadIdx.x == 0)
-	{
-		sharedBbMax = sharedBbMin + blockDim.x;
-	}
-	// TODO Add shared memory for counts.
-	__syncthreads();
+	extern __shared__ BBCache sharedBb[]; 
 
 	// Check for valid threads.
 	if (idx >= numPrimitives)
@@ -462,56 +308,52 @@ __global__ void calculate_bounding_boxesD(
 	i32 primId = sortedIndices[idx];
 
 	// Calculate leaves bounding box and set primitives count and intersection test cost.
-	ei::Vec4 cacheMin, cacheMax;
+	ei::Box currentBb;
 	float cost, costAsLeaf;
 	// primitiveCount stores the numbers of each primitives in form:
 	// 2 unused bits + 10 bits triangle + 10 bits quads + 10 bits spheres.
 	i32 primitiveCount;
 	if (primId >= offsetSpheres) {
-		// Calculate bounding boxes for spheres.
+		// Calculate bounding box for spheres.
 		i32 sphId = primId - offsetSpheres;
-		ei::Vec4 sph = sphVertices[sphId];
-		calculate_bounding_box_sph(sph, &cacheMin, &cacheMax);
+		ei::Sphere sph = *reinterpret_cast<ei::Sphere*>(sphVertices+sphId);
+		currentBb = ei::Box(sph);
 		primitiveCount = 1;
 		cost = ct2;
 	}
 	else {
 		if (primId >= offsetQuads) {
-			// Calculate Morton codes for quads.
+			// Calculate bounding box for quads.
 			i32 quadId = (primId - offsetQuads) << 2;
-			ei::Vec3 v0 = quadVertices[quadIndices[quadId]];
-			ei::Vec3 v1 = quadVertices[quadIndices[quadId + 1]];
-			ei::Vec3 v2 = quadVertices[quadIndices[quadId + 2]];
-			ei::Vec3 v3 = quadVertices[quadIndices[quadId + 3]];
-			calculate_bounding_box_quad(v0, v1, v2, v3, &cacheMin, &cacheMax);
+			ei::Vec3 v[4] = { quadVertices[quadIndices[quadId]],
+							  quadVertices[quadIndices[quadId + 1]],
+							  quadVertices[quadIndices[quadId + 2]],
+							  quadVertices[quadIndices[quadId + 3]] };
+			currentBb = ei::Box(v, 4);
 			primitiveCount = 0x00000400;
 			cost = ct1;
 		}
 		else {
-			// Calculate Morton codes for triangles.
+			// Calculate bounding box for triangles.
 			i32 triId = primId * 3;
-			ei::Vec3 v0 = triVertices[triIndices[triId]];
-			ei::Vec3 v1 = triVertices[triIndices[triId + 1]];
-			ei::Vec3 v2 = triVertices[triIndices[triId + 2]];
-			calculate_bounding_box_tri(v0, v1, v2, &cacheMin, &cacheMax);
+			ei::Vec3 v[3] = { triVertices[triIndices[triId]],
+							  triVertices[triIndices[triId + 1]],
+							  triVertices[triIndices[triId + 2]] };
+			currentBb = ei::Box(v, 3);
 			primitiveCount = 0x00100000;
 			cost = ct0;
 		}
 	}
 
 	// Store cost and primitiveCount.
-	float area = calculate_surface_area(cacheMin, cacheMax);
-	cost *= area;
-	cacheMin.w = __int_as_float(primitiveCount);
-	cacheMax.w = cost;
+	cost *= ei::surface(currentBb);
 
 	// Update node bounding boxes of current node.
-	sharedBbMin[threadIdx.x] = cacheMin;
-	sharedBbMax[threadIdx.x] = cacheMax;
+	sharedBb[threadIdx.x] = {currentBb, cost, primitiveCount};
 	i32 leafIndex = idx + (numPrimitives - 1); 
 	i32 boxId = leafIndex << 1;
-	boundingBoxes[boxId] = cacheMin;
-	boundingBoxes[boxId + 1] = cacheMax;
+	boundingBoxes[boxId] = {currentBb.min, __int_as_float(primitiveCount)};
+	boundingBoxes[boxId + 1] = {currentBb.max, cost};
 
 	__syncthreads(); // TODO check this.
 
@@ -541,23 +383,22 @@ __global__ void calculate_bounding_boxesD(
 		}
 
 		// Fetch bounding boxes and counts information.
-		ei::Vec4 childBbMin;
-		ei::Vec4 childBbMax;
-		if (childThreadId >= firstThreadInBlock && childThreadId <= lastThreadInBlock)
-		{
+		BBCache childInfo;
+		if (childThreadId >= firstThreadInBlock && childThreadId <= lastThreadInBlock) {
 			// If both child nodes were processed by the same block, we can reuse the values
 			// cached in shared memory.
 			i32 childThreadIdInBlock = childThreadId - firstThreadInBlock;
-			childBbMin = sharedBbMin[childThreadIdInBlock];
-			childBbMax = sharedBbMax[childThreadIdInBlock];
-		}
-		else
-		{
+			childInfo = sharedBb[childThreadIdInBlock];
+		} else {
 			// The children were processed in different blocks, so we have to find out if the one
 			// that was not processed by this thread was the left or right one.
 			boxId = childThreadId << 1;
-			childBbMin = boundingBoxes[boxId];
-			childBbMax = boundingBoxes[boxId + 1];
+			ei::Vec4 childBbMin = boundingBoxes[boxId];
+			ei::Vec4 childBbMax = boundingBoxes[boxId + 1];
+			childInfo = BBCache{
+				ei::Box{ei::Vec3{childBbMin}, ei::Vec3{childBbMax}},
+				childBbMax.w, __float_as_int(childBbMin.w)
+			};
 		}
 
 		__syncthreads(); // @todo check.
@@ -577,11 +418,10 @@ __global__ void calculate_bounding_boxesD(
 					collapseOffsets[lastNode + 1] = offset;
 			}
 
-			i32 otherprimitiveCount = __float_as_int(childBbMin.w);
-			extract_prim_counts(otherprimitiveCount, otherCounts);
+			extract_prim_counts(childInfo.primCount, otherCounts);
 
-			if (otherprimitiveCount < 0) {
-				otherprimitiveCount = -otherprimitiveCount;
+			if (childInfo.primCount < 0) {
+				childInfo.primCount = -childInfo.primCount;
 				// offset is the number of internal nodes below the other child.
 				i32 offset = childThreadId - otherCounts.w + 2;
 				if (lastNodeIsLeftChild)
@@ -602,13 +442,12 @@ __global__ void calculate_bounding_boxesD(
 				// Setting cacheMin.w is here to make sure:
 				// even if the current node has checkCollapse = false but be killed in 
 				// the next round, however, primitiveCount will be read to disable checkCollapse.
-				cacheMin.w = __int_as_float(0x00000FFF);
-			}
-			else {
-				primitiveCount += otherprimitiveCount;
+				primitiveCount = __int_as_float(0x00000FFF);
+			} else {
+				primitiveCount += childInfo.primCount;
 				// Calculate costs.
-				float area = calculate_surface_area(cacheMin, cacheMax);
-				cost = ci * area + childBbMax.w + cacheMax.w;
+				float area = ei::surface(currentBb);
+				cost = ci * area + childInfo.cost + cost;
 				counts.w = counts.x + counts.y + counts.z;// Determine offset.
 				costAsLeaf = area * (counts.x * ct0 + counts.y * ct1 + counts.z * ct2);
 				if (costAsLeaf < cost) {
@@ -617,7 +456,6 @@ __global__ void calculate_bounding_boxesD(
 					// Update cost.
 					cost = costAsLeaf;
 				}
-				cacheMax.w = cost;
 			}
 		}
 
@@ -629,8 +467,7 @@ __global__ void calculate_bounding_boxesD(
 		if (current < 0) {
 			current = -current;
 			lastNodeIsLeftChild = true;
-		}
-		else {
+		} else {
 			lastNodeIsLeftChild = false;
 		}
 
@@ -644,23 +481,20 @@ __global__ void calculate_bounding_boxesD(
 				primitiveCount |= 0x40000000;
 			else
 				primitiveCount &= 0xBFFFFFFF;
-			cacheMin.w = __int_as_float(primitiveCount);
 		}
-		calculate_node_bounding_box(
-			&cacheMin, &cacheMax, &cacheMin, &cacheMax, &childBbMin, &childBbMax);
-		sharedBbMin[threadIdx.x] = cacheMin;
-		sharedBbMax[threadIdx.x] = cacheMax;
+		currentBb = ei::Box{ currentBb, childInfo.bb };
+		sharedBb[threadIdx.x] = BBCache{currentBb, cost, primitiveCount};
 		boxId = lastNode << 1;
-		boundingBoxes[boxId] = cacheMin;
-		boundingBoxes[boxId + 1] = cacheMax;
+		boundingBoxes[boxId] = {currentBb.min, __int_as_float(primitiveCount)};
+		boundingBoxes[boxId + 1] = {currentBb.max, cost};
 
 		__syncthreads(); //@todo check.
 
 		if (current == 0xEFFFFFFF) {
 			// Print the bounding box of the base node.
 			printf("root bounding box:\n%f %f %f\n%f %f %f\n",
-				cacheMin.x, cacheMin.y, cacheMin.z,
-				cacheMax.x, cacheMax.y, cacheMax.z);
+				currentBb.min.x, currentBb.min.y, currentBb.min.z,
+				currentBb.max.x, currentBb.max.y, currentBb.max.z);
 			return;
 		}
 	}
@@ -711,62 +545,6 @@ __global__ void mark_nodesD(
 	}
 }
 
-__global__ void mark_leavesD(
-	u32 numInternalNodes,
-	ei::Vec4* __restrict__ boundingBoxes,
-	i32* __restrict__ removedMarks
-) {
-	i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
-
-	if (idx >= numInternalNodes)
-		return;
-
-	// This is better than using a stack, since less operations are needed
-	// and due to parallerism, performance is not affected.
-	i32 boxId = idx << 1;
-	i32 primitiveCount = __float_as_int(boundingBoxes[boxId].w);
-	if (primitiveCount >= 0)
-		return;
-	ei::IVec4 count;
-	// Extract counts for three kinds of primitvies.
-	extract_prim_counts(primitiveCount, count);
-	//if (count.w == 2) // Not needed due to start <= end check.
-	//	return; 
-	i32 start, end;
-	if (primitiveCount & 0x40000000 == 0) {
-		// Current node is a right child.
-		start = idx + 1;
-		end = idx + count.w - 2;
-	}
-	else {
-		// Current node is a left child.
-		end = idx - 1;
-		start = idx - count.w + 2;
-	}
-	while (start <= end) {
-		removedMarks[start] = 0xFFFFFFFF;
-		++start;
-	}
-}
-
-// This cannot be done by only knowing id and offset.
-// TODO finish this.
-__device__ __forceinline__
-i32 calculate_target_id(i32 id, i32* offsets) {
-	// In data storing order: 
-	// Before collapsing: numLeavesBeforeId = id
-	// After collapsing: numLeavesBeforeId = id - numReducedLeaves ,
-	// however, numReducedLeaves cannot be deduced from offset, since e.g.
-	// notation: A: 3 leaves -> one leaf, B: 4 leaves -> one leaf.
-	// For nodes on the right of A, offset += 1 (one internal node removed)
-	// For nodes on the right of B, offset += 2 (two internal node removed)
-	// since offset counts only number of removed internal nodes,
-	// for this, 2 x A <=> B.
-	// But numReducedLeaves of 2 x A is 2 x 2 = 4 leaves and for B is 3 leaves.
-	// Therefore, we need info about number of leaves / internal nodes before node id.
-//	i32 offset = offsets[id];
-	return 0;
-}
 
 __device__ __forceinline__
 i32 insert_id(i32 id, i32* preLeaves) {
