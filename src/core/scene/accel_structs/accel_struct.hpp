@@ -14,7 +14,7 @@ struct Ray;
 } // namespace ei
 
 
-namespace mufflon::scene {
+namespace mufflon::scene::accel_struct {
 
 /**
  * Interface for generic accelleration structure.
@@ -47,4 +47,4 @@ public:
 	// TODO: intersections for Rays
 };
 
-} // namespace mufflon::scene
+} // namespace mufflon::scene::accel_struct

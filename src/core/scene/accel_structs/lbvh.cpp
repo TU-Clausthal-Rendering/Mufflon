@@ -1,5 +1,5 @@
 #include "lbvh.hpp"
-#include "build_lbvh.h"
+#include "build_lbvh.hpp"
 
 namespace mufflon {	namespace scene {namespace accel_struct {
 

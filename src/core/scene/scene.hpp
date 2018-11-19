@@ -70,12 +70,12 @@ public:
 
 	// Checks whether the object currently has a BVH.
 	bool has_accel_structure() const noexcept {
-		return m_accel_struct != nullptr;
+		return m_accelStruct != nullptr;
 	}
 	// Returns the BVH of this object.
-	const IAccelerationStructure& get_accel_structure() const noexcept {
+	const accel_struct::IAccelerationStructure& get_accel_structure() const noexcept {
 		mAssert(this->has_accel_structure());
-		return *m_accel_struct;
+		return *m_accelStruct;
 	}
 	// Clears the BVH of this object.
 	void clear_accel_structure();
@@ -126,7 +126,7 @@ private:
 	// TODO: materials
 	// Acceleration structure over all instances
 	bool m_accelDirty = false;
-	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
+	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
 
 	const ei::IVec2 m_resolution = {};
 	ei::Box m_boundingBox;

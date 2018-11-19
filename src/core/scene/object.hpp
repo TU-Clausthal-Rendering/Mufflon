@@ -20,7 +20,9 @@ enum class Device : unsigned char;
 namespace scene {
 
 // Forward declaration
-class IAccelerationStructure;
+namespace accel_struct {
+	class IAccelerationStructure;
+}
 
 /**
  * Representation of a scene object.
@@ -153,12 +155,12 @@ public:
 
 	// Checks whether the object currently has a BVH.
 	bool has_accel_structure() const noexcept {
-		return m_accel_struct != nullptr;
+		return m_accelStruct != nullptr;
 	}
 	// Returns the BVH of this object.
-	const IAccelerationStructure& get_accel_structure() const noexcept {
+	const accel_struct::IAccelerationStructure& get_accel_structure() const noexcept {
 		mAssert(this->has_accel_structure());
-		return *m_accel_struct;
+		return *m_accelStruct;
 	}
 	// Clears the BVH of this object.
 	void clear_accel_structure();
@@ -212,7 +214,7 @@ private:
 	bool m_accelDirty = false;
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; // Current level-of-detail
-	std::unique_ptr<IAccelerationStructure> m_accel_struct = nullptr;
+	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
 
 	// TODO: how to handle the LoDs?
 };

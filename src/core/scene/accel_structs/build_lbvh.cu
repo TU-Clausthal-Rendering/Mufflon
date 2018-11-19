@@ -1,15 +1,12 @@
-#include "build_lbvh.h"
-
-#include <cuda_runtime_api.h>
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-#include <cuda_runtime_api.h>
-
+#include "build_lbvh.hpp"
 #include "util/types.hpp"
 #include "core/cuda/cu_lib_wrapper.h"
 
-namespace mufflon //TODO snippers
-{
+#include <cuda_runtime_api.h>
+//#include <device_launch_parameters.h>
+
+
+namespace mufflon { namespace {//TODO snippers
 
 __host__ __device__ ei::Vec3 get_triangle_centroid(ei::Vec3 v0, ei::Vec3 v1, ei::Vec3 v2) {
 	ei::Vec3 lo;
@@ -931,6 +928,11 @@ __global__ void copy_to_collapsed_bvh(
 	}
 }
 
+}} // namespace mufflon:: {
+
+
+
+namespace mufflon { namespace scene { namespace accel_struct {
 
 ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
 	ei::Vec3* quadVertices,
@@ -1057,4 +1059,4 @@ ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
 
 	return collapsedBVH;
 }
-}
+}}} // namespace mufflon

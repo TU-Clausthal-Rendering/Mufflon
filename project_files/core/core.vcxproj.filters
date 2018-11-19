@@ -351,16 +351,16 @@
     <ClInclude Include="..\..\src\core\math\rng.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\accel_struct\accel_struct.hpp">
-      <Filter>Source Files\core\scene\accel_structs</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h">
       <Filter>Source Files\core\cuda</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.h">
+    <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
   </ItemGroup>

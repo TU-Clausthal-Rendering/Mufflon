@@ -17,21 +17,21 @@ public:
 	~LBVH();
 
 	// Checks whether the structure is currently available on the given system.
-	bool is_resident(Device res) const;;
+	bool is_resident(Device res) const final;
 	// TODO: Makes the structure's data available on the desired system.
 	// TODO: hybrid Device allowed?
-	void make_resident(Device res);
+	void make_resident(Device res) final;
 	// TODO: Removes the structure from the given system, if present.
-	void unload_resident(Device res);
+	void unload_resident(Device res) final;
 	// TODO: Builds or rebuilds the structure.
-	void build(const std::vector<InstanceHandle>&);
+	void build(const std::vector<InstanceHandle>&) final;
 	// TODO: should this be put into a different class?
 	void build(const ei::Box& boundingBox,
 		util::Range<geometry::Polygons::FaceIterator> faces,
 		const AttributeList<false>::Attribute<geometry::Spheres::Sphere>& spheres,
-		std::size_t triangles, std::size_t quads);
+		std::size_t triangles, std::size_t quads) final;
 	// TODO: Checks whether the data on a given system has been modified and is out of sync.
-	virtual bool is_dirty(Device res) const;
+	virtual bool is_dirty(Device res) const final;
 private:
 
 	// Indicator for the location of the structure.
