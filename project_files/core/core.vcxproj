@@ -59,6 +59,7 @@
     <ClInclude Include="..\..\src\core\cameras\sample.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
+    <ClInclude Include="..\..\src\core\math\sfcurves.hpp" />
     <ClInclude Include="..\..\src\core\memory\accessor.hpp" />
     <ClInclude Include="..\..\src\core\memory\allocator.hpp" />
     <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp" />

@@ -3,6 +3,7 @@
 #include "util/assert.hpp"
 #include "core/cuda/error.hpp"
 #include "ei/3dtypes.hpp"
+#include "core/math/sfcurves.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cmath>
@@ -22,36 +23,6 @@ std::size_t get_num_internal_nodes(std::size_t elems) {
 	// Check if our tree is "filled" or if we have extra nodes on the bottom level
 	return nodes + (elems - static_cast<std::size_t>(std::pow(2u, height)));
 }
-
-// The following functions are taken from (taken from https://github.com/Jojendersie/Bim/blob/master/src/bim_sbvh.cpp)
-// Two sources to derive the z-order comparator
-// (floats - unused) http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.150.9547&rep=rep1&type=pdf
-// (ints - the below one uses this int-algorithm on floats) http://dl.acm.org/citation.cfm?id=545444
-// http://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/ Computing morton codes
-auto part_by_two = [](const u16 x) constexpr->u64 {
-	u64 r = x;
-	r = (r | (r << 16)) & 0x0000ff0000ff;
-	r = (r | (r << 8)) & 0x00f00f00f00f;
-	r = (r | (r << 4)) & 0x0c30c30c30c3;
-	r = (r | (r << 2)) & 0x249249249249;
-	return r;
-};
-
-// Converts gray-code to regular binary
-auto gray_to_binary = [](u64 num) constexpr->u64{
-	num = num ^ (num >> 32);
-	num = num ^ (num >> 16);
-	num = num ^ (num >> 8);
-	num = num ^ (num >> 4);
-	num = num ^ (num >> 2);
-	num = num ^ (num >> 1);
-	return num;
-};
-
-// Encodes 3 16-bit values into a single 64 bit value
-auto get_morton_code = [](const u16 a, const u16 b, const u16 c) constexpr->u64 {
-	return part_by_two(a) | (part_by_two(b) << 1u) | (part_by_two(c) << 2u);
-};
 
 template < class T >
 ei::Vec3 get_light_center(const T& light) {
@@ -314,12 +285,12 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 		ei::UVec3 x = ei::UVec3(get_light_center(a) * scale);
 		ei::UVec3 y = ei::UVec3(get_light_center(b) * scale);
 		// Interleave packages of 16 bit, convert to inverse Gray code and compare.
-		u64 codeA = gray_to_binary(get_morton_code(x.x >> 16u, x.y >> 16u, x.z >> 16u));
-		u64 codeB = gray_to_binary(get_morton_code(y.x >> 16u, y.y >> 16u, y.z >> 16u));
+		u64 codeA = math::get_hilbert_code(x.x >> 16u, x.y >> 16u, x.z >> 16u);
+		u64 codeB = math::get_hilbert_code(y.x >> 16u, y.y >> 16u, y.z >> 16u);
 		// If they are equal take the next 16 less significant bit.
 		if(codeA == codeB) {
-			codeA = gray_to_binary(get_morton_code(x.x & 0xffff, x.y & 0xffff, x.z & 0xffff));
-			codeB = gray_to_binary(get_morton_code(y.x & 0xffff, y.y & 0xffff, y.z & 0xffff));
+			codeA = math::get_hilbert_code(x.x & 0xffff, x.y & 0xffff, x.z & 0xffff);
+			codeB = math::get_hilbert_code(y.x & 0xffff, y.y & 0xffff, y.z & 0xffff);
 		}
 		return codeA < codeB;
 	});

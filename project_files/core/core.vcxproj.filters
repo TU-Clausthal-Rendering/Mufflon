@@ -339,6 +339,9 @@
     <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h">
       <Filter>Source Files\deps\glad\KHR</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\math\sfcurves.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\accel_struct.hpp">
