@@ -348,6 +348,9 @@
     <ClInclude Include="..\..\src\core\math\sfcurves.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\math\rng.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_struct\accel_struct.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>

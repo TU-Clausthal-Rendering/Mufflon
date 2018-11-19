@@ -31,6 +31,11 @@ CUDA_FUNCTION constexpr u64 gray_to_binary(u64 num) {
 	return num;
 };
 
+// Converts binary to gray-code
+CUDA_FUNCTION constexpr u64 binary_to_gray(u64 num) {
+	return num ^ (num >> 1);
+}
+
 // Encodes 3 16-bit values into a single 64 bit value on a Z-curve.
 CUDA_FUNCTION constexpr u64 get_morton_code(const u16 a, const u16 b, const u16 c) {
 	return part_by_two(a) | (part_by_two(b) << 1u) | (part_by_two(c) << 2u);
