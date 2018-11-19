@@ -33,7 +33,8 @@ inline __host__ __device__ ei::Vec4 read(ConstTextureDevHandle_t<Device::CUDA> t
 }
 inline __host__ __device__ ei::Vec4 read(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer = 0) {
 #ifdef __CUDA_ARCH__
-	return ei::details::hard_cast<ei::Vec4>(surf2Dread<float4>(texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y));
+	return ei::details::hard_cast<ei::Vec4>(surf2DLayeredread<float4>(texture.handle, texel.x * PIXEL_SIZE(texture.format),
+																	  texel.y, layer));
 #else
 	return ei::Vec4{0.0f};
 #endif
@@ -54,13 +55,13 @@ inline __host__ __device__ void write(TextureDevHandle_t<Device::CPU> texture, c
 inline __host__ __device__ void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, const ei::Vec4& value) {
 #ifdef __CUDA_ARCH__
 	float4 v = ei::details::hard_cast<float4>(value);
-	surf2Dwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y);
+	surf2DLayeredwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y, 0);
 #endif
 }
 inline __host__ __device__ void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
 #ifdef __CUDA_ARCH__
 	float4 v = ei::details::hard_cast<float4>(value);
-	surf2Dwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y + layer * texture.height);
+	surf2DLayeredwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y, layer);
 #endif
 }
 
