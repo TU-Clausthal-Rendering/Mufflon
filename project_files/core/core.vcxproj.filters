@@ -363,6 +363,9 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">
@@ -383,6 +386,9 @@
       <Filter>Source Files\core\cuda</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\scene\accel_structs\intersection.cu">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </CudaCompile>
   </ItemGroup>

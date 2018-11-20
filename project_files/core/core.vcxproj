@@ -77,6 +77,7 @@
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp" />
@@ -118,6 +119,7 @@
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />
+    <CudaCompile Include="..\..\src\core\scene\accel_structs\intersection.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

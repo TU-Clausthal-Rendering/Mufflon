@@ -8,7 +8,7 @@
 #include <device_launch_parameters.h>
 
 
-namespace mufflon { namespace {//TODO snippers
+namespace mufflon { namespace {
 
 __host__ __device__ ei::Vec3 get_triangle_centroid(ei::Vec3 v0, ei::Vec3 v1, ei::Vec3 v2) {
 	ei::Vec3 lo = min(v0, v1, v2);
@@ -568,7 +568,7 @@ i32 next_id(ei::IVec4& insertPos, ei::IVec2& endPos, i32& primType) {
 	}
 }
 
-__global__ void copy_to_collapsed_bvh(
+__global__ void copy_to_collapsed_bvhD(
 	i32 numInternalNodes,
 	ei::Vec4* collapsedBVH,
 	ei::Vec4 * __restrict__ boundingBoxes,
@@ -813,8 +813,8 @@ ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
 	i32 numInternalNodesCollapsedBVH = numNodesCollapsedBVH - numLeavesCollapsedBVH;
 	cudaMalloc((void**)&collapsedBVH, (numLeavesCollapsedBVH + 4 * numInternalNodesCollapsedBVH) 
 		* sizeof(ei::Vec4));
-	get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, copy_to_collapsed_bvh);
-	copy_to_collapsed_bvh << < numBlocks, numThreads >> > (
+	get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, copy_to_collapsed_bvhD);
+	copy_to_collapsed_bvhD << < numBlocks, numThreads >> > (
 		numInternalNodes,
 		collapsedBVH,
 		boundingBoxes,
