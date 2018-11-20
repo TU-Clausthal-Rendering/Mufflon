@@ -42,6 +42,91 @@
     <ClInclude Include="..\..\deps\chinoise\include\cn\fieldnoise.hpp" />
     <ClInclude Include="..\..\deps\chinoise\include\cn\rnd.hpp" />
     <ClInclude Include="..\..\deps\chinoise\include\cn\sampler.hpp" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_histogram.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_radix_sort_downsweep.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_radix_sort_upsweep.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_reduce_by_key.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_rle.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_scan.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_segment_fixup.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_select_if.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_spmv_orig.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\agent\single_pass_scan_operators.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_adjacent_difference.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_discontinuity.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_exchange.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_histogram.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_load.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_radix_rank.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_radix_sort.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_raking_layout.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_scan.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_shuffle.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\block_store.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_histogram_atomic.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_histogram_sort.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_reduce_raking.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_reduce_raking_commutative_only.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_reduce_warp_reductions.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_raking.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_warp_scans.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_warp_scans2.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_warp_scans3.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\cub.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_histogram.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_partition.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_radix_sort.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_run_length_encode.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_scan.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_segmented_radix_sort.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_segmented_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_select.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\device_spmv.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_histogram.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_radix_sort.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_reduce_by_key.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_rle.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_scan.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_select_if.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_spmv_orig.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_barrier.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_even_share.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_mapping.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_queue.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\host\mutex.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\arg_index_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\cache_modified_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\cache_modified_output_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\constant_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\counting_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\discard_output_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\tex_obj_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\tex_ref_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\iterator\transform_input_iterator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_load.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_operators.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_scan.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_search.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_store.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_allocator.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_arch.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_debug.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_device.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_macro.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_namespace.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_ptx.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\util_type.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_reduce_shfl.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_reduce_smem.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_shfl.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_smem.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\warp\warp_reduce.cuh" />
+    <ClInclude Include="..\..\deps\cub\cub\warp\warp_scan.cuh" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\2dtypes.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp" />
@@ -175,7 +260,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Debug\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;LIBRARY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -221,7 +306,7 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\Release\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;LIBRARY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

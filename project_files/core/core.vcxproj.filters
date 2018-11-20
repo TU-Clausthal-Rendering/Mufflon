@@ -65,6 +65,42 @@
     <Filter Include="Source Files\core\scene\accel_structs">
       <UniqueIdentifier>{12f4fde0-5ca0-4a4d-b861-603418b5b36d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\deps\cub">
+      <UniqueIdentifier>{1cecc38a-8783-4415-9fff-99b0c2ba4b2f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\agent">
+      <UniqueIdentifier>{d55174c2-54b1-4e6c-b1bf-b329ffdb9f16}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\block">
+      <UniqueIdentifier>{ff327e11-d915-4eab-b7e7-bd95a595a226}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\device">
+      <UniqueIdentifier>{3fc8eca3-3068-4afb-9d1f-e3990b2ffc29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\grid">
+      <UniqueIdentifier>{196acafc-12b9-4793-9d1a-52fb8513c10a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\host">
+      <UniqueIdentifier>{4c5ea34f-5e3f-42fb-b512-e350eafdfcdf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\iterator">
+      <UniqueIdentifier>{fec2fac7-80ed-4845-b2c0-1feea2db2305}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\warp">
+      <UniqueIdentifier>{d43c5115-8f9c-40ea-992c-3da4f06d5bac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\thread">
+      <UniqueIdentifier>{4021e02e-a8ce-481e-b234-7da0114688c9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\block\specializations">
+      <UniqueIdentifier>{50e764b8-943c-411b-9688-cf75f43dd3e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\device\dispatch">
+      <UniqueIdentifier>{89e8d33c-a09f-45a1-9cfe-d646316c3e73}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\deps\cub\warp\specializations">
+      <UniqueIdentifier>{6e05d85b-efc3-4aa6-82e2-bcacfb1180d4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -365,6 +401,261 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\cub.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_allocator.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_arch.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_debug.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_device.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_macro.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_namespace.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_ptx.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\util_type.cuh">
+      <Filter>Source Files\deps\cub</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_histogram.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_radix_sort_downsweep.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_radix_sort_upsweep.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_reduce.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_reduce_by_key.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_rle.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_scan.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_segment_fixup.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_select_if.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\agent_spmv_orig.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\agent\single_pass_scan_operators.cuh">
+      <Filter>Source Files\deps\cub\agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_adjacent_difference.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_discontinuity.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_exchange.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_histogram.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_load.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_radix_rank.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_radix_sort.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_raking_layout.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_reduce.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_scan.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_shuffle.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\block_store.cuh">
+      <Filter>Source Files\deps\cub\block</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_histogram_atomic.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_histogram_sort.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_reduce_raking.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_reduce_raking_commutative_only.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_reduce_warp_reductions.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_raking.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_warp_scans.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_warp_scans2.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\block\specializations\block_scan_warp_scans3.cuh">
+      <Filter>Source Files\deps\cub\block\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_histogram.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_partition.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_radix_sort.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_reduce.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_run_length_encode.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_scan.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_segmented_radix_sort.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_segmented_reduce.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_select.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\device_spmv.cuh">
+      <Filter>Source Files\deps\cub\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_histogram.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_radix_sort.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_reduce.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_reduce_by_key.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_rle.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_scan.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_select_if.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\device\dispatch\dispatch_spmv_orig.cuh">
+      <Filter>Source Files\deps\cub\device\dispatch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_barrier.cuh">
+      <Filter>Source Files\deps\cub\grid</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_even_share.cuh">
+      <Filter>Source Files\deps\cub\grid</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_mapping.cuh">
+      <Filter>Source Files\deps\cub\grid</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\grid\grid_queue.cuh">
+      <Filter>Source Files\deps\cub\grid</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\host\mutex.cuh">
+      <Filter>Source Files\deps\cub\host</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\arg_index_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\cache_modified_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\cache_modified_output_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\constant_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\counting_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\discard_output_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\tex_obj_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\tex_ref_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\iterator\transform_input_iterator.cuh">
+      <Filter>Source Files\deps\cub\iterator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_load.cuh">
+      <Filter>Source Files\deps\cub\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_operators.cuh">
+      <Filter>Source Files\deps\cub\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_reduce.cuh">
+      <Filter>Source Files\deps\cub\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_scan.cuh">
+      <Filter>Source Files\deps\cub\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_search.cuh">
+      <Filter>Source Files\deps\cub\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\thread\thread_store.cuh">
+      <Filter>Source Files\deps\cub\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\warp\warp_reduce.cuh">
+      <Filter>Source Files\deps\cub\warp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\warp\warp_scan.cuh">
+      <Filter>Source Files\deps\cub\warp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_reduce_shfl.cuh">
+      <Filter>Source Files\deps\cub\warp\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_reduce_smem.cuh">
+      <Filter>Source Files\deps\cub\warp\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_shfl.cuh">
+      <Filter>Source Files\deps\cub\warp\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_smem.cuh">
+      <Filter>Source Files\deps\cub\warp\specializations</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
