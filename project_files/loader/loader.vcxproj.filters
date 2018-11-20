@@ -20,6 +20,9 @@
     <Filter Include="Source Files\deps\chinoise">
       <UniqueIdentifier>{9de4c341-434c-4c95-bd7b-c29a852ca17e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\loader\export">
+      <UniqueIdentifier>{8ac1c7a9-9155-46d2-a6d5-a35f57cdb04b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -30,6 +33,9 @@
     </ClCompile>
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp">
       <Filter>Source Files\deps\chinoise</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\loader\export\interface.cpp">
+      <Filter>Source Files\loader\export</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -74,6 +80,9 @@
     </ClInclude>
     <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\loader\export\interface.h">
+      <Filter>Source Files\loader\export</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
