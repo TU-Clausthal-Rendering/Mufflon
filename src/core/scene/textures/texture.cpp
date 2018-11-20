@@ -136,7 +136,7 @@ void Texture::clear() {
 			else memset(m_cpuTexture->data(), 0, texMemSize);
 		} break;
 		case Device::CUDA: {
-			if(!m_cpuTexture)
+			if(!m_cudaTexture)
 				logError("[Texture::zero] Trying to clear a CUDA texture without memory.");
 			else {
 				// Is the dummy memory to small?

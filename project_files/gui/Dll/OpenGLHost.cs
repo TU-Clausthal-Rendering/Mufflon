@@ -43,6 +43,9 @@ namespace gui.Dll
         private int m_renderOffsetX = 0;
         private int m_renderOffsetY = 0;
 
+        // TODO: this is only for testing purposes
+        public static bool toggleRenderer = false;
+
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
@@ -72,22 +75,63 @@ namespace gui.Dll
             {
                 InitializeOpenGl();
 
+                Core.RendererType rendererType = Core.RendererType.CPU_PT;
+                IntPtr light = Core.world_add_point_light("testPointLight", new Core.Vec3(0, 0, 0),
+                   new Core.Vec3(1, 1, 1));
+                if(light == IntPtr.Zero)
+                    throw new Exception(Core.GetDllError());
+                IntPtr cam = Core.world_add_pinhole_camera("testPinholeCam", new Core.Vec3(0, 0, 0),
+                    new Core.Vec3(0, 0, 1), new Core.Vec3(0, 1, 0), 1e-10f, 1e10f, 2.3f);
+                if(cam == IntPtr.Zero)
+                    throw new Exception(Core.GetDllError());
+                IntPtr scenario = Core.world_create_scenario("testscenario");
+                if(scenario == IntPtr.Zero)
+                    throw new Exception(Core.GetDllError());
+                if(!Core.scenario_add_light(scenario, "testPointLight"))
+                    throw new Exception(Core.GetDllError());
+                if(!Core.scenario_set_camera(scenario, cam))
+                    throw new Exception(Core.GetDllError());
+                if (!Core.scenario_set_resolution(scenario, 800, 600))
+                    throw new Exception(Core.GetDllError());
+                if (Core.world_load_scenario(scenario) == IntPtr.Zero)
+                    throw new Exception(Core.GetDllError());
+                if(!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
+                    throw new Exception(Core.GetDllError());
+                if(!Core.render_enable_renderer(Core.RendererType.CPU_PT))
+                    throw new Exception(Core.GetDllError());
+
                 while (m_isRunning)
                 {
                     HandleCommands();
                     HandleResize();
 
-                    if(!Core.iterate())
-                      throw new Exception(Core.GetDllError());
+                    if(toggleRenderer)
+                    {
+                        if (rendererType == Core.RendererType.CPU_PT)
+                            rendererType = Core.RendererType.GPU_PT;
+                        else
+                            rendererType = Core.RendererType.CPU_PT;
 
+                        if (!Core.render_enable_renderer(rendererType))
+                            throw new Exception(Core.GetDllError());
+                        toggleRenderer = false;
+                    }
+
+                    if(!Core.render_iterate())
+                      throw new Exception(Core.GetDllError());
+                    if (!Core.display_screenshot())
+                        throw new Exception(Core.GetDllError());
                     if(!Gdi32.SwapBuffers(m_deviceContext))
                         throw new Win32Exception(Marshal.GetLastWin32Error());
+                    if(!Core.render_reset())
+                        throw new Exception(Core.GetDllError());
                 }
             }
             catch (Exception e)
             {
                 Dispatcher.BeginInvoke(Error, e.Message);
             }
+            Core.mufflon_destroy();
         }
 
 
@@ -198,10 +242,6 @@ namespace gui.Dll
             // stop render thread
             m_isRunning = false;
             m_renderThread.Join();
-
-            // Destroy the DLLs render resources
-            if (!Core.mufflon_destroy())
-                throw new Exception(Core.GetDllError());
 
             // destroy resources
             User32.DestroyWindow(hwnd.Handle);

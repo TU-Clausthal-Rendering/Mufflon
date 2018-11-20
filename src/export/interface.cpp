@@ -202,6 +202,140 @@ Boolean iterate() {
 
 	return true;
 }
+Boolean display_screenshot() {
+	if (!s_imageOutput) {
+		logError("[", FUNCTION_NAME, "] No image to print is present");
+		return false;
+	}
+
+	constexpr const char* VERTEX_CODE = "#version 330 core\nvoid main(){}";
+	constexpr const char* GEOMETRY_CODE =
+		"#version 330 core\n"
+		"layout(points) in;"
+		"layout(triangle_strip, max_vertices = 4) out;"
+		"out vec2 texcoord;"
+		"void main() {"
+		"	gl_Position = vec4(1.0, 1.0, 0.5, 1.0);"
+		"	texcoord = vec2(1.0, 1.0);"
+		"	EmitVertex();"
+		"	gl_Position = vec4(-1.0, 1.0, 0.5, 1.0);"
+		"	texcoord = vec2(0.0, 1.0);"
+		"	EmitVertex();"
+		"	gl_Position = vec4(1.0, -1.0, 0.5, 1.0);"
+		"	texcoord = vec2(1.0, 0.0);"
+		"	EmitVertex();"
+		"	gl_Position = vec4(-1.0, -1.0, 0.5, 1.0);"
+		"	texcoord = vec2(0.0, 0.0);"
+		"	EmitVertex();"
+		"	EndPrimitive();"
+		"}";
+	constexpr const char* FRAGMENT_CODE =
+		"#version 330 core\n"
+		"in vec2 texcoord;"
+		"uniform sampler2D textureSampler;"
+		"void main() {"
+		"	gl_FragColor.xyz = texture2D(textureSampler, texcoord).rgb;"
+		"}";
+
+	GLuint tex = 0u;
+	GLuint program = 0u;
+	GLuint vertShader = 0u;
+	GLuint geomShader = 0u;
+	GLuint fragShader = 0u;
+	GLuint vao = 0u;
+
+	auto cleanup = [&tex, &vao, &program, &vertShader, &geomShader, &fragShader]() {
+		glBindTexture(GL_TEXTURE_2D, 0u);
+		glUseProgram(0);
+		glBindVertexArray(0);
+		if (tex != 0) glDeleteTextures(1u, &tex);
+		if (vertShader != 0) glDeleteShader(vertShader);
+		if (geomShader != 0) glDeleteShader(geomShader);
+		if (fragShader != 0) glDeleteShader(fragShader);
+		if (program != 0) glDeleteProgram(program);
+		if (vao != 0) glDeleteVertexArrays(1, &vao);
+	};
+
+	// Creates an OpenGL texture, copies the screen data into it and
+	// renders it to the screen
+	glGenTextures(1u, &tex);
+	if (tex == 0) {
+		logError("[", FUNCTION_NAME, "] Failed to initialize screen texture");
+		cleanup();
+		return false;
+	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	vertShader = glCreateShader(GL_VERTEX_SHADER);
+	geomShader = glCreateShader(GL_GEOMETRY_SHADER);
+	fragShader = glCreateShader(GL_FRAGMENT_SHADER);
+	if (vertShader == 0 || fragShader == 0 || geomShader == 0) {
+		logError("[", FUNCTION_NAME, "] Failed to initialize screen shaders");
+		cleanup();
+		return false;
+	}
+	glShaderSource(vertShader, 1u, &VERTEX_CODE, nullptr);
+	glShaderSource(geomShader, 1u, &GEOMETRY_CODE, nullptr);
+	glShaderSource(fragShader, 1u, &FRAGMENT_CODE, nullptr);
+	glCompileShader(vertShader);
+	glCompileShader(geomShader);
+	glCompileShader(fragShader);
+	GLint compiled[3];
+	glGetShaderiv(vertShader, GL_COMPILE_STATUS, &compiled[0]);
+	glGetShaderiv(geomShader, GL_COMPILE_STATUS, &compiled[1]);
+	glGetShaderiv(fragShader, GL_COMPILE_STATUS, &compiled[2]);
+	if (compiled[0] != GL_TRUE || compiled[1] != GL_TRUE || compiled[2] != GL_TRUE) {
+		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders");
+		cleanup();
+		return false;
+	}
+
+	program = glCreateProgram();
+	if (program == 0u) {
+		logError("[", FUNCTION_NAME, "] Failed to initialize screen program");
+		cleanup();
+		return false;
+	}
+	glAttachShader(program, vertShader);
+	glAttachShader(program, geomShader);
+	glAttachShader(program, fragShader);
+	glLinkProgram(program);
+	GLint linkStatus;
+	glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
+	if (linkStatus != GL_TRUE) {
+		logError("[", FUNCTION_NAME, "] Failed to link screen program");
+		cleanup();
+		return false;
+	}
+	glDetachShader(program, vertShader);
+	glDetachShader(program, geomShader);
+	glDetachShader(program, fragShader);
+
+	ei::IVec2 res = WorldContainer::instance().get_current_scene()->get_resolution();
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, res.x, res.y, 0, GL_RGBA, GL_FLOAT,
+		s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::RADIANCE },
+			textures::Format::RGBA32F, false).data());
+
+	glUseProgram(program);
+	glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
+
+	glGenVertexArrays(1, &vao);
+	if (vao == 0) {
+		logError("[", FUNCTION_NAME, "] Failed to link screen program");
+		cleanup();
+		return false;
+	}
+	glBindVertexArray(vao);
+	glDrawArrays(GL_POINTS, 0, 1u);
+
+	cleanup();
+	return true;
+}
 Boolean resize(int width, int height, int offsetX, int offsetY) {
 	// glViewport should not be called with width or height zero
 	if(width == 0 || height == 0) return true;
@@ -1134,14 +1268,19 @@ Boolean scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level) {
 	return true;
 }
 
-IVec2 scenario_get_resolution(ScenarioHdl scenario) {
-	CHECK_NULLPTR(scenario, "scenario handle", (IVec2{ 0, 0 }));
-	return util::pun<IVec2>(static_cast<const Scenario*>(scenario)->get_resolution());
+Boolean scenario_get_resolution(ScenarioHdl scenario, uint32_t* width, uint32_t* height) {
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	ei::IVec2 res = static_cast<const Scenario*>(scenario)->get_resolution();
+	if(width != nullptr)
+		*width = res.x;
+	if(height != nullptr)
+		*height = res.y;
+	return true;
 }
 
-Boolean scenario_set_resolution(ScenarioHdl scenario, IVec2 res) {
+Boolean scenario_set_resolution(ScenarioHdl scenario, uint32_t width, uint32_t height) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	static_cast<Scenario*>(scenario)->set_resolution(util::pun<ei::IVec2>(res));
+	static_cast<Scenario*>(scenario)->set_resolution(ei::IVec2{ width, height });
 	return true;
 }
 
@@ -1487,6 +1626,12 @@ Boolean render_iterate() {
 	return true;
 }
 
+Boolean render_reset() {
+	if (s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
+	return true;
+}
+
 Boolean render_get_screenshot() {
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
@@ -1651,9 +1796,8 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 	return initialized;
 }
 
-LIBRARY_API Boolean CDECL mufflon_destroy() {
+LIBRARY_API void CDECL mufflon_destroy() {
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_currentRenderer.reset();
-	return true;
 }

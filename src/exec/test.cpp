@@ -272,7 +272,7 @@ void test_scene() {
 
 	ScenarioHdl scenario = world_find_scenario("TestScenario");
 	mAssert(scenario != nullptr);
-	success = scenario_set_resolution(scenario, { 800, 600 });
+	success = scenario_set_resolution(scenario, 800, 600 );
 	mAssert(success);
 	CameraHdl cam = world_get_camera("TestPinholeCam");
 	mAssert(cam != nullptr);

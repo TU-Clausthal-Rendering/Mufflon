@@ -24,7 +24,7 @@ public:
 	GpuPathTracer(scene::SceneHandle scene);
 
 	// This is just a test method, don't use this as an actual interface
-	virtual void iterate(OutputHandler& handler) const override;
+	virtual void iterate(OutputHandler& handler) override;
 	virtual void reset() override;
 
 private:
@@ -33,6 +33,7 @@ private:
 				 scene::lights::LightTree<Device::CUDA> lightTree,
 				 RenderBuffer<Device::CUDA> outputBuffer) const;
 
+	bool m_reset = true;
 	scene::SceneHandle m_currentScene;
 };
 

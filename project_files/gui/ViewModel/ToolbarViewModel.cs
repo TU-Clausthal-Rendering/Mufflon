@@ -10,6 +10,7 @@ using System.Windows.Input;
 using gui.Annotations;
 using gui.Command;
 using gui.Model;
+using gui.Dll;
 
 namespace gui.ViewModel
 {
@@ -29,6 +30,9 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(RendererModel.IsRendering):
+                    // TODO: this is only for testing purposes
+                    OpenGLHost.toggleRenderer = true;
+
                     OnPropertyChanged(nameof(PauseIconVisibility));
                     OnPropertyChanged(nameof(PlayIconVisibility));
                     break;

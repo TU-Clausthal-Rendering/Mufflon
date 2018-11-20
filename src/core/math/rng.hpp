@@ -43,7 +43,7 @@ public:
 private:
 	u64 m_state[2];		// The state: 128bit
 
-	u64 rotl(const u64 x, const u64 k) const {
+	__host__ __device__ u64 rotl(const u64 x, const u64 k) const {
 		return (x << k) | (x >> (64u - k));
 	}
 };

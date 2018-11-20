@@ -6,7 +6,7 @@ class OutputHandler; // TODO: implement an output handler for various configurat
 
 class IRenderer {
 public:
-	virtual void iterate(OutputHandler& output) const = 0;
+	virtual void iterate(OutputHandler& output) = 0;
 	virtual void reset() = 0;
 };
 

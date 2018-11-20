@@ -2,6 +2,8 @@
 
 #include "renderer.hpp"
 #include "core/scene/scene.hpp"
+#include "core/math/rng.hpp"
+#include <vector>
 
 namespace mufflon::cameras {
 	struct CameraParams;
@@ -17,13 +19,15 @@ public:
 	// Initialize all resources required by this renderer.
 	CpuPathTracer(scene::SceneHandle scene);
 
-	virtual void iterate(OutputHandler& outputBuffer) const override;
+	virtual void iterate(OutputHandler& outputBuffer) override;
 	virtual void reset() override;
 private:
 	// Create one sample path (actual PT algorithm)
-	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer) const;
+	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer);
 
+	bool m_reset = true;
 	scene::SceneHandle m_currentScene;
+	std::vector<math::Xoroshiro128> m_rngs;
 };
 
 } // namespace mufflon::renderer

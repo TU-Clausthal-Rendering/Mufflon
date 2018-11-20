@@ -12,7 +12,7 @@ GpuPathTracer::GpuPathTracer(scene::SceneHandle scene) :
 	// The PT does not need additional memory resources like photon maps.
 }
 
-void GpuPathTracer::iterate(OutputHandler& outputBuffer) const {
+void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// TODO: call sample in a parallel way for each output pixel
 
 	const ei::IVec2& resolution = m_currentScene->get_resolution();
@@ -24,13 +24,14 @@ void GpuPathTracer::iterate(OutputHandler& outputBuffer) const {
 
 	// TODO: pass scene data to kernel!
 	this->iterate(m_currentScene->get_resolution(), std::move(m_currentScene->get_light_tree<Device::CUDA>()),
-				  std::move(outputBuffer.begin_iteration<Device::CUDA>(false)));
+				  std::move(outputBuffer.begin_iteration<Device::CUDA>(m_reset)));
+	m_reset = false;
 
 	outputBuffer.end_iteration<Device::CUDA>();
 }
 
 void GpuPathTracer::reset() {
-	// TODO
+	m_reset = true;
 }
 
 } // namespace mufflon::renderer

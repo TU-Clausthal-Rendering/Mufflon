@@ -51,6 +51,15 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\core\core.vcxproj">
+      <Project>{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}</Project>
+      <Name>core</Name>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+      <OutputItemType>Content</OutputItemType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />

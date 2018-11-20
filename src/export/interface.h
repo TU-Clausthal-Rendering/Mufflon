@@ -244,32 +244,31 @@ LIBRARY_API ScenarioHdl CDECL world_find_scenario(const char* name);
 // TODO: add more materials (and material parameters)
 LIBRARY_API MaterialHdl CDECL world_add_lambert_material(const char* name, Vec3 rgb);
 LIBRARY_API MaterialHdl CDECL world_add_lambert_material_textured(const char* name, TextureHdl texture);
-//LIBRARY_API MaterialHdl CDECL world_add_lambert_material_textured(const char* name, Vec3 rgb);
 // TODO: add more cameras
 LIBRARY_API CameraHdl CDECL world_add_pinhole_camera(const char* name, Vec3 position,
 											   Vec3 dir, Vec3 up, float near,
 											   float far, float vFov);
-LIBRARY_API LightHdl world_add_point_light(const char* name, Vec3 position,
+LIBRARY_API LightHdl CDECL world_add_point_light(const char* name, Vec3 position,
 										   Vec3 intensity);
-LIBRARY_API LightHdl world_add_spot_light(const char* name, Vec3 position,
+LIBRARY_API LightHdl CDECL world_add_spot_light(const char* name, Vec3 position,
 										  Vec3 direction, Vec3 intensity,
 										  float openingAngleRad,
 										  float falloffStartRad);
-LIBRARY_API LightHdl world_add_directional_light(const char* name,
+LIBRARY_API LightHdl CDECL world_add_directional_light(const char* name,
 												 Vec3 direction,
 												 Vec3 radiance);
-LIBRARY_API LightHdl world_add_envmap_light(const char* name, TextureHdl envmap);
-LIBRARY_API CameraHdl world_get_camera(const char* name);
-LIBRARY_API LightHdl world_get_light(const char* name, LightType type);
-LIBRARY_API SceneHdl world_load_scenario(ScenarioHdl scenario);
-LIBRARY_API SceneHdl world_get_current_scene();
+LIBRARY_API LightHdl CDECL world_add_envmap_light(const char* name, TextureHdl envmap);
+LIBRARY_API CameraHdl CDECL world_get_camera(const char* name);
+LIBRARY_API LightHdl CDECL world_get_light(const char* name, LightType type);
+LIBRARY_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
+LIBRARY_API SceneHdl CDECL world_get_current_scene();
 
 // Scenario interface
 LIBRARY_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
 LIBRARY_API LodLevel CDECL scenario_get_global_lod_level(ScenarioHdl scenario);
 LIBRARY_API Boolean CDECL scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level);
-LIBRARY_API IVec2 CDECL scenario_get_resolution(ScenarioHdl scenario);
-LIBRARY_API Boolean CDECL scenario_set_resolution(ScenarioHdl scenario, IVec2 res);
+LIBRARY_API Boolean CDECL scenario_get_resolution(ScenarioHdl scenario, uint32_t* width, uint32_t* height);
+LIBRARY_API Boolean CDECL scenario_set_resolution(ScenarioHdl scenario, uint32_t width, uint32_t height);
 LIBRARY_API CameraHdl CDECL scenario_get_camera(ScenarioHdl scenario);
 LIBRARY_API Boolean CDECL scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
 LIBRARY_API Boolean CDECL scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj);
@@ -325,6 +324,7 @@ LIBRARY_API TextureHdl CDECL world_add_texture(const char* path, uint16_t width,
 // Interface for rendering
 LIBRARY_API Boolean CDECL render_enable_renderer(RendererType type);
 LIBRARY_API Boolean CDECL render_iterate();
+LIBRARY_API Boolean CDECL render_reset();
 // TODO: what do we pass to the GUI?
 LIBRARY_API Boolean CDECL render_get_screenshot();
 LIBRARY_API Boolean CDECL render_save_screenshot(const char* filename);
@@ -339,10 +339,10 @@ LIBRARY_API Boolean CDECL render_disable_all_render_targets();
 
 // Interface for initialization and destruction
 LIBRARY_API Boolean CDECL mufflon_initialize(void(*logCallback)(const char*, int));
-LIBRARY_API Boolean CDECL mufflon_destroy();
+LIBRARY_API void CDECL mufflon_destroy();
 
 // TODO
-LIBRARY_API Boolean CDECL iterate();
+LIBRARY_API Boolean CDECL display_screenshot();
 LIBRARY_API Boolean CDECL resize(int width, int height, int offsetX, int offsetY);
 LIBRARY_API void CDECL execute_command(const char* command);
 LIBRARY_API const char* CDECL get_error(int& length);

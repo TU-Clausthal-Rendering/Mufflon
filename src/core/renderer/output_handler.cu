@@ -1,5 +1,6 @@
 #include "output_handler.hpp"
 #include "util/log.hpp"
+#include <device_launch_parameters.h>
 
 using namespace mufflon::scene::textures;
 
