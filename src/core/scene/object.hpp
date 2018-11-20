@@ -6,6 +6,7 @@
 #include "util/assert.hpp"
 #include "util/types.hpp"
 #include "util/log.hpp"
+#include "util/range.hpp"
 #include "util/tagged_tuple.hpp"
 #include <climits>
 #include <cstdint>
@@ -23,6 +24,16 @@ namespace scene {
 namespace accel_struct {
 	class IAccelerationStructure;
 }
+
+// Data packet handed out by an object (for e.g. BVH construction)
+struct ObjectData {
+	std::size_t triangleCount;
+	std::size_t quadCount;
+	ei::Box aabb;
+	util::Range<geometry::Polygons::FaceIterator> faces;
+	geometry::Polygons::Attribute<OpenMesh::Vec3f>& faceVertices;
+	geometry::Spheres::Attribute<geometry::Spheres::Sphere>& spheres;
+};
 
 /**
  * Representation of a scene object.

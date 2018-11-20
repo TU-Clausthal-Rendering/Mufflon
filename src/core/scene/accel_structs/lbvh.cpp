@@ -1,4 +1,5 @@
 #include "lbvh.hpp"
+#include "core/scene/object.hpp"
 #include "build_lbvh.hpp"
 
 namespace mufflon {	namespace scene {namespace accel_struct {
@@ -51,14 +52,16 @@ void LBVH::build(const std::vector<InstanceHandle>&)
 {
 }
 
-void LBVH::build(const ei::Box & boundingBox, util::Range<geometry::Polygons::FaceIterator> faces, 
-				 const AttributeList<false>::Attribute<geometry::Spheres::Sphere>& spheres, 
-				 std::size_t triangles, std::size_t quads)
+void LBVH::build(ObjectData data)
 {
+	auto faces = data.faces;
+	auto& spheres = data.spheres;
+	auto& faceVertices = data.faceVertices;
+
 	i32 numVertices = static_cast<i32>(faces.begin().get_vertex_count());
 
-	i32 numTriangles = static_cast<i32>(triangles);
-	i32 numQuads = static_cast<i32>(quads);
+	i32 numTriangles = static_cast<i32>(data.triangleCount);
+	i32 numQuads = static_cast<i32>(data.quadCount);
 	i32 numSpheres = static_cast<i32>(spheres.get_elem_size());
 
 	// TODO determine where to store the data of vertices and indices.

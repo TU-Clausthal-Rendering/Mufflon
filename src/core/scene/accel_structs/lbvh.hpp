@@ -5,7 +5,6 @@
 namespace mufflon { namespace scene { namespace accel_struct {
 
 
-
 /**
  * LBVH class.
  * Linear Bounding Volume Hiearchie.
@@ -26,10 +25,7 @@ public:
 	// TODO: Builds or rebuilds the structure.
 	void build(const std::vector<InstanceHandle>&) final;
 	// TODO: should this be put into a different class?
-	void build(const ei::Box& boundingBox,
-		util::Range<geometry::Polygons::FaceIterator> faces,
-		const AttributeList<false>::Attribute<geometry::Spheres::Sphere>& spheres,
-		std::size_t triangles, std::size_t quads) final;
+	void build(ObjectData data) final;
 	// TODO: Checks whether the data on a given system has been modified and is out of sync.
 	virtual bool is_dirty(Device res) const final;
 private:
