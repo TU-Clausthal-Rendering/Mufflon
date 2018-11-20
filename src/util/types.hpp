@@ -97,7 +97,7 @@ public:
 		return *this;
 	}
 	__host__ __device__ constexpr AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
-		return AreaPdf{ m_pdf * cos / distSqr };
+		return AreaPdf{ m_pdf * ei::abs(cos) / distSqr };
 	}
 	__host__ __device__ static constexpr AngularPdf infinite() {
 		return AngularPdf{std::numeric_limits<float>::infinity()};
@@ -108,7 +108,7 @@ private:
 };
 
 __host__ __device__ constexpr AngularPdf AreaPdf::to_angular_pdf(Real cos, Real distSqr) const noexcept {
-	return AngularPdf{ m_pdf * distSqr / cos };
+	return AngularPdf{ m_pdf * distSqr / ei::abs(cos) };
 }
 
 using Pixel = ei::IVec2;
@@ -119,7 +119,8 @@ using Voxel = ei::IVec3;
 // MIS, ...
 template<typename T, typename D>
 __host__ __device__ inline T sdiv(const T& x, const D& d) {
-	return x / ei::max(d, static_cast<D>(1e-20f));
+	if(d < 0.0f) return x / ei::min(d, static_cast<D>(-1e-20f));
+	else return x / ei::max(d, static_cast<D>(1e-20f));
 }
 
 } // namespace mufflon

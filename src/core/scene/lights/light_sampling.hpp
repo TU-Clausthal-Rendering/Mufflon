@@ -14,14 +14,14 @@ namespace mufflon { namespace scene { namespace lights {
 struct Photon {
 	math::PositionSample pos;
 	math::DirectionSample dir;
-	ei::Vec3 intensity;
+	Spectrum intensity;
 	LightType type;
 };
 
 struct NextEventEstimation {
 	math::PositionSample pos;
 	math::DirectionSample dir;
-	ei::Vec3 diffIrradiance; // Unit: W/m²
+	Spectrum diffIrradiance; // Unit: W/m²
 	float distSqr;
 	LightType type;
 };
