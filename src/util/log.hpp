@@ -1,6 +1,10 @@
 #pragma once
 
+#include "export/api.hpp"
 #include <string>
+#ifndef __CUDACC__
+#include <string_view>
+#endif // __CUDACC__
 
 /// Log levels from 0 (all things including pendantic) to 3 (only errors and fatal errors)
 #ifndef CA_LOG_LEVEL
@@ -30,7 +34,7 @@ void disableStdHandler();
 namespace details {
 		
 	// This one calls all the callbacks
-	void logMessage(LogSeverity _severity, const std::string& _msg);
+	CORE_API void logMessage(LogSeverity _severity, const std::string& _msg);
 
 	// Dummy conversion methods to make all types compatible
 	inline const char* to_string(const char* _str) { return _str; }
@@ -73,7 +77,7 @@ void logInfo(ArgTs&&... _args)
 }
 #else
 template<typename... ArgTs>
-void logInfo(ArgTs&&... _args) {}
+CORE_API void logInfo(ArgTs&&... _args) {}
 #endif
 
 #if CA_LOG_LEVEL <= 2
@@ -86,7 +90,7 @@ void logWarning(ArgTs&&... _args)
 }
 #else
 template<typename... ArgTs>
-void logWarning(ArgTs&&... _args) {}
+CORE_API void logWarning(ArgTs&&... _args) {}
 #endif
 
 template<typename... ArgTs>

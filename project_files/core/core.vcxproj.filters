@@ -101,6 +101,9 @@
     <Filter Include="Source Files\deps\cub\warp\specializations">
       <UniqueIdentifier>{6e05d85b-efc3-4aa6-82e2-bcacfb1180d4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\export">
+      <UniqueIdentifier>{16cd16ac-42ec-446f-878c-14e31087e918}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -166,9 +169,6 @@
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp">
       <Filter>Source Files\core\memory</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\export\interface.cpp">
-      <Filter>Source Files\export</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
@@ -177,6 +177,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\accel_structs\lbvh.cpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\export\interface.cpp">
+      <Filter>Source Files\core\export</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -362,9 +365,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\export\interface.h">
-      <Filter>Source Files\export</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp">
       <Filter>Source Files\core\renderer</Filter>
@@ -656,6 +656,12 @@
     </ClInclude>
     <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_smem.cuh">
       <Filter>Source Files\deps\cub\warp\specializations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\interface.h">
+      <Filter>Source Files\core\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\degrad.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

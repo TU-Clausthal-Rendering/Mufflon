@@ -1,14 +1,20 @@
 #pragma once
 
 #ifdef _WIN32
-#    ifdef LIBRARY_EXPORTS
-#        define LIBRARY_API __declspec(dllexport)
+#    ifdef CORE_EXPORTS
+#        define CORE_API __declspec(dllexport)
 #    else
-#        define LIBRARY_API __declspec(dllimport)
+#        define CORE_API __declspec(dllimport)
+#    endif
+#    ifdef LOADER_EXPORTS
+#        define LOADER_API __declspec(dllexport)
+#    else
+#        define LOADER_API __declspec(dllimport)
 #    endif
 #    define CDECL __cdecl
 #elif
-#    define LIBRARY_API
+#    define CORE_API
+#    define LOADER_API
 #    define CDECL __attribute__((__cdecl__))
 #endif
 

@@ -2,7 +2,7 @@
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
 #include "util/punning.hpp"
-#include "util/types.hpp"
+#include "util/degrad.hpp"
 #include "ei/vector.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/renderer/output_handler.hpp"
@@ -1796,7 +1796,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 	return initialized;
 }
 
-LIBRARY_API void CDECL mufflon_destroy() {
+CORE_API void CDECL mufflon_destroy() {
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_currentRenderer.reset();
