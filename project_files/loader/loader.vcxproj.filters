@@ -23,6 +23,9 @@
     <Filter Include="Source Files\loader\export">
       <UniqueIdentifier>{8ac1c7a9-9155-46d2-a6d5-a35f57cdb04b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\loader\json">
+      <UniqueIdentifier>{d87eda65-ddf9-4f96-82bd-ae84d8df1d25}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -35,6 +38,12 @@
       <Filter>Source Files\deps\chinoise</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\loader\export\interface.cpp">
+      <Filter>Source Files\loader\export</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\loader\json\json.cpp">
+      <Filter>Source Files\loader\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\loader\export\binary.cpp">
       <Filter>Source Files\loader\export</Filter>
     </ClCompile>
   </ItemGroup>
@@ -82,6 +91,15 @@
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\loader\export\interface.h">
+      <Filter>Source Files\loader\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\loader\json\json.hpp">
+      <Filter>Source Files\loader\json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\loader\export\binary.hpp">
+      <Filter>Source Files\loader\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\loader\export\filesystem.hpp">
       <Filter>Source Files\loader\export</Filter>
     </ClInclude>
   </ItemGroup>

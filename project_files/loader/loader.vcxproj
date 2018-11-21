@@ -89,7 +89,9 @@
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp" />
+    <ClCompile Include="..\..\src\loader\export\binary.cpp" />
     <ClCompile Include="..\..\src\loader\export\interface.cpp" />
+    <ClCompile Include="..\..\src\loader\json\json.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />
@@ -106,7 +108,10 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
+    <ClInclude Include="..\..\src\loader\export\binary.hpp" />
+    <ClInclude Include="..\..\src\loader\export\filesystem.hpp" />
     <ClInclude Include="..\..\src\loader\export\interface.h" />
+    <ClInclude Include="..\..\src\loader\json\json.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

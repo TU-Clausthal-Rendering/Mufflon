@@ -237,7 +237,8 @@ CORE_API size_t CDECL spheres_get_sphere_count(ObjectHdl obj);
 CORE_API Boolean CDECL spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
 
 // World container interface
-CORE_API ObjectHdl CDECL world_create_object();
+CORE_API ObjectHdl CDECL world_create_object(const char* name);
+CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);

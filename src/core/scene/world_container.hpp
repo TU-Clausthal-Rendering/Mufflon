@@ -31,13 +31,11 @@ public:
 	WorldContainer& operator=(const WorldContainer&) = delete;
 
 	// Create a new object to be filled
-	ObjectHandle create_object();
-	// Adds an already created object and takes ownership of it
-	ObjectHandle add_object(Object&& obj);
+	ObjectHandle create_object(std::string name);
+	// Finds an object by its name
+	ObjectHandle get_object(const std::string_view& name);
 	// Creates a new instance.
 	InstanceHandle create_instance(ObjectHandle hdl);
-	// Adds a new instance.
-	InstanceHandle add_instance(Instance &&instance);
 	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name
@@ -125,7 +123,7 @@ private:
 	static WorldContainer s_container;
 
 	// All objects of the world.
-	std::vector<Object> m_objects;
+	std::map<std::string, Object, std::less<>> m_objects;
 	// All instances of the world
 	std::vector<Instance> m_instances;
 	// List of all scenarios available (mapped to their names)

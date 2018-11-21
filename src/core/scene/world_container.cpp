@@ -12,14 +12,19 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
-ObjectHandle WorldContainer::create_object() {
-	m_objects.emplace_back();
-	return &m_objects.back();
+ObjectHandle WorldContainer::create_object(std::string name) {
+	auto hdl = m_objects.emplace(std::move(name), Object{});
+	if(!hdl.second)
+		return nullptr;
+	hdl.first->second.set_name(hdl.first->first);
+	return &hdl.first->second;
 }
 
-ObjectHandle WorldContainer::add_object(Object&& obj) {
-	m_objects.emplace_back(std::move(obj));
-	return &m_objects.back();
+ObjectHandle WorldContainer::get_object(const std::string_view& name) {
+	auto iter = m_objects.find(name);
+	if(iter != m_objects.end())
+		return &iter->second;
+	return nullptr;
 }
 
 InstanceHandle WorldContainer::create_instance(ObjectHandle obj) {
@@ -31,13 +36,8 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj) {
 	return &m_instances.back();
 }
 
-// Adds a new instance.
-InstanceHandle WorldContainer::add_instance(Instance &&instance) {
-	m_instances.emplace_back(std::move(instance));
-	return &m_instances.back();
-}
-
 WorldContainer::ScenarioHandle WorldContainer::create_scenario(std::string name) {
+	// TODO: switch to pointer
 	ScenarioHandle hdl = m_scenarios.emplace(std::move(name), Scenario{}).first;
 	hdl->second.set_name(hdl->first);
 	return hdl;
@@ -57,6 +57,8 @@ MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial
 
 CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<cameras::Camera> camera) {
 	auto iter = m_cameras.emplace(name, move(camera));
+	if(!iter.second)
+		return nullptr;
 	iter.first->second->set_name(iter.first->first);
 	return iter.first->second.get();
 }
@@ -72,6 +74,7 @@ CameraHandle WorldContainer::get_camera(std::string_view name) {
 
 std::optional<WorldContainer::PointLightHandle> WorldContainer::add_light(std::string name,
 																		  lights::PointLight&& light) {
+	// TODO: switch to pointers
 	if(m_pointLights.find(name) != m_pointLights.cend()) {
 		logError("[WorldContainer::add_light] Point light with name '", name, "' already exists");
 		return std::nullopt;
@@ -82,6 +85,7 @@ std::optional<WorldContainer::PointLightHandle> WorldContainer::add_light(std::s
 
 std::optional<WorldContainer::SpotLightHandle> WorldContainer::add_light(std::string name,
 																		 lights::SpotLight&& light) {
+	// TODO: switch to pointers
 	if(m_spotLights.find(name) != m_spotLights.cend()) {
 		logError("[WorldContainer::add_light] Spot light with name '", name, "' already exists");
 		return std::nullopt;
@@ -92,6 +96,7 @@ std::optional<WorldContainer::SpotLightHandle> WorldContainer::add_light(std::st
 
 std::optional<WorldContainer::DirLightHandle> WorldContainer::add_light(std::string name,
 																		lights::DirectionalLight&& light) {
+	// TODO: switch to pointers
 	if(m_dirLights.find(name) != m_dirLights.cend()) {
 		logError("[WorldContainer::add_light] Directional light with name '", name, "' already exists");
 		return std::nullopt;
@@ -100,6 +105,7 @@ std::optional<WorldContainer::DirLightHandle> WorldContainer::add_light(std::str
 }
 std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::string name,
 																		TextureHandle env) {
+	// TODO: switch to pointers
 	if(m_envLights.find(name) != m_envLights.cend()) {
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;

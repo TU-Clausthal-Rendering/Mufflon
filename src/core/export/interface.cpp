@@ -1018,8 +1018,14 @@ Boolean spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	return true;
 }
 
-ObjectHdl world_create_object() {
-	return static_cast<ObjectHdl>(WorldContainer::instance().create_object());
+ObjectHdl world_create_object(const char* name) {
+	CHECK_NULLPTR(name, "object name", nullptr);
+	return static_cast<ObjectHdl>(WorldContainer::instance().create_object(name));
+}
+
+ObjectHdl world_get_object(const char* name) {
+	CHECK_NULLPTR(name, "object name", nullptr);
+	return static_cast<ObjectHdl>(WorldContainer::instance().get_object(name));
 }
 
 InstanceHdl world_create_instance(ObjectHdl obj) {

@@ -50,16 +50,24 @@ bool Scenario::is_masked(ConstObjectHandle hdl) const {
 std::size_t Scenario::get_custom_lod(ConstObjectHandle hdl) const {
 	auto iter = m_perObjectCustomization.find(hdl);
 	if(iter != m_perObjectCustomization.end())
-		return iter->second.lod;
-	return NO_CUSTOM_LOD;
+		return (iter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : iter->second.lod;
+	return m_globalLodLevel;
 }
 
 void Scenario::mask_object(ConstObjectHandle hdl) {
-	m_perObjectCustomization[hdl].masked = true;
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter != m_perObjectCustomization.end())
+		iter->second.masked = true;
+	else
+		m_perObjectCustomization.insert({ hdl, ObjectProperty{true, NO_CUSTOM_LOD} });
 }
 
 void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
-	m_perObjectCustomization[hdl].lod = level;
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter != m_perObjectCustomization.end())
+		iter->second.lod = level;
+	else
+		m_perObjectCustomization.insert({ hdl, ObjectProperty{false, level} });
 }
 
 void Scenario::remove_light(std::size_t index) {

@@ -1,28 +1,28 @@
+#include "interface.h"
+#include "binary.hpp"
+#include "filesystem.hpp"
 #include "util/assert.hpp"
 #include "util/log.hpp"
 #include "util/punning.hpp"
 #include "util/degrad.hpp"
+#include "loader/json/json.hpp"
 #include "core/export/interface.h"
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
+#include <rapidjson/error/en.h>
 #include <ei/vector.hpp>
 #include <fstream>
+#include <string>
+#include <sstream>
 #include <vector>
-
-// Make use of filepaths
-#if !defined(__cpp_lib_filesystem)
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#else // !defined(__cpp_lib_filesystem)
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif // !defined(__cpp_lib_filesystem)
 
 #define FUNCTION_NAME __func__
 
 inline constexpr const char FILE_VERSION[] = "1.0";
 
 using namespace mufflon;
+using namespace loader;
+using namespace loader::json;
 
 namespace {
 
@@ -41,640 +41,379 @@ std::string read_file(fs::path path) {
 	return fileString;
 }
 
-bool read_path(const rapidjson::Value::ConstMemberIterator& object,
-			   std::vector<ei::Vec3>& path,
-			   std::string_view objectName, const char* pathName) {
+void parse_cameras(ParserState& state, const rapidjson::Value& cameras) {
 	using namespace rapidjson;
-	Value::ConstMemberIterator pathIter = object->value.FindMember(pathName);
-	if(pathIter == object->value.MemberEnd()) {
-		logWarning("[", FUNCTION_NAME, "] Scene file: ", objectName, " '",
-				   object->name.GetString(), "' is missing ", pathName);
-		return false;
-	}
-	if(!pathIter->value.IsArray()) {
-		logWarning("[", FUNCTION_NAME, "] Scene file: ", pathName, " of ", objectName, " '",
-				   object->name.GetString(), "' has invalid type (must be array or array of array)");
-		return false;
-	}
-	for(auto pathValIter = pathIter->value.MemberBegin(); pathValIter != pathIter->value.MemberEnd(); ++pathValIter) {
-		if(!pathValIter->value.IsArray()) {
-			logWarning("[", FUNCTION_NAME, "] Scene file: ignoring non-array path segment of ", objectName, " '",
-					   object->name.GetString(), "'s ", pathName, "");
-			continue;
+	assertObject(state, cameras);
+	state.current = ParserState::Level::CAMERAS;
+
+
+	for(auto cameraIter = cameras.MemberBegin(); cameraIter != cameras.MemberEnd(); ++cameraIter) {
+		const Value& camera = cameraIter->value;
+		assertObject(state, camera);
+		state.objectNames.push_back(cameraIter->name.GetString());
+
+		// Read common values
+		// Placeholder values, because we don't know the scene size yet
+		// TODO: parse binary before JSON!
+		const float near = read_opt<float>(state, camera, "near", std::numeric_limits<float>::max());
+		const float far = read_opt<float>(state, camera, "near", std::numeric_limits<float>::max());
+		std::string_view type = read<const char*>(state, get(state, camera, "type"));
+		std::vector<ei::Vec3> camPath;
+		std::vector<ei::Vec3> camViewDir;
+		std::vector<ei::Vec3> camUp;
+		read(state, get(state, camera, "path"), camPath);
+		read(state, get(state, camera, "viewDir"), camViewDir, camPath.size());
+		auto upIter = get(state, camera, "up", false);
+		if(upIter != camera.MemberEnd()) {
+			read(state, get(state, camera, "up"), camUp, camPath.size());
+		} else {
+			camUp.push_back(ei::Vec3{ 0, 1, 0 });
 		}
-		if(pathValIter->value.Size() != 3u) {
-			logWarning("[", FUNCTION_NAME, "] Scene file: ignoring path segment of ", objectName, " '",
-					   object->name.GetString(), "'s ", pathName, " with invalid number of elements (",
-					   pathValIter->value.Size(), ")");
-			continue;
+
+		// Per-camera-model values
+		if(type.compare("pinhole") == 0) {
+			// Pinhole camera
+			const float fovDegree = read_opt<float>(state, camera, "fov", 25.f);
+			// TODO: add entire path!
+			if(camPath.size() > 1u)
+				logWarning("[", FUNCTION_NAME, "] Scene file: camera paths are not supported yet");
+			if(world_add_pinhole_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
+										util::pun<Vec3>(camViewDir[0u]),
+										util::pun<Vec3>(camUp[0u]), near, far,
+										static_cast<Radians>(Degrees(fovDegree))) == nullptr)
+				throw std::runtime_error("Failed to add camera '"
+										 + std::string(cameraIter->name.GetString()) + "'");
+		} else if(type.compare("focus") == 0 == 0) {
+			// TODO: Focus camera
+			logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
+		} else if(type.compare("ortho") == 0 == 0) {
+			// TODO: Orthogonal camera
+			logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
+		} else {
+			logWarning("[", FUNCTION_NAME, "] Scene file: camera object '",
+					   cameraIter->name.GetString(), "' has unknown type '", type, "'");
 		}
-		if(!pathValIter->value[0u].IsNumber()) {
-			logWarning("[", FUNCTION_NAME, "] Scene file: ignoring path segment of ", objectName, " '",
-					   object->name.GetString(), "'s ", pathName, " with invalid element type ");
-			continue;
-		}
-		path.emplace_back(pathValIter->value[0u].GetFloat(), pathValIter->value[1u].GetFloat(),
-							 pathValIter->value[2u].GetFloat());
+
+		state.objectNames.pop_back();
 	}
-	return true;
 }
 
-bool read_vec3(const rapidjson::Value::ConstMemberIterator& object,
-			   ei::Vec3& vec, std::string_view objectName, const char* vecName) {
+void parse_lights(ParserState& state, const rapidjson::Value& lights) {
 	using namespace rapidjson;
-	Value::ConstMemberIterator vecIter = object->value.FindMember(vecName);
-	if(!vecIter->value.IsArray()) {
-		logWarning("[", FUNCTION_NAME, "] Scene file: ", vecName, " of ", objectName, " '",
-				   object->name.GetString(), "' is not an array");
-		return false;
-	}
-	if(vecIter->value.Size() != 3u) {
-		logWarning("[", FUNCTION_NAME, "] Scene file: ", vecName, " of ", objectName, " '",
-				   object->name.GetString(), "' has invalid number of elements (",
-				   vecIter->value.Size()), ")";
-		return false;
-	}
-	if(!vecIter->value[0u].IsNumber()) {
-		logWarning("[", FUNCTION_NAME, "] Scene file: ", vecName, " of ", objectName, " '",
-				   object->name.GetString(), "' has invalid element type");
-		return false;
-	}
-	vec.x = vecIter->value[0u].GetFloat();
-	vec.y = vecIter->value[1u].GetFloat();
-	vec.z = vecIter->value[2u].GetFloat();
-	return true;
-}
+	assertObject(state, lights);
+	state.current = ParserState::Level::LIGHTS;
 
-bool parse_cameras(const rapidjson::Document& document) {
-	using namespace rapidjson;
-	Value::ConstMemberIterator cameras = document.FindMember("cameras");
-	if(cameras != document.MemberEnd()) {
-		if(!cameras->value.IsObject()) {
-			logError("[", FUNCTION_NAME, "] Scene file: doesn't specify cameras as key:value pairs");
-			return false;
-		}
-		// Iterate all cameras and add them to the world container
-		for(auto camera = cameras->value.MemberBegin(); camera != cameras->value.MemberEnd(); ++camera) {
-			// Validity check
-			if(camera->value.IsObject()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: skipping non-object camera value '",
-						   camera->name.GetString(), "'");
-				continue;
-			}
-			// Get the camera type
-			Value::ConstMemberIterator camType = camera->value.FindMember("type");
-			if(camType == camera->value.MemberEnd()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file camera object '",
-						   camera->name.GetString(), "' doesn't specify a type");
-				continue;
-			}
-			if(!camType->value.IsString()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: type of camera object '",
-						   camera->name.GetString(), "' is not a string");
-				continue;
-			}
+	for(auto lightIter = lights.MemberBegin(); lightIter != lights.MemberEnd(); ++lightIter) {
+		const Value& light = lightIter->value;
+		assertObject(state, light);
+		state.objectNames.push_back(lightIter->name.GetString());
 
-			// Parse common camera values
-			std::vector<ei::Vec3> posPath;
-			std::vector<ei::Vec3> viewDirPath;
-			std::vector<ei::Vec3> upDirPath;
-			// First is path
-			if(!read_path(camera, posPath, "camera", "path"))
-				continue;
-			if(posPath.size() == 0u) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: camera '",
-						   camera->name.GetString(), "' has empty or no valid elements in 'path'");
-				continue;
-			}
-			// Second is viewdir
-			if(!read_path(camera, viewDirPath, "camera", "viewDir"))
-				continue;
-			if(viewDirPath.size() == 0u) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: camera '",
-						   camera->name.GetString(), "' has empty or no valid elements in 'viewDir'");
-				continue;
-			}
-			if(viewDirPath.size() != posPath.size()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: 'path' and 'viewDir' of camera '",
-						   camera->name.GetString(), "' do not match in size (", posPath.size(), "(path) vs ",
-						   viewDirPath.size(), ")");
-				continue;
-			}
-			// Third is (optional) up
-			if(camera->value.HasMember("up")) {
-				if(!read_path(camera, posPath, "camera", "up"))
-					continue;
-				if(upDirPath.size() == 0u) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: camera '",
-							   camera->name.GetString(), "' has empty or no valid elements in 'up'");
-					continue;
-				}
-				if(upDirPath.size() != posPath.size()) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: 'path' and 'up' of camera '",
-							   camera->name.GetString(), "' do not match in size (", posPath.size(), "(path) vs ",
-							   upDirPath.size(), ")");
-					continue;
-				}
-			} else {
-				upDirPath.push_back(ei::Vec3{ 0, 1, 0 });
-			}
-			// Then come near and far plane (both optional)
-			// The min value indicates later that they need to be multiplied with
-			// the scene AABB diagonal
-			float near = std::numeric_limits<float>::min();
-			float far = std::numeric_limits<float>::min();
-			Value::ConstMemberIterator nearIter = camera->value.FindMember("near");
-			if(nearIter != camera->value.MemberEnd()) {
-				if(!nearIter->value.IsNumber())
-					logWarning("[", FUNCTION_NAME, "] Scene file: near plane of camera '",
-							   camera->name.GetString(), "' is not a number");
-				else
-					near = nearIter->value.GetFloat();
-			}
-			Value::ConstMemberIterator farIter = camera->value.FindMember("far");
-			if(farIter != camera->value.MemberEnd()) {
-				if(!farIter->value.IsNumber())
-					logWarning("[", FUNCTION_NAME, "] Scene file: far plane of camera '",
-							   camera->name.GetString(), "' is not a number");
-				else
-					far = farIter->value.GetFloat();
-			}
+		// Read common values (aka the type only)
+		std::string_view type = read<const char*>(state, get(state, light, "type"));
+		if(type.compare("point") == 0) {
+			// Point light
+			const ei::Vec3 position = read<ei::Vec3>(state, get(state, light, "position"));
+			ei::Vec3 intensity;
+			auto intensityIter = get(state, light, "intensity", false);
+			if(intensityIter != light.MemberEnd())
+				intensity = read<ei::Vec3>(state, intensityIter);
+			else
+				intensity = read<ei::Vec3>(state, get(state, light, "flux")) * 4.f * ei::PI;
+			intensity *= read_opt<float>(state, light, "scale", 1.f);
 
-			// Check the type
-			const char* type = camType->value.GetString();
-			if(std::strncmp(type, "pinhole", 7) == 0) {
-				// Pinhole camera
-				float fovDegree = 25.f;
-				// Default for FoV is 25 degrees
-				Value::ConstMemberIterator fov = camera->value.FindMember("fov");
-				if(fov != camera->value.MemberEnd()) {
-					if(!fov->value.IsNumber())
-						logWarning("[", FUNCTION_NAME, "] Scene file: fov of camera '",
-								   camera->name.GetString(), "' is not a number");
-					else
-						fovDegree = fov->value.GetFloat();
-				}
+			if(world_add_point_light(lightIter->name.GetString(), util::pun<Vec3>(position),
+									 util::pun<Vec3>(intensity)) == nullptr)
+				throw std::runtime_error("Failed to add point light '"
+										 + std::string(lightIter->name.GetString()) + "'");
+		} else if(type.compare("spot") == 0) {
+			// Spot light
+			const ei::Vec3 position = read<ei::Vec3>(state, get(state, light, "position"));
+			const ei::Vec3 direction = read<ei::Vec3>(state, get(state, light, "direction"));
+			const ei::Vec3 intensity = read<ei::Vec3>(state, get(state, light, "intensity"))
+								* read_opt<float>(state, light, "scale", 1.f);
+			Radians angle;
+			Radians falloffStart;
+			auto angleIter = get(state, light, "cosWidth", false);
+			if(angleIter != light.MemberEnd())
+				angle = std::acos(static_cast<Radians>(Degrees(read<float>(state, angleIter))));
+			else
+				angle = static_cast<Radians>(Degrees(read<float>(state, get(state, light, "width"))));
+			auto falloffIter = get(state, light, "cosFalloffStart", false);
+			if(falloffIter != light.MemberEnd())
+				falloffStart = std::acos(read<float>(state, falloffIter));
+			else
+				falloffStart = static_cast<Radians>(Degrees(read_opt<float>(state, light, "falloffWidth",
+								static_cast<Radians>(Degrees(angle)))));
 
-				// TODO: add entire path!
-				if(posPath.size() > 1u)
-					logWarning("[", FUNCTION_NAME, "] Scene file: camera paths are not supported yet");
-				world_add_pinhole_camera(camera->name.GetString(), util::pun<Vec3>(posPath[0u]),
-										 util::pun<Vec3>(viewDirPath[0u]),
-										 util::pun<Vec3>(upDirPath[0u]), near, far,
-										 static_cast<Radians>(Degrees(fovDegree)));
-			} else if(std::strncmp(type, "focus", 5) == 0) {
-				// TODO: Focus camera
-				logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
-			} else if(std::strncmp(type, "ortho", 5) == 0) {
-				// TODO: Orthogonal camera
-				logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
-			} else {
-				logWarning("[", FUNCTION_NAME, "] Scene file: camera object '",
-						   camera->name.GetString(), "' has unknown type '", type, "'");
-			}
-		}
-	} else {
-		logError("[", FUNCTION_NAME, "] Scene file: is missing cameras");
-		return false;
-	}
+			if(world_add_spot_light(lightIter->name.GetString(), util::pun<Vec3>(position),
+									util::pun<Vec3>(direction), util::pun<Vec3>(intensity),
+									angle, falloffStart) == nullptr)
+				throw std::runtime_error("Failed to add spot light '"
+										 + std::string(lightIter->name.GetString()) + "'");
+		} else if(type.compare("directional") == 0) {
+			// Directional light
+			const ei::Vec3 direction = read<ei::Vec3>(state, get(state, light, "direction"));
+			const ei::Vec3 radiance = read<ei::Vec3>(state, get(state, light, "radiance"))
+								* read_opt<float>(state, light, "scale", 1.f);
 
-	return true;
-}
-
-bool parse_lights(const rapidjson::Document& document) {
-	using namespace rapidjson;
-
-	Value::ConstMemberIterator lights = document.FindMember("lights");
-	if(lights != document.MemberEnd()) {
-		if(!lights->value.IsObject()) {
-			logError("[", FUNCTION_NAME, "] Scene file: doesn't specify lights as key:value pairs");
-			return false;
-		}
-		// Iterate all cameras and add them to the world container
-		for(auto light = lights->value.MemberBegin(); light != lights->value.MemberEnd(); ++light) {
-			// Validity check
-			if(light->value.IsObject()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: skipping non-object light value '",
-						   light->name.GetString(), "'");
-				continue;
-			}
-			// Get the camera type
-			Value::ConstMemberIterator lightType = light->value.FindMember("type");
-			if(lightType == light->value.MemberEnd()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file light object '",
-						   light->name.GetString(), "' doesn't specify a type");
-				continue;
-			}
-			if(!lightType->value.IsString()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: type of light object '",
-						   light->name.GetString(), "' is not a string");
-				continue;
-			}
-
-			// Check the type
-			const char* type = lightType->value.GetString();
-			if(std::strncmp(type, "point", 5) == 0) {
-				// Point light
-				ei::Vec3 position;
-				ei::Vec3 intensity;
-				if(!read_vec3(light, position, "point light", "position"))
-					continue;
-				if(light->value.HasMember("flux")) {
-					if(!read_vec3(light, intensity, "point light", "flux"))
-						continue;
-					// Convert flux to intensity
-					intensity *= 1.f / (4.f * ei::PI);
-				} else {
-					if(!read_vec3(light, intensity, "point light", "intensity"))
-						continue;
-				}
-				Value::ConstMemberIterator scale = light->value.FindMember("scale");
-				if(scale != light->value.MemberEnd()) {
-					if(!scale->value.IsNumber())
-						logWarning("[", FUNCTION_NAME, "] Scene file: scale of point light '",
-								   light->name.GetString(), "' is not a number");
-					else
-						intensity *= scale->value.GetFloat();
-				}
-				if(world_add_point_light(light->name.GetString(), util::pun<Vec3>(position),
-										 util::pun<Vec3>(intensity)) == nullptr) {
-					logError("[", FUNCTION_NAME, "] Scene file: failed to add point light '",
-							 light->name.GetString(), "'");
-					return false;
-				}
-			} else if(std::strncmp(type, "directional", 11) == 0) {
-				// Directional light
-				ei::Vec3 direction;
-				ei::Vec3 radiance;
-				if(!read_vec3(light, direction, "directional light", "direction"))
-					continue;
-				if(!read_vec3(light, radiance, "directional light", "radiance"))
-					continue;
-				Value::ConstMemberIterator scale = light->value.FindMember("scale");
-				if(scale != light->value.MemberEnd()) {
-					if(!scale->value.IsNumber())
-						logWarning("[", FUNCTION_NAME, "] Scene file: scale of directional light '",
-								   light->name.GetString(), "' is not a number");
-					else
-						radiance *= scale->value.GetFloat();
-				}
-				if(world_add_directional_light(light->name.GetString(), util::pun<Vec3>(direction),
-											   util::pun<Vec3>(radiance)) == nullptr) {
-					logError("[", FUNCTION_NAME, "] Scene file: failed to add directional light '",
-							 light->name.GetString(), "'");
-					return false;
-				}
-			} else if(std::strncmp(type, "spot", 4) == 0) {
-				// Spot light
-				ei::Vec3 position;
-				ei::Vec3 direction;
-				ei::Vec3 intensity;
-				float angle;
-				float falloff;
-				if(!read_vec3(light, position, "spot light", "position"))
-					continue;
-				if(!read_vec3(light, direction, "spot light", "direction"))
-					continue;
-				if(!read_vec3(light, intensity, "spot light", "intensity"))
-					continue;
-				Value::ConstMemberIterator scale = light->value.FindMember("scale");
-				if(scale != light->value.MemberEnd()) {
-					if(!scale->value.IsNumber())
-						logWarning("[", FUNCTION_NAME, "] Scene file: scale of spot light '",
-								   light->name.GetString(), "' is not a number");
-					else
-						intensity *= scale->value.GetFloat();
-				}
-				// Opening angle
-				if(light->value.HasMember("cosWidth")) {
-					Value::ConstMemberIterator angleIter = light->value.FindMember("cosWidth");
-					if(!angleIter->value.IsNumber()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: opening angle of spot light '",
-								   light->name.GetString(), "' is not a number");
-						continue;
-					}
-					angle = std::acos(angleIter->value.GetFloat());
-				} else {
-					Value::ConstMemberIterator angleIter = light->value.FindMember("width");
-					if(angleIter == light->value.MemberEnd()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: spot light '",
-								   light->name.GetString(), "' is missing opening angle");
-						continue;
-					}
-					if(!angleIter->value.IsNumber()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: opening angle of spot light '",
-								   light->name.GetString(), "' is not a number");
-						continue;
-					}
-					angle = angleIter->value.GetFloat();
-				}
-				// Falloff start
-				if(light->value.HasMember("cosFalloffStart")) {
-					Value::ConstMemberIterator falloffIter = light->value.FindMember("cosFalloffStart");
-					if(!falloffIter->value.IsNumber()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: falloff start of spot light '",
-								   light->name.GetString(), "' is not a number");
-						continue;
-					}
-					falloff = std::acos(falloffIter->value.GetFloat());
-				} else {
-					Value::ConstMemberIterator falloffIter = light->value.FindMember("falloffStart");
-					if(falloffIter == light->value.MemberEnd()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: spot light '",
-								   light->name.GetString(), "' is missing falloff start");
-						continue;
-					}
-					if(!falloffIter->value.IsNumber()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: falloff start of spot light '",
-								   light->name.GetString(), "' is not a number");
-						continue;
-					}
-					falloff = falloffIter->value.GetFloat();
-				}
-
-				if(world_add_spot_light(light->name.GetString(), util::pun<Vec3>(position),
-										util::pun<Vec3>(direction), util::pun<Vec3>(intensity),
-										angle, falloff) == nullptr) {
-					logError("[", FUNCTION_NAME, "] Scene file: failed to add spot light '",
-							 light->name.GetString(), "'");
-					return false;
-				}
-			} else if(std::strncmp(type, "envmap", 6) == 0) {
-				// Environment-map light
-				const char* texPath = nullptr;
-				float texScale = 1.f;
-				Value::ConstMemberIterator envmap = light->value.FindMember("map");
-				if(envmap == light->value.MemberEnd()) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: envmap light '",
-							   light->name.GetString(), "' is missing an envmap");
-					continue;
-				}
-				if(!envmap->value.IsString()) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: envmap of envmap light '",
-							   light->name.GetString(), "' is not a string");
-					continue;
-				}
-				texPath = envmap->value.GetString();
-				if(std::strlen(texPath) == 0u) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: envmap of envmap light '",
-							   light->name.GetString(), "' is empty");
-					continue;
-				}
+			if(world_add_directional_light(lightIter->name.GetString(), util::pun<Vec3>(direction),
+										   util::pun<Vec3>(radiance)) == nullptr)
+				throw std::runtime_error("Failed to add directional light '"
+										 + std::string(lightIter->name.GetString()) + "'");
+		} else if(type.compare("envmap") == 0) {
+			// Environment-mapped light
+			const char* texPath = read<const char*>(state, get(state, light, "map"));
+			const float scale = read_opt<float>(state, light, "scale", 1.f);
 				// TODO: load the texture
-				TextureHdl texture = world_add_texture(texPath, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
-													   TextureSampling::SAMPLING_NEAREST, false, nullptr);
-				if(texture == nullptr) {
-					logError("[", FUNCTION_NAME, "] Scene file: could not load envmap of envmap light '",
-							 light->name.GetString(), "'");
-					return false;
-				}
-				// TODO: incorporate scale
-				if(world_add_envmap_light(light->name.GetString(), texture) == nullptr) {
-					logError("[", FUNCTION_NAME, "] Scene file: failed to add envmap light '",
-							 light->name.GetString(), "'");
-					return false;
-				}
-			} else if(std::strncmp(type, "goniometric", 11) == 0) {
-				// TODO: goniometric light
-				logWarning("[", FUNCTION_NAME, "] Scene file: Goniometric lights are not supported yet");
-			} else {
-				logWarning("[", FUNCTION_NAME, "] Scene file: light object '",
-						   light->name.GetString(), "' has unknown type '", type, "'");
-			}
-		}
-	}
+			TextureHdl texture = world_add_texture(texPath, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
+												   TextureSampling::SAMPLING_NEAREST, false, nullptr);
+			if(texture == nullptr)
+				throw std::runtime_error("Failed to load texture for envmap light '"
+										 + std::string(lightIter->name.GetString()) + "'");
+			// TODO: incorporate scale
 
-	return true;
+			if(world_add_envmap_light(lightIter->name.GetString(), texture) == nullptr)
+				throw std::runtime_error("Failed to add directional light '"
+										 + std::string(lightIter->name.GetString()) + "'");
+		} else if(type.compare("goniometric") == 0) {
+			// TODO: Goniometric light
+			const ei::Vec3 position = read<ei::Vec3>(state, get(state, light, "position"));
+			const char* texPath = read<const char*>(state, get(state, light, "map"));
+			const float scale = read_opt<float>(state, light, "scale", 1.f);
+				// TODO: load the texture
+			TextureHdl texture = world_add_texture(texPath, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
+												   TextureSampling::SAMPLING_NEAREST, false, nullptr);
+			if(texture == nullptr)
+				throw std::runtime_error("Failed to load texture for goniometric light '"
+										 + std::string(lightIter->name.GetString()) + "'");
+			// TODO: incorporate scale
+
+			logWarning("[", FUNCTION_NAME, "] Scene file: Goniometric lights are not supported yet");
+		} else {
+			logWarning("[", FUNCTION_NAME, "] Scene file: light object '",
+					   lightIter->name.GetString(), "' has unknown type '", type, "'");
+		}
+
+		state.objectNames.pop_back();
+	}
 }
 
-bool parse_materials(const rapidjson::Document& document) {
+void parse_materials(ParserState& state, const rapidjson::Value& materials) {
 	using namespace rapidjson;
+	assertObject(state, materials);
+	state.current = ParserState::Level::MATERIALS;
 
-	Value::ConstMemberIterator scenarios = document.FindMember("materials");
-	if(scenarios != document.MemberEnd()) {
-		// TODO
-	} else {
-		logError("[", FUNCTION_NAME, "] Scene file: is missing scenarios");
-		return false;
+	for(auto matIter = materials.MemberBegin(); matIter != materials.MemberEnd(); ++matIter) {
 	}
-	return true;
 }
 
-bool parse_scenarios(const rapidjson::Document& document) {
+void parse_scenarios(ParserState& state, const rapidjson::Value& scenarios) {
 	using namespace rapidjson;
-	Value::ConstMemberIterator scenarios = document.FindMember("scenarios");
-	if(scenarios != document.MemberEnd()) {
-		if(!scenarios->value.IsObject()) {
-			logError("[", FUNCTION_NAME, "] Scene file: doesn't specify scenarios as key:value pairs");
-			return false;
-		}
-		// Iterate all cameras and add them to the world container
-		for(auto scenario = scenarios->value.MemberBegin(); scenario != scenarios->value.MemberEnd(); ++scenario) {
-			// Validity check
-			if(scenario->value.IsObject()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: skipping non-object scenario value '",
-						   scenario->name.GetString(), "'");
-				continue;
-			}
-			CameraHdl camHdl = nullptr;
-			IVec2 resolution{};
-			std::size_t globalLod = 0u;
-			// Read the camera
-			Value::ConstMemberIterator camera = scenario->value.FindMember("camera");
-			if(camera == scenario->value.MemberEnd()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: scenario '",
-						   scenario->name.GetString(), "' is missing a camera");
-				continue;
-			}
-			if(!camera->value.IsString()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: camera for scenario '",
-						   scenario->name.GetString(), "' is not a string");
-				continue;
-			}
-			camHdl = world_get_camera(camera->value.GetString());
-			if(camHdl == nullptr) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: camera for scenario '",
-						   scenario->name.GetString(), "' is invalid");
-				continue;
-			}
-			// Read the resolution
-			Value::ConstMemberIterator res = scenario->value.FindMember("resolution");
-			if(res == scenario->value.MemberEnd()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: scenario '",
-						   scenario->name.GetString(), "' is missing a resolution");
-				continue;
-			}
-			if(!res->value.IsArray()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: resolution for scenario '",
-						   scenario->name.GetString(), "' is not an array");
-				continue;
-			}
-			if(res->value.Size() != 2u) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: resolution for scenario '",
-						   scenario->name.GetString(), "' has invalid number of elements (",
-						   res->value.Size(), ")");
-				continue;
-			}
-			if(!res->value[0u].IsNumber()) {
-				logWarning("[", FUNCTION_NAME, "] Scene file: resolution for scenario '",
-						   scenario->name.GetString(), "' has invalid element type");
-				continue;
-			}
-			resolution.x = res->value[0u].GetInt();
-			resolution.y = res->value[1u].GetInt();
-			// TODO: check for negative res?
-			// Read the global LoD
-			Value::ConstMemberIterator lod = scenario->value.FindMember("lod");
-			if(lod != scenario->value.MemberEnd()) {
-				if(!lod->value.IsNumber()) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: global LoD for scenario '",
-							   scenario->name.GetString(), "' is not a number");
-				} else {
-					globalLod = lod->value.GetInt();
-				}
-			}
+	assertObject(state, scenarios);
+	state.current = ParserState::Level::SCENARIOS;
 
-			// Create the scenario and insert into world
-			ScenarioHdl scenHdl = world_create_scenario(scenario->name.GetString());
-			if(scenHdl == nullptr) {
-				logError("[", FUNCTION_NAME, "] Scene file: failed to create scenario '",
-						 scenario->name.GetString(), "'");
-				return false;
+	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
+		const Value& scenario = scenarioIter->value;
+		assertObject(state, scenario);
+		state.objectNames.push_back(scenarioIter->name.GetString());
+
+		const char* camera = read<const char*>(state, get(state, scenario, "camera"));
+		ei::IVec2 resolution = read<ei::IVec2>(state, get(state, scenario, "resolution"));
+		std::vector<const char*> lights;
+		auto lightIter = get(state, scenario, "lights", false);
+		std::size_t lod = read_opt<std::size_t>(state, scenario, "lod", 0u);
+		
+		CameraHdl camHdl = world_get_camera(camera);
+		if(camHdl == nullptr)
+			throw std::runtime_error("Camera '" + std::string(camera) + "' does not exist");
+		ScenarioHdl scenarioHdl = world_create_scenario(scenarioIter->name.GetString());
+		if(scenarioHdl == nullptr)
+			throw std::runtime_error("Failed to create scenario '" + std::string(scenarioIter->name.GetString()) + "'");
+
+		if(!scenario_set_camera(scenarioHdl, camHdl))
+			throw std::runtime_error("Failed to set camera '" + std::string(camera) + "' for scenario '"
+									 + std::string(scenarioIter->name.GetString()) + "'");
+		if(!scenario_set_resolution(scenarioHdl, resolution.x, resolution.y))
+			throw std::runtime_error("Failed to set resolution '" + std::to_string(resolution.x) + "x"
+									 + std::to_string(resolution.y) + " for scenario '"
+									 + std::string(scenarioIter->name.GetString()) + "'");
+		if(!scenario_set_global_lod_level(scenarioHdl, lod))
+			throw std::runtime_error("Failed to set LoD " + std::to_string(lod) + " for scenario '"
+									 + std::string(scenarioIter->name.GetString()) + "'");
+
+		// Add lights
+		if(lightIter != scenario.MemberEnd()) {
+			assertArray(state, lightIter);
+			state.objectNames.push_back("lights");
+			for(SizeType i = 0u; i < lightIter->value.Size(); ++i) {
+				const char* lightName = read<const char*>(state, lightIter->value[i]);
+				if(!scenario_add_light(scenarioHdl, lightName))
+					throw std::runtime_error("Failed to add light '" + std::string(lightName) + "' to scenario '"
+											 + std::string(scenarioIter->name.GetString()) + "'");
 			}
-			if(!scenario_set_camera(scenHdl, camHdl)) {
-				logError("[", FUNCTION_NAME, "] Scene file: failed to set camera of scenario '",
-						 scenario->name.GetString(), "'");
-				return false;
-			}
-			if(!scenario_set_resolution(scenHdl, resolution.x, resolution.y)) {
-				logError("[", FUNCTION_NAME, "] Scene file: failed to set resolution of scenario '",
-						 scenario->name.GetString(), "'");
-				return false;
-			}
-			if(!scenario_set_global_lod_level(scenHdl, globalLod)) {
-				logError("[", FUNCTION_NAME, "] Scene file: failed to set LoD of scenario '",
-						 scenario->name.GetString(), "'");
-				return false;
-			}
-			// Parse and set the lights
-			Value::ConstMemberIterator lights = scenario->value.FindMember("lights");
-			if(lights != scenario->value.MemberEnd()) {
-				if(!lights->value.IsArray()) {
-					logWarning("[", FUNCTION_NAME, "] Scene file: lights for scenario '",
-							   scenario->name.GetString(), "' is not an array");
-				} else if(lights->value.Size() > 0) {
-					if(!lights->value[0u].IsString()) {
-						logWarning("[", FUNCTION_NAME, "] Scene file: lights for scenario '",
-								   scenario->name.GetString(), "' has invalid element type");
-					} else {
-						for(auto lightIter = lights->value.MemberBegin(); lightIter != lights->value.MemberEnd(); ++lightIter) {
-							const char* lightName = lightIter->value.GetString();
-							if(!scenario_add_light(scenHdl, lightName)) {
-								logWarning("[", FUNCTION_NAME, "] Scene file: failed to add light '",
-										   lightName, "' to scenario '", scenario->name.GetString(), "'");
-							}
-						}
-					}
-				}
-			}
-			// TODO Read the material/object names/props
 		}
-	} else {
-		logError("[", FUNCTION_NAME, "] Scene file: is missing scenarios");
-		return false;
+
+		// Add objects
+		auto objectsIter = get(state, scenario, "objectProperties", false);
+		if(objectsIter != scenario.MemberEnd()) {
+			state.objectNames.push_back(objectsIter->name.GetString());
+			assertObject(state, objectsIter->value);
+			for(auto objIter = objectsIter->value.MemberBegin(); objIter != objectsIter->value.MemberEnd(); ++objIter) {
+				std::string_view objectName = objIter->name.GetString();
+				state.objectNames.push_back(&objectName[0u]);
+				const Value& object = objIter->value;
+				assertObject(state, object);
+				// Check for object name meta-tag
+				if(std::strncmp(&objectName[0u], "[obj:", 5u) != 0)
+					continue;
+				std::string subName{ objectName.substr(5u, objectName.length() - 6u) };
+				ObjectHdl objHdl = world_get_object(&objectName[0u]);
+				if(objHdl == nullptr)
+					throw std::runtime_error("Failed to find object '" + subName + "' from scenario '"
+											 + std::string(scenarioIter->name.GetString()) + "'");
+				// Check for LoD and masked
+				auto lodIter = get(state, object, "lod", false);
+				if(lodIter != object.MemberEnd())
+					if(!scenario_set_object_lod(scenarioHdl, objHdl, read<std::size_t>(state, lodIter)))
+						throw std::runtime_error("Failed to set LoD level of object '" + subName
+												 + "' for scenario '" + std::string(scenarioIter->name.GetString())
+												 + "'");
+				if(object.HasMember("masked"))
+					if(!scenario_mask_object(scenarioHdl, objHdl))
+						throw std::runtime_error("Failed to set mask for object '" + subName
+												 + "' for scenario '" + std::string(scenarioIter->name.GetString())
+												 + "'");
+
+				state.objectNames.pop_back();
+			}
+			state.objectNames.pop_back();
+		}
+
+		auto materialsIter = get(state, scenario, "materialAssignments");
+		state.objectNames.push_back(materialsIter->name.GetString());
+		assertObject(state, materialsIter->value);
+		for(auto matIter = materialsIter->value.MemberBegin(); matIter != materialsIter->value.MemberEnd(); ++matIter) {
+			std::string_view matName = matIter->name.GetString();
+			state.objectNames.push_back(&matName[0u]);
+			// Check for object name meta-tag
+			if(std::strncmp(&matName[0u], "[mat:", 5u) != 0)
+				continue;
+			std::string subName{ matName.substr(5u, matName.length() - 6u) };
+			const std::string_view inScenName = read<const char*>(state, matIter->value);
+			// TODO: create material association
+			// TODO: check if all materials were associated
+		}
 	}
-
-	return true;
 }
 
-bool parse_json_file(fs::path filePath) {
+void parse_scene_file(fs::path filePath) {
 	using namespace rapidjson;
+
+	// Make the file path absolute (easier to deal with)
+	if(filePath.is_relative())
+		filePath = fs::canonical(filePath);
+
+	// Track the state of the parser for error messages
+	ParserState state;
+	state.current = ParserState::Level::ROOT;
 
 	logInfo("[", FUNCTION_NAME, "] Parsing scene file '", filePath.string(), "'");
 
-	// Binary file path
-	fs::path binaryFile;
 	// JSON text
 	std::string jsonString = read_file(filePath);
 	
 	Document document;
-	document.Parse(jsonString.c_str());
+	// Parse and check for errors
+	ParseResult res = document.Parse(jsonString.c_str());
+	if(res.IsError()) {
+		// Walk the string and determine line number
+		std::stringstream ss(jsonString);
+		std::string line;
+		const std::size_t offset = res.Offset();
+		std::size_t currOffset = 0u;
+		std::size_t currLine = 0u;
+		while(std::getline(ss, line)) {
+			if(offset >= currOffset && offset <= (currOffset + line.length()))
+				break;
+			// Extra byte for newline
+			++currLine;
+			currOffset += line.size() + 1u;
+		}
+		throw std::runtime_error("Parser error: " + std::string(GetParseError_En(res.Code()))
+								 + " at offset " + std::to_string(res.Offset())
+								 + " (line " + std::to_string(currLine) + ')');
+	}
 
 	// Parse our file specification
-	if(!document.IsObject()) {
-		logError("[", FUNCTION_NAME, "] Scene file: doesn't have root object");
-		return false;
-	}
-
+	assertObject(state, document);
 	// Version
-	Value::ConstMemberIterator version = document.FindMember("version");
-	if(version != document.MemberEnd()) {
-		if(!version->value.IsString() || version->value.GetString() != FILE_VERSION) {
-			logWarning("[", FUNCTION_NAME, "] Scene file: doesn't match current version (",
-					   version->value.GetString(), "(file) vs ", FILE_VERSION, "(current))");
-		}
-		// TODO: do something with the version
+	std::string_view version;
+	auto versionIter = get(state, document, "version", false);
+	if(versionIter == document.MemberEnd()) {
+		logWarning("[", FUNCTION_NAME, "] Scene file: no version specified (current one assumed)");
 	} else {
-		logWarning("[", FUNCTION_NAME, "] Scene file: is missing a version");
+		std::string_view version = read<const char*>(state, versionIter);
+		if(version.compare(FILE_VERSION) != 0)
+			logWarning("[", FUNCTION_NAME, "] Scene file: version mismatch (",
+					   version, "(file) vs ", FILE_VERSION, "(current))");
 	}
 	// Binary file path
-	Value::ConstMemberIterator binary = document.FindMember("binary");
-	if(binary != document.MemberEnd()) {
-		if(!binary->value.IsString()) {
-			logError("[", FUNCTION_NAME, "] Scene file: contains a non-string binary file path");
-			return false;
-		}
-		binaryFile = fs::path(binary->value.GetString());
-		if(binaryFile.empty()) {
-			logError("[", FUNCTION_NAME, "] Scene file: has an empty binary file path");
-			return false;
-		}
-		// Make the file path absolute
-		if(binaryFile.is_relative())
-			binaryFile = filePath.parent_path() / binaryFile;
-		if(!fs::exists(binaryFile)) {
-			logError("[", FUNCTION_NAME, "] Scene file: specifies a binary file that doesn't exist");
-			return false;
-		}
-	} else {
-		logError("[", FUNCTION_NAME, "] Scene file: is missing a binary file path");
-		return false;
+	fs::path binaryFile = read<const char*>(state, get(state, document, "binary"));
+	
+	if(binaryFile.empty()) {
+		logError("[", FUNCTION_NAME, "] Scene file: has an empty binary file path");
+		return;
 	}
+	// Make the file path absolute
+	if(binaryFile.is_relative())
+		binaryFile = fs::canonical(filePath.parent_path() / binaryFile);
+	if(!fs::exists(binaryFile)) {
+		logError("[", FUNCTION_NAME, "] Scene file: specifies a binary file that doesn't exist ('",
+				 binaryFile.string(), "'");
+		return;
+	}
+	// First parse binary file
+	binary::parse_file(binaryFile);
+
 	// Cameras
-	if(!parse_cameras(document))
-		return false;
+	state.current = ParserState::Level::ROOT;
+	parse_cameras(state, get(state, document, "cameras")->value);
 	// Lights
-	if(!parse_lights(document))
-		return false;
+	state.current = ParserState::Level::ROOT;
+	parse_lights(state, get(state, document, "lights")->value);
 	// Materials
-	if(!parse_materials(document))
-		return false;
+	state.current = ParserState::Level::ROOT;
+	parse_materials(state, get(state, document, "lights")->value);
 	// Scenarios
-	if(!parse_scenarios(document))
-		return false;
+	state.current = ParserState::Level::ROOT;
+	parse_scenarios(state, get(state, document, "scenarios")->value);
 
 	// TODO: parse binary file
-
-	return true;
 }
 
 } // namespace
 
 bool load_scene_file(const char* path) {
-	fs::path filepath(path);
+	fs::path filePath(path);
 
 	// Perform some error checking
-	if (!fs::exists(filepath)) {
-		logError("[", FUNCTION_NAME, "] File '", fs::canonical(path).string(), "' does not exist");
+	if (!fs::exists(filePath)) {
+		logError("[", FUNCTION_NAME, "] File '", fs::canonical(filePath).string(), "' does not exist");
 		return false;
 	}
-	if (fs::is_directory(filepath)) {
-		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(path).string(), "' is a directory, not a file");
+	if (fs::is_directory(filePath)) {
+		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(filePath).string(), "' is a directory, not a file");
 		return false;
 	}
-	if (filepath.extension() != ".json")
+	if (filePath.extension() != ".json")
 		logWarning("[", FUNCTION_NAME, "] Scene file does not end with '.json'; attempting to parse it anyway");
 
+	try {
+		parse_scene_file(filePath);
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] ", e.what());
+		return false;
+	}
 
 	return true;
 }

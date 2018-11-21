@@ -10,6 +10,7 @@
 #include <execution>
 
 #include "core/export/interface.h"
+#include "loader/export/interface.h"
 #include "ei/3dtypes.hpp"
 #include "ei/vector.hpp"
 #include "core/memory/allocator.hpp"
@@ -133,7 +134,7 @@ void test_polygon() {
 	std::cout << "Testing polygons" << std::endl;
 	bool success = false;
 
-	ObjectHdl obj = world_create_object();
+	ObjectHdl obj = world_create_object("polyObj");
 	mAssert(obj != nullptr);
 	{
 		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u });
@@ -215,7 +216,7 @@ void test_sphere() {
 	std::cout << "Testing spheres" << std::endl;
 	bool success = false;
 
-	ObjectHdl obj = world_create_object();
+	ObjectHdl obj = world_create_object("sphereObj");
 	mAssert(obj != nullptr);
 	{
 		auto hdl0 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_INT, 1u });
@@ -311,6 +312,13 @@ void test_renderer() {
 	mAssert(success);
 }
 
+void test_scene_loader() {
+	std::string_view fileName = "C:\\Users\\Florian\\Desktop\\Repos\\mufflon\\build\\testscene.json";
+	if(!load_scene_file(&fileName[0u])) {
+		throw std::runtime_error("Failed to load scene file");
+	}
+}
+
 /*void test_allocator() {
 	std::cout << "Testing custom device allocator." << std::endl;
 
@@ -336,12 +344,13 @@ void test_renderer() {
 
 int main() {
 	mufflon_initialize(nullptr);
-	test_polygon();
+	/*test_polygon();
 	test_sphere();
 	test_lights();
 	test_camera();
 	test_scene();
-	test_renderer();
+	test_renderer();*/
+	test_scene_loader();
 	mufflon_destroy();
 
 	std::cout << "All tests successful" << std::endl;

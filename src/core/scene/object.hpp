@@ -54,6 +54,18 @@ public:
 	Object& operator=(Object&&) = default;
 	~Object();
 
+	// Returns the name of the object (references the string in the object map
+	// located in the world container)
+	const std::string_view& get_name() const noexcept {
+		return m_name;
+	}
+
+	// Sets the name of the object (care: since it takes a stringview, the
+	// underlying string must NOT be moved/changed)
+	void set_name(std::string_view name) noexcept {
+		m_name = name;
+	}
+
 	// Resizes storage of geometry type.
 	template < class Geom, class... Args >
 	void resize(Args&& ...args) {
@@ -219,6 +231,7 @@ public:
 	}
 
 private:
+	std::string_view m_name;
 	GeometryTuple m_geometryData;
 	ei::Box m_boundingBox;
 

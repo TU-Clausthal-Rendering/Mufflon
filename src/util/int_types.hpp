@@ -1,4 +1,5 @@
 #pragma once
+#include <ei/vector.hpp>
 
 #include <cstdint>
 
