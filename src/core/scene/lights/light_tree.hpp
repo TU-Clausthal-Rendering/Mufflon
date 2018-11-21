@@ -180,7 +180,7 @@ namespace lighttree_detail {
 
 // Helper to adjust PDF by the chance to pick light type
 CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
-	sample.pos.pdf *= AreaPdf(chance);
+	sample.pos.pdf *= chance;
 	return sample;
 }
 

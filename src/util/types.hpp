@@ -26,13 +26,27 @@ public:
 		m_pdf -= pdf.m_pdf;
 		return *this;
 	}
-	__host__ __device__ AreaPdf& operator*=(AreaPdf pdf) noexcept {
-		m_pdf *= pdf.m_pdf;
+	__host__ __device__ AreaPdf& operator*=(float probability) noexcept {
+		m_pdf *= probability;
 		return *this;
 	}
-	__host__ __device__ AreaPdf& operator/=(AreaPdf pdf) noexcept {
-		m_pdf /= pdf.m_pdf;
+	__host__ __device__ AreaPdf& operator/=(float probability) noexcept {
+		m_pdf /= probability;
 		return *this;
+	}
+	__host__ __device__ AreaPdf operator+(AreaPdf pdf) const noexcept {
+		return static_cast<AreaPdf>(m_pdf + pdf.m_pdf);
+	}
+	__host__ __device__ AreaPdf operator-(AreaPdf pdf) const noexcept {
+		return static_cast<AreaPdf>(m_pdf - pdf.m_pdf);
+	}
+	// Returnvalue is AreaSqPdf (not an AreaPdf)
+	__host__ __device__ float operator*(AreaPdf pdf) const noexcept {
+		return m_pdf * pdf.m_pdf;
+	}
+	// Return values is unitless
+	__host__ __device__ float operator/(AreaPdf pdf) const noexcept {
+		return m_pdf / pdf.m_pdf;
 	}
 	__host__ __device__ constexpr AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
 	__host__ __device__ static constexpr AreaPdf infinite() {
@@ -55,13 +69,25 @@ public:
 		m_pdf -= pdf.m_pdf;
 		return *this;
 	}
-	__host__ __device__ AngularPdf& operator*=(AngularPdf pdf) noexcept {
-		m_pdf *= pdf.m_pdf;
+	__host__ __device__ AngularPdf& operator*=(float probability) noexcept {
+		m_pdf /= probability;
 		return *this;
 	}
-	__host__ __device__ AngularPdf& operator/=(AngularPdf pdf) noexcept {
-		m_pdf /= pdf.m_pdf;
+	__host__ __device__ AngularPdf& operator/=(float probability) noexcept {
+		m_pdf *= probability;
 		return *this;
+	}
+	__host__ __device__ AngularPdf operator+(AngularPdf pdf) const noexcept {
+		return static_cast<AngularPdf>(m_pdf + pdf.m_pdf);
+	}
+	__host__ __device__ AngularPdf operator-(AngularPdf pdf) const noexcept {
+		return static_cast<AngularPdf>(m_pdf - pdf.m_pdf);
+	}
+	__host__ __device__ float operator*(AngularPdf pdf) const noexcept {
+		return m_pdf * pdf.m_pdf;
+	}
+	__host__ __device__ float operator/(AngularPdf pdf) const noexcept {
+		return m_pdf / pdf.m_pdf;
 	}
 	__host__ __device__ constexpr AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
 		return AreaPdf{ m_pdf * ei::abs(cos) / distSqr };

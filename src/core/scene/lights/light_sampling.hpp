@@ -120,16 +120,16 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightQuad& light,
 	mAssert(!isnan(split));
 
 	// Decide what side we're on
-	AreaPdf pdf;
+	float p;
 	float u0;
 	const ei::Triangle* side;
 	if(rnd.u0 < split) {
 		// Rescale the random number to be reusable
 		u0 = rnd.u0 * split;
-		pdf = AreaPdf{ split };
+		p = split;
 		side = &first;
 	} else {
-		pdf = AreaPdf{ 1.f - split };
+		p = 1.f - split;
 		u0 = (rnd.u0 - split) / (1.f - split);
 		side = &second;
 	}
@@ -139,7 +139,7 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightQuad& light,
 	const ei::Vec3 normal = ei::normalize(ei::cross(tangentX, tangentY));
 	// Sample the position on the selected triangle and account for chance to choose the triangle
 	math::PositionSample pos = math::sample_position(*side, u0, rnd.u1);
-	pos.pdf *= pdf;
+	pos.pdf *= p;
 	// Transform direction to world coordinates
 	math::DirectionSample dir = math::sample_dir_cosine(rnd.u2, rnd.u3);
 	dir.direction = tangent2world(dir.direction, tangentX, tangentY, normal);
@@ -240,21 +240,21 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 	mAssert(!isnan(split));
 
 	// Decide what side we're on
-	AreaPdf pdf;
+	float p;
 	float area;
 	const ei::Triangle* side;
 	if(rnd.u0 < split) {
-		pdf = AreaPdf{ split };
+		p = split;
 		area = areaFirst;
 		side = &first;
 	} else {
-		pdf = AreaPdf{ 1.f - split };
+		p = 1.f - split;
 		area = areaSecond;
 		side = &second;
 	}
 
 	math::PositionSample posSample = math::sample_position(*side, rnd.u2, rnd.u3);
-	posSample.pdf *= pdf;
+	posSample.pdf *= p;
 	ei::Vec3 direction = pos - posSample.position;
 	const float distSqr = ei::lensq(direction);
 	direction /= sqrtf(distSqr);
