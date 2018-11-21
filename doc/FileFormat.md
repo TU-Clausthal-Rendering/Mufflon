@@ -57,15 +57,19 @@ The names must match the names stored in the binary itself.
                 "resolution": [int,int],        // Target image resolution
                 "lights": ["<name of a light>", ...]  // List of light sources
                 "lod": int,             // Global level of detail number [0,...] where 0 has the highest resolution, OPTIONAL 0
-                "[mat:name1]": "<name of a material>",
-                "[mat:name2]": "<name of a material>",
-                ....                    // Each material in the binary must be mapped to one of the above materials.
-                                        // A material can be used by multiple binray-materials.
-                "[obj:name]": {         // OPTIONAL per object properties
-                    "mask",             // Do not render this object (blacklisted)
-                    "lod": int,         // Use a specific LOD different/independent from global LOD
-                    // More meta information
-                }
+				"materialAssignments": {
+					"[mat:name1]": "<name of a material>",
+					"[mat:name2]": "<name of a material>",
+					....                    // Each material in the binary must be mapped to one of the above materials.
+											// A material can be used by multiple binray-materials.
+				},
+				"objectProperties": {
+					"[obj:name]": {         // OPTIONAL per object properties
+						"mask",             // Do not render this object (blacklisted)
+						"lod": int,         // Use a specific LOD different/independent from global LOD
+						// More meta information
+					}
+				}
             }
             ...
         }
