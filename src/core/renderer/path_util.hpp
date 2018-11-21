@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "util/types.hpp"
 #include "core/memory/dyntype_memory.hpp"
@@ -41,23 +41,30 @@ struct PathHead {
  * The type is very versatile as its size varyes for each different Interaction and Renderer.
  * A vertex is: a header (fixed size), renderer specific payload (template arguments) and
  * the descriptor for the interaction (size depends on interaction).
+ *
+ * ExtensionT: A single struct to extend the vertex for the use in a specialized renderer.
+ *		@Alignment: the size of internal data is 40 byte. For GPU 16 byte alignment use
+ *		the first 8 bytes of ExtensionT for scalar or Vec2 types. Only then use larger types
+ *		like vec3/vec4.
+ *		Automatic padding via alignas() will not run, because the compiler cannot see
+ *		Vertex+ExtensionT as one type.
  */
-// TODO: template payload
 // TODO: creation factory
 // TODO: update function(s)
-class Vertex {
+template < typename ExtensionT >
+class PathVertex {
 public:
 	scene::Point get_position() const { return m_position; }
 	scene::Direction get_incident_direction() const { return m_incident; }
 
 	// The per area PDF of the previous segment which generated this vertex
 	AreaPdf get_incident_pdf() const { return m_incidentPdf; }
-	// Get the per area PDF, if this vertex is approached from a different vertex.
-	// prevForwardPdf: previous sampling pdf which gets converted to the AreaPdf
-	//		dependent on the current vertex type.
-	// connection: Connection direction (normalized) from/to the source vertex. The
-	//		sign of the direction can be arbitrary.
-	AreaPdf get_incident_pdf(AngularPdf prevForwardPdf, const scene::Direction & connection, float distSq) const {
+	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
+	// This method ensures compatibility with any kind of interaction.
+	// Non-hitable vertices simply return 0, surfaces return a real cosθ and
+	// some things like the LIGHT_ENVMAP return special values for the compatibility.
+	// connection: a direction with arbitrary orientation
+	float get_geometrical_factor(const scene::Direction& connection) const {
 		switch(m_type) {
 			// Non-hitable vertices
 			case Interaction::VOID:
@@ -65,25 +72,23 @@ public:
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_SPOT:
-				return AreaPdf{ 0.0f };
+				return 0.0f;
 			case Interaction::LIGHT_ENVMAP:
 				// There is no geometrical conversion factor for hitting environment maps.
 				// However, it is expected that the scene exit-distance is always the same
 				// and can be used in both directions without changing the result of a
 				// comparison.
-				return prevForwardPdf.to_area_pdf(1.0f, distSq);
+				return 1.0f;
 			case Interaction::LIGHT_AREA: {
 				auto* alDesc = as<AreaLightDesc>(this + 1); // Descriptor at end of vertex
-				float iDotN = dot(connection, alDesc->normal);
-				return prevForwardPdf.to_area_pdf(iDotN, distSq);
+				return dot(connection, alDesc->normal);
 			}
 			case Interaction::SURFACE: {
 				auto* surfDesc = as<SurfaceDesc>(this + 1); // Descriptor at end of vertex
-				float iDotN = dot(connection, surfDesc->tangentSpace.shadingN);
-				return prevForwardPdf.to_area_pdf(iDotN, distSq);
+				return dot(connection, surfDesc->tangentSpace.shadingN);
 			}
 		}
-		return AreaPdf{ 0.0f };
+		return 0.0f;
 	}
 
 	// Get the sampling PDFs of this vertex (not defined, if
@@ -98,6 +103,11 @@ public:
 		// TODO
 		return scene::materials::EvalValue{};
 	}
+
+	const PathVertex* previous() const { return m_offsetToPrevious == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPrevious); }
+
+	const ExtensionT& ext() const { return m_extension; }
+	ExtensionT& ext() { return m_extension; }
 protected:
 	struct AreaLightDesc {
 		scene::Direction normal;
@@ -134,7 +144,8 @@ protected:
 	// Area PDF of whatever created this vertex
 	AreaPdf m_incidentPdf;
 
-	// REMARK: currently 2 floats of unused in 16-byte alignment
+	// REMARK: currently 2 floats unused in 16-byte alignment
+	ExtensionT m_extension;
 };
 
 }} // namespace mufflon::renderer

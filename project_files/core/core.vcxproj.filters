@@ -181,6 +181,9 @@
     <ClCompile Include="..\..\src\core\export\interface.cpp">
       <Filter>Source Files\core\export</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">

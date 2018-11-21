@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\scene\accel_structs\lbvh.cpp" />
