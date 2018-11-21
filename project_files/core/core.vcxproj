@@ -194,6 +194,7 @@
     <ClInclude Include="..\..\src\util\degrad.hpp" />
     <ClInclude Include="..\..\src\util\dyntype_memory.hpp" />
     <ClInclude Include="..\..\src\util\flag.hpp" />
+    <ClInclude Include="..\..\src\util\int_types.hpp" />
     <ClInclude Include="..\..\src\util\log.hpp" />
     <ClInclude Include="..\..\src\util\punning.hpp" />
     <ClInclude Include="..\..\src\util\range.hpp" />
