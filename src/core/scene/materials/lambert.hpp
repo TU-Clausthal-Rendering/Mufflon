@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.hpp"
+#include "material_types.hpp"
 #include "material.hpp"
 #include "export/api.hpp"
 #include "core/math/sampling.hpp"

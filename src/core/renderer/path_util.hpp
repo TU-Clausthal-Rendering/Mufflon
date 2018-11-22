@@ -3,7 +3,7 @@
 #include "util/types.hpp"
 #include "core/memory/dyntype_memory.hpp"
 #include "core/scene/types.hpp"
-#include "core/scene/materials/types.hpp"
+#include "core/scene/materials/material_types.hpp"
 
 namespace mufflon { namespace renderer {
 

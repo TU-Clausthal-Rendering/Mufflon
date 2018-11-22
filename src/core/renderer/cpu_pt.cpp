@@ -2,7 +2,7 @@
 #include "path_util.hpp"
 #include "output_handler.hpp"
 #include "core/cameras/camera.hpp"
-#include "core/cameras/sample.hpp"
+#include "core/cameras/camera_sampling.hpp"
 #include "core/math/rng.hpp"
 #include <random>
 

@@ -267,9 +267,6 @@
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\materials\sample.hpp">
-      <Filter>Source Files\core\scene\materials</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\types.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -287,9 +284,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\materials\types.hpp">
-      <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\cuda\error.hpp">
       <Filter>Source Files\core\cuda</Filter>
@@ -316,9 +310,6 @@
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp">
-      <Filter>Source Files\core\cameras</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\cameras\sample.hpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp">
@@ -671,6 +662,14 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>    <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp">
+      <Filter>Source Files\core\cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\material_types.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -143,7 +143,7 @@
     <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h" />
     <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
-    <ClInclude Include="..\..\src\core\cameras\sample.hpp" />
+    <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp" />
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\export\interface.h" />
@@ -179,8 +179,8 @@
     <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp" />
-    <ClInclude Include="..\..\src\core\scene\materials\sample.hpp" />
-    <ClInclude Include="..\..\src\core\scene\materials\types.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\material_types.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
