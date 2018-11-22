@@ -163,6 +163,7 @@
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\build_lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
@@ -206,6 +207,7 @@
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
+    <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\intersection.cu" />
   </ItemGroup>

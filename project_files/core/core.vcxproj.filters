@@ -669,6 +669,9 @@
     <ClInclude Include="..\..\src\util\int_types.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">
@@ -692,6 +695,9 @@
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\accel_structs\intersection.cu">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </CudaCompile>
   </ItemGroup>
