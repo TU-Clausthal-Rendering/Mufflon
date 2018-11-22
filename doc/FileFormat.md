@@ -273,6 +273,7 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
             u32                 // Number of quads Q
             u32                 // Number of spheres S
             u32                 // Number of vertices V
+            u32                 // Number of edges E
             u32                 // Number of vertex attributes
             u32                 // Number of face attributes (same for triangles and quads)
             u32                 // Number of sphere attributes
