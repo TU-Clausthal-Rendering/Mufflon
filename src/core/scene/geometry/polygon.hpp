@@ -258,6 +258,10 @@ public:
 	VertexBulkReturn add_bulk(std::size_t count, util::IByteReader& pointStream,
 							  util::IByteReader& normalStream, util::IByteReader& uvStream,
 							  const ei::Box& boundingBox);
+	VertexBulkReturn add_bulk(std::size_t count, util::IByteReader& pointStream,
+							  util::IByteReader& uvStream);
+	VertexBulkReturn add_bulk(std::size_t count, util::IByteReader& pointStream,
+							  util::IByteReader& uvStream, const ei::Box& boundingBox);
 	/**
 	 * Bulk-loads the given attribute starting at the given vertex.
 	 * The number of read values will be capped by the number of vertice present

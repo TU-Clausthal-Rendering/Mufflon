@@ -36,18 +36,18 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj) {
 	return &m_instances.back();
 }
 
-WorldContainer::ScenarioHandle WorldContainer::create_scenario(std::string name) {
+ScenarioHandle WorldContainer::create_scenario(std::string name) {
 	// TODO: switch to pointer
-	ScenarioHandle hdl = m_scenarios.emplace(std::move(name), Scenario{}).first;
+	auto hdl = m_scenarios.emplace(std::move(name), Scenario{}).first;
 	hdl->second.set_name(hdl->first);
-	return hdl;
+	return &hdl->second;
 }
 
-std::optional<WorldContainer::ScenarioHandle> WorldContainer::get_scenario(const std::string_view& name) {
+ScenarioHandle WorldContainer::get_scenario(const std::string_view& name) {
 	auto iter = m_scenarios.find(name);
 	if(iter != m_scenarios.end())
-		return iter;
-	return std::nullopt;
+		return &iter->second;
+	return nullptr;
 }
 
 MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial> material) {
@@ -243,8 +243,9 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	return m_scene.get();
 }
 
-SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
-	return load_scene(hdl->second);
+SceneHandle WorldContainer::load_scene(ConstScenarioHandle hdl) {
+	mAssert(hdl != nullptr);
+	return load_scene(*hdl);
 }
 
 } // namespace mufflon::scene

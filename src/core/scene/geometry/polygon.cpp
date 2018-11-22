@@ -194,6 +194,47 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	return { hdl, readPoints, readNormals, readUvs };
 }
 
+Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
+											  util::IByteReader& uvStream) {
+	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData.n_vertices();
+	VertexHandle hdl(static_cast<int>(start));
+
+	// Resize the attributes prior
+	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+
+	// Read the attributes
+	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
+	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	// Expand the bounding box
+	const OpenMesh::Vec3f* points = *m_pointsAttr.aquireConst();
+	for(std::size_t i = start; i < start + readPoints; ++i) {
+		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
+		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
+	}
+
+	return { hdl, readPoints, 0u, readUvs };
+}
+
+Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
+											  util::IByteReader& uvStream, const ei::Box& boundingBox) {
+	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData.n_vertices();
+	VertexHandle hdl(static_cast<int>(start));
+
+	// Resize the attributes prior
+	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+
+	// Read the attributes
+	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
+	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	// Expand the bounding box
+	m_boundingBox.max = ei::max(boundingBox.max, m_boundingBox.max);
+	m_boundingBox.min = ei::min(boundingBox.min, m_boundingBox.min);
+
+	return { hdl, readPoints, 0u, readUvs };
+}
+
 void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
 				std::size_t divisions) {
 	tessellater(m_meshData, divisions);

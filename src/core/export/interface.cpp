@@ -576,7 +576,26 @@ VertexHdl polygon_add_vertex_bulk(ObjectHdl obj, size_t count, FILE* points,
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
 }
-	
+
+VertexHdl polygon_add_vertex_bulk_no_normals(ObjectHdl obj, size_t count,
+											 FILE* points, FILE* uvs,
+											 size_t* pointsRead,
+											 size_t* uvsRead) {
+	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
+	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
+	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
+	Object& object = *static_cast<Object*>(obj);
+	mufflon::util::FileReader pointReader{ points };
+	mufflon::util::FileReader uvReader{ uvs };
+
+	Polygons::VertexBulkReturn info = object.template add_bulk<Polygons>(count, pointReader,
+																		 uvReader);
+	if(pointsRead != nullptr)
+		*pointsRead = info.readPoints;
+	if(pointsRead != nullptr)
+		*uvsRead = info.readUvs;
+	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+}
 
 VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points,
 										  FILE* normals, FILE* uvs, Vec3 min,
@@ -599,6 +618,28 @@ VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points
 		*pointsRead = info.readPoints;
 	if(pointsRead != nullptr)
 		*normalsRead = info.readNormals;
+	if(pointsRead != nullptr)
+		*uvsRead = info.readUvs;
+	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+}
+
+VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
+												  FILE* points, FILE* uvs,
+												  Vec3 min, Vec3 max,
+												  size_t* pointsRead,
+												  size_t* uvsRead) {
+	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
+	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
+	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
+	Object& object = *static_cast<Object*>(obj);
+	mufflon::util::FileReader pointReader{ points };
+	mufflon::util::FileReader uvReader{ uvs };
+
+	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
+	Polygons::VertexBulkReturn info = object.template add_bulk<Polygons>(count, pointReader,
+																		 uvReader, aabb);
+	if(pointsRead != nullptr)
+		*pointsRead = info.readPoints;
 	if(pointsRead != nullptr)
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
@@ -631,6 +672,36 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 				 get_attr_type_name(attr->type));
 		return false;
 	});
+}
+
+Boolean polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal) {
+	CHECK_NULLPTR(obj, "object handle", false);
+	CHECK_GEQ_ZERO(vertex, "vertex index", false);
+	Object& object = *static_cast<Object*>(obj);
+	if(vertex >= static_cast<int>(object.template get_geometry<Polygons>().get_vertex_count())) {
+		logError("[", FUNCTION_NAME, "] Vertex index out of bounds (",
+				 vertex, " >= ", object.template get_geometry<Polygons>().get_vertex_count(),
+				 ")");
+		return false;
+	}
+
+	(*object.get_geometry<geometry::Polygons>().get_normals().aquire<>())[vertex] = util::pun<OpenMesh::Vec3f>(normal);
+	return true;
+}
+
+Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
+	CHECK_NULLPTR(obj, "object handle", false);
+	CHECK_GEQ_ZERO(vertex, "vertex index", false);
+	Object& object = *static_cast<Object*>(obj);
+	if(vertex >= static_cast<int>(object.template get_geometry<Polygons>().get_vertex_count())) {
+		logError("[", FUNCTION_NAME, "] Vertex index out of bounds (",
+				 vertex, " >= ", object.template get_geometry<Polygons>().get_vertex_count(),
+				 ")");
+		return false;
+	}
+
+	(*object.get_geometry<geometry::Polygons>().get_uvs().aquire<>())[vertex] = util::pun<OpenMesh::Vec2f>(uv);
+	return true;
 }
 
 Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
@@ -1018,6 +1089,33 @@ Boolean spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	return true;
 }
 
+Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat4x3* mat) {
+	CHECK_NULLPTR(inst, "instance handle", false);
+	CHECK_NULLPTR(mat, "transformation matrix", false);
+	Instance& instance = *static_cast<InstanceHandle>(inst);
+	instance.set_transformation_matrix(util::pun<ei::Matrix<float, 4u, 3u>>(*mat));
+	return true;
+}
+
+Boolean instance_get_transformation_matrix(InstanceHdl inst, Mat4x3* mat) {
+	CHECK_NULLPTR(inst, "instance handle", false);
+	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
+	if(mat != nullptr)
+		*mat = util::pun<Mat4x3>(instance.get_transformation_matrix());
+	return true;
+}
+
+Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max) {
+	CHECK_NULLPTR(inst, "instance handle", false);
+	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
+	const ei::Box& aabb = instance.get_bounding_box();
+	if(min != nullptr)
+		*min = util::pun<Vec3>(aabb.min);
+	if(max != nullptr)
+		*max = util::pun<Vec3>(aabb.max);
+	return true;
+}
+
 ObjectHdl world_create_object(const char* name) {
 	CHECK_NULLPTR(name, "object name", nullptr);
 	return static_cast<ObjectHdl>(WorldContainer::instance().create_object(name));
@@ -1036,20 +1134,20 @@ InstanceHdl world_create_instance(ObjectHdl obj) {
 
 ScenarioHdl world_create_scenario(const char* name) {
 	CHECK_NULLPTR(name, "scenario name", nullptr);
-	auto hdl = WorldContainer::instance().create_scenario(name);
-	return static_cast<ScenarioHdl>(&hdl->second);
+	ScenarioHandle hdl = WorldContainer::instance().create_scenario(name);
+	return static_cast<ScenarioHdl>(hdl);
 }
 
 ScenarioHdl world_find_scenario(const char* name) {
 	CHECK_NULLPTR(name, "scenario name", nullptr);
 	std::string_view nameView{ name };
-	auto hdl = WorldContainer::instance().get_scenario(nameView);
-	if(!hdl.has_value()) {
+	ScenarioHandle hdl = WorldContainer::instance().get_scenario(nameView);
+	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find scenario '",
 				 nameView, "'");
 		return nullptr;
 	}
-	return static_cast<ScenarioHdl>(&hdl.value()->second);
+	return static_cast<ScenarioHdl>(hdl);
 }
 
 MaterialHdl world_add_lambert_material(const char* name, Vec3 rgb) {
@@ -1215,7 +1313,7 @@ LightHdl world_get_light(const char* name, LightType type) {
 
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	SceneHandle hdl = WorldContainer::instance().load_scene(*static_cast<const Scenario*>(scenario));
+	SceneHandle hdl = WorldContainer::instance().load_scene(static_cast<ConstScenarioHandle>(scenario));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
 		return nullptr;

@@ -314,7 +314,7 @@ void test_renderer() {
 
 void test_scene_loader() {
 	std::string_view fileName = "C:\\Users\\Florian\\Desktop\\Repos\\mufflon\\build\\testscene.json";
-	if(!load_scene_file(&fileName[0u])) {
+	if(!loader_load_json(&fileName[0u])) {
 		throw std::runtime_error("Failed to load scene file");
 	}
 }

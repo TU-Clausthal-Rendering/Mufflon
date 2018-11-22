@@ -45,6 +45,10 @@ typedef struct {
 	int32_t y;
 } IVec2;
 
+typedef struct {
+	float v[12u];
+} Mat4x3;
+
 typedef enum {
 	ATTR_CHAR,
 	ATTR_UCHAR,
@@ -178,22 +182,30 @@ CORE_API FaceHdl CDECL polygon_add_quad(ObjectHdl obj, UVec4 vertices);
 CORE_API FaceHdl CDECL polygon_add_quad_material(ObjectHdl obj, UVec4 vertices,
 												 MatIdx idx);
 CORE_API VertexHdl CDECL polygon_add_vertex_bulk(ObjectHdl obj, size_t count, FILE* points,
-										FILE* normals, FILE* uvStream,
+										FILE* normals, FILE* uvs,
 										size_t* pointsRead, size_t* normalsRead,
 										size_t* uvsRead);
+CORE_API VertexHdl CDECL polygon_add_vertex_bulk_no_normals(ObjectHdl obj, size_t count, FILE* points,
+															FILE* uvs, size_t* pointsRead,
+															size_t* uvsRead);
 CORE_API VertexHdl CDECL polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points,
-										FILE* normals, FILE* uvStream,
+										FILE* normals, FILE* uvs,
 										Vec3 min, Vec3 max, size_t* pointsRead,
 										size_t* normalsRead, size_t* uvsRead);
+CORE_API VertexHdl CDECL polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count, FILE* points,
+																 FILE* uvs, Vec3 min, Vec3 max,
+																 size_t* pointsRead, size_t* uvsRead);
 CORE_API Boolean CDECL polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-											  VertexHdl vertex, void* value);
+													VertexHdl vertex, void* value);
+CORE_API Boolean CDECL polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal);
+CORE_API Boolean CDECL polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv);
 CORE_API Boolean CDECL polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
 											FaceHdl face, void* value);
 CORE_API Boolean CDECL polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx);
 CORE_API size_t CDECL polygon_set_vertex_attribute_bulk(ObjectHdl obj,
-													 const PolygonAttributeHandle* attr,
-													 VertexHdl startVertex, AttribDesc type,
-													 size_t count, FILE* stream);
+														const PolygonAttributeHandle* attr,
+														VertexHdl startVertex, size_t count,
+														FILE* stream);
 CORE_API size_t CDECL polygon_set_face_attribute_bulk(ObjectHdl obj,
 												   const PolygonAttributeHandle* attr,
 												   FaceHdl startFace, size_t count,
@@ -235,6 +247,11 @@ CORE_API size_t CDECL spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl sta
 												 size_t count, FILE* stream);
 CORE_API size_t CDECL spheres_get_sphere_count(ObjectHdl obj);
 CORE_API Boolean CDECL spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
+
+// Instance interface
+CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat4x3* mat);
+CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat4x3* mat);
+CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max);
 
 // World container interface
 CORE_API ObjectHdl CDECL world_create_object(const char* name);

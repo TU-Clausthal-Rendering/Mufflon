@@ -20,7 +20,6 @@ namespace mufflon::scene {
  */
 class WorldContainer {
 public:
-	using ScenarioHandle = std::map<std::string, Scenario, std::less<>>::iterator;
 	using PointLightHandle = std::map<std::string, lights::PointLight, std::less<>>::iterator;
 	using SpotLightHandle = std::map<std::string, lights::SpotLight, std::less<>>::iterator;
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
@@ -39,7 +38,7 @@ public:
 	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name
-	std::optional<ScenarioHandle> get_scenario(const std::string_view& name);
+	ScenarioHandle get_scenario(const std::string_view& name);
 
 	/*
 	 * Add a ready to use material to the scene. The material must be loaded completely.
@@ -102,8 +101,7 @@ public:
 	 * This destroys the currently loaded scene and overwrites it with a new one.
 	 * Returns nullptr if something goes wrong.
 	 */
-	SceneHandle load_scene(const Scenario& scenario);
-	SceneHandle load_scene(ScenarioHandle hdl);
+	SceneHandle load_scene(ConstScenarioHandle hdl);
 
 	// Returns the currently loaded scene, if present
 	SceneHandle get_current_scene() {
@@ -118,6 +116,8 @@ private:
 	WorldContainer(WorldContainer&&) = default;
 	WorldContainer& operator=(WorldContainer&&) = default;
 	~WorldContainer() = default;
+
+	SceneHandle load_scene(const Scenario& scenario);
 
 	// Global container object for everything
 	static WorldContainer s_container;

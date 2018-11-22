@@ -671,6 +671,9 @@
     <ClInclude Include="..\..\src\core\scene\materials\material_types.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\filesystem.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">

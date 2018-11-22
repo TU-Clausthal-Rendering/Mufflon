@@ -9,6 +9,7 @@ namespace mufflon { namespace scene {
 class Object;
 class Instance;
 class Scene;
+class Scenario;
 namespace materials {
 class IMaterial;
 }
@@ -31,6 +32,8 @@ using CameraHandle = cameras::Camera*;
 using ConstCameraHandle = const cameras::Camera*;
 using SceneHandle = Scene*;
 using ConstSceneHandle = const Scene*;
+using ScenarioHandle = Scenario*;
+using ConstScenarioHandle = const Scenario*;
 using ConstTextureHandle = const textures::Texture*;
 using TextureHandle = textures::Texture*;
 

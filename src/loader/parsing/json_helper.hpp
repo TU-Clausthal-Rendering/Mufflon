@@ -32,6 +32,13 @@ struct ParserState {
 	Value expected;
 	std::size_t expectedArraySize;
 	std::vector<const char*> objectNames;
+
+	void reset() {
+		current = Level::ROOT;
+		expected = Value::NONE;
+		expectedArraySize = 0u;
+		objectNames.clear();
+	}
 };
 
 class JsonException : public std::exception {

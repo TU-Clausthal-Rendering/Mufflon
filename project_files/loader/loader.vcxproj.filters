@@ -23,8 +23,8 @@
     <Filter Include="Source Files\loader\export">
       <UniqueIdentifier>{8ac1c7a9-9155-46d2-a6d5-a35f57cdb04b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\loader\json">
-      <UniqueIdentifier>{d87eda65-ddf9-4f96-82bd-ae84d8df1d25}</UniqueIdentifier>
+    <Filter Include="Source Files\loader\parsing">
+      <UniqueIdentifier>{5742c584-79b4-439d-9665-2ea0c1d89a10}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -40,11 +40,14 @@
     <ClCompile Include="..\..\src\loader\export\interface.cpp">
       <Filter>Source Files\loader\export</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\loader\json\json.cpp">
-      <Filter>Source Files\loader\json</Filter>
+    <ClCompile Include="..\..\src\loader\parsing\binary.cpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\loader\export\binary.cpp">
-      <Filter>Source Files\loader\export</Filter>
+    <ClCompile Include="..\..\src\loader\parsing\json_helper.cpp">
+      <Filter>Source Files\loader\parsing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\loader\parsing\json_loader.cpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -93,14 +96,14 @@
     <ClInclude Include="..\..\src\loader\export\interface.h">
       <Filter>Source Files\loader\export</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\loader\json\json.hpp">
-      <Filter>Source Files\loader\json</Filter>
+    <ClInclude Include="..\..\src\loader\parsing\binary.hpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\loader\export\binary.hpp">
-      <Filter>Source Files\loader\export</Filter>
+    <ClInclude Include="..\..\src\loader\parsing\json_helper.hpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\loader\export\filesystem.hpp">
-      <Filter>Source Files\loader\export</Filter>
+    <ClInclude Include="..\..\src\loader\parsing\json_loader.hpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

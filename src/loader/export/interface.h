@@ -2,8 +2,11 @@
 #include "export/api.hpp"
 
 extern "C" {
+#include <stdint.h>
 
-LOADER_API bool CDECL load_scene_file(const char* path);
+typedef uint32_t Boolean;
+
+LOADER_API Boolean CDECL loader_load_json(const char* path);
 
 } // extern "C"
 
