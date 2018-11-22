@@ -9,6 +9,7 @@ namespace mufflon { namespace renderer {
 
 enum class Interaction : u16 {
 	VOID,				// The ray missed the scene (no intersection)
+	VIRTUAL,			// Copy of another event. A virtual interaction mimics most of the methods of the true interaction, except evaluate()
 	SURFACE,			// A standard material interaction
 	CAMERA,				// A camera start vertex
 	LIGHT_POINT,		// A point-light vertex
@@ -28,10 +29,9 @@ struct Throughput {
 struct PathHead {
 	Throughput throughput;			// General throughput with guide heuristics
 	scene::Point position;
-	float prevPdfF;					// Forward PDF of the last sampling PDF
+	AngularPdf prevPdfF;			// Forward PDF of the last sampling PDF
 	scene::Direction incident;		// May be zero-vector for start points
-	float prevPdfB;					// Backward PDF of the last sampling PDF
-	// TODO: prevAreaPDF ?
+	AngularPdf prevPdfB;			// Backward PDF of the last sampling PDF
 	Interaction type;
 };
 
@@ -66,8 +66,13 @@ public:
 	// connection: a direction with arbitrary orientation
 	float get_geometrical_factor(const scene::Direction& connection) const {
 		switch(m_type) {
+			case Interaction::VIRTUAL: {
+				auto* virtDesc = as<VirtualDesc>(this + 1); // Descriptor at end of vertex
+				mAssertMsg(virtDesc->creationDir == connection,
+					"The virtual vertex can only be used for the one direction which was used during its creation.");
+				return virtDesc->geometricalFactor;
+			}
 			// Non-hitable vertices
-			case Interaction::VOID:
 			case Interaction::CAMERA:
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_DIRECTIONAL:
@@ -104,8 +109,18 @@ public:
 		return scene::materials::EvalValue{};
 	}
 
-	const PathVertex* previous() const { return m_offsetToPrevious == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPrevious); }
+	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
+	float get_incident_dist_sq() const {
+		if(m_offsetToPrevious == 0) return 0.0f;
+		return lensq(as<PathVertex>(as<u8>(this) + m_offsetToPrevious)->get_position() - m_position);
+	}
 
+	// Get the previous path vertex or nullptr if this is a start vertex.
+	const PathVertex* previous() const {
+		return m_offsetToPrevious == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPrevious);
+	}
+
+	// Access to the renderer dependent extension
 	const ExtensionT& ext() const { return m_extension; }
 	ExtensionT& ext() { return m_extension; }
 protected:
@@ -115,6 +130,13 @@ protected:
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace;
 	};
+	struct VirtualDesc {
+#ifdef DEBUG_ENABLED
+		scene::Direction creationDir;	// Check value only. Used to make sure the virtual vertex is only used for a very specific setup.
+#endif
+		float geometricalFactor;	// cosθ or similar from the original interaction
+	};
+	// TODO: alignment of descriptors?!
 
 
 	// The vertex  position in world space
@@ -146,6 +168,16 @@ protected:
 
 	// REMARK: currently 2 floats unused in 16-byte alignment
 	ExtensionT m_extension;
+};
+
+
+/*
+ * Memory management of vertices is quite challenging, because its size depends on
+ * the rendering algorithm and its interaction type.
+ * We target to store vertices densly packet in local byte buffers. The factory helps
+ * with estimating sizes and creating the vertex instances.
+ */
+class PathVertexFactory {
 };
 
 }} // namespace mufflon::renderer

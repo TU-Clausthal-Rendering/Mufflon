@@ -25,7 +25,7 @@ struct LambertParameterPack : public ParameterPack {
 		ParameterPack(baseParameters),
 		albedo(albedo)
 	{}
-	Spectrum albedo;
+	Spectrum albedo; // TODO: alignment is bad
 };
 
 // Class for the handling of the Lambertian material.

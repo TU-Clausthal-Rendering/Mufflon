@@ -11,22 +11,41 @@ namespace {
 
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct BptVertexExt {
-	float m_prevRelativeProbabilitySum;
+	// A cache to shorten the recursive evaluation of MIS.
+	// It is only possible to store the second previous sum, as the previous sum
+	// depends on the backward-pdf of the current vertex, which is only given in
+	// the moment of the full connection.
+	float m_secPrevRelativeProbabilitySum;
 };
 
 using BptPathVertex = PathVertex<BptVertexExt>;
+
+// Recursive implementation for demonstration purposes
+float get_mis_part_rec(const BptPathVertex & path0, AngularPdf pdfBack, const scene::Direction& connection, float distSq) {
+	AreaPdf reversePdf = pdfBack.to_area_pdf(path0.get_geometrical_factor(connection), distSq);
+	// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
+	float relPdf = reversePdf / path0.get_incident_pdf();
+	// Go into recursion (or not)
+	const BptPathVertex* prev = path0.previous();
+	if(!prev) return relPdf;	// Current one is a start vertex. There is no previous sum
+	float prevRelProbabilitySum = get_mis_part_rec(*prev, path0.get_backward_pdf(), path0.get_incident_direction(), path0.get_incident_dist_sq());
+	return prevRelProbabilitySum * relPdf + relPdf;
+}
 
 float get_mis_part(const BptPathVertex & path0, AngularPdf pdfBack, const scene::Direction& connection, float distSq) {
 	AreaPdf reversePdf = pdfBack.to_area_pdf(path0.get_geometrical_factor(connection), distSq);
 	// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
 	float relPdf = reversePdf / path0.get_incident_pdf();
 	// Sum up all previous relative probability (cached recursion).
-	// The cache is stored relative to this vertex and not to the newley connected one.
-	// Therefore, it must be multiplied with the local relativity.
 	// Also see PBRT p.1015.
-	float relToPrev = 1.0f; // TODO: needs correct backward pdf of path0
-	// TODO / path0.previous()->get_incident_pdf()
-	return path0.ext().m_prevRelativeProbabilitySum * relToPrev * relPdf + relPdf;
+	const BptPathVertex* prev = path0.previous();
+	if(!prev) return relPdf;	// Current one is a start vertex. There is no previous sum
+	// Unroll recursion further. The cache only knows the prev-prev value.
+	float geoFactor = prev->get_geometrical_factor(path0.get_incident_direction());
+	AreaPdf prevReversePdf = path0.get_backward_pdf().to_area_pdf(
+		geoFactor, path0.get_incident_dist_sq());
+	float relToPrev = prevReversePdf / prev->get_incident_pdf();
+	return (path0.ext().m_secPrevRelativeProbabilitySum * relToPrev + relToPrev) * relPdf + relPdf;
 }
 
 // Assumes that path0 and path1 are fully evaluated vertices of the end points of
