@@ -18,7 +18,7 @@ struct BptVertexExt {
 	float m_secPrevRelativeProbabilitySum;
 };
 
-using BptPathVertex = PathVertex<BptVertexExt>;
+using BptPathVertex = PathVertex<BptVertexExt, 4>;
 
 // Recursive implementation for demonstration purposes
 float get_mis_part_rec(const BptPathVertex & path0, AngularPdf pdfBack, const scene::Direction& connection, float distSq) {

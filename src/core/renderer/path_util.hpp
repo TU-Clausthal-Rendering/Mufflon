@@ -9,7 +9,6 @@ namespace mufflon { namespace renderer {
 
 enum class Interaction : u16 {
 	VOID,				// The ray missed the scene (no intersection)
-	VIRTUAL,			// Copy of another event. A virtual interaction mimics most of the methods of the true interaction, except evaluate()
 	SURFACE,			// A standard material interaction
 	CAMERA,				// A camera start vertex
 	LIGHT_POINT,		// A point-light vertex
@@ -17,6 +16,7 @@ enum class Interaction : u16 {
 	LIGHT_SPOT,			// A spot-light vertex
 	LIGHT_ENVMAP,		// An environment map-light vertex
 	LIGHT_AREA,			// An area-light vertex
+	VIRTUAL,			// Copy of another event. A virtual interaction mimics most of the methods of the true interaction, except evaluate()
 };
 
 struct Throughput {
@@ -48,10 +48,12 @@ struct PathHead {
  *		like vec3/vec4.
  *		Automatic padding via alignas() will not run, because the compiler cannot see
  *		Vertex+ExtensionT as one type.
+ * VERTEX_ALIGNMENT Number of bytes to which the vertices should be aligned (different
+ *		for CPU and GPU).
  */
 // TODO: creation factory
 // TODO: update function(s)
-template < typename ExtensionT >
+template < typename ExtensionT, int VERTEX_ALIGNMENT >
 class PathVertex {
 public:
 	scene::Point get_position() const { return m_position; }
@@ -59,6 +61,7 @@ public:
 
 	// The per area PDF of the previous segment which generated this vertex
 	AreaPdf get_incident_pdf() const { return m_incidentPdf; }
+
 	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
 	// This method ensures compatibility with any kind of interaction.
 	// Non-hitable vertices simply return 0, surfaces return a real cosθ and
@@ -66,13 +69,8 @@ public:
 	// connection: a direction with arbitrary orientation
 	float get_geometrical_factor(const scene::Direction& connection) const {
 		switch(m_type) {
-			case Interaction::VIRTUAL: {
-				auto* virtDesc = as<VirtualDesc>(this + 1); // Descriptor at end of vertex
-				mAssertMsg(virtDesc->creationDir == connection,
-					"The virtual vertex can only be used for the one direction which was used during its creation.");
-				return virtDesc->geometricalFactor;
-			}
 			// Non-hitable vertices
+			case Interaction::VOID:
 			case Interaction::CAMERA:
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_DIRECTIONAL:
@@ -85,12 +83,18 @@ public:
 				// comparison.
 				return 1.0f;
 			case Interaction::LIGHT_AREA: {
-				auto* alDesc = as<AreaLightDesc>(this + 1); // Descriptor at end of vertex
+				auto* alDesc = as<AreaLightDesc>(desc());
 				return dot(connection, alDesc->normal);
 			}
 			case Interaction::SURFACE: {
-				auto* surfDesc = as<SurfaceDesc>(this + 1); // Descriptor at end of vertex
+				auto* surfDesc = as<SurfaceDesc>(desc());
 				return dot(connection, surfDesc->tangentSpace.shadingN);
+			}
+			case Interaction::VIRTUAL: {
+				auto* virtDesc = as<VirtualDesc>(desc());
+				mAssertMsg(virtDesc->creationDir == connection,
+					"The virtual vertex can only be used for the one direction which was used during its creation.");
+				return virtDesc->geometricalFactor;
 			}
 		}
 		return 0.0f;
@@ -122,7 +126,12 @@ public:
 
 	// Access to the renderer dependent extension
 	const ExtensionT& ext() const { return m_extension; }
-	ExtensionT& ext() { return m_extension; }
+	ExtensionT& ext()			  { return m_extension; }
+
+	// Get the address of the interaction specific descriptor (aligned)
+	// TODO: benchmark if internal alignment is worth it
+	const void* desc() const { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+	void* desc()			 { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
 protected:
 	struct AreaLightDesc {
 		scene::Direction normal;
@@ -136,7 +145,6 @@ protected:
 #endif
 		float geometricalFactor;	// cosθ or similar from the original interaction
 	};
-	// TODO: alignment of descriptors?!
 
 
 	// The vertex  position in world space
@@ -168,6 +176,13 @@ protected:
 
 	// REMARK: currently 2 floats unused in 16-byte alignment
 	ExtensionT m_extension;
+
+	template<typename T, int A> 
+	friend class PathVertexFactory;
+private:
+	static constexpr int round_to_align(int s) {
+		return (s + (VERTEX_ALIGNMENT-1)) & ~(VERTEX_ALIGNMENT-1);
+	}
 };
 
 
@@ -176,8 +191,57 @@ protected:
  * the rendering algorithm and its interaction type.
  * We target to store vertices densly packet in local byte buffers. The factory helps
  * with estimating sizes and creating the vertex instances.
+ *
+ * ExtensionT: same type as used for the PathVertex to determine the memory layout.
+ * VERTEX_ALIGNMENT: Number of bytes to which the vertices should be aligned (different
+ *		for CPU and GPU).
  */
+template < typename ExtensionT, int VERTEX_ALIGNMENT >
 class PathVertexFactory {
+public:
+	using VertexType = PathVertex<ExtensionT, VERTEX_ALIGNMENT>;
+	static_assert(util::is_power_of_two(VERTEX_ALIGNMENT), "Alignment computation relies on power of two.");
+
+	// Get the size of a vertex. The size is rounded up to a multiple of VERTEX_ALIGNMENT.
+	// This is necessary to provide a good alignment on the respective device.
+	static constexpr int size(Interaction type) {
+		switch(type) {
+			case VOID: return round_to_align(sizeof(VertexType));
+			case SURFACE: return 0; // TODO (depends on material)
+			case CAMERA: return 0; // TODO (depends on camera)
+			case LIGHT_POINT: return 0; // TODO (depends on light)
+			case LIGHT_DIRECTIONAL: return 0; // TODO (depends on light)
+			case LIGHT_SPOT: return 0; // TODO (depends on light)
+			case LIGHT_ENVMAP: return 0; // TODO (depends on light)
+			case LIGHT_AREA: return 0; // TODO (depends on light)
+			case VIRTUAL: return round_to_align(round_to_align(sizeof(VertexType)) + sizeof(VirtualDesc));
+		}
+		return 0; // ERROR
+	}
+
+	// Create a virtual copy of one vertex
+	// mem: Memory with at least size(Interaction::VIRTUAL) free space
+	static void create_virtual(void* mem, const VertexType& other, const scene::materials::EvalValue& newValue, const scene::Direction& excident) {
+		VertexType* vert = as<VertexType>(mem);
+		vert->m_position = other.m_position;
+		vert->m_offsetToPrevious = other.m_offsetToPrevious;
+		vert->m_type = Interaction::VIRTUAL;
+		vert->m_incident = other.m_incident;
+		vert->m_pdfF = newValue.pdfF;
+		vert->m_pdfB = newValue.pdfB;
+		vert->m_incidentPdf = other.m_incidentPdf;
+		vert->m_extension = other.m_extension;
+		VertexType::VirtualDesc* desc = as<VertexType::VirtualDesc>(vert->desc());
+#ifdef DEBUG_ENABLED
+		desc->creationDir = excident;
+#endif
+		desc->geometricalFactor = newValue.cosThetaOut;
+	}
+
+private:
+	static constexpr int round_to_align(int s) {
+		return (s + (VERTEX_ALIGNMENT-1)) & ~(VERTEX_ALIGNMENT-1);
+	}
 };
 
 }} // namespace mufflon::renderer
