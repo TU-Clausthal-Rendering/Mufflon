@@ -19,7 +19,9 @@ The names must match the names stored in the binary itself.
 
     {
         "version": "1.0",
-        "binary": "<file name relative to this json>"
+        "binary": "<file name relative to this json>",
+		"defaultScenario": "<name of a scenario>"  // OPTIONAL the scenario to load on startup.
+		                                           // If none is given, the chosen scenario is unspecified
         "cameras": {
             "<name1>": {
                 "type": "{pinhole, focus, ortho}",
@@ -281,6 +283,8 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
             <ATTRIBUTES>'       // Optional Vertex attributes
             <TRIANGLES>'
             <QUADS>'
+			(T+Q)*u16'           // Material indices (<MATID> from <MATERIALS_HEADER>)
+            <ATTRIBUTES>'        // Optional list of face attributes (in order: first triangles, then quads)
             <SPHERES>'
     <VERTEXDATA> = V*3*f32      // Positions (vec3, in meter [m])
                    V*3*f32 | V*u32  // Normals (vec3, normalized)
@@ -288,11 +292,7 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
                    V*2*f32      // UV coordinates (vec2)
 
     <TRIANGLES> = T*3*u32       // Indices of the vertices (0-based, per LOD)
-                  T*u16         // Material indices (<MATID> from <MATERIALS_HEADER>)
-                  <ATTRIBUTES>  // Optional list of face attributes
     <QUADS> = Q*4*u32           // Indices of vertices (0-based, per LOD)
-              Q*u16             // Material indices (<MATID> from <MATERIALS_HEADER>)
-              <ATTRIBUTES>      // Optional list of face attributes, must have the same entries as for triangles
     <SPHERES> = S*4*f32         // Position (3 f32) and radius (1 f32) interleaved in meter [m]
                 S*u16           // Material indices (<MATID> from <MATERIALS_HEADER>)
                 <ATTRIBUTES>
@@ -305,8 +305,28 @@ However, there is a specification for a few predefined possible attributes (with
                    <STRING>     // Name (Custom)
                    <STRING>     // Meta information (Custom)
                    u32          // Meta information (Custom flags)
+				   u32 <TYPE>   // Type information
                    u64          // Size in bytes
                    <BYTES>      // Size many bytes
+	<TYPE> = i8 0
+	       | u8 1
+	       | i16 2
+	       | u16 3
+	       | i32 4
+	       | u32 5
+	       | i64 6
+	       | u64 7
+	       | f32 8
+	       | f64 9
+	       | 2*u8 10
+	       | 3*u8 11
+	       | 4*u8 12
+	       | 2*i32 13
+	       | 3*i32 14
+	       | 4*i32 15
+	       | 2*f32 16
+	       | 3*f32 17
+	       | 4*f32 18
 
     [AdditionalUV2D] = "AdditionalUV2D"
                        "{Light, Displacement}"
