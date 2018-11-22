@@ -16,7 +16,6 @@ enum class Interaction : u16 {
 	LIGHT_SPOT,			// A spot-light vertex
 	LIGHT_ENVMAP,		// An environment map-light vertex
 	LIGHT_AREA,			// An area-light vertex
-	VIRTUAL,			// Copy of another event. A virtual interaction mimics most of the methods of the true interaction, except evaluate()
 };
 
 struct Throughput {
@@ -90,12 +89,6 @@ public:
 				auto* surfDesc = as<SurfaceDesc>(desc());
 				return dot(connection, surfDesc->tangentSpace.shadingN);
 			}
-			case Interaction::VIRTUAL: {
-				auto* virtDesc = as<VirtualDesc>(desc());
-				mAssertMsg(virtDesc->creationDir == connection,
-					"The virtual vertex can only be used for the one direction which was used during its creation.");
-				return virtDesc->geometricalFactor;
-			}
 		}
 		return 0.0f;
 	}
@@ -131,8 +124,8 @@ public:
 	// Get the address of the interaction specific descriptor (aligned)
 	// TODO: benchmark if internal alignment is worth it
 	const void* desc() const { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
-	void* desc()			 { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
-protected:
+
+private:
 	struct AreaLightDesc {
 		scene::Direction normal;
 	};
@@ -177,12 +170,15 @@ protected:
 	// REMARK: currently 2 floats unused in 16-byte alignment
 	ExtensionT m_extension;
 
-	template<typename T, int A> 
-	friend class PathVertexFactory;
-private:
 	static constexpr int round_to_align(int s) {
 		return (s + (VERTEX_ALIGNMENT-1)) & ~(VERTEX_ALIGNMENT-1);
 	}
+
+	// Private because the vertex is read-only by design (desc() is a helper for vertex creation only)
+	void* desc() { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+
+	template<typename T, int A> 
+	friend class PathVertexFactory;
 };
 
 
@@ -207,21 +203,20 @@ public:
 	static constexpr int size(Interaction type) {
 		switch(type) {
 			case VOID: return round_to_align(sizeof(VertexType));
-			case SURFACE: return 0; // TODO (depends on material)
+			case SURFACE: return 0; // TODO (depends on material HIGHLY DYNAMIC, permits the use of constexpr)
 			case CAMERA: return 0; // TODO (depends on camera)
 			case LIGHT_POINT: return 0; // TODO (depends on light)
 			case LIGHT_DIRECTIONAL: return 0; // TODO (depends on light)
 			case LIGHT_SPOT: return 0; // TODO (depends on light)
 			case LIGHT_ENVMAP: return 0; // TODO (depends on light)
 			case LIGHT_AREA: return 0; // TODO (depends on light)
-			case VIRTUAL: return round_to_align(round_to_align(sizeof(VertexType)) + sizeof(VirtualDesc));
 		}
 		return 0; // ERROR
 	}
 
 	// Create a virtual copy of one vertex
 	// mem: Memory with at least size(Interaction::VIRTUAL) free space
-	static void create_virtual(void* mem, const VertexType& other, const scene::materials::EvalValue& newValue, const scene::Direction& excident) {
+	/*static void create_virtual(void* mem, const VertexType& other, const scene::materials::EvalValue& newValue, const scene::Direction& excident) {
 		VertexType* vert = as<VertexType>(mem);
 		vert->m_position = other.m_position;
 		vert->m_offsetToPrevious = other.m_offsetToPrevious;
@@ -236,7 +231,7 @@ public:
 		desc->creationDir = excident;
 #endif
 		desc->geometricalFactor = newValue.cosThetaOut;
-	}
+	}*/
 
 private:
 	static constexpr int round_to_align(int s) {
