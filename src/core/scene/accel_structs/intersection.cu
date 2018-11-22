@@ -52,7 +52,7 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 	// 2. Severity	Code	Description	Project	File	Line	Suppression State
 	// Warning		calling a __host__ function from a __host__ __device__ function is not allowed	core	E : \works\mufflonTemp\temp1\mufflon\deps\epsilon\include\ei\3dintersection.hpp	502
 
-#if 0
+#if 1
 
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
