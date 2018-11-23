@@ -207,6 +207,7 @@
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
+    <ClCompile Include="..\..\src\core\renderer\output_handler.cpp" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />

@@ -662,7 +662,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
-    </ClInclude>    <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp">
@@ -687,9 +688,6 @@
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">
       <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
-    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
-      <Filter>Source Files\core\renderer</Filter>
-    </CudaCompile>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
       <Filter>Source Files\core\cuda</Filter>
     </CudaCompile>
@@ -701,6 +699,12 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu">
       <Filter>Source Files\core\scene\accel_structs</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\output_handler.cpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
+      <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

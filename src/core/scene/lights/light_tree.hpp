@@ -544,8 +544,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 }
 
 // Emits a single photon from a light source.
-template < Device dev >
-CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 rng,
+CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 rng,
 						  const ei::Box& bounds, const RndSet& rnd) {
 	// No index means our RNG serves as an index
 	return emit(tree, rng, std::numeric_limits<u64>::max(), rng, bounds, rnd);
@@ -556,10 +555,10 @@ CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 rng,
  * For selecting the light source we want to connect against we try to maximize
  * the radiance.
  */
-template < Device dev, class Guide >
-CUDA_FUNCTION NextEventEstimation connect(const LightTree<dev>& tree, u64 index,
+template < class Guide >
+CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u64 index,
 										  u64 indexMax, u64 rng, const ei::Vec3& position,
-										  const ei::Box& bounds, const RndSet& rnd,
+										  const ei::Box& bounds, const NEERndSet& rnd,
 										  Guide&& guide) {
 	// Figure out which of the three top-level light types get the photon
 	// Implicit left boundary of 0 for the interval

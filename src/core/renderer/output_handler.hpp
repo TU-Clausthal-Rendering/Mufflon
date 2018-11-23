@@ -124,6 +124,32 @@ private:
 	int m_iteration;			// Number of completed iterations / index of current one
 	u16 m_width;
 	u16 m_height;
+
+
+	void update_variance_cuda(scene::textures::TextureDevHandle_t<Device::CUDA> iterTex,
+							  scene::textures::TextureDevHandle_t<Device::CUDA> cumTex,
+							  scene::textures::TextureDevHandle_t<Device::CUDA> varTex);
+
+	static __host__ __device__ void
+	update_variance(scene::textures::TextureDevHandle_t<CURRENT_DEV> iterTex,
+					scene::textures::TextureDevHandle_t<CURRENT_DEV> cumTex,
+					scene::textures::TextureDevHandle_t<CURRENT_DEV> varTex,
+					int x, int y, float iteration
+	) {
+		ei::Vec3 cum { read(cumTex, Pixel{x,y}) };
+		ei::Vec3 iter { read(iterTex, Pixel{x,y}) };
+		ei::Vec3 var { read(varTex, Pixel{x,y}) };
+		// Use a stable addition scheme for the variance
+		ei::Vec3 diff = iter - cum;
+		cum += diff / ei::max(1.0f, iteration);
+		var += diff * (iter - cum);
+		write(cumTex, Pixel{x,y}, {cum, 0.0f});
+		write(varTex, Pixel{x,y}, {var, 0.0f});
+	}
+	friend __global__ void update_variance_kernel(scene::textures::TextureDevHandle_t<Device::CUDA> iterTex,
+								scene::textures::TextureDevHandle_t<Device::CUDA> cumTex,
+								scene::textures::TextureDevHandle_t<Device::CUDA> varTex,
+								float iteration);
 };
 
 }} // namespace mufflon::renderer

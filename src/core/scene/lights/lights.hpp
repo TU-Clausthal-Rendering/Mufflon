@@ -8,6 +8,7 @@
 #include "core/math/sampling.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
+#include "core/scene/textures/interface.hpp"
 #include <cuda_fp16.h>
 #include <type_traits>
 
@@ -156,8 +157,7 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const SpotLight& light) {
 	float cosWidth = __half2float(light.cosThetaMax);
 	return light.intensity * (2.f * ei::PI * (1.f - cosFalloff) + (cosFalloff - cosWidth) / 5.f);
 }
-template < Device dev >
-CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightTriangle<dev>& light) {
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightTriangle<CURRENT_DEV>& light) {
 	float area = ei::surface(ei::Triangle{
 		light.points[0u], light.points[1u], light.points[2u]});
 	// Sample the radiance over the entire triangle region.
@@ -172,8 +172,7 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightTriangle<dev>& li
 	radianceSum /= 128;
 	return radianceSum * area * 2 * ei::PI;
 }
-template < Device dev >
-CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightQuad<dev>& light) {
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightQuad<CURRENT_DEV>& light) {
 	float area = ei::surface(ei::Tetrahedron{
 		light.points[0u], light.points[1u], light.points[2u], light.points[3u]});
 	// Sample the radiance over the entire triangle region.
@@ -187,8 +186,7 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightQuad<dev>& light)
 	radianceSum /= 128;
 	return radianceSum * area * 2 * ei::PI;
 }
-template < Device dev >
-CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightSphere<dev>& light) {
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const AreaLightSphere<CURRENT_DEV>& light) {
 	float area = ei::surface(ei::Sphere{ light.position, light.radius });
 	// Sample the radiance over the entire triangle region.
 	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
