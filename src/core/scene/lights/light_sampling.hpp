@@ -205,13 +205,14 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightT
 	const ei::Vec3 tangentY = triangle.v1 - triangle.v0;
 	const ei::Vec3 normal = ei::normalize(ei::cross(tangentX, tangentY));
 	// Compute the differential irradiance and make sure we went out the right
-	// direction TODO is the formula correct?
-	const ei::Vec3 diffIrradiance = (ei::dot(normal, direction) > 0u)
-										? (light.radiance * ei::surface(triangle) / distSqr)
+	// direction.
+	float cosOut = ei::dot(normal, direction);
+	const ei::Vec3 diffIrradiance = (cosOut > 0u)
+										? (light.radiance * ei::surface(triangle) * cosOut / distSqr)
 										: ei::Vec3{ 0 };
 	return NextEventEstimation{
 		posSample, math::DirectionSample{ direction,
-										  math::get_cosine_dir_pdf(ei::dot(normal, direction))},
+										  math::get_cosine_dir_pdf(cosOut)},
 		diffIrradiance, distSqr, LightType::AREA_LIGHT_TRIANGLE
 	};
 }

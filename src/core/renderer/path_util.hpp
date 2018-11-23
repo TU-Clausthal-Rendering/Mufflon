@@ -161,8 +161,19 @@ public:
 				const float cosFalloffStart = __half2float(desc->cosThetaMax);
 				float falloff = scene::lights::get_falloff(cosOut, cosThetaMax, cosFalloffStart);
 				return scene::materials::EvalValue{
-					m_incident * falloff, 0.0f,
+					desc->intensity * falloff, 0.0f,
 					AngularPdf{ math::get_uniform_cone_pdf(cosThetaMax) },
+					AngularPdf{ 0.0f }
+				};
+			}
+			case Interaction::LIGHT_AREA: {
+				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
+				const float cosOut = dot(desc->normal, excident);
+				// Early out (wrong hemisphere)
+				if(cosOut <= 0.0f) return scene::materials::EvalValue{};
+				return scene::materials::EvalValue{
+					m_incident * cosOut, 0.0f,
+					AngularPdf{ cosOut / ei::PI },
 					AngularPdf{ 0.0f }
 				};
 			}
@@ -243,7 +254,7 @@ public:
 		vert->m_position = light.position;
 		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
 		vert->m_type = Interaction::LIGHT_POINT;
-		vert->m_incident = light.intensity;		// Abuse of devasted memory
+		vert->m_incident = light.intensity;		// Abuse of vacant memory
 		vert->m_pdfF = excidentPdf;
 		vert->m_pdfB = AngularPdf { 0.0f };
 		vert->m_incidentPdf = incidentPdf;
@@ -258,7 +269,7 @@ public:
 		vert->m_position = light.direction;		// Abuse for special case
 		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
 		vert->m_type = Interaction::LIGHT_DIRECTIONAL;
-		vert->m_incident = light.radiance;		// Abuse of devasted memory
+		vert->m_incident = light.radiance;		// Abuse of vacant memory
 		vert->m_pdfF = AngularPdf { 1.0f };		// Infinite in theory, use one for numerical reasons
 		vert->m_pdfB = AngularPdf { 0.0f };
 		vert->m_incidentPdf = incidentPdf;
@@ -272,7 +283,7 @@ public:
 		vert->m_position = light.position;
 		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
 		vert->m_type = Interaction::LIGHT_SPOT;
-		vert->m_incident = ei::unpackOctahedral32(light.direction);		// Abuse of devasted memory
+		vert->m_incident = ei::unpackOctahedral32(light.direction);		// Abuse of vacant memory
 		vert->m_pdfF = excidentPdf;
 		vert->m_pdfB = AngularPdf { 0.0f };
 		vert->m_incidentPdf = incidentPdf;
@@ -282,6 +293,23 @@ public:
 		desc->cosThetaMax = light.cosThetaMax;
 		desc->cosFalloffStart = light.cosFalloffStart;
 		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(SpotLightDesc));
+	}
+
+	// Area lights
+	static int create_light(void* mem, const void* previous,
+		const scene::Point& position, const scene::Direction& normal, float area, const Spectrum& radiance, AreaPdf incidentPdf, AngularPdf excidentPdf) {
+		PathVertex* vert = as<PathVertex>(mem);
+		vert->m_position = position;
+		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
+		vert->m_type = Interaction::LIGHT_AREA;
+		vert->m_incident = radiance * area;		// Abuse of vacant memory, directly store the intensity
+		vert->m_pdfF = excidentPdf;
+		vert->m_pdfB = AngularPdf { 0.0f };
+		vert->m_incidentPdf = incidentPdf;
+		vert->m_extension = ExtensionT{};
+		AreaLightDesc* desc = as<AreaLightDesc>(vert->desc());
+		desc->normal = normal;
+		return round_to_align(sizeof(PathVertex));
 	}
 
 private:
