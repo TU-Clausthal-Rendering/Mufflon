@@ -15,11 +15,11 @@ enum
 	EntrypointSentinel = 0x76543210,   // Bottom-most stack entry, indicating the end of traversal.
 };
 
-// Experimentally determined best mix of float/int/video minmax instructions for Kepler.
-__device__ __inline__ int   min_min(int a, int b, int c) { int v; asm("vmin.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ int   min_max(int a, int b, int c) { int v; asm("vmin.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ int   max_min(int a, int b, int c) { int v; asm("vmax.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ int   max_max(int a, int b, int c) { int v; asm("vmax.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+// Experimentally determined best mix of float/i32/video minmax instructions for Kepler.
+__device__ __inline__ i32   min_min(i32 a, i32 b, i32 c) { i32 v; asm("vmin.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __inline__ i32   min_max(i32 a, i32 b, i32 c) { i32 v; asm("vmin.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __inline__ i32   max_min(i32 a, i32 b, i32 c) { i32 v; asm("vmax.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __inline__ i32   max_max(i32 a, i32 b, i32 c) { i32 v; asm("vmax.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
 __device__ __inline__ float fmin_fmin(float a, float b, float c) { return __int_as_float(min_min(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
 __device__ __inline__ float fmin_fmax(float a, float b, float c) { return __int_as_float(min_max(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
 __device__ __inline__ float fmax_fmin(float a, float b, float c) { return __int_as_float(max_min(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
@@ -40,30 +40,26 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 	const ei::Vec3* __restrict__ triVertices,
 	const ei::Vec3* __restrict__ quadVertices,
 	const ei::Vec4* __restrict__ sphVertices,
+	const ei::Vec2* __restrict__ triUVs,
+	const ei::Vec2* __restrict__ quadUVs,
 	const i32* __restrict__ triIndices,
 	const i32* __restrict__ quadIndices,
 	const i32* __restrict__ primIds,
 	const i32 offsetQuads, const i32 offsetSpheres,
 	RayIntersectionResult* __restrict__ result,
 	const float tmin, const float tmax) {
-	// TODO: two problems need to be solved:
-	// 1. Severity	Code	Description	Project	File	Line	Suppression State
-	// Error		identifier "ei::EPSILON" is undefined in device code	core	E : \works\mufflonTemp\temp1\mufflon\deps\epsilon\include\ei\3dintersection.hpp	699
-	// 2. Severity	Code	Description	Project	File	Line	Suppression State
-	// Warning		calling a __host__ function from a __host__ __device__ function is not allowed	core	E : \works\mufflonTemp\temp1\mufflon\deps\epsilon\include\ei\3dintersection.hpp	502
-
-#if 1
-
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
-	int traversalStack[STACK_SIZE];
+	i32 traversalStack[STACK_SIZE];
 	traversalStack[0] = EntrypointSentinel; // Bottom-most entry.
 
-	int     hitPrimId;                       // Primitive index of the closest intersection, -1 if none.
+	i32     hitPrimId;                       // Primitive index of the closest intersection, -1 if none.
+	ei::Vec3 hitBarycentric;
 	float   hitT;                           // t-value of the closest intersection.
+	i32 hitSecondTri;                           // For ray-quad intersection.
 
 	// nodeAddr: Non-negative: current internal node; negative: leaf.
-	int     nodeAddr = 0; // Start from the root.  
+	i32     nodeAddr = 0; // Start from the root.  
 	char*   stackPtr = (char*)&traversalStack[0]; //Current position in traversal stack.
 	const float	ooeps = exp2f(-80.0f); // Avoid div by zero.
 
@@ -115,7 +111,7 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 			// Neither child was intersected => pop stack.
 			if (!traverseChild0 && !traverseChild1)
 			{
-				nodeAddr = *(int*)stackPtr;
+				nodeAddr = *(i32*)stackPtr;
 				stackPtr -= 4;
 			}
 			// Otherwise => fetch child pointers.
@@ -126,12 +122,12 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 				if (traverseChild0 && traverseChild1)
 				{
 					if (c1min < c0min) {
-						int tmp = nodeAddr;
+						i32 tmp = nodeAddr;
 						nodeAddr = cnodes.y;
 						cnodes.y = tmp;
 					}
 					stackPtr += 4;
-					*(int*)stackPtr = cnodes.y;
+					*(i32*)stackPtr = cnodes.y;
 				}
 			}
 		}
@@ -140,7 +136,7 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 		// TODO: use warp/block to do the intersection test.
 		while (nodeAddr < 0)
 		{
-			const int leafId = ~nodeAddr;
+			const i32 leafId = ~nodeAddr;
 			{
 				const ei::Vec4 leaf = bvh[leafId];
 				ei::IVec4 counts; // x: tri; y: quds; z: spheres; w: total count.
@@ -162,10 +158,12 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 							  triVertices[triIndices[triId + 2]] };
 
 					float t;
-					if (ei::intersects(ray, tri, t)) {
+					ei::Vec3 barycentric;
+					if (ei::intersects(ray, tri, t, barycentric)) {
 						if (t < hitT) {
 							hitT = t;
 							hitPrimId = primId;
+							hitBarycentric = barycentric;
 						}
 					}
 				}
@@ -179,23 +177,28 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 						continue;
 					const i32 quadId = (primId - offsetQuads) * 4;
 					const ei::Vec3 v[4] = { quadVertices[quadIndices[quadId]],
-							  triVertices[quadIndices[quadId + 1]],
-							  triVertices[quadIndices[quadId + 2]],
+							  quadVertices[quadIndices[quadId + 1]],
+							  quadVertices[quadIndices[quadId + 2]],
 							  quadVertices[quadIndices[quadId]] };
 					const ei::Triangle tri0 = { v[0], v[1], v[2] };
 					float t;
-					if (ei::intersects(ray, tri0, t)) {
+					ei::Vec3 barycentric;
+					if (ei::intersects(ray, tri0, t, barycentric)) {
 						if (t < hitT) {
 							hitT = t;
 							hitPrimId = primId;
+							hitBarycentric = barycentric;
+							hitSecondTri = 0;
 						}
 					}
 
-					const ei::Triangle tri1 = { v[0], v[1], v[2] };
+					const ei::Triangle tri1 = { v[0], v[2], v[3] };
 					if (ei::intersects(ray, tri1, t)) {
 						if (t < hitT) {
 							hitT = t;
 							hitPrimId = primId;
+							hitBarycentric = barycentric;
+							hitSecondTri = 1;
 						}
 					}
 				}
@@ -220,13 +223,69 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 				}
 			}
 			// Postponed next node.
-			nodeAddr = *(int*)stackPtr;
+			nodeAddr = *(i32*)stackPtr;
 			stackPtr -= 4;
 		}
 	}
-	(*result) = { hitT, hitPrimId };
-#endif // 0
+	if (hitPrimId == -1) {
+		(*result) = { hitT, hitPrimId };
+	}
+	else {
+		ei::Vec3 normal;
+		ei::Vec3 tangent;
+		ei::Vec2 uv;
 
+		if (hitPrimId < offsetSpheres) {
+			const ei::Vec3* vertices;
+			const ei::Vec2* uvs;
+			const i32* indices;
+			i32 triId;
+			if (hitPrimId < offsetQuads) {
+				// Triangle.
+				triId = hitPrimId * 3;
+				indices = triIndices;
+				vertices = triVertices;
+				uvs = triUVs;
+			}
+			else {
+				// Quad.
+				triId = (hitPrimId - offsetQuads) * 4 + hitSecondTri;
+				indices = quadIndices;
+				vertices = quadVertices;
+				uvs = quadUVs;
+			}
+			ei::IVec3 ids = { indices[triId],
+			ids.y = indices[triId + 1],
+			ids.z = indices[triId + 2] };
+
+			ei::Vec3 v[3] = { vertices[ids.x], vertices[ids.y], vertices[ids.z] };
+			tangent = ei::normalize(v[1] - v[0]);
+			normal = ei::cross(ei::normalize(v[0] - v[2]), tangent);
+
+			ei::Vec2 uvV[3] = { uvs[ids.x], uvs[ids.y], uvs[ids.z] };
+			uv = uvV[0] * hitBarycentric.x + uvV[1] * hitBarycentric.y + 
+				uvV[2] * hitBarycentric.z;
+		}
+		else {
+			// Sphere.
+			const i32 sphId = hitPrimId - offsetSpheres;
+			ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
+			const ei::Vec4 v = sphVertices[sphId];
+			normal = ei::normalize(hitPoint - ei::Vec3(v));
+
+			if (normal.x == 0.f && normal.y == 0.f) {
+				tangent = ei::Vec3(1.f, 0.f, 0.f);
+			}
+			else {
+				tangent = ei::Vec3(ei::normalize(ei::Vec2(normal.y, -normal.x)), 0.f);
+			}
+
+			uv.x = atan2f(normal.x, normal.y) / (2.f * ei::PI) + 0.5f;
+			uv.y = 0.5f * normal.z + 0.5f;
+		}
+
+		(*result) = { hitT, hitPrimId, normal, tangent, uv, hitBarycentric};
+	}
 }
 
 void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
@@ -234,6 +293,8 @@ void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
 	const ei::Vec3* triVertices,
 	const ei::Vec3* quadVertices,
 	const ei::Vec4* sphVertices,
+	const ei::Vec2* triUVs,
+	const ei::Vec2* quadUVs,
 	const i32* triIndices,
 	const i32* quadIndices,
 	const i32* primIds,
@@ -242,7 +303,7 @@ void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
 	const float tmin, const float tmax) {
 
 	intersection_testD << <1, 1 >> > (ray, startPrimId, bvh, triVertices, quadVertices, sphVertices,
-		triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result, tmin, tmax);
+		triUVs, quadUVs, triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result, tmin, tmax);
 
 }
 
