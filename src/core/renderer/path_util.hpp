@@ -2,15 +2,20 @@
 
 #include "util/types.hpp"
 #include "core/memory/dyntype_memory.hpp"
+#include "core/math/sampling.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/materials/material_types.hpp"
+#include "core/scene/lights/lights.hpp"
+#include "core/scene/accel_structs/intersection.hpp"
+#include <ei/conversions.hpp>
 
 namespace mufflon { namespace renderer {
 
 enum class Interaction : u16 {
 	VOID,				// The ray missed the scene (no intersection)
 	SURFACE,			// A standard material interaction
-	CAMERA,				// A camera start vertex
+	CAMERA,				// A perspective camera start vertex
+	CAMERA_ORTHO,		// An orthographic camera start vertex
 	LIGHT_POINT,		// A point-light vertex
 	LIGHT_DIRECTIONAL,	// A directional-light vertex
 	LIGHT_SPOT,			// A spot-light vertex
@@ -51,12 +56,36 @@ struct PathHead {
  *		for CPU and GPU).
  */
 // TODO: creation factory
-// TODO: update function(s)
 template < typename ExtensionT, int VERTEX_ALIGNMENT >
 class PathVertex {
 public:
-	scene::Point get_position() const { return m_position; }
-	scene::Direction get_incident_direction() const { return m_incident; }
+	bool is_end_point() const {
+		return m_type != Interaction::SURFACE;
+	}
+	bool is_orthographic() const {
+		return m_type == Interaction::LIGHT_DIRECTIONAL
+			|| m_type == Interaction::LIGHT_ENVMAP
+			|| m_type == Interaction::CAMERA_ORTHO;
+	}
+	bool is_camera() const {
+		return m_type == Interaction::CAMERA || m_type == Interaction::CAMERA_ORTHO;
+	}
+
+	// Get the position of the vertex. For orthographic vertices this
+	// position is computed with respect to a referencePosition.
+	scene::Point get_position(const scene::Point& referencePosition) const {
+		if(m_type == Interaction::LIGHT_DIRECTIONAL || m_type == Interaction::LIGHT_ENVMAP)
+			return referencePosition - m_position * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
+		if(m_type == Interaction::CAMERA_ORTHO)
+			return referencePosition; // TODO project to near plane
+		return m_position;
+	}
+
+	// The incident direction, or undefined for end vertices (may be abused by end vertices.
+	scene::Direction get_incident_direction() const {
+		mAssertMsg(!is_end_point(), "Incident direction for end points is not defined. Hope your code did not expect a meaningful value.");
+		return m_incident;
+	}
 
 	// The per area PDF of the previous segment which generated this vertex
 	AreaPdf get_incident_pdf() const { return m_incidentPdf; }
@@ -101,20 +130,58 @@ public:
 	// Compute new values of the PDF and BxDF/outgoing radiance for a new
 	// exident direction.
 	// excident: direction pointing away from this vertex.
+	// excidentDistSq: squared distance to the next vertex.
+	//		This is required for the special cases of directional/environmental light sources.
 	scene::materials::EvalValue evaluate(const scene::Direction & excident) const {
-		// TODO
+		switch(m_type) {
+			case Interaction::VOID: return scene::materials::EvalValue{};
+			case Interaction::LIGHT_POINT: {
+				return scene::materials::EvalValue{
+					m_incident, 0.0f,
+					AngularPdf{ 1.0f / (4*ei::PI) },
+					AngularPdf{ 0.0f }
+				};
+			}
+			case Interaction::LIGHT_DIRECTIONAL: {
+				return scene::materials::EvalValue{
+					m_incident, 0.0f,
+					// Special case: the incindent area PDF is directly projected.
+					// To avoid the wrong conversion later we need to do its reversal here.
+					m_incidentPdf.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE * scene::MAX_SCENE_SIZE),
+					AngularPdf{ 0.0f }
+				};
+			}
+			case Interaction::LIGHT_SPOT: {
+				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
+				const float cosThetaMax = __half2float(desc->cosThetaMax);
+				const float cosOut = dot(m_incident, excident);
+				// Early out
+				if(cosOut <= cosThetaMax) return scene::materials::EvalValue{};
+				// OK, there will be some contribution
+				const float cosFalloffStart = __half2float(desc->cosThetaMax);
+				float falloff = scene::lights::get_falloff(cosOut, cosThetaMax, cosFalloffStart);
+				return scene::materials::EvalValue{
+					m_incident * falloff, 0.0f,
+					AngularPdf{ math::get_uniform_cone_pdf(cosThetaMax) },
+					AngularPdf{ 0.0f }
+				};
+			}
+		}
 		return scene::materials::EvalValue{};
 	}
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
-	float get_incident_dist_sq() const {
-		if(m_offsetToPrevious == 0) return 0.0f;
-		return lensq(as<PathVertex>(as<u8>(this) + m_offsetToPrevious)->get_position() - m_position);
+	float get_incident_dist_sq(const void* pathMem) const {
+		if(m_offsetToPath == 0xffff) return 0.0f;
+		const PathVertex* prev = as<PathVertex>(as<u8>(pathMem) + m_offsetToPath);
+		// The m_position is always a true position (the 'this' vertex is not an
+		// end-point and can thus not be an orthogonal source).
+		return lensq(prev->get_position(m_position) - m_position);
 	}
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
-	const PathVertex* previous() const {
-		return m_offsetToPrevious == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPrevious);
+	const PathVertex* previous(const void* pathMem) const {
+		return m_offsetToPath == 0xffff ? nullptr : as<PathVertex>(as<u8>(pathMem) + m_offsetToPath);
 	}
 
 	// Access to the renderer dependent extension
@@ -125,34 +192,124 @@ public:
 	// TODO: benchmark if internal alignment is worth it
 	const void* desc() const { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
 
+	/*
+	* Compute the connection vector from path0 to path1 (non-normalized).
+	* This is a non-trivial operation because of special cases like directional lights and
+	* orthographic cammeras.
+	*/
+	static ei::Vec3 get_connection(const PathVertex& path0, const PathVertex& path1) {
+		mAssert(is_connection_possible(path0, path1));
+		if(path0.is_orthographic())
+			return path0.m_position * scene::MAX_SCENE_SIZE;
+		if(path1.is_orthographic())
+			return -path1.m_position * scene::MAX_SCENE_SIZE;
+		return path1.m_position - path0.m_position;
+	}
+
+	static bool is_connection_possible(const PathVertex& path0, const PathVertex& path1) {
+		// Enumerate cases which are not connectible
+		return !(
+			path0.is_orthographic() && path1.is_orthographic()	// Two orthographic vertices
+		 || path0.is_orthographic() && path1.is_camera()		// Orthographic light source with camera
+		 || path0.is_camera() && path1.is_orthographic()
+		);
+	}
+
+	/* *************************************************************************
+	 * Creation methods (factory)											   *
+	 * Memory management of vertices is quite challenging, because its size	   *
+	 * depends on the rendering algorithm and its interaction type.			   *
+	 * We target to store vertices densly packet in local byte buffers. The	   *
+	 * factory methods help with estimating sizes and creating the vertex	   *
+	 * instances.															   *
+	 * Return the size of the created vertex								   *
+	************************************************************************* */
+	static int create_void(void* mem, const void* previous, const scene::accel_struct::RayIntersectionResult& intersectionResult, const ei::Ray& incidentRay) {
+		PathVertex* vert = as<PathVertex>(mem);
+		vert->m_position = incidentRay.origin + incidentRay.direction * intersectionResult.hitT;
+		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
+		vert->m_type = Interaction::VOID;
+		vert->m_incident = incidentRay.direction;
+		vert->m_pdfF = AngularPdf { 0.0f };
+		vert->m_pdfB = AngularPdf { 0.0f };
+		vert->m_incidentPdf = AreaPdf { 0.0f };
+		vert->m_extension = ExtensionT{};
+		return round_to_align( sizeof(PathVertex) );
+	}
+
+	static int create_light(void* mem, const void* previous,
+		const scene::lights::PointLight& light, AreaPdf incidentPdf, AngularPdf excidentPdf) {
+		PathVertex* vert = as<PathVertex>(mem);
+		vert->m_position = light.position;
+		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
+		vert->m_type = Interaction::LIGHT_POINT;
+		vert->m_incident = light.intensity;		// Abuse of devasted memory
+		vert->m_pdfF = excidentPdf;
+		vert->m_pdfB = AngularPdf { 0.0f };
+		vert->m_incidentPdf = incidentPdf;
+		vert->m_extension = ExtensionT{};
+		return round_to_align(sizeof(PathVertex));
+	}
+
+	static int create_light(void* mem, const void* previous,
+		const scene::lights::DirectionalLight& light, AreaPdf incidentPdf) {
+		PathVertex* vert = as<PathVertex>(mem);
+		mAssert(approx(len(light.direction), 1.0f));
+		vert->m_position = light.direction;		// Abuse for special case
+		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
+		vert->m_type = Interaction::LIGHT_DIRECTIONAL;
+		vert->m_incident = light.radiance;		// Abuse of devasted memory
+		vert->m_pdfF = AngularPdf { 1.0f };		// Infinite in theory, use one for numerical reasons
+		vert->m_pdfB = AngularPdf { 0.0f };
+		vert->m_incidentPdf = incidentPdf;
+		vert->m_extension = ExtensionT{};
+		return round_to_align(sizeof(PathVertex));
+	}
+
+	static int create_light(void* mem, const void* previous,
+		const scene::lights::SpotLight& light, AreaPdf incidentPdf, AngularPdf excidentPdf) {
+		PathVertex* vert = as<PathVertex>(mem);
+		vert->m_position = light.position;
+		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
+		vert->m_type = Interaction::LIGHT_SPOT;
+		vert->m_incident = ei::unpackOctahedral32(light.direction);		// Abuse of devasted memory
+		vert->m_pdfF = excidentPdf;
+		vert->m_pdfB = AngularPdf { 0.0f };
+		vert->m_incidentPdf = incidentPdf;
+		vert->m_extension = ExtensionT{};
+		SpotLightDesc* desc = as<SpotLightDesc>(vert->desc());
+		desc->intensity = light.intensity;
+		desc->cosThetaMax = light.cosThetaMax;
+		desc->cosFalloffStart = light.cosFalloffStart;
+		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(SpotLightDesc));
+	}
+
 private:
 	struct AreaLightDesc {
 		scene::Direction normal;
 	};
+	struct SpotLightDesc {
+		ei::Vec3 intensity;
+		half cosThetaMax;
+		half cosFalloffStart;
+	};
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace;
 	};
-	struct VirtualDesc {
-#ifdef DEBUG_ENABLED
-		scene::Direction creationDir;	// Check value only. Used to make sure the virtual vertex is only used for a very specific setup.
-#endif
-		float geometricalFactor;	// cosθ or similar from the original interaction
-	};
 
 
-	// The vertex  position in world space
+	// The vertex position in world space. For orthographic end vertices
+	// this is the main direction and not a position.
 	scene::Point m_position;
 
-	// Byte offset to the previous vertex (can also be used as an index,
-	// if vertices are packed with constant space).
-	// Intended use in packed buffers: prev = as<Vertex>(as<u8>(this) + m_offsetToPrevious)
-	short m_offsetToPrevious;
+	// Byte offset to the beginning of a path.
+	u16 m_offsetToPath;
 
 	// Interaction type of this vertex (the descriptor at the end of the vertex depends on this).
 	Interaction m_type;
 
 	// Direction from which this vertex was reached.
-	// May be zero-vector for start points.
+	// May be zero-vector for start points or used otherwise.
 	scene::Direction m_incident;
 
 	// PDF at this vertex in forward direction.
@@ -179,64 +336,6 @@ private:
 
 	template<typename T, int A> 
 	friend class PathVertexFactory;
-};
-
-
-/*
- * Memory management of vertices is quite challenging, because its size depends on
- * the rendering algorithm and its interaction type.
- * We target to store vertices densly packet in local byte buffers. The factory helps
- * with estimating sizes and creating the vertex instances.
- *
- * ExtensionT: same type as used for the PathVertex to determine the memory layout.
- * VERTEX_ALIGNMENT: Number of bytes to which the vertices should be aligned (different
- *		for CPU and GPU).
- */
-template < typename ExtensionT, int VERTEX_ALIGNMENT >
-class PathVertexFactory {
-public:
-	using VertexType = PathVertex<ExtensionT, VERTEX_ALIGNMENT>;
-	static_assert(util::is_power_of_two(VERTEX_ALIGNMENT), "Alignment computation relies on power of two.");
-
-	// Get the size of a vertex. The size is rounded up to a multiple of VERTEX_ALIGNMENT.
-	// This is necessary to provide a good alignment on the respective device.
-	static constexpr int size(Interaction type) {
-		switch(type) {
-			case VOID: return round_to_align(sizeof(VertexType));
-			case SURFACE: return 0; // TODO (depends on material HIGHLY DYNAMIC, permits the use of constexpr)
-			case CAMERA: return 0; // TODO (depends on camera)
-			case LIGHT_POINT: return 0; // TODO (depends on light)
-			case LIGHT_DIRECTIONAL: return 0; // TODO (depends on light)
-			case LIGHT_SPOT: return 0; // TODO (depends on light)
-			case LIGHT_ENVMAP: return 0; // TODO (depends on light)
-			case LIGHT_AREA: return 0; // TODO (depends on light)
-		}
-		return 0; // ERROR
-	}
-
-	// Create a virtual copy of one vertex
-	// mem: Memory with at least size(Interaction::VIRTUAL) free space
-	/*static void create_virtual(void* mem, const VertexType& other, const scene::materials::EvalValue& newValue, const scene::Direction& excident) {
-		VertexType* vert = as<VertexType>(mem);
-		vert->m_position = other.m_position;
-		vert->m_offsetToPrevious = other.m_offsetToPrevious;
-		vert->m_type = Interaction::VIRTUAL;
-		vert->m_incident = other.m_incident;
-		vert->m_pdfF = newValue.pdfF;
-		vert->m_pdfB = newValue.pdfB;
-		vert->m_incidentPdf = other.m_incidentPdf;
-		vert->m_extension = other.m_extension;
-		VertexType::VirtualDesc* desc = as<VertexType::VirtualDesc>(vert->desc());
-#ifdef DEBUG_ENABLED
-		desc->creationDir = excident;
-#endif
-		desc->geometricalFactor = newValue.cosThetaOut;
-	}*/
-
-private:
-	static constexpr int round_to_align(int s) {
-		return (s + (VERTEX_ALIGNMENT-1)) & ~(VERTEX_ALIGNMENT-1);
-	}
 };
 
 }} // namespace mufflon::renderer

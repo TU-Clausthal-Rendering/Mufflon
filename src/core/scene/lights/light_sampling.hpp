@@ -45,19 +45,6 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 tangent2world(const ei::Vec3& dir,
 	return dir.x * tangentY + dir.z * normal + dir.y * tangentY;
 }
 
-// Computes the falloff of a spotlight
-CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
-												const float cosThetaMax,
-												const float cosFalloffStart) {
-	if(cosTheta >= cosThetaMax) {
-		if(cosTheta >= cosFalloffStart)
-			return 1.f;
-		else
-			return powf((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 4u);
-	}
-	return 0.f;
-}
-
 // Sample a light source
 CUDA_FUNCTION __forceinline__ Photon sample_light(const PointLight& light,
 												  const RndSet& rnd) {
@@ -197,8 +184,8 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 																const RndSet& rnd) {
 	float cosThetaMax = __half2float(light.cosThetaMax);
 	const ei::Vec3 direction = (light.position - pos) / sqrtf(distSqr);
-	const float falloff = get_falloff(ei::dot(ei::unpackOctahedral32(light.direction),
-											  direction),
+	const float falloff = get_falloff(-ei::dot(ei::unpackOctahedral32(light.direction),
+											   direction),
 									  cosThetaMax, __half2float(light.cosFalloffStart));
 	return NextEventEstimation{
 		math::PositionSample{ light.position, AreaPdf::infinite() },

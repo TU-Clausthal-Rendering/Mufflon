@@ -40,13 +40,13 @@ struct alignas(16) PointLight {
 
 /**
  * A spot light, following PBRT's description.
- * To save storage space, the direction is encoded in a single float.
+ * To save storage space, the direction is encoded in a single u32.
  * Additionally, the cosine terms for opening angle and falloff
  * are encoded 
  */
 struct alignas(16) SpotLight {
 	ei::Vec3 position;
-	u32 direction;
+	u32 direction;			// points away from the light source (direction of ligt flow), packed with ei::packOctahedral32
 	ei::Vec3 intensity;
 	half cosThetaMax;
 	half cosFalloffStart;
@@ -161,6 +161,20 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const DirectionalLight& light,
 		+ aabbDiag.x*aabbDiag.y*std::abs(light.direction.z);
 	return light.radiance * surface;
 }
+
+// Computes the falloff of a spotlight
+CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
+												const float cosThetaMax,
+												const float cosFalloffStart) {
+	if(cosTheta >= cosThetaMax) {
+		if(cosTheta >= cosFalloffStart)
+			return 1.f;
+		else
+			return powf((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 4u);
+	}
+	return 0.f;
+}
+
 
 
 #ifndef __CUDACC__

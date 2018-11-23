@@ -32,7 +32,7 @@ namespace mufflon { namespace scene { namespace materials {
 	// Return value of a BxDF evaluation function
 	struct EvalValue {
 		Spectrum bxdf {0.0f};			// BRDF or BTDF value
-		float cosThetaOut {1.0f};		// Outgoing cosine
+		float cosThetaOut {0.0f};		// Outgoing cosine
 		AngularPdf pdfF {0.0f};			// Sampling PDF in forward direction 
 		AngularPdf pdfB {0.0f};			// Sampling PDF with reversed incident and excident directions
 	};

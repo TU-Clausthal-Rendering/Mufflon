@@ -20,4 +20,9 @@ namespace mufflon { namespace scene {
 		Tangent shadingTY;		// Second tangent: shadingTY ⊥ shadingN ∧ shadingTX ⊥ shadingTY
 	};
 
+	// A reasonable maximum size. Larger scenes will cause numeric problems.
+	// Also, the PathVertex class relies on some constant maximum to leave the scene.
+	constexpr float MAX_SCENE_SIZE = 1048576.0f;	// 2^20
+
+
 }} // namespace mufflon::scene
