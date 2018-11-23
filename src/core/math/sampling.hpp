@@ -28,6 +28,15 @@ CUDA_FUNCTION constexpr AngularPdf get_cosine_dir_pdf(float cosTheta) {
 	return AngularPdf{ cosTheta / ei::PI };
 }
 
+// Basic transformation of an uniform integer into an uniform flaot in [0,1)
+CUDA_FUNCTION __forceinline__ float sample_uniform(u32 u0) {
+	return u0 / 4294967810.0f; // successor(float(0xffffffff));
+}
+CUDA_FUNCTION __forceinline__ ei::Vec2 sample_uniform(u64 u01) {
+	return ei::Vec2{ sample_uniform(u32(u01 & 0xffffffffull)),
+					 sample_uniform(u32(u01 >> 32ull)) };
+}
+
 // Sample a cosine distributed direction from two random numbers in [0,1)
 CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_cosine(float u0, float u1) {
 	float cosTheta = sqrt(u0);			// cos(acos(sqrt(x))) = sqrt(x)
@@ -59,13 +68,12 @@ CUDA_FUNCTION __forceinline__ DirectionSample sample_cone_uniform(float maxCosTh
 }
 
 // Samples a position on a triangle
-CUDA_FUNCTION __forceinline__ PositionSample sample_position(const ei::Triangle& tri,
-															 float u0, float u1) {
+// The third barycentric is ommitted. It is simply 1-s-t.
+CUDA_FUNCTION __forceinline__ ei::Vec2 sample_barycentric(float u0, float u1) {
+	// TODO: test the sqrt-free variant
 	float s = 1.f - sqrtf(1.f - u0);
 	float t = (1.f - s) * u1;
-	// From PBRT
-	return PositionSample{ scene::Point{tri.v0 + s * (tri.v1 - tri.v0) + t * (tri.v2 - tri.v0) },
-						   AreaPdf{1.f / ei::surface(tri)} };
+	return ei::Vec2{s, t};
 }
 
 // Samples a position within the bounding box orthogonally projected in the given direction

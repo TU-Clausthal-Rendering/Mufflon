@@ -100,7 +100,8 @@ public:
 		m_state = scramble_seed(seed);
 	}
 
-	__host__ __device__ ei::UVec2 next() {
+	// Get 2 independent 32bit random values packed in 64bit
+	__host__ __device__ u64 next() {
 		u64 s = m_state;
 		m_state += 11400714819323198485ull;
 		// Inverse transformation of Hilbert-Curve to 2D point
@@ -112,7 +113,7 @@ public:
 		s = ((s >>  4) & 0x00f000f000f000f0ull) | ((s <<  4) & 0x0f000f000f000f00ull) | (s & 0xf00ff00ff00ff00full);	// ...BBBBBBBBAAAAAAAA
 		s = ((s >>  8) & 0x0000ff000000ff00ull) | ((s <<  8) & 0x00ff000000ff0000ull) | (s & 0xff0000ffff0000ffull);
 		s = ((s >> 16) & 0x00000000ffff0000ull) | ((s << 16) & 0x0000ffff00000000ull) | (s & 0xffff00000000ffffull);
-		return ei::details::hard_cast<ei::UVec2>(s);
+		return s;
 	}
 private:
 	u64 m_state;

@@ -196,9 +196,9 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_cluster_center(const ChildType& child
 		switch(child.get_light_type()) {
 			case LightType::POINT_LIGHT: return get_center(*reinterpret_cast<const PointLight*>(light));
 			case LightType::SPOT_LIGHT: return get_center(*reinterpret_cast<const SpotLight*>(light));
-			case LightType::AREA_LIGHT_TRIANGLE: return get_center(*reinterpret_cast<const AreaLightTriangle*>(light));
-			case LightType::AREA_LIGHT_QUAD: return get_center(*reinterpret_cast<const AreaLightQuad*>(light));
-			case LightType::AREA_LIGHT_SPHERE: return get_center(*reinterpret_cast<const AreaLightSphere*>(light));
+			case LightType::AREA_LIGHT_TRIANGLE: return get_center(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light));
+			case LightType::AREA_LIGHT_QUAD: return get_center(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light));
+			case LightType::AREA_LIGHT_SPHERE: return get_center(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light));
 			case LightType::DIRECTIONAL_LIGHT: return get_center(*reinterpret_cast<const DirectionalLight*>(light));
 			default: mAssert(false); return {};
 		}
@@ -209,9 +209,9 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const char* light, LightType typ
 	switch(type) {
 		case LightType::POINT_LIGHT: return get_flux(*reinterpret_cast<const PointLight*>(light));
 		case LightType::SPOT_LIGHT: return get_flux(*reinterpret_cast<const SpotLight*>(light));
-		case LightType::AREA_LIGHT_TRIANGLE: return get_flux(*reinterpret_cast<const AreaLightTriangle*>(light));
-		case LightType::AREA_LIGHT_QUAD: return get_flux(*reinterpret_cast<const AreaLightQuad*>(light));
-		case LightType::AREA_LIGHT_SPHERE: return get_flux(*reinterpret_cast<const AreaLightSphere*>(light));
+		case LightType::AREA_LIGHT_TRIANGLE: return get_flux(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light));
+		case LightType::AREA_LIGHT_QUAD: return get_flux(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light));
+		case LightType::AREA_LIGHT_SPHERE: return get_flux(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light));
 		case LightType::DIRECTIONAL_LIGHT: return get_flux(*reinterpret_cast<const DirectionalLight*>(light), aabbDiag);
 		default: mAssert(false); return {};
 	}
@@ -238,9 +238,9 @@ CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
 	switch(type) {
 		case LightType::POINT_LIGHT: return sample_light(*reinterpret_cast<const PointLight*>(light), rnd);
 		case LightType::SPOT_LIGHT: return sample_light(*reinterpret_cast<const SpotLight*>(light), rnd);
-		case LightType::AREA_LIGHT_TRIANGLE: return sample_light(*reinterpret_cast<const AreaLightTriangle*>(light), rnd);
-		case LightType::AREA_LIGHT_QUAD: return sample_light(*reinterpret_cast<const AreaLightQuad*>(light), rnd);
-		case LightType::AREA_LIGHT_SPHERE: return sample_light(*reinterpret_cast<const AreaLightSphere*>(light), rnd);
+		case LightType::AREA_LIGHT_TRIANGLE: return sample_light(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
+		case LightType::AREA_LIGHT_QUAD: return sample_light(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
+		case LightType::AREA_LIGHT_SPHERE: return sample_light(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
 		case LightType::DIRECTIONAL_LIGHT: return sample_light(*reinterpret_cast<const DirectionalLight*>(light), bounds, rnd);
 		default: mAssert(false); return {};
 	}
@@ -249,14 +249,14 @@ CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
 // Converts the typeless memory into the given light type and samples it
 CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* light,
 								  const ei::Vec3& position, float distSqr,
-								  const ei::Box& bounds, const RndSet& rnd) {
+								  const ei::Box& bounds, const NEERndSet& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
 		case LightType::POINT_LIGHT: return connect_light(*reinterpret_cast<const PointLight*>(light), position, distSqr, rnd);
 		case LightType::SPOT_LIGHT: return connect_light(*reinterpret_cast<const SpotLight*>(light), position, distSqr, rnd);
-		case LightType::AREA_LIGHT_TRIANGLE: return connect_light(*reinterpret_cast<const AreaLightTriangle*>(light), position, rnd);
-		case LightType::AREA_LIGHT_QUAD: return connect_light(*reinterpret_cast<const AreaLightQuad*>(light), position, rnd);
-		case LightType::AREA_LIGHT_SPHERE: return connect_light(*reinterpret_cast<const AreaLightSphere*>(light), position, rnd);
+		case LightType::AREA_LIGHT_TRIANGLE: return connect_light(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), position, rnd);
+		case LightType::AREA_LIGHT_QUAD: return connect_light(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), position, rnd);
+		case LightType::AREA_LIGHT_SPHERE: return connect_light(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), position, rnd);
 		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, bounds, rnd);
 		default: mAssert(false); return {};
 	}
@@ -370,7 +370,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u64 right,
 										  u64 index, u64 rng, const ei::Vec3& position,
-										  const ei::Box& bounds, const RndSet& rnd,
+										  const ei::Box& bounds, const NEERndSet& rnd,
 										  Guide&& guide) {
 	using namespace lighttree_detail;
 	// Check: do we have more than one light here?
@@ -470,8 +470,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
  * To ensure a good distribution, we also take an index, which is used to guide
  * the descent into the tree when it is possible to do so without using RNG.
  */
-template < Device dev >
-CUDA_FUNCTION Photon emit(const LightTree<dev>& tree, u64 index,
+CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 								u64 indexMax, u64 rng, const ei::Box& bounds,
 								const RndSet& rnd) {
 	// Figure out which of the three top-level light types get the photon

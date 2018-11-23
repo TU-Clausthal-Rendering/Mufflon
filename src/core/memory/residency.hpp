@@ -23,6 +23,14 @@ inline Device operator^(Device a, Device b) {
 	return Device(static_cast<int>(a) ^ static_cast<int>(b));
 }
 
+// Many code snippets are either CPU or CUDA. This can be detected at compile time.
+// => no template parameter Device for algorithms.
+#ifdef __CUDA_ARCH__
+constexpr Device CURRENT_DEV = Device::CUDA;
+#else
+constexpr Device CURRENT_DEV = Device::CPU;
+#endif
+
 /*
  * Generic type-trait for device-something-handles.
  * The idea is to have custom types per device which can be set dependent on a
