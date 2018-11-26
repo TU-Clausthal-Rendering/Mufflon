@@ -140,6 +140,8 @@ AttribDesc BinaryLoader::map_bin_attrib_type(AttribType type) {
 
 // Read vertices with applied normal compression, but no deflating
 void BinaryLoader::read_normal_compressed_vertices() {
+	if(m_currObjState.numVertices == 0)
+		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
 	FileDescriptor points{ m_filePath, "rb" };
 	FileDescriptor normals{ m_filePath, "rb" };
@@ -174,6 +176,8 @@ void BinaryLoader::read_normal_compressed_vertices() {
 
 // Read vertices without deflation and without normal compression
 void BinaryLoader::read_normal_uncompressed_vertices() {
+	if(m_currObjState.numVertices == 0)
+		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
 	FileDescriptor points{ m_filePath, "rb" };
 	FileDescriptor normals{ m_filePath, "rb" };
@@ -213,13 +217,14 @@ BinaryLoader::AttribState BinaryLoader::read_uncompressed_attribute() {
 
 // Reads the acctual data into the object
 void BinaryLoader::read_uncompressed_vertex_attributes() {
-	
+	if(m_currObjState.numVertices == 0 || m_currObjState.numVertAttribs == 0)
+		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	if(read<u32>() != ATTRIBUTE_MAGIC)
-		throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-								 + std::to_string(m_currObjState.lodLevel) + ')');
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
+		if(read<u32>() != ATTRIBUTE_MAGIC)
+			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel) + ')');
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.openMeshIndex == INVALID_INDEX)
@@ -237,13 +242,14 @@ void BinaryLoader::read_uncompressed_vertex_attributes() {
 
 // Reads the acctual data into the object
 void BinaryLoader::read_uncompressed_face_attributes() {
-
+	if((m_currObjState.numTriangles == 0 && m_currObjState.numQuads == 0) || m_currObjState.numFaceAttribs == 0)
+		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	if(read<u32>() != ATTRIBUTE_MAGIC)
-		throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-								 + std::to_string(m_currObjState.lodLevel) + ')');
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
+		if(read<u32>() != ATTRIBUTE_MAGIC)
+			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel) + ')');
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.openMeshIndex == INVALID_INDEX)
@@ -261,12 +267,14 @@ void BinaryLoader::read_uncompressed_face_attributes() {
 
 // Reads the acctual data into the object
 void BinaryLoader::read_uncompressed_sphere_attributes() {
+	if(m_currObjState.numSpheres == 0 || m_currObjState.numSphereAttribs == 0)
+		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	if(read<u32>() != ATTRIBUTE_MAGIC)
-		throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-								 + std::to_string(m_currObjState.lodLevel) + ')');
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
+		if(read<u32>() != ATTRIBUTE_MAGIC)
+			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel) + ')');
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -283,6 +291,8 @@ void BinaryLoader::read_uncompressed_sphere_attributes() {
 }
 
 void BinaryLoader::read_uncompressed_face_materials() {
+	if(m_currObjState.numTriangles == 0 && m_currObjState.numQuads == 0)
+		return;
 	FileDescriptor matIdxs{ m_filePath, "rb" };
 	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 	const u32 faces = m_currObjState.numTriangles + m_currObjState.numQuads;
@@ -296,6 +306,8 @@ void BinaryLoader::read_uncompressed_face_materials() {
 }
 
 void BinaryLoader::read_uncompressed_sphere_materials() {
+	if(m_currObjState.numSpheres == 0)
+		return;
 	FileDescriptor matIdxs{ m_filePath, "rb" };
 	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 	if(spheres_set_material_idx_bulk(m_currObjState.objHdl, static_cast<SphereHdl>(0u),
@@ -308,6 +320,8 @@ void BinaryLoader::read_uncompressed_sphere_materials() {
 }
 
 void BinaryLoader::read_uncompressed_triangles() {
+	if(m_currObjState.numTriangles == 0)
+		return;
 	// Read the faces (cannot do that bulk-like)
 	for(u32 tri = 0u; tri < m_currObjState.numTriangles; ++tri) {
 		const ei::UVec3 indices = read<ei::UVec3>();
@@ -318,7 +332,7 @@ void BinaryLoader::read_uncompressed_triangles() {
 	FileDescriptor matIdxs{ m_filePath, "rb" };
 	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 	if(polygon_set_material_idx_bulk(m_currObjState.objHdl, static_cast<FaceHdl>(0u),
-									 m_currObjState.numTriangles, matIdxs.get()))
+									 m_currObjState.numTriangles, matIdxs.get()) == INVALID_SIZE)
 		throw std::runtime_error("Failed to set triangle material for object '" + m_currObjState.name + "', LoD "
 								 + std::to_string(m_currObjState.lodLevel));
 	// Seek to the quads
@@ -327,6 +341,8 @@ void BinaryLoader::read_uncompressed_triangles() {
 }
 
 void BinaryLoader::read_uncompressed_quads() {
+	if(m_currObjState.numQuads == 0)
+		return;
 	// Read the faces (cannot do that bulk-like)
 	for(u32 quad = 0u; quad < m_currObjState.numQuads; ++quad) {
 		const ei::UVec4 indices = read<ei::UVec4>();
@@ -337,14 +353,16 @@ void BinaryLoader::read_uncompressed_quads() {
 	FileDescriptor matIdxs{ m_filePath, "rb" };
 	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 	if(polygon_set_material_idx_bulk(m_currObjState.objHdl, static_cast<FaceHdl>(0u),
-									 m_currObjState.numQuads, matIdxs.get()))
-		throw std::runtime_error("Failed to set triangle material for object '" + m_currObjState.name + "', LoD "
+									 m_currObjState.numQuads, matIdxs.get()) == INVALID_SIZE)
+		throw std::runtime_error("Failed to set quad material for object '" + m_currObjState.name + "', LoD "
 								 + std::to_string(m_currObjState.lodLevel));
 	// Seek to the material indices
 	m_fileStream.seekg(4u * sizeof(u32) * m_currObjState.numQuads, std::ios_base::cur);
 }
 
 void BinaryLoader::read_uncompressed_spheres() {
+	if(m_currObjState.numSpheres == 0)
+		return;
 	FileDescriptor spheres{ m_filePath, "rb" };
 	spheres.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 	std::size_t spheresRead = 0u;

@@ -39,11 +39,13 @@ struct ParserState {
 		expectedArraySize = 0u;
 		objectNames.clear();
 	}
+
+	std::string get_parser_level() const;
 };
 
-class JsonException : public std::exception {
+class ParserException : public std::exception {
 public:
-	JsonException(const ParserState& state);
+	ParserException(const ParserState& state);
 
 	virtual const char* what() const override {
 		return m_msg.c_str();
@@ -89,7 +91,7 @@ void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
 		  std::vector<T>& vals) {
 	if(!val->value.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 	state.objectNames.push_back(val->name.GetString());
 	vals.reserve(vals.size() + val->value.Size());
@@ -105,12 +107,12 @@ void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
 	if(!val->value.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = 0u;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 	if(!val->value.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = expectedSize;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 	state.objectNames.push_back(val->name.GetString());
 	vals.reserve(vals.size() + val->value.Size());

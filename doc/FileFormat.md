@@ -157,6 +157,7 @@ Materials
                 | <texture>,            // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
                                         // OR a texture with one or three channels (relative path)
                                         // DEFAULT: 0.5
+	"ndf": "{BS,GGX,Cos}",				// Name of the normal distribution function
     "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
                                         // DEFAULT: [0.5, 0.5, 0.5]
 
@@ -166,6 +167,7 @@ Materials
                  | <texture>,           // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
                                         // OR a texture with one or three channels (relative path)
                                         // DEFAULT: 0.5
+	"ndf": "{BS,GGX,Cos}",				// Name of the normal distribution function
     "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
 
 `"type": "emissive"`

@@ -35,10 +35,244 @@ std::string read_file(fs::path path) {
 
 } // namespace
 
+JsonException::JsonException(const std::string& str, rapidjson::ParseResult res) :
+	m_error("Parser error: " + std::string(rapidjson::GetParseError_En(res.Code()))
+			 + " at offset " + std::to_string(res.Offset()))  {
+
+		// Walk the string and determine line number
+	std::stringstream ss(str);
+	std::string line;
+	const std::size_t offset = res.Offset();
+	std::size_t currOffset = 0u;
+	std::size_t currLine = 0u;
+	while(std::getline(ss, line)) {
+		if(offset >= currOffset && offset <= (currOffset + line.length()))
+			break;
+		// Extra byte for newline
+		++currLine;
+		currOffset += line.size() + 1u;
+	}
+
+	m_error += " (line " + std::to_string(currLine) + ')';
+}
+
 void JsonLoader::clear_state() {
 	m_jsonString.clear();
 	m_state.reset();
 	m_binaryFile.clear();
+}
+
+TextureHdl JsonLoader::load_texture(const char* name) {
+	// TODO: load texture
+	TextureHdl tex = world_add_texture(name, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
+									   TextureSampling::SAMPLING_NEAREST, false, nullptr);
+	if(tex == nullptr)
+		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
+	return tex;
+}
+
+MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator matIter) {
+	using namespace rapidjson;
+	MaterialParams* mat = new MaterialParams{};
+
+	const Value& material = matIter->value;
+	assertObject(m_state, material);
+	const char* materialName = matIter->name.GetString();
+	m_state.objectNames.push_back(materialName);
+
+	// Read the outer medium
+	if(auto outerIter = get(m_state, material, "outerMedium", false); outerIter != material.MemberEnd()) {
+		// Parse the outer medium of the material
+		m_state.objectNames.push_back(outerIter->name.GetString());
+		const Value& outerMedium = outerIter->value;
+		mat->outer.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, outerMedium, "absorption")));
+		auto refractIter = get(m_state, outerMedium, "refractionIndex");
+		if(refractIter->value.IsArray()) {
+			mat->outer.refractionIndex.c = util::pun<Vec2>(read<ei::Vec2>(m_state, refractIter));
+			mat->outer.type = OuterMediumType::MEDIUM_CONDUCTOR;
+		} else {
+			mat->outer.refractionIndex.f = read<float>(m_state, refractIter);
+			mat->outer.type = OuterMediumType::MEDIUM_DIELECTRIC;
+		}
+		m_state.objectNames.pop_back();
+	} else {
+		mat->outer.type = OuterMediumType::MEDIUM_NONE;
+	}
+
+	std::string_view type = read<const char*>(m_state, get(m_state, material, "type"));
+	if(type.compare("lambert") == 0) {
+		// Lambert material
+		auto albedoIter = get(m_state, material, "albedo");
+		MaterialHdl hdl = nullptr;
+		if(albedoIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_LAMBERT;
+			mat->inner.lambert.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
+		} else {
+			mat->innerType = MaterialParamType::MATERIAL_LAMBERT_TEXTURED;
+			mat->inner.lambert.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
+		}
+	} else if(type.compare("torrance") == 0) {
+		// Torrance material
+		std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
+		if(ndf.compare("BS") == 0)
+			mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
+		else if(ndf.compare("GGC") == 0)
+			mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+		else if(ndf.compare("GGC") == 0)
+			mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+		else
+			throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
+		auto roughnessIter = get(m_state, material, "roughness");
+		auto albedoIter = get(m_state, material, "albedo");
+		if(roughnessIter->value.IsNumber() && albedoIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_TORRANCE;
+			mat->inner.torrance.roughness.f = read<float>(m_state, roughnessIter);
+			mat->inner.torrance.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
+		} else if(roughnessIter->value.IsNumber() && albedoIter->value.IsString()) {
+			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_TEXALBEDO;
+			mat->inner.torrance.roughness.f = read<float>(m_state, roughnessIter);
+			mat->inner.torrance.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
+		} else if(roughnessIter->value.IsString() && albedoIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_TEXALBEDO;
+			mat->inner.torrance.roughness.tex = load_texture(read<const char*>(m_state, roughnessIter));
+			mat->inner.torrance.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
+		} else if(roughnessIter->value.IsString() && albedoIter->value.IsString()) {
+			TextureHdl roughTex = load_texture(read<const char*>(m_state, roughnessIter));
+			TextureHdl albedoTex = load_texture(read<const char*>(m_state, albedoIter));
+			mat->inner.torrance.roughness.tex = roughTex;
+			mat->inner.torrance.albedo.tex = albedoTex;
+		} else if(roughnessIter->value.IsArray() && albedoIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_ANISOTROPIC;
+			mat->inner.torrance.roughness.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, roughnessIter));
+			mat->inner.torrance.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
+		} else if(roughnessIter->value.IsArray() && albedoIter->value.IsString()) {
+			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO;
+			mat->inner.torrance.roughness.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, roughnessIter));
+			mat->inner.torrance.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
+		} else {
+			throw std::runtime_error("Invalid types for either roughness or albedo");
+		}
+	} else if(type.compare("walter") == 0) {
+		// Walter material
+		std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
+		if(ndf.compare("BS") == 0)
+			mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
+		else if(ndf.compare("GGC") == 0)
+			mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+		else if(ndf.compare("GGC") == 0)
+			mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+		else
+			throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
+		auto roughnessIter = get(m_state, material, "roughness");
+		mat->inner.walter.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, material, "absorption")));
+		if(roughnessIter->value.IsNumber()) {
+			mat->innerType = MaterialParamType::MATERIAL_WALTER;
+			mat->inner.torrance.roughness.f = read<float>(m_state, roughnessIter);
+		} else if(roughnessIter->value.IsString()) {
+			mat->innerType = MaterialParamType::MATERIAL_WALTER_TEXTURED;
+			mat->inner.torrance.roughness.tex = load_texture(read<const char*>(m_state, roughnessIter));
+		} else if(roughnessIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_WALTER_ANISOTROPIC;
+			mat->inner.torrance.roughness.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, roughnessIter));
+		} else {
+			throw std::runtime_error("Invalid type for roughness");
+		}
+	} else if(type.compare("emissive") == 0) {
+		// Emissive material
+		mat->inner.emissive.scale = read_opt<float>(m_state, material, "scale", 1.f);
+		auto radianceIter = get(m_state, material, "radiance");
+		if(radianceIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
+			mat->inner.emissive.radiance.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, radianceIter));
+		} else if(radianceIter->value.IsString()) {
+			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE_TEXTURED;
+			mat->inner.emissive.radiance.tex = load_texture(read<const char*>(m_state, radianceIter));
+		} else {
+			throw std::runtime_error("Invalid type for radiance");
+		}
+	} else if(type.compare("orennayar") == 0) {
+		// Oren-Nayar material
+		mat->inner.orennayar.roughness = read_opt<float>(m_state, material, "roughness", 1.f);
+		auto albedoIter = get(m_state, material, "albedo");
+		if(albedoIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_ORENNAYAR;
+			mat->inner.orennayar.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
+		} else if(albedoIter->value.IsString()) {
+			mat->innerType = MaterialParamType::MATERIAL_ORENNAYAR_TEXTURED;
+			mat->inner.orennayar.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
+		}
+		else {
+			throw std::runtime_error("Invalid type for albedo");
+		}
+	} else if(type.compare("blend") == 0) {
+		// Blend material
+		mat->innerType = MaterialParamType::MATERIAL_BLEND;
+		mat->inner.blend.a.factor = read<float>(m_state, get(m_state, material, "factorA"));
+		mat->inner.blend.b.factor = read<float>(m_state, get(m_state, material, "factorB"));
+		mat->inner.blend.a.mat = load_material(get(m_state, material, "layerA"));
+		mat->inner.blend.b.mat = load_material(get(m_state, material, "layerB"));
+	} else if(type.compare("fresnel") == 0) {
+		// TODO: fresnel material
+		auto refrIter = get(m_state, material, "refractionIndex");
+		if(refrIter->value.IsNumber()) {
+			mat->innerType = MaterialParamType::MATERIAL_FRESNEL;
+			mat->inner.fresnel.refractionIndex.f = read<float>(m_state, refrIter);
+		} else if(refrIter->value.IsArray()) {
+			mat->innerType = MaterialParamType::MATERIAL_FRESNEL_COMPLEX;
+			mat->inner.fresnel.refractionIndex.c = util::pun<Vec2>(read<ei::Vec2>(m_state, refrIter));
+		} else {
+			throw std::runtime_error("Invalid type for albedo");
+		}
+		mat->inner.fresnel.a = load_material(get(m_state, material, "layerA"));
+		mat->inner.fresnel.b = load_material(get(m_state, material, "layerB"));
+	} else if(type.compare("glass") == 0) {
+		// TODO: glass material
+	} else if(type.compare("opaque") == 0) {
+		// TODO: opaque material
+	} else {
+		throw std::runtime_error("Unknown material type '" + std::string(type) + "'");
+	}
+
+	m_state.objectNames.pop_back();
+	return mat;
+}
+
+void JsonLoader::free_material(MaterialParams* mat) {
+	switch(mat->innerType) {
+		case MATERIAL_LAMBERT:
+		case MATERIAL_LAMBERT_TEXTURED:
+		case MATERIAL_TORRANCE:
+		case MATERIAL_TORRANCE_TEXALBEDO:
+		case MATERIAL_TORRANCE_ANISOTROPIC:
+		case MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO:
+		case MATERIAL_TORRANCE_TEXTURED:
+		case MATERIAL_TORRANCE_TEXTURED_TEXALBEDO:
+		case MATERIAL_WALTER:
+		case MATERIAL_WALTER_ANISOTROPIC:
+		case MATERIAL_WALTER_TEXTURED:
+		case MATERIAL_EMISSIVE:
+		case MATERIAL_EMISSIVE_TEXTURED:
+		case MATERIAL_ORENNAYAR:
+		case MATERIAL_ORENNAYAR_TEXTURED:
+			if(mat != nullptr)
+				delete mat;
+			return;
+		case MATERIAL_BLEND:
+			if(mat->inner.blend.a.mat != nullptr)
+				free_material(mat->inner.blend.a.mat);
+			if(mat->inner.blend.b.mat != nullptr)
+				free_material(mat->inner.blend.b.mat);
+			return;
+		case MATERIAL_FRESNEL:
+		case MATERIAL_FRESNEL_COMPLEX:
+			if(mat->inner.fresnel.a != nullptr)
+			free_material(mat->inner.fresnel.a);
+			if(mat->inner.blend.a.mat != nullptr)
+				if(mat->inner.fresnel.b != nullptr)
+			free_material(mat->inner.fresnel.b);
+			return;
+		default: return;
+	}
 }
 
 void JsonLoader::load_cameras() {
@@ -64,8 +298,7 @@ void JsonLoader::load_cameras() {
 		std::vector<ei::Vec3> camUp;
 		read(m_state, get(m_state, camera, "path"), camPath);
 		read(m_state, get(m_state, camera, "viewDir"), camViewDir, camPath.size());
-		auto upIter = get(m_state, camera, "up", false);
-		if(upIter != camera.MemberEnd()) {
+		if(auto upIter = get(m_state, camera, "up", false); upIter != camera.MemberEnd()) {
 			read(m_state, get(m_state, camera, "up"), camUp, camPath.size());
 		} else {
 			camUp.push_back(ei::Vec3{ 0, 1, 0 });
@@ -82,8 +315,7 @@ void JsonLoader::load_cameras() {
 										util::pun<Vec3>(camViewDir[0u]),
 										util::pun<Vec3>(camUp[0u]), near, far,
 										static_cast<Radians>(Degrees(fovDegree))) == nullptr)
-				throw std::runtime_error("Failed to add camera '"
-										 + std::string(cameraIter->name.GetString()) + "'");
+				throw std::runtime_error("Failed to add camera");
 		} else if(type.compare("focus") == 0 == 0) {
 			// TODO: Focus camera
 			logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
@@ -116,8 +348,7 @@ void JsonLoader::load_lights() {
 			// Point light
 			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
 			ei::Vec3 intensity;
-			auto intensityIter = get(m_state, light, "intensity", false);
-			if(intensityIter != light.MemberEnd())
+			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
 				intensity = read<ei::Vec3>(m_state, intensityIter);
 			else
 				intensity = read<ei::Vec3>(m_state, get(m_state, light, "flux")) * 4.f * ei::PI;
@@ -125,8 +356,7 @@ void JsonLoader::load_lights() {
 
 			if(world_add_point_light(lightIter->name.GetString(), util::pun<Vec3>(position),
 									 util::pun<Vec3>(intensity)) == nullptr)
-				throw std::runtime_error("Failed to add point light '"
-										 + std::string(lightIter->name.GetString()) + "'");
+				throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
 			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
@@ -135,13 +365,11 @@ void JsonLoader::load_lights() {
 				* read_opt<float>(m_state, light, "scale", 1.f);
 			Radians angle;
 			Radians falloffStart;
-			auto angleIter = get(m_state, light, "cosWidth", false);
-			if(angleIter != light.MemberEnd())
+			if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
 				angle = std::acos(static_cast<Radians>(Degrees(read<float>(m_state, angleIter))));
 			else
 				angle = static_cast<Radians>(Degrees(read<float>(m_state, get(m_state, light, "width"))));
-			auto falloffIter = get(m_state, light, "cosFalloffStart", false);
-			if(falloffIter != light.MemberEnd())
+			if(auto falloffIter = get(m_state, light, "cosFalloffStart", false);  falloffIter != light.MemberEnd())
 				falloffStart = std::acos(read<float>(m_state, falloffIter));
 			else
 				falloffStart = static_cast<Radians>(Degrees(read_opt<float>(m_state, light, "falloffWidth",
@@ -150,8 +378,7 @@ void JsonLoader::load_lights() {
 			if(world_add_spot_light(lightIter->name.GetString(), util::pun<Vec3>(position),
 									util::pun<Vec3>(direction), util::pun<Vec3>(intensity),
 									angle, falloffStart) == nullptr)
-				throw std::runtime_error("Failed to add spot light '"
-										 + std::string(lightIter->name.GetString()) + "'");
+				throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
 			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
@@ -160,34 +387,20 @@ void JsonLoader::load_lights() {
 
 			if(world_add_directional_light(lightIter->name.GetString(), util::pun<Vec3>(direction),
 										   util::pun<Vec3>(radiance)) == nullptr)
-				throw std::runtime_error("Failed to add directional light '"
-										 + std::string(lightIter->name.GetString()) + "'");
+				throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
-			const char* texPath = read<const char*>(m_state, get(m_state, light, "map"));
+			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
-				// TODO: load the texture
-			TextureHdl texture = world_add_texture(texPath, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
-												   TextureSampling::SAMPLING_NEAREST, false, nullptr);
-			if(texture == nullptr)
-				throw std::runtime_error("Failed to load texture for envmap light '"
-										 + std::string(lightIter->name.GetString()) + "'");
 			// TODO: incorporate scale
 
 			if(world_add_envmap_light(lightIter->name.GetString(), texture) == nullptr)
-				throw std::runtime_error("Failed to add directional light '"
-										 + std::string(lightIter->name.GetString()) + "'");
+				throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
 			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
-			const char* texPath = read<const char*>(m_state, get(m_state, light, "map"));
+			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
-				// TODO: load the texture
-			TextureHdl texture = world_add_texture(texPath, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
-												   TextureSampling::SAMPLING_NEAREST, false, nullptr);
-			if(texture == nullptr)
-				throw std::runtime_error("Failed to load texture for goniometric light '"
-										 + std::string(lightIter->name.GetString()) + "'");
 			// TODO: incorporate scale
 
 			logWarning("[", FUNCTION_NAME, "] Scene file: Goniometric lights are not supported yet");
@@ -207,6 +420,14 @@ void JsonLoader::load_materials() {
 	m_state.current = ParserState::Level::MATERIALS;
 
 	for(auto matIter = materials.MemberBegin(); matIter != materials.MemberEnd(); ++matIter) {
+		MaterialParams* mat = nullptr;
+		try {
+			mat = load_material(matIter);
+		} catch(const std::runtime_error&) {
+			free_material(mat);
+			throw;
+		}
+		world_add_material(matIter->name.GetString(), mat);
 	}
 }
 
@@ -232,18 +453,15 @@ void JsonLoader::load_scenarios() {
 			throw std::runtime_error("Camera '" + std::string(camera) + "' does not exist");
 		ScenarioHdl scenarioHdl = world_create_scenario(scenarioIter->name.GetString());
 		if(scenarioHdl == nullptr)
-			throw std::runtime_error("Failed to create scenario '" + std::string(scenarioIter->name.GetString()) + "'");
+			throw std::runtime_error("Failed to create scenario");
 
 		if(!scenario_set_camera(scenarioHdl, camHdl))
-			throw std::runtime_error("Failed to set camera '" + std::string(camera) + "' for scenario '"
-									 + std::string(scenarioIter->name.GetString()) + "'");
+			throw std::runtime_error("Failed to set camera '" + std::string(camera) + "'");
 		if(!scenario_set_resolution(scenarioHdl, resolution.x, resolution.y))
 			throw std::runtime_error("Failed to set resolution '" + std::to_string(resolution.x) + "x"
-									 + std::to_string(resolution.y) + " for scenario '"
-									 + std::string(scenarioIter->name.GetString()) + "'");
+									 + std::to_string(resolution.y) + "'");
 		if(!scenario_set_global_lod_level(scenarioHdl, lod))
-			throw std::runtime_error("Failed to set LoD " + std::to_string(lod) + " for scenario '"
-									 + std::string(scenarioIter->name.GetString()) + "'");
+			throw std::runtime_error("Failed to set LoD " + std::to_string(lod));
 
 		// Add lights
 		if(lightIter != scenario.MemberEnd()) {
@@ -252,8 +470,7 @@ void JsonLoader::load_scenarios() {
 			for(SizeType i = 0u; i < lightIter->value.Size(); ++i) {
 				const char* lightName = read<const char*>(m_state, lightIter->value[i]);
 				if(!scenario_add_light(scenarioHdl, lightName))
-					throw std::runtime_error("Failed to add light '" + std::string(lightName) + "' to scenario '"
-											 + std::string(scenarioIter->name.GetString()) + "'");
+					throw std::runtime_error("Failed to add light '" + std::string(lightName) + "'");
 			}
 		}
 
@@ -273,20 +490,14 @@ void JsonLoader::load_scenarios() {
 				std::string subName{ objectName.substr(5u, objectName.length() - 6u) };
 				ObjectHdl objHdl = world_get_object(&objectName[0u]);
 				if(objHdl == nullptr)
-					throw std::runtime_error("Failed to find object '" + subName + "' from scenario '"
-											 + std::string(scenarioIter->name.GetString()) + "'");
+					throw std::runtime_error("Failed to find object '" + subName + "'");
 				// Check for LoD and masked
-				auto lodIter = get(m_state, object, "lod", false);
-				if(lodIter != object.MemberEnd())
+				if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd())
 					if(!scenario_set_object_lod(scenarioHdl, objHdl, read<std::size_t>(m_state, lodIter)))
-						throw std::runtime_error("Failed to set LoD level of object '" + subName
-												 + "' for scenario '" + std::string(scenarioIter->name.GetString())
-												 + "'");
+						throw std::runtime_error("Failed to set LoD level of object '" + subName + "'");
 				if(object.HasMember("masked"))
 					if(!scenario_mask_object(scenarioHdl, objHdl))
-						throw std::runtime_error("Failed to set mask for object '" + subName
-												 + "' for scenario '" + std::string(scenarioIter->name.GetString())
-												 + "'");
+						throw std::runtime_error("Failed to set mask for object '" + subName + "'");
 
 				m_state.objectNames.pop_back();
 			}
@@ -322,24 +533,8 @@ void JsonLoader::load_file() {
 	Document document;
 	// Parse and check for errors
 	ParseResult res = document.Parse(m_jsonString.c_str());
-	if(res.IsError()) {
-		// Walk the string and determine line number
-		std::stringstream ss(m_jsonString);
-		std::string line;
-		const std::size_t offset = res.Offset();
-		std::size_t currOffset = 0u;
-		std::size_t currLine = 0u;
-		while(std::getline(ss, line)) {
-			if(offset >= currOffset && offset <= (currOffset + line.length()))
-				break;
-			// Extra byte for newline
-			++currLine;
-			currOffset += line.size() + 1u;
-		}
-		throw std::runtime_error("Parser error: " + std::string(GetParseError_En(res.Code()))
-								 + " at offset " + std::to_string(res.Offset())
-								 + " (line " + std::to_string(currLine) + ')');
-	}
+	if(res.IsError())
+		throw JsonException(m_jsonString, res);
 
 	// Parse our file specification
 	assertObject(m_state, document);
@@ -406,18 +601,22 @@ void JsonLoader::load_file() {
 	// TODO
 	binLoader.load_file(defaultGlobalLod, defaultLocalLods);
 
+	try {
 	// Cameras
-	m_state.current = ParserState::Level::ROOT;
-	load_cameras();
-	// Lights
-	m_state.current = ParserState::Level::ROOT;
-	load_lights();
-	// Materials
-	m_state.current = ParserState::Level::ROOT;
-	load_materials();
-	// Scenarios
-	m_state.current = ParserState::Level::ROOT;
-	load_scenarios();
+		m_state.current = ParserState::Level::ROOT;
+		load_cameras();
+		// Lights
+		m_state.current = ParserState::Level::ROOT;
+		load_lights();
+		// Materials
+		m_state.current = ParserState::Level::ROOT;
+		load_materials();
+		// Scenarios
+		m_state.current = ParserState::Level::ROOT;
+		load_scenarios();
+	} catch(const std::runtime_error& e) {
+		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
+	}
 
 
 	// TODO: parse binary file

@@ -185,7 +185,6 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 		s_logCallback(message.c_str(), static_cast<int>(severity));
 }
 
-
 } // namespace
 
 // TODO: remove, Felix prototype
@@ -815,6 +814,8 @@ size_t polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t co
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
 	CHECK_GEQ_ZERO(startFace, "start face index", INVALID_SIZE);
+	if(count == 0u)
+		return 0u;
 	Object& object = *static_cast<Object*>(obj);
 	if(startFace >= static_cast<int>(object.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Face index out of bounds (",
@@ -1150,27 +1151,60 @@ ScenarioHdl world_find_scenario(const char* name) {
 	return static_cast<ScenarioHdl>(hdl);
 }
 
-MaterialHdl world_add_lambert_material(const char* name, Vec3 rgb) {
+MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	CHECK_NULLPTR(name, "material name", nullptr);
-	// Create a texture from the pixel color
-	auto tex = WorldContainer::instance().add_texture(textures::Format::RGB32F, rgb);
-	return world_add_lambert_material_textured(name, static_cast<TextureHdl>(&tex->second));
-}
+	CHECK_NULLPTR(mat, "material parameters", nullptr);
 
-MaterialHdl world_add_lambert_material_textured(const char* name, TextureHdl texture) {
-	CHECK_NULLPTR(name, "material name", nullptr);
-	CHECK_NULLPTR(texture, "texture handle", nullptr);
+	MaterialHandle hdl = nullptr;
+	switch(mat->innerType) {
+		case MATERIAL_LAMBERT: {
+			auto tex = WorldContainer::instance().add_texture(textures::Format::RGB32F, mat->inner.lambert.albedo.rgb);
+			hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>(&tex->second));
+		}	break;
+		case MATERIAL_LAMBERT_TEXTURED: {
+			auto tex = mat->inner.lambert.albedo.tex;
+			hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
+		}	break;
+		case MATERIAL_TORRANCE:
+		case MATERIAL_TORRANCE_TEXALBEDO:
+		case MATERIAL_TORRANCE_ANISOTROPIC:
+		case MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO:
+		case MATERIAL_TORRANCE_TEXTURED:
+		case MATERIAL_TORRANCE_TEXTURED_TEXALBEDO:
+			// TODO
+			logWarning("[", FUNCTION_NAME, "] Material type 'torrance' not supported yet");
+			return nullptr;
+		case MATERIAL_WALTER:
+		case MATERIAL_WALTER_ANISOTROPIC:
+		case MATERIAL_WALTER_TEXTURED:
+			logWarning("[", FUNCTION_NAME, "] Material type 'walter' not supported yet");
+			return nullptr;
+		case MATERIAL_EMISSIVE:
+		case MATERIAL_EMISSIVE_TEXTURED:
+			logWarning("[", FUNCTION_NAME, "] Material type 'emissive' not supported yet");
+			return nullptr;
+		case MATERIAL_ORENNAYAR:
+		case MATERIAL_ORENNAYAR_TEXTURED:
+			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
+			return nullptr;
+		case MATERIAL_BLEND:
+			logWarning("[", FUNCTION_NAME, "] Material type 'blend' not supported yet");
+			return nullptr;
+		case MATERIAL_FRESNEL:
+		case MATERIAL_FRESNEL_COMPLEX:
+			logWarning("[", FUNCTION_NAME, "] Material type 'fresnel' not supported yet");
+			return nullptr;
+		default:
+			logWarning("[", FUNCTION_NAME, "] Unknown material type");
+	}
 
-	MaterialHandle hdl = WorldContainer::instance().add_material(
-		std::make_unique<materials::Lambert>(static_cast<TextureHandle>(texture)));
 	if(hdl == nullptr) {
-		logError("[", FUNCTION_NAME, "] Error creating lambert material");
+		logError("[", FUNCTION_NAME, "] Error creating material '",
+				 name, "'");
 		return nullptr;
 	}
-	hdl->set_name(name);
-	// TODO: fill with life
 
-	return static_cast<MaterialHandle>(hdl);
+	return static_cast<MaterialHdl>(hdl);
 }
 
 CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,

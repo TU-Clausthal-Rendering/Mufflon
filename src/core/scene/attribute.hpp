@@ -543,6 +543,7 @@ public:
 			m_mesh.resize(m_mesh.n_vertices(), m_mesh.n_edges(), length);
 		else
 			m_mesh.resize(length, m_mesh.n_edges(), m_mesh.n_faces());
+		m_attribLength = length;
 	}
 
 	// Read the attribute between start and start+count from the stream

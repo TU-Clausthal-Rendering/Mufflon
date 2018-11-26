@@ -1,11 +1,23 @@
 #pragma once
 
 #include "json_helper.hpp"
+#include "core/export/interface.h"
 #include "util/filesystem.hpp"
 #include <rapidjson/document.h>
 #include <string>
 
 namespace loader::json {
+
+class JsonException : public std::exception {
+public:
+	JsonException(const std::string& str, rapidjson::ParseResult res);
+	virtual const char* what() const override {
+		return m_error.c_str();
+	}
+
+private:
+	std::string m_error;
+};
 
 class JsonLoader {
 public:
@@ -22,6 +34,9 @@ public:
 	void clear_state();
 
 private:
+	TextureHdl load_texture(const char* name);
+	MaterialParams* load_material(rapidjson::Value::ConstMemberIterator matIter);
+	void free_material(MaterialParams* mat);
 	void load_cameras();
 	void load_lights();
 	void load_materials();

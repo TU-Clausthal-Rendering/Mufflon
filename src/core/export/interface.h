@@ -118,6 +118,39 @@ typedef enum {
 	SAMPLING_LINEAR
 } TextureSampling;
 
+typedef enum {
+	NDF_BECKMANN,
+	NDF_GGX,
+	NDF_PHONG
+} NormalDistFunction;
+
+typedef enum {
+	MATERIAL_LAMBERT,
+	MATERIAL_LAMBERT_TEXTURED,
+	MATERIAL_TORRANCE,
+	MATERIAL_TORRANCE_TEXALBEDO,
+	MATERIAL_TORRANCE_ANISOTROPIC,
+	MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO,
+	MATERIAL_TORRANCE_TEXTURED,
+	MATERIAL_TORRANCE_TEXTURED_TEXALBEDO,
+	MATERIAL_WALTER,
+	MATERIAL_WALTER_ANISOTROPIC,
+	MATERIAL_WALTER_TEXTURED,
+	MATERIAL_EMISSIVE,
+	MATERIAL_EMISSIVE_TEXTURED,
+	MATERIAL_ORENNAYAR,
+	MATERIAL_ORENNAYAR_TEXTURED,
+	MATERIAL_BLEND,
+	MATERIAL_FRESNEL,
+	MATERIAL_FRESNEL_COMPLEX
+} MaterialParamType;
+
+typedef enum {
+	MEDIUM_NONE,
+	MEDIUM_DIELECTRIC,
+	MEDIUM_CONDUCTOR
+} OuterMediumType;
+
 typedef struct {
 	AttributeType type;
 	uint32_t rows;
@@ -152,6 +185,92 @@ typedef void* CameraHdl;
 typedef void* LightHdl;
 typedef void* TextureHdl;
 typedef const void* ConstCameraHdl;
+
+// Material types
+typedef struct {
+	OuterMediumType type;
+	union {
+		float f;
+		Vec2 c;
+	} refractionIndex;
+	Vec3 absorption;
+} OuterMedium;
+
+typedef struct {
+	union {
+		Vec3 rgb;
+		TextureHdl tex;
+	} albedo;
+} LambertParams;
+typedef struct {
+	union {
+		float f;
+		Vec3 rgb;
+		TextureHdl tex;
+	} roughness;
+	NormalDistFunction ndf;
+	union {
+		Vec3 rgb;
+		TextureHdl tex;
+	} albedo;
+} TorranceParams;
+typedef struct {
+	union {
+		float f;
+		Vec3 rgb;
+		TextureHdl tex;
+	} roughness;
+	NormalDistFunction ndf;
+	Vec3 absorption;
+} WalterParams;
+typedef struct {
+	union {
+		Vec3 rgb;
+		TextureHdl tex;
+	} radiance;
+	float scale;
+} EmissiveParams;
+typedef struct {
+	union {
+		Vec3 rgb;
+		TextureHdl tex;
+	} albedo;
+	float roughness;
+} OrennayarParams;
+
+// Forward declaration for recursive definition
+struct MaterialParamsStruct;
+
+typedef struct {
+	typedef struct {
+		float factor;
+		struct MaterialParamsStruct* mat;
+	} Layer;
+	Layer a;
+	Layer b;
+} BlendParams;
+typedef struct {
+	union {
+		float f;
+		Vec2 c;
+	} refractionIndex;
+	struct MaterialParamsStruct* a;
+	struct MaterialParamsStruct* b;
+} FresnelParams;
+
+typedef struct MaterialParamsStruct {
+	OuterMedium outer;
+	MaterialParamType innerType;
+	union {
+		LambertParams lambert;
+		TorranceParams torrance;
+		WalterParams walter;
+		EmissiveParams emissive;
+		OrennayarParams orennayar;
+		BlendParams blend;
+		FresnelParams fresnel;
+	} inner;
+} MaterialParams;
 
 // TODO: how to handle errors
 
@@ -259,9 +378,9 @@ CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);
-// TODO: add more materials (and material parameters)
-CORE_API MaterialHdl CDECL world_add_lambert_material(const char* name, Vec3 rgb);
-CORE_API MaterialHdl CDECL world_add_lambert_material_textured(const char* name, TextureHdl texture);
+CORE_API MaterialHdl CDECL world_add_material(const char* name, const MaterialParams* mat);
+// TODO: blended/fresnel materials
+// TODO: glass/opaque materials
 // TODO: add more cameras
 CORE_API CameraHdl CDECL world_add_pinhole_camera(const char* name, Vec3 position,
 											   Vec3 dir, Vec3 up, float near,

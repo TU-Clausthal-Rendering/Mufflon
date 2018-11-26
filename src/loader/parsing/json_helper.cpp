@@ -30,7 +30,26 @@ std::string_view map_type_to_string(ParserState::Value val) {
 
 } // namespace
 
-JsonException::JsonException(const ParserState& state) {
+std::string ParserState::get_parser_level() const {
+	std::string key;
+	if(current == ParserState::Level::ROOT) {
+		if(objectNames.empty())
+			key = "\"Root\"";
+		else
+			key = "\"Root\":\"" + std::string(objectNames.front()) + ':';
+	} else {
+		key = '\"' + std::string(map_level_to_string(current)) + "\":";
+		for(std::size_t i = 1u; i < objectNames.size(); ++i)
+			key += '\"' + std::string(objectNames[i - 1u]) + "\":";
+		if(expected == ParserState::Value::NONE)
+			key = key.substr(0u, key.length() - 1u);
+		else
+			key += '\"' + std::string(objectNames.back()) + '\"';
+	}
+	return key;
+}
+
+ParserException::ParserException(const ParserState& state) {
 	// TODO
 	if(state.current == ParserState::Level::ROOT) {
 		if(state.objectNames.empty())
@@ -61,7 +80,7 @@ rapidjson::Value::ConstMemberIterator get(ParserState& state,
 	if(required && iter == val.MemberEnd()) {
 		state.objectNames.push_back(name);
 		state.expected = ParserState::Value::NONE;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 	return iter;
 }
@@ -69,14 +88,14 @@ rapidjson::Value::ConstMemberIterator get(ParserState& state,
 void assertObject(ParserState& state, const rapidjson::Value& val) {
 	if(!val.IsObject()) {
 		state.expected = ParserState::Value::OBJECT;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 void assertObject(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
 	if(!val->value.IsObject()) {
 		state.expected = ParserState::Value::OBJECT;
 		state.objectNames.push_back(val->name.GetString());
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 
@@ -84,7 +103,7 @@ void assertArray(ParserState& state, const rapidjson::Value& val) {
 	if(!val.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = 0u;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 void assertArray(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
@@ -92,7 +111,7 @@ void assertArray(ParserState& state, const rapidjson::Value::ConstMemberIterator
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = 0u;
 		state.objectNames.push_back(val->name.GetString());
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 
@@ -100,7 +119,7 @@ void assertArray(ParserState& state, const rapidjson::Value& val, std::size_t ex
 	if(!val.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = expected;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 void assertArray(ParserState& state, const rapidjson::Value::ConstMemberIterator& val, std::size_t expected) {
@@ -108,49 +127,49 @@ void assertArray(ParserState& state, const rapidjson::Value::ConstMemberIterator
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = expected;
 		state.objectNames.push_back(val->name.GetString());
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 
 void assertNumber(ParserState& state, const rapidjson::Value& val) {
 	if(!val.IsNumber()) {
 		state.expected = ParserState::Value::NUMBER;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 void assertNumber(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
 	if(!val->value.IsNumber()) {
 		state.expected = ParserState::Value::NUMBER;
 		state.objectNames.push_back(val->name.GetString());
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 
 void assertBoolean(ParserState& state, const rapidjson::Value& val) {
 	if(!val.IsBool()) {
 		state.expected = ParserState::Value::BOOLEAN;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 void assertBoolean(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
 	if(!val->value.IsBool()) {
 		state.expected = ParserState::Value::BOOLEAN;
 		state.objectNames.push_back(val->name.GetString());
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 
 void assertString(ParserState& state, const rapidjson::Value& val) {
 	if(!val.IsString()) {
 		state.expected = ParserState::Value::STRING;
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 void assertString(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
 	if(!val->value.IsString()) {
 		state.expected = ParserState::Value::STRING;
 		state.objectNames.push_back(val->name.GetString());
-		throw JsonException(state);
+		throw ParserException(state);
 	}
 }
 
