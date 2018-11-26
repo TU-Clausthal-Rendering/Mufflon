@@ -127,8 +127,8 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 	int quantity = which.is_variance() ? ei::ilog2(which >> 8) : ei::ilog2(int(which));
 	bool isNormalized = !which.is_variance() && m_targets.is_set(which << 8);
 	float normalizer = isNormalized ? 1.0f : ((which & 0xff) ?
-								1.0f / ei::max(1, m_iteration) :
-								1.0f / ei::max(1, m_iteration-1));
+								1.0f / ei::max(1, m_iteration+1) :
+								1.0f / ei::max(1, m_iteration));
 
 	// Upload to CPU / synchronize if necessary
 	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
@@ -136,7 +136,6 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 		*m_cumulativeTex[quantity].aquireConst<Device::CPU>();
 
 	// TODO: openmp
-	if(normalizer != 1.0f)
 	for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x) {
 		ei::Vec4 value = read(tex, Pixel{x,y});
 		value *= normalizer;
