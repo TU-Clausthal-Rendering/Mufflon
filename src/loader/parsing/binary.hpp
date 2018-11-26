@@ -15,13 +15,6 @@ namespace loader::binary {
 
 class BinaryLoader {
 public:
-	static constexpr mufflon::u32 MATERIALS_HEADER_MAGIC = ('M' << 24u) | ('a' << 16u) | ('t' << 8u) | 's';
-	static constexpr mufflon::u32 OBJECTS_HEADER_MAGIC = ('O' << 24u) | ('b' << 16u) | ('j' << 8u) | 's';
-	static constexpr mufflon::u32 OBJECT_MAGIC = ('O' << 24u) | ('b' << 16u) | ('j' << 8u) | '_';
-	static constexpr mufflon::u32 INSTANCE_MAGIC = ('I' << 24u) | ('n' << 16u) | ('s' << 8u) | 't';
-	static constexpr mufflon::u32 LOD_MAGIC = ('L' << 24u) | ('O' << 16u) | ('D' << 8u) | '_';
-	static constexpr mufflon::u32 ATTRIBUTE_MAGIC = ('A' << 24u) | ('t' << 16u) | ('t' << 8u) | 'r';
-
 	BinaryLoader(fs::path filePath) :
 		m_filePath(std::move(filePath))
 	{
@@ -34,6 +27,13 @@ public:
 	void clear_state();
 
 private:
+	static constexpr mufflon::u32 MATERIALS_HEADER_MAGIC = 'M' | ('a' << 8u) | ('t' << 16u) | ('s' << 24u);
+	static constexpr mufflon::u32 OBJECTS_HEADER_MAGIC = 'O' | ('b' << 8u) | ('j' << 16u) | ('s' << 24u);
+	static constexpr mufflon::u32 OBJECT_MAGIC = 'O' | ('b' << 8u) | ('j' << 16u) | ('_' << 24u);
+	static constexpr mufflon::u32 INSTANCE_MAGIC = 'I' | ('n' << 8u) | ('s' << 16u) | ('t' << 24u);
+	static constexpr mufflon::u32 LOD_MAGIC = 'L' | ('O' << 8u) | ('D' << 16u) | ('_' << 24u);
+	static constexpr mufflon::u32 ATTRIBUTE_MAGIC = 'A' | ('t' << 8u) | ('t' << 16u) | ('r' << 24u);
+
 	// Per-object flags
 	struct ObjectFlag : public mufflon::util::Flags<mufflon::u32> {
 		static constexpr mufflon::u32 NONE = 0;
@@ -93,7 +93,7 @@ private:
 	template < class T >
 	T read() {
 		T val;
-		m_fileStream >> val;
+		m_fileStream.read(reinterpret_cast<char*>(&val), sizeof(T));
 		return val;
 	}
 
@@ -112,7 +112,7 @@ private:
 
 	void read_instances();
 	void read_object(const mufflon::u64 globalLod,
-					 const std::unordered_map<std::string_view, mufflon::u64> localLods);
+					 const std::unordered_map<std::string_view, mufflon::u64>& localLods);
 	void read_lod();
 
 	const fs::path m_filePath;

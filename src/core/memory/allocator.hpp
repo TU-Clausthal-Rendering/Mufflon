@@ -38,7 +38,7 @@ public:
 		// Initialize it
 		for(std::size_t i = 0; i < n; ++i)
 			new (ptr+i) T {std::forward<Args>(args)...};
-		return ptr;
+return ptr;
 	}
 
 	// Danger: realloc does not handle construction/destruction
@@ -72,6 +72,13 @@ public:
 	static void copy(T* dst, const T* src, std::size_t n) {
 		std::memcpy(dst, src, sizeof(T) * n);
 	}
+
+	template < class T >
+	static void copy_cuda(T* dst, const T* src, std::size_t n) {
+		static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
+		cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyHostToDevice));
+	}
 };
 
 // Allocator specialization for CUDA
@@ -97,7 +104,7 @@ public:
 		// Initialize it
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		T prototype { std::forward<Args>(args)... };
+		T prototype{ std::forward<Args>(args)... };
 		for(std::size_t i = 0; i < n; ++i)
 			cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyHostToDevice));
 		return ptr;
@@ -133,10 +140,16 @@ public:
 	static void copy(T* dst, const T* src, std::size_t n) {
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice);
+		cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
+	}
+
+	template < class T >
+	static void copy_cpu(T* dst, const T* src, std::size_t n) {
+		static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
+		cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
 	}
 };
-
 
 // Deleter for the above custom allocated memories.
 template < Device dev >

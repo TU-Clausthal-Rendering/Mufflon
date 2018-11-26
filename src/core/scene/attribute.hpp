@@ -1,10 +1,11 @@
 #pragma once
 
-#include "core/memory/allocator.hpp"
-#include "core/memory/residency.hpp"
 #include "export/api.hpp"
 #include "util/assert.hpp"
 #include "util/byte_io.hpp"
+#include "core/memory/allocator.hpp"
+#include "core/memory/residency.hpp"
+#include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Core/Utils/BaseProperty.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <functional>
@@ -360,18 +361,20 @@ private:
  * Needs to be specialized for every device due to the different memory systems.
  * Should guarantee contiguous storage whenever possible.
  * dev: Device on which the pool is located
- * owning: false if the pool only stores references and no actual memory itself.
  */
-template < Device dev, bool owning = true >
+template < Device dev >
 class AttributePool;
+
+// Forward declaration of 
+template < bool isFace >
+class OmAttributePool;
 
 // Specialization for CPU without OpenMesh
 template <>
-class AttributePool<Device::CPU, true> : public MallocAttributePool<Allocator<Device::CPU>> {
+class AttributePool<Device::CPU> : public MallocAttributePool<Allocator<Device::CPU>> {
 public:
 	static constexpr Device DEVICE = Device::CPU;
-	static constexpr bool OWNING = true;
-	template < Device dev, bool owning >
+	template < Device dev >
 	friend class AttributePool;
 	template < class A >
 	friend class MallocAttributePool;
@@ -383,8 +386,8 @@ public:
 	AttributePool& operator=(AttributePool&&) = default;
 	~AttributePool() = default;
 
-	template < Device dev, bool owning = true >
-	void synchronize(AttributePool<dev, owning>& pool) {
+	template < Device dev >
+	void synchronize(AttributePool<dev>& pool) {
 		(void)pool;
 		// Needs to be specialized on a per-device basis
 		throw std::runtime_error("This synchronization is not implemented yet");
@@ -393,12 +396,13 @@ public:
 
 // Specialized attribute pool for CUDA
 template <>
-class AttributePool<Device::CUDA, true> : public MallocAttributePool<Allocator<Device::CUDA>> {
+class AttributePool<Device::CUDA> : public MallocAttributePool<Allocator<Device::CUDA>> {
 public:
 	static constexpr Device DEVICE = Device::CUDA;
-	static constexpr bool OWNING = true;
-	template < Device dev, bool owning >
+	template < Device dev >
 	friend class AttributePool;
+	template < bool face >
+	friend class OmAttributePool;
 	template < class A >
 	friend class MallocAttributePool;
 
@@ -409,37 +413,56 @@ public:
 	AttributePool& operator=(AttributePool&&) = default;
 	~AttributePool() = default;
 
-	template < Device dev, bool owning = true >
-	void synchronize(AttributePool<dev, owning>& pool) {
+	template < Device dev >
+	void synchronize(AttributePool<dev>& pool) {
 		(void)pool;
 		// Needs to be specialized on a per-device basis
 		throw std::runtime_error("This synchronization is not implemented yet");
 	}
+
+	template < bool isFace >
+	void synchronize(OmAttributePool<isFace>& pool);
 };
 
 // Specialization for CPU with OpenMesh
-template <>
-class AttributePool<Device::CPU, false> {
+template < bool isFace >
+class OmAttributePool {
 public:
 	static constexpr Device DEVICE = Device::CPU;
-	static constexpr bool OWNING = false;
-	template < Device dev, bool owning >
+	static constexpr bool IS_FACE = isFace;
+	template < class T >
+	using PropType = std::conditional_t<IS_FACE, OpenMesh::FPropHandleT<T>, OpenMesh::VPropHandleT<T>>;
+	template < Device dev >
 	friend class AttributePool;
 	template < class A >
 	friend class MallocAttributePool;
 
-	AttributePool() = default;
-	AttributePool(const AttributePool&) = delete;
-	AttributePool(AttributePool&&) = default;
-	AttributePool& operator=(const AttributePool&) = delete;
-	AttributePool& operator=(AttributePool&&) = default;
-	~AttributePool() = default;
+	OmAttributePool(geometry::PolygonMeshType& mesh) :
+		m_mesh(mesh)
+	{}
+	OmAttributePool(const OmAttributePool&) = delete;
+	OmAttributePool(OmAttributePool&& pool) :
+		m_mesh(pool.m_mesh),
+		m_attribLength(pool.m_attribLength),
+		m_accumElemSize(pool.m_accumElemSize),
+		m_attributes(std::move(pool.m_attributes)),
+		m_accessors(std::move(pool.m_accessors)) {
+		std::cout << "Moving OmAttributePool<" << IS_FACE << "> from "
+			<< reinterpret_cast<std::uintptr_t>(&pool) << " to "
+			<< reinterpret_cast<std::uintptr_t>(this) << std::endl;
+	}
+	OmAttributePool& operator=(const OmAttributePool&) = delete;
+	OmAttributePool& operator=(OmAttributePool&&) = delete;
+	~OmAttributePool() {
+		std::cout << "Deleting OmAttributePool<" << IS_FACE << "> (" 
+			<< reinterpret_cast<std::uintptr_t>(this) << ")" << std::endl;
+	}
 
 	// Helper class identifying an attribute in the pool
 	template < class T >
 	struct AttributeHandle {
 		using Type = T;
-		friend class AttributePool<Device::CPU, false>;
+		friend class OmAttributePool<IS_FACE>;
 
 		AttributeHandle() :
 			m_index(std::numeric_limits<std::size_t>::max()) {}
@@ -455,25 +478,31 @@ public:
 		std::size_t m_index;
 	};
 
-	// Adds a new attribute to the pool
+	// Adds a new vertex attribute to the pool
 	template < class T >
-	AttributeHandle<T> add(OpenMesh::BaseProperty& prop) {
+	AttributeHandle<T> add(PropType<T> hdl) {
+		std::cout << "Adding attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
+		auto& prop = m_mesh.property(hdl);
 		// Ensure that the property is at the same size
 		prop.resize(m_attribLength);
 
 		// Look for previously removed attribute spots
 		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
-			if(m_attributes[i] == nullptr) {
-				m_attributes[i] = &prop;
+			if(!m_attributes[i].is_valid()) {
+				m_attributes[i] = OpenMesh::BaseHandle{ hdl.idx() };
 				return AttributeHandle<T>{ i };
 			}
 		}
-		m_attributes.push_back(&prop);
-
+		m_attributes.push_back(OpenMesh::BaseHandle{ hdl.idx() });
 		// Create an accessor that can use the type info
-		m_accessors.push_back([](OpenMesh::BaseProperty& prop) {
-			return reinterpret_cast<char*>(dynamic_cast<OpenMesh::PropertyT<T>&>(prop).data_vector().data());
+		m_accessors.push_back([](OpenMesh::BaseHandle attr, geometry::PolygonMeshType& mesh) {
+			auto& prop = mesh.property(PropType<T> { attr.idx() });
+			return std::make_pair<char*, std::size_t>(reinterpret_cast<char*>(prop.data_vector().data()),
+				prop.size_of());
 		});
+
+		// Increase the combined element size
+		m_accumElemSize += sizeof(T);
 
 		// No hole found
 		return AttributeHandle<T>{ m_attributes.size() - 1u };
@@ -482,9 +511,10 @@ public:
 	// Removes the given attribute from the pool
 	template < class T >
 	bool remove(const AttributeHandle<T>& hdl) {
+		std::cout << "Removing attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
 		if(hdl.index() >= m_attributes.size())
 			return false;
-		if(m_attributes[hdl.index()] == nullptr)
+		if(!m_attributes[hdl.index()].is_valid())
 			return false;
 
 		// Either entirely remove or mark as hole
@@ -492,7 +522,7 @@ public:
 			m_attributes.pop_back();
 			m_accessors.pop_back();
 		} else {
-			m_attributes[hdl.index()] = nullptr;
+			m_attributes[hdl.index()].invalidate();
 			// Don't bother removing the accessor
 		}
 
@@ -504,11 +534,10 @@ public:
 	T* aquire(const AttributeHandle<T>& hdl) {
 		if(hdl.index() >= m_attributes.size())
 			return nullptr;
-		if(m_attributes[hdl.index()] == nullptr)
+		if(!m_attributes[hdl.index()].is_valid())
 			return nullptr;
 
-		auto& prop = dynamic_cast<typename OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
-		return prop.data_vector().data();
+		return m_mesh.property(PropType<T>{ m_attributes[hdl.index()].idx() }).data_vector().data();
 	}
 
 	// Aquires the given attribute for read-only access
@@ -516,35 +545,35 @@ public:
 	const T* aquireConst(const AttributeHandle<T>& hdl) const {
 		if(hdl.index() >= m_attributes.size())
 			return nullptr;
-		if(m_attributes[hdl.index()] == nullptr)
+		if(!m_attributes[hdl.index()].is_valid())
 			return nullptr;
 
-		const OpenMesh::PropertyT<T>& prop = dynamic_cast<const OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
-		return prop.data_vector().data();
+		return m_mesh.property(PropType<T> { m_attributes[hdl.index()].idx() }).data_vector().data();
 	}
 
 	// Resizes all attributes to the given length
 	void resize(std::size_t length) {
-		for(auto& attrib : m_attributes) {
-			if(attrib != nullptr)
-				attrib->resize(length);
-		}
-		m_attribLength = length;
+		std::cout << "Resizing attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
+		if constexpr(IS_FACE)
+			m_mesh.resize(m_mesh.n_vertices(), m_mesh.n_edges(), length);
+		else
+			m_mesh.resize(length, m_mesh.n_edges(), m_mesh.n_faces());
 	}
 
 	// Read the attribute between start and start+count from the stream
 	template < class T >
 	std::size_t restore(const AttributeHandle<T>& hdl, util::IByteReader& stream,
 						std::size_t start, std::size_t count) {
+		std::cout << "Restoring attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
 		mAssert(hdl.index() < m_attributes.size());
 		if(start >= m_attribLength)
 			return 0u;
-		if(m_attributes[hdl.index()] == nullptr)
+		if(!m_attributes[hdl.index()].is_valid())
 			return 0u;
-		auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
+
+		T* data = m_mesh.property(PropType<T>{ m_attributes[hdl.index()].idx() }).data_vector().data();
 		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
-		return stream.read(reinterpret_cast<char*>(&prop.data_vector().data()[start]),
-						   bytes) / sizeof(T);
+		return stream.read(reinterpret_cast<char*>(data), bytes) / sizeof(T);
 	}
 
 	// Write the attribute to the stream
@@ -554,25 +583,37 @@ public:
 		mAssert(hdl.index() < m_attributes.size());
 		if(start >= m_attribLength)
 			return 0u;
-		if(m_attributes[hdl.index()] == nullptr)
+		if(!m_attributes[hdl.index()].hdl.is_valid())
 			return 0u;
-		const auto& prop = dynamic_cast<OpenMesh::PropertyT<T>&>(*m_attributes[hdl.index()]);
+
+		const T* data = m_mesh.property(PropType<T> { m_attributes[hdl.index()].idx() }).data_vector().data();
 		std::size_t bytes = sizeof(T) * (std::min(count, m_attribLength - start));
-		return stream.write(reinterpret_cast<const char*>(&prop.data_vector().data()[start]),
-							bytes) / sizeof(T);
+		return stream.write(reinterpret_cast<char*>(data), bytes) / sizeof(T);
 	}
 
 	// Unloads the attribute pool from the device
 	void unload() {
 		// TODO: is this even possible?
-		//throw std::runtime_error("Unloading OpenMesh data is not supported yet");
 	}
 
-	template < Device dev, bool owning = true >
-	void synchronize(AttributePool<dev, owning>& pool) {
-		(void)pool;
-		// Needs to be specialized on a per-device basis
-		throw std::runtime_error("This synchronization is not implemented yet");
+	template < Device dev, class = std::enable_if_t<dev != Device::CPU> >
+	void synchronize(AttributePool<dev>& pool) {
+		std::size_t currOffset = 0u;
+		pool.make_present();
+
+		// Loop to copy the attributes
+		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
+			auto attrib = m_attributes[i];
+			if(attrib.is_valid()) {
+				// Copy the current attribute into the buffer
+				auto[propPtr, currLength] = m_accessors[i](attrib, m_mesh);
+				if constexpr(dev == Device::CUDA)
+					Allocator::copy_cuda<char>(&pool.get_pool_data()[currOffset], propPtr, currLength);
+				else
+					throw std::runtime_error("Missing OpenGL copy");
+				currOffset += currLength;
+			}
+		}
 	}
 
 	// Returns the length of the attributes
@@ -582,12 +623,7 @@ public:
 
 	// Returns the current size of the pool in bytes
 	std::size_t get_byte_count() const noexcept {
-		std::size_t bytes = 0u;
-		for(auto attribute : m_attributes) {
-			if(attribute != nullptr)
-				bytes += attribute->size_of();
-		}
-		return bytes;
+		return m_accumElemSize * m_attribLength;
 	}
 
 	// Returns whether the pool is currently allocated
@@ -601,24 +637,53 @@ public:
 	}
 
 private:
-	std::size_t m_attribLength;
-	std::vector<OpenMesh::BaseProperty*> m_attributes; // Non-owning pointer to OpenMesh attribute
-	std::vector<std::function<char*(OpenMesh::BaseProperty&)>> m_accessors; // Accessors to attribute
+	geometry::PolygonMeshType& m_mesh;
+	std::size_t m_attribLength = 0u;
+	std::size_t m_accumElemSize = 0u;
+	std::vector<OpenMesh::BaseHandle> m_attributes; // Attribute handle, later to be retrieved
+	std::vector<std::function<std::pair<char*, std::size_t>(OpenMesh::BaseHandle,
+															geometry::PolygonMeshType&)>> m_accessors; // Accessors to attribute
 };
 
 // Function overloads for "unified" call syntay
-template < Device changedDev, Device syncDev, bool changedOwns, bool syncOwns>
-void synchronize(AttributePool<changedDev, changedOwns>& changed, AttributePool<syncDev, syncOwns>& sync) {
+template < Device changedDev, Device syncDev >
+void synchronize(AttributePool<changedDev>& changed, AttributePool<syncDev>& sync) {
 	changed.template synchronize<>(sync);
+}
+template < Device changedDev, bool isFace >
+void synchronize(AttributePool<changedDev>& changed, OmAttributePool<isFace>& sync) {
+	changed.template synchronize<>(sync);
+}
+template < bool isFace, Device syncedDev >
+void synchronize(OmAttributePool<isFace>& changed, AttributePool<syncedDev>& sync) {
+	changed.template synchronize<>(sync);
+}
+template < bool isFace, bool syncFace >
+void synchronize(OmAttributePool<isFace>& changed, OmAttributePool<syncFace>& sync) {
+	throw std::runtime_error("Attempted synchronization between same devices");
 }
 
 template <>
-void AttributePool<Device::CPU, true>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
+void AttributePool<Device::CPU>::synchronize<Device::CUDA>(AttributePool<Device::CUDA>& pool);
 template <>
-void AttributePool<Device::CPU, false>::synchronize<Device::CUDA, true>(AttributePool<Device::CUDA, true>& pool);
-template <>
-void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, true>(AttributePool<Device::CPU, true>& pool);
-template <>
-void AttributePool<Device::CUDA, true>::synchronize<Device::CPU, false>(AttributePool<Device::CPU, false>& pool);
+void AttributePool<Device::CUDA>::synchronize<Device::CPU>(AttributePool<Device::CPU>& pool);
+
+// Synchronization specialization from CUDA to CPU (non-owning)
+template < bool isFace >
+void AttributePool<Device::CUDA>::synchronize(OmAttributePool<isFace>& pool) {
+	pool.make_present();
+	std::size_t currOffset = 0u;
+
+	// Loop to copy the attributes
+	for(std::size_t i = 0u; i < pool.m_attributes.size(); ++i) {
+		auto attrib = pool.m_attributes[i];
+		if(attrib.is_valid()) {
+			// Copy from the contiguous buffer into the attributes
+			auto[propPtr, currLength] = pool.m_accessors[i](attrib, pool.m_mesh);
+			Allocator::copy_cpu<char>(propPtr, &this->get_pool_data()[currOffset], currLength);
+			currOffset += currLength;
+		}
+	}
+}
 
 }} // namespace mufflon::scene

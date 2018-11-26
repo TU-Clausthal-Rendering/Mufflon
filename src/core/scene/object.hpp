@@ -31,7 +31,7 @@ struct ObjectData {
 	std::size_t quadCount;
 	ei::Box aabb;
 	util::Range<geometry::Polygons::FaceIterator> faces;
-	geometry::Polygons::Attribute<OpenMesh::Vec3f>& faceVertices;
+	geometry::Polygons::VertexAttribute<OpenMesh::Vec3f>& faceVertices;
 	geometry::Spheres::Attribute<geometry::Spheres::Sphere>& spheres;
 };
 
@@ -190,7 +190,7 @@ public:
 	// Initializes the acceleration structure to a given implementation.
 	template < class Accel, class... Args >
 	void set_accel_structure(Args&& ...args) {
-		m_accel_struct = std::make_unique<Accel>(std::forward<Args>(args)...);
+		m_accelStruct = std::make_unique<Accel>(std::forward<Args>(args)...);
 	}
 	// (Re-)builds the acceleration structure.
 	void build_accel_structure();

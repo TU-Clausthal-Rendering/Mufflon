@@ -283,7 +283,7 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
             <ATTRIBUTES>'       // Optional Vertex attributes
             <TRIANGLES>'
             <QUADS>'
-			(T+Q)*u16'           // Material indices (<MATID> from <MATERIALS_HEADER>)
+			(T+Q)*u16'           // Material indices (<MATID> from <MATERIALS_HEADER>, in order: first triangles, then quads)
             <ATTRIBUTES>'        // Optional list of face attributes (in order: first triangles, then quads)
             <SPHERES>'
     <VERTEXDATA> = V*3*f32      // Positions (vec3, in meter [m])

@@ -211,6 +211,13 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 		}
 	}
 
+	// Check if the resulting scene has issues with size
+	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
+	   || ei::len(m_scene->get_bounding_box().max) >= SUGGESTED_MAX_SCENE_SIZE)
+		logWarning("[WorldContainer::load_scene] Scene size is larger than recommended "
+				   "(Furthest point of the bounding box should not be further than "
+				   "2^20m away)");
+
 	// Add regular lights
 	for(const std::string_view& name : scenario.get_light_names()) {
 		if(auto pointLight = get_point_light(name); pointLight.has_value()) {

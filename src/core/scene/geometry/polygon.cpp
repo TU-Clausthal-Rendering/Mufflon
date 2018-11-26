@@ -11,11 +11,13 @@ namespace mufflon::scene::geometry {
 
 // Default construction, creates material-index attribute.
 Polygons::Polygons() :
-	m_meshData(),
-	m_pointsAttr(this->aquire(create_points_handle())),
-	m_normalsAttr(this->aquire(create_normals_handle())),
-	m_uvsAttr(this->aquire(create_uvs_handle())),
-	m_matIndexAttr(this->aquire(create_mat_index_handle())) {
+	m_meshData(std::make_unique<PolygonMeshType>()),
+	m_vertexAttributes(*m_meshData),
+	m_faceAttributes(*m_meshData),
+	m_pointsAttrHdl(create_points_handle()),
+	m_normalsAttrHdl(create_normals_handle()),
+	m_uvsAttrHdl(create_uvs_handle()),
+	m_matIndexAttrHdl(create_mat_index_handle()) {
 	// Invalidate bounding box
 	m_boundingBox.min = {
 		std::numeric_limits<float>::max(),
@@ -30,12 +32,14 @@ Polygons::Polygons() :
 }
 
 // Creates polygon from already-created mesh.
-Polygons::Polygons(MeshType&& mesh) :
-	m_meshData(mesh),
-	m_pointsAttr(this->aquire(create_points_handle())),
-	m_normalsAttr(this->aquire(create_normals_handle())),
-	m_uvsAttr(this->aquire(create_uvs_handle())),
-	m_matIndexAttr(this->aquire(create_mat_index_handle())) {
+Polygons::Polygons(PolygonMeshType&& mesh) :
+	m_meshData(std::make_unique<PolygonMeshType>(std::move(mesh))),
+	m_vertexAttributes(*m_meshData),
+	m_faceAttributes(*m_meshData),
+	m_pointsAttrHdl(create_points_handle()),
+	m_normalsAttrHdl(create_normals_handle()),
+	m_uvsAttrHdl(create_uvs_handle()),
+	m_matIndexAttrHdl(create_mat_index_handle()) {
 	// Invalidate bounding box
 	m_boundingBox.min = {
 		std::numeric_limits<float>::max(),
@@ -50,21 +54,21 @@ Polygons::Polygons(MeshType&& mesh) :
 }
 
 void Polygons::resize(std::size_t vertices, std::size_t edges, std::size_t faces) {
-	m_meshData.resize(vertices, edges, faces);
+	m_meshData->resize(vertices, edges, faces);
 	m_vertexAttributes.resize(vertices);
 	m_faceAttributes.resize(faces);
 }
 
 Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 								   const UvCoordinate& uv) {
-	mAssert(m_meshData.has_vertex_normals());
-	mAssert(m_meshData.has_vertex_texcoords2D());
-	VertexHandle vh = m_meshData.add_vertex(util::pun<OpenMesh::Vec3f>(point));
+	mAssert(m_meshData->has_vertex_normals());
+	mAssert(m_meshData->has_vertex_texcoords2D());
+	VertexHandle vh = m_meshData->add_vertex(util::pun<OpenMesh::Vec3f>(point));
 	// Resize the attribute and set the vertex data
 	m_vertexAttributes.resize(m_vertexAttributes.get_size() + 1u);
-	(*m_pointsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
-	(*m_normalsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
-	(*m_uvsAttr.aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
+	(*get_points().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
+	(*get_normals().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
+	(*get_uvs().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
 	return vh;
@@ -72,10 +76,10 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2) {
-	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData.n_vertices());
-	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData.n_vertices());
-	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData.n_vertices());
-	FaceHandle hdl = m_meshData.add_face(v0, v1, v2);
+	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData->n_vertices());
+	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData->n_vertices());
+	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData->n_vertices());
+	FaceHandle hdl = m_meshData->add_face(v0, v1, v2);
 	mAssert(hdl.is_valid());
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
@@ -86,7 +90,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
-	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
+	(*get_mat_indices().aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
 
@@ -110,11 +114,11 @@ Polygons::TriangleHandle Polygons::add(const std::array<VertexHandle, 3u>& verti
 
 Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 								   const VertexHandle& v2, const VertexHandle& v3) {
-	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData.n_vertices());
-	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData.n_vertices());
-	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData.n_vertices());
-	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData.n_vertices());
-	FaceHandle hdl = m_meshData.add_face(v0, v1, v2, v3);
+	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData->n_vertices());
+	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData->n_vertices());
+	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData->n_vertices());
+	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData->n_vertices());
+	FaceHandle hdl = m_meshData->add_face(v0, v1, v2, v3);
 	mAssert(hdl.is_valid());
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
@@ -126,7 +130,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   const VertexHandle& v2, const VertexHandle& v3,
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
-	(*m_matIndexAttr.aquire<>())[hdl.idx()] = idx;
+	(*get_mat_indices().aquire<>())[hdl.idx()] = idx;
 	return hdl;
 }
 
@@ -152,19 +156,19 @@ Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices,
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& normalStream, util::IByteReader& uvStream) {
-	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData.n_vertices();
+	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData->n_vertices();
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
 
 	// Read the attributes
-	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
-	std::size_t readNormals = m_normalsAttr.restore(normalStream, start, count);
-	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	std::size_t readPoints = get_points().restore(pointStream, start, count);
+	std::size_t readNormals = get_normals().restore(normalStream, start, count);
+	std::size_t readUvs = get_uvs().restore(uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = *m_pointsAttr.aquireConst();
+	const OpenMesh::Vec3f* points = *get_points().aquireConst();
 	for(std::size_t i = start; i < start + readPoints; ++i) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
@@ -176,17 +180,17 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& normalStream, util::IByteReader& uvStream,
 											  const ei::Box& boundingBox) {
-	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData.n_vertices();
+	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData->n_vertices();
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
 
 	// Read the attributes
-	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
-	std::size_t readNormals = m_normalsAttr.restore(normalStream, start, count);
-	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	std::size_t readPoints = get_points().restore(pointStream, start, count);
+	std::size_t readNormals = get_normals().restore(normalStream, start, count);
+	std::size_t readUvs = get_uvs().restore(uvStream, start, count);
 	// Expand the bounding box
 	m_boundingBox.max = ei::max(boundingBox.max, m_boundingBox.max);
 	m_boundingBox.min = ei::min(boundingBox.min, m_boundingBox.min);
@@ -196,18 +200,18 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& uvStream) {
-	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData.n_vertices();
+	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData->n_vertices();
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
 
 	// Read the attributes
-	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
-	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	std::size_t readPoints = get_points().restore(pointStream, start, count);
+	std::size_t readUvs = get_uvs().restore(uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = *m_pointsAttr.aquireConst();
+	const OpenMesh::Vec3f* points = *get_points().aquireConst();
 	for(std::size_t i = start; i < start + readPoints; ++i) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
@@ -218,16 +222,16 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& uvStream, const ei::Box& boundingBox) {
-	mAssert(m_meshData.n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData.n_vertices();
+	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	std::size_t start = m_meshData->n_vertices();
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData.n_edges(), m_meshData.n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
 
 	// Read the attributes
-	std::size_t readPoints = m_pointsAttr.restore(pointStream, start, count);
-	std::size_t readUvs = m_uvsAttr.restore(uvStream, start, count);
+	std::size_t readPoints = get_points().restore(pointStream, start, count);
+	std::size_t readUvs = get_uvs().restore(uvStream, start, count);
 	// Expand the bounding box
 	m_boundingBox.max = ei::max(boundingBox.max, m_boundingBox.max);
 	m_boundingBox.min = ei::min(boundingBox.min, m_boundingBox.min);
@@ -235,9 +239,9 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	return { hdl, readPoints, 0u, readUvs };
 }
 
-void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, Real>& tessellater,
+void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMeshType, Real>& tessellater,
 				std::size_t divisions) {
-	tessellater(m_meshData, divisions);
+	tessellater(*m_meshData, divisions);
 	// TODO: change number of triangles/quads!
 	// Flag the entire polygon as dirty
 	m_vertexAttributes.mark_changed<>();
@@ -254,10 +258,10 @@ void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<MeshType, R
 	logInfo("Adaptively tessellated polygon mesh with ", divisions, " subdivisions");
 }*/
 
-void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
+void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 				std::size_t target_vertices) {
-	decimater.mesh() = m_meshData;
-	std::size_t targetDecimations = m_meshData.n_vertices() - target_vertices;
+	decimater.mesh() = *m_meshData;
+	std::size_t targetDecimations = m_meshData->n_vertices() - target_vertices;
 	std::size_t actualDecimations = decimater.decimate_to(target_vertices);
 	// Flag the entire polygon as dirty
 	// TODO: change number of triangles/quads!
@@ -265,6 +269,34 @@ void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<MeshType>& decimater,
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
 			" decimations performed");
 	// TODO: this leaks mesh outside
+}
+
+Polygons::VertexAttributeHandle<OpenMesh::Vec3f> Polygons::create_points_handle() {
+	OpenMesh::VPropHandleT<OpenMesh::Vec3f> omHandle = m_meshData->points_pph();
+	mAssert(omHandle.is_valid());
+	OpenMesh::PropertyT<OpenMesh::Vec3f>& pointsProp = m_meshData->property(omHandle);
+	VertexAttributeHdl<OpenMesh::Vec3f> customHandle = m_vertexAttributes.add<OpenMesh::Vec3f>(pointsProp.name(), omHandle);
+	return { std::move(omHandle), std::move(customHandle) };
+}
+
+Polygons::VertexAttributeHandle<OpenMesh::Vec3f> Polygons::create_normals_handle() {
+	OpenMesh::VPropHandleT<OpenMesh::Vec3f> omHandle = m_meshData->vertex_normals_pph();
+	mAssert(omHandle.is_valid());
+	OpenMesh::PropertyT<OpenMesh::Vec3f>& normalsProp = m_meshData->property(omHandle);
+	VertexAttributeHdl<OpenMesh::Vec3f> customHandle = m_vertexAttributes.add<OpenMesh::Vec3f>(normalsProp.name(), omHandle);
+	return { std::move(omHandle), std::move(customHandle) };
+}
+
+Polygons::VertexAttributeHandle<OpenMesh::Vec2f> Polygons::create_uvs_handle() {
+	OpenMesh::VPropHandleT<OpenMesh::Vec2f> omHandle = m_meshData->vertex_texcoords2D_pph();
+	mAssert(omHandle.is_valid());
+	OpenMesh::PropertyT<OpenMesh::Vec2f>& uvsProp = m_meshData->property(omHandle);
+	VertexAttributeHdl<OpenMesh::Vec2f> customHandle = m_vertexAttributes.add<OpenMesh::Vec2f>(uvsProp.name(), omHandle);
+	return { std::move(omHandle), std::move(customHandle) };
+}
+
+Polygons::FaceAttributeHandle<MaterialIndex> Polygons::create_mat_index_handle() {
+	return this->request<FaceAttributeHandle<MaterialIndex>>("materialIndex");
 }
 
 } // namespace mufflon::scene::geometry

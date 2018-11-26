@@ -387,7 +387,7 @@ void BinaryLoader::read_lod() {
 }
 
 void BinaryLoader::read_object(const u64 globalLod,
-							   const std::unordered_map<std::string_view, u64> localLods) {
+							   const std::unordered_map<std::string_view, u64>& localLods) {
 	m_currObjState.name = read<std::string>();
 	m_currObjState.keyframe = read<u32>();
 	m_currObjState.animObjId = read<u32>();
@@ -480,13 +480,13 @@ void BinaryLoader::load_file(const u64 globalLod,
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' does not exist");
 
 	// Open the binary file and enable exception management
-	std::ifstream m_fileStream(m_filePath, std::ios::in | std::ios::binary);
-	if(m_fileStream.bad())
+	m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
+	if(m_fileStream.bad() || m_fileStream.fail())
 		throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + '\'');
 	m_fileStream.exceptions(std::ifstream::failbit);
 	// Needed to get a C file descriptor offset
 	const std::ifstream::pos_type fileStart = m_fileStream.tellg();
-	logInfo("[", FUNCTION_NAME, "] Reading binary file '", m_filePath.string(), '\'');
+	logInfo("[", FUNCTION_NAME, "] Reading binary file '", m_filePath.string(), "'");
 
 	// Read the materials header
 	if(read<u32>() != MATERIALS_HEADER_MAGIC)

@@ -379,12 +379,32 @@ void JsonLoader::load_file() {
 	binary::BinaryLoader binLoader{ m_binaryFile };
 	// Choose first one in JSON - no guarantees
 	if(m_defaultScenario.empty())
-		m_scenarios->value.MemberBegin()->name.GetString();
+		m_defaultScenario = m_scenarios->value.MemberBegin()->name.GetString();
 	// Partially parse the default scenario
 	m_state.current = ParserState::Level::SCENARIOS;
 	const Value& defScen = get(m_state, m_scenarios->value, &m_defaultScenario[0u])->value;
+	const u64 defaultGlobalLod = read_opt<u64>(m_state, defScen, "lod", 0u);
+	std::unordered_map<std::string_view, u64> defaultLocalLods;
+	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
+	if(objPropsIter != defScen.MemberEnd()) {
+		m_state.objectNames.push_back(&m_defaultScenario[0u]);
+		m_state.objectNames.push_back("objectProperties");
+		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
+			std::string_view objectName = propIter->name.GetString();
+			m_state.objectNames.push_back(&objectName[0u]);
+			const Value& object = propIter->value;
+			assertObject(m_state, object);
+			// Check for object name meta-tag
+			if(std::strncmp(&objectName[0u], "[obj:", 5u) != 0)
+				continue;
+			std::string_view subName = objectName.substr(5u, objectName.length() - 6u);
+			auto lodIter = get(m_state, object, "lod", false);
+			if(lodIter != object.MemberEnd())
+				defaultLocalLods.insert({ subName, read<u64>(m_state, lodIter) });
+		}
+	}
 	// TODO
-	//binLoader.load_file();
+	binLoader.load_file(defaultGlobalLod, defaultLocalLods);
 
 	// Cameras
 	m_state.current = ParserState::Level::ROOT;
@@ -398,6 +418,7 @@ void JsonLoader::load_file() {
 	// Scenarios
 	m_state.current = ParserState::Level::ROOT;
 	load_scenarios();
+
 
 	// TODO: parse binary file
 }

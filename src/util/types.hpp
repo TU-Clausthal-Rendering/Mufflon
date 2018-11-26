@@ -48,7 +48,7 @@ public:
 	__host__ __device__ float operator/(AreaPdf pdf) const noexcept {
 		return m_pdf / pdf.m_pdf;
 	}
-	__host__ __device__ constexpr AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
+	__host__ __device__ AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
 	__host__ __device__ static constexpr AreaPdf infinite() {
 		return AreaPdf{ std::numeric_limits<float>::infinity() };
 	}
@@ -89,7 +89,7 @@ public:
 	__host__ __device__ float operator/(AngularPdf pdf) const noexcept {
 		return m_pdf / pdf.m_pdf;
 	}
-	__host__ __device__ constexpr AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
+	__host__ __device__ AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
 		return AreaPdf{ m_pdf * ei::abs(cos) / distSqr };
 	}
 	__host__ __device__ static constexpr AngularPdf infinite() {
@@ -100,7 +100,7 @@ private:
 	Real m_pdf = 0.f;
 };
 
-__host__ __device__ constexpr AngularPdf AreaPdf::to_angular_pdf(Real cos, Real distSqr) const noexcept {
+__host__ __device__ inline AngularPdf AreaPdf::to_angular_pdf(Real cos, Real distSqr) const noexcept {
 	return AngularPdf{ m_pdf * distSqr / ei::abs(cos) };
 }
 

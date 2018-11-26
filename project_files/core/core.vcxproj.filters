@@ -184,6 +184,9 @@
     <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\attr_test.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -671,6 +674,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\filesystem.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp">
+      <Filter>Source Files\core\scene\geometry</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

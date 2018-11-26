@@ -26,6 +26,8 @@ public:
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 	using TexCacheHandle = std::map<std::string, textures::Texture, std::less<>>::iterator;
 
+	static constexpr float SUGGESTED_MAX_SCENE_SIZE = 1024.f*1024.f;
+
 	WorldContainer(const WorldContainer&) = delete;
 	WorldContainer& operator=(const WorldContainer&) = delete;
 

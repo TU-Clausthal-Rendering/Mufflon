@@ -24,6 +24,7 @@
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\scene\accel_structs\lbvh.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
+    <ClCompile Include="..\..\src\core\scene\attr_test.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
@@ -170,6 +171,7 @@
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
+    <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp" />
     <ClInclude Include="..\..\src\core\scene\handles.hpp" />
     <ClInclude Include="..\..\src\core\scene\instance.hpp" />
@@ -273,8 +275,8 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SupportJustMyCode>false</SupportJustMyCode>
-      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /D/Y "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
@@ -318,8 +320,8 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

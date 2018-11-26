@@ -26,11 +26,11 @@ public:
 	// Basic type definitions
 	using Index = u32;
 	using SphereHandle = std::size_t;
-	using AttributeListType = AttributeList<false>;
+	using AttributeListType = AttributeList<Device::CPU>;
 	template < class T >
 	using AttributeHandle = typename AttributeListType::template AttributeHandle<T>;
 	template < class T >
-	using Attribute = typename AttributeListType::template Attribute<T>;
+	using Attribute = typename AttributeListType::template BaseAttribute<T>;
 
 	// Struct communicating the number of bulk-read spheres
 	struct BulkReturn {
@@ -59,7 +59,7 @@ public:
 
 	// Default construction, creates material-index attribute.
 	Spheres();
-	Spheres(const Spheres&) = default;
+	Spheres(const Spheres&) = delete;
 	Spheres(Spheres&&) = default;
 	Spheres& operator=(const Spheres&) = delete;
 	Spheres& operator=(Spheres&&) = delete;
@@ -132,17 +132,17 @@ public:
 	}
 
 	Attribute<Sphere>& get_spheres() {
-		return m_sphereData;
+		return this->aquire(m_sphereData);
 	}
 	const Attribute<Sphere>& get_spheres() const {
-		return m_sphereData;
+		return this->aquire(m_sphereData);
 	}
 
 	Attribute<MaterialIndex>& get_mat_indices() {
-		return m_matIndex;
+		return this->aquire(m_matIndex);
 	}
 	const Attribute<MaterialIndex>& get_mat_indices() const {
-		return m_matIndex;
+		return this->aquire(m_matIndex);
 	}
 	
 	// Synchronizes the default attributes position, normal, uv, matindex 
@@ -166,8 +166,8 @@ public:
 
 private:
 	AttributeListType m_attributes;
-	Attribute<Sphere>& m_sphereData;
-	Attribute<MaterialIndex>& m_matIndex;
+	AttributeHandle<Sphere> m_sphereData;
+	AttributeHandle<MaterialIndex> m_matIndex;
 	ei::Box m_boundingBox;
 };
 
