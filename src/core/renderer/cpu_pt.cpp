@@ -76,8 +76,8 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			ei::Vec3{1, 1, 1}
 		};
 		
-		ei::Vec2 xy { coord.x / static_cast<float>(m_currentScene->get_resolution().x),
-					  coord.y / static_cast<float>(m_currentScene->get_resolution().y) };
+		ei::Vec2 xy { coord.x / static_cast<float>(outputBuffer.get_width()),
+					  coord.y / static_cast<float>(outputBuffer.get_height()) };
 		xy *= math::sample_uniform( m_rngs[pixel].next() );
 		ei::Vec3 testRadiance = colors[0u] * (1.f - xy.x)*(1.f - xy.y) + colors[1u] * xy.x*(1.f - xy.y)
 			+ colors[2u] * (1.f - xy.x)*xy.y + colors[3u] * xy.x*xy.y;

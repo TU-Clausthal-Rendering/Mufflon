@@ -15,15 +15,8 @@ GpuPathTracer::GpuPathTracer(scene::SceneHandle scene) :
 void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// TODO: call sample in a parallel way for each output pixel
 
-	const ei::IVec2& resolution = m_currentScene->get_resolution();
-	if(resolution.x <= 0 || resolution.y <= 0) {
-		logError("[GpuPathTracer::iterate] Invalid resolution (<= 0)");
-		return;
-	}
-	cuda::check_error(cudaPeekAtLastError());
-
 	// TODO: pass scene data to kernel!
-	this->iterate(m_currentScene->get_resolution(), std::move(m_currentScene->get_light_tree<Device::CUDA>()),
+	this->iterate(outputBuffer.get_resolution(), std::move(m_currentScene->get_light_tree<Device::CUDA>()),
 				  std::move(outputBuffer.begin_iteration<Device::CUDA>(m_reset)));
 	m_reset = false;
 

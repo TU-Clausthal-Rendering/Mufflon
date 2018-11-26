@@ -202,7 +202,8 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	posLights.reserve(m_pointLights.size() + m_spotLights.size());
 	dirLights.reserve(m_dirLights.size());
 
-	m_scene = std::make_unique<Scene>(scenario.get_camera(), scenario.get_resolution());
+	m_scenario = &scenario;
+	m_scene = std::make_unique<Scene>(scenario.get_camera());
 	for(auto& instance : m_instances) {
 		if(!scenario.is_masked(&instance.get_object())) {
 			m_scene->add_instance(&instance);

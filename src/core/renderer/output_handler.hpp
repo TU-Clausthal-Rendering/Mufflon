@@ -96,6 +96,7 @@ struct RenderBuffer {
 
 	__host__ __device__ int get_width() const { return m_resolution.x; }
 	__host__ __device__ int get_height() const { return m_resolution.y; }
+	__host__ __device__ ei::IVec2 get_resolution() const { return m_resolution; }
 };
 
 // Kind of a multiple-platform multiple-render-target.
@@ -121,6 +122,7 @@ public:
 	int get_width() const { return m_width; }
 	int get_height() const { return m_height; }
 	int get_num_pixels() const { return m_width * m_height; }
+	ei::IVec2 get_resolution() const { return {m_width, m_height}; }
 private:
 	// In each block either none, m_iter... only, or all three are defined.
 	// If variances is required all three will be used and m_iter resets every iteration.

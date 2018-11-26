@@ -136,6 +136,7 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 		*m_cumulativeTex[quantity].aquireConst<Device::CPU>();
 
 	// TODO: openmp
+	if(normalizer != 1.0f)
 	for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x) {
 		ei::Vec4 value = read(tex, Pixel{x,y});
 		value *= normalizer;

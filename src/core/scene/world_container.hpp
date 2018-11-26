@@ -39,6 +39,8 @@ public:
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name
 	ScenarioHandle get_scenario(const std::string_view& name);
+	// Get the scenario for which load_scene() was called last.
+	ConstScenarioHandle get_current_scenario() const { return m_scenario; }
 
 	/*
 	 * Add a ready to use material to the scene. The material must be loaded completely.
@@ -143,6 +145,7 @@ private:
 	// TODO: cameras, lights, materials
 
 	// Current scene
+	ConstScenarioHandle m_scenario = nullptr;
 	std::unique_ptr<Scene> m_scene = nullptr;
 };
 

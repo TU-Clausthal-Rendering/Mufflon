@@ -20,9 +20,8 @@ namespace mufflon { namespace scene {
  */
 class Scene {
 public:
-	Scene(ConstCameraHandle cam, ei::IVec2 resolution) :
-		m_camera(cam),
-		m_resolution(std::move(resolution)) {}
+	Scene(ConstCameraHandle cam) :
+		m_camera(cam) {}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = default;
 	Scene& operator=(const Scene&) = delete;
@@ -110,10 +109,6 @@ public:
 		return m_camera;
 	}
 
-	constexpr const ei::IVec2& get_resolution() const noexcept {
-		return m_resolution;
-	}
-
 private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
@@ -128,7 +123,6 @@ private:
 	bool m_accelDirty = false;
 	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
 
-	const ei::IVec2 m_resolution = {};
 	ei::Box m_boundingBox;
 };
 

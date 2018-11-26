@@ -316,7 +316,7 @@ Boolean display_screenshot() {
 	glDetachShader(program, geomShader);
 	glDetachShader(program, fragShader);
 
-	ei::IVec2 res = WorldContainer::instance().get_current_scene()->get_resolution();
+	ei::IVec2 res = s_imageOutput->get_resolution();
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, res.x, res.y, 0, GL_RGBA, GL_FLOAT,
 		s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::RADIANCE },
 			textures::Format::RGBA32F, false).data());
@@ -1696,8 +1696,8 @@ Boolean render_enable_renderer(RendererType type) {
 		logError("[", FUNCTION_NAME, "] Cannot enable renderer before scene hasn't been set");
 		return false;
 	}
-	s_imageOutput = std::make_unique<renderer::OutputHandler>(scene->get_resolution().x,
-															scene->get_resolution().y,
+	ei::IVec2 res = WorldContainer::instance().get_current_scenario()->get_resolution();
+	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y,
 															s_outputTargets);
 	switch(type) {
 		case RendererType::RENDERER_CPU_PT: {
@@ -1764,7 +1764,7 @@ Boolean render_save_screenshot(const char* filename) {
 			return;
 		}
 		file.write("PF\n", 3);
-		ei::IVec2 res = WorldContainer::instance().get_current_scene()->get_resolution();
+		ei::IVec2 res = s_imageOutput->get_resolution();
 		auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
 		file.write(sizes.c_str(), sizes.length());
 		file.write("\n-1.000000\n", 11);
