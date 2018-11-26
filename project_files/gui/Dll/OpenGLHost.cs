@@ -35,6 +35,8 @@ namespace gui.Dll
         // render thread (asynchronous openGL drawing)
         private Thread m_renderThread;
         private bool m_isRunning = true;
+        private bool m_isRendering = false;
+        public bool IsRendering { set => m_isRendering = value; }
         private readonly ConcurrentQueue<string> m_commandQueue = new ConcurrentQueue<string>();
 
         // helper to detect resize in render thread
@@ -105,7 +107,7 @@ namespace gui.Dll
                     HandleCommands();
                     HandleResize();
 
-                    if(toggleRenderer)
+                    /*if(toggleRenderer)
                     {
                         if (rendererType == Core.RendererType.CPU_PT)
                             rendererType = Core.RendererType.GPU_PT;
@@ -115,17 +117,17 @@ namespace gui.Dll
                         if (!Core.render_enable_renderer(rendererType))
                             throw new Exception(Core.GetDllError());
                         toggleRenderer = false;
-                    }
+                    }*/
 
-                    if(!Core.render_iterate())
-                      throw new Exception(Core.GetDllError());
-                    if (!Core.display_screenshot())
-                        throw new Exception(Core.GetDllError());
-                    if(!Gdi32.SwapBuffers(m_deviceContext))
-                        throw new Win32Exception(Marshal.GetLastWin32Error());
-                    // TODO: Why is this called in the renderloop?
-                    //if(!Core.render_reset())
-                    //    throw new Exception(Core.GetDllError());
+                    if (m_isRendering)
+                    {
+                        if (!Core.render_iterate())
+                            throw new Exception(Core.GetDllError());
+                        if (!Core.display_screenshot())
+                            throw new Exception(Core.GetDllError());
+                        if (!Gdi32.SwapBuffers(m_deviceContext))
+                            throw new Win32Exception(Marshal.GetLastWin32Error());
+                    }
                 }
             }
             catch (Exception e)

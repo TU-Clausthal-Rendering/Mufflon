@@ -22,6 +22,7 @@ namespace gui.ViewModel
         {
             m_models = models;
             PlayPauseCommand = new PlayPauseCommand(models);
+            ResetCommand = new ResetCommand(models);
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
         }
 
@@ -30,8 +31,7 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(RendererModel.IsRendering):
-                    // TODO: this is only for testing purposes
-                    OpenGLHost.toggleRenderer = true;
+                    m_models.App.GlHost.IsRendering = m_models.Renderer.IsRendering;
 
                     OnPropertyChanged(nameof(PauseIconVisibility));
                     OnPropertyChanged(nameof(PlayIconVisibility));
@@ -46,6 +46,7 @@ namespace gui.ViewModel
             m_models.Renderer.IsRendering ? Visibility.Visible : Visibility.Collapsed;
 
         public ICommand PlayPauseCommand { get; }
+        public ICommand ResetCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

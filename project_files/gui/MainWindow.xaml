@@ -63,7 +63,7 @@
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button>
+                    <Button Command="{Binding Toolbar.ResetCommand}">
                         <Image 
                             Source="Icons/restart.png"
                             Width="16"
