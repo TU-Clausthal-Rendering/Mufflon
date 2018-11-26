@@ -194,7 +194,7 @@ void BinaryLoader::read_normal_uncompressed_vertices() {
 								 + std::to_string(m_currObjState.lodLevel));
 	if(pointsRead != m_currObjState.numVertices || normalsRead != m_currObjState.numVertices
 	   || uvsRead != m_currObjState.numVertices)
-		throw std::runtime_error("Not all vertices were fully read'" + m_currObjState.name
+		throw std::runtime_error("Not all vertices were fully read for object '" + m_currObjState.name
 								 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	// Seek to the faces
 	m_fileStream.seekg((2u * 3u + 2u) * sizeof(float) * m_currObjState.numVertices, std::ios_base::cur);

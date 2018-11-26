@@ -184,8 +184,8 @@
     <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\attr_test.cpp">
-      <Filter>Source Files\core\scene</Filter>
+    <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -702,9 +702,6 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu">
       <Filter>Source Files\core\scene\accel_structs</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\src\core\renderer\output_handler.cpp">
-      <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
       <Filter>Source Files\core\renderer</Filter>

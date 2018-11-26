@@ -441,22 +441,10 @@ public:
 		m_mesh(mesh)
 	{}
 	OmAttributePool(const OmAttributePool&) = delete;
-	OmAttributePool(OmAttributePool&& pool) :
-		m_mesh(pool.m_mesh),
-		m_attribLength(pool.m_attribLength),
-		m_accumElemSize(pool.m_accumElemSize),
-		m_attributes(std::move(pool.m_attributes)),
-		m_accessors(std::move(pool.m_accessors)) {
-		std::cout << "Moving OmAttributePool<" << IS_FACE << "> from "
-			<< reinterpret_cast<std::uintptr_t>(&pool) << " to "
-			<< reinterpret_cast<std::uintptr_t>(this) << std::endl;
-	}
+	OmAttributePool(OmAttributePool&&) = default;
 	OmAttributePool& operator=(const OmAttributePool&) = delete;
 	OmAttributePool& operator=(OmAttributePool&&) = delete;
-	~OmAttributePool() {
-		std::cout << "Deleting OmAttributePool<" << IS_FACE << "> (" 
-			<< reinterpret_cast<std::uintptr_t>(this) << ")" << std::endl;
-	}
+	~OmAttributePool() = default;
 
 	// Helper class identifying an attribute in the pool
 	template < class T >
@@ -481,7 +469,6 @@ public:
 	// Adds a new vertex attribute to the pool
 	template < class T >
 	AttributeHandle<T> add(PropType<T> hdl) {
-		std::cout << "Adding attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
 		auto& prop = m_mesh.property(hdl);
 		// Ensure that the property is at the same size
 		prop.resize(m_attribLength);
@@ -511,7 +498,6 @@ public:
 	// Removes the given attribute from the pool
 	template < class T >
 	bool remove(const AttributeHandle<T>& hdl) {
-		std::cout << "Removing attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
 		if(hdl.index() >= m_attributes.size())
 			return false;
 		if(!m_attributes[hdl.index()].is_valid())
@@ -553,7 +539,6 @@ public:
 
 	// Resizes all attributes to the given length
 	void resize(std::size_t length) {
-		std::cout << "Resizing attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
 		if constexpr(IS_FACE)
 			m_mesh.resize(m_mesh.n_vertices(), m_mesh.n_edges(), length);
 		else
@@ -564,7 +549,6 @@ public:
 	template < class T >
 	std::size_t restore(const AttributeHandle<T>& hdl, util::IByteReader& stream,
 						std::size_t start, std::size_t count) {
-		std::cout << "Restoring attribute (" << reinterpret_cast<std::uintptr_t>(this) << ", " << IS_FACE << ")" << std::endl;
 		mAssert(hdl.index() < m_attributes.size());
 		if(start >= m_attribLength)
 			return 0u;
