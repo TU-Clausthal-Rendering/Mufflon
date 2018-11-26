@@ -36,6 +36,7 @@ struct RenderBuffer {
 	scene::textures::TextureDevHandle_t<dev> m_normal = {};
 	scene::textures::TextureDevHandle_t<dev> m_albedo = {};
 	scene::textures::TextureDevHandle_t<dev> m_lightness = {};
+	ei::IVec2 m_resolution;
 
 	// Handle contribution of connection and merge events
 	__host__ __device__ void contribute(Pixel pixel,
@@ -92,6 +93,9 @@ struct RenderBuffer {
 			write(m_lightness, pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 	}
+
+	__host__ __device__ int get_width() const { return m_resolution.x; }
+	__host__ __device__ int get_height() const { return m_resolution.y; }
 };
 
 // Kind of a multiple-platform multiple-render-target.
@@ -113,6 +117,10 @@ public:
 	// exportFormat: The format of the pixels in the vector (includes elementary type and number of channels).
 	// exportSRgb: Convert the values from linear to sRGB before packing the data into the exportFormat.
 	scene::textures::CpuTexture get_data(OutputValue which, scene::textures::Format exportFormat, bool exportSRgb);
+
+	int get_width() const { return m_width; }
+	int get_height() const { return m_height; }
+	int get_num_pixels() const { return m_width * m_height; }
 private:
 	// In each block either none, m_iter... only, or all three are defined.
 	// If variances is required all three will be used and m_iter resets every iteration.
@@ -122,8 +130,8 @@ private:
 	scene::textures::Texture m_cumulativeVarTex[5];		// Accumulate the variance
 	OutputValue m_targets;
 	int m_iteration;			// Number of completed iterations / index of current one
-	u16 m_width;
-	u16 m_height;
+	int m_width;
+	int m_height;
 
 
 	void update_variance_cuda(scene::textures::TextureDevHandle_t<Device::CUDA> iterTex,

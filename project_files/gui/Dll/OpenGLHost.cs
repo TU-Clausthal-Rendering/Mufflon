@@ -123,8 +123,9 @@ namespace gui.Dll
                         throw new Exception(Core.GetDllError());
                     if(!Gdi32.SwapBuffers(m_deviceContext))
                         throw new Win32Exception(Marshal.GetLastWin32Error());
-                    if(!Core.render_reset())
-                        throw new Exception(Core.GetDllError());
+                    // TODO: Why is this called in the renderloop?
+                    //if(!Core.render_reset())
+                    //    throw new Exception(Core.GetDllError());
                 }
             }
             catch (Exception e)

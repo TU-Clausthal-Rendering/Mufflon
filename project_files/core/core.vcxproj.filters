@@ -324,9 +324,6 @@
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\util\dyntype_memory.hpp">
-      <Filter>Source Files\util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>

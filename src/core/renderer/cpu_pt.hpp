@@ -24,6 +24,8 @@ public:
 private:
 	// Create one sample path (actual PT algorithm)
 	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer);
+	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
+	void initRngs(int num);
 
 	bool m_reset = true;
 	scene::SceneHandle m_currentScene;

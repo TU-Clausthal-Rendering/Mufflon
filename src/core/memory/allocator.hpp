@@ -92,6 +92,8 @@ public:
 		cuda::check_error(cudaMalloc(&ptr, sizeof(T) * n));
 		if(ptr == nullptr)
 			throw BadAllocation<DEVICE>();
+		// TODO: initialize only if necessary? But when is this.
+		// - not for elementary types like char, int, ... except there is an 'args'?
 		// Initialize it
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");

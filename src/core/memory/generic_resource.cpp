@@ -23,9 +23,9 @@ void GenericResource::synchronize() {
 }
 
 // Explicit instanciations
-template <> void GenericResource::synchronize<Device::CPU, Device::CPU>();
-template <> void GenericResource::synchronize<Device::CPU, Device::CUDA>();
-template <> void GenericResource::synchronize<Device::CUDA, Device::CPU>();
-template <> void GenericResource::synchronize<Device::CUDA, Device::CUDA>();
+template void GenericResource::synchronize<Device::CPU, Device::CPU>();
+template void GenericResource::synchronize<Device::CPU, Device::CUDA>();
+template void GenericResource::synchronize<Device::CUDA, Device::CPU>();
+template void GenericResource::synchronize<Device::CUDA, Device::CUDA>();
 
 } // namespace mufflon

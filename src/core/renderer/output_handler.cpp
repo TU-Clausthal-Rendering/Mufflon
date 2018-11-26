@@ -34,6 +34,9 @@ OutputHandler::OutputHandler(u16 width, u16 height, OutputValue targets) :
 	m_width(width),
 	m_height(height)
 {
+	if(width <= 0 || height <= 0) {
+		logError("[OutputHandler::OutputHandler] Invalid resolution (<= 0)");
+	}
 }
 
 template < Device dev >
@@ -65,6 +68,7 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 		}
 		++i;
 	}
+	rb.m_resolution = ei::IVec2{m_width, m_height};
 
 	return std::move(rb);
 }
@@ -94,7 +98,7 @@ void OutputHandler::end_iteration() {
 				TextureDevHandle_t<Device::CPU> cumTex = *m_cumulativeTex[i].aquire<Device::CPU>();
 				TextureDevHandle_t<Device::CPU> varTex = *m_cumulativeVarTex[i].aquire<Device::CPU>();
 				// TODO: openmp
-				for(int y = 0; y < int(m_height); ++y) for(int x = 0; x < int(m_width); ++x)
+				for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x)
 					update_variance(iterTex, cumTex, varTex, x, y, float(m_iteration));
 			}
 			// TODO: opengl

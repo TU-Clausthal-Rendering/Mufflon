@@ -20,23 +20,20 @@ CpuPathTracer::CpuPathTracer(scene::SceneHandle scene) :
 }
 
 void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
-	// TODO: call sample in a parallel way for each output pixel
-
-	const ei::IVec2& resolution = m_currentScene->get_resolution();
-	if(resolution.x <= 0 || resolution.y <= 0) {
-		logError("[CpuPathTracer::iterate] Invalid resolution (<= 0)");
-		return;
-	}
+	// (Re) create the random number generators
+	if(m_rngs.size() != outputBuffer.get_num_pixels()
+		|| m_reset)
+		initRngs(outputBuffer.get_num_pixels());
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_reset = false;
 
-	const i32 PIXEL_COUNT = resolution.x * resolution.y;
+	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 //#pragma omp parallel for
-	for(int pixel = 0; pixel < PIXEL_COUNT; ++pixel) {
-		this->sample(Pixel{ pixel % resolution.x, pixel / resolution.x }, buffer);
+	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
+		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
@@ -47,6 +44,7 @@ void CpuPathTracer::reset() {
 }
 
 void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer) {
+	int pixel = coord.x + coord.y * outputBuffer.get_width();
 	// TODO: Create a start for the path
 	//RaySample camVertex = sample_ray(reinterpret_cast<const cameras::CameraParams*>(m_cameraParams.data()),
 	//	coord, outputBuffer->get_resolution(), rndSet);
@@ -78,16 +76,22 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			ei::Vec3{1, 1, 1}
 		};
 		
-		float x = coord.x / static_cast<float>(m_currentScene->get_resolution().x);
-		float y = coord.y / static_cast<float>(m_currentScene->get_resolution().y);
-		x *= static_cast<u32>(m_rngs[0].next()) / static_cast<float>(std::numeric_limits<u32>::max());
-		y *= static_cast<u32>(m_rngs[0].next()) / static_cast<float>(std::numeric_limits<u32>::max());
-		ei::Vec3 testRadiance = colors[0u] * (1.f - x)*(1.f - y) + colors[1u] * x*(1.f - y)
-			+ colors[2u] * (1.f - x)*y + colors[3u] * x*y;
+		ei::Vec2 xy { coord.x / static_cast<float>(m_currentScene->get_resolution().x),
+					  coord.y / static_cast<float>(m_currentScene->get_resolution().y) };
+		xy *= math::sample_uniform( m_rngs[pixel].next() );
+		ei::Vec3 testRadiance = colors[0u] * (1.f - xy.x)*(1.f - xy.y) + colors[1u] * xy.x*(1.f - xy.y)
+			+ colors[2u] * (1.f - xy.x)*xy.y + colors[3u] * xy.x*xy.y;
 		outputBuffer.contribute(coord, head.throughput, testRadiance,
 								ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 								ei::Vec3{ 0, 0, 0 });
 	}
+}
+
+void CpuPathTracer::initRngs(int num) {
+	m_rngs.resize(num);
+	// TODO: incude some global seed into the initialization
+	for(int i = 0; i < num; ++i)
+		m_rngs[i] = math::Rng(i);
 }
 
 } // namespace mufflon::renderer

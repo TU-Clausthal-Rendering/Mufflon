@@ -21,10 +21,26 @@ CUDA_FUNCTION u64 scramble_seed(u32 x) {
 // http://vigna.di.unimi.it/xorshift/xoroshiro128plus.c
 class Xoroshiro128 {
 public:
+	__host__ __device__ Xoroshiro128() {
+		m_state[0] = 0x2f0ae9bc;
+		m_state[1] = 0x6431af73;
+	}
+
 	__host__ __device__ Xoroshiro128(u32 seed) {
 		m_state[1] = scramble_seed(seed);
 		m_state[0] = scramble_seed(seed+1);
 		next();
+	}
+
+	// Restore the RNG from a pure state
+	__host__ __device__ Xoroshiro128(const ei::UVec4& state) {
+		m_state[0] = u64(state.x) | (u64(state.y) << 32ull);
+		m_state[1] = u64(state.z) | (u64(state.w) << 32ull);
+	}
+	// Dump the state (e.g. for storing in textures)
+	ei::UVec4 get_state() const {
+		return {m_state[0] & 0xfffffff, m_state[0] >> 32ull,
+				m_state[1] & 0xfffffff, m_state[1] >> 32ull};
 	}
 
 	__host__ __device__ u64 next() {
@@ -54,6 +70,10 @@ private:
 // TODO: test which one is faster.
 class PCG64 {
 public:
+	__host__ __device__ PCG64() {
+		m_state = 0x2f0ae9bc6431af73ull;
+	}
+
 	__host__ __device__ PCG64(u32 seed) {
 		m_state = scramble_seed(seed);
 		next();

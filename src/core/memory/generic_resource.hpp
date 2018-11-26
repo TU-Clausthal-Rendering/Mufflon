@@ -13,6 +13,7 @@ namespace mufflon {
 class GenericResource {
 public:
 	GenericResource() : m_size(0) {}
+	GenericResource(std::size_t size) : m_size(size) {}
 
 	/* 
 	 * Set the size for future allocations. All internal memories will be
