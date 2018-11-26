@@ -108,6 +108,10 @@ public:
 	ConstCameraHandle get_camera() const noexcept {
 		return m_camera;
 	}
+	template < Device dev >
+	const cameras::CameraParams* get_camera_data() const noexcept {
+		return m_cameraParams.get<dev, cameras::CameraParams>();
+	}
 
 private:
 	// List of instances and thus objects to-be-rendered

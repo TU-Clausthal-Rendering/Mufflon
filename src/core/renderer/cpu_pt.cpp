@@ -1,12 +1,16 @@
 #include "cpu_pt.hpp"
 #include "path_util.hpp"
+#include "random_walk.hpp"
 #include "output_handler.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/camera_sampling.hpp"
+#include "core/scene/materials/medium.hpp"
 #include "core/math/rng.hpp"
 #include <random>
 
 namespace mufflon::renderer {
+
+using PtPathVertex = PathVertex<u8, 4>;
 
 CpuPathTracer::CpuPathTracer(scene::SceneHandle scene) :
 	m_currentScene(scene)
@@ -45,13 +49,26 @@ void CpuPathTracer::reset() {
 
 void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
-	// TODO: Create a start for the path
-	//RaySample camVertex = sample_ray(reinterpret_cast<const cameras::CameraParams*>(m_cameraParams.data()),
-	//	coord, outputBuffer->get_resolution(), rndSet);
-	// TODO setup from camera
-	PathHead head{
-		Throughput{ei::Vec3{1.0f}, 1.0f}
-	};
+	// Create a start for the path
+	const cameras::CameraParams& cam = *m_currentScene->get_camera_data<Device::CPU>();
+	cameras::RndSet camRnd { math::sample_uniform(m_rngs[pixel].next()),
+							 math::sample_uniform(m_rngs[pixel].next()) };
+	cameras::RaySample camSample = camera_sample_ray(cam, coord, ei::Vec2{outputBuffer.get_resolution()}, camRnd);
+	// Setup first "vertex" from camera
+	//ei::Ray ray{camSample.origin, camSample.excident};
+	Throughput throughput {ei::Vec3{1.0f}, 1.0f};
+	PtPathVertex vertex; // TODO: larger buffer
+	scene::materials::Medium medium;
+
+
+	/*PathHead head {
+		Throughput{ei::Vec3{camVertex.w / float(camVertex.pdf)}, 1.0f},
+		camVertex.origin,
+		camVertex.pdf,
+		ei::Vec3{0.0f},
+		AngularPdf{0.0f},
+		cam.type == cameras::CameraModel::ORTHOGRAPHIC ? Interaction::CAMERA_ORTHO : Interaction::CAMERA
+	};*/
 
 	int pathLen = 0;
 	do {
@@ -59,14 +76,18 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 			// TODO: Call NEE member function for the camera start/recursive vertices
 			// TODO: Walk
-			//head = walk(head);
-			break;
+			scene::materials::RndSet rnd { math::sample_uniform(m_rngs[pixel].next()), m_rngs[pixel].next() >> 32 };
+			scene::materials::Sample sample = vertex.sample(rnd);
+			scene::accel_struct::RayIntersectionResult nextHit;
+			if(!walk(ei::Ray(vertex.get_position(), sample.excident), sample.pdfF,
+				sample.throughput, medium, 0.0f, throughput, nextHit))
+				break;
 		}
 		++pathLen;
-	} while(pathLen < 666 && head.type != Interaction::VOID);
+	} while(pathLen < 666);
 
 	// Random walk ended because of missing the scene?
-	if(pathLen < 666 && head.type == Interaction::VOID) {
+	if(pathLen < 666) {
 		// TODO: fetch background
 		// TODO: normals, position???
 		constexpr ei::Vec3 colors[4]{
@@ -81,7 +102,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		xy *= math::sample_uniform( m_rngs[pixel].next() );
 		ei::Vec3 testRadiance = colors[0u] * (1.f - xy.x)*(1.f - xy.y) + colors[1u] * xy.x*(1.f - xy.y)
 			+ colors[2u] * (1.f - xy.x)*xy.y + colors[3u] * xy.x*xy.y;
-		outputBuffer.contribute(coord, head.throughput, testRadiance,
+		outputBuffer.contribute(coord, throughput, testRadiance,
 								ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 								ei::Vec3{ 0, 0, 0 });
 	}

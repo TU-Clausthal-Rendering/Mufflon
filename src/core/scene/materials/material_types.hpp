@@ -14,13 +14,17 @@ namespace mufflon { namespace scene { namespace materials {
 		float u0;	// In [0,1)
 		float u1;	// In [0,1)
 		u32 i0;		// Full 32 bit random information
+
+		RndSet(ei::Vec2 u01, u32 i0) :
+			u0(u01.x), u1(u01.y),
+			i0(i0) {}
 	};
 
 	// Return value of an importance sampler
 	struct Sample {
 		Spectrum throughput {1.0f};		// BxDF * cosθ / pdfF
-		Direction excident {0.0f};		// The sampled direction
 		AngularPdf pdfF {0.0f};			// Sampling PDF in forward direction (current sampler)
+		Direction excident {0.0f};		// The sampled direction
 		AngularPdf pdfB {0.0f};			// Sampling PDF with reversed incident and excident directions
 		enum class Type: u32 {			// Type of interaction
 			INVALID,

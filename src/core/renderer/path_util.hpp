@@ -7,6 +7,7 @@
 #include "core/scene/materials/material_types.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
+#include "core/cameras/camera_sampling.hpp"
 #include <ei/conversions.hpp>
 
 namespace mufflon { namespace renderer {
@@ -26,17 +27,6 @@ enum class Interaction : u16 {
 struct Throughput {
 	Spectrum weight;
 	float guideWeight;
-};
-
-// Collection of parameters produced by a random walk
-// TODO: vertex customization?
-struct PathHead {
-	Throughput throughput;			// General throughput with guide heuristics
-	scene::Point position;
-	AngularPdf prevPdfF;			// Forward PDF of the last sampling PDF
-	scene::Direction incident;		// May be zero-vector for start points
-	AngularPdf prevPdfB;			// Backward PDF of the last sampling PDF
-	Interaction type;
 };
 
 /*
@@ -78,6 +68,12 @@ public:
 			return referencePosition - m_position * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
 		if(m_type == Interaction::CAMERA_ORTHO)
 			return referencePosition; // TODO project to near plane
+		return m_position;
+	}
+
+	// Get the position of the vertex. For orthographic vertices an assertion is issued
+	scene::Point get_position() const {
+		mAssertMsg(!is_orthographic(), "Implementation error. Orthogonal vertices have no position.");
 		return m_position;
 	}
 
@@ -179,6 +175,11 @@ public:
 			}
 		}
 		return scene::materials::EvalValue{};
+	}
+
+	scene::materials::Sample sample(const scene::materials::RndSet& rndSet) const {
+		// TODO
+		return scene::materials::Sample{};
 	}
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.

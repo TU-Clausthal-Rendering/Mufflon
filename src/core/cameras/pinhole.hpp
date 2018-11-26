@@ -63,7 +63,7 @@ pinholecam_sample_ray(const PinholeParams& params, const Pixel& coord, const ei:
 	float pdf = 1.0f / (pixelArea * dirWorldNormalized.z * dirWorldNormalized.z * dirWorldNormalized.z);
 	return RaySample{
 		params.position + dirWorld * params.near,
-		pdf,
+		AngularPdf{ pdf },
 		dirWorldNormalized,
 		pdf		// W is the same as the PDF by construction
 	};

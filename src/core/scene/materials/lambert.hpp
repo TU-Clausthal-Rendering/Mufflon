@@ -59,8 +59,8 @@ lambert_sample(const LambertParameterPack& params,
 	// Copy the sign for two sided diffuse
 	return Sample {
 		Spectrum{params.albedo},
-		excidentTS * ei::sgn(incidentTS.z),
 		AngularPdf(excidentTS.z / ei::PI),
+		excidentTS * ei::sgn(incidentTS.z),
 		AngularPdf(ei::abs(incidentTS.z) / ei::PI),
 		Sample::Type::REFLECTED
 	};

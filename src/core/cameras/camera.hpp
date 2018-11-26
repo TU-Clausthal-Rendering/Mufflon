@@ -60,8 +60,10 @@ public:
 	virtual ~Camera() = default;
 
 	// The name of the camera as used by the scenario setup.
+#ifndef __CUDACC__
 	const std::string_view& get_name() const noexcept { return m_name; }
 	void set_name(std::string_view name) { m_name = name; }
+#endif
 
 	const scene::Direction get_x_dir() const noexcept { return {m_viewSpace.m00, m_viewSpace.m01, m_viewSpace.m02}; }
 	// The y-axis is up
@@ -117,7 +119,7 @@ protected:
 	float m_near {1e-10f};		// Optional near clipping distance
 	float m_far {1e10f};		// Optional far clipping distance
 private:
-	std::string_view m_name;
+	std::string m_name;
 };
 
 /*
@@ -130,12 +132,17 @@ struct RndSet {
 	float u1;	// In [0,1)
 	float u2;	// In [0,1)
 	float u3;	// In [0,1)
+
+	RndSet(ei::Vec2 u01, ei::Vec2 u23) :
+		u0(u01.x), u1(u01.y),
+		u2(u23.x), u3(u23.y) {}
 };
 
 struct RaySample {
 	// TODO: data layout? (currently set for GPU friendly padding)
+	// TODO: per area pdf
 	scene::Point origin {0.0f};			// Position on the near plane to start the ray
-	float pdf {0.0f};					// The camera sampling PDF
+	AngularPdf pdf {0.0f};				// The camera sampling PDF
 	scene::Direction excident {0.0f};	// The sampled direction
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };

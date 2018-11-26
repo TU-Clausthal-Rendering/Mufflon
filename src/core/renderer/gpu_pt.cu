@@ -24,9 +24,7 @@ __global__ static void sample(Pixel imageDims,
 	//Photon p = emit(lightTree, 1u, 2u, 12345u, ei::Box{ ei::Vec3{0,0,0},ei::Vec3{1,1,1} }, rnd);
 	//printf("PDF: %f\n", static_cast<float>(p.dir.pdf));
 
-	PathHead head{
-		Throughput{ei::Vec3{1.0f}, 1.0f}
-	};
+	Throughput throughput {ei::Vec3{1.0f}, 1.0f};
 	int pathLen = 0;
 	do {
 		if(pathLen < 666) { // TODO: min and max pathLen bounds
@@ -37,10 +35,10 @@ __global__ static void sample(Pixel imageDims,
 			break;
 		}
 		++pathLen;
-	} while(pathLen < 666 && head.type != Interaction::VOID);
+	} while(pathLen < 666);
 
 	// Random walk ended because of missing the scene?
-	if(pathLen < 666 && head.type == Interaction::VOID) {
+	if(pathLen < 666) {
 		constexpr ei::Vec3 colors[4]{
 				ei::Vec3{0, 0, 1},
 				ei::Vec3{0, 1, 0},
@@ -54,7 +52,7 @@ __global__ static void sample(Pixel imageDims,
 			y *= rnds[2 * (coord.x + coord.y * imageDims.x) + 1];
 			ei::Vec3 testRadiance = colors[0u] * (1.f - x)*(1.f - y) + colors[1u] * x*(1.f - y)
 				+ colors[2u] * (1.f - x)*y + colors[3u] * x*y;
-			outputBuffer.contribute(coord, head.throughput, testRadiance,
+			outputBuffer.contribute(coord, throughput, testRadiance,
 									ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 									ei::Vec3{ 0, 0, 0 });
 		}

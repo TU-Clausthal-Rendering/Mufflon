@@ -20,7 +20,7 @@ camera_sample_ray(const CameraParams& params, const Pixel& coord, const ei::Vec2
 	switch(params.type) {
 		case CameraModel::PINHOLE: {
 			return pinholecam_sample_ray(static_cast<const PinholeParams&>(params), coord, resolution, rndSet);
-		} break;
+		}
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[cameras::sample_ray] Trying to evaluate unimplemented camera model ", params.type);
@@ -36,7 +36,7 @@ camera_project(const CameraParams& params, const ei::Vec2& resolution, const sce
 	switch(params.type) {
 		case CameraModel::PINHOLE: {
 			return pinholecam_project(static_cast<const PinholeParams&>(params), resolution, position);
-		} break;
+		}
 		default: ;
 #ifndef __CUDA_ARCH__
 			logWarning("[cameras::project] Trying to evaluate unimplemented camera model ", params.type);
