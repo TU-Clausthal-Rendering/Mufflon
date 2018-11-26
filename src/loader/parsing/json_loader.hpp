@@ -5,6 +5,7 @@
 #include "util/filesystem.hpp"
 #include <rapidjson/document.h>
 #include <string>
+#include <map>
 
 namespace loader::json {
 
@@ -40,7 +41,7 @@ private:
 	void load_cameras();
 	void load_lights();
 	void load_materials();
-	void load_scenarios();
+	void load_scenarios(const std::vector<std::string>& binMatNames);
 
 	const fs::path m_filePath;
 	std::string m_jsonString;
@@ -52,6 +53,7 @@ private:
 	std::string_view m_version;
 	fs::path m_binaryFile;
 	std::string_view m_defaultScenario;
+	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
 	ParserState m_state;
 };
 

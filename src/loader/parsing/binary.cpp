@@ -493,60 +493,71 @@ void BinaryLoader::read_instances() {
 
 void BinaryLoader::load_file(const u64 globalLod,
 							 const std::unordered_map<std::string_view, u64>& localLods) {
-	this->clear_state();
-	if(!fs::exists(m_filePath))
-		throw std::runtime_error("Binary file '" + m_filePath.string() + "' does not exist");
+	try {
+		if(!fs::exists(m_filePath))
+			throw std::runtime_error("Binary file '" + m_filePath.string() + "' does not exist");
 
-	// Open the binary file and enable exception management
-	m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
-	if(m_fileStream.bad() || m_fileStream.fail())
-		throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + '\'');
-	m_fileStream.exceptions(std::ifstream::failbit);
-	// Needed to get a C file descriptor offset
-	const std::ifstream::pos_type fileStart = m_fileStream.tellg();
-	logInfo("[", FUNCTION_NAME, "] Reading binary file '", m_filePath.string(), "'");
+		// Open the binary file and enable exception management
+		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
+		if(m_fileStream.bad() || m_fileStream.fail())
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + '\'');
+		m_fileStream.exceptions(std::ifstream::failbit);
+		// Needed to get a C file descriptor offset
+		const std::ifstream::pos_type fileStart = m_fileStream.tellg();
+		logInfo("[", FUNCTION_NAME, "] Reading binary file '", m_filePath.string(), "'");
 
-	// Read the materials header
-	if(read<u32>() != MATERIALS_HEADER_MAGIC)
-		throw std::runtime_error("Invalid materials header magic constant");
-	const u64 objectStart = read<u64>();
-	const u32 numMaterials = read<u32>();
-	// Read the material names (and implicitly their indices)
-	m_materialNames.reserve(numMaterials);
-	for(u32 i = 0u; i < numMaterials; ++i)
-		m_materialNames.push_back(read<std::string>());
+		// Read the materials header
+		if(read<u32>() != MATERIALS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid materials header magic constant");
+		const u64 objectStart = read<u64>();
+		const u32 numMaterials = read<u32>();
+		// Read the material names (and implicitly their indices)
+		m_materialNames.reserve(numMaterials);
+		for(u32 i = 0u; i < numMaterials; ++i) {
+			std::string& name = m_materialNames.emplace_back();
+			u32 nameLength = read<u32>();
+			name.resize(nameLength + 6u); // Extra 6 chars for [mat:...] wrapping
+			for(u32 i = 0u; i < nameLength; ++i)
+				name[i + 5u] = read<char>();
+		}
 
-	// Jump to the location of objects
-	m_fileStream.seekg(objectStart, std::ifstream::beg);
-	// Parse the object header
-	if(read<u32>() != OBJECTS_HEADER_MAGIC)
-		throw std::runtime_error("Invalid objects header magic constant");
-	const u64 instanceStart = read<u64>();
+		// Jump to the location of objects
+		m_fileStream.seekg(objectStart, std::ifstream::beg);
+		// Parse the object header
+		if(read<u32>() != OBJECTS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid objects header magic constant");
+		const u64 instanceStart = read<u64>();
 
-	// Parse the object jumptable
-	std::vector<u64> objJumpTable(read<u32>());
-	for(std::size_t i = 0u; i < objJumpTable.size(); ++i)
-		objJumpTable[i] = read<u64>();
+		// Parse the object jumptable
+		std::vector<u64> objJumpTable(read<u32>());
+		for(std::size_t i = 0u; i < objJumpTable.size(); ++i)
+			objJumpTable[i] = read<u64>();
 
-	// Next come the objects
-	for(std::size_t i = 0u; i < objJumpTable.size(); ++i) {
-		// Jump to the right position in file
-		m_fileStream.seekg(objJumpTable[i], std::ifstream::beg);
-		// Read the object flags
-		m_currObjState.flags = ObjectFlag{ read<u32>() };
+		// Next come the objects
+		for(std::size_t i = 0u; i < objJumpTable.size(); ++i) {
+			// Jump to the right position in file
+			m_fileStream.seekg(objJumpTable[i], std::ifstream::beg);
+			// Read the object flags
+			m_currObjState.flags = ObjectFlag{ read<u32>() };
 
-		// Read object
-		if(read<u32>() != OBJECT_MAGIC)
-			throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ')');
-		read_object(globalLod, localLods);
+			// Read object
+			if(read<u32>() != OBJECT_MAGIC)
+				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ')');
+			read_object(globalLod, localLods);
+		}
+
+		// Now come instances
+		m_fileStream.seekg(instanceStart, std::ios_base::beg);
+		if(read<u32>() != INSTANCE_MAGIC)
+			throw std::runtime_error("Invalid instance magic constant");
+		read_instances();
+
+		this->clear_state();
+	} catch(const std::exception&) {
+		// Clean up before leaving throwing
+		this->clear_state();
+		throw;
 	}
-
-	// Now come instances
-	m_fileStream.seekg(instanceStart, std::ios_base::beg);
-	if(read<u32>() != INSTANCE_MAGIC)
-		throw std::runtime_error("Invalid instance magic constant");
-
-	read_instances();
 }
 
 } // namespace loader::binary

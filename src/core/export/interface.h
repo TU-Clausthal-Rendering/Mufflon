@@ -419,9 +419,9 @@ CORE_API Boolean CDECL scenario_add_light(ScenarioHdl scenario, const char* name
 CORE_API Boolean CDECL scenario_remove_light_by_index(ScenarioHdl scenario, size_t index);
 CORE_API Boolean CDECL scenario_remove_light_by_named(ScenarioHdl scenario, const char* name);
 CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,
-														 const char* name);
+													 const char* name, size_t nameLength);
 CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,
-													 const char* name);
+												 const char* name, size_t nameLength);
 CORE_API MaterialHdl CDECL scenario_get_assigned_material(ScenarioHdl scenario,
 														  MatIdx index);
 CORE_API Boolean CDECL scenario_assign_material(ScenarioHdl scenario, MatIdx index,

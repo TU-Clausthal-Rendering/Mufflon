@@ -24,7 +24,10 @@ public:
 
 	void load_file(const mufflon::u64 globalLod,
 				   const std::unordered_map<std::string_view, mufflon::u64>& localLods);
-	void clear_state();
+
+	const std::vector<std::string>& get_material_names() const noexcept {
+		return m_materialNames;
+	}
 
 private:
 	static constexpr mufflon::u32 MATERIALS_HEADER_MAGIC = 'M' | ('a' << 8u) | ('t' << 16u) | ('s' << 24u);
@@ -97,6 +100,9 @@ private:
 		return val;
 	}
 
+	// Cleans up the internal data structures
+	void clear_state();
+
 	static AttribDesc map_bin_attrib_type(AttribType type);
 	AttribState read_uncompressed_attribute();
 	void read_normal_compressed_vertices();
@@ -121,6 +127,7 @@ private:
 	std::ifstream::pos_type m_fileStart;
 	ObjectState m_currObjState;
 	// Parsed data
+	// The material names are wrapped in [mat:...] for ease of use in the JSON parser
 	std::vector<std::string> m_materialNames;
 	std::vector<ObjectHdl> m_objectHandles;
 };

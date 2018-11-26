@@ -60,6 +60,7 @@ void JsonLoader::clear_state() {
 	m_jsonString.clear();
 	m_state.reset();
 	m_binaryFile.clear();
+	m_materialMap.clear();
 }
 
 TextureHdl JsonLoader::load_texture(const char* name) {
@@ -427,11 +428,15 @@ void JsonLoader::load_materials() {
 			free_material(mat);
 			throw;
 		}
-		world_add_material(matIter->name.GetString(), mat);
+		auto hdl = world_add_material(matIter->name.GetString(), mat);
+		free_material(mat);
+		if(hdl == nullptr)
+			throw std::runtime_error("Failed to add material to world");
+		m_materialMap.emplace(matIter->name.GetString(), hdl);
 	}
 }
 
-void JsonLoader::load_scenarios() {
+void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 	using namespace rapidjson;
 	const Value& scenarios = m_scenarios->value;
 	assertObject(m_state, scenarios);
@@ -504,19 +509,23 @@ void JsonLoader::load_scenarios() {
 			m_state.objectNames.pop_back();
 		}
 
+		// Associate binary with JSON material names
 		auto materialsIter = get(m_state, scenario, "materialAssignments");
 		m_state.objectNames.push_back(materialsIter->name.GetString());
 		assertObject(m_state, materialsIter->value);
-		for(auto matIter = materialsIter->value.MemberBegin(); matIter != materialsIter->value.MemberEnd(); ++matIter) {
-			std::string_view matName = matIter->name.GetString();
-			m_state.objectNames.push_back(&matName[0u]);
-			// Check for object name meta-tag
-			if(std::strncmp(&matName[0u], "[mat:", 5u) != 0)
-				continue;
-			std::string subName{ matName.substr(5u, matName.length() - 6u) };
-			const std::string_view inScenName = read<const char*>(m_state, matIter->value);
-			// TODO: create material association
-			// TODO: check if all materials were associated
+		for(const std::string& binName : binMatNames) {
+			// The binary names from the loader already wrap the name in the desired format
+			std::string_view matName = read<const char*>(m_state, get(m_state, materialsIter->value,
+																 binName.c_str()));
+			// Offset to remove the [mat:...] wrapping
+			MatIdx slot = scenario_declare_material_slot(scenarioHdl, &binName.c_str()[5u], binName.length() - 6u);
+			if(slot == INVALID_MATERIAL)
+				throw std::runtime_error("Failed to declare material slot");
+			auto matHdl = m_materialMap.find(matName);
+			if(matHdl == m_materialMap.cend())
+				throw std::runtime_error("Unknown material name '" + std::string(matName) + "'in association");
+			if(!scenario_assign_material(scenarioHdl, slot, matHdl->second))
+				throw std::runtime_error("Failed to associate material '" + matHdl->first + "'");
 		}
 	}
 }
@@ -613,7 +622,7 @@ void JsonLoader::load_file() {
 		load_materials();
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
-		load_scenarios();
+		load_scenarios(binLoader.get_material_names());
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
 	}

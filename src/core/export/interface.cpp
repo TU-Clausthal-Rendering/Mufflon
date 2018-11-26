@@ -1514,17 +1514,19 @@ Boolean scenario_remove_light_by_named(ScenarioHdl scenario, const char* name) {
 }
 
 MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
-									  const char* name) {
+									  const char* name, std::size_t nameLength) {
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
-	return static_cast<Scenario*>(scenario)->declare_material_slot(name);
+	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
+	return static_cast<Scenario*>(scenario)->declare_material_slot(nameView);
 }
 
 MatIdx scenario_get_material_slot(ScenarioHdl scenario,
-								  const char* name) {
+								  const char* name, std::size_t nameLength) {
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
-	return static_cast<const Scenario*>(scenario)->get_material_slot_index(name);
+	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
+	return static_cast<const Scenario*>(scenario)->get_material_slot_index(nameView);
 }
 
 MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
