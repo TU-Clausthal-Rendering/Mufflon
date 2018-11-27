@@ -656,7 +656,7 @@ VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
 }
 
 Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-								  VertexHdl vertex, void* value) {
+								  VertexHdl vertex, const void* value) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
@@ -675,7 +675,7 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 	return switchAttributeType(attr->type, [&object, attr, vertex, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr));
-		(*attribute.template aquire<Device::CPU>())[vertex] = *static_cast<Type*>(value);
+		(*attribute.template aquire<Device::CPU>())[vertex] = *static_cast<const Type*>(value);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -715,7 +715,7 @@ Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
 }
 
 Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-								FaceHdl face, void* value) {
+								FaceHdl face, const void* value) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
@@ -734,7 +734,7 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 	return switchAttributeType(attr->type, [&object, attr, face, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr));
-		(*attribute.template aquire<Device::CPU>())[face] = *static_cast<Type*>(value);
+		(*attribute.template aquire<Device::CPU>())[face] = *static_cast<const Type*>(value);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -992,7 +992,7 @@ SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 }
 
 Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
-						   SphereHdl sphere, void* value) {
+						   SphereHdl sphere, const void* value) {
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
@@ -1010,7 +1010,7 @@ Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttr<Type> sphereAttr{ static_cast<size_t>(attr->index) };
 		auto& attribute = object.template aquire<Spheres>(sphereAttr);
-		(*attribute.template aquire<Device::CPU>())[sphere] = *static_cast<Type*>(value);
+		(*attribute.template aquire<Device::CPU>())[sphere] = *static_cast<const Type*>(value);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",

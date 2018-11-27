@@ -104,10 +104,19 @@ private:
 		return val;
 	}
 
+	// Reads a value from a character stream
+	template < class T >
+	T read(const unsigned char*& data) {
+		T val = *reinterpret_cast<const T*>(data);
+		data += sizeof(T);
+		return val;
+	}
+
 	// Cleans up the internal data structures
 	void clear_state();
 
 	static AttribDesc map_bin_attrib_type(AttribType type);
+	// Uncompressed data
 	AttribState read_uncompressed_attribute();
 	void read_normal_compressed_vertices();
 	void read_normal_uncompressed_vertices();
@@ -119,6 +128,18 @@ private:
 	void read_uncompressed_sphere_attributes();
 	void read_uncompressed_face_materials();
 	void read_uncompressed_sphere_materials();
+	// Deflated data
+	std::vector<unsigned char> decompress();
+	AttribState read_compressed_attribute(const unsigned char*& data);
+	void read_compressed_normal_compressed_vertices();
+	void read_compressed_normal_uncompressed_vertices();
+	void read_compressed_triangles();
+	void read_compressed_quads();
+	void read_compressed_spheres();
+	void read_compressed_vertex_attributes();
+	void read_compressed_face_attributes();
+	void read_compressed_face_materials();
+	void read_compressed_sphere_attributes(const unsigned char* data);
 
 	void read_instances();
 	void read_object(const mufflon::u64 globalLod,

@@ -29,6 +29,13 @@ typedef struct {
 } Vec3;
 
 typedef struct {
+	float x;
+	float y;
+	float z;
+	float w;
+} Vec4;
+
+typedef struct {
 	uint32_t x;
 	uint32_t y;
 	uint32_t z;
@@ -299,11 +306,11 @@ CORE_API VertexHdl CDECL polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, 
 																 FILE* uvs, Vec3 min, Vec3 max,
 																 size_t* pointsRead, size_t* uvsRead);
 CORE_API Boolean CDECL polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-													VertexHdl vertex, void* value);
+													VertexHdl vertex, const void* value);
 CORE_API Boolean CDECL polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal);
 CORE_API Boolean CDECL polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv);
 CORE_API Boolean CDECL polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
-											FaceHdl face, void* value);
+											FaceHdl face, const void* value);
 CORE_API Boolean CDECL polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx);
 CORE_API size_t CDECL polygon_set_vertex_attribute_bulk(ObjectHdl obj,
 														const PolygonAttributeHandle* attr,
@@ -340,7 +347,7 @@ CORE_API SphereHdl CDECL spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t coun
 													  FILE* stream, Vec3 min, Vec3 max,
 													  size_t* readSpheres);
 CORE_API Boolean CDECL spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
-									   SphereHdl sphere, void* value);
+									   SphereHdl sphere, const void* value);
 CORE_API Boolean CDECL spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere,
 										  MatIdx idx);
 CORE_API size_t CDECL spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* attr,

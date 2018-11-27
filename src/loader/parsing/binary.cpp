@@ -64,7 +64,24 @@ private:
 	FILE* m_desc;
 };
 
+constexpr std::size_t get_attribute_size(AttribDesc desc) {
+	switch(desc.type) {
+		case AttributeType::ATTR_CHAR: return desc.rows * sizeof(i8);
+		case AttributeType::ATTR_UCHAR: return desc.rows * sizeof(u8);
+		case AttributeType::ATTR_SHORT: return desc.rows * sizeof(i16);
+		case AttributeType::ATTR_USHORT: return desc.rows * sizeof(u16);
+		case AttributeType::ATTR_INT: return desc.rows * sizeof(i32);
+		case AttributeType::ATTR_UINT: return desc.rows * sizeof(u32);
+		case AttributeType::ATTR_LONG: return desc.rows * sizeof(i64);
+		case AttributeType::ATTR_ULONG: return desc.rows * sizeof(u64);
+		case AttributeType::ATTR_FLOAT: return desc.rows * sizeof(float);
+		case AttributeType::ATTR_DOUBLE: return desc.rows * sizeof(double);
+		default: return 0u;
+	}
+}
+
 } // namespace
+
 
 
 // Read a string as specified by the file format
@@ -104,6 +121,16 @@ Mat4x3 BinaryLoader::read<Mat4x3>() {
 template <>
 ei::Box BinaryLoader::read<ei::Box>() {
 	return ei::Box{ read<ei::Vec3>(), read<ei::Vec3>() };
+}
+
+template <>
+std::string BinaryLoader::read<std::string>(const unsigned char*& data) {
+	std::string str;
+	u32 size = read<u32>(data);
+	str.resize(size);
+	for(u32 i = 0u; i < size; ++i)
+		str[i] = read<char>(data);
+	return str;
 }
 
 // Clears the loader state
@@ -172,8 +199,8 @@ void BinaryLoader::read_normal_compressed_vertices() {
 										+ std::to_string(m_currObjState.lodLevel));
 	}
 
-	// Seek to the faces
-	m_fileStream.seekg((3u + 2u * 2u) * sizeof(float) * m_currObjState.numVertices, std::ios_base::cur);
+	// Seek to the attributes
+	m_fileStream.seekg(2u * sizeof(float) * m_currObjState.numVertices, std::ios_base::cur);
 }
 
 // Read vertices without deflation and without normal compression
@@ -202,7 +229,7 @@ void BinaryLoader::read_normal_uncompressed_vertices() {
 	   || uvsRead != m_currObjState.numVertices)
 		throw std::runtime_error("Not all vertices were fully read for object '" + m_currObjState.name
 								 + "', LoD " + std::to_string(m_currObjState.lodLevel));
-	// Seek to the faces
+	// Seek to the attributes
 	m_fileStream.seekg((2u * 3u + 2u) * sizeof(float) * m_currObjState.numVertices, std::ios_base::cur);
 }
 
@@ -214,6 +241,15 @@ BinaryLoader::AttribState BinaryLoader::read_uncompressed_attribute() {
 		read<u32>(),
 		map_bin_attrib_type(static_cast<AttribType>(read<u32>())),
 		read<u64>()
+	};
+}
+BinaryLoader::AttribState BinaryLoader::read_compressed_attribute(const unsigned char*& data) {
+	return AttribState{
+		read<std::string>(data),
+		read<std::string>(data),
+		read<u32>(data),
+		map_bin_attrib_type(static_cast<AttribType>(read<u32>(data))),
+		read<u64>(data)
 	};
 }
 
@@ -331,15 +367,8 @@ void BinaryLoader::read_uncompressed_triangles() {
 			throw std::runtime_error("Failed to add triangle to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	}
-	FileDescriptor matIdxs{ m_filePath, "rb" };
-	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	if(polygon_set_material_idx_bulk(m_currObjState.objHdl, static_cast<FaceHdl>(0u),
-									 m_currObjState.numTriangles, matIdxs.get()) == INVALID_SIZE)
-		throw std::runtime_error("Failed to set triangle material for object '" + m_currObjState.name + "', LoD "
-								 + std::to_string(m_currObjState.lodLevel));
 	// Seek to the quads
 	m_fileStream.seekg(3u * sizeof(u32) * m_currObjState.numTriangles, std::ios_base::cur);
-
 }
 
 void BinaryLoader::read_uncompressed_quads() {
@@ -352,12 +381,6 @@ void BinaryLoader::read_uncompressed_quads() {
 			throw std::runtime_error("Failed to add quad to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	}
-	FileDescriptor matIdxs{ m_filePath, "rb" };
-	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	if(polygon_set_material_idx_bulk(m_currObjState.objHdl, static_cast<FaceHdl>(0u),
-									 m_currObjState.numQuads, matIdxs.get()) == INVALID_SIZE)
-		throw std::runtime_error("Failed to set quad material for object '" + m_currObjState.name + "', LoD "
-								 + std::to_string(m_currObjState.lodLevel));
 	// Seek to the material indices
 	m_fileStream.seekg(4u * sizeof(u32) * m_currObjState.numQuads, std::ios_base::cur);
 }
@@ -382,9 +405,222 @@ void BinaryLoader::read_uncompressed_spheres() {
 	read_uncompressed_sphere_attributes();
 }
 
+std::vector<unsigned char> BinaryLoader::decompress() {
+	u32 compressedBytes = read<u32>();
+	u32 decompressedBytes = read<u32>();
+	std::vector<unsigned char> in(compressedBytes);
+	std::vector<unsigned char> out(decompressedBytes);
+	// First read the bytes from the stream
+	m_fileStream.read(reinterpret_cast<char*>(in.data()), compressedBytes);
+	unsigned long outBytes;
+	uncompress(out.data(), &outBytes,
+			   in.data(), static_cast<unsigned long>(in.size()));
+	if(outBytes != static_cast<unsigned long>(decompressedBytes))
+		throw std::runtime_error("Corrupt deflate stream");
+	out.resize(outBytes);
+	return out;
+}
+
+void BinaryLoader::read_compressed_normal_compressed_vertices() {
+	if(m_currObjState.numVertices == 0)
+		return;
+
+	std::vector<unsigned char> vertexData = decompress();
+	const Vec3* points = reinterpret_cast<const Vec3*>(vertexData.data());
+	const u32* packedNormals = reinterpret_cast<const u32*>(vertexData.data() + m_currObjState.numVertices
+													  * 3u * sizeof(float));
+	const Vec2* uvs = reinterpret_cast<const Vec2*>(vertexData.data() + m_currObjState.numVertices
+													* (3u * sizeof(float) + sizeof(u32)));
+	
+	for(u32 vertex = 0u; vertex < m_currObjState.numVertices; ++vertex) {
+		Vec3 unpackedNormal = util::pun<Vec3>(ei::unpackOctahedral32(packedNormals[vertex]));
+
+		if(polygon_add_vertex(m_currObjState.objHdl, points[vertex], unpackedNormal, uvs[vertex]) == INVALID_INDEX)
+			throw std::runtime_error("Failed to add vertex " + std::to_string(vertex)
+									 + " to object '" + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel));
+	}
+}
+
+// Read vertices without deflation and without normal compression
+void BinaryLoader::read_compressed_normal_uncompressed_vertices() {
+	if(m_currObjState.numVertices == 0)
+		return;
+
+	std::vector<unsigned char> vertexData = decompress();
+	const Vec3* points = reinterpret_cast<const Vec3*>(vertexData.data());
+	const Vec3* normals = reinterpret_cast<const Vec3*>(vertexData.data() + m_currObjState.numVertices * 3u * sizeof(float));
+	const Vec2* uvs = reinterpret_cast<const Vec2*>(vertexData.data() + m_currObjState.numVertices * (3u + 3u) * sizeof(float));
+
+	for(u32 vertex = 0u; vertex < m_currObjState.numVertices; ++vertex) {
+		if(polygon_add_vertex(m_currObjState.objHdl, points[vertex], normals[vertex], uvs[vertex]) == INVALID_INDEX)
+			throw std::runtime_error("Failed to add vertex " + std::to_string(vertex)
+									 + " to object '" + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel));
+	}
+}
+
+void BinaryLoader::read_compressed_triangles() {
+	if(m_currObjState.numTriangles == 0)
+		return;
+
+	std::vector<unsigned char> triangleData = decompress();
+	const UVec3* indices = reinterpret_cast<const UVec3*>(triangleData.data());
+	// Read the faces (cannot do that bulk-like)
+	for(u32 tri = 0u; tri < m_currObjState.numTriangles; ++tri) {
+		if(polygon_add_triangle(m_currObjState.objHdl, indices[tri]) == INVALID_INDEX)
+			throw std::runtime_error("Failed to add triangle to object '" + m_currObjState.name
+									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
+	}
+}
+
+void BinaryLoader::read_compressed_quads() {
+	if(m_currObjState.numQuads == 0)
+		return;
+
+	std::vector<unsigned char> quadData = decompress();
+	const UVec4* indices = reinterpret_cast<const UVec4*>(quadData.data());
+	// Read the faces (cannot do that bulk-like)
+	for(u32 quad = 0u; quad < m_currObjState.numQuads; ++quad) {
+		if(polygon_add_quad(m_currObjState.objHdl, indices[quad]) == INVALID_INDEX)
+			throw std::runtime_error("Failed to add quad to object '" + m_currObjState.name
+									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
+	}
+}
+
+void BinaryLoader::read_compressed_spheres() {
+	if(m_currObjState.numSpheres == 0)
+		return;
+
+	std::vector<unsigned char> sphereData = decompress();
+	// Attributes and material indices are compressed together with sphere
+	const Vec4* spheres = reinterpret_cast<const Vec4*>(sphereData.data());
+	const u16* matIndices = reinterpret_cast<const u16*>(sphereData.data() + m_currObjState.numSpheres
+														 * 4u * sizeof(float));
+	for(u32 i = 0u; i < m_currObjState.numSpheres; ++i) {
+		Vec3 sphere{ spheres[i].x, spheres[i].y, spheres[i].z };
+		SphereHdl hdl;
+		if(hdl = spheres_add_sphere(m_currObjState.objHdl, sphere, spheres[i].w) == INVALID_INDEX)
+			throw std::runtime_error("Failed to add sphere to object '" + m_currObjState.name
+									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
+		if(!spheres_set_material_idx(m_currObjState.objHdl, hdl, matIndices[i]))
+			throw std::runtime_error("Failed to set sphere material index to object '"
+									 + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel));
+	}
+
+	const unsigned char* attributes = sphereData.data() + m_currObjState.numSpheres
+										* (4u * sizeof(float) + sizeof(u16));
+	read_compressed_sphere_attributes(attributes);
+}
+void BinaryLoader::read_compressed_vertex_attributes() {
+	if(m_currObjState.numVertices == 0 || m_currObjState.numVertAttribs == 0)
+		return;
+
+	std::vector<unsigned char> attributeData = decompress();
+	const unsigned char* attributes = attributeData.data();
+
+	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
+		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
+			throw std::runtime_error("Invalid attribute magic constant (object '"
+									 + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel) + ')');
+		AttribState state = read_uncompressed_attribute();
+		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(),
+														state.type);
+		if(attrHdl.customIndex == INVALID_INDEX)
+			throw std::runtime_error("Failed to add vertex attribute to object '" + m_currObjState.name
+									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
+		for(u32 v = 0u; v < m_currObjState.numVertices; ++v) {
+			if(!polygon_set_vertex_attribute(m_currObjState.objHdl, &attrHdl, v, attributes))
+				throw std::runtime_error("Failed to set vertex attribute data for object '"
+										 + m_currObjState.name + "', LoD "
+										 + std::to_string(m_currObjState.lodLevel));
+			attributes += get_attribute_size(state.type);
+		}
+	}
+}
+
+void BinaryLoader::read_compressed_face_attributes() {
+	if((m_currObjState.numTriangles == 0 && m_currObjState.numQuads == 0)
+	   || m_currObjState.numFaceAttribs == 0)
+		return;
+
+	std::vector<unsigned char> attributeData = decompress();
+	const unsigned char* attributes = attributeData.data();
+
+	for(u32 i = 0u; i < m_currObjState.numFaceAttribs; ++i) {
+		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
+			throw std::runtime_error("Invalid attribute magic constant (object '"
+									 + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel) + ')');
+		AttribState state = read_uncompressed_attribute();
+		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(),
+													  state.type);
+		if(attrHdl.customIndex == INVALID_INDEX)
+			throw std::runtime_error("Failed to add face attribute to object '" + m_currObjState.name
+									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
+		for(u32 f = 0u; f < m_currObjState.numTriangles + m_currObjState.numQuads; ++f) {
+			if(!polygon_set_face_attribute(m_currObjState.objHdl, &attrHdl, f, attributes))
+				throw std::runtime_error("Failed to set face attribute data for object '"
+										 + m_currObjState.name + "', LoD "
+										 + std::to_string(m_currObjState.lodLevel));
+			attributes += get_attribute_size(state.type);
+		}
+	}
+}
+
+void BinaryLoader::read_compressed_face_materials() {
+	if((m_currObjState.numTriangles == 0 && m_currObjState.numQuads == 0)
+	   || m_currObjState.numFaceAttribs == 0)
+		return;
+
+	std::vector<unsigned char> matData = decompress();
+	const u16* matIndices = reinterpret_cast<const u16*>(matData.data());
+	for(u32 f = 0u; f < m_currObjState.numTriangles + m_currObjState.numQuads; ++f) {
+		if(!polygon_set_material_idx(m_currObjState.objHdl, f, matIndices[f]))
+			throw std::runtime_error("Failed to set face material for object '"
+									 + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel));
+	}
+}
+
+void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attributes) {
+	if(m_currObjState.numSpheres == 0 || m_currObjState.numSphereAttribs == 0)
+		return;
+
+	for(u32 i = 0u; i < m_currObjState.numSphereAttribs; ++i) {
+		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
+			throw std::runtime_error("Invalid attribute magic constant (object '"
+									 + m_currObjState.name + "', LoD "
+									 + std::to_string(m_currObjState.lodLevel) + ')');
+		AttribState state = read_uncompressed_attribute();
+		auto attrHdl = spheres_request_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
+		if(attrHdl.index == INVALID_INDEX)
+			throw std::runtime_error("Failed to add sphere attribute to object '" + m_currObjState.name
+									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
+		for(u32 s = 0u; s < m_currObjState.numSpheres; ++s) {
+			if(!spheres_set_attribute(m_currObjState.objHdl, &attrHdl, s, attributes))
+				throw std::runtime_error("Failed to set sphere attribute data for object '"
+										 + m_currObjState.name + "', LoD "
+										 + std::to_string(m_currObjState.lodLevel));
+			attributes += get_attribute_size(state.type);
+		}
+	}
+}
+
 void BinaryLoader::read_lod() {
 	if(m_currObjState.flags.is_set(ObjectFlag::DEFLATE)) {
-			// TODO
+		if(m_currObjState.flags.is_set(ObjectFlag::COMPRESSED_NORMALS))
+			read_compressed_normal_compressed_vertices();
+		else
+			read_compressed_normal_uncompressed_vertices();
+		read_compressed_vertex_attributes();
+		read_compressed_triangles();
+		read_compressed_quads();
+		read_compressed_face_materials();
+		read_compressed_face_attributes();
+		read_compressed_spheres();
 		throw std::runtime_error("Compressed data is not supported yet");
 	} else {
 		// First comes vertex data

@@ -260,6 +260,10 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                                         // deflate compressed. All optional compressed blocks are marked
                                         // with ' (each ' is one independent DEFLATE stream).
             | COMPRESSED_NORMALS 2      // Normals can be compressed into 32bit with a custom compression
+			
+	<DATA>' = u32						// Size in bytes of the compressed data block
+	          u32						// Size in bytes of the decompressed data block
+			  <DATA>
 
     <OBJECT> = u32 'Obj_'       // Type check for this section
                <STRING>         // The name, used as [obj:name] in the above JSON specification
