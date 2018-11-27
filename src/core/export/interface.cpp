@@ -1406,12 +1406,11 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling,
 		return nullptr;
 	}
 
+	// The texture will take ownership of the pointer
 	auto hdl = WorldContainer::instance().add_texture(path, texData.width, texData.height,
 													  texData.layers, static_cast<textures::Format>(texData.format),
 													  static_cast<textures::SamplingMode>(sampling),
 													  sRgb, texData.data);
-	// We need to manually free the data
-	delete[] texData.data;
 	return static_cast<TextureHdl>(&hdl->second);
 }
 

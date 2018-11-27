@@ -22,7 +22,7 @@ typedef enum {
 } TextureFormat;
 
 typedef struct {
-	char* data = nullptr;
+	uint8_t* data = nullptr;
 	uint32_t width = 0u;
 	uint32_t height = 0u;
 	uint32_t components = 0u;

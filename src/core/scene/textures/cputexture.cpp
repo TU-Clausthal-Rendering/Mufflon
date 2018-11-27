@@ -6,11 +6,15 @@ using namespace ei;
 
 namespace mufflon::scene::textures {
 
-CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb) :
-	m_imageData(width * height * PIXEL_SIZE(format)),
+CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
+					   bool sRgb, u8* data) :
+	m_imageData((data == nullptr)
+				? std::make_unique<u8[]>(width * height * PIXEL_SIZE(format))
+				: std::unique_ptr<u8[]>(data)),
 	m_format(format),
 	m_size(width, height, numLayers)
 {
+
 	// Choose an optimized sampling routine
 	if(width * height * numLayers == 1)
 		m_sample = mode == SamplingMode::NEAREST ? &CpuTexture::sample111_nearest : &CpuTexture::sample111_linear;
@@ -20,35 +24,33 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 	// Select the proper access function for the format
 	switch(format) {
 		case Format::R8U: m_fetch = sRgb ? &CpuTexture::fetch_sR8U : &CpuTexture::fetch_R8U;
-						  m_write = sRgb ? &CpuTexture::write_sR8U : &CpuTexture::write_R8U; break;
+			m_write = sRgb ? &CpuTexture::write_sR8U : &CpuTexture::write_R8U; break;
 		case Format::RG8U: m_fetch = sRgb ? &CpuTexture::fetch_sRG8U : &CpuTexture::fetch_RG8U;
-						   m_write = sRgb ? &CpuTexture::write_sRG8U : &CpuTexture::write_RG8U; break;
+			m_write = sRgb ? &CpuTexture::write_sRG8U : &CpuTexture::write_RG8U; break;
 		case Format::RGB8U: m_fetch = sRgb ? &CpuTexture::fetch_sRGB8U : &CpuTexture::fetch_RGB8U;
-							m_write = sRgb ? &CpuTexture::write_sRGB8U : &CpuTexture::write_RGB8U; break;
+			m_write = sRgb ? &CpuTexture::write_sRGB8U : &CpuTexture::write_RGB8U; break;
 		case Format::RGBA8U: m_fetch = sRgb ? &CpuTexture::fetch_sRGBA8U : &CpuTexture::fetch_RGBA8U;
-							 m_write = sRgb ? &CpuTexture::write_sRGBA8U : &CpuTexture::write_RGBA8U; break;
+			m_write = sRgb ? &CpuTexture::write_sRGBA8U : &CpuTexture::write_RGBA8U; break;
 		case Format::R16U: m_fetch = &CpuTexture::fetch_R16U;
-						   m_write = &CpuTexture::write_R16U; break;
+			m_write = &CpuTexture::write_R16U; break;
 		case Format::RG16U: m_fetch = &CpuTexture::fetch_RG16U;
-							m_write = &CpuTexture::write_RG16U; break;
+			m_write = &CpuTexture::write_RG16U; break;
 		case Format::RGB16U: m_fetch = &CpuTexture::fetch_RGB16U;
-							 m_write = &CpuTexture::write_RGB16U; break;
+			m_write = &CpuTexture::write_RGB16U; break;
 		case Format::RGBA16U: m_fetch = &CpuTexture::fetch_RGBA16U;
-							  m_write = &CpuTexture::write_RGBA16U; break;
+			m_write = &CpuTexture::write_RGBA16U; break;
 		case Format::R32F: m_fetch = &CpuTexture::fetch_R32F;
-						   m_write = &CpuTexture::write_R32F; break;
+			m_write = &CpuTexture::write_R32F; break;
 		case Format::RG32F: m_fetch = &CpuTexture::fetch_RG32F;
-							m_write = &CpuTexture::write_RG32F; break;
+			m_write = &CpuTexture::write_RG32F; break;
 		case Format::RGB32F: m_fetch = &CpuTexture::fetch_RGB32F;
-							 m_write = &CpuTexture::write_RGB32F; break;
+			m_write = &CpuTexture::write_RGB32F; break;
 		case Format::RGBA32F: m_fetch = &CpuTexture::fetch_RGBA32F;
-							  m_write = &CpuTexture::write_RGBA32F; break;
+			m_write = &CpuTexture::write_RGBA32F; break;
 		case Format::RGB9E5: m_fetch = &CpuTexture::fetch_RGB9E5;
-							 m_write = &CpuTexture::write_RGB9E5; break;
+			m_write = &CpuTexture::write_RGB9E5; break;
 	};
 }
-
-
 
 Vec4 CpuTexture::read(const Pixel& texel, int layer) const {
 	IVec3 wrappedPixel = mod(IVec3{texel, layer}, m_size);
@@ -85,171 +87,171 @@ constexpr float SRGB_TO_RGB[256] = {
 };
 
 Vec4 CpuTexture::fetch_R8U(int texelIdx) const {
-	const u8* data = m_imageData.data();
+	const u8* data = m_imageData.get();
 	return {data[texelIdx] / 255.0f, 0.0f, 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RG8U(int texelIdx) const {
-	const Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.data());
+	const Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.get());
 	return {data[texelIdx] / 255.0f, 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGB8U(int texelIdx) const {
-	const Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.data());
+	const Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.get());
 	return {data[texelIdx] / 255.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGBA8U(int texelIdx) const {
-	const Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.data());
+	const Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.get());
 	return data[texelIdx] / 255.0f;
 }
 
 Vec4 CpuTexture::fetch_sR8U(int texelIdx) const {
-	const u8* data = m_imageData.data();
+	const u8* data = m_imageData.get();
 	return {SRGB_TO_RGB[data[texelIdx]], 0.0f, 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_sRG8U(int texelIdx) const {
-	const Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.data());
+	const Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.get());
 	return {SRGB_TO_RGB[data[texelIdx].r], SRGB_TO_RGB[data[texelIdx].g], 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_sRGB8U(int texelIdx) const {
-	const Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.data());
+	const Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.get());
 	return {SRGB_TO_RGB[data[texelIdx].r], SRGB_TO_RGB[data[texelIdx].g], SRGB_TO_RGB[data[texelIdx].b], 1.0f};
 }
 
 Vec4 CpuTexture::fetch_sRGBA8U(int texelIdx) const {
-	const Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.data());
+	const Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.get());
 	return {SRGB_TO_RGB[data[texelIdx].r], SRGB_TO_RGB[data[texelIdx].g], SRGB_TO_RGB[data[texelIdx].b], data[texelIdx].a / 255.0f};
 }
 
 Vec4 CpuTexture::fetch_R16U(int texelIdx) const {
-	const u16* data = as<u16>(m_imageData.data());
+	const u16* data = as<u16>(m_imageData.get());
 	return {data[texelIdx] / 65535.0f, 0.0f, 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RG16U(int texelIdx) const {
-	const Vec<u16,2>* data = as<Vec<u16,2>>(m_imageData.data());
+	const Vec<u16,2>* data = as<Vec<u16,2>>(m_imageData.get());
 	return {data[texelIdx] / 65535.0f, 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGB16U(int texelIdx) const {
-	const Vec<u16,3>* data = as<Vec<u16,3>>(m_imageData.data());
+	const Vec<u16,3>* data = as<Vec<u16,3>>(m_imageData.get());
 	return {data[texelIdx] / 65535.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGBA16U(int texelIdx) const {
-	const Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.data());
+	const Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.get());
 	return data[texelIdx] / 65535.0f;
 }
 
 Vec4 CpuTexture::fetch_R32F(int texelIdx) const {
-	return {as<float>(m_imageData.data())[texelIdx], 0.0f, 0.0f, 1.0f};
+	return {as<float>(m_imageData.get())[texelIdx], 0.0f, 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RG32F(int texelIdx) const {
-	return {as<Vec2>(m_imageData.data())[texelIdx], 0.0f, 1.0f};
+	return {as<Vec2>(m_imageData.get())[texelIdx], 0.0f, 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGB32F(int texelIdx) const {
-	return {as<Vec3>(m_imageData.data())[texelIdx], 1.0f};
+	return {as<Vec3>(m_imageData.get())[texelIdx], 1.0f};
 }
 
 Vec4 CpuTexture::fetch_RGBA32F(int texelIdx) const {
-	return as<Vec4>(m_imageData.data())[texelIdx];
+	return as<Vec4>(m_imageData.get())[texelIdx];
 }
 
 Vec4 CpuTexture::fetch_RGB9E5(int texelIdx) const
 {
-	u32 data = as<u32>(m_imageData.data())[texelIdx];
+	u32 data = as<u32>(m_imageData.get())[texelIdx];
 	return {unpackRGB9E5(data), 1.0f};
 }
 
 
 void CpuTexture::write_R8U(int texelIdx, const Vec4& value) {
-	u8* data = m_imageData.data();
+	u8* data = m_imageData.get();
 	data[texelIdx] = static_cast<u8>(clamp(value.x, 0.0f, 1.0f) * 255.0f);
 }
 
 void CpuTexture::write_RG8U(int texelIdx, const Vec4& value) {
-	Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.data());
+	Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.get());
 	data[texelIdx] = Vec<u8,2>{clamp(Vec2{value}, 0.0f, 1.0f) * 255.0f};
 }
 
 void CpuTexture::write_RGB8U(int texelIdx, const Vec4& value) {
-	Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.data());
+	Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.get());
 	data[texelIdx] = Vec<u8,3>{clamp(Vec3{value}, 0.0f, 1.0f) * 255.0f};
 }
 
 void CpuTexture::write_RGBA8U(int texelIdx, const Vec4& value) {
-	Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.data());
+	Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.get());
 	data[texelIdx] = Vec<u8,4>{clamp(value, 0.0f, 1.0f) * 255.0f};
 }
 
 void CpuTexture::write_sR8U(int texelIdx, const Vec4& value) {
-	u8* data = m_imageData.data();
+	u8* data = m_imageData.get();
 	data[texelIdx] = static_cast<u8>(rgbToSRgb(clamp(value.x, 0.0f, 1.0f)) * 255.0f);
 }
 
 void CpuTexture::write_sRG8U(int texelIdx, const Vec4& value) {
-	Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.data());
+	Vec<u8,2>* data = as<Vec<u8,2>>(m_imageData.get());
 	data[texelIdx] = Vec<u8,2>{rgbToSRgb(clamp(Vec2{value}, 0.0f, 1.0f)) * 255.0f};
 }
 
 void CpuTexture::write_sRGB8U(int texelIdx, const Vec4& value) {
-	Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.data());
+	Vec<u8,3>* data = as<Vec<u8,3>>(m_imageData.get());
 	data[texelIdx] = Vec<u8,3>{rgbToSRgb(clamp(Vec3{value}, 0.0f, 1.0f)) * 255.0f};
 }
 
 void CpuTexture::write_sRGBA8U(int texelIdx, const Vec4& value) {
-	Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.data());
+	Vec<u8,4>* data = as<Vec<u8,4>>(m_imageData.get());
 	data[texelIdx] = Vec<u8,4>{rgbToSRgb(clamp(Vec3{value}, 0.0f, 1.0f)) * 255.0f, u8(clamp(value.a, 0.0f, 1.0f) * 255.0f)};
 }
 
 
 void CpuTexture::write_R16U(int texelIdx, const Vec4& value) {
-	u16* data = as<u16>(m_imageData.data());
+	u16* data = as<u16>(m_imageData.get());
 	data[texelIdx] = static_cast<u16>(clamp(value.x, 0.0f, 1.0f) * 65535.0f);
 }
 
 void CpuTexture::write_RG16U(int texelIdx, const Vec4& value) {
-	Vec<u16,2>* data = as<Vec<u16,2>>(m_imageData.data());
+	Vec<u16,2>* data = as<Vec<u16,2>>(m_imageData.get());
 	data[texelIdx] = Vec<u16,2>{clamp(Vec2{value}, 0.0f, 1.0f) * 65535.0f};
 }
 
 void CpuTexture::write_RGB16U(int texelIdx, const Vec4& value) {
-	Vec<u16,3>* data = as<Vec<u16,3>>(m_imageData.data());
+	Vec<u16,3>* data = as<Vec<u16,3>>(m_imageData.get());
 	data[texelIdx] = Vec<u16,3>{clamp(Vec3{value}, 0.0f, 1.0f) * 65535.0f};
 }
 
 void CpuTexture::write_RGBA16U(int texelIdx, const Vec4& value) {
-	Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.data());
+	Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.get());
 	data[texelIdx] = Vec<u16,4>{clamp(value, 0.0f, 1.0f) * 65535.0f};
 }
 
 void CpuTexture::write_R32F(int texelIdx, const Vec4& value) {
-	float* data = as<float>(m_imageData.data());
+	float* data = as<float>(m_imageData.get());
 	data[texelIdx]   = value.x;
 }
 
 void CpuTexture::write_RG32F(int texelIdx, const Vec4& value) {
-	Vec2* data = as<Vec2>(m_imageData.data());
+	Vec2* data = as<Vec2>(m_imageData.get());
 	data[texelIdx]   = Vec2{value};
 }
 
 void CpuTexture::write_RGB32F(int texelIdx, const Vec4& value) {
-	Vec3* data = as<Vec3>(m_imageData.data());
+	Vec3* data = as<Vec3>(m_imageData.get());
 	data[texelIdx] = Vec3{value};
 }
 
 void CpuTexture::write_RGBA32F(int texelIdx, const Vec4& value) {
-	Vec4* data = as<Vec4>(m_imageData.data());
+	Vec4* data = as<Vec4>(m_imageData.get());
 	data[texelIdx] = value;
 }
 
 void CpuTexture::write_RGB9E5(int texelIdx, const Vec4& value) {
-	as<u32>(m_imageData.data())[texelIdx] = ei::packRGB9E5(Vec3{value});
+	as<u32>(m_imageData.get())[texelIdx] = ei::packRGB9E5(Vec3{value});
 }
 
 

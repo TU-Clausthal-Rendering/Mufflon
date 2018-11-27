@@ -136,7 +136,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 			}
 		}
 
-		texData->data = reinterpret_cast<char*>(data);
+		texData->data = reinterpret_cast<uint8_t*>(data);
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] Texture load for '",
 				 path, "' caught exception: ", e.what());

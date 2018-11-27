@@ -3,7 +3,7 @@
 #include "util/types.hpp"
 #include "core/scene/types.hpp"
 #include "texture.hpp"
-#include <vector>
+#include <memory>
 
 namespace mufflon { namespace scene { namespace textures {
 
@@ -12,7 +12,9 @@ namespace mufflon { namespace scene { namespace textures {
 class CpuTexture {
 public:
 	// Allocate the texture, data must be filled by using the data() pointer (or writes).
-	CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode, bool sRgb);
+	// Takes ownership if pointer is given
+	CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
+			   bool sRgb, u8* data = nullptr);
 	CpuTexture(const CpuTexture&) = delete;
 	CpuTexture(CpuTexture&&) = default;
 	CpuTexture& operator=(const CpuTexture&) = delete;
@@ -49,10 +51,10 @@ public:
 	i32 get_height() const noexcept { return m_size.y; }
 	i32 get_num_layers() const noexcept { return m_size.z; }
 
-	u8* data() noexcept { return m_imageData.data(); }
-	const u8* data() const noexcept { return m_imageData.data(); }
+	u8* data() noexcept { return m_imageData.get(); }
+	const u8* data() const noexcept { return m_imageData.get(); }
 private:
-	std::vector<u8> m_imageData;
+	std::unique_ptr<u8[]> m_imageData;
 	Format m_format;
 	ei::IVec3 m_size;		// width, height, numLayers
 

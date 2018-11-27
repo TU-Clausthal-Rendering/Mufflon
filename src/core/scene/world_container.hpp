@@ -79,7 +79,8 @@ public:
 	bool has_texture(std::string_view name) const;
 	std::optional<TexCacheHandle> find_texture(std::string_view name);
 	TexCacheHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
-					  textures::Format format, textures::SamplingMode mode, bool sRgb, void* data);
+							   textures::Format format, textures::SamplingMode mode,
+							   bool sRgb, u8* data);
 	template < class T >
 	TexCacheHandle add_texture(textures::Format format, const T& data) {
 		// Create a string-hash from the 1x1-texture data
@@ -87,9 +88,12 @@ public:
 		using std::to_string;
 		// TODO
 		//name += to_string(data);
+		u8* texMem = new u8[sizeof(T)];
+		std::memcpy(texMem, &data, sizeof(T));
+		// Texture takes ownership of the pointer
 		return m_textures.emplace(std::move(name), textures::Texture{ 1u, 1u, 1u, format,
 								  textures::SamplingMode::NEAREST, false,
-								  &data }).first;
+								  texMem }).first;
 	}
 
 	// Useful only when storing light names

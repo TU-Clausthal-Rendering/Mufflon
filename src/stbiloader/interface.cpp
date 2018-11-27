@@ -80,7 +80,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 	// Copy over the image data
 	texData->format = get_float_format(components);
 	bytes *= width * height * components;
-	texData->data = new char[bytes];
+	texData->data = new uint8_t[bytes];
 	std::memcpy(texData->data, data, bytes);
 	stbi_image_free(data);
 
