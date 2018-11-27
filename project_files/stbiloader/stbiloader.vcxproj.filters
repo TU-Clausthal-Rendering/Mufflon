@@ -14,13 +14,24 @@
     <Filter Include="Source Files\stbiloader">
       <UniqueIdentifier>{04fd482b-b74b-4399-8b13-61b440a2ae08}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\export">
+      <UniqueIdentifier>{11e36466-83ea-49c3-b07e-df12966d11e1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\stbi\stb_image.h">
       <Filter>Source Files\deps\stbi</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\stbiloader\interface.hpp">
+    <ClInclude Include="..\..\src\stbiloader\interface.h">
       <Filter>Source Files\stbiloader</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\export\api.hpp">
+      <Filter>Source Files\export</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\stbiloader\interface.cpp">
+      <Filter>Source Files\stbiloader</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

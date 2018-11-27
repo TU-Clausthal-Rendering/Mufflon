@@ -1,4 +1,5 @@
 #include "interface.h"
+#include "plugin/texture_plugin.hpp"
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
 #include "util/punning.hpp"
@@ -19,8 +20,15 @@
 #include <type_traits>
 #include <mutex>
 #include <fstream>
+#include <vector>
 // TODO: remove this (leftover from Felix' prototype)
 #include <glad/glad.h>
+
+#ifdef _MSC_VER
+#include <minwindef.h>
+#else // _MSC_VER
+#include <dlfcn.h>
+#endif // _MSC_VER
 
 // Undefine unnecessary windows macros
 #undef near
@@ -74,7 +82,10 @@ std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets;
 static void(*s_logCallback)(const char*, int);
 // TODO: remove these (leftover from Felix' prototype)
-static std::string s_lastError;
+std::string s_lastError;
+
+// Plugin container
+std::vector<TextureLoaderPlugin> s_plugins;
 
 constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX, INVALID_INDEX,
@@ -1918,6 +1929,50 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		registerMessageHandler(delegateLog);
 		disableStdHandler();
 
+		// Load plugins from the DLLs directory
+		s_plugins.clear();
+		fs::path pluginPath;
+		// First obtain the module handle (platform specific), then use that to
+		// get the module's path
+#ifdef _MSC_VER
+		HMODULE moduleHandle = nullptr;
+		if(::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+							 | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+							 reinterpret_cast<LPCTSTR>(&mufflon_initialize),
+							 &moduleHandle)) {
+			WCHAR buffer[MAX_PATH] = { 0 };
+			DWORD length = ::GetModuleFileNameW(moduleHandle, buffer, MAX_PATH);
+			if(length == 0)
+				logError("[", FUNCTION_NAME, "] Failed to obtain module path; cannot load plugins");
+			else
+				pluginPath = std::wstring(buffer, length);
+		} else {
+			logError("[", FUNCTION_NAME, "] Failed to obtain module handle; cannot load plugins");
+		}
+#else // _MSC_VER
+		Dl_info info;
+		if(::dladdr(reinterpret_cast<void*>(mufflon_initialize), &info) == 0)
+			logError("[", FUNCTION_NAME, "] Failed to obtain module path; cannot load plugins");
+		else
+			pluginPath = info.dli_fname;
+#endif // _MSC_VER
+		// If we managed to get the module path, check for plugins there
+		if(!pluginPath.empty()) {
+			for(const auto& dir : fs::directory_iterator(pluginPath.parent_path())) {
+				fs::path path = dir.path();
+				if(path != pluginPath && !fs::is_directory(path) && path.extension() == ".dll") {
+					TextureLoaderPlugin plugin{ path };
+					// If we succeeded in loading (and thus have the necessary functions),
+					// add it as a usable plugin
+					if(plugin.is_loaded()) {
+						logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
+								plugin.get_path().string(), "'");
+						s_plugins.push_back(std::move(plugin));
+					}
+				}
+			}
+		}
+
 		if (!gladLoadGL()) {
 			logError("[", FUNCTION_NAME, "] gladLoadGL failed");
 			return false;
@@ -1931,6 +1986,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 				"devices; initializing device 0");
 			cuda::check_error(cudaSetDevice(0u));
 		}
+
 		initialized = true;
 	}
 	return initialized;

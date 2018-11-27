@@ -104,6 +104,9 @@
     <Filter Include="Source Files\core\export">
       <UniqueIdentifier>{16cd16ac-42ec-446f-878c-14e31087e918}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\plugin">
+      <UniqueIdentifier>{e621662f-a532-464b-83a1-3f02d8c729fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -186,6 +189,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\plugin\plugin.cpp">
+      <Filter>Source Files\plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\plugin\texture_plugin.cpp">
+      <Filter>Source Files\plugin</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -677,6 +686,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp">
       <Filter>Source Files\core\scene\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\plugin\plugin.hpp">
+      <Filter>Source Files\plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\plugin\texture_plugin.hpp">
+      <Filter>Source Files\plugin</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
