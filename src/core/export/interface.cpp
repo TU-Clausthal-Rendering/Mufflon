@@ -1386,16 +1386,30 @@ TextureHdl world_get_texture(const char* path) {
 	return static_cast<TextureHdl>(&hdl.value()->second);
 }
 
-TextureHdl world_add_texture(const char* path, uint16_t width,
-							 uint16_t height, uint16_t layers,
-							 TextureFormat format, TextureSampling sampling,
-							 Boolean sRgb, void* data) {
+TextureHdl world_add_texture(const char* path, TextureSampling sampling,
+							 Boolean sRgb) {
 	CHECK_NULLPTR(path, "texture path", nullptr);
-	CHECK_NULLPTR(data, "texture data", nullptr);
-	auto hdl = WorldContainer::instance().add_texture(path, width, height,
-													  layers, static_cast<textures::Format>(format),
+	// Use the plugins to load the texture
+	fs::path filePath(path);
+	TextureData texData{};
+	for(auto& plugin : s_plugins) {
+		if(plugin.is_loaded()) {
+			if(plugin.can_load_format(filePath.extension().string())) {
+				if(plugin.load(filePath.string(), &texData))
+					break;
+			}
+		}
+	}
+	if(texData.data == nullptr) {
+		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
+				 filePath.string(), "'");
+		return nullptr;
+	}
+
+	auto hdl = WorldContainer::instance().add_texture(path, texData.width, texData.height,
+													  texData.layers, static_cast<textures::Format>(texData.format),
 													  static_cast<textures::SamplingMode>(sampling),
-													  sRgb, data);
+													  sRgb, texData.data);
 	return static_cast<TextureHdl>(&hdl->second);
 }
 
@@ -1931,7 +1945,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 
 		// Load plugins from the DLLs directory
 		s_plugins.clear();
-		fs::path pluginPath;
+		fs::path dllPath;
 		// First obtain the module handle (platform specific), then use that to
 		// get the module's path
 #ifdef _MSC_VER
@@ -1945,7 +1959,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 			if(length == 0)
 				logError("[", FUNCTION_NAME, "] Failed to obtain module path; cannot load plugins");
 			else
-				pluginPath = std::wstring(buffer, length);
+				dllPath = std::wstring(buffer, length);
 		} else {
 			logError("[", FUNCTION_NAME, "] Failed to obtain module handle; cannot load plugins");
 		}
@@ -1954,13 +1968,15 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		if(::dladdr(reinterpret_cast<void*>(mufflon_initialize), &info) == 0)
 			logError("[", FUNCTION_NAME, "] Failed to obtain module path; cannot load plugins");
 		else
-			pluginPath = info.dli_fname;
+			dllPath = info.dli_fname;
 #endif // _MSC_VER
 		// If we managed to get the module path, check for plugins there
-		if(!pluginPath.empty()) {
-			for(const auto& dir : fs::directory_iterator(pluginPath.parent_path())) {
+		if(!dllPath.empty()) {
+			// We assume that the plugins are in a subdirectory called 'plugins' to
+			// avoid loading excessively many DLLs
+			for(const auto& dir : fs::directory_iterator(dllPath.parent_path() / "plugins")) {
 				fs::path path = dir.path();
-				if(path != pluginPath && !fs::is_directory(path) && path.extension() == ".dll") {
+				if(!fs::is_directory(path) && path.extension() == ".dll") {
 					TextureLoaderPlugin plugin{ path };
 					// If we succeeded in loading (and thus have the necessary functions),
 					// add it as a usable plugin

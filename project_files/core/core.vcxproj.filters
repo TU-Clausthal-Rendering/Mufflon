@@ -693,6 +693,9 @@
     <ClInclude Include="..\..\src\plugin\texture_plugin.hpp">
       <Filter>Source Files\plugin</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\export\texture_data.h">
+      <Filter>Source Files\core\export</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">

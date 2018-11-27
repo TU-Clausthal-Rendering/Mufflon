@@ -17,6 +17,12 @@
     <Filter Include="Source Files\gliloader">
       <UniqueIdentifier>{b52a72bf-7f4d-424c-87f8-78537e6f5c6d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\util">
+      <UniqueIdentifier>{26ddcea4-c720-44a3-98a1-b804c402ba18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\plugin">
+      <UniqueIdentifier>{9508c161-a1e2-4445-b282-bfd9253adf5b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\gli\gli\clear.hpp">
@@ -184,8 +190,11 @@
     <ClInclude Include="..\..\deps\gli\gli\core\workaround.hpp">
       <Filter>Source Files\deps\gli\core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\gliloader\interface.hpp">
-      <Filter>Source Files\gliloader</Filter>
+    <ClInclude Include="..\..\src\util\log.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\plugin\texture_interface.h">
+      <Filter>Source Files\plugin</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -331,6 +340,12 @@
   <ItemGroup>
     <ClCompile Include="..\..\deps\gli\gli\core\dummy.cpp">
       <Filter>Source Files\deps\gli\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gliloader\interface.cpp">
+      <Filter>Source Files\gliloader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\util\log.cpp">
+      <Filter>Source Files\util</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

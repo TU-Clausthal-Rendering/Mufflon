@@ -64,9 +64,7 @@ void JsonLoader::clear_state() {
 }
 
 TextureHdl JsonLoader::load_texture(const char* name) {
-	// TODO: load texture
-	TextureHdl tex = world_add_texture(name, 0u, 0u, 0u, TextureFormat::FORMAT_R8U,
-									   TextureSampling::SAMPLING_NEAREST, false, nullptr);
+	TextureHdl tex = world_add_texture(name, TextureSampling::SAMPLING_LINEAR, false);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -213,7 +211,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		mat->inner.blend.a.mat = load_material(get(m_state, material, "layerA"));
 		mat->inner.blend.b.mat = load_material(get(m_state, material, "layerB"));
 	} else if(type.compare("fresnel") == 0) {
-		// TODO: fresnel material
+		// Fresnel material
 		auto refrIter = get(m_state, material, "refractionIndex");
 		if(refrIter->value.IsNumber()) {
 			mat->innerType = MaterialParamType::MATERIAL_FRESNEL;
@@ -276,7 +274,7 @@ void JsonLoader::free_material(MaterialParams* mat) {
 	}
 }
 
-void JsonLoader::load_cameras() {
+void JsonLoader::load_cameras(const ei::Box& aabb) {
 	using namespace rapidjson;
 	const Value& cameras = m_cameras->value;
 	assertObject(m_state, cameras);
@@ -289,10 +287,10 @@ void JsonLoader::load_cameras() {
 		m_state.objectNames.push_back(cameraIter->name.GetString());
 
 		// Read common values
-		// Placeholder values, because we don't know the scene size yet
-		// TODO: parse binary before JSON!
-		const float near = read_opt<float>(m_state, camera, "near", std::numeric_limits<float>::max());
-		const float far = read_opt<float>(m_state, camera, "near", std::numeric_limits<float>::max());
+		// Default camera planes depend on scene bounding box size
+		const float sceneDiag = ei::abs(ei::len(aabb.max - aabb.min));
+		const float near = read_opt<float>(m_state, camera, "near", DEFAULT_NEAR_PLANE * sceneDiag);
+		const float far = read_opt<float>(m_state, camera, "far", DEFAULT_FAR_PLANE * sceneDiag);
 		std::string_view type = read<const char*>(m_state, get(m_state, camera, "type"));
 		std::vector<ei::Vec3> camPath;
 		std::vector<ei::Vec3> camViewDir;
@@ -607,13 +605,13 @@ void JsonLoader::load_file() {
 				defaultLocalLods.insert({ subName, read<u64>(m_state, lodIter) });
 		}
 	}
-	// TODO
+	// Load the binary file before we load the rest of the JSON
 	binLoader.load_file(defaultGlobalLod, defaultLocalLods);
 
 	try {
-	// Cameras
+		// Cameras
 		m_state.current = ParserState::Level::ROOT;
-		load_cameras();
+		load_cameras(binLoader.get_bounding_box());
 		// Lights
 		m_state.current = ParserState::Level::ROOT;
 		load_lights();
@@ -626,9 +624,6 @@ void JsonLoader::load_file() {
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
 	}
-
-
-	// TODO: parse binary file
 }
 
 

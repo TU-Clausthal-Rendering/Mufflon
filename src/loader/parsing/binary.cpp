@@ -111,6 +111,7 @@ void BinaryLoader::clear_state() {
 		m_fileStream.close();
 	m_currObjState = ObjectState{};
 	m_materialNames.clear();
+	m_aabb = ei::Box{};
 }
 
 AttribDesc BinaryLoader::map_bin_attrib_type(AttribType type) {
@@ -467,6 +468,14 @@ void BinaryLoader::read_instances() {
 		if(!instance_set_transformation_matrix(instHdl, &transMat))
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
+
+		Vec3 min;
+		Vec3 max;
+		if(!instance_get_bounding_box(instHdl, &min, &max))
+			throw std::runtime_error("Failed to get bounding box for instance of object ID "
+									 + std::to_string(objId));
+
+		m_aabb = ei::Box(m_aabb, ei::Box(util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max)));
 	}
 
 	for(std::size_t i = 0u; i < hasInstance.size(); ++i) {

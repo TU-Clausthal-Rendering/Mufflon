@@ -1,6 +1,7 @@
 #pragma once
 
 #include "plugin.hpp"
+#include "core/export/texture_data.h"
 
 namespace mufflon {
 
@@ -19,15 +20,15 @@ public:
 		return m_canLoadFunc(&extension[0u]);
 	}
 
-	void load(std::string_view filePath) const {
+	bool load(std::string_view filePath, TextureData* texData) const {
 		if(!m_loadFunc)
 			throw std::runtime_error("No function bound for 'load'");
-		m_loadFunc(&filePath[0u]);
+		return m_loadFunc(&filePath[0u], texData);
 	}
 	
 private:
 	bool(*m_canLoadFunc)(const char*);
-	void(*m_loadFunc)(const char*);
+	bool(*m_loadFunc)(const char*, TextureData* texData);
 };
 
 } // namespace mufflon

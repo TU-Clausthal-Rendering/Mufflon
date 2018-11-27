@@ -29,6 +29,10 @@ public:
 		return m_materialNames;
 	}
 
+	const ei::Box& get_bounding_box() const noexcept {
+		return m_aabb;
+	}
+
 private:
 	static constexpr mufflon::u32 MATERIALS_HEADER_MAGIC = 'M' | ('a' << 8u) | ('t' << 16u) | ('s' << 24u);
 	static constexpr mufflon::u32 OBJECTS_HEADER_MAGIC = 'O' | ('b' << 8u) | ('j' << 16u) | ('s' << 24u);
@@ -130,6 +134,7 @@ private:
 	// The material names are wrapped in [mat:...] for ease of use in the JSON parser
 	std::vector<std::string> m_materialNames;
 	std::vector<ObjectHdl> m_objectHandles;
+	ei::Box m_aabb;
 };
 
 } // namespace loader::binary

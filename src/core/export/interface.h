@@ -1,6 +1,7 @@
 #pragma once
 
 #include "export/api.hpp"
+#include "texture_data.h"
 
 extern "C" {
 
@@ -95,23 +96,6 @@ typedef enum {
 	LIGHT_ENVMAP,
 	LIGHT_COUNT
 } LightType;
-
-typedef enum {
-	FORMAT_R8U,
-	FORMAT_RG8U,
-	FORMAT_RGB8U,
-	FORMAT_RGBA8U,
-	FORMAT_R16U,
-	FORMAT_RG16U,
-	FORMAT_RGB16U,
-	FORMAT_RGBA16U,
-	FORMAT_R32F,
-	FORMAT_RG32F,
-	FORMAT_RGB32F,
-	FORMAT_RGBA32F,
-	FORMAT_RGB9E5,
-	FORMAT_NUM
-} TextureFormat;
 
 typedef enum {
 	SAMPLING_NEAREST,
@@ -452,10 +436,8 @@ CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 directio
 CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
 CORE_API Boolean CDECL world_exists_texture(const char* path);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
-CORE_API TextureHdl CDECL world_add_texture(const char* path, uint16_t width,
-											   uint16_t height, uint16_t layers,
-											   TextureFormat format, TextureSampling sampling,
-											   Boolean sRgb, void* data);
+CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling,
+											Boolean sRgb);
 // TODO: interface for envmap light
 
 // Interface for rendering

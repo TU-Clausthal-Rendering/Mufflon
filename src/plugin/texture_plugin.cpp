@@ -12,7 +12,7 @@ TextureLoaderPlugin::TextureLoaderPlugin(fs::path path) :
 		if(has_function("can_load_texture_format")
 		   && has_function("load_texture")) {
 			m_canLoadFunc = load_function<bool, const char*>("can_load_texture_format");
-			m_loadFunc = load_function<void, const char*>("load_texture");
+			m_loadFunc = load_function<bool, const char*, TextureData*>("load_texture");
 		}
 
 		// If not (or something went wrong), we immediately close it again

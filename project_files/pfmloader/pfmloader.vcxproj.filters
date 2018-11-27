@@ -5,29 +5,20 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\deps">
-      <UniqueIdentifier>{3d663ae1-eaa4-4a5c-b255-578eb18de675}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\deps\stbi">
-      <UniqueIdentifier>{bb8f59cf-8c05-4152-9602-22ae6f6eed18}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\stbiloader">
-      <UniqueIdentifier>{04fd482b-b74b-4399-8b13-61b440a2ae08}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\export">
-      <UniqueIdentifier>{11e36466-83ea-49c3-b07e-df12966d11e1}</UniqueIdentifier>
+      <UniqueIdentifier>{a09e5972-a536-4d14-9bb3-1cb6557c409c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\pfmloader">
+      <UniqueIdentifier>{812333d9-c80e-4824-96c0-9ef33e2603e8}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\util">
-      <UniqueIdentifier>{38d12190-d04e-4bb3-8bcc-06d532c62d01}</UniqueIdentifier>
+      <UniqueIdentifier>{b468221b-cd1f-4890-8b40-c2fa3950d764}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\plugin">
-      <UniqueIdentifier>{dd81739f-ce87-4978-8b98-180b62bbf506}</UniqueIdentifier>
+      <UniqueIdentifier>{016a32fe-bc1b-41e0-9df7-6e8f109c0995}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\deps\stbi\stb_image.h">
-      <Filter>Source Files\deps\stbi</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\export\api.hpp">
       <Filter>Source Files\export</Filter>
     </ClInclude>
@@ -39,8 +30,8 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\stbiloader\interface.cpp">
-      <Filter>Source Files\stbiloader</Filter>
+    <ClCompile Include="..\..\src\pfmloader\interface.cpp">
+      <Filter>Source Files\pfmloader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\util\log.cpp">
       <Filter>Source Files\util</Filter>

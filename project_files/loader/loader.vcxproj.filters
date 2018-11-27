@@ -26,6 +26,9 @@
     <Filter Include="Source Files\loader\parsing">
       <UniqueIdentifier>{5742c584-79b4-439d-9665-2ea0c1d89a10}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\util">
+      <UniqueIdentifier>{4a959210-53dc-4e57-826d-966bfbedf809}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -48,6 +51,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\loader\parsing\json_loader.cpp">
       <Filter>Source Files\loader\parsing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\util\log.cpp">
+      <Filter>Source Files\util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -104,6 +110,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\loader\parsing\json_loader.hpp">
       <Filter>Source Files\loader\parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\log.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

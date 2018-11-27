@@ -3,6 +3,7 @@
 #include "json_helper.hpp"
 #include "core/export/interface.h"
 #include "util/filesystem.hpp"
+#include <ei/3dtypes.hpp>
 #include <rapidjson/document.h>
 #include <string>
 #include <map>
@@ -23,6 +24,8 @@ private:
 class JsonLoader {
 public:
 	static constexpr const char FILE_VERSION[] = "1.0";
+	static constexpr float DEFAULT_NEAR_PLANE = 1.e-4f;
+	static constexpr float DEFAULT_FAR_PLANE = 2.f;
 
 	JsonLoader(fs::path file) :
 		m_filePath(fs::canonical(file))
@@ -38,7 +41,7 @@ private:
 	TextureHdl load_texture(const char* name);
 	MaterialParams* load_material(rapidjson::Value::ConstMemberIterator matIter);
 	void free_material(MaterialParams* mat);
-	void load_cameras();
+	void load_cameras(const ei::Box& aabb);
 	void load_lights();
 	void load_materials();
 	void load_scenarios(const std::vector<std::string>& binMatNames);
