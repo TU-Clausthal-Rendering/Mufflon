@@ -56,7 +56,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;$(SolutionDir)deps\miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_WINDLL;LOADER_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -73,7 +73,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;$(SolutionDir)deps\miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_WINDLL;LOADER_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -89,6 +89,7 @@
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp" />
+    <ClCompile Include="..\..\deps\miniz\miniz\miniz.c" />
     <ClCompile Include="..\..\src\loader\export\interface.cpp" />
     <ClCompile Include="..\..\src\loader\parsing\binary.cpp" />
     <ClCompile Include="..\..\src\loader\parsing\json_helper.cpp" />
@@ -110,6 +111,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
+    <ClInclude Include="..\..\deps\miniz\miniz\miniz.h" />
     <ClInclude Include="..\..\src\loader\export\interface.h" />
     <ClInclude Include="..\..\src\loader\parsing\binary.hpp" />
     <ClInclude Include="..\..\src\loader\parsing\json_helper.hpp" />

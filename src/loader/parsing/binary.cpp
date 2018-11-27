@@ -5,6 +5,7 @@
 #include <ei/conversions.hpp>
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
+#include <miniz/miniz.h>
 #include <cstdio>
 
 namespace loader::binary {
