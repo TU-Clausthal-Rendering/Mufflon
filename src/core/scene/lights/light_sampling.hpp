@@ -20,17 +20,20 @@ struct Photon {
 	// These are required to generate general purpose vertices.
 	union SourceParam {
 		CUDA_FUNCTION SourceParam() {}
+		CUDA_FUNCTION SourceParam(const scene::Direction& d, half cT, half cFS) : spot{d, cT, cFS} {}
+		CUDA_FUNCTION SourceParam(const scene::Direction& n, float a) : area{n, a} {}
+		CUDA_FUNCTION SourceParam(const scene::Direction& d, AngularPdf p) : dir{d, p} {}
 		struct {
-			ei::Vec3 direction;
+			scene::Direction direction;
 			half cosThetaMax;
 			half cosFalloffStart;
 		} spot;
 		struct {
-			ei::Vec3 normal;
+			scene::Direction normal;
 			float area;		// TODO: remove? (ATM not used by the vertex)
 		} area;
 		struct {
-			ei::Vec3 direction;
+			scene::Direction direction;
 			AngularPdf dirPdf;
 		} dir;
 	} source_param;
@@ -70,7 +73,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const SpotLight& light,
 												  const math::RndSet2& rnd
 ) {
 	return Photon{ { light.position, AreaPdf::infinite() },
-				   light.intensity, LightType::SPOT_LIGHT };
+				   light.intensity, LightType::SPOT_LIGHT,
+				   {ei::unpackOctahedral32(light.direction), light.cosThetaMax, light.cosFalloffStart} };
 }
 
 CUDA_FUNCTION __forceinline__ SurfaceSample
@@ -94,7 +98,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightTriangle<CURREN
 	// TODO: what is the outgoing size?
 	return Photon{
 		posSample.pos, Spectrum{ sample(light.radianceTex, posSample.uv) },
-		LightType::AREA_LIGHT_TRIANGLE
+		LightType::AREA_LIGHT_TRIANGLE,
+		{posSample.normal, 1.0f / float(posSample.pos.pdf)}
 	};
 }
 
@@ -144,7 +149,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightQuad<CURRENT_DE
 	SurfaceSample posSample = sample_light_pos(light, rnd.u0, rnd.u1);
 	// TODO: what is the outgoing size?
 	return Photon{ posSample.pos,
-		Spectrum{sample(light.radianceTex, posSample.uv)}, LightType::AREA_LIGHT_QUAD };
+		Spectrum{sample(light.radianceTex, posSample.uv)}, LightType::AREA_LIGHT_QUAD,
+		{posSample.normal, 1.0f / float(posSample.pos.pdf)} };
 }
 
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightSphere<CURRENT_DEV>& light,
@@ -156,7 +162,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightSphere<CURRENT_
 	return Photon{
 		math::PositionSample{ light.position + normal.direction * light.radius,
 							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		Spectrum{sample(light.radianceTex, uv)}, LightType::AREA_LIGHT_SPHERE
+		Spectrum{sample(light.radianceTex, uv)}, LightType::AREA_LIGHT_SPHERE,
+		{normal.direction, 4*ei::PI*ei::sq(light.radius)}
 	};
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const DirectionalLight& light,
@@ -164,7 +171,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const DirectionalLight& light,
 												  const math::RndSet2& rnd) {
 	return Photon{
 		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1),
-		light.radiance, LightType::DIRECTIONAL_LIGHT
+		light.radiance, LightType::DIRECTIONAL_LIGHT,
+		{light.direction, AngularPdf::infinite()}
 	};
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const EnvMapLight<CURRENT_DEV>& light,
