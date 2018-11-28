@@ -114,25 +114,30 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
  * For samplers with layer decisions (light tree, materials) there is a rndset with
  * an additional 64bit random value (RndSet2_1).
  */
-struct RndSet2 {
-	float u0;
-	float u1;
-
-	RndSet2(u64 x) :
-		u0{sample_uniform(u32(x))},
-		u1{sample_uniform(u32(x >> 32))}
-	{}
-};
-
 struct RndSet2_1 {
 	float u0;
 	float u1;
 	u64 i0;
 
-	RndSet2_1(u64 x0, u64 x1) :
+	CUDA_FUNCTION __forceinline__ RndSet2_1(u64 x0, u64 x1) :
 		u0{sample_uniform(u32(x0))},
 		u1{sample_uniform(u32(x0 >> 32))},
 		i0{x1}
+	{}
+};
+
+struct RndSet2 {
+	float u0;
+	float u1;
+
+	CUDA_FUNCTION __forceinline__ RndSet2(u64 x) :
+		u0{sample_uniform(u32(x))},
+		u1{sample_uniform(u32(x >> 32))}
+	{}
+
+	// Truncating initialization if someone asks for less than we have
+	CUDA_FUNCTION __forceinline__ RndSet2(const RndSet2_1& x) :
+		u0{x.u0}, u1{x.u1}
 	{}
 };
 

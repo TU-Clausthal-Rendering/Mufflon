@@ -198,14 +198,15 @@ public:
 	}
 
 	VertexSample sample(const math::RndSet2_1& rndSet) const {
+		using namespace scene::lights;
 		switch(m_type) {
 			case Interaction::VOID: return VertexSample{};
 			case Interaction::LIGHT_POINT: {
-				math::DirectionSample excident = math::sample_dir_sphere_uniform(rndSet.u0, rndSet.u1);
+				auto lout = sample_light_dir_point(m_intensity, rndSet);
 				return VertexSample{
-					m_intensity, VertexSample::Type::REFLECTED,
-					ei::Ray{m_position, excident.direction},
-					excident.pdf, AngularPdf{0.0f},
+					lout.flux, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, lout.dir.direction},
+					lout.dir.pdf, AngularPdf{0.0f},
 				};
 			}
 			case Interaction::LIGHT_DIRECTIONAL: {
@@ -218,30 +219,18 @@ public:
 			}
 			case Interaction::LIGHT_SPOT: {
 				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
-				// Sample direction in the cone
-				math::DirectionSample dir = math::sample_cone_uniform(rndSet.u0, rndSet.u1, desc->cosThetaMax);
-				// Transform direction to world coordinates
-				const ei::Vec3 tangentX = normalize(perpendicular(desc->direction));
-				const ei::Vec3 tangentY = cross(desc->direction, tangentX);
-				const ei::Vec3 globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * desc->direction;
-				// Compute falloff for cone
-				const float falloff = scene::lights::get_falloff(dir.direction.z, desc->cosThetaMax, desc->cosFalloffStart);
+				auto lout = sample_light_dir_spot(m_intensity, desc->direction, desc->cosThetaMax, desc->cosFalloffStart, rndSet);
 				return VertexSample{
-					m_intensity * falloff, VertexSample::Type::REFLECTED,
-					ei::Ray{m_position, globalDir}, dir.pdf, AngularPdf{0.0f}
+					lout.flux, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, lout.dir.direction}, lout.dir.pdf, AngularPdf{0.0f}
 				};
 			}
 			case Interaction::LIGHT_AREA: {
 				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
-				// Sample the direction (lambertian model)
-				math::DirectionSample dir = math::sample_dir_cosine(rndSet.u0, rndSet.u1);
-				// Transform direction to world coordinates
-				const ei::Vec3 tangentX = normalize(perpendicular(desc->normal));
-				const ei::Vec3 tangentY = cross(desc->normal, tangentX);
-				const ei::Vec3 globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * desc->normal;
+				auto lout = sample_light_dir_area(m_intensity, desc->normal, rndSet);
 				return VertexSample{
-					m_intensity * dir.direction.z, VertexSample::Type::REFLECTED,
-					ei::Ray{m_position, globalDir}, dir.pdf, AngularPdf{0.0f}
+					lout.flux, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, lout.dir.direction}, lout.dir.pdf, AngularPdf{0.0f}
 				};
 			}
 			case Interaction::CAMERA_PINHOLE: {

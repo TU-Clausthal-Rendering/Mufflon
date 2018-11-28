@@ -236,12 +236,12 @@ CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
 										const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
-		case LightType::POINT_LIGHT: return sample_light(*reinterpret_cast<const PointLight*>(light), rnd);
-		case LightType::SPOT_LIGHT: return sample_light(*reinterpret_cast<const SpotLight*>(light), rnd);
-		case LightType::AREA_LIGHT_TRIANGLE: return sample_light(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
-		case LightType::AREA_LIGHT_QUAD: return sample_light(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
-		case LightType::AREA_LIGHT_SPHERE: return sample_light(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
-		case LightType::DIRECTIONAL_LIGHT: return sample_light(*reinterpret_cast<const DirectionalLight*>(light), bounds, rnd);
+		case LightType::POINT_LIGHT: return sample_light_pos(*reinterpret_cast<const PointLight*>(light), rnd);
+		case LightType::SPOT_LIGHT: return sample_light_pos(*reinterpret_cast<const SpotLight*>(light), rnd);
+		case LightType::AREA_LIGHT_TRIANGLE: return sample_light_pos(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
+		case LightType::AREA_LIGHT_QUAD: return sample_light_pos(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
+		case LightType::AREA_LIGHT_SPHERE: return sample_light_pos(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
+		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), bounds, rnd);
 		default: mAssert(false); return {};
 	}
 }
@@ -472,7 +472,8 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
  */
 CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 								u64 indexMax, u64 rng, const ei::Box& bounds,
-								const math::RndSet2& rnd) {
+								const math::RndSet2_1& rnd) {
+	using namespace lighttree_detail;
 	// Figure out which of the three top-level light types get the photon
 	// Implicit left boundary of 0 for the interval
 	u64 intervalRight = indexMax;
@@ -491,8 +492,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	u64 rightEnv = static_cast<u64>(intervalRight * envProb);
 	if(index < rightEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
-		return lighttree_detail::adjustPdf(sample_light(tree.envLight,
-														rnd), envProb);
+		return adjustPdf(sample_light_pos(tree.envLight, bounds, rnd), envProb);
 	}
 	// ...then come directional lights...
 	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * envProb));
@@ -501,9 +501,8 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 									   + tree.dirLights.root.flux) / fluxSum);
 	if(index >= leftDir && index < rightDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
-		return lighttree_detail::adjustPdf(emit(tree.dirLights, leftDir,
-												rightDir, index, rng,
-												bounds, rnd), dirProb);
+		return adjustPdf(emit(tree.dirLights, leftDir, rightDir,
+							  index, rng, bounds, rnd), dirProb);
 	}
 	// ...and last positional lights
 	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight
@@ -511,9 +510,8 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 												 + tree.dirLights.root.flux / fluxSum)));
 	if(index >= leftPos) {
 		mAssert(tree.posLights.lightCount > 0u);
-		return lighttree_detail::adjustPdf(emit(tree.posLights, leftPos,
-												intervalRight, index, rng,
-												bounds, rnd), posProb);
+		return adjustPdf(emit(tree.posLights, leftPos, intervalRight,
+							  index, rng, bounds, rnd), posProb);
 	}
 
 	// If we made it until here, it means that we fell between
@@ -528,24 +526,21 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 									   + tree.dirLights.root.flux) / fluxSum);
 	if(rng < splitEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
-		return lighttree_detail::adjustPdf(sample_light(tree.envLight, rnd),
-										   envProb);
+		return adjustPdf(sample_light_pos(tree.envLight, bounds, rnd), envProb);
 	} else if(rng < splitDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
-		return lighttree_detail::adjustPdf(emit(tree.dirLights, splitEnv,
-												splitDir, rng, rng, bounds, rnd),
-										   dirProb);
+		return adjustPdf(emit(tree.dirLights, splitEnv, splitDir, rng, rng, bounds, rnd),
+						 dirProb);
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
-		return lighttree_detail::adjustPdf(emit(tree.posLights, splitDir,
-												std::numeric_limits<u64>::max(),
-												rng, rng, bounds, rnd), posProb);
+		return adjustPdf(emit(tree.posLights, splitDir, std::numeric_limits<u64>::max(),
+							  rng, rng, bounds, rnd), posProb);
 	}
 }
 
 // Emits a single photon from a light source.
 CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 rng,
-						  const ei::Box& bounds, const math::RndSet2& rnd) {
+						  const ei::Box& bounds, const math::RndSet2_1& rnd) {
 	// No index means our RNG serves as an index
 	return emit(tree, rng, std::numeric_limits<u64>::max(), rng, bounds, rnd);
 }
