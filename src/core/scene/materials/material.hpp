@@ -71,7 +71,7 @@ public:
 
 	// A name of the material for mental recognition (no program logic depends on this name)
 	const std::string& get_name() const noexcept { return m_name; }
-	void set_name(std::string_view name) { m_name = name; }
+	void set_name(std::string name) { m_name = move(name); }
 
 	/* 
 	 * Size of the material descriptor itself (mainly texture handles)

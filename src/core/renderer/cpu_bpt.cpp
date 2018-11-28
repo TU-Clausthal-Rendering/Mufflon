@@ -33,7 +33,7 @@ using BptPathVertex = PathVertex<BptVertexExt, 4>;
 }*/
 
 float get_mis_part(const BptPathVertex& path,
-	const scene::materials::EvalValue& value,
+	const math::EvalValue& value,
 	AngularPdf pdfBack,
 	const scene::Direction& connection, float distSq,
 	const void* pathMem
@@ -55,8 +55,8 @@ float get_mis_part(const BptPathVertex& path,
 
 // Assumes that path0 and path1 are fully evaluated vertices of the end points of
 // the two sub-paths.
-float get_mis_weight(const BptPathVertex& path0, const scene::materials::EvalValue& value0,
-					 const BptPathVertex& path1, const scene::materials::EvalValue& value1,
+float get_mis_weight(const BptPathVertex& path0, const math::EvalValue& value0,
+					 const BptPathVertex& path1, const math::EvalValue& value1,
 					 const scene::Direction& connection, float distSq,
 					 const void* pathMem0, const void* pathMem1
 ) {
@@ -71,17 +71,20 @@ float get_mis_weight(const BptPathVertex& path0, const scene::materials::EvalVal
 }
 
 struct { Spectrum bxdfs; float cosines; }
-connect(const BptPathVertex& path0, const BptPathVertex& path1, const void* pathMem0, const void* pathMem1) {
+connect(const BptPathVertex& path0, const BptPathVertex& path1,
+		const void* pathMem0, const void* pathMem1,
+		const scene::materials::Medium* media
+) {
 	// Some vertices will always have a contribution of 0 if connected (e.g. directional light with camera).
 	if(!BptPathVertex::is_connection_possible(path0, path1)) return {Spectrum{0.0f}, 0.0f};
 	// TODO: shadow test
 	ei::Vec3 connection = BptPathVertex::get_connection(path0, path1);
 	float distSq = lensq(connection);
 	connection /= sqrt(distSq);
-	auto val0 = path0.evaluate( connection);
-	auto val1 = path1.evaluate(-connection);
+	auto val0 = path0.evaluate( connection, media, false);
+	auto val1 = path1.evaluate(-connection, media, true);
 	float mis = get_mis_weight(path0, val0, path1, val1, connection, distSq, pathMem0, pathMem1);
-	return {val0.bxdf * val1.bxdf, val0.cosThetaOut * val1.cosThetaOut};
+	return {val0.value * val1.value, val0.cosThetaOut * val1.cosThetaOut};
 }
 
 } // namespace ::
@@ -91,7 +94,7 @@ void foo(RenderBuffer<Device::CPU>& rb) {
 	std::array<u8, 100> mem;
 	BptPathVertex& path0tmp = *as<BptPathVertex>(mem.data());
 	BptPathVertex& path1tmp = *as<BptPathVertex>(mem.data()+1);
-	auto [bxdfs, cosines] = connect(path0tmp, path1tmp, mem.data(), mem.data());
+	auto [bxdfs, cosines] = connect(path0tmp, path1tmp, mem.data(), mem.data(), nullptr);
 	//rb.contribute(Pixel{0,0}, , , cosines, bxdfs);
 }
 

@@ -27,7 +27,7 @@ CUDA_FUNCTION ei::Vec2 solve(const ei::Mat2x2 & _A, const ei::Vec2 & _b) {
  * incident: normalized incident direction. Points towards the surface.
  * adjoint: false if this is a view sub-path, true if it is a light sub-path.
  */
-CUDA_FUNCTION Sample
+CUDA_FUNCTION math::PathSample
 sample(const TangentSpace& tangentSpace,
 		const ParameterPack& params,
 		const Direction& incident,
@@ -38,7 +38,7 @@ sample(const TangentSpace& tangentSpace,
 	// Cancel the path if shadowed shading normal (incident)
 	float iDotG = -dot(incident, tangentSpace.geoN);
 	float iDotN = -dot(incident, tangentSpace.shadingN);
-	if(iDotG * iDotN <= 0.0f) return Sample{};
+	if(iDotG * iDotN <= 0.0f) return math::PathSample{};
 
 	// Complete to-tangent space transformation.
 	Direction incidentTS {
@@ -49,7 +49,7 @@ sample(const TangentSpace& tangentSpace,
 	mAssert(ei::approx(len(incidentTS), 1.0f));
 
 	// Use model specific subroutine
-	Sample res;
+	math::PathSample res;
 	switch(params.type)
 	{
 		case Materials::LAMBERT: {
@@ -92,7 +92,7 @@ sample(const TangentSpace& tangentSpace,
  * adjoint: false if the incident is a view sub-path, true if it is a light sub-path.
  * merge: Used to apply a different shading normal correction.
  */
-CUDA_FUNCTION EvalValue
+CUDA_FUNCTION math::EvalValue
 evaluate(const TangentSpace& tangentSpace,
 		 const ParameterPack& params,
 		 const Direction& incident,
@@ -104,14 +104,16 @@ evaluate(const TangentSpace& tangentSpace,
 	float iDotN = -dot(incident, tangentSpace.shadingN);
 	float eDotN =  dot(excident, tangentSpace.shadingN);
 	// Early out if possible
-	if(!params.flags.is_set(MaterialPropertyFlags::REFLECTIVE) && iDotN * eDotN > 0.0f) return EvalValue{};
-	if(!params.flags.is_set(MaterialPropertyFlags::REFRACTIVE) && iDotN * eDotN < 0.0f) return EvalValue{};
+	if(!params.flags.is_set(MaterialPropertyFlags::REFLECTIVE) && iDotN * eDotN > 0.0f)
+		return math::EvalValue{};
+	if(!params.flags.is_set(MaterialPropertyFlags::REFRACTIVE) && iDotN * eDotN < 0.0f)
+		return math::EvalValue{};
 
 	float iDotG = -dot(incident, tangentSpace.geoN);
 	float eDotG =  dot(excident, tangentSpace.geoN);
 	// Shadow masking for the shading normal
 	if(eDotG * eDotN <= 0.0f || iDotG * iDotN <= 0.0f)
-		return EvalValue{};
+		return math::EvalValue{};
 
 	// Complete to-tangent space transformation.
 	Direction incidentTS(
@@ -134,7 +136,7 @@ evaluate(const TangentSpace& tangentSpace,
 	}
 
 	// Call material implementation
-	EvalValue res;
+	math::EvalValue res;
 	switch(params.type)
 	{
 		case Materials::LAMBERT: {
@@ -147,19 +149,19 @@ evaluate(const TangentSpace& tangentSpace,
 	}
 
 	// Early out if result is discarded anyway
-	if(res.bxdf == 0.0f) return res;
+	if(res.value == 0.0f) return res;
 
 	// Shading normal caused density correction.
 	if(merge) {
 		if(adjoint)
-			res.bxdf *= (SHADING_NORMAL_EPS + ei::abs(iDotN))
-					  / (SHADING_NORMAL_EPS + ei::abs(iDotG));
+			res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN))
+					   / (SHADING_NORMAL_EPS + ei::abs(iDotG));
 		else
-			res.bxdf *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
-					  / (SHADING_NORMAL_EPS + ei::abs(eDotG));
+			res.value *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
+					   / (SHADING_NORMAL_EPS + ei::abs(eDotG));
 	} else if(adjoint) {
-		res.bxdf *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
-				  / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
+		res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
+				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
 	return res;
@@ -180,6 +182,23 @@ albedo(const ParameterPack& params) {
 			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", params.type);
 #endif
 			return Spectrum{0.0f};
+	}
+}
+
+
+/*
+ * Get the size in bytes which are consumed for the complete parameter pack
+ */
+CUDA_FUNCTION int get_size(const ParameterPack& params) {
+	switch(params.type)
+	{
+		case Materials::LAMBERT: return sizeof(LambertParameterPack);
+			// Others might be recursive: write get_size for the specific materials
+		default:
+#ifndef __CUDA_ARCH__
+			logWarning("[materials::get_size] Trying to evaluate unimplemented material type ", params.type);
+#endif
+			return 0;
 	}
 }
 

@@ -53,12 +53,14 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
 	Throughput throughput {ei::Vec3{1.0f}, 1.0f};
-	PtPathVertex vertex; // TODO: larger buffer
-	scene::materials::Medium medium;	// TODO: get somewhere
+	u8 vertexBuffer[256];
+	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	scene::materials::Medium* media = nullptr;	// TODO: get somewhere
 	// Create a start for the path
 	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
 														 m_rngs[pixel].next());
-	PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos);
+	int s = PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos);
+	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 	int pathLen = 0;
 	do {
@@ -68,9 +70,17 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			// TODO: Walk
 			math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
 			scene::accel_struct::RayIntersectionResult nextHit;
-			if(!walk(vertex, medium, rnd, 0.0f, throughput, nextHit))
+			math::DirectionSample sampledDir;
+			if(!walk(*vertex, media, rnd, 0.0f, false, throughput, sampledDir, nextHit))
 				break;
-			// TODO: create a new vertex based on the intersection result
+			// TODO: maybe move the following into the walk too?
+			// e.g. by giving a second pointer for the output vertex (which can be the input)
+			ei::Vec3 position = vertex->get_position() + sampledDir.direction * nextHit.hitT;
+			// TODO: get tangent space and parameter pack from nextHit
+			float incidentCos = dot(nextHit.normal, sampledDir.direction); // TODO: shading normal
+			PtPathVertex::create_surface(&vertex, &vertex, scene::materials::ParameterPack{},
+				{ position, sampledDir.pdf.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
+				scene::TangentSpace{}, sampledDir.direction);
 		}
 		++pathLen;
 	} while(pathLen < 666);

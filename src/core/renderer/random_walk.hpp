@@ -31,24 +31,31 @@ struct PathHead {
  * This also computes the attenuation through the medium.
  *
  * vertex: generic vertex which is sampled to proceed on the path
+ * adjoint: is this a light sub-path?
  * rndSet: a set of random numbers to sample the vertex
  * u0: a uniform random number for roussion roulette.
  * throughput [in/out]: The throughput value which is changed by the current sampling event/russion roulette.
+ * sampledDir [out]: the ray which was sampled in the walk
  * nextHit [out]: The intersection result of the walk (if any)
  * returns: true if there is a nextHit. false if the path is canceled/misses the scene.
  */
 template < typename VertexType >
 CUDA_FUNCTION bool walk(const VertexType& vertex,
-						const scene::materials::Medium& medium,
+						const scene::materials::Medium* media,
 						const math::RndSet2_1& rndSet, float u0,
-						Throughput& throughput, scene::accel_struct::RayIntersectionResult& nextHit
+						bool adjoint,
+						Throughput& throughput,
+						math::DirectionSample& sampledDir,
+						scene::accel_struct::RayIntersectionResult& nextHit
 ) {
 	// Sample the vertex's outgoing direction
-	VertexSample sample = vertex.sample(rndSet);
+	VertexSample sample = vertex.sample(media, rndSet, adjoint);
+	if(sample.type == math::PathEventType::INVALID) return false;
 
 	// Update throughputs
 	throughput.weight *= sample.throughput;
 	throughput.guideWeight *= 1.0f - expf(-(sample.pdfF * sample.pdfF) / 5.0f);
+	sampledDir = {sample.excident, sample.pdfF}; // TODOd pdfB is currently lost, maybe DirectionalSample should always include a second pdf?
 
 	// Russian roulette
 	float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
@@ -63,10 +70,12 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 	// TODO: optional energy clamping
 
 	// Go to the next intersection
+	//ei::Ray ray {sample.origin, sample.excident};
 	//bool didHit = first_hit(, nextHit);
 
 	// Compute attenuation
-	Spectrum transmission = medium.get_transmission( nextHit.hitT );
+	const scene::materials::Medium& currentMedium = media[sample.medium];
+	Spectrum transmission = currentMedium.get_transmission( nextHit.hitT );
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
 

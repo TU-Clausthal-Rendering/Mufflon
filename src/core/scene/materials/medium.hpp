@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "util/types.hpp"
+#include "export/api.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -22,15 +23,15 @@ namespace mufflon { namespace scene { namespace materials {
 			m_absorptionCoeff = coeff;
 		}
 
-		const ei::Vec2& get_refraction_index() const {
+		CUDA_FUNCTION __forceinline__ const ei::Vec2& get_refraction_index() const {
 			return m_refractionIndex;
 		}
-		const Spectrum& get_absorption_coeff() const {
+		CUDA_FUNCTION __forceinline__ const Spectrum& get_absorption_coeff() const {
 			return m_absorptionCoeff;
 		}
 
 		// Compute the transmission in this medium for the given travel distance.
-		Spectrum get_transmission(float distance) const {
+		CUDA_FUNCTION __forceinline__ Spectrum get_transmission(float distance) const {
 			return exp(m_absorptionCoeff * -distance);
 		}
 	private:

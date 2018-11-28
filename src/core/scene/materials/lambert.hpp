@@ -50,16 +50,16 @@ private:
 
 
 // The importance sampling routine
-CUDA_FUNCTION Sample
+CUDA_FUNCTION math::PathSample
 lambert_sample(const LambertParameterPack& params,
 			   const Direction& incidentTS,
 			   const math::RndSet2_1& rndSet) {
 	// Importance sampling for lambert: BRDF * cos(theta)
 	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1).direction;
 	// Copy the sign for two sided diffuse
-	return Sample {
+	return math::PathSample {
 		Spectrum{params.albedo},
-		Sample::Type::REFLECTED,
+		math::PathEventType::REFLECTED,
 		excidentTS * ei::sgn(incidentTS.z),
 		AngularPdf(excidentTS.z / ei::PI),
 		AngularPdf(ei::abs(incidentTS.z) / ei::PI)
@@ -67,14 +67,14 @@ lambert_sample(const LambertParameterPack& params,
 }
 
 // The evaluation routine
-CUDA_FUNCTION EvalValue
+CUDA_FUNCTION math::EvalValue
 lambert_evaluate(const LambertParameterPack& params,
 				 const Direction& incidentTS,
 				 const Direction& excidentTS) {
 	// No transmission - already checked by material, but in a combined model we might get a call
-	if(incidentTS.z * excidentTS.z < 0.0f) return EvalValue{};
+	if(incidentTS.z * excidentTS.z < 0.0f) return math::EvalValue{};
 	// Two sided diffuse (therefore the abs())
-	return EvalValue {
+	return math::EvalValue {
 		params.albedo / ei::PI,
 		ei::abs(excidentTS.z),
 		AngularPdf(ei::abs(excidentTS.z) / ei::PI),
