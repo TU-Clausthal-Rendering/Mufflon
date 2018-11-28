@@ -8,12 +8,12 @@ namespace mufflon::cameras {
 		PinholeParams buffer {
 			CameraModel::PINHOLE,
 			m_position,
-			get_x_dir(),
+			m_tanVFov,
+			get_view_dir(),
 			m_near,
 			get_up_dir(),
 			m_far,
-			get_view_dir(),
-			m_tanVFov
+			{0,0}, {0,0} // TODO: get the resoultion
 		};
 		switch(dev) {
 			case Device::CPU: copy<Device::CPU, Device::CPU>(outBuffer, &buffer, sizeof(PinholeParams)); break;

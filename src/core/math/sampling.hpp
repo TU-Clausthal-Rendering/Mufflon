@@ -37,6 +37,11 @@ CUDA_FUNCTION __forceinline__ ei::Vec2 sample_uniform(u64 u01) {
 					 sample_uniform(u32(u01 >> 32ull)) };
 }
 
+// Rescale a random number inside the interval [pLeft, pRight] to [0,1]
+CUDA_FUNCTION __forceinline__ float rescale_sample(float x, float pLeft, float pRight) {
+	return (x - pLeft) / (pRight - pLeft);
+}
+
 // Sample a cosine distributed direction from two random numbers in [0,1)
 CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_cosine(float u0, float u1) {
 	float cosTheta = sqrt(u0);			// cos(acos(sqrt(x))) = sqrt(x)
@@ -80,7 +85,7 @@ CUDA_FUNCTION __forceinline__ ei::Vec2 sample_barycentric(float u0, float u1) {
 // Taken from Johannes' renderer
 CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direction& dir,
 															 const ei::Box& bounds,
-															 float u0, float u1, float u2) {
+															 float u0, float u1) {
 	// Compute projected cube area
 	ei::Vec3 sides = bounds.max - bounds.min;
 	float projAx = sides.y * sides.z * fabsf(dir.x);
@@ -90,13 +95,45 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 	// Sample a position on one of the cube faces
 	ei::Vec3 position;
 	float x = u0 * area;
-	if(x < projAx)
-		position = ei::Vec3{ (dir.x < 0.f) ? 1.f : 0.f, u1, u2 };
-	else if(x < projAx + projAy)
-		position = ei::Vec3{ u1, (dir.y < 0.f) ? 1.f : 0.f, u2 };
-	else
-		position = ei::Vec3{ u1, u2, (dir.z < 0.f) ? 1.f : 0.f };
+	if(x < projAx) {
+		u0 = rescale_sample(u0, 0.0f, projAx);
+		position = ei::Vec3{ (dir.x < 0.f) ? 1.f : 0.f, u1, u0 };
+	} else if(x < projAx + projAy) {
+		u0 = rescale_sample(u0, projAx, projAx + projAy);
+		position = ei::Vec3{ u1, (dir.y < 0.f) ? 1.f : 0.f, u0 };
+	} else {
+		u0 = rescale_sample(u0, projAx + projAy, 1.0f);
+		position = ei::Vec3{ u1, u0, (dir.z < 0.f) ? 1.f : 0.f };
+	}
 	return PositionSample{ bounds.min + position * sides, AreaPdf{ 1.f / area } };
 }
+
+/*
+ * A RndSet is a fixed size set of random numbers which may be consumed by a sampler.
+ * There are different sets dependent on the application. Most samplers use 2 numbers.
+ * For samplers with layer decisions (light tree, materials) there is a rndset with
+ * an additional 64bit random value (RndSet2_1).
+ */
+struct RndSet2 {
+	float u0;
+	float u1;
+
+	RndSet2(u64 x) :
+		u0{sample_uniform(u32(x))},
+		u1{sample_uniform(u32(x >> 32))}
+	{}
+};
+
+struct RndSet2_1 {
+	float u0;
+	float u1;
+	u64 i0;
+
+	RndSet2_1(u64 x0, u64 x1) :
+		u0{sample_uniform(u32(x0))},
+		u1{sample_uniform(u32(x0 >> 32))},
+		i0{x1}
+	{}
+};
 
 }} // namespace mufflon::math

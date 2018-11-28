@@ -53,16 +53,16 @@ private:
 CUDA_FUNCTION Sample
 lambert_sample(const LambertParameterPack& params,
 			   const Direction& incidentTS,
-			   const RndSet& rndSet) {
+			   const math::RndSet2_1& rndSet) {
 	// Importance sampling for lambert: BRDF * cos(theta)
 	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1).direction;
 	// Copy the sign for two sided diffuse
 	return Sample {
 		Spectrum{params.albedo},
-		AngularPdf(excidentTS.z / ei::PI),
+		Sample::Type::REFLECTED,
 		excidentTS * ei::sgn(incidentTS.z),
-		AngularPdf(ei::abs(incidentTS.z) / ei::PI),
-		Sample::Type::REFLECTED
+		AngularPdf(excidentTS.z / ei::PI),
+		AngularPdf(ei::abs(incidentTS.z) / ei::PI)
 	};
 }
 

@@ -233,7 +233,7 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 get_cluster_flux(const ChildType& child,
 // Converts the typeless memory into the given light type and samples it
 CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
 										const ei::Box& bounds,
-										const RndSet& rnd) {
+										const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
 		case LightType::POINT_LIGHT: return sample_light(*reinterpret_cast<const PointLight*>(light), rnd);
@@ -249,7 +249,7 @@ CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
 // Converts the typeless memory into the given light type and samples it
 CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* light,
 								  const ei::Vec3& position, float distSqr,
-								  const ei::Box& bounds, const NEERndSet& rnd) {
+								  const ei::Box& bounds, const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
 		case LightType::POINT_LIGHT: return connect_light(*reinterpret_cast<const PointLight*>(light), position, distSqr, rnd);
@@ -272,7 +272,7 @@ CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* ligh
  */
 CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 								u64 index, u64 rng, const ei::Box& bounds,
-								const RndSet& rnd) {
+								const math::RndSet2& rnd) {
 	// Check: do we have more than one light here?
 	if(tree.lightCount == 1u) {
 		// Nothing to do but sample the photon
@@ -370,7 +370,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u64 right,
 										  u64 index, u64 rng, const ei::Vec3& position,
-										  const ei::Box& bounds, const NEERndSet& rnd,
+										  const ei::Box& bounds, const math::RndSet2& rnd,
 										  Guide&& guide) {
 	using namespace lighttree_detail;
 	// Check: do we have more than one light here?
@@ -472,7 +472,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
  */
 CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 								u64 indexMax, u64 rng, const ei::Box& bounds,
-								const RndSet& rnd) {
+								const math::RndSet2& rnd) {
 	// Figure out which of the three top-level light types get the photon
 	// Implicit left boundary of 0 for the interval
 	u64 intervalRight = indexMax;
@@ -545,7 +545,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 
 // Emits a single photon from a light source.
 CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 rng,
-						  const ei::Box& bounds, const RndSet& rnd) {
+						  const ei::Box& bounds, const math::RndSet2& rnd) {
 	// No index means our RNG serves as an index
 	return emit(tree, rng, std::numeric_limits<u64>::max(), rng, bounds, rnd);
 }
@@ -558,7 +558,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 rng,
 template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u64 index,
 										  u64 indexMax, u64 rng, const ei::Vec3& position,
-										  const ei::Box& bounds, const NEERndSet& rnd,
+										  const ei::Box& bounds, const math::RndSet2& rnd,
 										  Guide&& guide) {
 	// Figure out which of the three top-level light types get the photon
 	// Implicit left boundary of 0 for the interval

@@ -14,9 +14,26 @@ namespace mufflon { namespace scene { namespace lights {
 
 struct Photon {
 	math::PositionSample pos;
-	math::DirectionSample dir;
 	Spectrum intensity;
 	LightType type;
+	// Deliver some additional information dependent on the type.
+	// These are required to generate general purpose vertices.
+	union SourceParam {
+		CUDA_FUNCTION SourceParam() {}
+		struct {
+			ei::Vec3 direction;
+			half cosThetaMax;
+			half cosFalloffStart;
+		} spot;
+		struct {
+			ei::Vec3 normal;
+			float area;		// TODO: remove? (ATM not used by the vertex)
+		} area;
+		struct {
+			ei::Vec3 direction;
+			AngularPdf dirPdf;
+		} dir;
+	} source_param;
 };
 
 struct NextEventEstimation {
@@ -32,23 +49,6 @@ struct SurfaceSample {
 	math::PositionSample pos;
 	UvCoordinate uv;
 	scene::Direction normal;
-	scene::Direction tangentX;
-	scene::Direction tangentY;
-};
-
-/**
- * A RndSet is a fixed size set of random numbers which may be consumed by a light
- * sampler. There is currently no guarantee about their relative quality.
- */
-struct RndSet {
-	float u0;	// In [0,1)
-	float u1;	// In [0,1)
-	float u2;	// In [0,1)
-	float u3;	// In [0,1)
-};
-struct NEERndSet {
-	float u0;	// In [0,1)
-	float u1;	// In [0,1)
 };
 
 // Transform a direction from tangent into world space (convention Z-up vs. Y-up)
@@ -61,35 +61,16 @@ CUDA_FUNCTION __forceinline__ ei::Vec3 tangent2world(const ei::Vec3& dir,
 
 // Sample a light source
 CUDA_FUNCTION __forceinline__ Photon sample_light(const PointLight& light,
-												  const RndSet& rnd) {
+												  const math::RndSet2& rnd) {
 	return Photon{ { light.position, AreaPdf::infinite() },
-				   math::sample_dir_sphere_uniform(rnd.u0, rnd.u1),
 				   light.intensity, LightType::POINT_LIGHT };
 }
-CUDA_FUNCTION __forceinline__ Photon sample_light(const SpotLight& light,
-												  const RndSet& rnd) {
-	const float cosThetaMax = __half2float(light.cosThetaMax);
-	const float cosFalloffStart = __half2float(light.cosFalloffStart);
-	// Sample direction in the cone
-	math::DirectionSample dir = math::sample_cone_uniform(rnd.u0, rnd.u1, cosThetaMax);
-	// Transform direction to world coordinates
-	// For that we need an arbitrary "up"-vector to compute our two tangents
-	ei::Vec3 up{ 0, 1, 0 };
-	if(fabsf(ei::dot(up, dir.direction)) < 0.05f) {
-		// Too close to our up direction -> take "random" other vector
-		up = ei::Vec3{ 1, 0, 0 };
-	}
-	// Compute tangent space
-	const ei::Vec3 tangentX = ei::normalize(ei::cross(up, dir.direction));
-	const ei::Vec3 tangentY = ei::cross(dir.direction, tangentX);
-	dir.direction = tangent2world(dir.direction, tangentX, tangentY,
-								  ei::unpackOctahedral32(light.direction));
-	// Compute falloff for cone
-	const float falloff = get_falloff(ei::dot(ei::unpackOctahedral32(light.direction), dir.direction),
-								cosThetaMax, cosFalloffStart);
 
+CUDA_FUNCTION __forceinline__ Photon sample_light(const SpotLight& light,
+												  const math::RndSet2& rnd
+) {
 	return Photon{ { light.position, AreaPdf::infinite() },
-				   dir, light.intensity * falloff, LightType::SPOT_LIGHT };
+				   light.intensity, LightType::SPOT_LIGHT };
 }
 
 CUDA_FUNCTION __forceinline__ SurfaceSample
@@ -105,19 +86,14 @@ sample_light_pos(const AreaLightTriangle<CURRENT_DEV>& light, float u0, float u1
 	const ei::Vec3 position = light.points[0u] + tangentX * bary.x + tangentY * bary.y;
 	const ei::Vec2 uv = light.uv[0u] + (light.uv[1u] - light.uv[0u]) * bary.x + (light.uv[2u] - light.uv[0u]) * bary.y;
 	return { math::PositionSample{position, AreaPdf{ area2Inv * 2.0f }},
-			 uv, normal, tangentX, tangentY };
+			 uv, normal };
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightTriangle<CURRENT_DEV>& light,
-												  const RndSet& rnd) {
+												  const math::RndSet2& rnd) {
 	SurfaceSample posSample = sample_light_pos(light, rnd.u0, rnd.u1);
-	// Sample the direction (lambertian model)
-	math::DirectionSample dir = math::sample_dir_cosine(rnd.u2, rnd.u3);
-	// Transform into world space (Z-up to Y-up)
-	dir.direction = tangent2world(dir.direction, posSample.tangentX,
-								  posSample.tangentY, posSample.normal);
 	// TODO: what is the outgoing size?
 	return Photon{
-		posSample.pos, dir, Spectrum{ sample(light.radianceTex, posSample.uv) },
+		posSample.pos, Spectrum{ sample(light.radianceTex, posSample.uv) },
 		LightType::AREA_LIGHT_TRIANGLE
 	};
 }
@@ -161,21 +137,18 @@ sample_light_pos(const AreaLightQuad<CURRENT_DEV>& light, float u0, float u1) {
 		+ (light.uv[side?2u:1u] - light.uv[0u]) * bary.x
 		+ (light.uv[side?3u:2u] - light.uv[0u]) * bary.y;
 	return { math::PositionSample{position, AreaPdf{ 1.0f / (area1 + area2) }}, uv,
-			 side ? normal2 / (area2 * 2.0f) : normal1 / (area1 * 2.0f),
-			 side ? tangent2X : tangent1X, side ? tangent2Y : tangent1Y };
+			 side ? normal2 / (area2 * 2.0f) : normal1 / (area1 * 2.0f) };
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightQuad<CURRENT_DEV>& light,
-												  const RndSet& rnd) {
+												  const math::RndSet2& rnd) {
 	SurfaceSample posSample = sample_light_pos(light, rnd.u0, rnd.u1);
-	// Transform direction to world coordinates
-	math::DirectionSample dir = math::sample_dir_cosine(rnd.u2, rnd.u3);
-	dir.direction = tangent2world(dir.direction, posSample.tangentX, posSample.tangentY, posSample.normal);
 	// TODO: what is the outgoing size?
-	return Photon{ posSample.pos, dir,
+	return Photon{ posSample.pos,
 		Spectrum{sample(light.radianceTex, posSample.uv)}, LightType::AREA_LIGHT_QUAD };
 }
+
 CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightSphere<CURRENT_DEV>& light,
-												  const RndSet& rnd) {
+												  const math::RndSet2& rnd) {
 	// We don't need to convert the "normal" due to sphere symmetry
 	const math::DirectionSample normal = math::sample_dir_sphere_uniform(rnd.u0, rnd.u1);
 	const ei::Vec2 uv {atan2(normal.direction.y, normal.direction.x), acos(normal.direction.z)}; // TODO: not using the sampler (inline) would allow to avoid the atan function here
@@ -183,27 +156,25 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const AreaLightSphere<CURRENT_
 	return Photon{
 		math::PositionSample{ light.position + normal.direction * light.radius,
 							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		math::sample_dir_cosine(rnd.u2, rnd.u3),
 		Spectrum{sample(light.radianceTex, uv)}, LightType::AREA_LIGHT_SPHERE
 	};
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const DirectionalLight& light,
 												  const ei::Box& bounds,
-												  const RndSet& rnd) {
+												  const math::RndSet2& rnd) {
 	return Photon{
-		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1, rnd.u2),
-		math::DirectionSample{ light.direction, AngularPdf::infinite() },
+		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1),
 		light.radiance, LightType::DIRECTIONAL_LIGHT
 	};
 }
 CUDA_FUNCTION __forceinline__ Photon sample_light(const EnvMapLight<CURRENT_DEV>& light,
-												  const RndSet& rnd) {
+												  const math::RndSet2& rnd) {
 	(void)light;
 	(void)rnd;
 	// TODO
 	return Photon{
 		{},{},
-		{}, LightType::ENVMAP_LIGHT
+		LightType::ENVMAP_LIGHT
 	};
 }
 
@@ -211,7 +182,7 @@ CUDA_FUNCTION __forceinline__ Photon sample_light(const EnvMapLight<CURRENT_DEV>
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight& light,
 																const ei::Vec3& pos,
 																const float distSqr,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	const ei::Vec3 direction = (light.position - pos) / sqrtf(distSqr);
 	return NextEventEstimation{
 		math::PositionSample{ light.position, AreaPdf::infinite() },
@@ -222,7 +193,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight& light,
 																const ei::Vec3& pos,
 																const float distSqr,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	float cosThetaMax = __half2float(light.cosThetaMax);
 	const ei::Vec3 direction = (light.position - pos) / sqrtf(distSqr);
 	const float falloff = get_falloff(-ei::dot(ei::unpackOctahedral32(light.direction),
@@ -236,7 +207,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightTriangle<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	SurfaceSample posSample = sample_light_pos(light, rnd.u0, rnd.u1);
 	ei::Vec3 direction = pos - posSample.pos.position;
 	const float distSqr = ei::lensq(direction);
@@ -256,7 +227,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightT
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQuad<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	SurfaceSample posSample = sample_light_pos(light, rnd.u0, rnd.u1);
 	ei::Vec3 direction = pos - posSample.pos.position;
 	const float distSqr = ei::lensq(direction);
@@ -276,7 +247,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightSphere<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	// TODO
 	return NextEventEstimation{
 		math::PositionSample{},
@@ -288,7 +259,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const DirectionalLight& light,
 																const ei::Vec3& pos,
 																const ei::Box& bounds,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	// TODO
 	return NextEventEstimation{
 		math::PositionSample{},
@@ -299,7 +270,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Directiona
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLight<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
-																const NEERndSet& rnd) {
+																const math::RndSet2& rnd) {
 	// TODO
 	return NextEventEstimation{
 		math::PositionSample{},

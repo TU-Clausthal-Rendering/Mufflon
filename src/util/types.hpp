@@ -50,7 +50,7 @@ public:
 	}
 	__host__ __device__ AngularPdf to_angular_pdf(Real cos, Real distSqr) const noexcept;
 	__host__ __device__ static constexpr AreaPdf infinite() {
-		return AreaPdf{ std::numeric_limits<float>::infinity() };
+		return AreaPdf{ 4294967296.f }; // In theory infinite, but must behave well in float32 (power of two does not change the mantissa, shortens out anyway)
 	}
 
 private:
@@ -93,7 +93,7 @@ public:
 		return AreaPdf{ m_pdf * ei::abs(cos) / distSqr };
 	}
 	__host__ __device__ static constexpr AngularPdf infinite() {
-		return AngularPdf{std::numeric_limits<float>::infinity()};
+		return AngularPdf{ 4294967296.f }; // In theory infinite, but must behave well in float32 (power of two does not change the mantissa, shortens out anyway)
 	}
 
 private:

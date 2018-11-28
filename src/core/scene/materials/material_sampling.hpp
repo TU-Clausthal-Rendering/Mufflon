@@ -32,7 +32,7 @@ sample(const TangentSpace& tangentSpace,
 		const ParameterPack& params,
 		const Direction& incident,
 		const Medium* media,
-		const RndSet& rndSet,
+		const math::RndSet2_1& rndSet,
 		bool adjoint
 ) {
 	// Cancel the path if shadowed shading normal (incident)

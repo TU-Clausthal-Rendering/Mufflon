@@ -49,26 +49,15 @@ void CpuPathTracer::reset() {
 
 void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
-	// Create a start for the path
-	const cameras::CameraParams& cam = *m_currentScene->get_camera_data<Device::CPU>();
-	cameras::RndSet camRnd { math::sample_uniform(m_rngs[pixel].next()),
-							 math::sample_uniform(m_rngs[pixel].next()) };
-	cameras::RaySample camSample = camera_sample_ray(cam, coord, ei::Vec2{outputBuffer.get_resolution()}, camRnd);
-	// Setup first "vertex" from camera
-	//ei::Ray ray{camSample.origin, camSample.excident};
+
 	Throughput throughput {ei::Vec3{1.0f}, 1.0f};
 	PtPathVertex vertex; // TODO: larger buffer
-	scene::materials::Medium medium;
-
-
-	/*PathHead head {
-		Throughput{ei::Vec3{camVertex.w / float(camVertex.pdf)}, 1.0f},
-		camVertex.origin,
-		camVertex.pdf,
-		ei::Vec3{0.0f},
-		AngularPdf{0.0f},
-		cam.type == cameras::CameraModel::ORTHOGRAPHIC ? Interaction::CAMERA_ORTHO : Interaction::CAMERA
-	};*/
+	scene::materials::Medium medium;	// TODO: get somewhere
+	// Create a start for the path
+	const cameras::CameraParams& cam = *m_currentScene->get_camera_data<Device::CPU>();
+	math::RndSet2 camRnd { m_rngs[pixel].next() };
+	math::PositionSample camPos = camera_sample_position(cam, camRnd);
+	PtPathVertex::create_camera(&vertex, &vertex, cam, camPos);
 
 	int pathLen = 0;
 	do {
@@ -76,12 +65,11 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 			// TODO: Call NEE member function for the camera start/recursive vertices
 			// TODO: Walk
-			scene::materials::RndSet rnd { math::sample_uniform(m_rngs[pixel].next()), m_rngs[pixel].next() >> 32 };
-			scene::materials::Sample sample = vertex.sample(rnd);
+			math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
 			scene::accel_struct::RayIntersectionResult nextHit;
-			if(!walk(ei::Ray(vertex.get_position(), sample.excident), sample.pdfF,
-				sample.throughput, medium, 0.0f, throughput, nextHit))
+			if(!walk(vertex, medium, rnd, 0.0f, throughput, nextHit))
 				break;
+			// TODO: create a new vertex based on the intersection result
 		}
 		++pathLen;
 	} while(pathLen < 666);

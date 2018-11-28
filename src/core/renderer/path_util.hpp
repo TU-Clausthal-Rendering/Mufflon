@@ -5,7 +5,7 @@
 #include "core/math/sampling.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/materials/material_types.hpp"
-#include "core/scene/lights/lights.hpp"
+#include "core/scene/lights/light_sampling.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/cameras/camera_sampling.hpp"
 #include <ei/conversions.hpp>
@@ -15,18 +15,29 @@ namespace mufflon { namespace renderer {
 enum class Interaction : u16 {
 	VOID,				// The ray missed the scene (no intersection)
 	SURFACE,			// A standard material interaction
-	CAMERA,				// A perspective camera start vertex
+	CAMERA_PINHOLE,		// A perspective camera start vertex
 	CAMERA_ORTHO,		// An orthographic camera start vertex
 	LIGHT_POINT,		// A point-light vertex
-	LIGHT_DIRECTIONAL,	// A directional-light vertex
+	LIGHT_DIRECTIONAL,	// A directional-light vertex (include environment map vertices)
 	LIGHT_SPOT,			// A spot-light vertex
-	LIGHT_ENVMAP,		// An environment map-light vertex
 	LIGHT_AREA,			// An area-light vertex
 };
 
 struct Throughput {
 	Spectrum weight;
 	float guideWeight;
+};
+
+struct VertexSample {
+	Spectrum throughput {0.0f};
+	enum class Type: u32 {			// Type of interaction
+		INVALID,
+		REFLECTED,
+		REFRACTED,
+	} type = Type::INVALID;
+	ei::Ray excident;
+	AngularPdf pdfF {0.0f};			// Sampling PDF in forward direction (current sampler)
+	AngularPdf pdfB {0.0f};			// Sampling PDF with reversed incident and excident directions
 };
 
 /*
@@ -49,22 +60,23 @@ struct Throughput {
 template < typename ExtensionT, int VERTEX_ALIGNMENT >
 class PathVertex {
 public:
+	PathVertex() : m_type(Interaction::VOID) {}
+
 	bool is_end_point() const {
 		return m_type != Interaction::SURFACE;
 	}
 	bool is_orthographic() const {
 		return m_type == Interaction::LIGHT_DIRECTIONAL
-			|| m_type == Interaction::LIGHT_ENVMAP
 			|| m_type == Interaction::CAMERA_ORTHO;
 	}
 	bool is_camera() const {
-		return m_type == Interaction::CAMERA || m_type == Interaction::CAMERA_ORTHO;
+		return m_type == Interaction::CAMERA_PINHOLE || m_type == Interaction::CAMERA_ORTHO;
 	}
 
 	// Get the position of the vertex. For orthographic vertices this
 	// position is computed with respect to a referencePosition.
 	scene::Point get_position(const scene::Point& referencePosition) const {
-		if(m_type == Interaction::LIGHT_DIRECTIONAL || m_type == Interaction::LIGHT_ENVMAP)
+		if(m_type == Interaction::LIGHT_DIRECTIONAL)
 			return referencePosition - m_position * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
 		if(m_type == Interaction::CAMERA_ORTHO)
 			return referencePosition; // TODO project to near plane
@@ -95,17 +107,16 @@ public:
 		switch(m_type) {
 			// Non-hitable vertices
 			case Interaction::VOID:
-			case Interaction::CAMERA:
+			case Interaction::CAMERA_PINHOLE:
 			case Interaction::LIGHT_POINT:
-			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_SPOT:
 				return 0.0f;
-			case Interaction::LIGHT_ENVMAP:
+			case Interaction::LIGHT_DIRECTIONAL:
 				// There is no geometrical conversion factor for hitting environment maps.
 				// However, it is expected that the scene exit-distance is always the same
 				// and can be used in both directions without changing the result of a
 				// comparison.
-				return 1.0f;
+				return ei::sq(scene::MAX_SCENE_SIZE);
 			case Interaction::LIGHT_AREA: {
 				auto* alDesc = as<AreaLightDesc>(desc());
 				return dot(connection, alDesc->normal);
@@ -120,8 +131,8 @@ public:
 
 	// Get the sampling PDFs of this vertex (not defined, if
 	// the vertex is an end point on a surface). Details at the members
-	AngularPdf get_forward_pdf() const { return m_pdfF; }
-	AngularPdf get_backward_pdf() const { return m_pdfB; }
+	//AngularPdf get_forward_pdf() const { return m_pdfF; }
+	//AngularPdf get_backward_pdf() const { return m_pdfB; }
 
 	// Compute new values of the PDF and BxDF/outgoing radiance for a new
 	// exident direction.
@@ -133,14 +144,15 @@ public:
 			case Interaction::VOID: return scene::materials::EvalValue{};
 			case Interaction::LIGHT_POINT: {
 				return scene::materials::EvalValue{
-					m_incident, 0.0f,
+					m_intensity, 0.0f,
 					AngularPdf{ 1.0f / (4*ei::PI) },
 					AngularPdf{ 0.0f }
 				};
 			}
 			case Interaction::LIGHT_DIRECTIONAL: {
+				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
 				return scene::materials::EvalValue{
-					m_incident, 0.0f,
+					m_intensity, 0.0f,
 					// Special case: the incindent area PDF is directly projected.
 					// To avoid the wrong conversion later we need to do its reversal here.
 					m_incidentPdf.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE * scene::MAX_SCENE_SIZE),
@@ -150,14 +162,14 @@ public:
 			case Interaction::LIGHT_SPOT: {
 				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
 				const float cosThetaMax = __half2float(desc->cosThetaMax);
-				const float cosOut = dot(m_incident, excident);
+				const float cosOut = dot(desc->direction, excident);
 				// Early out
 				if(cosOut <= cosThetaMax) return scene::materials::EvalValue{};
 				// OK, there will be some contribution
 				const float cosFalloffStart = __half2float(desc->cosThetaMax);
 				float falloff = scene::lights::get_falloff(cosOut, cosThetaMax, cosFalloffStart);
 				return scene::materials::EvalValue{
-					desc->intensity * falloff, 0.0f,
+					m_intensity * falloff, 0.0f,
 					AngularPdf{ math::get_uniform_cone_pdf(cosThetaMax) },
 					AngularPdf{ 0.0f }
 				};
@@ -168,18 +180,81 @@ public:
 				// Early out (wrong hemisphere)
 				if(cosOut <= 0.0f) return scene::materials::EvalValue{};
 				return scene::materials::EvalValue{
-					m_incident * cosOut, 0.0f,
+					m_intensity * cosOut, 0.0f,
 					AngularPdf{ cosOut / ei::PI },
 					AngularPdf{ 0.0f }
+				};
+			}
+			case Interaction::CAMERA_PINHOLE: {
+				const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
+				cameras::ProjectionResult proj = pinholecam_project(*desc, excident);
+				return scene::materials::EvalValue{
+					Spectrum{proj.w}, 0.0f,
+					proj.pdf, AngularPdf{ 0.0f }
 				};
 			}
 		}
 		return scene::materials::EvalValue{};
 	}
 
-	scene::materials::Sample sample(const scene::materials::RndSet& rndSet) const {
-		// TODO
-		return scene::materials::Sample{};
+	VertexSample sample(const math::RndSet2_1& rndSet) const {
+		switch(m_type) {
+			case Interaction::VOID: return VertexSample{};
+			case Interaction::LIGHT_POINT: {
+				math::DirectionSample excident = math::sample_dir_sphere_uniform(rndSet.u0, rndSet.u1);
+				return VertexSample{
+					m_intensity, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, excident.direction},
+					excident.pdf, AngularPdf{0.0f},
+				};
+			}
+			case Interaction::LIGHT_DIRECTIONAL: {
+				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
+				return VertexSample{
+					m_intensity, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, desc->direction},
+					desc->dirPdf, AngularPdf{0.0f}
+				};
+			}
+			case Interaction::LIGHT_SPOT: {
+				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
+				// Sample direction in the cone
+				math::DirectionSample dir = math::sample_cone_uniform(rndSet.u0, rndSet.u1, desc->cosThetaMax);
+				// Transform direction to world coordinates
+				const ei::Vec3 tangentX = normalize(perpendicular(desc->direction));
+				const ei::Vec3 tangentY = cross(desc->direction, tangentX);
+				const ei::Vec3 globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * desc->direction;
+				// Compute falloff for cone
+				const float falloff = scene::lights::get_falloff(dir.direction.z, desc->cosThetaMax, desc->cosFalloffStart);
+				return VertexSample{
+					m_intensity * falloff, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, globalDir}, dir.pdf, AngularPdf{0.0f}
+				};
+			}
+			case Interaction::LIGHT_AREA: {
+				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
+				// Sample the direction (lambertian model)
+				math::DirectionSample dir = math::sample_dir_cosine(rndSet.u0, rndSet.u1);
+				// Transform direction to world coordinates
+				const ei::Vec3 tangentX = normalize(perpendicular(desc->normal));
+				const ei::Vec3 tangentY = cross(desc->normal, tangentX);
+				const ei::Vec3 globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * desc->normal;
+				return VertexSample{
+					m_intensity * dir.direction.z, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, globalDir}, dir.pdf, AngularPdf{0.0f}
+				};
+			}
+			case Interaction::CAMERA_PINHOLE: {
+				const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
+				cameras::Importon importon = pinholecam_sample_ray(*desc, m_position);
+				return VertexSample{
+					Spectrum{1.0f}, VertexSample::Type::REFLECTED,
+					ei::Ray{m_position, importon.dir.direction},
+					importon.dir.pdf, AngularPdf{0.0f}
+				};
+			}
+		}
+		return VertexSample{};
 	}
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
@@ -225,6 +300,7 @@ public:
 		 || path0.is_orthographic() && path1.is_camera()		// Orthographic light source with camera
 		 || path0.is_camera() && path1.is_orthographic()
 		);
+		// TODO: camera clipping here? Seems to be the best location
 	}
 
 	/* *************************************************************************
@@ -236,91 +312,102 @@ public:
 	 * instances.															   *
 	 * Return the size of the created vertex								   *
 	************************************************************************* */
-	static int create_void(void* mem, const void* previous, const scene::accel_struct::RayIntersectionResult& intersectionResult, const ei::Ray& incidentRay) {
+	static int create_void(void* mem, const void* previous,
+		const scene::accel_struct::RayIntersectionResult& intersectionResult,
+		const ei::Ray& incidentRay
+	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = incidentRay.origin + incidentRay.direction * intersectionResult.hitT;
-		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
+		vert->init_prev_offset(mem, previous);
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incidentRay.direction;
-		vert->m_pdfF = AngularPdf { 0.0f };
-		vert->m_pdfB = AngularPdf { 0.0f };
 		vert->m_incidentPdf = AreaPdf { 0.0f };
 		vert->m_extension = ExtensionT{};
 		return round_to_align( sizeof(PathVertex) );
 	}
 
-	static int create_light(void* mem, const void* previous,
-		const scene::lights::PointLight& light, AreaPdf incidentPdf, AngularPdf excidentPdf) {
+	static int create_camera(void* mem, const void* previous,
+		const cameras::CameraParams& camera,
+		const math::PositionSample& position
+	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		vert->m_position = light.position;
-		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
-		vert->m_type = Interaction::LIGHT_POINT;
-		vert->m_incident = light.intensity;		// Abuse of vacant memory
-		vert->m_pdfF = excidentPdf;
-		vert->m_pdfB = AngularPdf { 0.0f };
-		vert->m_incidentPdf = incidentPdf;
+		vert->m_position = position.position;
+		vert->init_prev_offset(mem, previous);
+		//vert->m_incident = viewDir; unused
+		vert->m_incidentPdf = position.pdf;
 		vert->m_extension = ExtensionT{};
-		return round_to_align(sizeof(PathVertex));
+		if(camera.type == cameras::CameraModel::PINHOLE) {
+			vert->m_type = Interaction::CAMERA_PINHOLE;
+			cameras::PinholeParams* desc = as<cameras::PinholeParams>(vert->desc());
+			return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
+		}
+		mAssertMsg(false, "Not implemented yet.");
+		return 0;
 	}
 
 	static int create_light(void* mem, const void* previous,
-		const scene::lights::DirectionalLight& light, AreaPdf incidentPdf) {
+		const scene::lights::Photon& lightSample,	// Positional sample for the starting point on a light source
+		math::Rng& rng								// Only used for the incomplete vertices (env-map)
+	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		mAssert(approx(len(light.direction), 1.0f));
-		vert->m_position = light.direction;		// Abuse for special case
-		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
-		vert->m_type = Interaction::LIGHT_DIRECTIONAL;
-		vert->m_incident = light.radiance;		// Abuse of vacant memory
-		vert->m_pdfF = AngularPdf { 1.0f };		// Infinite in theory, use one for numerical reasons
-		vert->m_pdfB = AngularPdf { 0.0f };
-		vert->m_incidentPdf = incidentPdf;
+		vert->m_position = lightSample.pos.position;
+		vert->init_prev_offset(mem, previous);
+		vert->m_intensity = lightSample.intensity;
+		vert->m_incidentPdf = lightSample.pos.pdf;
 		vert->m_extension = ExtensionT{};
-		return round_to_align(sizeof(PathVertex));
+		switch(lightSample.type) {
+			case scene::lights::LightType::POINT_LIGHT: {
+				vert->m_type = Interaction::LIGHT_POINT;
+				return round_to_align(sizeof(PathVertex));
+			}
+			case scene::lights::LightType::SPOT_LIGHT: {
+				vert->m_type = Interaction::LIGHT_SPOT;
+				SpotLightDesc* desc = as<SpotLightDesc>(vert->desc());
+				desc->direction = lightSample.source_param.spot.direction;
+				desc->cosThetaMax = lightSample.source_param.spot.cosThetaMax;
+				desc->cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
+				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(SpotLightDesc));
+			}
+			case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
+			case scene::lights::LightType::AREA_LIGHT_QUAD:
+			case scene::lights::LightType::AREA_LIGHT_SPHERE: {
+				vert->m_type = Interaction::LIGHT_AREA;
+				AreaLightDesc* desc = as<AreaLightDesc>(vert->desc());
+				desc->normal = lightSample.source_param.area.normal;
+				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(AreaLightDesc));
+			}
+			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
+				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
+				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
+				desc->direction = lightSample.source_param.dir.direction;
+				desc->dirPdf = lightSample.source_param.dir.dirPdf;
+				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(DirLightDesc));
+			}
+			case scene::lights::LightType::ENVMAP_LIGHT: {
+				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
+				// Environment lights are not fully sampled
+				// TODO: complete sampling, REQUIRES scene BB
+				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
+				desc->direction = lightSample.source_param.dir.direction;
+				desc->dirPdf = lightSample.source_param.dir.dirPdf;
+				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(DirLightDesc));
+			}
+		}
 	}
 
-	static int create_light(void* mem, const void* previous,
-		const scene::lights::SpotLight& light, AreaPdf incidentPdf, AngularPdf excidentPdf) {
-		PathVertex* vert = as<PathVertex>(mem);
-		vert->m_position = light.position;
-		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
-		vert->m_type = Interaction::LIGHT_SPOT;
-		vert->m_incident = ei::unpackOctahedral32(light.direction);		// Abuse of vacant memory
-		vert->m_pdfF = excidentPdf;
-		vert->m_pdfB = AngularPdf { 0.0f };
-		vert->m_incidentPdf = incidentPdf;
-		vert->m_extension = ExtensionT{};
-		SpotLightDesc* desc = as<SpotLightDesc>(vert->desc());
-		desc->intensity = light.intensity;
-		desc->cosThetaMax = light.cosThetaMax;
-		desc->cosFalloffStart = light.cosFalloffStart;
-		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(SpotLightDesc));
-	}
-
-	// Area lights
-	static int create_light(void* mem, const void* previous,
-		const scene::Point& position, const scene::Direction& normal, float area, const Spectrum& radiance, AreaPdf incidentPdf, AngularPdf excidentPdf) {
-		PathVertex* vert = as<PathVertex>(mem);
-		vert->m_position = position;
-		vert->m_offsetToPath = as<u8>(previous) - as<u8>(mem);
-		vert->m_type = Interaction::LIGHT_AREA;
-		vert->m_incident = radiance * area;		// Abuse of vacant memory, directly store the intensity
-		vert->m_pdfF = excidentPdf;
-		vert->m_pdfB = AngularPdf { 0.0f };
-		vert->m_incidentPdf = incidentPdf;
-		vert->m_extension = ExtensionT{};
-		AreaLightDesc* desc = as<AreaLightDesc>(vert->desc());
-		desc->normal = normal;
-		return round_to_align(sizeof(PathVertex));
-	}
 
 private:
 	struct AreaLightDesc {
 		scene::Direction normal;
 	};
 	struct SpotLightDesc {
-		ei::Vec3 intensity;
+		ei::Vec3 direction;
 		half cosThetaMax;
 		half cosFalloffStart;
+	};
+	struct DirLightDesc {
+		ei::Vec3 direction;
+		AngularPdf dirPdf;
 	};
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace;
@@ -339,21 +426,24 @@ private:
 
 	// Direction from which this vertex was reached.
 	// May be zero-vector for start points or used otherwise.
-	scene::Direction m_incident;
+	union {
+		scene::Direction m_incident;		// For surface vertices
+		Spectrum m_intensity;				// For light vertices
+	};
 
 	// PDF at this vertex in forward direction.
 	// Non-zero for start points and zero for end points.
-	AngularPdf m_pdfF;
+	//AngularPdf m_pdfF;
 
 	// PDF in backward direction.
 	// Zero for start points and non-zero for (real) end points. A path ending
 	// on a surface will have a value of zero anyway.
-	AngularPdf m_pdfB;
+	//AngularPdf m_pdfB;
 
 	// Area PDF of whatever created this vertex
 	AreaPdf m_incidentPdf;
 
-	// REMARK: currently 2 floats unused in 16-byte alignment
+	// REMARK: currently 0 floats unused in 16-byte alignment
 	ExtensionT m_extension;
 
 	static constexpr int round_to_align(int s) {
@@ -362,6 +452,12 @@ private:
 
 	// Private because the vertex is read-only by design (desc() is a helper for vertex creation only)
 	void* desc() { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+
+	void init_prev_offset(void* mem, const void* previous) {
+		std::size_t s = as<u8>(previous) - as<u8>(mem);
+		mAssert(s <= 0xffff);
+		m_offsetToPath = static_cast<u16>(s);
+	}
 
 	template<typename T, int A> 
 	friend class PathVertexFactory;

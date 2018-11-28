@@ -16,12 +16,12 @@ struct PathHead {
 	scene::Direction excident;		// May be zero-vector for start points
 
 	PathHead() {}
-	PathHead(const cameras::RaySample& camSample) :
+/*	PathHead(const cameras::Importon& camSample) :
 		throughput{ei::Vec3{camSample.w / float(camSample.pdf)}, 1.0f},
 		position{camSample.origin},
 		pdfF{camSample.pdf},
 		excident{camSample.excident}
-	{}
+	{}*/
 };
 
 /*
@@ -30,25 +30,28 @@ struct PathHead {
  * sampling and roussian roulette.
  * This also computes the attenuation through the medium.
  *
- * excidentRay: position and excident direction of a completed sampling event
- * rayPdf: the angular PDF of this sampling event
- * rayContribution: throughput of the ray (usually BxDF / PDF)
+ * vertex: generic vertex which is sampled to proceed on the path
+ * rndSet: a set of random numbers to sample the vertex
  * u0: a uniform random number for roussion roulette.
  * throughput [in/out]: The throughput value which is changed by the current sampling event/russion roulette.
  * nextHit [out]: The intersection result of the walk (if any)
  * returns: true if there is a nextHit. false if the path is canceled/misses the scene.
  */
-//template < typename VertexType >
-CUDA_FUNCTION bool walk(const ei::Ray& excidentRay, AngularPdf rayPdf,
-						const Spectrum& eventThroughput, const scene::materials::Medium& medium, float u0,
+template < typename VertexType >
+CUDA_FUNCTION bool walk(const VertexType& vertex,
+						const scene::materials::Medium& medium,
+						const math::RndSet2_1& rndSet, float u0,
 						Throughput& throughput, scene::accel_struct::RayIntersectionResult& nextHit
 ) {
+	// Sample the vertex's outgoing direction
+	VertexSample sample = vertex.sample(rndSet);
+
 	// Update throughputs
-	throughput.weight *= eventThroughput;
-	throughput.guideWeight *= 1.0f - expf(-(rayPdf * rayPdf) / 5.0f);
+	throughput.weight *= sample.throughput;
+	throughput.guideWeight *= 1.0f - expf(-(sample.pdfF * sample.pdfF) / 5.0f);
 
 	// Russian roulette
-	float continuationPropability = ei::min(max(eventThroughput) + 0.05f, 1.0f);
+	float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
 	if(u0 >= continuationPropability)	// The smaller the contribution the more likely the kill
 		return false;
 	else {

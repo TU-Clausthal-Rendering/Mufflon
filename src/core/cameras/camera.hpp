@@ -2,6 +2,7 @@
 
 #include "core/scene/types.hpp"
 #include "core/memory/residency.hpp"
+#include "core/math/sampling.hpp"
 #include "util/assert.hpp"
 #include <string>
 
@@ -122,34 +123,14 @@ private:
 	std::string m_name;
 };
 
-/*
- * A RndSet is a fixed size set of random numbers which may be consumed by a camera
- * sampler. Note that material samplers have a different kind of RndSet.
- * The first pair (u0,u1) should be a high quality stratified sample.
- */
-struct RndSet {
-	float u0;	// In [0,1)
-	float u1;	// In [0,1)
-	float u2;	// In [0,1)
-	float u3;	// In [0,1)
-
-	RndSet(ei::Vec2 u01, ei::Vec2 u23) :
-		u0(u01.x), u1(u01.y),
-		u2(u23.x), u3(u23.y) {}
-};
-
-struct RaySample {
-	// TODO: data layout? (currently set for GPU friendly padding)
-	// TODO: per area pdf
-	scene::Point origin {0.0f};			// Position on the near plane to start the ray
-	AngularPdf pdf {0.0f};				// The camera sampling PDF
-	scene::Direction excident {0.0f};	// The sampled direction
+struct Importon {
+	math::DirectionSample dir;
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 
 struct ProjectionResult {
 	Pixel coord {-1};					// The pixel in which the projection falls
-	float pdf {0.0f};					// The camera sampling PDF
+	AngularPdf pdf {0.0f};				// The camera sampling PDF
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 

@@ -3,6 +3,7 @@
 #include "camera.hpp"
 #include "export/api.hpp"
 #include "util/types.hpp"
+#include "core/math/sampling.hpp"
 #include <ei/3dtypes.hpp>
 #include <cuda_runtime.h>
 
@@ -36,35 +37,42 @@ private:
 };
 
 // A GPU friendly packing of the camera parameters.
+// TODO: smaller size and better alignment by packing one of the directions?
 struct PinholeParams : public CameraParams {
 	scene::Point position;
-	scene::Direction xAxis;
+	float tanVFov;
+	scene::Direction viewDir;
 	float near;
 	scene::Direction up;
 	float far;
-	scene::Direction viewDir;
-	float tanVFov;
+	ei::Vec<u16,2> resolution;	// Output buffer resoultion
+	ei::Vec<u16,2> pixel;		// Target pixel
 };
 
-CUDA_FUNCTION RaySample
-pinholecam_sample_ray(const PinholeParams& params, const Pixel& coord, const ei::Vec2& resolution, const RndSet& rndSet) {
+CUDA_FUNCTION math::PositionSample
+pinholecam_sample_position(const PinholeParams& params, const math::RndSet2& rndSet) {
 	// Get a (randomized) position in [-1,1]²
-	ei::Vec2 subPixel = coord + ei::Vec2(rndSet.u0, rndSet.u1);
-	ei::Vec2 canonicalPos = subPixel / resolution * 2.0f - 1.0f;
+	ei::Vec2 subPixel = params.pixel + ei::Vec2(rndSet.u0, rndSet.u1);
+	ei::Vec2 canonicalPos = subPixel / params.resolution * 2.0f - 1.0f;
 	// Transform it into a point on the near plane (camera space)
 	canonicalPos *= params.tanVFov;
-	float aspectRatio = resolution.x / resolution.y;
+	float aspectRatio = params.resolution.x / float(params.resolution.y);
 	ei::Vec3 nPos {canonicalPos.x * aspectRatio, canonicalPos.y, 1.0f};
 	// Go to world space
-	ei::Vec3 dirWorld = params.xAxis * nPos.x + params.up * nPos.y + params.viewDir * nPos.z;
-	ei::Vec3 dirWorldNormalized = normalize(dirWorld);
-	// Get the PDF of the above procedure
+	ei::Vec3 xAxis = cross(params.viewDir, params.up);
+	ei::Vec3 dirWorld = xAxis * nPos.x + params.up * nPos.y + params.viewDir * nPos.z;
+	return { params.position + dirWorld * params.near, AreaPdf::infinite() };
+}
+
+CUDA_FUNCTION Importon
+pinholecam_sample_ray(const PinholeParams& params, const scene::Point& exitPosWorld) {
+	ei::Vec3 dirWorldNormalized = normalize(exitPosWorld);
+	float aspectRatio = params.resolution.x / float(params.resolution.y);
+	// Get the PDF of the pixel sampling procedure
 	float pixelArea = ei::sq(2 * params.tanVFov) * aspectRatio;
 	float pdf = 1.0f / (pixelArea * dirWorldNormalized.z * dirWorldNormalized.z * dirWorldNormalized.z);
-	return RaySample{
-		params.position + dirWorld * params.near,
-		AngularPdf{ pdf },
-		dirWorldNormalized,
+	return Importon{
+		math::DirectionSample{ dirWorldNormalized, AngularPdf{ pdf } },
 		pdf		// W is the same as the PDF by construction
 	};
 	// TODO: use the far-plane?
@@ -73,36 +81,32 @@ pinholecam_sample_ray(const PinholeParams& params, const Pixel& coord, const ei:
 // Compute pixel position and PDF
 // position: a direction in world space.
 CUDA_FUNCTION ProjectionResult
-pinholecam_project(const PinholeParams& params, const ei::Vec2& resolution, const scene::Point& position) {
-	ei::Vec3 camToPosDir = position - params.position;
-	float w = dot(params.viewDir, camToPosDir);
-	// Clip on near plane
-	if(w < params.near) return ProjectionResult{};
-	// TODO: use the far-plane?
+pinholecam_project(const PinholeParams& params, const scene::Point& excident) {
+	float cosOut = dot(params.viewDir, excident);
 
 	// Compute screen coordinate for this position
-	ei::Vec2 uv{ dot(params.xAxis, camToPosDir), dot(params.up, camToPosDir) };
-	uv /= w * params.tanVFov;
-	float aspectRatio = resolution.x / resolution.y;
+	ei::Vec3 xAxis = cross(params.viewDir, params.up);
+	ei::Vec2 uv{ dot(xAxis, excident), dot(params.up, excident) };
+	uv /= cosOut * params.tanVFov;
+	float aspectRatio = params.resolution.x / float(params.resolution.y);
 	uv.x /= aspectRatio;
 
 	// On screen?
 	if(!(uv.x > -1 && uv.x <= 1 && uv.y > -1 && uv.y <= 1))
 		return ProjectionResult{};
 
-	Pixel pixelCoord{ floor((uv * -0.5f + 0.5f) * resolution) };
+	Pixel pixelCoord{ floor((uv * -0.5f + 0.5f) * params.resolution) };
 	// Need to check the boundaries. In rare cases values like uv.x==-0.999999940
 	// cause pixel coordinates in equal to the resolution.
-	if(pixelCoord.x >= resolution.x) { pixelCoord.x = u32(resolution.x) - 1; }
-	if(pixelCoord.y >= resolution.y) { pixelCoord.y = u32(resolution.y) - 1; }
+	if(pixelCoord.x >= params.resolution.x) { pixelCoord.x = u32(params.resolution.x) - 1; }
+	if(pixelCoord.y >= params.resolution.y) { pixelCoord.y = u32(params.resolution.y) - 1; }
 
-	float cosAtCam = w / len(camToPosDir);
 	float pixelArea = ei::sq(2.0f * params.tanVFov) * aspectRatio;
-	float pdf = 1.0f / (pixelArea * cosAtCam * cosAtCam * cosAtCam);
+	float pdf = 1.0f / (pixelArea * cosOut * cosOut * cosOut);
 
 	return ProjectionResult{
 		pixelCoord,
-		pdf,
+		AngularPdf{ pdf },
 		pdf
 	};
 }
