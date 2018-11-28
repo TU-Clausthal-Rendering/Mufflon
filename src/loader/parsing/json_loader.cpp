@@ -1,5 +1,6 @@
 #include "json_loader.hpp"
 #include "binary.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "util/log.hpp"
 #include "util/punning.hpp"
 #include "util/int_types.hpp"
@@ -530,6 +531,7 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 
 void JsonLoader::load_file() {
 	using namespace rapidjson;
+	auto scope = CpuProfiler::instance().start("JsonLoader::load_file");
 
 	this->clear_state();
 	logInfo("[", FUNCTION_NAME, "] Parsing scene file '", m_filePath.string(), "'");

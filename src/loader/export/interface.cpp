@@ -1,8 +1,10 @@
 #include "interface.h"
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "loader/parsing/json_loader.hpp"
 #include <stdexcept>
+#include <iostream>
 
 #define FUNCTION_NAME __func__
 
@@ -31,6 +33,8 @@ Boolean loader_load_json(const char* path) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
 		return false;
 	}
+	CpuProfiler::instance().create_snapshot_all();
+	std::cout << CpuProfiler::instance().save_snapshots() << std::endl;
 
 	return true;
 }

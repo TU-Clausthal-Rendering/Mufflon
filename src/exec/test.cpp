@@ -343,7 +343,9 @@ void test_scene_loader() {
 }*/
 
 int main() {
+	std::uint64_t cycles0 = __rdtsc();
 	mufflon_initialize(nullptr);
+	std::uint64_t cycles1 = __rdtsc();
 	/*test_polygon();
 	test_sphere();
 	test_lights();
@@ -351,9 +353,7 @@ int main() {
 	test_scene();
 	test_renderer();*/
 	test_scene_loader();
-	mufflon_destroy();
 
-	std::cout << "All tests successful" << std::endl;
 	std::cin.get();
 	return 0;
 }

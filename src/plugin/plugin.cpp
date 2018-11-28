@@ -1,29 +1,29 @@
 #include "plugin.hpp"
 #include "util/log.hpp"
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>
-#else // _MSC_VER
+#else // _WIN32
 #include <dlfcn.h>
-#endif // _MSC_VER
+#endif // _WIN32
 
 namespace mufflon {
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 using HandleType = HINSTANCE;
-#else // _MSC_VER
+#else // _WIN32
 using HandleType = void*;
-#endif // _MSC_VER
+#endif // _WIN32
 
 Plugin::Plugin(fs::path path) :
 	m_pluginPath(path),
 	m_handle(nullptr)
 {
 	if(fs::exists(m_pluginPath) && !fs::is_directory(m_pluginPath)) {
-#ifdef _MSC_VER
+#ifdef _WIN32
 		m_handle = ::LoadLibrary(m_pluginPath.c_str());
-#else // _MSC_VER
+#else // _WIN32
 		m_handle = dlopen();
-#endif // _MSC_VER
+#endif // _WIN32
 		if(!is_loaded())
 			logError("[Plugin::Plugin] Failed to load plugin '",
 					 m_pluginPath.string(), "': ", get_last_error_message());
@@ -48,11 +48,11 @@ bool Plugin::is_loaded() const {
 
 void Plugin::close() {
 	if(is_loaded()) {
-#ifdef _MSC_VER
+#ifdef _WIN32
 		if(!::FreeLibrary(static_cast<HandleType>(m_handle))) {
-#else // _MSC_VER
+#else // _WIN32
 		if(::dlcose(static_cast<HandleType>(m_handle)) != 0) {
-#endif // _MSC_VER
+#endif // _WIN32
 			logError("[Plugin::close] Failed to free plugin '",
 					 m_pluginPath.string(), "': ", get_last_error_message());
 		}
@@ -67,15 +67,15 @@ bool Plugin::has_function(std::string_view name) const {
 }
 
 void* Plugin::load_procedure(const char* name) const {
-#ifdef _MSC_VER
+#ifdef _WIN32
 	return ::GetProcAddress(static_cast<HandleType>(m_handle), name);
-#else // _MSC_VER
+#else // _WIN32
 	return ::dlsym(static_cast<HandleType>(m_handle), name);
-#endif // _MSC_VER
+#endif // _WIN32
 }
 
 std::string Plugin::get_last_error_message() {
-#ifdef _MSC_VER
+#ifdef _WIN32
 	DWORD errorId = ::GetLastError();
 	if(errorId == 0) {
 		return std::string();
@@ -89,9 +89,9 @@ std::string Plugin::get_last_error_message() {
 		::LocalFree(msgBuffer);
 		return msg;
 	}
-#else // _MSC_VER
+#else // _WIN32
 	return std::string(::dlerror());
-#endif // _MSC_VER
+#endif // _WIN32
 }
 
 } // namespace mufflon

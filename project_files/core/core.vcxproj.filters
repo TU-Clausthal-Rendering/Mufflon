@@ -107,6 +107,9 @@
     <Filter Include="Source Files\plugin">
       <UniqueIdentifier>{e621662f-a532-464b-83a1-3f02d8c729fa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\profiler">
+      <UniqueIdentifier>{0b4c810c-d739-4525-89c3-f8fb154f9b5f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -195,6 +198,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\plugin\texture_plugin.cpp">
       <Filter>Source Files\plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp">
+      <Filter>Source Files\profiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -695,6 +701,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\export\texture_data.h">
       <Filter>Source Files\core\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp">
+      <Filter>Source Files\profiler</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

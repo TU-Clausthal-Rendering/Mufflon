@@ -2,6 +2,7 @@
 #include "core/export/interface.h"
 #include "util/log.hpp"
 #include "util/punning.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include <ei/conversions.hpp>
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
@@ -205,6 +206,7 @@ void BinaryLoader::read_normal_compressed_vertices() {
 
 // Read vertices without deflation and without normal compression
 void BinaryLoader::read_normal_uncompressed_vertices() {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::read_normal_uncompressed_vertices");
 	if(m_currObjState.numVertices == 0)
 		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
@@ -358,6 +360,7 @@ void BinaryLoader::read_uncompressed_sphere_materials() {
 }
 
 void BinaryLoader::read_uncompressed_triangles() {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::read_uncompressed_triangles");
 	if(m_currObjState.numTriangles == 0)
 		return;
 	// Read the faces (cannot do that bulk-like)
@@ -372,6 +375,7 @@ void BinaryLoader::read_uncompressed_triangles() {
 }
 
 void BinaryLoader::read_uncompressed_quads() {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::read_uncompressed_quads");
 	if(m_currObjState.numQuads == 0)
 		return;
 	// Read the faces (cannot do that bulk-like)
@@ -610,6 +614,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attrib
 }
 
 void BinaryLoader::read_lod() {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::read_lod");
 	if(m_currObjState.flags.is_set(ObjectFlag::DEFLATE)) {
 		if(m_currObjState.flags.is_set(ObjectFlag::COMPRESSED_NORMALS))
 			read_compressed_normal_compressed_vertices();
@@ -644,6 +649,7 @@ void BinaryLoader::read_lod() {
 
 void BinaryLoader::read_object(const u64 globalLod,
 							   const std::unordered_map<std::string_view, u64>& localLods) {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::read_object");
 	m_currObjState.name = read<std::string>();
 	m_currObjState.keyframe = read<u32>();
 	m_currObjState.animObjId = read<u32>();
@@ -691,6 +697,7 @@ void BinaryLoader::read_object(const u64 globalLod,
 }
 
 void BinaryLoader::read_instances() {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::read_instances");
 	std::vector<uint8_t> hasInstance(m_objectHandles.size(), false);
 	const u32 numInstances = read<u32>();
 	for(u32 i = 0u; i < numInstances; ++i) {
@@ -739,6 +746,7 @@ void BinaryLoader::read_instances() {
 
 void BinaryLoader::load_file(const u64 globalLod,
 							 const std::unordered_map<std::string_view, u64>& localLods) {
+	auto scope = CpuProfiler::instance().start("BinaryLoader::load_file");
 	try {
 		if(!fs::exists(m_filePath))
 			throw std::runtime_error("Binary file '" + m_filePath.string() + "' does not exist");
@@ -790,6 +798,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 			if(read<u32>() != OBJECT_MAGIC)
 				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ')');
 			read_object(globalLod, localLods);
+			CpuProfiler::instance().create_snapshot_from("BinaryLoader::read_object");
 		}
 
 		// Now come instances

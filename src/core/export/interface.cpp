@@ -24,11 +24,11 @@
 // TODO: remove this (leftover from Felix' prototype)
 #include <glad/glad.h>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <minwindef.h>
-#else // _MSC_VER
+#else // _WIN32
 #include <dlfcn.h>
-#endif // _MSC_VER
+#endif // _WIN32
 
 // Undefine unnecessary windows macros
 #undef near
@@ -1949,7 +1949,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		fs::path dllPath;
 		// First obtain the module handle (platform specific), then use that to
 		// get the module's path
-#ifdef _MSC_VER
+#ifdef _WIN32
 		HMODULE moduleHandle = nullptr;
 		if(::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
 							 | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -1964,13 +1964,13 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		} else {
 			logError("[", FUNCTION_NAME, "] Failed to obtain module handle; cannot load plugins");
 		}
-#else // _MSC_VER
+#else // _WIN32
 		Dl_info info;
 		if(::dladdr(reinterpret_cast<void*>(mufflon_initialize), &info) == 0)
 			logError("[", FUNCTION_NAME, "] Failed to obtain module path; cannot load plugins");
 		else
 			dllPath = info.dli_fname;
-#endif // _MSC_VER
+#endif // _WIN32
 		// If we managed to get the module path, check for plugins there
 		if(!dllPath.empty()) {
 			// We assume that the plugins are in a subdirectory called 'plugins' to
