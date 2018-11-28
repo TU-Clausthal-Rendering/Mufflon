@@ -36,6 +36,7 @@ namespace gui.ViewModel
         public ICommand AddLightCommand { get; }
         public ICommand AddMaterialCommand { get; }
         public ICommand AddCameraCommand { get; }
+        public ICommand LoadSceneCommand { get; }
 
         private readonly Models m_models;
 
@@ -57,6 +58,7 @@ namespace gui.ViewModel
             AddLightCommand = new AddLightCommand(m_models);
             AddCameraCommand = new AddCameraCommand(m_models);
             AddMaterialCommand = new AddMaterialCommand(m_models);
+            LoadSceneCommand = new LoadSceneCommand(m_models);
         }
     }
 }

@@ -86,12 +86,14 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
+    <Compile Include="Command\LoadSceneCommand.cs" />
     <Compile Include="Command\PlayPauseCommand.cs" />
     <Compile Include="Command\RemoveCameraCommand.cs" />
     <Compile Include="Command\RemoveLightCommand.cs" />
     <Compile Include="Command\RemoveMaterialCommand.cs" />
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
+    <Compile Include="Dll\Loader.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
     <Compile Include="Model\Camera\FocusCameraModel.cs" />

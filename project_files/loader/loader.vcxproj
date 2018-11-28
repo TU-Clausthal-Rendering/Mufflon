@@ -94,7 +94,6 @@
     <ClCompile Include="..\..\src\loader\parsing\binary.cpp" />
     <ClCompile Include="..\..\src\loader\parsing\json_helper.cpp" />
     <ClCompile Include="..\..\src\loader\parsing\json_loader.cpp" />
-    <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />

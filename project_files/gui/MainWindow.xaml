@@ -33,7 +33,7 @@
                 BorderBrush="{StaticResource BorderBrush}">
                 <MenuItem Header="File">
                     <MenuItem Header="Load Renderer"/>
-                    <MenuItem Header="Load Scene"/>
+                    <MenuItem Header="Load Scene" Command="{Binding LoadSceneCommand}"/>
                 </MenuItem>
                 <MenuItem Header="Help">
                     <MenuItem Header="About"/>

@@ -55,9 +55,6 @@
     <ClCompile Include="..\..\src\loader\parsing\json_loader.cpp">
       <Filter>Source Files\loader\parsing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\util\log.cpp">
-      <Filter>Source Files\util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\deps\miniz\miniz\miniz.c">
       <Filter>Source Files\deps\miniz</Filter>
     </ClCompile>
