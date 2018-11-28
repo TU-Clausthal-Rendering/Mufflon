@@ -27,9 +27,11 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// (Re) create the random number generators
 	if(m_rngs.size() != outputBuffer.get_num_pixels()
 		|| m_reset)
-		initRngs(outputBuffer.get_num_pixels());
+		init_rngs(outputBuffer.get_num_pixels());
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
+	m_currentScene->get_camera()->get_parameter_pack(as<cameras::CameraParams>(m_camParams),
+													 Device::CPU, buffer.get_resolution());
 	m_reset = false;
 
 	// TODO: call sample in a parallel way for each output pixel
@@ -54,10 +56,9 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	PtPathVertex vertex; // TODO: larger buffer
 	scene::materials::Medium medium;	// TODO: get somewhere
 	// Create a start for the path
-	const cameras::CameraParams& cam = *m_currentScene->get_camera_data<Device::CPU>();
-	math::RndSet2 camRnd { m_rngs[pixel].next() };
-	math::PositionSample camPos = camera_sample_position(cam, camRnd);
-	PtPathVertex::create_camera(&vertex, &vertex, cam, camPos);
+	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
+														 m_rngs[pixel].next());
+	PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos);
 
 	int pathLen = 0;
 	do {
@@ -96,7 +97,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	}
 }
 
-void CpuPathTracer::initRngs(int num) {
+void CpuPathTracer::init_rngs(int num) {
 	m_rngs.resize(num);
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)

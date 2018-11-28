@@ -15,10 +15,10 @@ namespace mufflon { namespace cameras {
  * to complete the ray sample.
  */
 CUDA_FUNCTION math::PositionSample
-camera_sample_position(const CameraParams& params, const math::RndSet2& rndSet) {
+camera_sample_position(const CameraParams& params, const Pixel& pixel, const math::RndSet2& rndSet) {
 	switch(params.type) {
 		case CameraModel::PINHOLE: {
-			return pinholecam_sample_position(static_cast<const PinholeParams&>(params), rndSet);
+			return pinholecam_sample_position(static_cast<const PinholeParams&>(params), pixel, rndSet);
 		}
 		default:
 #ifndef __CUDA_ARCH__
@@ -63,5 +63,7 @@ camera_project(const CameraParams& params, const scene::Point& excident) {
 			return ProjectionResult{};
 	}
 }
+
+constexpr std::size_t MAX_CAMERA_PARAM_SIZE = sizeof(PinholeParams); // TODO max() with the packs of the other camera models
 
 }} // namespace mufflon::cameras

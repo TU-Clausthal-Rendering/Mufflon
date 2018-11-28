@@ -4,7 +4,7 @@
 
 namespace mufflon::cameras {
 
-	void Pinhole::get_parameter_pack(CameraParams* outBuffer, Device dev) const {
+	void Pinhole::get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel& resolution) const {
 		PinholeParams buffer {
 			CameraModel::PINHOLE,
 			m_position,
@@ -13,7 +13,7 @@ namespace mufflon::cameras {
 			m_near,
 			get_up_dir(),
 			m_far,
-			{0,0}, {0,0} // TODO: get the resoultion
+			ei::Vec<u16,2>{resolution}
 		};
 		switch(dev) {
 			case Device::CPU: copy<Device::CPU, Device::CPU>(outBuffer, &buffer, sizeof(PinholeParams)); break;

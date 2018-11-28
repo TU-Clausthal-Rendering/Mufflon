@@ -38,11 +38,6 @@ public:
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
-		// Refill the camera resource (always, because it is cheap?)
-		m_cameraParams.resize(m_camera->get_parameter_pack_size());
-		auto* pCam = m_cameraParams.template get<dev, cameras::CameraParams>();
-		m_camera->get_parameter_pack(pCam, dev);
-
 		for(InstanceHandle instance : m_instances) {
 			(void)instance;
 			// TODO
@@ -52,7 +47,6 @@ public:
 
 	template < Device dev >
 	void unload() {
-		m_cameraParams.template get<dev>().unload();
 		for(InstanceHandle instance : m_instances) {
 			(void)instance;
 			// TODO
@@ -108,17 +102,12 @@ public:
 	ConstCameraHandle get_camera() const noexcept {
 		return m_camera;
 	}
-	template < Device dev >
-	const cameras::CameraParams* get_camera_data() const noexcept {
-		return m_cameraParams.get<dev, cameras::CameraParams>();
-	}
 
 private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
 
 	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
-	GenericResource m_cameraParams;	// Device independent parameter pack of the camera
 
 	// Light tree containing all light sources enabled for the scene
 	lights::LightTreeBuilder m_lightTree;
