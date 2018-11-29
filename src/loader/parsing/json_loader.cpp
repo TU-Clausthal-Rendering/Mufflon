@@ -64,7 +64,7 @@ void JsonLoader::clear_state() {
 }
 
 TextureHdl JsonLoader::load_texture(const char* name) {
-	TextureHdl tex = world_add_texture(name, TextureSampling::SAMPLING_LINEAR, false);
+	TextureHdl tex = world_add_texture(name, TextureSampling::SAMPLING_LINEAR);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;

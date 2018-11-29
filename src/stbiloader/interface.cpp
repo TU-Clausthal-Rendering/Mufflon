@@ -67,9 +67,11 @@ Boolean load_texture(const char* path, TextureData* texData) {
 	if(stbi_is_hdr(path)) {
 		data = reinterpret_cast<char*>(stbi_loadf(path, &width, &height, &components, 0));
 		bytes = sizeof(float);
+		texData->sRgb = 0u;
 	} else {
 		data = reinterpret_cast<char*>(stbi_load(path, &width, &height, &components, 0));
 		bytes = sizeof(char);
+		texData->sRgb = 1u;
 	}
 
 	if(data == nullptr || width <= 0 || height <= 0 || components <= 0) {

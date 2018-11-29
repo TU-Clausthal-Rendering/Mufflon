@@ -80,6 +80,7 @@ namespace {
 std::unique_ptr<renderer::IRenderer> s_currentRenderer;
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets;
+WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
 // TODO: remove these (leftover from Felix' prototype)
 std::string s_lastError;
@@ -1169,20 +1170,20 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	MaterialHandle hdl = nullptr;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
-			auto tex = WorldContainer::instance().add_texture(textures::Format::RGB32F, mat->inner.lambert.albedo.rgb);
-			hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>(&tex->second));
-			hdl->set_outer_medium( WorldContainer::instance().add_medium(
+			auto tex = s_world.add_texture(textures::Format::RGB32F, mat->inner.lambert.albedo.rgb);
+			hdl = s_world.add_material(std::make_unique<materials::Lambert>(&tex->second));
+			hdl->set_outer_medium( s_world.add_medium(
 				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-			hdl->set_inner_medium( WorldContainer::instance().add_medium(hdl->compute_medium()) );
+			hdl->set_inner_medium( s_world.add_medium(hdl->compute_medium()) );
 		}	break;
 		case MATERIAL_LAMBERT_TEXTURED: {
 			auto tex = mat->inner.lambert.albedo.tex;
-			hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
-			hdl->set_outer_medium( WorldContainer::instance().add_medium(
+			hdl = s_world.add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
+			hdl->set_outer_medium( s_world.add_medium(
 				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-			hdl->set_inner_medium( WorldContainer::instance().add_medium(hdl->compute_medium()) );
+			hdl->set_inner_medium( s_world.add_medium(hdl->compute_medium()) );
 		}	break;
 		case MATERIAL_TORRANCE:
 		case MATERIAL_TORRANCE_TEXALBEDO:
@@ -1378,11 +1379,6 @@ SceneHdl world_get_current_scene() {
 	return static_cast<SceneHdl>(WorldContainer::instance().get_current_scene());
 }
 
-Boolean world_exists_texture(const char* path) {
-	CHECK_NULLPTR(path, "texture path", false);
-	return WorldContainer::instance().has_texture(path);
-}
-
 TextureHdl world_get_texture(const char* path) {
 	CHECK_NULLPTR(path, "texture path", false);
 	auto hdl = WorldContainer::instance().find_texture(path);
@@ -1394,9 +1390,14 @@ TextureHdl world_get_texture(const char* path) {
 	return static_cast<TextureHdl>(&hdl.value()->second);
 }
 
-TextureHdl world_add_texture(const char* path, TextureSampling sampling,
-							 Boolean sRgb) {
+TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 	CHECK_NULLPTR(path, "texture path", nullptr);
+
+	// Check if the texture is already loaded
+	auto hdl = WorldContainer::instance().find_texture(path);
+	if(hdl.has_value())
+		return static_cast<TextureHdl>(&hdl.value()->second);
+
 	// Use the plugins to load the texture
 	fs::path filePath(path);
 	TextureData texData{};
@@ -1415,11 +1416,11 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling,
 	}
 
 	// The texture will take ownership of the pointer
-	auto hdl = WorldContainer::instance().add_texture(path, texData.width, texData.height,
-													  texData.layers, static_cast<textures::Format>(texData.format),
-													  static_cast<textures::SamplingMode>(sampling),
-													  sRgb, texData.data);
-	return static_cast<TextureHdl>(&hdl->second);
+	hdl = WorldContainer::instance().add_texture(path, texData.width, texData.height,
+												 texData.layers, static_cast<textures::Format>(texData.format),
+												 static_cast<textures::SamplingMode>(sampling),
+												 texData.sRgb, texData.data);
+	return static_cast<TextureHdl>(&hdl.value()->second);
 }
 
 const char* scenario_get_name(ScenarioHdl scenario) {

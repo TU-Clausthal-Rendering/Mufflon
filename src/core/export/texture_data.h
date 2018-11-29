@@ -28,6 +28,7 @@ typedef struct {
 	uint32_t components = 0u;
 	uint32_t layers = 0u;
 	TextureFormat format = TextureFormat::FORMAT_NUM;
+	uint32_t sRgb = 1u;
 } TextureData;
 
 }

@@ -431,10 +431,8 @@ CORE_API Boolean CDECL world_get_dir_light_direction(LightHdl hdl, Vec3* directi
 CORE_API Boolean CDECL world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance);
 CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
 CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
-CORE_API Boolean CDECL world_exists_texture(const char* path);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
-CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling,
-											Boolean sRgb);
+CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 // TODO: interface for envmap light
 
 // Interface for rendering
