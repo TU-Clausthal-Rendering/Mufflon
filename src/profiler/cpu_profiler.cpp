@@ -111,7 +111,7 @@ void CpuProfileState::create_snapshot() {
 
 std::ostream& CpuProfileState::save_profiler_snapshots(std::ostream& stream) const {
 	// Stores the snapshots as a CSV
-	stream << ",snapshots:" << m_snapshots.size() << '\n';
+	stream << ",snapshots:" << m_snapshots.size() << ",type:cpu\n";
 	for(const auto& snapshot : m_snapshots) {
 		stream << snapshot.totalCpuCycles << ',' << snapshot.totalThreadTime.count() << ','
 			<< snapshot.totalProcessTime.count() << ',' << snapshot.totalWallTime.count() << ','
@@ -122,7 +122,7 @@ std::ostream& CpuProfileState::save_profiler_snapshots(std::ostream& stream) con
 
 std::ostream& CpuProfileState::save_profiler_current_state(std::ostream& stream) const {
 	// Stores the current state as a CSV
-	stream << m_currentSample.totalCpuCycles << ',' << m_currentSample.totalThreadTime.count() << ','
+	stream << ",type:cpu\n" << m_currentSample.totalCpuCycles << ',' << m_currentSample.totalThreadTime.count() << ','
 		<< m_currentSample.totalProcessTime.count() << ',' << m_currentSample.totalWallTime.count() << ','
 		<< m_currentSample.sampleCount << '\n';
 	return stream;

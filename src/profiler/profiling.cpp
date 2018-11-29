@@ -69,7 +69,7 @@ std::ostream& ProfileState::save_snapshots(std::ostream& stream) const {
 }
 
 std::ostream& ProfileState::save_current_state(std::ostream& stream) const {
-	stream << "children:" << m_children.size() << '\n';
+	stream << "children:" << m_children.size();
 	this->save_profiler_current_state(stream);
 	for(auto& child : m_children) {
 		stream << '"' << child.first << "\",";

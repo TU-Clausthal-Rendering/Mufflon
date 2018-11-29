@@ -2,6 +2,7 @@
 
 #include "profiling.hpp"
 #include "util/int_types.hpp"
+#include <cuda_runtime.h>
 #include <algorithm>
 #include <chrono>
 #include <string_view>
@@ -20,8 +21,13 @@ public:
 
 	GpuProfileState(ProfileState*& active);
 
-	// Abstractions from OS APIs
-	static WallTimePoint get_wall_timepoint();
+	// GPU time
+	constexpr Microsecond get_total_gpu_time() const noexcept {
+		return m_currentSample.totalGpuTime;
+	}
+	constexpr std::chrono::duration<double, std::micro> get_average_gpu_time() const noexcept {
+		return m_currentSample.totalGpuTime / static_cast<double>(std::max<u64>(1u, m_currentSample.sampleCount));
+	}
 
 	// Wall time
 	constexpr Microsecond get_total_wall_time() const noexcept {
@@ -57,11 +63,13 @@ protected:
 private:
 	// Sample data
 	struct SampleData {
+		Microsecond totalGpuTime;
 		Microsecond totalWallTime;
 		u64 sampleCount = 0u;
 	};
 
 	// Time points from when start is called
+	cudaEvent_t m_startEvent;
 	WallClock::time_point m_startWallTimepoint;
 
 	// Current sample data
