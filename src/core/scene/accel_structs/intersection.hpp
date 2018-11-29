@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/types.hpp"
+#include "core/scene/handles.hpp"
 #include <ei/3dtypes.hpp>
 
 namespace mufflon {
@@ -9,7 +10,7 @@ namespace accel_struct {
 
 struct RayIntersectionResult {
 	float hitT;
-	i32 hitPrimId;
+	PrimitiveHandle hitPrimId;
 	ei::Vec3 normal;
 	ei::Vec3 tangent;
 	ei::Vec2 uv;

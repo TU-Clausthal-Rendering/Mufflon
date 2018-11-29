@@ -189,7 +189,7 @@ void any_intersectionD(
 							meshVertices[quadIndices[quadId + 3]] };
 				const ei::Triangle tri0 = { v[0], v[1], v[2] };
 				float t;
-				if (ei::intersects(ray, tri0)) {
+				if (ei::intersects(ray, tri0, t)) {
 					if (t < tmax) {
 						*result = 1;
 						return;
@@ -197,7 +197,7 @@ void any_intersectionD(
 				}
 
 				const ei::Triangle tri1 = { v[0], v[2], v[3] };
-				if (ei::intersects(ray, tri1)) {
+				if (ei::intersects(ray, tri1, t)) {
 					if (t < tmax) {
 						*result = 1;
 						return;
@@ -254,25 +254,22 @@ void first_intersectionD(
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
 	i32 traversalStack[STACK_SIZE];
-	traversalStack[0] = EntrypointSentinel; // Bottom-most entry.
+	traversalStack[0] = EntrypointSentinel;	// Bottom-most entry.
 
 	// Primitive index of the closest intersection, -1 if none.
-	i32     hitPrimId = -1;                      // No primitive intersected so far.
+	i32 hitPrimId = -1;						// No primitive intersected so far.
+	i32 hitInstanceId = -1;
 	ei::Vec3 hitBarycentric;
-	float   hitT = tmax;                          // t-value of the closest intersection.
-	i32 hitSecondTri;                           // For ray-quad intersection.
+	float hitT = tmax;						// t-value of the closest intersection.
+	i32 hitSecondTri;						// For ray-quad intersection.
 
 	// nodeAddr: Non-negative: current internal node; negative: leaf.
-	i32     nodeAddr = 0; // Start from the root.  
-	char*   stackPtr = (char*)&traversalStack[0]; //Current position in traversal stack.
+	i32 nodeAddr = 0; // Start from the root.  
+	char* stackPtr = (char*)&traversalStack[0]; // Current position in traversal stack.
 	const float	ooeps = exp2f(-80.0f); // Avoid div by zero.
 
-	const float idirx = 1.0f / (fabsf(ray.direction.x) > ooeps ? ray.direction.x : copysignf(ooeps, ray.direction.x));
-	const float idiry = 1.0f / (fabsf(ray.direction.y) > ooeps ? ray.direction.y : copysignf(ooeps, ray.direction.y));
-	const float idirz = 1.0f / (fabsf(ray.direction.z) > ooeps ? ray.direction.z : copysignf(ooeps, ray.direction.z));
-	const float oodx = ray.origin.x * idirx;
-	const float oody = ray.origin.y * idiry;
-	const float oodz = ray.origin.z * idirz;
+	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
+	const ei::Vec3 ood = ray.origin * invDir;
 
 	// Traversal loop.
 	while (nodeAddr != EntrypointSentinel)
@@ -288,22 +285,19 @@ void first_intersectionD(
 			int2  cnodes = *(int2*)&tmp;
 
 			// Intersect the ray against the child bvh.
-			const float c0lox = n0xy.x * idirx - oodx;
-			const float c0hix = n0xy.y * idirx - oodx;
-			const float c0loy = n0xy.z * idiry - oody;
-			const float c0hiy = n0xy.w * idiry - oody;
-			const float c0loz = nz.x   * idirz - oodz;
-			const float c0hiz = nz.y   * idirz - oodz;
-			const float c1loz = nz.z   * idirz - oodz;
-			const float c1hiz = nz.w   * idirz - oodz;
-			const float c0min = spanBeginKepler(c0lox, c0hix, c0loy, c0hiy, c0loz, c0hiz, tmin);
-			const float c0max = spanEndKepler(c0lox, c0hix, c0loy, c0hiy, c0loz, c0hiz, hitT);
-			const float c1lox = n1xy.x * idirx - oodx;
-			const float c1hix = n1xy.y * idirx - oodx;
-			const float c1loy = n1xy.z * idiry - oody;
-			const float c1hiy = n1xy.w * idiry - oody;
-			const float c1min = spanBeginKepler(c1lox, c1hix, c1loy, c1hiy, c1loz, c1hiz, tmin);
-			const float c1max = spanEndKepler(c1lox, c1hix, c1loy, c1hiy, c1loz, c1hiz, hitT);
+			const float c0lox = n0xy.x * invDir.x - ood.x;
+			const float c0hix = n0xy.y * invDir.x - ood.x;
+			const float c0loy = n0xy.z * invDir.y - ood.y;
+			const float c0hiy = n0xy.w * invDir.y - ood.y;
+			const ei::Vec4 c01z = nz * invDir.z - ood.z;
+			const float c0min = spanBeginKepler(c0lox, c0hix, c0loy, c0hiy, c01z.x, c01z.y, tmin);
+			const float c0max = spanEndKepler(c0lox, c0hix, c0loy, c0hiy, c01z.x, c01z.y, hitT);
+			const float c1lox = n1xy.x * invDir.x - ood.x;
+			const float c1hix = n1xy.y * invDir.x - ood.x;
+			const float c1loy = n1xy.z * invDir.y - ood.y;
+			const float c1hiy = n1xy.w * invDir.y - ood.y;
+			const float c1min = spanBeginKepler(c1lox, c1hix, c1loy, c1hiy, c01z.z, c01z.w, tmin);
+			const float c1max = spanEndKepler(c1lox, c1hix, c1loy, c1hiy, c01z.z, c01z.w, hitT);
 
 			const bool traverseChild0 = (c0max >= c0min);
 			const bool traverseChild1 = (c1max >= c1min);
@@ -442,8 +436,8 @@ void first_intersectionD(
 			stackPtr -= 4;
 		}
 	}
-	if (hitPrimId == -1) {
-		(*result) = { hitT, hitPrimId };
+	if (hitPrimId == -1u) {
+		(*result) = { hitT, -1ull };
 	}
 	else {
 		ei::Vec3 normal;
@@ -493,7 +487,7 @@ void first_intersectionD(
 			uv.y = 0.5f * normal.z + 0.5f;
 		}
 
-		(*result) = { hitT, hitPrimId, normal, tangent, uv, hitBarycentric};
+		(*result) = { hitT, hitPrimId | (u64(hitInstanceId) << 32ull), normal, tangent, uv, hitBarycentric};
 	}
 }
 

@@ -40,5 +40,6 @@ using ScenarioHandle = Scenario*;
 using ConstScenarioHandle = const Scenario*;
 using ConstTextureHandle = const textures::Texture*;
 using TextureHandle = textures::Texture*;
+using PrimitiveHandle = uint64_t;		// | 32bit instance | 32 bit primitive (poly+spheres enumerated in a single sequence |
 
 }} // namespace mufflon::scene

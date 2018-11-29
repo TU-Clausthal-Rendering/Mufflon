@@ -108,7 +108,8 @@ __host__ __device__ inline AngularPdf AreaPdf::to_angular_pdf(Real cos, Real dis
 // Save division (avoids division by 0). Required in robust implementations of materials
 // MIS, ...
 template<typename T, typename D>
-__host__ __device__ inline T sdiv(const T& x, const D& d) {
+__host__ __device__ inline decltype(std::declval<T>() / std::declval<D>())
+sdiv(const T& x, const D& d) {
 	if(d < 0.0f) return x / ei::min(d, static_cast<D>(-1e-20f));
 	else return x / ei::max(d, static_cast<D>(1e-20f));
 }
