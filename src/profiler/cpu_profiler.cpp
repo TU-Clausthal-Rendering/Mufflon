@@ -2,10 +2,12 @@
 #include "util/log.hpp"
 #ifdef _WIN32
 #include <windows.h>
+#include <Psapi.h>
 #else // _WIN32
 #include <pthread.h>
 #include <time.h>
 #include <ctime>
+#inlcude <unistd.h>
 #endif // _WIN32
 
 namespace mufflon {
@@ -126,14 +128,57 @@ std::ostream& CpuProfileState::save_profiler_current_state(std::ostream& stream)
 	return stream;
 }
 
-std::size_t CpuProfileState::get_memory_used() {
-	// TODO
-	return 0u;
+std::size_t CpuProfileState::get_total_memory() {
+#ifdef _WIN32
+	ULONGLONG memKb;
+	if(!::GetPhysicallyInstalledSystemMemory(&memKb)) {
+		logError("[CpuProfileState::get_total_memory] Failed to optain physical memory size");
+		return 0u;
+}
+	return memKb * 1024;
+#else // _WIN32
+	return sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+#endif // _WIN32
 }
 
-std::size_t CpuProfileState::get_total_memory() {
-	// TODO
-	return 0u;
+std::size_t CpuProfileState::get_free_memory() {
+#ifdef _WIN32
+	MEMORYSTATUSEX state;
+	state.dwLength = sizeof(state);
+	if(!::GlobalMemoryStatusEx(&state)) {
+		logError("[CpuProfileState::get_free_memory] Failed to optain free memory");
+		return 0u;
+	}
+	return state.ullAvailPhys;
+#else // _WIN32
+	// TODO: this isn't really accurate for an OS anymore...
+	return get_total_memory() - get_used_memory();
+#endif // _WIN32
+}
+
+std::size_t CpuProfileState::get_used_memory() {
+#ifdef _WIN32
+	PROCESS_MEMORY_COUNTERS counters;
+	if(!::GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
+		logError("[CpuProfileState::get_used_memory] Failed to optain process memory");
+		return 0u;
+	}
+	return counters.WorkingSetSize;
+#else // _WIN32
+	long mem = 0;
+	FILE* fp = nullptr;
+	if((fp = std::fopen("/proc/self/statm", "r")) == nullptr) {
+		logError("[CpuProfileState::get_used_memory] Failed to open stats file");
+		return 0u;
+	}
+	if(std::fscanf(fp, "%*s%ld", &mem) != 1) {
+		logError("[CpuProfileState::get_used_memory] Failed to find process memory");
+		mem = 0u;
+	}
+	if(std::fclose(fp) != 0)
+		logWarning("[CpuProfileState::get_used_memory] Failed to close stats file");
+	return mem * sysconf(_SC_PAGE_SIZE);
+#endif // _WIN32
 }
 
 }

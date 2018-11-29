@@ -1,5 +1,6 @@
 #pragma once
 #include "export/api.hpp"
+#include "core/export/interface.h"
 
 extern "C" {
 #include <stdint.h>
@@ -8,6 +9,14 @@ typedef uint32_t Boolean;
 
 LOADER_API Boolean CDECL loader_set_logger(void(*logCallback)(const char*, int));
 LOADER_API Boolean CDECL loader_load_json(const char* path);
+LOADER_API void CDECL loader_profiling_enable();
+LOADER_API void CDECL loader_profiling_disable();
+LOADER_API Boolean CDECL loader_profiling_set_level(ProfilingLevel level);
+LOADER_API Boolean CDECL loader_profiling_save_current_state(const char* path);
+LOADER_API Boolean CDECL loader_profiling_save_snapshots(const char* path);
+LOADER_API const char* CDECL loader_profiling_get_current_state();
+LOADER_API const char* CDECL loader_profiling_get_snapshots();
+LOADER_API void CDECL loader_profiling_reset();
 
 } // extern "C"
 

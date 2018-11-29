@@ -344,8 +344,8 @@ void test_scene_loader() {
 
 int main() {
 	mufflon_initialize(nullptr);
-	profiling_enable();
-	profiling_set_level(ProfilingLevel::PROFILING_ALL);
+	loader_profiling_enable();
+	loader_profiling_set_level(ProfilingLevel::PROFILING_ALL);
 	/*test_polygon();
 	test_sphere();
 	test_lights();
@@ -353,6 +353,12 @@ int main() {
 	test_scene();
 	test_renderer();*/
 	test_scene_loader();
+	std::unique_ptr<const char[]> profilerData(loader_profiling_get_current_state());
+	std::cout << profilerData.get() << std::endl;
+	std::cout << "Memory: " << profiling_get_total_cpu_memory() / (1024 * 1024)
+		<< "MB " << profiling_get_used_cpu_memory() / (1024 * 1024)
+		<< "MB " << profiling_get_free_cpu_memory() / (1024 * 1024)
+		<< "MB " << std::endl;
 
 	std::cin.get();
 	return 0;

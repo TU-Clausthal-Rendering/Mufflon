@@ -95,7 +95,6 @@
     <ClCompile Include="..\..\src\loader\parsing\json_helper.cpp" />
     <ClCompile Include="..\..\src\loader\parsing\json_loader.cpp" />
     <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp" />
-    <ClCompile Include="..\..\src\profiler\gpu_profiler.cpp" />
     <ClCompile Include="..\..\src\profiler\profiling.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
@@ -120,7 +119,6 @@
     <ClInclude Include="..\..\src\loader\parsing\json_helper.hpp" />
     <ClInclude Include="..\..\src\loader\parsing\json_loader.hpp" />
     <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp" />
-    <ClInclude Include="..\..\src\profiler\gpu_profiler.hpp" />
     <ClInclude Include="..\..\src\profiler\profiling.hpp" />
     <ClInclude Include="..\..\src\util\filesystem.hpp" />
     <ClInclude Include="..\..\src\util\log.hpp" />

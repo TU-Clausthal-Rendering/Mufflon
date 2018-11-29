@@ -1,5 +1,7 @@
 #include "gpu_profiler.hpp"
 #include "util/log.hpp"
+#include "core/cuda/error.hpp"
+#include <cuda_runtime.h>
 
 namespace mufflon {
 
@@ -44,14 +46,22 @@ std::ostream& GpuProfileState::save_profiler_current_state(std::ostream& stream)
 	return stream;
 }
 
-std::size_t GpuProfileState::get_memory_used() {
-	// TODO
-	return 0u;
+std::size_t GpuProfileState::get_total_memory() {
+	std::size_t free = 0u;
+	std::size_t total = 0u;
+	cuda::check_error(cudaMemGetInfo(&free, &total));
+	return total;
 }
 
-std::size_t GpuProfileState::get_total_memory() {
-	// TODO
-	return 0u;
+std::size_t GpuProfileState::get_free_memory() {
+	std::size_t free = 0u;
+	std::size_t total = 0u;
+	cuda::check_error(cudaMemGetInfo(&free, &total));
+	return  free;
+}
+
+std::size_t GpuProfileState::get_used_memory() {
+	return get_total_memory() - get_free_memory();
 }
 
 }

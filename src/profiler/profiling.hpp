@@ -119,9 +119,9 @@ private:
 	Profiler() = default;
 
 	// Holds the top-level profilers
-	bool m_enabled = true;
+	bool m_enabled = false;
 	ProfileState* m_active = nullptr;
-	ProfileLevel m_activation = ProfileLevel::HIGH;
+	ProfileLevel m_activation = ProfileLevel::LOW;
 	std::unordered_map<std::string_view, std::unique_ptr<ProfileState>> m_profilers;
 };
 

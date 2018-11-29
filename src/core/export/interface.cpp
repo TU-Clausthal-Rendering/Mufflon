@@ -6,6 +6,7 @@
 #include "util/degrad.hpp"
 #include "ei/vector.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include "profiler/gpu_profiler.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/cpu_pt.hpp"
@@ -1958,15 +1959,15 @@ Boolean render_disable_all_render_targets() {
 		&& render_disable_non_variance_render_targets();
 }
 
-void CDECL profiling_enable() {
+void profiling_enable() {
 	Profiler::instance().set_enabled(true);
 }
 
-void CDECL profiling_disable() {
+void profiling_disable() {
 	Profiler::instance().set_enabled(false);
 }
 
-Boolean CDECL profiling_set_level(ProfilingLevel level) {
+Boolean profiling_set_level(ProfilingLevel level) {
 	switch(level) {
 		case ProfilingLevel::PROFILING_LOW:
 			Profiler::instance().set_profile_level(ProfileLevel::LOW);
@@ -1983,19 +1984,19 @@ Boolean CDECL profiling_set_level(ProfilingLevel level) {
 	return false;
 }
 
-Boolean CDECL profiling_save_current_state(const char* path) {
+Boolean profiling_save_current_state(const char* path) {
 	CHECK_NULLPTR(path, "file path", false);
 	Profiler::instance().save_current_state(path);
 	return true;
 }
 
-Boolean CDECL profiling_save_snapshots(const char* path) {
+Boolean profiling_save_snapshots(const char* path) {
 	CHECK_NULLPTR(path, "file path", false);
 	Profiler::instance().save_snapshots(path);
 	return true;
 }
 
-const char* CDECL profiling_get_current_state() {
+const char* profiling_get_current_state() {
 	std::string str = Profiler::instance().save_current_state();
 	char* buffer = new char[str.size() + 1u];
 	std::memcpy(buffer, str.c_str(), str.size());
@@ -2003,7 +2004,7 @@ const char* CDECL profiling_get_current_state() {
 	return buffer;
 }
 
-const char* CDECL profiling_get_snapshots() {
+const char* profiling_get_snapshots() {
 	std::string str = Profiler::instance().save_snapshots();
 	char* buffer = new char[str.size() + 1u];
 	std::memcpy(buffer, str.c_str(), str.size());
@@ -2011,8 +2012,32 @@ const char* CDECL profiling_get_snapshots() {
 	return buffer;
 }
 
-void CDECL profiling_reset() {
+void profiling_reset() {
 	Profiler::instance().reset_all();
+}
+
+size_t profiling_get_total_cpu_memory() {
+	return CpuProfileState::get_total_memory();
+}
+
+size_t profiling_get_free_cpu_memory() {
+	return CpuProfileState::get_free_memory();
+}
+
+size_t profiling_get_used_cpu_memory() {
+	return CpuProfileState::get_used_memory();
+}
+
+size_t profiling_get_total_gpu_memory() {
+	return GpuProfileState::get_total_memory();
+}
+
+size_t profiling_get_free_gpu_memory() {
+	return GpuProfileState::get_free_memory();
+}
+
+size_t profiling_get_used_gpu_memory() {
+	return GpuProfileState::get_used_memory();
 }
 
 Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
@@ -2089,7 +2114,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 	return initialized;
 }
 
-CORE_API void CDECL mufflon_destroy() {
+CORE_API void mufflon_destroy() {
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_currentRenderer.reset();

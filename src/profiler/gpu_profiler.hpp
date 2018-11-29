@@ -42,8 +42,9 @@ public:
 	virtual void reset_sample() override;
 
 	// Returns the memory used
-	static std::size_t get_memory_used();
 	static std::size_t get_total_memory();
+	static std::size_t get_free_memory();
+	static std::size_t get_used_memory();
 
 protected:
 	virtual void start_sample() override;
