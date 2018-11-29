@@ -200,11 +200,11 @@ std::optional<WorldContainer::TexCacheHandle> WorldContainer::find_texture(std::
 WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path, u16 width,
 											  u16 height, u16 numLayers,
 											  textures::Format format, textures::SamplingMode mode,
-											  bool sRgb, u8* data) {
+											  bool sRgb, std::unique_ptr<u8[]> data) {
 	mAssert(data != nullptr);
-	// TODO: ensure that we have more than 1x1 pixels?
+	// TODO: ensure that we have at least 1x1 pixels?
 	return m_textures.emplace(path, textures::Texture{ width, height, numLayers,
-							  format, mode, sRgb, data }).first;
+							  format, mode, sRgb, move(data) }).first;
 }
 
 SceneHandle WorldContainer::load_scene(const Scenario& scenario) {

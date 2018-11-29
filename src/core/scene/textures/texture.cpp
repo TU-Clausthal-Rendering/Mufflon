@@ -8,7 +8,7 @@
 namespace mufflon::scene::textures {
 
 Texture::Texture(u16 width, u16 height, u16 numLayers, Format format,
-				 SamplingMode mode, bool sRgb, u8* data) :
+				 SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data) :
 	m_width(width),
 	m_height(height),
 	m_numLayers(numLayers),
@@ -18,11 +18,10 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format,
 	m_cudaTexture(nullptr)
 {
 	if(data) {
-		create_texture_cpu(data);
-		m_dirty.mark_changed(Device::CPU);
-		copy<Device::CPU, Device::CPU>(m_cpuTexture->data(), data, m_width * m_height * PIXEL_SIZE(m_format));
 		// A file loader provides an array with pixel data. This is loaded into
 		// a CPUTexture per default.
+		create_texture_cpu(move(data));
+		m_dirty.mark_changed(Device::CPU);
 	}
 }
 
@@ -161,9 +160,9 @@ template void Texture::clear<Device::OPENGL>();
 
 
 
-void Texture::create_texture_cpu(u8* data) {
+void Texture::create_texture_cpu(std::unique_ptr<u8[]> data) {
 	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format,
-												m_mode, m_sRgb, data);
+												m_mode, m_sRgb, move(data));
 	m_handles.get<TextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
 	m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
 }

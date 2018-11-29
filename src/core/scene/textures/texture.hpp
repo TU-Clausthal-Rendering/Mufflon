@@ -175,7 +175,7 @@ public:
 
 	// Loads a texture into the CPU-RAM
 	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
-			bool sRgb, u8* data = nullptr);
+			bool sRgb, std::unique_ptr<u8[]> data = nullptr);
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
@@ -233,7 +233,7 @@ private:
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
 
-	void create_texture_cpu(u8* data = nullptr);
+	void create_texture_cpu(std::unique_ptr<u8[]> data = nullptr);
 	void create_texture_cuda();
 };
 

@@ -1170,8 +1170,8 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	MaterialHandle hdl = nullptr;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
-			auto tex = s_world.add_texture(textures::Format::RGB32F, mat->inner.lambert.albedo.rgb);
-			hdl = s_world.add_material(std::make_unique<materials::Lambert>(&tex->second));
+			auto tex = world_add_texture_value3(mat->inner.lambert.albedo.rgb, TextureSampling::SAMPLING_NEAREST);
+			hdl = s_world.add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
 			hdl->set_outer_medium( s_world.add_medium(
 				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
@@ -1419,8 +1419,51 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 	hdl = WorldContainer::instance().add_texture(path, texData.width, texData.height,
 												 texData.layers, static_cast<textures::Format>(texData.format),
 												 static_cast<textures::SamplingMode>(sampling),
-												 texData.sRgb, texData.data);
+												 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
 	return static_cast<TextureHdl>(&hdl.value()->second);
+}
+
+template < typename T >
+TextureHdl world_add_texture_value(std::string_view name, T value, textures::Format format, TextureSampling sampling) {
+	// Check if the texture is already loaded
+	auto hdl = s_world.find_texture(name);
+	if(hdl.has_value())
+		return static_cast<TextureHdl>(&hdl.value()->second);
+
+	// Create new
+	std::unique_ptr<u8[]> data = std::make_unique<u8[]>(sizeof(T));
+	memcpy(data.get(), &value, sizeof(T));
+	hdl = s_world.add_texture(name, 1, 1, 1, format,
+							  static_cast<textures::SamplingMode>(sampling),
+							  false, move(data));
+	return static_cast<TextureHdl>(&hdl.value()->second);
+}
+
+CORE_API TextureHdl CDECL world_add_texture_value1(float value, TextureSampling sampling) {
+	// Create an artifical name for the value texture (for compatibilty with file-textures)
+	std::string name = "x" + std::to_string(value);
+	return world_add_texture_value(name, value, textures::Format::R32F, sampling);
+}
+CORE_API TextureHdl CDECL world_add_texture_value2(Vec2 value, TextureSampling sampling) {
+	// Create an artifical name for the value texture (for compatibilty with file-textures)
+	std::string name = "x" + std::to_string(value.x)
+					 + " y" + std::to_string(value.y);
+	return world_add_texture_value(name, value, textures::Format::RG32F, sampling);
+}
+CORE_API TextureHdl CDECL world_add_texture_value3(Vec3 value, TextureSampling sampling) {
+	// Create an artifical name for the value texture (for compatibilty with file-textures)
+	std::string name = "x" + std::to_string(value.x)
+					 + " y" + std::to_string(value.y)
+					 + " z" + std::to_string(value.z);
+	return world_add_texture_value(name, value, textures::Format::RGB32F, sampling);
+}
+CORE_API TextureHdl CDECL world_add_texture_value4(Vec4 value, TextureSampling sampling) {
+	// Create an artifical name for the value texture (for compatibilty with file-textures)
+	std::string name = "x" + std::to_string(value.x)
+					 + " y" + std::to_string(value.y)
+					 + " z" + std::to_string(value.z)
+					 + " w" + std::to_string(value.w);
+	return world_add_texture_value(name, value, textures::Format::RGBA32F, sampling);
 }
 
 const char* scenario_get_name(ScenarioHdl scenario) {
