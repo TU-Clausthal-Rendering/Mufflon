@@ -796,7 +796,6 @@ void BinaryLoader::load_file(const u64 globalLod,
 			if(read<u32>() != OBJECT_MAGIC)
 				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ')');
 			read_object(globalLod, localLods);
-			Profiler::instance().create_snapshot_from("BinaryLoader::read_object");
 		}
 
 		// Now come instances
