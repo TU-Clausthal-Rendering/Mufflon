@@ -45,8 +45,7 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
 						Throughput& throughput,
-						math::DirectionSample& sampledDir,
-						scene::accel_struct::RayIntersectionResult& nextHit
+						VertexType* outVertex
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(media, rndSet, adjoint);
@@ -55,7 +54,6 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 	// Update throughputs
 	throughput.weight *= sample.throughput;
 	throughput.guideWeight *= 1.0f - expf(-(sample.pdfF * sample.pdfF) / 5.0f);
-	sampledDir = {sample.excident, sample.pdfF}; // TODOd pdfB is currently lost, maybe DirectionalSample should always include a second pdf?
 
 	// Russian roulette
 	float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
@@ -70,6 +68,7 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 	// TODO: optional energy clamping
 
 	// Go to the next intersection
+	scene::accel_struct::RayIntersectionResult nextHit;
 	//ei::Ray ray {sample.origin, sample.excident};
 	//bool didHit = first_hit(, nextHit);
 
@@ -78,6 +77,16 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 	Spectrum transmission = currentMedium.get_transmission( nextHit.hitT );
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
+
+	// if(!didHit) return false;
+
+	// Create the new surface vertex
+	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
+	float incidentCos = dot(nextHit.normal, sample.excident); // TODO: shading normal?
+	// TODO: get tangent space and parameter pack from nextHit
+	VertexType::create_surface(outVertex, &vertex, scene::materials::ParameterPack{},
+				{ position, sample.pdfF.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
+				scene::TangentSpace{}, sample.excident);
 
 	return true;
 }
