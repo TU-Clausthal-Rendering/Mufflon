@@ -1,7 +1,5 @@
 #include "cpu_profiler.hpp"
 #include "util/log.hpp"
-#include <fstream>
-#include <sstream>
 #ifdef _WIN32
 #include <windows.h>
 #else // _WIN32
@@ -12,23 +10,8 @@
 
 namespace mufflon {
 
-
-CpuProfileState::CpuProfileScope::CpuProfileScope(CpuProfileState& profiler) :
-	m_startCycle(get_cpu_cycle()),
-	m_startThreadTime(get_thread_time()),
-	m_startProcessTime(get_process_time()),
-	m_startWallTimepoint(get_wall_timepoint()),
-	m_profiler(profiler)
-{
-}
-
-CpuProfileState::CpuProfileScope::~CpuProfileScope() {
-	m_profiler.add_sample(*this);
-}
-
-CpuProfileState::CpuProfileState(CpuProfileState*& active) :
-	m_activeRef(active),
-	m_parent(active)
+CpuProfileState::CpuProfileState(ProfileState*& active) :
+	ProfileState(active)
 {}
 
 u64 CpuProfileState::get_cpu_cycle() {
@@ -99,27 +82,24 @@ CpuProfileState::WallTimePoint CpuProfileState::get_wall_timepoint() {
 	return WallClock::now();
 }
 
-void CpuProfileState::add_sample(const CpuProfileScope& scope) {
-	m_currentSample.totalCpuCycles += get_cpu_cycle() - scope.m_startCycle;
-	m_currentSample.totalThreadTime += get_thread_time() - scope.m_startThreadTime;
-	m_currentSample.totalProcessTime += get_process_time() - scope.m_startProcessTime;
-	m_currentSample.totalWallTime += std::chrono::duration_cast<Microsecond>(WallClock::now() - scope.m_startWallTimepoint);
+void CpuProfileState::create_sample() {
+	m_currentSample.totalCpuCycles += get_cpu_cycle() - m_startCpuCycle;
+	m_currentSample.totalThreadTime += get_thread_time() - m_startThreadTime;
+	m_currentSample.totalProcessTime += get_process_time() - m_startProcessTime;
+	m_currentSample.totalWallTime += std::chrono::duration_cast<Microsecond>(WallClock::now() - m_startWallTimepoint);
 	++m_currentSample.sampleCount;
-
-	// Change the active profiler back to whatever came before
-	m_activeRef = m_parent;
 }
 
-CpuProfileState::CpuProfileScope CpuProfileState::start() {
+void CpuProfileState::start_sample() {
 	// Bump up the active profiler
-	m_activeRef = this;
-	return CpuProfileScope(*this);
+	m_startCpuCycle = get_cpu_cycle();
+	m_startThreadTime = get_thread_time();
+	m_startProcessTime = get_process_time();
+	m_startWallTimepoint = get_wall_timepoint();
 }
 
-void CpuProfileState::reset() {
+void CpuProfileState::reset_sample() {
 	m_currentSample = SampleData{};
-	for(auto& child : m_children)
-		child.second.reset();
 }
 
 void CpuProfileState::create_snapshot() {
@@ -127,173 +107,33 @@ void CpuProfileState::create_snapshot() {
 	m_currentSample = SampleData();
 }
 
-void CpuProfileState::create_snapshot_all() {
-	m_snapshots.push_back(m_currentSample);
-	for(auto& child : m_children)
-		child.second.create_snapshot_all();
-	m_currentSample = SampleData();
-}
-
-std::ostream& CpuProfileState::save_snapshots(std::ostream& stream) const {
+std::ostream& CpuProfileState::save_profiler_snapshots(std::ostream& stream) const {
 	// Stores the snapshots as a CSV
-	stream << "children:" << m_children.size() << ",snapshots:" << m_snapshots.size() << '\n';
+	stream << ",snapshots:" << m_snapshots.size() << '\n';
 	for(const auto& snapshot : m_snapshots) {
 		stream << snapshot.totalCpuCycles << ',' << snapshot.totalThreadTime.count() << ','
 			<< snapshot.totalProcessTime.count() << ',' << snapshot.totalWallTime.count() << ','
 			<< snapshot.sampleCount << '\n';
 	}
-	for(auto& child : m_children) {
-		stream << '"' << child.first << "\",";
-		child.second.save_snapshots(stream);
-	}
 	return stream;
 }
 
-std::ostream& CpuProfileState::save_current_state(std::ostream& stream) const {
+std::ostream& CpuProfileState::save_profiler_current_state(std::ostream& stream) const {
 	// Stores the current state as a CSV
-	stream << "children:" << m_children.size() << '\n';
 	stream << m_currentSample.totalCpuCycles << ',' << m_currentSample.totalThreadTime.count() << ','
 		<< m_currentSample.totalProcessTime.count() << ',' << m_currentSample.totalWallTime.count() << ','
 		<< m_currentSample.sampleCount << '\n';
-	for(auto& child : m_children) {
-		stream << '"' << child.first << "\",";
-		child.second.save_current_state(stream);
-	}
 	return stream;
 }
 
-CpuProfiler& CpuProfiler::instance() {
-	static CpuProfiler instance;
-	return instance;
+std::size_t CpuProfileState::get_memory_used() {
+	// TODO
+	return 0u;
 }
 
-std::optional<CpuProfileState::CpuProfileScope> CpuProfiler::start(std::string_view name, ProfileLevel level) {
-	if(m_enabled && static_cast<std::underlying_type_t<ProfileLevel>>(level)
-					<= static_cast<std::underlying_type_t<ProfileLevel>>(m_activation)) {
-		if(m_active != nullptr) {
-			// Use cascaded profiler
-			auto iter = m_active->m_children.find(name);
-			if(iter == m_active->m_children.end())
-				iter = m_active->m_children.emplace(name, CpuProfileState{ m_active }).first;
-			return iter->second.start();
-		} else {
-			// Use top level profiler
-			auto iter = m_profilers.find(name);
-			if(iter == m_profilers.end())
-				iter = m_profilers.emplace(name, CpuProfileState{ m_active }).first;
-			return iter->second.start();
-		}
-	}
-
-	return std::nullopt;
-}
-
-void CpuProfiler::reset() {
-	for(auto& profiler : m_profilers)
-		profiler.second.reset();
-}
-
-void CpuProfiler::create_snapshot(std::string_view name) {
-	if(m_active != nullptr) {
-		// Use cascaded profiler
-		auto iter = m_active->m_children.find(name);
-		if(iter != m_active->m_children.end())
-			iter->second.create_snapshot();
-	} else {
-		// Use top level profiler
-		auto iter = m_profilers.find(name);
-		if(iter != m_profilers.end())
-			iter->second.create_snapshot();
-	}
-}
-
-void CpuProfiler::create_snapshot_from(std::string_view name) {
-	if(m_active != nullptr) {
-		// Use cascaded profiler
-		auto iter = m_active->m_children.find(name);
-		if(iter != m_active->m_children.end())
-			iter->second.create_snapshot_all();
-	} else {
-		// Use top level profiler
-		auto iter = m_profilers.find(name);
-		if(iter != m_profilers.end())
-			iter->second.create_snapshot_all();
-	}
-}
-
-void CpuProfiler::create_snapshot_all() {
-	for(auto& profiler : m_profilers)
-		profiler.second.create_snapshot_all();
-}
-
-void CpuProfiler::save_current_state(std::string_view path) const {
-	fs::path file = path;
-	std::ofstream fileStream(file);
-	if(fileStream.bad()) {
-		logError("[CpuProfiler::save_current_state] could not open output file '",
-				 file.string(), "'");
-		return;
-	}
-	fileStream.exceptions(std::ios::failbit);
-
-	try {
-		for(auto& profiler : m_profilers) {
-			fileStream << '"' << profiler.first << "\",";
-			profiler.second.save_current_state(fileStream);
-		}
-	} catch(const std::exception& e) {
-		logError("[CpuProfiler::save_current_state] Failed to save profiling results: ",
-				 e.what());
-	}
-}
-
-void CpuProfiler::save_snapshots(std::string_view path) const {
-	fs::path file = path;
-	std::ofstream fileStream(file);
-	if(fileStream.bad()) {
-		logError("[CpuProfiler::save_snapshots] could not open output file '",
-				 file.string(), "'");
-		return;
-	}
-	fileStream.exceptions(std::ios::failbit);
-
-	try {
-		for(auto& profiler : m_profilers) {
-			fileStream << '"' << profiler.first << "\",";
-			profiler.second.save_snapshots(fileStream);
-		}
-	} catch(const std::exception& e) {
-		logError("[CpuProfiler::save_snapshots] Failed to save profiling results: ",
-				 e.what());
-	}
-}
-
-std::string CpuProfiler::save_current_state() const {
-	std::ostringstream stream;
-	try {
-		for(auto& profiler : m_profilers) {
-			stream << '"' << profiler.first << "\",";
-			profiler.second.save_current_state(stream);
-		}
-	} catch(const std::exception& e) {
-		logError("[CpuProfiler::save_current_state] Failed to save profiling results: ",
-				 e.what());
-	}
-	return stream.str();
-}
-
-std::string CpuProfiler::save_snapshots() const {
-	std::ostringstream stream;
-	try {
-		for(auto& profiler : m_profilers) {
-			stream << '"' << profiler.first << "\",";
-			profiler.second.save_snapshots(stream);
-		}
-	} catch(const std::exception& e) {
-		logError("[CpuProfiler::save_snapshots] Failed to save profiling results: ",
-				 e.what());
-	}
-	return stream.str();
+std::size_t CpuProfileState::get_total_memory() {
+	// TODO
+	return 0u;
 }
 
 }

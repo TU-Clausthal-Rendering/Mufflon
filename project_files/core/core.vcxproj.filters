@@ -202,6 +202,12 @@
     <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp">
       <Filter>Source Files\profiler</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\profiler\gpu_profiler.cpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\profiler\profiling.cpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -703,6 +709,12 @@
       <Filter>Source Files\core\export</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\profiler\gpu_profiler.hpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\profiler\profiling.hpp">
       <Filter>Source Files\profiler</Filter>
     </ClInclude>
   </ItemGroup>

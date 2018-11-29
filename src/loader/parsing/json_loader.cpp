@@ -529,7 +529,7 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 
 void JsonLoader::load_file() {
 	using namespace rapidjson;
-	auto scope = CpuProfiler::instance().start("JsonLoader::load_file");
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file");
 
 	this->clear_state();
 	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");

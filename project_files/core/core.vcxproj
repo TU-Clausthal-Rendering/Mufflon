@@ -39,6 +39,8 @@
     <ClCompile Include="..\..\src\plugin\plugin.cpp" />
     <ClCompile Include="..\..\src\plugin\texture_plugin.cpp" />
     <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp" />
+    <ClCompile Include="..\..\src\profiler\gpu_profiler.cpp" />
+    <ClCompile Include="..\..\src\profiler\profiling.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -199,6 +201,8 @@
     <ClInclude Include="..\..\src\plugin\plugin.hpp" />
     <ClInclude Include="..\..\src\plugin\texture_plugin.hpp" />
     <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp" />
+    <ClInclude Include="..\..\src\profiler\gpu_profiler.hpp" />
+    <ClInclude Include="..\..\src\profiler\profiling.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
     <ClInclude Include="..\..\src\util\byte_io.hpp" />
     <ClInclude Include="..\..\src\util\degrad.hpp" />

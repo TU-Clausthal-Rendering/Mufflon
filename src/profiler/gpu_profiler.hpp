@@ -10,7 +10,7 @@
 
 namespace mufflon {
 
-class CpuProfileState : public ProfileState {
+class GpuProfileState : public ProfileState {
 public:
 	friend class Profiler;
 
@@ -18,37 +18,10 @@ public:
 	using WallClock = std::chrono::high_resolution_clock;
 	using WallTimePoint = WallClock::time_point;
 
-	CpuProfileState(ProfileState*& active);
+	GpuProfileState(ProfileState*& active);
 
 	// Abstractions from OS APIs
-	static u64 get_cpu_cycle();
-	static Microsecond get_thread_time();
-	static Microsecond get_process_time();
 	static WallTimePoint get_wall_timepoint();
-
-	// CPU cylces
-	constexpr u64 get_total_cpu_cycles() const noexcept {
-		return m_currentSample.totalCpuCycles;
-	}
-	constexpr double get_average_cpu_cycles() const noexcept {
-		return static_cast<double>(m_currentSample.totalCpuCycles) / static_cast<double>(std::max<u64>(1u, m_currentSample.sampleCount));
-	}
-
-	// Thread time
-	constexpr Microsecond get_total_thread_time() const noexcept {
-		return m_currentSample.totalThreadTime;
-	}
-	constexpr std::chrono::duration<double, std::micro> get_average_thread_time() const noexcept {
-		return m_currentSample.totalThreadTime / static_cast<double>(std::max<u64>(1u, m_currentSample.sampleCount));
-	}
-
-	// Process time
-	constexpr Microsecond get_total_process_time() const noexcept {
-		return m_currentSample.totalProcessTime;
-	}
-	constexpr std::chrono::duration<double, std::micro> get_average_process_time() const noexcept {
-		return m_currentSample.totalProcessTime / static_cast<double>(std::max<u64>(1u, m_currentSample.sampleCount));
-	}
 
 	// Wall time
 	constexpr Microsecond get_total_wall_time() const noexcept {
@@ -83,17 +56,11 @@ protected:
 private:
 	// Sample data
 	struct SampleData {
-		u64 totalCpuCycles = 0u;
-		Microsecond totalThreadTime;
-		Microsecond totalProcessTime;
 		Microsecond totalWallTime;
 		u64 sampleCount = 0u;
 	};
 
 	// Time points from when start is called
-	u64 m_startCpuCycle = 0u;
-	Microsecond m_startThreadTime;
-	Microsecond m_startProcessTime;
 	WallClock::time_point m_startWallTimepoint;
 
 	// Current sample data

@@ -343,9 +343,9 @@ void test_scene_loader() {
 }*/
 
 int main() {
-	std::uint64_t cycles0 = __rdtsc();
 	mufflon_initialize(nullptr);
-	std::uint64_t cycles1 = __rdtsc();
+	profiling_enable();
+	profiling_set_level(ProfilingLevel::PROFILING_ALL);
 	/*test_polygon();
 	test_sphere();
 	test_lights();

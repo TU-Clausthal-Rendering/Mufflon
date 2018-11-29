@@ -1939,23 +1939,23 @@ Boolean render_disable_all_render_targets() {
 }
 
 void CDECL profiling_enable() {
-	CpuProfiler::instance().set_enabled(true);
+	Profiler::instance().set_enabled(true);
 }
 
 void CDECL profiling_disable() {
-	CpuProfiler::instance().set_enabled(false);
+	Profiler::instance().set_enabled(false);
 }
 
 Boolean CDECL profiling_set_level(ProfilingLevel level) {
 	switch(level) {
 		case ProfilingLevel::PROFILING_LOW:
-			CpuProfiler::instance().set_profile_level(ProfileLevel::LOW);
+			Profiler::instance().set_profile_level(ProfileLevel::LOW);
 			return true;
 		case ProfilingLevel::PROFILING_HIGH:
-			CpuProfiler::instance().set_profile_level(ProfileLevel::HIGH);
+			Profiler::instance().set_profile_level(ProfileLevel::HIGH);
 			return true;
 		case ProfilingLevel::PROFILING_ALL:
-			CpuProfiler::instance().set_profile_level(ProfileLevel::ALL);
+			Profiler::instance().set_profile_level(ProfileLevel::ALL);
 			return true;
 		default:
 			logError("[", FUNCTION_NAME, "] invalid profiling level");
@@ -1965,18 +1965,18 @@ Boolean CDECL profiling_set_level(ProfilingLevel level) {
 
 Boolean CDECL profiling_save_current_state(const char* path) {
 	CHECK_NULLPTR(path, "file path", false);
-	CpuProfiler::instance().save_current_state(path);
+	Profiler::instance().save_current_state(path);
 	return true;
 }
 
 Boolean CDECL profiling_save_snapshots(const char* path) {
 	CHECK_NULLPTR(path, "file path", false);
-	CpuProfiler::instance().save_snapshots(path);
+	Profiler::instance().save_snapshots(path);
 	return true;
 }
 
 const char* CDECL profiling_get_current_state() {
-	std::string str = CpuProfiler::instance().save_current_state();
+	std::string str = Profiler::instance().save_current_state();
 	char* buffer = new char[str.size() + 1u];
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
@@ -1984,7 +1984,7 @@ const char* CDECL profiling_get_current_state() {
 }
 
 const char* CDECL profiling_get_snapshots() {
-	std::string str = CpuProfiler::instance().save_snapshots();
+	std::string str = Profiler::instance().save_snapshots();
 	char* buffer = new char[str.size() + 1u];
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
@@ -1992,7 +1992,7 @@ const char* CDECL profiling_get_snapshots() {
 }
 
 void CDECL profiling_reset() {
-	CpuProfiler::instance().reset();
+	Profiler::instance().reset_all();
 }
 
 Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {

@@ -5,6 +5,7 @@
 #include "loader/parsing/json_loader.hpp"
 #include <stdexcept>
 #include <mutex>
+#include <iostream>
 
 #define FUNCTION_NAME __func__
 
@@ -56,6 +57,8 @@ Boolean loader_load_json(const char* path) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
 		return false;
 	}
+
+	std::cout << Profiler::instance().save_current_state() << std::endl;
 
 	return true;
 }

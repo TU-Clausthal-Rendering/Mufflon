@@ -67,6 +67,12 @@
     <ClCompile Include="..\..\src\util\log.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\profiler\gpu_profiler.cpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\profiler\profiling.cpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp">
@@ -134,6 +140,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\filesystem.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\profiler\gpu_profiler.hpp">
+      <Filter>Source Files\profiler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\profiler\profiling.hpp">
+      <Filter>Source Files\profiler</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
