@@ -38,6 +38,29 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 		s_logCallback(message.c_str(), static_cast<int>(severity));
 }
 
+bool get_format(gli::format format, TextureData& texData) {
+	switch(format) {
+		case gli::format::FORMAT_R8_UINT_PACK8: texData.format = TextureFormat::FORMAT_R8U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_R8_SRGB_PACK8: texData.format = TextureFormat::FORMAT_R8U; texData.sRgb = true; return true;
+		case gli::format::FORMAT_RG8_UINT_PACK8: texData.format = TextureFormat::FORMAT_RG8U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RG8_SRGB_PACK8: texData.format = TextureFormat::FORMAT_RG8U; texData.sRgb = true; return true;
+		case gli::format::FORMAT_RGB8_UINT_PACK8: texData.format = TextureFormat::FORMAT_RGB8U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGB8_SRGB_PACK8: texData.format = TextureFormat::FORMAT_RGB8U; texData.sRgb = true; return true;
+		case gli::format::FORMAT_RGBA8_UINT_PACK8: texData.format = TextureFormat::FORMAT_RGBA8U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGBA8_SRGB_PACK8: texData.format = TextureFormat::FORMAT_RGBA8U; texData.sRgb = true; return true;
+		case gli::format::FORMAT_R16_UINT_PACK16: texData.format = TextureFormat::FORMAT_R16U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RG16_UINT_PACK16: texData.format = TextureFormat::FORMAT_RG16U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGB16_UINT_PACK16: texData.format = TextureFormat::FORMAT_RGB16U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGBA16_UINT_PACK16: texData.format = TextureFormat::FORMAT_RGBA16U; texData.sRgb = false; return true;
+		case gli::format::FORMAT_R32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_R32F; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RG32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_RG32F; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGB32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_RGB32F; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGBA32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_RGBA32F; texData.sRgb = false; return true;
+		case gli::format::FORMAT_RGB9E5_UFLOAT_PACK32: texData.format = TextureFormat::FORMAT_RGB9E5; texData.sRgb = false; return true;
+		default: return false;
+	}
+}
+
 } // namespace
 
 Boolean set_logger(void(*logCallback)(const char*, int)) {
@@ -72,18 +95,27 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		return false;
 	}
 	
-	// TODO: determine format
-
-	texData->layers = static_cast<std::uint32_t>(tex.layers());
-	for(std::uint32_t layer = 0u; layer < texData->layers; ++layer) {
-		// TODO: load layers
-		for(std::size_t face = 0u; face < tex.faces(); ++face) {
-			// TODO: load face
-			for(std::size_t mip = 0u; mip < tex.levels(); ++mip) {
-				// TODO: load mip-map
-			}
-		}
+	// Determine the format
+	if(!get_format(tex.format(), *texData)) {
+		logError("[", FUNCTION_NAME, "] Unknown texture format of texture '", pathView, "'");
+		return false;
 	}
+	if(tex.faces() != 1u) {
+		logError("[", FUNCTION_NAME, "] Cannot load cubemaps yet: '", pathView, "'");
+		return false;
+	}
+	if(tex.layers() != 0u) {
+		logError("[", FUNCTION_NAME, "] Cannot load texture arrays yet: '", pathView, "'");
+		return false;
+	}
+	// TODO: load layers (aka texture arrays)
+	// TODO: load faces (aka cubemap support)
+
+	texData->layers = 1u;
+	auto data = tex.data(0u, 0u, 0u);
+	std::size_t size = tex.size(0u);
+	texData->data = new std::uint8_t[size];
+	std::memcpy(texData->data, data, size);
 
 	return false;
 }
