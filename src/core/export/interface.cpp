@@ -1170,15 +1170,7 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	MaterialHandle hdl = nullptr;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
-			auto tex = world_add_texture_value(reinterpret_cast<const float*>(&mat->inner.lambert.albedo.rgb), 3, TextureSampling::SAMPLING_NEAREST);
-			hdl = s_world.add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
-			hdl->set_outer_medium( s_world.add_medium(
-				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
-				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-			hdl->set_inner_medium( s_world.add_medium(hdl->compute_medium()) );
-		}	break;
-		case MATERIAL_LAMBERT_TEXTURED: {
-			auto tex = mat->inner.lambert.albedo.tex;
+			auto tex = mat->inner.lambert.albedo;
 			hdl = s_world.add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
 			hdl->set_outer_medium( s_world.add_medium(
 				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
@@ -1186,32 +1178,22 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 			hdl->set_inner_medium( s_world.add_medium(hdl->compute_medium()) );
 		}	break;
 		case MATERIAL_TORRANCE:
-		case MATERIAL_TORRANCE_TEXALBEDO:
-		case MATERIAL_TORRANCE_ANISOTROPIC:
-		case MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO:
-		case MATERIAL_TORRANCE_TEXTURED:
-		case MATERIAL_TORRANCE_TEXTURED_TEXALBEDO:
 			// TODO
 			logWarning("[", FUNCTION_NAME, "] Material type 'torrance' not supported yet");
 			return nullptr;
 		case MATERIAL_WALTER:
-		case MATERIAL_WALTER_ANISOTROPIC:
-		case MATERIAL_WALTER_TEXTURED:
 			logWarning("[", FUNCTION_NAME, "] Material type 'walter' not supported yet");
 			return nullptr;
 		case MATERIAL_EMISSIVE:
-		case MATERIAL_EMISSIVE_TEXTURED:
 			logWarning("[", FUNCTION_NAME, "] Material type 'emissive' not supported yet");
 			return nullptr;
 		case MATERIAL_ORENNAYAR:
-		case MATERIAL_ORENNAYAR_TEXTURED:
 			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
 			return nullptr;
 		case MATERIAL_BLEND:
 			logWarning("[", FUNCTION_NAME, "] Material type 'blend' not supported yet");
 			return nullptr;
 		case MATERIAL_FRESNEL:
-		case MATERIAL_FRESNEL_COMPLEX:
 			logWarning("[", FUNCTION_NAME, "] Material type 'fresnel' not supported yet");
 			return nullptr;
 		default:

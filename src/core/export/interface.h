@@ -117,23 +117,13 @@ typedef enum {
 
 typedef enum {
 	MATERIAL_LAMBERT,
-	MATERIAL_LAMBERT_TEXTURED,
 	MATERIAL_TORRANCE,
-	MATERIAL_TORRANCE_TEXALBEDO,
-	MATERIAL_TORRANCE_ANISOTROPIC,
-	MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO,
-	MATERIAL_TORRANCE_TEXTURED,
-	MATERIAL_TORRANCE_TEXTURED_TEXALBEDO,
 	MATERIAL_WALTER,
-	MATERIAL_WALTER_ANISOTROPIC,
-	MATERIAL_WALTER_TEXTURED,
 	MATERIAL_EMISSIVE,
-	MATERIAL_EMISSIVE_TEXTURED,
 	MATERIAL_ORENNAYAR,
-	MATERIAL_ORENNAYAR_TEXTURED,
 	MATERIAL_BLEND,
 	MATERIAL_FRESNEL,
-	MATERIAL_FRESNEL_COMPLEX
+	// MATERIAL_FRESNEL_CONDUCTOR	// Maybe reintroduce
 } MaterialParamType;
 
 typedef struct {
@@ -178,44 +168,24 @@ typedef struct {
 } Medium;
 
 typedef struct {
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} albedo;
+	TextureHdl albedo;
 } LambertParams;
 typedef struct {
-	union {
-		float f;
-		Vec3 rgb;
-		TextureHdl tex;
-	} roughness;
+	TextureHdl roughness;
 	NormalDistFunction ndf;
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} albedo;
+	TextureHdl albedo;
 } TorranceParams;
 typedef struct {
-	union {
-		float f;
-		Vec3 rgb;
-		TextureHdl tex;
-	} roughness;
+	TextureHdl roughness;
 	NormalDistFunction ndf;
 	Vec3 absorption;
 } WalterParams;
 typedef struct {
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} radiance;
+	TextureHdl radiance;
 	float scale;
 } EmissiveParams;
 typedef struct {
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} albedo;
+	TextureHdl albedo;
 	float roughness;
 } OrennayarParams;
 
@@ -231,10 +201,7 @@ typedef struct {
 	Layer b;
 } BlendParams;
 typedef struct {
-	union {
-		float f;
-		Vec2 c;
-	} refractionIndex;
+	Vec2 refractionIndex;
 	struct MaterialParamsStruct* a;
 	struct MaterialParamsStruct* b;
 } FresnelParams;

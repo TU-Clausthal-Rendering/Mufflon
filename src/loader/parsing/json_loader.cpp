@@ -100,17 +100,20 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 	std::string_view type = read<const char*>(m_state, get(m_state, material, "type"));
 	if(type.compare("lambert") == 0) {
 		// Lambert material
+		mat->innerType = MaterialParamType::MATERIAL_LAMBERT;
 		auto albedoIter = get(m_state, material, "albedo");
 		MaterialHdl hdl = nullptr;
 		if(albedoIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_LAMBERT;
-			mat->inner.lambert.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
-		} else {
-			mat->innerType = MaterialParamType::MATERIAL_LAMBERT_TEXTURED;
-			mat->inner.lambert.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
-		}
+			ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
+			mat->inner.lambert.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
+		} else if(albedoIter->value.IsString()) {
+			mat->inner.lambert.albedo = load_texture(read<const char*>(m_state, albedoIter));
+		} else
+			throw std::runtime_error("Invalid type for albedo.");
+
 	} else if(type.compare("torrance") == 0) {
 		// Torrance material
+		mat->innerType = MaterialParamType::MATERIAL_TORRANCE;
 		std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 		if(ndf.compare("BS") == 0)
 			mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
@@ -121,87 +124,76 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		else
 			throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 		auto roughnessIter = get(m_state, material, "roughness");
+		if(roughnessIter->value.IsArray()) {
+			ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
+			mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+		} else if(roughnessIter->value.IsNumber()) {
+			float alpha = read<float>(m_state, roughnessIter);
+			mat->inner.torrance.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
+		} else if(roughnessIter->value.IsString()) {
+			mat->inner.torrance.roughness = load_texture(read<const char*>(m_state, roughnessIter));
+		} else
+			throw std::runtime_error("Invalid type for roughness.");
 		auto albedoIter = get(m_state, material, "albedo");
-		if(roughnessIter->value.IsNumber() && albedoIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_TORRANCE;
-			mat->inner.torrance.roughness.f = read<float>(m_state, roughnessIter);
-			mat->inner.torrance.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
-		} else if(roughnessIter->value.IsNumber() && albedoIter->value.IsString()) {
-			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_TEXALBEDO;
-			mat->inner.torrance.roughness.f = read<float>(m_state, roughnessIter);
-			mat->inner.torrance.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
-		} else if(roughnessIter->value.IsString() && albedoIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_TEXALBEDO;
-			mat->inner.torrance.roughness.tex = load_texture(read<const char*>(m_state, roughnessIter));
-			mat->inner.torrance.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
-		} else if(roughnessIter->value.IsString() && albedoIter->value.IsString()) {
-			TextureHdl roughTex = load_texture(read<const char*>(m_state, roughnessIter));
-			TextureHdl albedoTex = load_texture(read<const char*>(m_state, albedoIter));
-			mat->inner.torrance.roughness.tex = roughTex;
-			mat->inner.torrance.albedo.tex = albedoTex;
-		} else if(roughnessIter->value.IsArray() && albedoIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_ANISOTROPIC;
-			mat->inner.torrance.roughness.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, roughnessIter));
-			mat->inner.torrance.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
-		} else if(roughnessIter->value.IsArray() && albedoIter->value.IsString()) {
-			mat->innerType = MaterialParamType::MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO;
-			mat->inner.torrance.roughness.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, roughnessIter));
-			mat->inner.torrance.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
-		} else {
-			throw std::runtime_error("Invalid types for either roughness or albedo");
-		}
+		if(albedoIter->value.IsArray()) {
+			ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
+			mat->inner.torrance.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
+		} else if(albedoIter->value.IsString()) {
+			mat->inner.torrance.albedo = load_texture(read<const char*>(m_state, albedoIter));
+		} else
+			throw std::runtime_error("Invalid type for albedo.");
+
 	} else if(type.compare("walter") == 0) {
 		// Walter material
+		mat->innerType = MaterialParamType::MATERIAL_WALTER;
 		std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 		if(ndf.compare("BS") == 0)
-			mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
+			mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;
 		else if(ndf.compare("GGC") == 0)
-			mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+			mat->inner.walter.ndf = NormalDistFunction::NDF_GGX;
 		else if(ndf.compare("GGC") == 0)
-			mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+			mat->inner.walter.ndf = NormalDistFunction::NDF_GGX;
 		else
 			throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 		auto roughnessIter = get(m_state, material, "roughness");
 		mat->inner.walter.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, material, "absorption")));
 		if(roughnessIter->value.IsNumber()) {
-			mat->innerType = MaterialParamType::MATERIAL_WALTER;
-			mat->inner.torrance.roughness.f = read<float>(m_state, roughnessIter);
+			float alpha = read<float>(m_state, roughnessIter);
+			mat->inner.walter.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
 		} else if(roughnessIter->value.IsString()) {
-			mat->innerType = MaterialParamType::MATERIAL_WALTER_TEXTURED;
-			mat->inner.torrance.roughness.tex = load_texture(read<const char*>(m_state, roughnessIter));
+			mat->inner.walter.roughness = load_texture(read<const char*>(m_state, roughnessIter));
 		} else if(roughnessIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_WALTER_ANISOTROPIC;
-			mat->inner.torrance.roughness.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, roughnessIter));
-		} else {
+			ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
+			mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+		} else
 			throw std::runtime_error("Invalid type for roughness");
-		}
+
 	} else if(type.compare("emissive") == 0) {
 		// Emissive material
+		mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
 		mat->inner.emissive.scale = read_opt<float>(m_state, material, "scale", 1.f);
 		auto radianceIter = get(m_state, material, "radiance");
 		if(radianceIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
-			mat->inner.emissive.radiance.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, radianceIter));
+			ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);
+			mat->inner.emissive.radiance = world_add_texture_value(reinterpret_cast<float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
 		} else if(radianceIter->value.IsString()) {
-			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE_TEXTURED;
-			mat->inner.emissive.radiance.tex = load_texture(read<const char*>(m_state, radianceIter));
-		} else {
+			mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter));
+		} else
 			throw std::runtime_error("Invalid type for radiance");
-		}
+
 	} else if(type.compare("orennayar") == 0) {
 		// Oren-Nayar material
+		mat->innerType = MaterialParamType::MATERIAL_ORENNAYAR;
 		mat->inner.orennayar.roughness = read_opt<float>(m_state, material, "roughness", 1.f);
 		auto albedoIter = get(m_state, material, "albedo");
 		if(albedoIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_ORENNAYAR;
-			mat->inner.orennayar.albedo.rgb = util::pun<Vec3>(read<ei::Vec3>(m_state, albedoIter));
+			ei::Vec3 rgb = read<ei::Vec3>(m_state, albedoIter);
+			mat->inner.orennayar.albedo = world_add_texture_value(reinterpret_cast<float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
 		} else if(albedoIter->value.IsString()) {
-			mat->innerType = MaterialParamType::MATERIAL_ORENNAYAR_TEXTURED;
-			mat->inner.orennayar.albedo.tex = load_texture(read<const char*>(m_state, albedoIter));
-		}
-		else {
+			mat->inner.orennayar.albedo = load_texture(read<const char*>(m_state, albedoIter));
+		} else
 			throw std::runtime_error("Invalid type for albedo");
-		}
+
 	} else if(type.compare("blend") == 0) {
 		// Blend material
 		mat->innerType = MaterialParamType::MATERIAL_BLEND;
@@ -211,15 +203,14 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		mat->inner.blend.b.mat = load_material(get(m_state, material, "layerB"));
 	} else if(type.compare("fresnel") == 0) {
 		// Fresnel material
+		mat->innerType = MaterialParamType::MATERIAL_FRESNEL;
 		auto refrIter = get(m_state, material, "refractionIndex");
 		if(refrIter->value.IsNumber()) {
-			mat->innerType = MaterialParamType::MATERIAL_FRESNEL;
-			mat->inner.fresnel.refractionIndex.f = read<float>(m_state, refrIter);
+			mat->inner.fresnel.refractionIndex = Vec2{read<float>(m_state, refrIter), 0.0f};
 		} else if(refrIter->value.IsArray()) {
-			mat->innerType = MaterialParamType::MATERIAL_FRESNEL_COMPLEX;
-			mat->inner.fresnel.refractionIndex.c = util::pun<Vec2>(read<ei::Vec2>(m_state, refrIter));
+			mat->inner.fresnel.refractionIndex = util::pun<Vec2>(read<ei::Vec2>(m_state, refrIter));
 		} else {
-			throw std::runtime_error("Invalid type for albedo");
+			throw std::runtime_error("Invalid type for refraction index");
 		}
 		mat->inner.fresnel.a = load_material(get(m_state, material, "layerA"));
 		mat->inner.fresnel.b = load_material(get(m_state, material, "layerB"));
@@ -238,20 +229,10 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 void JsonLoader::free_material(MaterialParams* mat) {
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT:
-		case MATERIAL_LAMBERT_TEXTURED:
 		case MATERIAL_TORRANCE:
-		case MATERIAL_TORRANCE_TEXALBEDO:
-		case MATERIAL_TORRANCE_ANISOTROPIC:
-		case MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO:
-		case MATERIAL_TORRANCE_TEXTURED:
-		case MATERIAL_TORRANCE_TEXTURED_TEXALBEDO:
 		case MATERIAL_WALTER:
-		case MATERIAL_WALTER_ANISOTROPIC:
-		case MATERIAL_WALTER_TEXTURED:
 		case MATERIAL_EMISSIVE:
-		case MATERIAL_EMISSIVE_TEXTURED:
 		case MATERIAL_ORENNAYAR:
-		case MATERIAL_ORENNAYAR_TEXTURED:
 			if(mat != nullptr)
 				delete mat;
 			return;
@@ -262,7 +243,6 @@ void JsonLoader::free_material(MaterialParams* mat) {
 				free_material(mat->inner.blend.b.mat);
 			return;
 		case MATERIAL_FRESNEL:
-		case MATERIAL_FRESNEL_COMPLEX:
 			if(mat->inner.fresnel.a != nullptr)
 			free_material(mat->inner.fresnel.a);
 			if(mat->inner.blend.a.mat != nullptr)
