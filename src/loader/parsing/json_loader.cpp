@@ -11,8 +11,6 @@
 #include <fstream>
 #include <sstream>
 
-#define FUNCTION_NAME __func__
-
 namespace loader::json {
 
 using namespace mufflon;
@@ -28,7 +26,7 @@ std::string read_file(fs::path path) {
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
 	if(file.gcount() != fileSize)
-		logWarning("[", FUNCTION_NAME, "] File '", path.string(), "'not read completely");
+		logWarning("[read_file] File '", path.string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
 	return fileString;
@@ -310,7 +308,7 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 			const float fovDegree = read_opt<float>(m_state, camera, "fov", 25.f);
 			// TODO: add entire path!
 			if(camPath.size() > 1u)
-				logWarning("[", FUNCTION_NAME, "] Scene file: camera paths are not supported yet");
+				logWarning("[JsonLoader::load_cameras] Scene file: camera paths are not supported yet");
 			if(world_add_pinhole_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
 										util::pun<Vec3>(camViewDir[0u]),
 										util::pun<Vec3>(camUp[0u]), near, far,
@@ -318,12 +316,12 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 				throw std::runtime_error("Failed to add camera");
 		} else if(type.compare("focus") == 0 == 0) {
 			// TODO: Focus camera
-			logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
+			logWarning("[JsonLoader::load_cameras] Scene file: Focus cameras are not supported yet");
 		} else if(type.compare("ortho") == 0 == 0) {
 			// TODO: Orthogonal camera
-			logWarning("[", FUNCTION_NAME, "] Scene file: Focus cameras are not supported yet");
+			logWarning("[JsonLoader::load_cameras] Scene file: Focus cameras are not supported yet");
 		} else {
-			logWarning("[", FUNCTION_NAME, "] Scene file: camera object '",
+			logWarning("[JsonLoader::load_cameras] Scene file: camera object '",
 					   cameraIter->name.GetString(), "' has unknown type '", type, "'");
 		}
 
@@ -403,9 +401,9 @@ void JsonLoader::load_lights() {
 			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
 			// TODO: incorporate scale
 
-			logWarning("[", FUNCTION_NAME, "] Scene file: Goniometric lights are not supported yet");
+			logWarning("[JsonLoader::load_lights] Scene file: Goniometric lights are not supported yet");
 		} else {
-			logWarning("[", FUNCTION_NAME, "] Scene file: light object '",
+			logWarning("[JsonLoader::load_cameras] Scene file: light object '",
 					   lightIter->name.GetString(), "' has unknown type '", type, "'");
 		}
 
@@ -534,7 +532,7 @@ void JsonLoader::load_file() {
 	auto scope = CpuProfiler::instance().start("JsonLoader::load_file");
 
 	this->clear_state();
-	logInfo("[", FUNCTION_NAME, "] Parsing scene file '", m_filePath.string(), "'");
+	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");
 
 	// JSON text
 	m_jsonString = read_file(m_filePath);
@@ -550,24 +548,24 @@ void JsonLoader::load_file() {
 	// Version
 	auto versionIter = get(m_state, document, "version", false);
 	if(versionIter == document.MemberEnd()) {
-		logWarning("[", FUNCTION_NAME, "] Scene file: no version specified (current one assumed)");
+		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
 		if(m_version.compare(FILE_VERSION) != 0)
-			logWarning("[", FUNCTION_NAME, "] Scene file: version mismatch (",
+			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 	}
 	// Binary file path
 	m_binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
 	if(m_binaryFile.empty()) {
-		logError("[", FUNCTION_NAME, "] Scene file: has an empty binary file path");
+		logError("[JsonLoader::load_file] Scene file: has an empty binary file path");
 		return;
 	}
 	// Make the file path absolute
 	if(m_binaryFile.is_relative())
 		m_binaryFile = fs::canonical(m_filePath.parent_path() / m_binaryFile);
 	if(!fs::exists(m_binaryFile)) {
-		logError("[", FUNCTION_NAME, "] Scene file: specifies a binary file that doesn't exist ('",
+		logError("[JsonLoader::load_file] Scene file: specifies a binary file that doesn't exist ('",
 				 m_binaryFile.string(), "'");
 		return;
 	}

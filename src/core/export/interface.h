@@ -142,6 +142,12 @@ typedef enum {
 	MEDIUM_CONDUCTOR
 } OuterMediumType;
 
+typedef enum {
+	PROFILING_LOW,
+	PROFILING_HIGH,
+	PROFILING_ALL,
+} ProfilingLevel;
+
 typedef struct {
 	AttributeType type;
 	uint32_t rows;
@@ -462,6 +468,16 @@ CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_non_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
+
+// Interface for profiling
+CORE_API void CDECL profiling_enable();
+CORE_API void CDECL profiling_disable();
+CORE_API Boolean CDECL profiling_set_level(ProfilingLevel level);
+CORE_API Boolean CDECL profiling_save_current_state(const char* path);
+CORE_API Boolean CDECL profiling_save_snapshots(const char* path);
+CORE_API const char* CDECL profiling_get_current_state();
+CORE_API const char* CDECL profiling_get_snapshots();
+CORE_API void CDECL profiling_reset();
 
 // Interface for initialization and destruction
 CORE_API Boolean CDECL mufflon_initialize(void(*logCallback)(const char*, int));

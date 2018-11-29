@@ -4,12 +4,35 @@
 #include "profiler/cpu_profiler.hpp"
 #include "loader/parsing/json_loader.hpp"
 #include <stdexcept>
-#include <iostream>
+#include <mutex>
 
 #define FUNCTION_NAME __func__
 
 using namespace mufflon;
 using namespace loader;
+
+namespace {
+
+void(*s_logCallback)(const char*, int);
+
+// Function delegating the logger output to the applications handle, if applicable
+void delegateLog(LogSeverity severity, const std::string& message) {
+	if(s_logCallback != nullptr)
+		s_logCallback(message.c_str(), static_cast<int>(severity));
+}
+
+} // namespace
+
+Boolean loader_set_logger(void(*logCallback)(const char*, int)) {
+	static bool initialized = false;
+	s_logCallback = logCallback;
+	if(!initialized) {
+		registerMessageHandler(delegateLog);
+		disableStdHandler();
+		initialized = true;
+	}
+	return true;
+}
 
 Boolean loader_load_json(const char* path) {
 	fs::path filePath(path);
@@ -33,8 +56,6 @@ Boolean loader_load_json(const char* path) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
 		return false;
 	}
-	CpuProfiler::instance().create_snapshot_all();
-	std::cout << CpuProfiler::instance().save_snapshots() << std::endl;
 
 	return true;
 }

@@ -13,6 +13,8 @@ namespace gui.Dll
     static class Loader
     {
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool loader_set_logger(Core.LogCallback callback);
+        [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool loader_load_json(string path);
     }
 }

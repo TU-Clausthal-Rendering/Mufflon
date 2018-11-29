@@ -13,8 +13,6 @@ namespace loader::binary {
 
 using namespace mufflon;
 
-#define FUNCTION_NAME __func__
-
 namespace {
 
 // RAII wrapper around C file descriptor
@@ -640,7 +638,7 @@ void BinaryLoader::read_lod() {
 		read_uncompressed_face_attributes();
 		read_uncompressed_spheres();
 
-		logInfo("[", FUNCTION_NAME, "] Loaded LoD ", m_currObjState.lodLevel, " of object object'",
+		logInfo("[BinaryLoader::read_lod] Loaded LoD ", m_currObjState.lodLevel, " of object object'",
 				m_currObjState.name, "' with ", m_currObjState.numVertices, " vertices, ",
 				m_currObjState.numTriangles, " triangles, ", m_currObjState.numQuads, " quads, ",
 				m_currObjState.numSpheres, " spheres");
@@ -758,7 +756,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
 		const std::ifstream::pos_type fileStart = m_fileStream.tellg();
-		logInfo("[", FUNCTION_NAME, "] Reading binary file '", m_filePath.string(), "'");
+		logInfo("[BinaryLoader::load_file] Reading binary file '", m_filePath.string(), "'");
 
 		// Read the materials header
 		if(read<u32>() != MATERIALS_HEADER_MAGIC)

@@ -15,6 +15,7 @@ extern "C" {
 
 typedef uint32_t Boolean;
 
+EXPORT Boolean CDECL set_logger(void(*logCallback)(const char*, int));
 EXPORT Boolean CDECL can_load_texture_format(const char* ext);
 EXPORT Boolean CDECL load_texture(const char* path, TextureData* texData);
 

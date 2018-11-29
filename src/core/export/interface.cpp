@@ -5,6 +5,7 @@
 #include "util/punning.hpp"
 #include "util/degrad.hpp"
 #include "ei/vector.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/cpu_pt.hpp"
@@ -16,6 +17,7 @@
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/lambert.hpp"
+#include "loader/export/interface.h"
 #include <cuda_runtime.h>
 #include <type_traits>
 #include <mutex>
@@ -1936,6 +1938,63 @@ Boolean render_disable_all_render_targets() {
 		&& render_disable_non_variance_render_targets();
 }
 
+void CDECL profiling_enable() {
+	CpuProfiler::instance().set_enabled(true);
+}
+
+void CDECL profiling_disable() {
+	CpuProfiler::instance().set_enabled(false);
+}
+
+Boolean CDECL profiling_set_level(ProfilingLevel level) {
+	switch(level) {
+		case ProfilingLevel::PROFILING_LOW:
+			CpuProfiler::instance().set_profile_level(ProfileLevel::LOW);
+			return true;
+		case ProfilingLevel::PROFILING_HIGH:
+			CpuProfiler::instance().set_profile_level(ProfileLevel::HIGH);
+			return true;
+		case ProfilingLevel::PROFILING_ALL:
+			CpuProfiler::instance().set_profile_level(ProfileLevel::ALL);
+			return true;
+		default:
+			logError("[", FUNCTION_NAME, "] invalid profiling level");
+	}
+	return false;
+}
+
+Boolean CDECL profiling_save_current_state(const char* path) {
+	CHECK_NULLPTR(path, "file path", false);
+	CpuProfiler::instance().save_current_state(path);
+	return true;
+}
+
+Boolean CDECL profiling_save_snapshots(const char* path) {
+	CHECK_NULLPTR(path, "file path", false);
+	CpuProfiler::instance().save_snapshots(path);
+	return true;
+}
+
+const char* CDECL profiling_get_current_state() {
+	std::string str = CpuProfiler::instance().save_current_state();
+	char* buffer = new char[str.size() + 1u];
+	std::memcpy(buffer, str.c_str(), str.size());
+	buffer[str.size()] = '\0';
+	return buffer;
+}
+
+const char* CDECL profiling_get_snapshots() {
+	std::string str = CpuProfiler::instance().save_snapshots();
+	char* buffer = new char[str.size() + 1u];
+	std::memcpy(buffer, str.c_str(), str.size());
+	buffer[str.size()] = '\0';
+	return buffer;
+}
+
+void CDECL profiling_reset() {
+	CpuProfiler::instance().reset();
+}
+
 Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 	// Only once per process do we register/unregister the message handler
 	static bool initialized = false;
@@ -1984,6 +2043,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 					if(plugin.is_loaded()) {
 						logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
 								plugin.get_path().string(), "'");
+						plugin.set_logger(s_logCallback);
 						s_plugins.push_back(std::move(plugin));
 					}
 				}

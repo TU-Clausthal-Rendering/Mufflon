@@ -65,7 +65,8 @@ namespace mufflon {
 		{
 			if(!s_initialized)
 			{
-				s_msgHandlers.push_back(defaultHandler);
+				if(s_msgHandlers.empty())
+					s_msgHandlers.push_back(defaultHandler);
 #if defined(_WINDOWS) || defined(_WIN64) || defined(_WIN32)
 				HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
 				SetConsoleMode(hStdout, ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT);

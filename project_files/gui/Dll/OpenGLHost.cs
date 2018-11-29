@@ -167,6 +167,8 @@ namespace gui.Dll
             m_logCallbackPointer = new Core.LogCallback(LogCallback);
             if (!Core.mufflon_initialize(m_logCallbackPointer))
                 throw new Exception(Core.GetDllError());
+            if (!Loader.loader_set_logger(m_logCallbackPointer))
+                throw new Exception(Core.GetDllError());
         }
 
         private void LogCallback(string message, int severity)

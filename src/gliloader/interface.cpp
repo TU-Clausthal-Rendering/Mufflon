@@ -2,6 +2,7 @@
 #include "util/log.hpp"
 #include <gli/gl.hpp>
 #include <gli/gli.hpp>
+#include <mutex>
 
 // Helper macros for error checking and logging
 #define FUNCTION_NAME __func__
@@ -24,13 +25,31 @@ using namespace mufflon;
 
 namespace {
 
+void(*s_logCallback)(const char*, int);
+
 Boolean load_openexr(const char* path, TextureData* texData) {
 	// TODO
 	return false;
 }
 
+// Function delegating the logger output to the applications handle, if applicable
+void delegateLog(LogSeverity severity, const std::string& message) {
+	if(s_logCallback != nullptr)
+		s_logCallback(message.c_str(), static_cast<int>(severity));
+}
+
 } // namespace
 
+Boolean set_logger(void(*logCallback)(const char*, int)) {
+	static bool initialized = false;
+	s_logCallback = logCallback;
+	if(!initialized) {
+		registerMessageHandler(delegateLog);
+		disableStdHandler();
+		initialized = true;
+	}
+	return true;
+}
 
 Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".dds", 4u) == 0

@@ -34,7 +34,7 @@ void disableStdHandler();
 namespace details {
 		
 	// This one calls all the callbacks
-	CORE_API void CDECL logMessage(LogSeverity _severity, const std::string& _msg);
+	void logMessage(LogSeverity _severity, const std::string& _msg);
 
 	// Dummy conversion methods to make all types compatible
 	inline const char* to_string(const char* _str) { return _str; }

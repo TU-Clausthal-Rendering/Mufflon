@@ -64,6 +64,9 @@
     <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp">
       <Filter>Source Files\profiler</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\log.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp">

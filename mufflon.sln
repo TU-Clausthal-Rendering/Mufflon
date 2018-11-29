@@ -19,6 +19,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gui", "project_files\gui\gui.csproj", "{92CEF99E-51BB-4733-9AC2-A8E0DBB37E18}"
 	ProjectSection(ProjectDependencies) = postProject
 		{15E94C26-7D49-421A-8CE4-7D697349FB79} = {15E94C26-7D49-421A-8CE4-7D697349FB79}
+		{5169EDD3-83D8-4C39-A6F0-E6D606352372} = {5169EDD3-83D8-4C39-A6F0-E6D606352372}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stbiloader", "project_files\stbiloader\stbiloader.vcxproj", "{06EBF5EE-8F15-4008-B153-B82C1B382186}"
