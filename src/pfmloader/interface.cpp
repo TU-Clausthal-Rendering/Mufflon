@@ -126,6 +126,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		texData->height = static_cast<std::uint32_t>(height);
 		texData->components = grayscale ? 1u : 3u;
 		texData->layers = 1u;
+		texData->sRgb = 0u;
 		float* data = new float[texData->width * texData->height * texData->components];
 
 		if(std::strncmp(bands, "Pf", 2u) == 0) {

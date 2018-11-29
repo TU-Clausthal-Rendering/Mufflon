@@ -7,10 +7,10 @@ using namespace ei;
 namespace mufflon::scene::textures {
 
 CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
-					   bool sRgb, u8* data) :
+					   bool sRgb, std::unique_ptr<u8[]> data) :
 	m_imageData((data == nullptr)
 				? std::make_unique<u8[]>(width * height * PIXEL_SIZE(format))
-				: std::unique_ptr<u8[]>(data)),
+				: move(data)),
 	m_format(format),
 	m_size(width, height, numLayers)
 {

@@ -55,7 +55,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	Throughput throughput {ei::Vec3{1.0f}, 1.0f};
 	u8 vertexBuffer[256];
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
-	scene::materials::Medium* media = nullptr;	// TODO: get somewhere
+	const scene::materials::Medium* media = m_currentScene->get_media<Device::CPU>();
 	// Create a start for the path
 	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
 														 m_rngs[pixel].next());

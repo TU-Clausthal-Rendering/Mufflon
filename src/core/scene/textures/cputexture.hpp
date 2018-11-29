@@ -14,7 +14,7 @@ public:
 	// Allocate the texture, data must be filled by using the data() pointer (or writes).
 	// Takes ownership if pointer is given
 	CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
-			   bool sRgb, u8* data = nullptr);
+			   bool sRgb, std::unique_ptr<u8[]> data = nullptr);
 	CpuTexture(const CpuTexture&) = delete;
 	CpuTexture(CpuTexture&&) = default;
 	CpuTexture& operator=(const CpuTexture&) = delete;

@@ -53,6 +53,12 @@ public:
 	 */
 	MaterialHandle add_material(std::unique_ptr<materials::IMaterial> material);
 
+	/*
+	 * Add a medium to the world. If another medium with the same properties
+	 * exists it will be returned and the number of media will not be changed.
+	 */
+	materials::MediumHandle add_medium(const materials::Medium& medium);
+
 	// Add a fully specfied camera to the pool of all cameras.
 	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
 
@@ -80,21 +86,7 @@ public:
 	std::optional<TexCacheHandle> find_texture(std::string_view name);
 	TexCacheHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
 							   textures::Format format, textures::SamplingMode mode,
-							   bool sRgb, u8* data);
-	template < class T >
-	TexCacheHandle add_texture(textures::Format format, const T& data) {
-		// Create a string-hash from the 1x1-texture data
-		std::string name = "1x1texture:" + std::string(FORMAT_NAME(format)) + ':';
-		using std::to_string;
-		// TODO
-		//name += to_string(data);
-		u8* texMem = new u8[sizeof(T)];
-		std::memcpy(texMem, &data, sizeof(T));
-		// Texture takes ownership of the pointer
-		return m_textures.emplace(std::move(name), textures::Texture{ 1u, 1u, 1u, format,
-								  textures::SamplingMode::NEAREST, false,
-								  texMem }).first;
-	}
+							   bool sRgb, std::unique_ptr<u8[]> data);
 
 	// Useful only when storing light names
 	std::optional<std::string_view> get_light_name_ref(const std::string_view& name) const noexcept;
@@ -138,6 +130,8 @@ private:
 	std::map<std::string, Scenario, std::less<>> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
+	// All media in the world (all with unique properties)
+	std::vector<materials::Medium> m_media;
 	// All available cameras mapped to their name.
 	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
 	// All light sources of the scene

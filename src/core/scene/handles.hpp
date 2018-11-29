@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace mufflon { namespace cameras {
 class Camera;
 }}// namespace mufflon::cameras
@@ -11,14 +13,16 @@ class Instance;
 class Scene;
 class Scenario;
 namespace materials {
-class IMaterial;
+	class IMaterial;
+	class Medium;
+	using MediumHandle = uint16_t;
 }
 namespace lights {
-struct PointLight;
-struct SpotLight;
+	struct PointLight;
+	struct SpotLight;
 }
 namespace textures {
-class Texture;
+	class Texture;
 }
 
 

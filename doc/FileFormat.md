@@ -46,6 +46,7 @@ The names must match the names stored in the binary itself.
             "<name1>": {
                 "type": "{lambert, torrance, walter, emissive, orennayar, blend, fresnel, glass, opaque}",
                 "outerMedium": {      // OPTIONAL, the inner medium is always specified by the other material parameters
+                                      // If not given the outer medium is assumed to be vacuum (index 1, absorption 0)
                     "refractionIndex": float | [n,k],   // The real part of the refraction index (for dielectric)
                                                         // OR complex number (vec2, for conductor)
                     "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3

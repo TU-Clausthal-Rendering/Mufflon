@@ -117,23 +117,13 @@ typedef enum {
 
 typedef enum {
 	MATERIAL_LAMBERT,
-	MATERIAL_LAMBERT_TEXTURED,
 	MATERIAL_TORRANCE,
-	MATERIAL_TORRANCE_TEXALBEDO,
-	MATERIAL_TORRANCE_ANISOTROPIC,
-	MATERIAL_TORRANCE_ANISOTROPIC_TEXALBEDO,
-	MATERIAL_TORRANCE_TEXTURED,
-	MATERIAL_TORRANCE_TEXTURED_TEXALBEDO,
 	MATERIAL_WALTER,
-	MATERIAL_WALTER_ANISOTROPIC,
-	MATERIAL_WALTER_TEXTURED,
 	MATERIAL_EMISSIVE,
-	MATERIAL_EMISSIVE_TEXTURED,
 	MATERIAL_ORENNAYAR,
-	MATERIAL_ORENNAYAR_TEXTURED,
 	MATERIAL_BLEND,
 	MATERIAL_FRESNEL,
-	MATERIAL_FRESNEL_COMPLEX
+	// MATERIAL_FRESNEL_CONDUCTOR	// Maybe reintroduce
 } MaterialParamType;
 
 typedef enum {
@@ -185,53 +175,29 @@ typedef const void* ConstCameraHdl;
 
 // Material types
 typedef struct {
-	OuterMediumType type;
-	union {
-		float f;
-		Vec2 c;
-	} refractionIndex;
+	Vec2 refractionIndex;
 	Vec3 absorption;
-} OuterMedium;
+} Medium;
 
 typedef struct {
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} albedo;
+	TextureHdl albedo;
 } LambertParams;
 typedef struct {
-	union {
-		float f;
-		Vec3 rgb;
-		TextureHdl tex;
-	} roughness;
+	TextureHdl roughness;
 	NormalDistFunction ndf;
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} albedo;
+	TextureHdl albedo;
 } TorranceParams;
 typedef struct {
-	union {
-		float f;
-		Vec3 rgb;
-		TextureHdl tex;
-	} roughness;
+	TextureHdl roughness;
 	NormalDistFunction ndf;
 	Vec3 absorption;
 } WalterParams;
 typedef struct {
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} radiance;
+	TextureHdl radiance;
 	float scale;
 } EmissiveParams;
 typedef struct {
-	union {
-		Vec3 rgb;
-		TextureHdl tex;
-	} albedo;
+	TextureHdl albedo;
 	float roughness;
 } OrennayarParams;
 
@@ -247,16 +213,13 @@ typedef struct {
 	Layer b;
 } BlendParams;
 typedef struct {
-	union {
-		float f;
-		Vec2 c;
-	} refractionIndex;
+	Vec2 refractionIndex;
 	struct MaterialParamsStruct* a;
 	struct MaterialParamsStruct* b;
 } FresnelParams;
 
 typedef struct MaterialParamsStruct {
-	OuterMedium outer;
+	Medium outerMedium;
 	MaterialParamType innerType;
 	union {
 		LambertParams lambert;
@@ -447,10 +410,9 @@ CORE_API Boolean CDECL world_get_dir_light_direction(LightHdl hdl, Vec3* directi
 CORE_API Boolean CDECL world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance);
 CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
 CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
-CORE_API Boolean CDECL world_exists_texture(const char* path);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
-CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling,
-											Boolean sRgb);
+CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
+CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
 // TODO: interface for envmap light
 
 // Interface for rendering
