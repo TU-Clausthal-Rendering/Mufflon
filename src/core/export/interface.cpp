@@ -29,6 +29,7 @@
 
 #ifdef _WIN32
 #include <minwindef.h>
+#include <combaseapi.h>
 #else // _WIN32
 #include <dlfcn.h>
 #endif // _WIN32
@@ -1998,7 +1999,12 @@ Boolean profiling_save_snapshots(const char* path) {
 
 const char* profiling_get_current_state() {
 	std::string str = Profiler::instance().save_current_state();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
+#else // _WIN32
 	char* buffer = new char[str.size() + 1u];
+#endif // _WIN32
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
@@ -2006,7 +2012,12 @@ const char* profiling_get_current_state() {
 
 const char* profiling_get_snapshots() {
 	std::string str = Profiler::instance().save_snapshots();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
+#else // _WIN32
 	char* buffer = new char[str.size() + 1u];
+#endif // _WIN32
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;

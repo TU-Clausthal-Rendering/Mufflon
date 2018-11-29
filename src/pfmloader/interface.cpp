@@ -75,7 +75,7 @@ Boolean set_logger(void(*logCallback)(const char*, int)) {
 }
 
 Boolean can_load_texture_format(const char* ext) {
-	return std::strncmp(ext, ".pfm", 4u);
+	return std::strncmp(ext, ".pfm", 4u) == 0u;
 }
 
 Boolean load_texture(const char* path, TextureData* texData) {

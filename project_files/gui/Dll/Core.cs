@@ -57,6 +57,14 @@ namespace gui.Dll
             ENVMAP
         };
 
+        internal enum ProfilingLevel
+        {
+            OFF,
+            LOW,
+            HIGH,
+            ALL
+        };
+
 
         public delegate void LogCallback(string message, int severity);
 
@@ -180,6 +188,38 @@ namespace gui.Dll
         internal static extern bool render_disable_non_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_all_render_targets();
+
+        // Interface for profiling
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void profiling_enable();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void profiling_disable();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool profiling_set_level(ProfilingLevel level);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool profiling_save_current_state(string path);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool profiling_save_snapshots(string path);
+        [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string profiling_get_current_state();
+        [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string profiling_get_snapshots();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void profiling_reset();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong profiling_get_total_cpu_memory();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong profiling_get_free_cpu_memory();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong profiling_get_used_cpu_memory();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong profiling_get_total_gpu_memory();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong profiling_get_free_gpu_memory();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong profiling_get_used_gpu_memory();
 
         // Interface for initialization and destruction
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

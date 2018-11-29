@@ -344,6 +344,7 @@ void test_scene_loader() {
 
 int main() {
 	mufflon_initialize(nullptr);
+	loader_set_logger(nullptr);
 	loader_profiling_enable();
 	loader_profiling_set_level(ProfilingLevel::PROFILING_ALL);
 	/*test_polygon();
