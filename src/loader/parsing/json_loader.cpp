@@ -84,18 +84,17 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		// Parse the outer medium of the material
 		m_state.objectNames.push_back(outerIter->name.GetString());
 		const Value& outerMedium = outerIter->value;
-		mat->outer.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, outerMedium, "absorption")));
+		mat->outerMedium.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, outerMedium, "absorption")));
 		auto refractIter = get(m_state, outerMedium, "refractionIndex");
 		if(refractIter->value.IsArray()) {
-			mat->outer.refractionIndex.c = util::pun<Vec2>(read<ei::Vec2>(m_state, refractIter));
-			mat->outer.type = OuterMediumType::MEDIUM_CONDUCTOR;
+			mat->outerMedium.refractionIndex = util::pun<Vec2>(read<ei::Vec2>(m_state, refractIter));
 		} else {
-			mat->outer.refractionIndex.f = read<float>(m_state, refractIter);
-			mat->outer.type = OuterMediumType::MEDIUM_DIELECTRIC;
+			mat->outerMedium.refractionIndex = Vec2{read<float>(m_state, refractIter), 0.0f};
 		}
 		m_state.objectNames.pop_back();
 	} else {
-		mat->outer.type = OuterMediumType::MEDIUM_NONE;
+		mat->outerMedium.absorption = Vec3{0.0f};
+		mat->outerMedium.refractionIndex = Vec2{1.0f, 0.0f};
 	}
 
 	std::string_view type = read<const char*>(m_state, get(m_state, material, "type"));

@@ -2,6 +2,7 @@
 #include "util/log.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/materials/medium.hpp"
 #include <iostream>
 
 namespace mufflon::scene {
@@ -53,6 +54,17 @@ ScenarioHandle WorldContainer::get_scenario(const std::string_view& name) {
 MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial> material) {
 	m_materials.push_back(move(material));
 	return m_materials.back().get();
+}
+
+materials::MediumHandle WorldContainer::add_medium(const materials::Medium& medium) {
+	materials::MediumHandle h = 0;
+	// Check for duplicates
+	for(auto& m : m_media) {
+		if(m == medium) return h;
+		++h;
+	}
+	m_media.push_back(medium);
+	return h;
 }
 
 CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<cameras::Camera> camera) {
@@ -243,6 +255,9 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 							envLightTex.value()->second);
 	else
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));
+
+	// Make media available / resident
+	m_scene->load_media(m_media);
 
 	// TODO: load the materials (make something resident?)
 	// TODO: cameras light, etc.

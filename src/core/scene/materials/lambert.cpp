@@ -45,5 +45,10 @@ void Lambert::get_parameter_pack_cpu(const HandlePack* handles, const UvCoordina
 	};
 }
 
+Medium Lambert::compute_medium() const {
+	// Use some average dielectric refraction index and a maximum absorption
+	return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
+}
+
 
 }}} // namespace mufflon::scene::materials

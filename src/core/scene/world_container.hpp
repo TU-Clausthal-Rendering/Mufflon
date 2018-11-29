@@ -53,6 +53,12 @@ public:
 	 */
 	MaterialHandle add_material(std::unique_ptr<materials::IMaterial> material);
 
+	/*
+	 * Add a medium to the world. If another medium with the same properties
+	 * exists it will be returned and the number of media will not be changed.
+	 */
+	materials::MediumHandle add_medium(const materials::Medium& medium);
+
 	// Add a fully specfied camera to the pool of all cameras.
 	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
 
@@ -138,6 +144,8 @@ private:
 	std::map<std::string, Scenario, std::less<>> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
+	// All media in the world (all with unique properties)
+	std::vector<materials::Medium> m_media;
 	// All available cameras mapped to their name.
 	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
 	// All light sources of the scene

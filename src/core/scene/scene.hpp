@@ -35,6 +35,8 @@ public:
 		m_accelDirty = true;
 	}
 
+	void load_media(const std::vector<materials::Medium>& media);
+
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
@@ -43,6 +45,7 @@ public:
 			// TODO
 		}
 		// TODO: materials etc.
+		m_media.synchronize<Device::CPU, dev>();
 	}
 
 	template < Device dev >
@@ -52,6 +55,7 @@ public:
 			// TODO
 		}
 		// TODO: materials etc.
+		m_media.unload<dev>();
 	}
 
 	const ei::Box& get_bounding_box() const noexcept {
@@ -103,10 +107,15 @@ public:
 		return m_camera;
 	}
 
+	template < Device dev >
+	const materials::Medium* get_media() const noexcept {
+		return m_media.get<dev, materials::Medium>();
+	}
+
 private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
-
+	GenericResource m_media;		// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 
 	// Light tree containing all light sources enabled for the scene

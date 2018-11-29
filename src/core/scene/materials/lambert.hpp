@@ -39,6 +39,7 @@ public:
 	std::size_t get_parameter_pack_size() const final { return sizeof(LambertParameterPack); }
 	void get_handle_pack(Device device, HandlePack* outBuffer) const final;
 	void get_parameter_pack_cpu(const HandlePack* handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const final;
+	Medium compute_medium() const final;
 	bool is_emissive() const final { return false; }
 	bool is_brdf() const final { return true; }
 	bool is_btdf() const final { return false; }

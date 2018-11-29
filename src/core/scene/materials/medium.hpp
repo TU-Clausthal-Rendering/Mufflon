@@ -12,6 +12,12 @@ namespace mufflon { namespace scene { namespace materials {
 	 */
 	class Medium {
 	public:
+		Medium() = default;
+		Medium(const ei::Vec2 refrIndex, const Spectrum& absorptionCoeff) :
+			m_refractionIndex{refrIndex},
+			m_absorptionCoeff{absorptionCoeff}
+		{}
+
 		void set_refraction_index(float n) {
 			m_refractionIndex.x = n;
 			m_refractionIndex.y = 0.0f;
@@ -34,11 +40,17 @@ namespace mufflon { namespace scene { namespace materials {
 		CUDA_FUNCTION __forceinline__ Spectrum get_transmission(float distance) const {
 			return exp(m_absorptionCoeff * -distance);
 		}
+
+		bool operator==(const Medium& rhs) const {
+			// Although we work with float we can use ==, because we expect either
+			// the exact same definition or treat the medium as a different one.
+			return (m_refractionIndex == rhs.m_refractionIndex)
+				&& (m_absorptionCoeff == rhs.m_absorptionCoeff);
+		}
 	private:
+		// TODO: half packing for GPU friendly alignment?
 		ei::Vec2 m_refractionIndex {1.0f, 0.0f};	// Complex refraction index, complex part is 0 for dielectrics
 		Spectrum m_absorptionCoeff {0.0f};			// Absorption coefficient λ used as transmission=exp(-d*λ)
 	};
-
-	using MediumHandle = u16;
 
 }}} // namespace mufflon::scene::materials

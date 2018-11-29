@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "material.hpp"
+#include "medium.hpp"
 #include "export/api.hpp"
 #include "core/scene/types.hpp"
 #include "util/log.hpp"

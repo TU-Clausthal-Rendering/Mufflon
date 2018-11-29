@@ -1171,10 +1171,18 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 		case MATERIAL_LAMBERT: {
 			auto tex = WorldContainer::instance().add_texture(textures::Format::RGB32F, mat->inner.lambert.albedo.rgb);
 			hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>(&tex->second));
+			hdl->set_outer_medium( WorldContainer::instance().add_medium(
+				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
+				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
+			hdl->set_inner_medium( WorldContainer::instance().add_medium(hdl->compute_medium()) );
 		}	break;
 		case MATERIAL_LAMBERT_TEXTURED: {
 			auto tex = mat->inner.lambert.albedo.tex;
 			hdl = WorldContainer::instance().add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
+			hdl->set_outer_medium( WorldContainer::instance().add_medium(
+				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
+				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
+			hdl->set_inner_medium( WorldContainer::instance().add_medium(hdl->compute_medium()) );
 		}	break;
 		case MATERIAL_TORRANCE:
 		case MATERIAL_TORRANCE_TEXALBEDO:

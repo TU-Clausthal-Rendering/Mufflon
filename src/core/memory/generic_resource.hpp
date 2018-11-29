@@ -22,6 +22,10 @@ public:
 	 */
 	void resize(std::size_t size);
 
+	std::size_t size() const {
+		return m_size;
+	}
+
 	/*
 	 * Get a typized pointer to the memory on one device. If the memory does not
 	 * exsist it will be created by the call.

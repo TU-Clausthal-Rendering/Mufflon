@@ -4,7 +4,7 @@
 #include "util/flag.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
-#include "core/scene/textures/texture.hpp"
+#include "core/scene/handles.hpp"
 #include "medium.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
@@ -117,6 +117,11 @@ public:
 	MediumHandle get_inner_medium() const {
 		return m_innerMedium;
 	}
+	void set_inner_medium(MediumHandle medium) {
+		m_innerMedium = medium;
+	}
+
+	virtual Medium compute_medium() const = 0;
 
 	// Is any component of this material able to emit light?
 	virtual bool is_emissive() const = 0;

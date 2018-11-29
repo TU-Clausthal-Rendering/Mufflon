@@ -136,12 +136,6 @@ typedef enum {
 	MATERIAL_FRESNEL_COMPLEX
 } MaterialParamType;
 
-typedef enum {
-	MEDIUM_NONE,
-	MEDIUM_DIELECTRIC,
-	MEDIUM_CONDUCTOR
-} OuterMediumType;
-
 typedef struct {
 	AttributeType type;
 	uint32_t rows;
@@ -179,13 +173,9 @@ typedef const void* ConstCameraHdl;
 
 // Material types
 typedef struct {
-	OuterMediumType type;
-	union {
-		float f;
-		Vec2 c;
-	} refractionIndex;
+	Vec2 refractionIndex;
 	Vec3 absorption;
-} OuterMedium;
+} Medium;
 
 typedef struct {
 	union {
@@ -250,7 +240,7 @@ typedef struct {
 } FresnelParams;
 
 typedef struct MaterialParamsStruct {
-	OuterMedium outer;
+	Medium outerMedium;
 	MaterialParamType innerType;
 	union {
 		LambertParams lambert;
