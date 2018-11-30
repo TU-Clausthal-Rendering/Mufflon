@@ -37,10 +37,14 @@ struct AccelStructInfo {
 	i32 numPrimives;
 };
 
-void intersection_test_CUDA(
+void first_intersection_CUDA(
 	AccelStructInfo bvh,
 	RayInfo rayInfo,
 	RayIntersectionResult* result);
+
+bool any_intersection_CUDA(
+	AccelStructInfo bvh,
+	RayInfo rayInfo);
 
 }
 }

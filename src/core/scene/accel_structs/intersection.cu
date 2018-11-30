@@ -34,8 +34,209 @@ namespace mufflon {
 namespace scene {
 namespace accel_struct {
 
+//TODO tmin tmax needed?
 __global__
-void intersection_testD(
+void any_intersectionD(
+	const ei::Vec4* __restrict__ bvh,
+	const i32 bvhSize,
+	const ei::Vec3* __restrict__ meshVertices,
+	const ei::Vec2* __restrict__ meshUVs,
+	const i32* __restrict__ triIndices,
+	const i32* __restrict__ quadIndices,
+	const ei::Vec4* __restrict__ spheres,
+	const i32 offsetQuads, const i32 offsetSpheres,
+	const i32* __restrict__ primIds,
+	const i32 numPrimives,
+	const ei::Ray ray, const i32 startPrimId,
+	const float tmin, const float tmax,
+	i32* result
+) {
+	// Setup traversal.
+	// Traversal stack in CUDA thread-local memory.
+	i32 traversalStack[STACK_SIZE];
+	traversalStack[0] = EntrypointSentinel; // Bottom-most entry.
+
+	// nodeAddr: Non-negative: current internal node; negative: leaf.
+	i32     nodeAddr = 0; // Start from the root.  
+	char*   stackPtr = (char*)&traversalStack[0]; //Current position in traversal stack.
+	const float	ooeps = exp2f(-80.0f); // Avoid div by zero.
+
+	const float idirx = 1.0f / (fabsf(ray.direction.x) > ooeps ? ray.direction.x : copysignf(ooeps, ray.direction.x));
+	const float idiry = 1.0f / (fabsf(ray.direction.y) > ooeps ? ray.direction.y : copysignf(ooeps, ray.direction.y));
+	const float idirz = 1.0f / (fabsf(ray.direction.z) > ooeps ? ray.direction.z : copysignf(ooeps, ray.direction.z));
+	const float oodx = ray.origin.x * idirx;
+	const float oody = ray.origin.y * idiry;
+	const float oodz = ray.origin.z * idirz;
+
+	// Traversal loop.
+	while (nodeAddr != EntrypointSentinel)
+	{
+		// while (nodeAddr >= 0 && nodeAddr != EntrypointSentinel)
+		while (u32(nodeAddr) < u32(EntrypointSentinel))   // functionally equivalent, but faster
+		{
+			// Fetch AABBs of the two child bvh.
+			const ei::Vec4 n0xy = bvh[nodeAddr]; // (c0.lo.x, c0.hi.x, c0.lo.y, c0.hi.y)
+			const ei::Vec4 n1xy = bvh[nodeAddr + 1]; // (c1.lo.x, c1.hi.x, c1.lo.y, c1.hi.y)
+			const ei::Vec4 nz = bvh[nodeAddr + 2];// (c0.lo.z, c0.hi.z, c1.lo.z, c1.hi.z)
+			ei::Vec4 tmp = bvh[nodeAddr + 3]; // child_index0, child_index1
+			int2  cnodes = *(int2*)&tmp;
+
+			// Intersect the ray against the child bvh.
+			const float c0lox = n0xy.x * idirx - oodx;
+			const float c0hix = n0xy.y * idirx - oodx;
+			const float c0loy = n0xy.z * idiry - oody;
+			const float c0hiy = n0xy.w * idiry - oody;
+			const float c0loz = nz.x   * idirz - oodz;
+			const float c0hiz = nz.y   * idirz - oodz;
+			const float c1loz = nz.z   * idirz - oodz;
+			const float c1hiz = nz.w   * idirz - oodz;
+			const float c0min = spanBeginKepler(c0lox, c0hix, c0loy, c0hiy, c0loz, c0hiz, tmin);
+			const float c0max = spanEndKepler(c0lox, c0hix, c0loy, c0hiy, c0loz, c0hiz, tmax);
+			const float c1lox = n1xy.x * idirx - oodx;
+			const float c1hix = n1xy.y * idirx - oodx;
+			const float c1loy = n1xy.z * idiry - oody;
+			const float c1hiy = n1xy.w * idiry - oody;
+			const float c1min = spanBeginKepler(c1lox, c1hix, c1loy, c1hiy, c1loz, c1hiz, tmin);
+			const float c1max = spanEndKepler(c1lox, c1hix, c1loy, c1hiy, c1loz, c1hiz, tmax);
+
+			const bool traverseChild0 = (c0max >= c0min);
+			const bool traverseChild1 = (c1max >= c1min);
+
+			// Neither child was intersected => pop stack.
+			if (!traverseChild0 && !traverseChild1)
+			{
+				nodeAddr = *(i32*)stackPtr;
+				stackPtr -= 4;
+			}
+			// Otherwise => fetch child pointers.
+			else {
+				nodeAddr = (traverseChild0) ? cnodes.x : cnodes.y;
+
+				// Both children were intersected => push the farther one.
+				if (traverseChild0 && traverseChild1)
+				{
+					if (c1min < c0min) {
+						i32 tmp = nodeAddr;
+						nodeAddr = cnodes.y;
+						cnodes.y = tmp;
+					}
+					stackPtr += 4;
+					*(i32*)stackPtr = cnodes.y;
+				}
+			}
+		}
+
+		// Process postponed leaf bvh.
+		// TODO: use warp/block to do the intersection test.
+		while (nodeAddr < 0)
+		{
+			const i32 leafId = ~nodeAddr;
+			ei::IVec4 counts; // x: tri; y: quds; z: spheres; w: total count.
+			i32 primId;
+			i32 startId;
+			if (leafId >= bvhSize) {
+				startId = leafId - bvhSize;
+				primId = primIds[startId];
+				if (primId >= offsetSpheres) {
+					counts = ei::IVec4(0, 0, 1, 1);
+				}
+				else if (primId >= offsetQuads) {
+					counts = ei::IVec4(0, 1, 0, 1);
+				}
+				else
+					counts = ei::IVec4(1, 0, 0, 1);
+			}
+			else {
+				const ei::IVec4 leaf = ((ei::IVec4*)bvh)[leafId];
+				// Extract counts for three kinds of primitvies.
+				extract_prim_counts(leaf.x, counts);
+				startId = leaf.y;
+				primId = primIds[startId++];
+			}
+			// Triangles intersetion test.
+			// Uses Moeller-Trumbore intersection algorithm:
+			// https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+			for (i32 i = 0; i < counts.x; i++)
+			{
+				if (primId == startPrimId)
+					continue;
+				const i32 triId = primId * 3;
+				const ei::Triangle tri = { meshVertices[triIndices[triId]],
+							meshVertices[triIndices[triId + 1]],
+							meshVertices[triIndices[triId + 2]] };
+
+				float t;
+				if (ei::intersects(ray, tri, t)) {
+					if (t < tmax) {
+						*result = 1;
+						return;
+					}
+				}
+				if (startId < numPrimives)
+					primId = primIds[startId++];
+			}
+
+
+			// Quads intersetion test.
+			for (i32 i = 0; i < counts.y; i++)
+			{
+				if (primId == startPrimId)
+					continue;
+				const i32 quadId = (primId - offsetQuads) * 4;
+				const ei::Vec3 v[4] = { meshVertices[quadIndices[quadId]],
+							meshVertices[quadIndices[quadId + 1]],
+							meshVertices[quadIndices[quadId + 2]],
+							meshVertices[quadIndices[quadId + 3]] };
+				const ei::Triangle tri0 = { v[0], v[1], v[2] };
+				float t;
+				if (ei::intersects(ray, tri0)) {
+					if (t < tmax) {
+						*result = 1;
+						return;
+					}
+				}
+
+				const ei::Triangle tri1 = { v[0], v[2], v[3] };
+				if (ei::intersects(ray, tri1)) {
+					if (t < tmax) {
+						*result = 1;
+						return;
+					}
+				}
+				if (startId < numPrimives)
+					primId = primIds[startId++];
+			}
+
+
+			// Spheres intersetion test.
+			for (i32 i = 0; i < counts.z; i++)
+			{
+				if (primId == startPrimId)
+					continue;
+				const i32 sphId = primId - offsetSpheres;
+				const ei::Vec4 v = spheres[sphId];
+				const ei::Sphere sph = { ei::Vec3(v), v.w };
+				float t;
+				if (ei::intersects(ray, sph, t)) {
+					if (t < tmax) {
+						*result = 1;
+						return;
+					}
+				}
+				if (startId < numPrimives)
+					primId = primIds[startId++];
+			}
+			// Postponed next node.
+			nodeAddr = *(i32*)stackPtr;
+			stackPtr -= 4;
+		}
+	}
+	(*result) = 0;
+}
+
+// TODO add tmin check if it is needed.
+__global__
+void first_intersectionD(
 	const ei::Vec4* __restrict__ bvh,
 	const i32 bvhSize, 
 	const ei::Vec3* __restrict__ meshVertices,
@@ -55,9 +256,10 @@ void intersection_testD(
 	i32 traversalStack[STACK_SIZE];
 	traversalStack[0] = EntrypointSentinel; // Bottom-most entry.
 
-	i32     hitPrimId;                       // Primitive index of the closest intersection, -1 if none.
+	// Primitive index of the closest intersection, -1 if none.
+	i32     hitPrimId = -1;                      // No primitive intersected so far.
 	ei::Vec3 hitBarycentric;
-	float   hitT;                           // t-value of the closest intersection.
+	float   hitT = tmax;                          // t-value of the closest intersection.
 	i32 hitSecondTri;                           // For ray-quad intersection.
 
 	// nodeAddr: Non-negative: current internal node; negative: leaf.
@@ -71,10 +273,6 @@ void intersection_testD(
 	const float oodx = ray.origin.x * idirx;
 	const float oody = ray.origin.y * idiry;
 	const float oodz = ray.origin.z * idirz;
-
-	hitT = tmax;
-	nodeAddr = 0;   // Start from the root.
-	hitPrimId = -1;  // No primitive intersected so far.
 
 	// Traversal loop.
 	while (nodeAddr != EntrypointSentinel)
@@ -299,12 +497,12 @@ void intersection_testD(
 	}
 }
 
-void intersection_test_CUDA(
+void first_intersection_CUDA(
 	AccelStructInfo bvh,
 	RayInfo rayInfo,
 	RayIntersectionResult* result) {
 	
-	intersection_testD << <1, 1 >> > (
+	first_intersectionD << <1, 1 >> > (
 		bvh.bvh,
 		bvh.bvhSize,
 		bvh.meshVertices,
@@ -316,9 +514,36 @@ void intersection_test_CUDA(
 		bvh.primIds,
 		bvh.numPrimives,
 		rayInfo.ray, rayInfo.startPrimId,
-		rayInfo.tmin, rayInfo.tmax
+		rayInfo.tmin, rayInfo.tmax,
+		result
 		);
 
+}
+
+bool any_intersection_CUDA(
+	AccelStructInfo bvh,
+	RayInfo rayInfo) {
+
+	i32* resultD;
+	cudaMalloc((void**)&resultD, sizeof(i32));
+	any_intersectionD << <1, 1 >> > (
+		bvh.bvh,
+		bvh.bvhSize,
+		bvh.meshVertices,
+		bvh.meshUVs,
+		bvh.triIndices,
+		bvh.quadIndices,
+		bvh.spheres,
+		bvh.offsetQuads, bvh.offsetSpheres,
+		bvh.primIds,
+		bvh.numPrimives,
+		rayInfo.ray, rayInfo.startPrimId,
+		rayInfo.tmin, rayInfo.tmax,
+		resultD
+		);
+	i32 result;
+	cudaMemcpy(&result, resultD, sizeof(i32), cudaMemcpyDeviceToHost);
+	return static_cast<bool>(result);
 }
 
 }
