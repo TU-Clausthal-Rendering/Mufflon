@@ -372,8 +372,8 @@ For compression/decompression the following codes is used:
             u = dir.x / l1norm
             v = dir.y / l1norm
         else # warp lower hemisphere
-            u = (1 - dir.y / l1norm) * (dir.x >= 0 ? 1 : -1)
-            v = (1 - dir.x / l1norm) * (dir.y >= 0 ? 1 : -1)
+            u = (1 - abs(dir.y) / l1norm) * (dir.x >= 0 ? 1 : -1)
+            v = (1 - abs(dir.x) / l1norm) * (dir.y >= 0 ? 1 : -1)
         end
         u = floor((u / 2 + 0.5) * 65535.49 + 0.5)   # from [-1,1] to [0,2^16-1]
         v = floor((v / 2 + 0.5) * 65535.49 + 0.5)   # from [-1,1] to [0,2^16-1]
