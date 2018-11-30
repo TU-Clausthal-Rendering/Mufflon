@@ -16,18 +16,31 @@ struct RayIntersectionResult {
 	ei::Vec3 barycentric;
 };
 
-void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
-	const ei::Vec4* bvh,
-	const ei::Vec3* meshVertices,
-	const ei::Vec4* spheres,
-	const ei::Vec2* meshUVs,
-	const i32* triIndices,
-	const i32* quadIndices,
-	const i32* primIds,
-	const i32 offsetQuads, const i32 offsetSpheres,
-	RayIntersectionResult* result,
-	const i32 bvhSize, const i32 numPrimives,
-	const float tmin, const float tmax);
+struct RayInfo {
+	ei::Ray ray;
+	i32 startPrimId;
+	float tmin;
+	float tmax;
+};
+
+struct AccelStructInfo {
+	ei::Vec4* bvh;
+	i32 bvhSize;
+	ei::Vec3* meshVertices;
+	ei::Vec2* meshUVs;
+	i32* triIndices;
+	i32* quadIndices;
+	ei::Vec4* spheres;
+	i32 offsetQuads; 
+	i32 offsetSpheres;
+	i32* primIds;
+	i32 numPrimives;
+};
+
+void intersection_test_CUDA(
+	AccelStructInfo bvh,
+	RayInfo rayInfo,
+	RayIntersectionResult* result);
 
 }
 }

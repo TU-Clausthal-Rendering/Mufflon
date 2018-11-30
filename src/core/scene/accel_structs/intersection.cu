@@ -35,18 +35,21 @@ namespace scene {
 namespace accel_struct {
 
 __global__
-void intersection_testD(const ei::Ray ray, const i32 startPrimId, 
+void intersection_testD(
 	const ei::Vec4* __restrict__ bvh,
+	const i32 bvhSize, 
 	const ei::Vec3* __restrict__ meshVertices,
-	const ei::Vec4* __restrict__ spheres,
 	const ei::Vec2* __restrict__ meshUVs,
 	const i32* __restrict__ triIndices,
 	const i32* __restrict__ quadIndices,
-	const i32* __restrict__ primIds,
+	const ei::Vec4* __restrict__ spheres,
 	const i32 offsetQuads, const i32 offsetSpheres,
-	RayIntersectionResult* __restrict__ result,
-	const i32 bvhSize, const i32 numPrimives,
-	const float tmin, const float tmax) {
+	const i32* __restrict__ primIds,
+	const i32 numPrimives,
+	const ei::Ray ray, const i32 startPrimId, 
+	const float tmin, const float tmax,
+	RayIntersectionResult* __restrict__ result
+) {
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
 	i32 traversalStack[STACK_SIZE];
@@ -296,22 +299,25 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 	}
 }
 
-void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
-	const ei::Vec4* bvh,
-	const ei::Vec3* meshVertices,
-	const ei::Vec4* spheres,
-	const ei::Vec2* meshUVs,
-	const i32* triIndices,
-	const i32* quadIndices,
-	const i32* primIds,
-	const i32 offsetQuads, const i32 offsetSpheres,
-	RayIntersectionResult* result,
-	const i32 bvhSize, const i32 numPrimives,
-	const float tmin, const float tmax) {
-
-	intersection_testD << <1, 1 >> > (ray, startPrimId, bvh, meshVertices, spheres,
-		meshUVs, triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result,
-		bvhSize, numPrimives, tmin, tmax);
+void intersection_test_CUDA(
+	AccelStructInfo bvh,
+	RayInfo rayInfo,
+	RayIntersectionResult* result) {
+	
+	intersection_testD << <1, 1 >> > (
+		bvh.bvh,
+		bvh.bvhSize,
+		bvh.meshVertices,
+		bvh.meshUVs,
+		bvh.triIndices,
+		bvh.quadIndices,
+		bvh.spheres,
+		bvh.offsetQuads, bvh.offsetSpheres,
+		bvh.primIds,
+		bvh.numPrimives,
+		rayInfo.ray, rayInfo.startPrimId,
+		rayInfo.tmin, rayInfo.tmax
+		);
 
 }
 
