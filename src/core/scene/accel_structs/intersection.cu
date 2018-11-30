@@ -47,6 +47,7 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 	const i32* __restrict__ primIds,
 	const i32 offsetQuads, const i32 offsetSpheres,
 	RayIntersectionResult* __restrict__ result,
+	const i32 bvhSize, const i32 numPrimives,
 	const float tmin, const float tmax) {
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
@@ -137,90 +138,105 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 		while (nodeAddr < 0)
 		{
 			const i32 leafId = ~nodeAddr;
-			{
-				const ei::Vec4 leaf = bvh[leafId];
-				ei::IVec4 counts; // x: tri; y: quds; z: spheres; w: total count.
+			ei::IVec4 counts; // x: tri; y: quds; z: spheres; w: total count.
+			i32 primId;
+			i32 startId;
+			if (leafId >= bvhSize) {
+				startId = leafId - bvhSize;
+				primId = primIds[startId];
+				if (primId >= offsetSpheres) {
+					counts = ei::IVec4(0, 0, 1, 1);
+				} else if (primId >= offsetQuads) {
+					counts = ei::IVec4(0, 1, 0, 1);
+				} else 
+					counts = ei::IVec4(1, 0, 0, 1);
+			}
+			else {
+				const ei::IVec4 leaf = ((ei::IVec4*)bvh)[leafId];
 				// Extract counts for three kinds of primitvies.
 				extract_prim_counts(leaf.x, counts);
+				startId = leaf.y;
+				primId = primIds[startId++];
+			}
+			// Triangles intersetion test.
+			// Uses Moeller-Trumbore intersection algorithm:
+			// https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+			for (i32 i = 0; i < counts.x; i++)
+			{
+				if (primId == startPrimId)
+					continue;
+				const i32 triId = primId * 3;
+				const ei::Triangle tri = { triVertices[triIndices[triId]],
+							triVertices[triIndices[triId + 1]],
+							triVertices[triIndices[triId + 2]] };
 
-				i32 startId = leaf.y;
-				// Triangles intersetion test.
-				// Uses Moeller-Trumbore intersection algorithm:
-				// https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
-				for (i32 i = 0; i < counts.x; i++)
-				{
-					const i32 primId = primIds[startId++];
-					if (primId == startPrimId)
-						continue;
-					const i32 triId = primId * 3;
-					const ei::Triangle tri = { triVertices[triIndices[triId]],
-							  triVertices[triIndices[triId + 1]],
-							  triVertices[triIndices[triId + 2]] };
+				float t;
+				ei::Vec3 barycentric;
+				if (ei::intersects(ray, tri, t, barycentric)) {
+					if (t < hitT) {
+						hitT = t;
+						hitPrimId = primId;
+						hitBarycentric = barycentric;
+					}
+				}
+				if (startId < numPrimives)
+					primId = primIds[startId++];
+			}
 
-					float t;
-					ei::Vec3 barycentric;
-					if (ei::intersects(ray, tri, t, barycentric)) {
-						if (t < hitT) {
-							hitT = t;
-							hitPrimId = primId;
-							hitBarycentric = barycentric;
-						}
+
+			// Quads intersetion test.
+			for (i32 i = 0; i < counts.y; i++)
+			{
+				if (primId == startPrimId)
+					continue;
+				const i32 quadId = (primId - offsetQuads) * 4;
+				const ei::Vec3 v[4] = { quadVertices[quadIndices[quadId]],
+							quadVertices[quadIndices[quadId + 1]],
+							quadVertices[quadIndices[quadId + 2]],
+							quadVertices[quadIndices[quadId + 3]] };
+				const ei::Triangle tri0 = { v[0], v[1], v[2] };
+				float t;
+				ei::Vec3 barycentric;
+				if (ei::intersects(ray, tri0, t, barycentric)) {
+					if (t < hitT) {
+						hitT = t;
+						hitPrimId = primId;
+						hitBarycentric = barycentric;
+						hitSecondTri = 0;
 					}
 				}
 
-
-				// Quads intersetion test.
-				for (i32 i = 0; i < counts.y; i++)
-				{
-					const i32 primId = primIds[startId++];
-					if (primId == startPrimId)
-						continue;
-					const i32 quadId = (primId - offsetQuads) * 4;
-					const ei::Vec3 v[4] = { quadVertices[quadIndices[quadId]],
-							  quadVertices[quadIndices[quadId + 1]],
-							  quadVertices[quadIndices[quadId + 2]],
-							  quadVertices[quadIndices[quadId]] };
-					const ei::Triangle tri0 = { v[0], v[1], v[2] };
-					float t;
-					ei::Vec3 barycentric;
-					if (ei::intersects(ray, tri0, t, barycentric)) {
-						if (t < hitT) {
-							hitT = t;
-							hitPrimId = primId;
-							hitBarycentric = barycentric;
-							hitSecondTri = 0;
-						}
-					}
-
-					const ei::Triangle tri1 = { v[0], v[2], v[3] };
-					if (ei::intersects(ray, tri1, t)) {
-						if (t < hitT) {
-							hitT = t;
-							hitPrimId = primId;
-							hitBarycentric = barycentric;
-							hitSecondTri = 1;
-						}
+				const ei::Triangle tri1 = { v[0], v[2], v[3] };
+				if (ei::intersects(ray, tri1, t, barycentric)) {
+					if (t < hitT) {
+						hitT = t;
+						hitPrimId = primId;
+						hitBarycentric = barycentric;
+						hitSecondTri = 1;
 					}
 				}
+				if (startId < numPrimives)
+					primId = primIds[startId++];
+			}
 
 
-				// Spheres intersetion test.
-				for (i32 i = 0; i < counts.z; i++)
-				{
-					const i32 primId = primIds[startId++];
-					if (primId == startPrimId)
-						continue;
-					const i32 sphId = primId - offsetSpheres;
-					const ei::Vec4 v = sphVertices[sphId];
-					const ei::Sphere sph = { ei::Vec3(v), v.w };
-					float t;
-					if (ei::intersects(ray, sph, t)) {
-						if (t < hitT) {
-							hitT = t;
-							hitPrimId = primId;
-						}
+			// Spheres intersetion test.
+			for (i32 i = 0; i < counts.z; i++)
+			{
+				if (primId == startPrimId)
+					continue;
+				const i32 sphId = primId - offsetSpheres;
+				const ei::Vec4 v = sphVertices[sphId];
+				const ei::Sphere sph = { ei::Vec3(v), v.w };
+				float t;
+				if (ei::intersects(ray, sph, t)) {
+					if (t < hitT) {
+						hitT = t;
+						hitPrimId = primId;
 					}
 				}
+				if (startId < numPrimives)
+					primId = primIds[startId++];
 			}
 			// Postponed next node.
 			nodeAddr = *(i32*)stackPtr;
@@ -300,10 +316,12 @@ void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
 	const i32* primIds,
 	const i32 offsetQuads, const i32 offsetSpheres,
 	RayIntersectionResult* result,
+	const i32 bvhSize, const i32 numPrimives,
 	const float tmin, const float tmax) {
 
 	intersection_testD << <1, 1 >> > (ray, startPrimId, bvh, triVertices, quadVertices, sphVertices,
-		triUVs, quadUVs, triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result, tmin, tmax);
+		triUVs, quadUVs, triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result,
+		bvhSize, numPrimives, tmin, tmax);
 
 }
 

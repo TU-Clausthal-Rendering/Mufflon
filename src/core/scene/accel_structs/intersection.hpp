@@ -28,6 +28,7 @@ void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
 	const i32* primIds,
 	const i32 offsetQuads, const i32 offsetSpheres,
 	RayIntersectionResult* result,
+	const i32 bvhSize, const i32 numPrimives,
 	const float tmin, const float tmax);
 
 }
