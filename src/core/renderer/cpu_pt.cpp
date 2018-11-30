@@ -72,6 +72,12 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
 			if(!walk(*vertex, media, rnd, 0.0f, false, throughput, vertex))
 				break;
+
+			// Evaluate direct hit of area ligths
+			auto emission = vertex->get_emission();
+			if(emission.radiance != 0.0f) {
+				float mis = emission.backwardPdf / vertex->get_incident_pdf();
+			}
 		}
 		++pathLen;
 	} while(pathLen < 666);

@@ -187,6 +187,10 @@ public:
 		return math::EvalValue{};
 	}
 
+	/*
+	 * Create a new outgoing direction. This method can be used in a loop
+	 * to fully Monte Carlo integrate the rendering equation at this vertex.
+	 */
 	VertexSample sample(const scene::materials::Medium* media,
 						const math::RndSet2_1& rndSet,
 						bool adjoint = false
@@ -283,6 +287,10 @@ public:
 		 || path0.is_camera() && path1.is_orthographic()
 		);
 		// TODO: camera clipping here? Seems to be the best location
+	}
+
+	struct { Spectrum radiance; AreaPdf backwardPdf; } get_emission() {
+		return {};
 	}
 
 	/* *************************************************************************

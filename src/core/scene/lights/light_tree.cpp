@@ -218,55 +218,29 @@ LightSubTree::Node::Node(const DirectionalLight& left, const DirectionalLight& r
 
 LightTreeBuilder::LightTreeBuilder() :
 	m_envMapTexture(nullptr),
-	m_flags(),
-	m_trees{
-		LightTree<Device::CPU>{
-			EnvMapLight<Device::CPU>{},
-			{ {}, 0u, nullptr, nullptr },
-			{ {}, 0u, nullptr, nullptr },
-			0u,
-			nullptr
-		},
-		LightTree<Device::CUDA>{
-			EnvMapLight<Device::CUDA>{},
-			{ {}, 0u, nullptr, nullptr },
-			{ {}, 0u, nullptr, nullptr },
-			0u,
-			nullptr
-		},
-	}
-{
-
-}
+	m_flags()
+{}
 
 LightTreeBuilder::~LightTreeBuilder() {
-	m_trees.for_each([](auto& tree) {
-		using TreeType = std::decay_t<decltype(tree)>;
-		Allocator<TreeType::DEVICE>::free(tree.memory, tree.length);
-	});
+	unload<Device::CPU>();
+	unload<Device::CUDA>();
 }
 
 void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
 					  const ei::Box& boundingBox,
 					  std::optional<TextureHandle> envLight) {
-	LightTree<Device::CPU>& tree = m_trees.get<LightTree<Device::CPU>>();
-
-	// First delete any leftovers
-	tree.memory = Allocator<Device::CPU>::free(tree.memory, tree.length);
-	tree.envLight = EnvMapLight<Device::CPU>{};
-	tree.envLight.flux = ei::Vec3{0.f, 0.f, 0.f};
+	unload<Device::CPU>();
+	m_treeCpu = std::make_unique<LightTree<Device::CPU>>( posLights.size() );
 
 	// Construct the environment light
 	if(envLight.has_value()) {
-		tree.envLight = EnvMapLight<Device::CPU>{ *envLight.value()->aquireConst<Device::CPU>(), ei::Vec3{0, 0, 0} };
+		m_treeCpu->envLight = EnvMapLight<Device::CPU>{ *envLight.value()->aquireConst<Device::CPU>(), ei::Vec3{0, 0, 0} };
 		// TODO: accumulate flux
 	}
 
 	if(posLights.size() == 0u && dirLights.size() == 0u) {
 		// Shortcut if no lights are specified
-		tree.dirLights.lightCount = 0u;
-		tree.posLights.lightCount = 0u;
 		return;
 	}
 
@@ -305,26 +279,26 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	for(const auto& light : posLights)
 		posLightSize += std::visit([](const auto& posLight) { return sizeof(posLight); }, light);
 
-	tree.length = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
+	m_treeCpu->length = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightSize + posLightSize;
-	tree.memory = Allocator<Device::CPU>::alloc_array<char>(tree.length);
+	m_treeCpu->memory = Allocator<Device::CPU>::alloc_array<char>(m_treeCpu->length);
 	// Set up the node pointers
-	tree.dirLights.nodes = reinterpret_cast<LightSubTree::Node*>(tree.memory);
-	tree.dirLights.lights = &tree.memory[sizeof(LightSubTree::Node) * dirNodes];
-	tree.posLights.nodes = reinterpret_cast<LightSubTree::Node*>(
-		&tree.memory[sizeof(LightSubTree::Node) * dirNodes + dirLightSize]);
-	tree.posLights.lights = &tree.memory[sizeof(LightSubTree::Node) * dirNodes
+	m_treeCpu->dirLights.nodes = reinterpret_cast<LightSubTree::Node*>(m_treeCpu->memory);
+	m_treeCpu->dirLights.lights = &m_treeCpu->memory[sizeof(LightSubTree::Node) * dirNodes];
+	m_treeCpu->posLights.nodes = reinterpret_cast<LightSubTree::Node*>(
+		&m_treeCpu->memory[sizeof(LightSubTree::Node) * dirNodes + dirLightSize]);
+	m_treeCpu->posLights.lights = &m_treeCpu->memory[sizeof(LightSubTree::Node) * dirNodes
 												+ dirLightSize
 												+ sizeof(LightSubTree::Node) * posNodes];
 
 	// Copy the lights into the tree
 	// Directional lights are easier, because they have a fixed size
 	{
-		std::memcpy(tree.dirLights.lights, dirLights.data(), dirLightSize);
+		std::memcpy(m_treeCpu->dirLights.lights, dirLights.data(), dirLightSize);
 	}
 	// Positional lights are more difficult since we don't know the concrete size
 	{
-		char* mem = tree.posLights.lights;
+		char* mem = m_treeCpu->posLights.lights;
 		for(const auto& light : posLights) {
 			std::visit([&mem](const auto& posLight) {
 				std::memcpy(mem, &posLight, sizeof(posLight));
@@ -334,8 +308,9 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	}
 
 	// Now we gotta construct the proper nodes by recursively merging them together
-	create_light_tree(dirLights, tree.dirLights, scale);
-	create_light_tree(posLights, tree.posLights, scale);
+	// TODO: FILL the hashmap
+	create_light_tree(dirLights, m_treeCpu->dirLights, scale);
+	create_light_tree(posLights, m_treeCpu->posLights, scale);
 	m_flags.mark_changed(Device::CPU);
 }
 

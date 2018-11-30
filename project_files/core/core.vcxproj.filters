@@ -717,6 +717,9 @@
     <ClInclude Include="..\..\src\profiler\profiling.hpp">
       <Filter>Source Files\profiler</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\hashmap.hpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">

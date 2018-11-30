@@ -6,6 +6,7 @@
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
+#include "core/memory/hashmap.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
@@ -107,12 +108,12 @@ struct LightSubTree {
 
 	struct {
 		ei::Vec3 center;
-		float flux;
+		float flux { 0.0f };
 		u16 type;
 	} root;
-	std::size_t lightCount;
-	Node* nodes;
-	char* lights;
+	std::size_t lightCount { 0 };
+	Node* nodes { nullptr };
+	char* lights { nullptr };
 };
 
 template < Device dev >
@@ -124,8 +125,15 @@ struct LightTree {
 	LightSubTree dirLights;
 	LightSubTree posLights;
 	// Actual memory
-	std::size_t length;
-	ArrayDevHandle_t<DEVICE, char> memory;
+	std::size_t length { 0 };
+	ArrayDevHandle_t<DEVICE, char> memory { nullptr };
+	// A map to find the node of a given primitve.
+	// The map stores an encoded path to the node. Storing its pointer/offset
+	// would be useless in terms of finding its probability. Therefore,
+	// the tree must be traversed
+	HashMap<dev, PrimitiveHandle, u32> primToNodePath;
+
+	LightTree(std::size_t numPosLights) : primToNodePath{u32(numPosLights)} {}
 };
 
 #ifndef __CUDACC__
@@ -146,7 +154,8 @@ public:
 	template < Device dev >
 	const LightTree<dev>& aquire_tree() noexcept {
 		this->synchronize<dev>();
-		return m_trees.get<LightTree<dev>>();
+		if constexpr(dev == Device::CPU) return *m_treeCpu;
+		else return *m_treeCuda;
 	}
 
 	template < Device dev >
@@ -157,15 +166,22 @@ public:
 
 	template < Device dev >
 	void unload() {
-		LightTree<dev>& tree = m_trees.get<LightTree<dev>>();
-		tree.memory.handle = Allocator<dev>::free(tree.memory.handle, tree.length);
+		if(dev == Device::CPU && m_treeCpu) {
+			Allocator<dev>::free(m_treeCpu->memory, m_treeCpu->length);
+			m_treeCpu = nullptr;
+		} else if(m_treeCuda) {
+			Allocator<dev>::free(m_treeCuda->memory, m_treeCuda->length);
+			m_treeCuda->primToNodePath.free();
+			m_treeCuda = nullptr;
+		}
 		// TODO: unload envmap handle
 	}
 
 private:
 	TextureHandle m_envMapTexture;
 	util::DirtyFlags<Device> m_flags;
-	util::TaggedTuple<LightTree<Device::CPU>, LightTree<Device::CUDA>> m_trees;
+	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;
+	std::unique_ptr<LightTree<Device::CUDA>> m_treeCuda;
 };
 
 // Functions for synchronizing a light tree

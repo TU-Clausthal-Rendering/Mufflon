@@ -160,6 +160,7 @@
     <ClInclude Include="..\..\src\core\memory\allocator.hpp" />
     <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp" />
     <ClInclude Include="..\..\src\core\memory\generic_resource.hpp" />
+    <ClInclude Include="..\..\src\core\memory\hashmap.hpp" />
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />
