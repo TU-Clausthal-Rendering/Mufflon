@@ -27,7 +27,7 @@ std::size_t get_num_internal_nodes(std::size_t elems) {
 template < class T >
 ei::Vec3 get_light_center(const T& light) {
 	if constexpr(std::is_same_v<T, PositionalLights>)
-		return std::visit([](const auto& posLight) { return get_center(posLight); }, light);
+		return std::visit([](const auto& posLight) { return get_center(posLight); }, light.light);
 	else
 		return get_center(light);
 }
@@ -53,7 +53,7 @@ public:
 		for(std::size_t i = 1u; i < lights.size(); ++i) {
 			m_offsets[i] = m_offsets[i - 1u] + std::visit([](const auto& light) constexpr {
 				return static_cast<u32>(sizeof(light));
-			}, lights[i - 1u]);
+			}, lights[i - 1u].light);
 		}
 	}
 
@@ -159,6 +159,23 @@ void create_light_tree(const std::vector<LightType>& lights, LightSubTree& tree,
 	tree.root.type = Node::INVALID_TYPE;
 	tree.root.flux = tree.nodes[0u].left.flux + tree.nodes[0u].right.flux;
 	tree.root.center = tree.nodes[0u].center;
+}
+
+void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, PrimitiveHandle, u32>& map) {
+	int height = ei::ilog2(lights.size());
+	u32 extraNodes = u32(lights.size()) - (1u << height);
+	u32 lvlOff = extraNodes * 2;		// Index of first node on the height-1 level (all nodes < lvlOff are in level height)
+	if(extraNodes > 0) ++height;
+	u32 i = 0;
+	for(const auto& light : lights) {
+		if(light.primitive != ~0u) {		// Hitable light source?
+			u32 code = (i <= lvlOff) ? i : (i-lvlOff)*2+lvlOff;
+			// Append zero -> most significant bit is the root branch
+			code <<= 32 - height;
+			map.insert(light.primitive, code);
+		}
+		++i;
+	}
 }
 
 } // namespace
@@ -277,7 +294,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	std::size_t dirLightSize = sizeof(DirectionalLight) * dirLights.size();
 	std::size_t posLightSize = 0u;
 	for(const auto& light : posLights)
-		posLightSize += std::visit([](const auto& posLight) { return sizeof(posLight); }, light);
+		posLightSize += std::visit([](const auto& posLight) { return sizeof(posLight); }, light.light);
 
 	m_treeCpu->length = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightSize + posLightSize;
@@ -303,14 +320,14 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 			std::visit([&mem](const auto& posLight) {
 				std::memcpy(mem, &posLight, sizeof(posLight));
 				mem += sizeof(posLight);
-			}, light);
+			}, light.light);
 		}
 	}
 
 	// Now we gotta construct the proper nodes by recursively merging them together
-	// TODO: FILL the hashmap
 	create_light_tree(dirLights, m_treeCpu->dirLights, scale);
 	create_light_tree(posLights, m_treeCpu->posLights, scale);
+	fill_map(posLights, m_treeCpu->primToNodePath);
 	m_flags.mark_changed(Device::CPU);
 }
 

@@ -233,9 +233,9 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	// Add regular lights
 	for(const std::string_view& name : scenario.get_light_names()) {
 		if(auto pointLight = get_point_light(name); pointLight.has_value()) {
-			posLights.push_back(pointLight.value()->second);
+			posLights.push_back({pointLight.value()->second, ~0u});
 		} else if(auto spotLight = get_spot_light(name); spotLight.has_value()) {
-			posLights.push_back(spotLight.value()->second);
+			posLights.push_back({spotLight.value()->second, ~0u});
 		} else if(auto dirLight = get_dir_light(name); dirLight.has_value()) {
 			dirLights.push_back(dirLight.value()->second);
 		} else if(auto envLight = get_env_light(name); envLight.has_value()) {

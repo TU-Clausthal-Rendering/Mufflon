@@ -14,29 +14,29 @@ template < typename K > CUDA_FUNCTION __forceinline__
 u32 generic_hash(K key) {
 	// Selfmade medium quality, but very fast hash (5 ops per 32bit word in the loop)
 	// Passes the most important tests of SMHasher at sufficient quality
-	u32 x = 0xa136aaad;
+	u32 x = 0xa136aaadu;
 	const u32* pkey = reinterpret_cast<u32*>(&key);
 	for(int i = 0; i < sizeof(K) / 4; ++i, ++pkey) {
-		x ^= *pkey * 0x11;
-		x = (x ^ (x >> 15)) * 0x469e0db1;
+		x ^= *pkey * 0x11u;
+		x = (x ^ (x >> 15)) * 0x469e0db1u;
 	}
 	// Get the last few bytes if there are some (should be removed as dead code if
 	// sizeof(K) is a multiple of 4.
 	if(sizeof(K) & 3) {
 		// Make sure to read only the front-most n-bytes (n = sizeof%4 = sizeof&3)
-		uint32_t k = *pkey & (0xffffffff >> (32 - 8 * (sizeof(K) & 3)));
+		uint32_t k = *pkey & (0xffffffffull >> (32u - 8u * (sizeof(K) & 3u)));
 		k += sizeof(K) & 3;
 		x ^= k;
-		x = (x ^ (x >> 17)) * 0x469e0db1;
+		x = (x ^ (x >> 17)) * 0x469e0db1u;
 	}
 
 	// Finalize using the best(?) known finalizer
 	// https://github.com/skeeto/hash-prospector
 	x ^= sizeof(K);		// Makes a hugh difference in some SMHasher tests.
 	x ^= x >> 16;
-	x *= 0x7feb352d;
+	x *= 0x7feb352du;
 	x ^= x >> 15;
-	x *= 0x846ca68b;
+	x *= 0x846ca68bu;
 	x ^= x >> 16;
 	return x;
 }
@@ -58,6 +58,7 @@ template < typename K, typename V >
 class HashMap<Device::CPU, K, V> {
 public:
 	HashMap(int numExpectedEntries) {
+		m_dataSize = numExpectedEntries;
 		m_data.reset(new std::pair<K,V>[numExpectedEntries]);
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
 		m_map.reset(new std::atomic_uint32_t[m_mapSize]);
@@ -69,7 +70,7 @@ public:
 		u32 hash = generic_hash(key);
 		// Insert the datum
 		u32 dataIdx = m_dataCount.fetch_add(1);
-		mAssert(dataIdx < m_data.size());
+		mAssert(dataIdx < m_dataSize);
 		m_data[dataIdx].first = key;
 		m_data[dataIdx].second = value;
 		// Try to insert until we find an empty entry
@@ -103,6 +104,7 @@ private:
 	std::unique_ptr<std::pair<K,V>[]> m_data;
 	std::unique_ptr<std::atomic_uint32_t[]> m_map;
 	u32 m_mapSize;
+	u32 m_dataSize;
 	std::atomic_uint32_t m_dataCount;
 };
 

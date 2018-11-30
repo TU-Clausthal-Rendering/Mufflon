@@ -7,6 +7,7 @@
 #include "core/math/rng.hpp"
 #include "core/math/sampling.hpp"
 #include "core/scene/types.hpp"
+#include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/interface.hpp"
 #include <cuda_fp16.h>
@@ -227,8 +228,11 @@ CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 
 #ifndef __CUDACC__
 // Kind of code duplication, but for type-safety use this when constructing a light tree
-using PositionalLights = std::variant<PointLight, SpotLight, AreaLightTriangle<Device::CPU>,
-	AreaLightQuad<Device::CPU>, AreaLightSphere<Device::CPU>>;
+struct PositionalLights {
+	std::variant<PointLight, SpotLight, AreaLightTriangle<Device::CPU>,
+	AreaLightQuad<Device::CPU>, AreaLightSphere<Device::CPU>> light;
+	PrimitiveHandle primitive { ~0u };
+};
 using Light = std::variant<PointLight, SpotLight, AreaLightTriangle<Device::CPU>,
 	AreaLightQuad<Device::CPU>, AreaLightSphere<Device::CPU>, DirectionalLight, EnvMapLight<Device::CPU>>;
 
@@ -288,7 +292,7 @@ inline LightType get_light_type(const LT& light) {
 
 	(void)light;
 	if constexpr(std::is_same_v<LT, PositionalLights>)
-		return std::visit(posLightType, light);
+		return std::visit(posLightType, light.light);
 	else if constexpr(is_positional_light_type<LT>())
 		return posLightType(light);
 	else if constexpr(is_envmap_light_type<LT>())
@@ -302,7 +306,7 @@ inline LightType get_light_type(const LT& light) {
 inline ei::Vec3 get_flux(const PositionalLights& light) {
 	return std::visit([](const auto& posLight) {
 		return get_flux(posLight);
-	}, light);
+	}, light.light);
 }
 
 template < class LT >
@@ -311,7 +315,7 @@ inline ei::Vec3 get_flux(const LT& light, const ei::Vec3& aabbDiag) {
 	if constexpr(std::is_same_v<LT, PositionalLights>)
 		return std::visit([](const auto& posLight) {
 		return get_flux(posLight);
-	}, light);
+	}, light.light);
 	else if constexpr(is_envmap_light_type<LT>())
 		return light.flux;
 	else if constexpr(std::is_same_v<LT, DirectionalLight>)
