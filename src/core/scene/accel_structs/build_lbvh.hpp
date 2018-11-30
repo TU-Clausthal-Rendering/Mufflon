@@ -4,9 +4,8 @@
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
-ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
-	ei::Vec3* quadVertices,
-	ei::Vec4* sphVertices,
+ei::Vec4* build_lbvh64(ei::Vec3* meshVertices,
+	ei::Vec4* spheres,
 	i32* triIndices,
 	i32* quadIndices,
 	ei::Vec3 lo, ei::Vec3 hi, ei::Vec4 traverseCosts,

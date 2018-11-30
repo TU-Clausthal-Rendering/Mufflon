@@ -37,11 +37,9 @@ namespace accel_struct {
 __global__
 void intersection_testD(const ei::Ray ray, const i32 startPrimId, 
 	const ei::Vec4* __restrict__ bvh,
-	const ei::Vec3* __restrict__ triVertices,
-	const ei::Vec3* __restrict__ quadVertices,
-	const ei::Vec4* __restrict__ sphVertices,
-	const ei::Vec2* __restrict__ triUVs,
-	const ei::Vec2* __restrict__ quadUVs,
+	const ei::Vec3* __restrict__ meshVertices,
+	const ei::Vec4* __restrict__ spheres,
+	const ei::Vec2* __restrict__ meshUVs,
 	const i32* __restrict__ triIndices,
 	const i32* __restrict__ quadIndices,
 	const i32* __restrict__ primIds,
@@ -166,9 +164,9 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 				if (primId == startPrimId)
 					continue;
 				const i32 triId = primId * 3;
-				const ei::Triangle tri = { triVertices[triIndices[triId]],
-							triVertices[triIndices[triId + 1]],
-							triVertices[triIndices[triId + 2]] };
+				const ei::Triangle tri = { meshVertices[triIndices[triId]],
+							meshVertices[triIndices[triId + 1]],
+							meshVertices[triIndices[triId + 2]] };
 
 				float t;
 				ei::Vec3 barycentric;
@@ -190,10 +188,10 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 				if (primId == startPrimId)
 					continue;
 				const i32 quadId = (primId - offsetQuads) * 4;
-				const ei::Vec3 v[4] = { quadVertices[quadIndices[quadId]],
-							quadVertices[quadIndices[quadId + 1]],
-							quadVertices[quadIndices[quadId + 2]],
-							quadVertices[quadIndices[quadId + 3]] };
+				const ei::Vec3 v[4] = { meshVertices[quadIndices[quadId]],
+							meshVertices[quadIndices[quadId + 1]],
+							meshVertices[quadIndices[quadId + 2]],
+							meshVertices[quadIndices[quadId + 3]] };
 				const ei::Triangle tri0 = { v[0], v[1], v[2] };
 				float t;
 				ei::Vec3 barycentric;
@@ -226,7 +224,7 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 				if (primId == startPrimId)
 					continue;
 				const i32 sphId = primId - offsetSpheres;
-				const ei::Vec4 v = sphVertices[sphId];
+				const ei::Vec4 v = spheres[sphId];
 				const ei::Sphere sph = { ei::Vec3(v), v.w };
 				float t;
 				if (ei::intersects(ray, sph, t)) {
@@ -252,33 +250,27 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 		ei::Vec2 uv;
 
 		if (hitPrimId < offsetSpheres) {
-			const ei::Vec3* vertices;
-			const ei::Vec2* uvs;
 			const i32* indices;
 			i32 triId;
 			if (hitPrimId < offsetQuads) {
 				// Triangle.
 				triId = hitPrimId * 3;
 				indices = triIndices;
-				vertices = triVertices;
-				uvs = triUVs;
 			}
 			else {
 				// Quad.
 				triId = (hitPrimId - offsetQuads) * 4 + hitSecondTri;
 				indices = quadIndices;
-				vertices = quadVertices;
-				uvs = quadUVs;
 			}
 			ei::IVec3 ids = { indices[triId],
 			ids.y = indices[triId + 1],
 			ids.z = indices[triId + 2] };
 
-			ei::Vec3 v[3] = { vertices[ids.x], vertices[ids.y], vertices[ids.z] };
+			ei::Vec3 v[3] = { meshVertices[ids.x], meshVertices[ids.y], meshVertices[ids.z] };
 			tangent = ei::normalize(v[1] - v[0]);
 			normal = ei::cross(ei::normalize(v[0] - v[2]), tangent);
 
-			ei::Vec2 uvV[3] = { uvs[ids.x], uvs[ids.y], uvs[ids.z] };
+			ei::Vec2 uvV[3] = { meshUVs[ids.x], meshUVs[ids.y], meshUVs[ids.z] };
 			uv = uvV[0] * hitBarycentric.x + uvV[1] * hitBarycentric.y + 
 				uvV[2] * hitBarycentric.z;
 		}
@@ -286,7 +278,7 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 			// Sphere.
 			const i32 sphId = hitPrimId - offsetSpheres;
 			ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
-			const ei::Vec4 v = sphVertices[sphId];
+			const ei::Vec4 v = spheres[sphId];
 			normal = ei::normalize(hitPoint - ei::Vec3(v));
 
 			if (normal.x == 0.f && normal.y == 0.f) {
@@ -306,11 +298,9 @@ void intersection_testD(const ei::Ray ray, const i32 startPrimId,
 
 void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
 	const ei::Vec4* bvh,
-	const ei::Vec3* triVertices,
-	const ei::Vec3* quadVertices,
-	const ei::Vec4* sphVertices,
-	const ei::Vec2* triUVs,
-	const ei::Vec2* quadUVs,
+	const ei::Vec3* meshVertices,
+	const ei::Vec4* spheres,
+	const ei::Vec2* meshUVs,
 	const i32* triIndices,
 	const i32* quadIndices,
 	const i32* primIds,
@@ -319,8 +309,8 @@ void intersection_test_CUDA(const ei::Ray ray, const i32 startPrimId,
 	const i32 bvhSize, const i32 numPrimives,
 	const float tmin, const float tmax) {
 
-	intersection_testD << <1, 1 >> > (ray, startPrimId, bvh, triVertices, quadVertices, sphVertices,
-		triUVs, quadUVs, triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result,
+	intersection_testD << <1, 1 >> > (ray, startPrimId, bvh, meshVertices, spheres,
+		meshUVs, triIndices, quadIndices, primIds, offsetQuads, offsetSpheres, result,
 		bvhSize, numPrimives, tmin, tmax);
 
 }

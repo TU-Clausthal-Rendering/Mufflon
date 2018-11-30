@@ -43,9 +43,8 @@ ei::Vec3 normalize_position(ei::Vec3 pos, ei::Vec3 lo, ei::Vec3 hi) {
 }
 
 __global__ void calculate_morton_codes64D(
-	ei::Vec3* triVertices,
-	ei::Vec3* quadVertices,
-	ei::Vec4* sphVertices,
+	ei::Vec3* meshVertices,
+	ei::Vec4* spheres,
 	i32* triIndices,
 	i32* quadIndices,
 	u64* mortonCodes,
@@ -61,25 +60,25 @@ __global__ void calculate_morton_codes64D(
 	if (idx >= offsetSpheres) {
 		// Calculate Morton codes for spheres.
 		i32 sphId = idx - offsetSpheres;
-		ei::Vec4 sph = sphVertices[sphId];
+		ei::Vec4 sph = spheres[sphId];
 		centroid = ei::Vec3(sph);
 	}
 	else {
 		if (idx >= offsetQuads) {
 			// Calculate Morton codes for quads.
 			i32 quadId = (idx - offsetQuads) << 2;
-			ei::Vec3 v0 = quadVertices[quadIndices[quadId]];
-			ei::Vec3 v1 = quadVertices[quadIndices[quadId + 1]];
-			ei::Vec3 v2 = quadVertices[quadIndices[quadId + 2]];
-			ei::Vec3 v3 = quadVertices[quadIndices[quadId + 3]];
+			ei::Vec3 v0 = meshVertices[quadIndices[quadId]];
+			ei::Vec3 v1 = meshVertices[quadIndices[quadId + 1]];
+			ei::Vec3 v2 = meshVertices[quadIndices[quadId + 2]];
+			ei::Vec3 v3 = meshVertices[quadIndices[quadId + 3]];
 			centroid = get_quad_centroid(v0, v1, v2, v3);
 		}
 		else {
 			// Calculate Morton codes for triangles.
 			i32 triId = idx * 3;
-			ei::Vec3 v0 = triVertices[triIndices[triId]];
-			ei::Vec3 v1 = triVertices[triIndices[triId + 1]];
-			ei::Vec3 v2 = triVertices[triIndices[triId + 2]];
+			ei::Vec3 v0 = meshVertices[triIndices[triId]];
+			ei::Vec3 v1 = meshVertices[triIndices[triId + 1]];
+			ei::Vec3 v2 = meshVertices[triIndices[triId + 2]];
 			centroid = get_triangle_centroid(v0, v1, v2);
 		}
 	}
@@ -277,9 +276,8 @@ static_assert(sizeof(BBCache) == 8*sizeof(float), "Alignment of BBCache will be 
 
 __global__ void calculate_bounding_boxesD(
 	u32 numPrimitives,
-	ei::Vec3* triVertices,
-	ei::Vec3* quadVertices,
-	ei::Vec4* sphVertices,
+	ei::Vec3* meshVertices,
+	ei::Vec4* spheres,
 	i32* triIndices,
 	i32* quadIndices,
 	ei::Vec4 * __restrict__ boundingBoxes, //TODO remove __restricts?
@@ -319,7 +317,7 @@ __global__ void calculate_bounding_boxesD(
 	if (primId >= offsetSpheres) {
 		// Calculate bounding box for spheres.
 		i32 sphId = primId - offsetSpheres;
-		ei::Sphere sph = *reinterpret_cast<ei::Sphere*>(sphVertices+sphId);
+		ei::Sphere sph = *reinterpret_cast<ei::Sphere*>(spheres+sphId);
 		currentBb = ei::Box(sph);
 		primitiveCount = 1;
 		cost += ct2;
@@ -329,10 +327,10 @@ __global__ void calculate_bounding_boxesD(
 		if (primId >= offsetQuads) {
 			// Calculate bounding box for quads.
 			i32 quadId = (primId - offsetQuads) << 2;
-			ei::Vec3 v[4] = { quadVertices[quadIndices[quadId]],
-							  quadVertices[quadIndices[quadId + 1]],
-							  quadVertices[quadIndices[quadId + 2]],
-							  quadVertices[quadIndices[quadId + 3]] };
+			ei::Vec3 v[4] = { meshVertices[quadIndices[quadId]],
+							  meshVertices[quadIndices[quadId + 1]],
+							  meshVertices[quadIndices[quadId + 2]],
+							  meshVertices[quadIndices[quadId + 3]] };
 			currentBb = ei::Box(v, 4);
 			primitiveCount = 0x00000400;
 			cost += ct1;
@@ -341,9 +339,9 @@ __global__ void calculate_bounding_boxesD(
 		else {
 			// Calculate bounding box for triangles.
 			i32 triId = primId * 3;
-			ei::Vec3 v[3] = { triVertices[triIndices[triId]],
-							  triVertices[triIndices[triId + 1]],
-							  triVertices[triIndices[triId + 2]] };
+			ei::Vec3 v[3] = { meshVertices[triIndices[triId]],
+							  meshVertices[triIndices[triId + 1]],
+							  meshVertices[triIndices[triId + 2]] };
 			currentBb = ei::Box(v, 3);
 			primitiveCount = 0x00100000;
 			cost += ct0;
@@ -769,9 +767,8 @@ __global__ void copy_to_collapsed_bvhD(
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
-ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
-	ei::Vec3* quadVertices,
-	ei::Vec4* sphVertices,
+ei::Vec4* build_lbvh64(ei::Vec3* meshVertices,
+	ei::Vec4* spheres,
 	i32* triIndices,
 	i32* quadIndices,
 	ei::Vec3 lo, ei::Vec3 hi, ei::Vec4 traverseCosts,
@@ -790,8 +787,8 @@ ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
 	i32* sortIndices;
 	cudaMalloc((void**)&sortIndices, numPrimitives * sizeof(i32));
 	get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codes64D);
-	calculate_morton_codes64D <<< numBlocks, numThreads >>> (triVertices, quadVertices, 
-		sphVertices, triIndices, quadIndices, 
+	calculate_morton_codes64D <<< numBlocks, numThreads >>> (meshVertices,
+		spheres, triIndices, quadIndices, 
 		mortonCodes, sortIndices, lo, hi, 
 		offsetQuads, offsetSpheres, numPrimitives);
 
@@ -836,8 +833,8 @@ ei::Vec4* build_lbvh64(ei::Vec3* triVertices,
 		calculate_bounding_boxesD, functor);
 	calculate_bounding_boxesD <<<numBlocks, numThreads, bboxCacheSize >>> (
 		numPrimitives,
-		triVertices, quadVertices,
-		sphVertices, triIndices, quadIndices,
+		meshVertices,
+		spheres, triIndices, quadIndices,
 		boundingBoxes,
 		sortIndices,
 		parents,
