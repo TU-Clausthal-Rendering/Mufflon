@@ -186,6 +186,22 @@ albedo(const ParameterPack& params) {
 	}
 }
 
+/*
+ * Get the self emission into some direction.
+ */
+CUDA_FUNCTION Spectrum
+emission(const ParameterPack& params, const scene::Direction& excident) {
+	switch(params.type)
+	{
+		case Materials::LAMBERT: return Spectrum{0.0f};
+		default:
+#ifndef __CUDA_ARCH__
+			logWarning("[materials::emission] Trying to evaluate unimplemented material type ", params.type);
+#endif
+			return Spectrum{0.0f};
+	}
+}
+
 
 /*
  * Get the size in bytes which are consumed for the complete parameter pack

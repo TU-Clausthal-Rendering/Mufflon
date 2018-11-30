@@ -93,7 +93,7 @@ public:
 	}
 
 	template < Device dev >
-	lights::LightTree<dev> get_light_tree() {
+	const lights::LightTree<dev>& get_light_tree() {
 		return m_lightTree.aquire_tree<dev>();
 	}
 

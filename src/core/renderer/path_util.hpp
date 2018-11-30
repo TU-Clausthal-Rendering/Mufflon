@@ -289,8 +289,24 @@ public:
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
-	struct { Spectrum radiance; AreaPdf backwardPdf; } get_emission() {
-		return {};
+	Spectrum get_emission() {
+		switch(m_type) {
+			case Interaction::VOID:
+			case Interaction::LIGHT_POINT:
+			case Interaction::LIGHT_DIRECTIONAL:
+			case Interaction::LIGHT_SPOT:
+			case Interaction::CAMERA_PINHOLE:
+				return Spectrum{0.0f};
+			case Interaction::LIGHT_AREA: {
+				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
+				return m_intensity; // TODO: / area
+			}
+			case Interaction::SURFACE: {
+				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
+				return scene::materials::emission(desc->params, m_incident);
+			}
+		}
+		return Spectrum{0.0f};
 	}
 
 	/* *************************************************************************

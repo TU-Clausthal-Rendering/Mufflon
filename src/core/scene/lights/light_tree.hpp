@@ -652,6 +652,7 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 								  PrimitiveHandle primitive,
 								  const ei::Vec3& refPosition, Guide&& guide) {
 	mAssert(primitive != ~0u);
+	using namespace lighttree_detail;
 
 	float p = tree.posLights.root.flux / (tree.dirLights.root.flux + tree.posLights.root.flux + ei::sum(tree.envLight.flux));
 	u32 code = *tree.primToNodePath.find(primitive); // If crash here, you have hit an emissive surface which is not in the light tree. This is a fundamental problem and not only an access violation.
@@ -703,5 +704,22 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 	}
 	return AreaPdf{0.0f};
 }
+
+// Guide the light tree traversal based on flux only
+CUDA_FUNCTION float guide_flux(const scene::Point&, const scene::Point&, const scene::Point&,
+							   float leftFlux, float rightFlux) {
+	return leftFlux / (leftFlux + rightFlux);
+}
+
+// Guide the light tree traversal based on expected contribution
+CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
+								   const scene::Point& leftPosition,
+								   const scene::Point& rightPosition,
+								   float leftFlux, float rightFlux) {
+	leftFlux /= lensq(leftPosition - refPosition);
+	rightFlux /= lensq(rightPosition - refPosition);
+	return leftFlux / (leftFlux + rightFlux);
+}
+
 
 }}} // namespace mufflon::scene::lights

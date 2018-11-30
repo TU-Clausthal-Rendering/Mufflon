@@ -90,16 +90,15 @@ public:
 		u32 hash = generic_hash(key);
 		u32 idx = hash % m_mapSize;
 		u32 step = 0;
-		u32 expected = ~0u;
-		while(!std::atomic_compare_exchange_strong(&m_map[idx], &expected, dataIdx)) {
-			if(m_data[expected].first == key) return &m_data[expected].second;
+		u32 res;
+		while((res = std::atomic_load(&m_map[idx])) != ~0u) {
+			if(m_data[res].first == key) return &m_data[res].second;
 			++step;
 			idx = (idx + step * step) % m_mapSize;
-			expected = ~0u;
 		}
 		return nullptr;
 	}
-	const V* find(K key) const { return const_cast<HashMap*>(this)->find(); }
+	const V* find(K key) const { return const_cast<HashMap*>(this)->find(key); }
 private:
 	std::unique_ptr<std::pair<K,V>[]> m_data;
 	std::unique_ptr<std::atomic_uint32_t[]> m_map;
@@ -150,7 +149,7 @@ public:
 		u32 idx = hash % m_mapSize;
 		u32 step = 0;
 		u32 res;
-		while((res = atomicCAS(&m_map[idx], ~0u, dataIdx)) != ~0u) {
+		while((res = m_map[idx]) != ~0u) { // NO ATOMIC-LOAD ON CUDA??
 			if(m_data[res].first == key) return &m_data[res].second;
 			++step;
 			idx = (idx + step * step) % m_mapSize;
