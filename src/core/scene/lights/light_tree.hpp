@@ -6,6 +6,7 @@
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
+#include "core/memory/dyntype_memory.hpp"
 #include "core/memory/hashmap.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/types.hpp"
@@ -639,6 +640,68 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 					   rng, rng, position, bounds,
 					   rnd, guide);
 	}
+}
+
+/*
+ * Hitable light source (area lights) must provide MIS helpers which are
+ * called if a surface is hit randomly. This method computes the area pdf
+ * which would be produced by the above connect_light() samplers.
+ */
+template < class Guide >
+CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
+								  PrimitiveHandle primitive,
+								  const ei::Vec3& refPosition, Guide&& guide) {
+	mAssert(primitive != ~0u);
+
+	float p = tree.posLights.root.flux / (tree.dirLights.root.flux + tree.posLights.root.flux + ei::sum(tree.envLight.flux));
+	u32 code = *tree.primToNodePath.find(primitive); // If crash here, you have hit an emissive surface which is not in the light tree. This is a fundamental problem and not only an access violation.
+
+	// Travers through the tree to compute the complete, guide dependent pdf
+	u32 offset = 0u;
+	u16 type = tree.posLights.root.type;
+	// Iterate until we hit a leaf
+	while(type == LightSubTree::Node::INVALID_TYPE) {
+		const LightSubTree::Node* currentNode = &tree.posLights.nodes[offset];
+		// Find out the two cluster centers
+		const ei::Vec3 leftCenter = get_cluster_center(currentNode->left, tree.posLights);
+		const ei::Vec3 rightCenter = get_cluster_center(currentNode->right, tree.posLights);
+
+		float pLeft = guide(refPosition, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
+		// Go right? The code has stored the path to the primitive (beginning with the most significant bit).
+		if(code & 0x80000000) {
+			p *= (1.0f - pLeft);
+			type = currentNode->right.type;
+			offset = currentNode->right.offset;
+		} else {
+			p *= pLeft;
+			type = currentNode->left.type;
+			offset = currentNode->left.offset;
+		}
+		code <<= 1;
+	}
+
+	// Now, p is the choice probability, but we also need the surface area
+	switch(static_cast<LightType>(type)) {
+		case LightType::AREA_LIGHT_TRIANGLE: {
+			auto& a = as<AreaLightTriangle<CURRENT_DEV>>(tree.posLights.lights[offset]);
+			float area = ei::surface(ei::Triangle{a.points[0], a.points[1], a.points[2]});
+			return AreaPdf{ p / area };
+		}
+		case LightType::AREA_LIGHT_QUAD: {
+			auto& a = as<AreaLightQuad<CURRENT_DEV>>(tree.posLights.lights[offset]);
+			float area = ei::surface(ei::Triangle{a.points[0], a.points[1], a.points[2]})
+					   + ei::surface(ei::Triangle{a.points[0], a.points[2], a.points[3]});
+			return AreaPdf{ p / area };
+		}
+		case LightType::AREA_LIGHT_SPHERE: {
+			auto& a = as<AreaLightSphere<CURRENT_DEV>>(tree.posLights.lights[offset]);
+			float area = 4 * ei::PI * ei::sq(a.radius);
+			return AreaPdf{ p / area };
+		}
+		default:
+			mAssertMsg(false, "Decoded node must be some hitable area light.");
+	}
+	return AreaPdf{0.0f};
 }
 
 }}} // namespace mufflon::scene::lights
