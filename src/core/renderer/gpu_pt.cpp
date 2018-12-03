@@ -1,6 +1,7 @@
 #include "gpu_pt.hpp"
 #include "output_handler.hpp"
 #include "core/scene/scene.hpp"
+#include "core/scene/world_container.hpp"
 
 namespace mufflon::renderer {
 
@@ -14,7 +15,6 @@ GpuPathTracer::GpuPathTracer(scene::SceneHandle scene) :
 
 void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// TODO: call sample in a parallel way for each output pixel
-
 	// TODO: pass scene data to kernel!
 	this->iterate(outputBuffer.get_resolution(), std::move(m_currentScene->get_light_tree<Device::CUDA>()),
 				  std::move(outputBuffer.begin_iteration<Device::CUDA>(m_reset)));

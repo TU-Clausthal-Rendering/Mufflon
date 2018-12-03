@@ -121,10 +121,10 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		if(grayscale)
 			texData->format = TextureFormat::FORMAT_R32F;
 		else
-			texData->format = TextureFormat::FORMAT_RGB32F;
+			texData->format = TextureFormat::FORMAT_RGBA32F;
 		texData->width = static_cast<std::uint32_t>(width);
 		texData->height = static_cast<std::uint32_t>(height);
-		texData->components = grayscale ? 1u : 3u;
+		texData->components = grayscale ? 1u : 4u;
 		texData->layers = 1u;
 		texData->sRgb = 0u;
 		float* data = new float[texData->width * texData->height * texData->components];
@@ -149,9 +149,10 @@ Boolean load_texture(const char* path, TextureData* texData) {
 						g = swap_bytes(g);
 						b = swap_bytes(b);
 					}
-					data[3u * (y * texData->width + x) + 0u] = r;
-					data[3u * (y * texData->width + x) + 1u] = g;
-					data[3u * (y * texData->width + x) + 2u] = b;
+					data[4u * (y * texData->width + x) + 0u] = r;
+					data[4u * (y * texData->width + x) + 1u] = g;
+					data[4u * (y * texData->width + x) + 2u] = b;
+					data[4u * (y * texData->width + x) + 3u] = 0u;
 				}
 			}
 		}

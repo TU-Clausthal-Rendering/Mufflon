@@ -28,10 +28,9 @@ void(*s_logCallback)(const char*, int);
 
 TextureFormat get_int_format(int components) {
 	switch(components) {
-		case 1: return TextureFormat::FORMAT_R32F;
-		case 2: return TextureFormat::FORMAT_RG32F;
-		case 3: return TextureFormat::FORMAT_RGB32F;
-		case 4: return TextureFormat::FORMAT_RGBA32F;
+		case 1: return TextureFormat::FORMAT_R8U;
+		case 2: return TextureFormat::FORMAT_RG8U;
+		case 4: return TextureFormat::FORMAT_RGBA8U;
 		default: return TextureFormat::FORMAT_NUM;
 	}
 }
@@ -40,7 +39,6 @@ TextureFormat get_float_format(int components) {
 	switch(components) {
 		case 1: return TextureFormat::FORMAT_R32F;
 		case 2: return TextureFormat::FORMAT_RG32F;
-		case 3: return TextureFormat::FORMAT_RGB32F;
 		case 4: return TextureFormat::FORMAT_RGBA32F;
 		default: return TextureFormat::FORMAT_NUM;
 	}
@@ -86,10 +84,12 @@ Boolean load_texture(const char* path, TextureData* texData) {
 	if(stbi_is_hdr(path)) {
 		data = reinterpret_cast<char*>(stbi_loadf(path, &width, &height, &components, 0));
 		bytes = sizeof(float);
+		texData->format = get_float_format(components);
 		texData->sRgb = 0u;
 	} else {
 		data = reinterpret_cast<char*>(stbi_load(path, &width, &height, &components, 0));
 		bytes = sizeof(char);
+		texData->format = get_int_format(components);
 		texData->sRgb = 1u;
 	}
 
@@ -98,8 +98,8 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		return false;
 	}
 
+
 	// Copy over the image data
-	texData->format = get_float_format(components);
 	bytes *= width * height * components;
 	texData->data = new uint8_t[bytes];
 	std::memcpy(texData->data, data, bytes);

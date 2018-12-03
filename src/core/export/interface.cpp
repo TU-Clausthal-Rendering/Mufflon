@@ -1401,7 +1401,6 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 				 filePath.string(), "'");
 		return nullptr;
 	}
-
 	// The texture will take ownership of the pointer
 	hdl = WorldContainer::instance().add_texture(path, texData.width, texData.height,
 												 texData.layers, static_cast<textures::Format>(texData.format),
@@ -1426,7 +1425,6 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	switch(num) {
 		case 1: format = textures::Format::R32F; break;
 		case 2: format = textures::Format::RG32F; break;
-		case 3: format = textures::Format::RGB32F; break;
 		case 4: format = textures::Format::RGBA32F; break;
 	}
 
@@ -2116,9 +2114,11 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
 		if (count > 0) {
-			logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
-				"devices; initializing device 0");
 			cuda::check_error(cudaSetDevice(0u));
+			cudaDeviceProp deviceProp;
+			cuda::check_error(cudaGetDeviceProperties(&deviceProp, 0u));
+			logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
+				"devices; initializing device 0 (", deviceProp.name, ")");
 		}
 
 		initialized = true;

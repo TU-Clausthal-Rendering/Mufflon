@@ -3,6 +3,7 @@
 #include "util/log.hpp"
 #include "core/cuda/error.hpp"
 #include "core/memory/synchronize.hpp"
+#include <algorithm>
 #include <vector>
 
 namespace mufflon::scene::textures {
@@ -11,7 +12,7 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format,
 				 SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data) :
 	m_width(width),
 	m_height(height),
-	m_numLayers(numLayers),
+	m_numLayers(std::max<u16>(1u, numLayers)),
 	m_format(format),
 	m_mode(mode),
 	m_sRgb(sRgb),
@@ -48,18 +49,21 @@ void Texture::synchronize() {
 			}
 		}
 		// Copy the memory (wherever it changed)
-		// TODO: this needs to be memcpyarray?
 		if((dev == Device::CUDA) && m_dirty.has_changes(Device::CPU)) {
-			cuda::check_error(cudaMemcpyToArray(m_cudaTexture, 0u, 0u, m_cpuTexture->data(),
-												m_width * m_height * PIXEL_SIZE(m_format),
-												cudaMemcpyHostToDevice));
-			//copy<dev, Device::CPU>(m_cudaTexture, m_cpuTexture->data(), m_width * m_height * PIXEL_SIZE(m_format));
+			cudaMemcpy3DParms copyParams{ 0u };
+			copyParams.srcPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
+			copyParams.dstArray = m_cudaTexture;
+			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
+			copyParams.kind = cudaMemcpyHostToDevice;
+			cuda::check_error(cudaMemcpy3D(&copyParams));
 		}
 		if((dev == Device::CPU) && m_dirty.has_changes(Device::CUDA)) {
-			cuda::check_error(cudaMemcpyFromArray(m_cpuTexture->data(), m_cudaTexture, 0u, 0u,
-												  m_width * m_height * PIXEL_SIZE(m_format),
-												  cudaMemcpyDeviceToHost));
-			//copy<dev, Device::CUDA>(m_cpuTexture->data(), m_cudaTexture, m_width * m_height * PIXEL_SIZE(m_format));
+			cudaMemcpy3DParms copyParams{ 0u };
+			copyParams.dstPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
+			copyParams.srcArray = m_cudaTexture;
+			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
+			copyParams.kind = cudaMemcpyDeviceToHost;
+			cuda::check_error(cudaMemcpy3D(&copyParams));
 		}
 	} else {
 		// Alternative: might be that we weren't allocated yet
@@ -172,17 +176,17 @@ void Texture::create_texture_cuda() {
 	switch(m_format) {
 		case Format::R8U: channelDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned); break;
 		case Format::RG8U: channelDesc = cudaCreateChannelDesc(8, 8, 0, 0, cudaChannelFormatKindUnsigned); break;
-		case Format::RGB8U: channelDesc = cudaCreateChannelDesc(8, 8, 8, 0, cudaChannelFormatKindUnsigned); break;
 		case Format::RGBA8U: channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned); break;
 		case Format::R16U: channelDesc = cudaCreateChannelDesc(16, 0, 0, 0, cudaChannelFormatKindUnsigned); break;
 		case Format::RG16U: channelDesc = cudaCreateChannelDesc(16, 16, 0, 0, cudaChannelFormatKindUnsigned); break;
-		case Format::RGB16U: channelDesc = cudaCreateChannelDesc(16, 16, 16, 0, cudaChannelFormatKindUnsigned); break;
 		case Format::RGBA16U: channelDesc = cudaCreateChannelDesc(16, 16, 16, 16, cudaChannelFormatKindUnsigned); break;
+			// TODO: needs driver API
+		case Format::R16F: channelDesc = cudaCreateChannelDesc(16, 0, 0, 0, cudaChannelFormatKindFloat); break;
+		case Format::RG16F: channelDesc = cudaCreateChannelDesc(16, 16, 0, 0, cudaChannelFormatKindFloat); break;
+		case Format::RGBA16F: channelDesc = cudaCreateChannelDesc(16, 16, 16, 16, cudaChannelFormatKindFloat); break;
 		case Format::R32F: channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat); break;
 		case Format::RG32F: channelDesc = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat); break;
-		case Format::RGB32F: channelDesc = cudaCreateChannelDesc(32, 32, 32, 0, cudaChannelFormatKindFloat); break;
 		case Format::RGBA32F: channelDesc = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat); break;
-		case Format::RGB9E5: channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned); break;
 		default:
 			mAssertMsg(false, "Format not implemented.");
 	}
@@ -191,16 +195,14 @@ void Texture::create_texture_cuda() {
 	// Allocate the CUDA texture array
 	cuda::check_error(cudaMalloc3DArray(&m_cudaTexture, &channelDesc,
 										make_cudaExtent(m_width, m_height, m_numLayers),
-										(NUM_CHANNELS(m_format) != 3) ? cudaArraySurfaceLoadStore : cudaArrayDefault
-										| cudaArrayLayered));
+										cudaArrayLayered | cudaArraySurfaceLoadStore));
 
 	// Specify the texture view on the memory
-	cudaResourceDesc resDesc;
+	cudaResourceDesc resDesc{};
 	resDesc.resType = cudaResourceTypeArray;
 	resDesc.res.array.array = m_cudaTexture;
-	cudaTextureDesc texDesc;
+	cudaTextureDesc texDesc{};
 	texDesc.addressMode[0] = texDesc.addressMode[1] = texDesc.addressMode[2] = cudaAddressModeWrap;
-	texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
 	texDesc.sRGB = m_sRgb;
 	texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] = texDesc.borderColor[3] = 0.0f;
 	texDesc.normalizedCoords = true;
@@ -211,11 +213,20 @@ void Texture::create_texture_cuda() {
 	texDesc.maxMipmapLevelClamp = 0;
 	// The texture read mode depends on the type and size of texels
 	// Normalization is only possible for 8- and 16-bit non-floats
-	if(channelDesc.f == cudaChannelFormatKindFloat || channelDesc.x > 16
-	   || channelDesc.y > 16 || channelDesc.z > 16 || channelDesc.w > 16)
+	if(channelDesc.f == cudaChannelFormatKindFloat) {
 		texDesc.readMode = cudaReadModeElementType;
-	else
-		texDesc.readMode = cudaReadModeNormalizedFloat;
+		texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
+	} else {
+		if(channelDesc.x <= 16 && channelDesc.y <= 16 && channelDesc.z < 16 && channelDesc.w <= 16) {
+			texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
+			texDesc.readMode = cudaReadModeNormalizedFloat;
+		} else {
+			if(m_mode == SamplingMode::LINEAR)
+				logWarning("[Texture::create_texture_cuda] Textures with integer-components > 16 do not support linear filtering");
+			texDesc.filterMode = cudaFilterModePoint;
+			texDesc.readMode = cudaReadModeElementType;
+		}
+	}
 
 	// Fill the handle (texture)
 	auto& texHdl = m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>();
@@ -226,7 +237,7 @@ void Texture::create_texture_cuda() {
 	texHdl.format = m_format;
 
 	// Fill the handle (surface)
-	if(NUM_CHANNELS(m_format) != 3) // Allow read-only RGB formats without causing errors here
+	if(m_format == Format::RGBA32F) // Allow read-only RGB formats without causing errors here
 	{
 		auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
 		cuda::check_error(cudaCreateSurfaceObject(&surfHdl.handle, &resDesc));

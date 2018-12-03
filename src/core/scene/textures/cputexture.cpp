@@ -14,7 +14,6 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 	m_format(format),
 	m_size(width, height, numLayers)
 {
-
 	// Choose an optimized sampling routine
 	if(width * height * numLayers == 1)
 		m_sample = mode == SamplingMode::NEAREST ? &CpuTexture::sample111_nearest : &CpuTexture::sample111_linear;
@@ -27,28 +26,20 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 			m_write = sRgb ? &CpuTexture::write_sR8U : &CpuTexture::write_R8U; break;
 		case Format::RG8U: m_fetch = sRgb ? &CpuTexture::fetch_sRG8U : &CpuTexture::fetch_RG8U;
 			m_write = sRgb ? &CpuTexture::write_sRG8U : &CpuTexture::write_RG8U; break;
-		case Format::RGB8U: m_fetch = sRgb ? &CpuTexture::fetch_sRGB8U : &CpuTexture::fetch_RGB8U;
-			m_write = sRgb ? &CpuTexture::write_sRGB8U : &CpuTexture::write_RGB8U; break;
 		case Format::RGBA8U: m_fetch = sRgb ? &CpuTexture::fetch_sRGBA8U : &CpuTexture::fetch_RGBA8U;
 			m_write = sRgb ? &CpuTexture::write_sRGBA8U : &CpuTexture::write_RGBA8U; break;
 		case Format::R16U: m_fetch = &CpuTexture::fetch_R16U;
 			m_write = &CpuTexture::write_R16U; break;
 		case Format::RG16U: m_fetch = &CpuTexture::fetch_RG16U;
 			m_write = &CpuTexture::write_RG16U; break;
-		case Format::RGB16U: m_fetch = &CpuTexture::fetch_RGB16U;
-			m_write = &CpuTexture::write_RGB16U; break;
 		case Format::RGBA16U: m_fetch = &CpuTexture::fetch_RGBA16U;
 			m_write = &CpuTexture::write_RGBA16U; break;
 		case Format::R32F: m_fetch = &CpuTexture::fetch_R32F;
 			m_write = &CpuTexture::write_R32F; break;
 		case Format::RG32F: m_fetch = &CpuTexture::fetch_RG32F;
 			m_write = &CpuTexture::write_RG32F; break;
-		case Format::RGB32F: m_fetch = &CpuTexture::fetch_RGB32F;
-			m_write = &CpuTexture::write_RGB32F; break;
 		case Format::RGBA32F: m_fetch = &CpuTexture::fetch_RGBA32F;
 			m_write = &CpuTexture::write_RGBA32F; break;
-		case Format::RGB9E5: m_fetch = &CpuTexture::fetch_RGB9E5;
-			m_write = &CpuTexture::write_RGB9E5; break;
 	};
 }
 

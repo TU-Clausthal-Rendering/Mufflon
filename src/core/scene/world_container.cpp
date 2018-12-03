@@ -202,7 +202,6 @@ WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path
 											  u16 height, u16 numLayers,
 											  textures::Format format, textures::SamplingMode mode,
 											  bool sRgb, std::unique_ptr<u8[]> data) {
-	mAssert(data != nullptr);
 	// TODO: ensure that we have at least 1x1 pixels?
 	return m_textures.emplace(path, textures::Texture{ width, height, numLayers,
 							  format, mode, sRgb, move(data) }).first;

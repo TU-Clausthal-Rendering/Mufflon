@@ -19,6 +19,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\2dtypes.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\3dtypes.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\configure.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\conversions.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\defaultconfig.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\elementarytypes.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\deps\gli\gli\clear.hpp" />
     <ClInclude Include="..\..\deps\gli\gli\comparison.hpp" />
     <ClInclude Include="..\..\deps\gli\gli\convert.hpp" />
@@ -165,6 +176,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.0.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -195,7 +207,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps/gli;$(SolutionDir)deps/gli/external;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps;$(SolutionDir)deps/epsilon/include;$(SolutionDir)deps/gli;$(SolutionDir)deps/gli/external;$(CudaToolkitIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_WINDLL;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -230,7 +242,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps/gli;$(SolutionDir)deps/gli/external;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps;$(SolutionDir)deps/epsilon/include;$(SolutionDir)deps/gli;$(SolutionDir)deps/gli/external;$(CudaToolkitIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_WINDLL;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -241,5 +253,6 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.0.targets" />
   </ImportGroup>
 </Project>

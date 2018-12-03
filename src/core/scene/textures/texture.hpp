@@ -27,18 +27,16 @@ namespace mufflon { namespace scene { namespace textures {
 enum class Format : u16 {
 	R8U,
 	RG8U,
-	RGB8U,
 	RGBA8U,
 	R16U,
 	RG16U,
-	RGB16U,
 	RGBA16U,
+	R16F,
+	RG16F,
+	RGBA16F,
 	R32F,
 	RG32F,
-	RGB32F,
 	RGBA32F,
-	RGB9E5,		// Special shared exponent format (9-bit mantissa per channel, 5-bit exponent).
-	// TODO: 16F
 
 	NUM
 };
@@ -122,22 +120,22 @@ using ConstTextureDevHandle_t = typename TextureDevHandle<dev>::ConstHandleType;
 
 inline constexpr size_t PIXEL_SIZE(Format format) {
 	constexpr u8 PIXEL_SIZES[int(Format::NUM)] = {
-		1, 2, 3, 4, // ...8U formats
-		2, 4, 6, 8, // ...16U formats
-		//4, 8, 12, 16, // ...32U formats
-		4, 8, 12, 16, // ...32F formats
-		4			// RGB9E5
+		1, 2, 4, // ...8U formats
+		2, 4, 8, // ...16U formats
+		2, 4, 8, // ...16F formats
+		//4, 8, 16, // ...32U formats
+		4, 8, 16 // ...32F formats
 	};
 	return PIXEL_SIZES[int(format)];
 }
 
 inline constexpr int NUM_CHANNELS(Format format) {
 	constexpr u8 NUM_CHANNELS[int(Format::NUM)] = {
-		1, 2, 3, 4, // ...8U formats
-		1, 2, 3, 4, // ...16U formats
-		//1, 2, 3, 4, // ...32U formats
-		1, 2, 3, 4, // ...32F formats
-		1			// RGB9E5
+		1, 2, 4, // ...8U formats
+		1, 2, 4, // ...16U formats
+		1, 2, 4, // ...16F formats
+		//1, 2, 4, // ...32U formats
+		1, 2, 4 // ...32F formats
 	};
 	return NUM_CHANNELS[int(format)];
 }
@@ -145,10 +143,10 @@ inline constexpr int NUM_CHANNELS(Format format) {
 #ifndef __CUDACC__
 inline constexpr std::string_view FORMAT_NAME(Format format) {
 	constexpr std::string_view NAMES[static_cast<std::underlying_type_t<Format>>(Format::NUM)] = {
-		"FORMAT_R8U", "FORMAT_RG8U", "FORMAT_RGB8U", "FORMAT_RGBA8U",
-		"FORMAT_R16U", "FORMAT_RG16U", "FORMAT_RGB16U", "FORMAT_RGBA16U",
-		"FORMAT_R32F", "FORMAT_RG32F", "FORMAT_RGB32F", "FORMAT_RGBA32F",
-		"FORMAT_RGB9E5"
+		"FORMAT_R8U", "FORMAT_RG8U", "FORMAT_RGBA8U",
+		"FORMAT_R16U", "FORMAT_RG16U", "FORMAT_RGBA16U",
+		"FORMAT_R16F", "FORMAT_RG16F", "FORMAT_RGBA16F",
+		"FORMAT_R32F", "FORMAT_RG32F", "FORMAT_RGBA32F",
 	};
 	return NAMES[static_cast<std::underlying_type_t<Format>>(format)];
 }
@@ -229,7 +227,7 @@ private:
 	// Handles and resources
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<CpuTexture> m_cpuTexture;
-	cudaArray* m_cudaTexture;
+	cudaArray_t m_cudaTexture;
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
 

@@ -607,6 +607,13 @@ void JsonLoader::load_file() {
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
 		load_scenarios(binLoader.get_material_names());
+		// Load the default scenario
+		m_state.current = ParserState::Level::ROOT;
+		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
+		if(defScenHdl == nullptr)
+			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + '\'');
+		if(!world_load_scenario(defScenHdl))
+			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + '\'');
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
 	}

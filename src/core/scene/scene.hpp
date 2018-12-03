@@ -45,7 +45,7 @@ public:
 			// TODO
 		}
 		// TODO: materials etc.
-		m_media.synchronize<Device::CPU, dev>();
+		m_media.synchronize<dev, Device::CPU>();
 	}
 
 	template < Device dev >

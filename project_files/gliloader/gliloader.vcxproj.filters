@@ -23,6 +23,9 @@
     <Filter Include="Source Files\plugin">
       <UniqueIdentifier>{9508c161-a1e2-4445-b282-bfd9253adf5b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\deps\epsilon">
+      <UniqueIdentifier>{77aaffdd-3774-4b50-bb64-616a2da22d69}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\gli\gli\clear.hpp">
@@ -195,6 +198,39 @@
     </ClInclude>
     <ClInclude Include="..\..\src\plugin\texture_interface.h">
       <Filter>Source Files\plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\2dtypes.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\3dtypes.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\configure.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\conversions.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\defaultconfig.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\elementarytypes.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp">
+      <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

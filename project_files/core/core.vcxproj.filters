@@ -190,9 +190,6 @@
     <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\plugin\plugin.cpp">
       <Filter>Source Files\plugin</Filter>
     </ClCompile>
@@ -207,6 +204,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\profiler\profiling.cpp">
       <Filter>Source Files\profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
