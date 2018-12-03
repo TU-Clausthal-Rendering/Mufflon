@@ -342,9 +342,13 @@ void test_scene_loader() {
 	mAssert(p3 != nullptr);
 }*/
 
+void log(const char* msg, int severity) {
+	std::cout << msg << std::endl;
+}
+
 int main() {
-	mufflon_initialize(nullptr);
-	loader_set_logger(nullptr);
+	mufflon_initialize(log);
+	loader_set_logger(log);
 	loader_profiling_enable();
 	loader_profiling_set_level(ProfilingLevel::PROFILING_ALL);
 	/*test_polygon();

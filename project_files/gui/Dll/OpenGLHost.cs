@@ -76,7 +76,6 @@ namespace gui.Dll
             try
             {
                 InitializeOpenGl();
-
                 Core.RendererType rendererType = Core.RendererType.CPU_PT;
                 IntPtr light = Core.world_add_point_light("testPointLight", new Core.Vec3(0, 0, 0),
                    new Core.Vec3(1, 1, 1));
@@ -99,7 +98,7 @@ namespace gui.Dll
                     throw new Exception(Core.GetDllError());
                 if(!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
                     throw new Exception(Core.GetDllError());
-                if(!Core.render_enable_renderer(Core.RendererType.CPU_PT))
+                if(!Core.render_enable_renderer(rendererType))
                     throw new Exception(Core.GetDllError());
 
                 while (m_isRunning)
