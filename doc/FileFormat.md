@@ -375,17 +375,15 @@ For compression/decompression the following codes is used:
             u = (1 - abs(dir.y) / l1norm) * (dir.x >= 0 ? 1 : -1)
             v = (1 - abs(dir.x) / l1norm) * (dir.y >= 0 ? 1 : -1)
         end
-        u = floor((u / 2 + 0.5) * 65535.49 + 0.5)   # from [-1,1] to [0,2^16-1]
-        v = floor((v / 2 + 0.5) * 65535.49 + 0.5)   # from [-1,1] to [0,2^16-1]
+        u = (uint16)floor(u * 32767.0 + 0.5)   # from [-1,1] to [-2^15-1,2^15-1]
+        v = (uint16)floor(v * 32767.0 + 0.5)   # from [-1,1] to [-2^15-1,2^15-1]
         return u | (v << 16)
     end
 
     # map a 32 bit uint back to a normal vector
     unpackNormal32(u32 uv) -> (vec3 dir)
-        u = (uv & 0xff) / float(2^16-1)
-        v = (uv >> 16) / float(2^16-1)
-        u = u * 2 - 1
-        v = v * 2 - 1
+        u = (int16)(uv & 0xffff) / float(2^15-1)
+        v = (int16)(uv >> 16) / float(2^15-1)
         z = 1 - abs(u) - abs(v)
         if z >= 0:
             x = u
