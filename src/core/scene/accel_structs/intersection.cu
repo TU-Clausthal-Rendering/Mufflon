@@ -34,7 +34,6 @@ namespace mufflon {
 namespace scene {
 namespace accel_struct {
 
-//TODO tmin tmax needed?
 __global__
 void any_intersectionD(
 	const ei::Vec4* __restrict__ bvh,
@@ -167,7 +166,7 @@ void any_intersectionD(
 
 				float t;
 				if (ei::intersects(ray, tri, t)) {
-					if (t < tmax) {
+					if (t > tmin && t < tmax) {
 						*result = 1;
 						return;
 					}
@@ -190,7 +189,7 @@ void any_intersectionD(
 				const ei::Triangle tri0 = { v[0], v[1], v[2] };
 				float t;
 				if (ei::intersects(ray, tri0, t)) {
-					if (t < tmax) {
+					if (t > tmin && t < tmax) {
 						*result = 1;
 						return;
 					}
@@ -198,7 +197,7 @@ void any_intersectionD(
 
 				const ei::Triangle tri1 = { v[0], v[2], v[3] };
 				if (ei::intersects(ray, tri1, t)) {
-					if (t < tmax) {
+					if (t > tmin && t < tmax) {
 						*result = 1;
 						return;
 					}
@@ -218,7 +217,7 @@ void any_intersectionD(
 				const ei::Sphere sph = { ei::Vec3(v), v.w };
 				float t;
 				if (ei::intersects(ray, sph, t)) {
-					if (t < tmax) {
+					if (t > tmin && t < tmax) {
 						*result = 1;
 						return;
 					}
@@ -366,7 +365,7 @@ void first_intersectionD(
 				float t;
 				ei::Vec3 barycentric;
 				if (ei::intersects(ray, tri, t, barycentric)) {
-					if (t < hitT) {
+					if (t > tmin && t < hitT) {
 						hitT = t;
 						hitPrimId = primId;
 						hitBarycentric = barycentric;
@@ -391,7 +390,7 @@ void first_intersectionD(
 				float t;
 				ei::Vec3 barycentric;
 				if (ei::intersects(ray, tri0, t, barycentric)) {
-					if (t < hitT) {
+					if (t > tmin && t < hitT) {
 						hitT = t;
 						hitPrimId = primId;
 						hitBarycentric = barycentric;
@@ -401,7 +400,7 @@ void first_intersectionD(
 
 				const ei::Triangle tri1 = { v[0], v[2], v[3] };
 				if (ei::intersects(ray, tri1, t, barycentric)) {
-					if (t < hitT) {
+					if (t > tmin && t < hitT) {
 						hitT = t;
 						hitPrimId = primId;
 						hitBarycentric = barycentric;
@@ -423,7 +422,7 @@ void first_intersectionD(
 				const ei::Sphere sph = { ei::Vec3(v), v.w };
 				float t;
 				if (ei::intersects(ray, sph, t)) {
-					if (t < hitT) {
+					if (t > tmin && t < hitT) {
 						hitT = t;
 						hitPrimId = primId;
 					}
