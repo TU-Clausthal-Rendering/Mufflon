@@ -20,8 +20,8 @@ The names must match the names stored in the binary itself.
     {
         "version": "1.0",
         "binary": "<file name relative to this json>",
-		"defaultScenario": "<name of a scenario>"  // OPTIONAL the scenario to load on startup.
-		                                           // If none is given, the chosen scenario is unspecified
+        "defaultScenario": "<name of a scenario>"  // OPTIONAL the scenario to load on startup.
+                                                   // If none is given, the chosen scenario is unspecified
         "cameras": {
             "<name1>": {
                 "type": "{pinhole, focus, ortho}",
@@ -60,19 +60,19 @@ The names must match the names stored in the binary itself.
                 "resolution": [int,int],        // Target image resolution
                 "lights": ["<name of a light>", ...]  // List of light sources
                 "lod": int,             // Global level of detail number [0,...] where 0 has the highest resolution, OPTIONAL 0
-				"materialAssignments": {
-					"[mat:name1]": "<name of a material>",
-					"[mat:name2]": "<name of a material>",
-					....                    // Each material in the binary must be mapped to one of the above materials.
-											// A material can be used by multiple binray-materials.
-				},
-				"objectProperties": {
-					"[obj:name]": {         // OPTIONAL per object properties
-						"mask",             // Do not render this object (blacklisted)
-						"lod": int,         // Use a specific LOD different/independent from global LOD
-						// More meta information
-					}
-				}
+                "materialAssignments": {
+                    "[mat:name1]": "<name of a material>",
+                    "[mat:name2]": "<name of a material>",
+                    ....                    // Each material in the binary must be mapped to one of the above materials.
+                                            // A material can be used by multiple binray-materials.
+                },
+                "objectProperties": {
+                    "[obj:name]": {         // OPTIONAL per object properties
+                        "mask",             // Do not render this object (blacklisted)
+                        "lod": int,         // Use a specific LOD different/independent from global LOD
+                        // More meta information
+                    }
+                }
             }
             ...
         }
@@ -228,8 +228,6 @@ The high level structure is
 
     <MATERIALS_HEADER>
     <OBJECTS>
-      <OBJECTS_HEADER>
-      <OBJECTS>
     <INSTANCES>
 
 The <MATERIALS_HEADER> maps integer indices to the "binary-names" which are used as a link in the JSON file:
@@ -242,18 +240,13 @@ The <MATERIALS_HEADER> maps integer indices to the "binary-names" which are used
     <STRING> = u32      // Number of bytes L in this string
                L*u8     // UTF-8 string with length L
 
-The <OBJECTS_HEADER> provides a fast way to find a single object for partial and masked loading processes.
+The <OBJECTS> provides a fast way to find a single object for partial and masked loading processes.
 Since the same pattern is used for LOD inside objects, their is a generic specification for the <JUMP_TABLE>.
 
-    <OBJECTS_HEADER> = u32 'Objs'   // Type check for this section
-                       u64          // Absolute start position of next section (<INSTANCES>)
-                       <JUMP_TABLE>
-
-    <JUMP_TABLE> = u32          // Number of entries in the table N
-                   N*u64        // Absolute start position of the object/LOD,
-                                // the index in the array is the <OBJID>/lod level (0-based)
-
-    <OBJECTS> = u32 <FLAGS>
+    <OBJECTS> = u32 'Objs'   // Type check for this section
+                u64          // Absolute start position of next section (<INSTANCES>)
+                u32 <FLAGS>
+                <JUMP_TABLE>
                 N*<OBJECT>      // List of objects with the number specified by N from the jump table
 
     <FLAGS> = DEFLATE 1                 // All <VERTEXDATA>, <SPHERES>, and index data (<TRIANGLES>, <QUADS>
@@ -261,19 +254,26 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                                         // deflate compressed. All optional compressed blocks are marked
                                         // with ' (each ' is one independent DEFLATE stream).
             | COMPRESSED_NORMALS 2      // Normals can be compressed into 32bit with a custom compression
-			
-	<DATA>' = u32						// Size in bytes of the compressed data block
-	          u32						// Size in bytes of the decompressed data block
-			  <DATA>
+
+    <JUMP_TABLE> = u32          // Number of entries in the table N
+                   N*u64        // Absolute start position of the object/LOD,
+                                // the index in the array is the <OBJID>/lod level (0-based)
+
+    <DATA>' = u32                       // Size in bytes of the compressed data block
+              u32                       // Size in bytes of the decompressed data block
+              <DATA>
 
     <OBJECT> = u32 'Obj_'       // Type check for this section
                <STRING>         // The name, used as [obj:name] in the above JSON specification
+               u32 <OFLAGS>     // Object specific flags
                u32              // Keyframe of the object if animated or 0xffffffff
                u32              // <OBJID> of the previous object in an animation sequence or 0xffffffff
                3*f32            // Bounding box min for the object (in object space)
                3*f32            // Bounding box max for the object (in object space)
                <JUMP_TABLE>     // Jump table over LODs (number = D)
                D*<LOD>          // LODs sorted after detail (0 has the highest detail)
+
+    <OFLAGS> = EMISSIVE 1       // There is at least one primitive (polygon ore sphere) with an emissive material
 
 LODs contain the real geometry. It must have sorted geometry, because attributes (like count of indices) differ per geometry.
 
@@ -290,8 +290,8 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
             <ATTRIBUTES>'       // Optional Vertex attributes
             <TRIANGLES>'
             <QUADS>'
-			(T+Q)*u16'           // Material indices (<MATID> from <MATERIALS_HEADER>, in order: first triangles, then quads)
-            <ATTRIBUTES>'        // Optional list of face attributes (in order: first triangles, then quads)
+            (T+Q)*u16'          // Material indices (<MATID> from <MATERIALS_HEADER>, in order: first triangles, then quads)
+            <ATTRIBUTES>'       // Optional list of face attributes (in order: first triangles, then quads)
             <SPHERES>'
     <VERTEXDATA> = V*3*f32      // Positions (vec3, in meter [m])
                    V*3*f32 | V*u32  // Normals (vec3, normalized)
@@ -312,28 +312,28 @@ However, there is a specification for a few predefined possible attributes (with
                    <STRING>     // Name (Custom)
                    <STRING>     // Meta information (Custom)
                    u32          // Meta information (Custom flags)
-				   u32 <TYPE>   // Type information
+                   u32 <TYPE>   // Type information
                    u64          // Size in bytes
                    <BYTES>      // Size many bytes
-	<TYPE> = i8 0
-	       | u8 1
-	       | i16 2
-	       | u16 3
-	       | i32 4
-	       | u32 5
-	       | i64 6
-	       | u64 7
-	       | f32 8
-	       | f64 9
-	       | 2*u8 10
-	       | 3*u8 11
-	       | 4*u8 12
-	       | 2*i32 13
-	       | 3*i32 14
-	       | 4*i32 15
-	       | 2*f32 16
-	       | 3*f32 17
-	       | 4*f32 18
+    <TYPE> = i8 0
+           | u8 1
+           | i16 2
+           | u16 3
+           | i32 4
+           | u32 5
+           | i64 6
+           | u64 7
+           | f32 8
+           | f64 9
+           | 2*u8 10
+           | 3*u8 11
+           | 4*u8 12
+           | 2*i32 13
+           | 3*i32 14
+           | 4*i32 15
+           | 2*f32 16
+           | 3*f32 17
+           | 4*f32 18
 
     [AdditionalUV2D] = "AdditionalUV2D"
                        "{Light, Displacement}"

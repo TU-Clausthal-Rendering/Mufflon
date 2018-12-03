@@ -7,6 +7,7 @@
 #include "util/types.hpp"
 #include "util/log.hpp"
 #include "util/range.hpp"
+#include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
 #include <climits>
 #include <cstdint>
@@ -33,6 +34,10 @@ struct ObjectData {
 	util::Range<geometry::Polygons::FaceIterator> faces;
 	geometry::Polygons::VertexAttribute<OpenMesh::Vec3f>& faceVertices;
 	geometry::Spheres::Attribute<geometry::Spheres::Sphere>& spheres;
+};
+
+struct ObjectFlags : public util::Flags<u32> {
+	static constexpr u32 EMISSIVE = 1u;
 };
 
 /**
@@ -64,6 +69,10 @@ public:
 	// underlying string must NOT be moved/changed)
 	void set_name(std::string_view name) noexcept {
 		m_name = name;
+	}
+
+	void set_flags(ObjectFlags flags) noexcept {
+		m_flags = flags;
 	}
 
 	// Resizes storage of geometry type.
@@ -173,6 +182,11 @@ public:
 		m_animationFrame = frame;
 	}
 
+	// Is there any emissive polygon in this object
+	bool is_emissive() const noexcept {
+		return m_flags.is_set(ObjectFlags::EMISSIVE);
+	}
+
 	// Checks if the acceleration structure on one of the system parts has been modified.
 	bool is_accel_dirty(Device res) const noexcept;
 
@@ -236,9 +250,10 @@ private:
 	ei::Box m_boundingBox;
 
 	bool m_accelDirty = false;
+	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; // Current level-of-detail
-	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
+	ObjectFlags m_flags;
 
 	// TODO: how to handle the LoDs?
 };

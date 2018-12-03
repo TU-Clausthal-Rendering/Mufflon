@@ -13,11 +13,12 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
-ObjectHandle WorldContainer::create_object(std::string name) {
+ObjectHandle WorldContainer::create_object(std::string name, ObjectFlags flags) {
 	auto hdl = m_objects.emplace(std::move(name), Object{});
 	if(!hdl.second)
 		return nullptr;
 	hdl.first->second.set_name(hdl.first->first);
+	hdl.first->second.set_flags(flags);
 	return &hdl.first->second;
 }
 

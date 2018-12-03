@@ -138,6 +138,11 @@ typedef enum {
 	PROFILING_ALL,
 } ProfilingLevel;
 
+typedef enum {
+	NONE = 0,
+	OBJ_EMISSIVE = 1
+} ObjectFlags;
+
 typedef struct {
 	AttributeType type;
 	uint32_t rows;
@@ -333,7 +338,7 @@ CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat4
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max);
 
 // World container interface
-CORE_API ObjectHdl CDECL world_create_object(const char* name);
+CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);

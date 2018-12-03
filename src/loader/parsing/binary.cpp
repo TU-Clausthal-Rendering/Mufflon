@@ -613,8 +613,8 @@ void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attrib
 
 void BinaryLoader::read_lod() {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_lod");
-	if(m_currObjState.flags.is_set(ObjectFlag::DEFLATE)) {
-		if(m_currObjState.flags.is_set(ObjectFlag::COMPRESSED_NORMALS))
+	if(m_currObjState.globalFlags.is_set(GlobalFlag::DEFLATE)) {
+		if(m_currObjState.globalFlags.is_set(GlobalFlag::COMPRESSED_NORMALS))
 			read_compressed_normal_compressed_vertices();
 		else
 			read_compressed_normal_uncompressed_vertices();
@@ -627,7 +627,7 @@ void BinaryLoader::read_lod() {
 		throw std::runtime_error("Compressed data is not supported yet");
 	} else {
 		// First comes vertex data
-		if(m_currObjState.flags.is_set(ObjectFlag::COMPRESSED_NORMALS))
+		if(m_currObjState.globalFlags.is_set(GlobalFlag::COMPRESSED_NORMALS))
 			read_normal_compressed_vertices();
 		else
 			read_normal_uncompressed_vertices();
@@ -649,6 +649,7 @@ void BinaryLoader::read_object(const u64 globalLod,
 							   const std::unordered_map<std::string_view, u64>& localLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_object");
 	m_currObjState.name = read<std::string>();
+	m_currObjState.flags = static_cast<ObjectFlags>( read<u32>() );
 	m_currObjState.keyframe = read<u32>();
 	m_currObjState.animObjId = read<u32>();
 	m_currObjState.aabb = read<ei::Box>();
@@ -685,7 +686,7 @@ void BinaryLoader::read_object(const u64 globalLod,
 	m_currObjState.numSphereAttribs = read<u32>();
 
 	// Create the object for direct writing
-	m_currObjState.objHdl = world_create_object(m_currObjState.name.c_str());
+	m_currObjState.objHdl = world_create_object(m_currObjState.name.c_str(), m_currObjState.flags);
 	m_objectHandles.push_back(m_currObjState.objHdl);
 	if(m_currObjState.objHdl == nullptr)
 		throw std::runtime_error("Failed to create object '" + m_currObjState.name + "', LoD "
@@ -779,6 +780,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 		if(read<u32>() != OBJECTS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid objects header magic constant");
 		const u64 instanceStart = read<u64>();
+		GlobalFlag compressionFlags = GlobalFlag{ read<u32>() };
 
 		// Parse the object jumptable
 		std::vector<u64> objJumpTable(read<u32>());
@@ -789,8 +791,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 		for(std::size_t i = 0u; i < objJumpTable.size(); ++i) {
 			// Jump to the right position in file
 			m_fileStream.seekg(objJumpTable[i], std::ifstream::beg);
-			// Read the object flags
-			m_currObjState.flags = ObjectFlag{ read<u32>() };
+			m_currObjState.globalFlags = compressionFlags;
 
 			// Read object
 			if(read<u32>() != OBJECT_MAGIC)

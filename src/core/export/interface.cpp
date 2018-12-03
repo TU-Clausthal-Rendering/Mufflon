@@ -1133,9 +1133,10 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max) {
 	return true;
 }
 
-ObjectHdl world_create_object(const char* name) {
+ObjectHdl world_create_object(const char* name, ::ObjectFlags flags) {
 	CHECK_NULLPTR(name, "object name", nullptr);
-	return static_cast<ObjectHdl>(WorldContainer::instance().create_object(name));
+	return static_cast<ObjectHdl>(WorldContainer::instance().create_object(name,
+			util::pun<scene::ObjectFlags>(flags)));
 }
 
 ObjectHdl world_get_object(const char* name) {

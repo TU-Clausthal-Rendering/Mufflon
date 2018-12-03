@@ -32,7 +32,7 @@ public:
 	WorldContainer& operator=(const WorldContainer&) = delete;
 
 	// Create a new object to be filled
-	ObjectHandle create_object(std::string name);
+	ObjectHandle create_object(std::string name, ObjectFlags flags);
 	// Finds an object by its name
 	ObjectHandle get_object(const std::string_view& name);
 	// Creates a new instance.

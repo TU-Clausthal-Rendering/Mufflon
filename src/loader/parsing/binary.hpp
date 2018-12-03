@@ -41,16 +41,21 @@ private:
 	static constexpr mufflon::u32 LOD_MAGIC = 'L' | ('O' << 8u) | ('D' << 16u) | ('_' << 24u);
 	static constexpr mufflon::u32 ATTRIBUTE_MAGIC = 'A' | ('t' << 8u) | ('t' << 16u) | ('r' << 24u);
 
-	// Per-object flags
-	struct ObjectFlag : public mufflon::util::Flags<mufflon::u32> {
+	struct GlobalFlag : public mufflon::util::Flags<mufflon::u32> {
 		static constexpr mufflon::u32 NONE = 0;
 		static constexpr mufflon::u32 DEFLATE = 1;
 		static constexpr mufflon::u32 COMPRESSED_NORMALS = 2;
 	};
+	// Per-object flags
+	/*struct ObjectFlag : public mufflon::util::Flags<mufflon::u32> {
+		static constexpr mufflon::u32 NONE = 0;
+		static constexpr mufflon::u32 EMISSIVE = 1;		// At least one emitting primitive
+	};*/
 
 	struct ObjectState {
 		std::string name;
-		ObjectFlag flags;
+		GlobalFlag globalFlags;
+		ObjectFlags flags;
 		mufflon::u64 lodLevel;
 		ei::Box aabb;
 		mufflon::u32 keyframe;

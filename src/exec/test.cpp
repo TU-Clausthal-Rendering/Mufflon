@@ -134,7 +134,7 @@ void test_polygon() {
 	std::cout << "Testing polygons" << std::endl;
 	bool success = false;
 
-	ObjectHdl obj = world_create_object("polyObj");
+	ObjectHdl obj = world_create_object("polyObj", static_cast<ObjectFlags>(0));
 	mAssert(obj != nullptr);
 	{
 		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u });
@@ -216,7 +216,7 @@ void test_sphere() {
 	std::cout << "Testing spheres" << std::endl;
 	bool success = false;
 
-	ObjectHdl obj = world_create_object("sphereObj");
+	ObjectHdl obj = world_create_object("sphereObj", static_cast<ObjectFlags>(0));
 	mAssert(obj != nullptr);
 	{
 		auto hdl0 = spheres_request_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_INT, 1u });
