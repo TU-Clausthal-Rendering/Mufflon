@@ -177,6 +177,23 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		}
 	}
 
+	// Now the nodes from the next higher (incomplete) level
+	// Take into account that up to one light has been merged already at the beginning
+	std::size_t startLight = (extraNodes % 2 == 0u) ? 0u : 1u;
+	std::size_t nodeCount = (lightOffsets.light_count() - 2u * extraNodes - startLight) / 2u;
+	// Start node for completely filled tree, but we may need an offset
+	std::size_t lightStartNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u + extraNodes;
+	for(std::size_t i = 0u; i < nodeCount; ++i) {
+		mAssert(startLight + 2u * i + 1u < lightOffsets.light_count());
+		mAssert(lightStartNode + i < get_num_internal_nodes(lightOffsets.light_count()));
+		std::size_t left = startLight + 2u * i;
+		std::size_t right = startLight + 2u * i + 1u;
+		Node& node = as<Node>(tree.memory)[lightStartNode + i];
+
+		node = Node{ tree.memory, lightOffsets[left], lightOffsets.type(left),
+			lightOffsets[right], lightOffsets.type(right), aabbDiag };
+	}
+
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
 	height -= 1u;
 	for(std::size_t level = height; level >= 1u; --level) {
