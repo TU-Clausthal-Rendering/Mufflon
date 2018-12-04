@@ -48,7 +48,7 @@ namespace gui.ViewModel
         // Initializes the 
         private void initProfilerData()
         {
-            string csv = Core.profiling_get_current_and_snapshots();
+            string csv = Core.profiling_get_total_and_snapshots();
 
             TreeViewItem top = new TreeViewItem();
             top.FontFamily = new FontFamily("Courier New");
@@ -236,8 +236,8 @@ namespace gui.ViewModel
 
             return String.Format("              |         Total  |       Average \n" +
                                  "Samples:      | {0,14} |\n" +
-                                 "Wall time:    | {1,13}ms | {2,13}ms\n" +
-                                 "GPU time:     | {3,13}ms | {4,13}ms\n",
+                                 "Wall time:    | {1,12}ms | {2,12}ms\n" +
+                                 "GPU time:     | {3,12}ms | {4,12}ms\n",
                                  samples,
                                  totalWallMilliSecond, (ulong)(totalWallMilliSecond / (float)samples),
                                  totalGpuMilliSecond, (ulong)(totalGpuMilliSecond / (float)samples));

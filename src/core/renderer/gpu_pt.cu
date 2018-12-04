@@ -80,7 +80,7 @@ void GpuPathTracer::iterate(Pixel imageDims,
 		1u
 	};
 
-	cuda::check_error(cudaPeekAtLastError());
+	cuda::check_error(cudaGetLastError());
 	sample<<<gridDims, blockDims>>>(imageDims,
 									std::move(outputBuffer), devRnds);
 	cuda::check_error(cudaGetLastError());

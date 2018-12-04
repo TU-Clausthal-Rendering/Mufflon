@@ -201,7 +201,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool profiling_save_snapshots(string path);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool profiling_save_current_and_snapshots(string path);
+        internal static extern bool profiling_save_total_and_snapshots(string path);
         [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string profiling_get_current_state();
@@ -210,7 +210,7 @@ namespace gui.Dll
         internal static extern string profiling_get_snapshots();
         [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string profiling_get_current_and_snapshots();
+        internal static extern string profiling_get_total_and_snapshots();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void profiling_reset();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

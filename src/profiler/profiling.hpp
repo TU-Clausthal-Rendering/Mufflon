@@ -41,7 +41,7 @@ public:
 	void create_snapshot_all();
 	std::ostream& save_current_state(std::ostream& stream) const;
 	std::ostream& save_snapshots(std::ostream& stream) const;
-	std::ostream& save_current_and_snapshots(std::ostream& stream) const;
+	std::ostream& save_total_and_snapshots(std::ostream& stream) const;
 
 	ProfileState* find_child(std::string_view name);
 	ProfileState* add_child(std::string_view name, std::unique_ptr<ProfileState>&& child);
@@ -51,7 +51,7 @@ protected:
 	virtual void create_sample() = 0;
 	virtual std::ostream& save_profiler_snapshots(std::ostream& stream) const = 0;
 	virtual std::ostream& save_profiler_current_state(std::ostream& stream) const = 0;
-	virtual std::ostream& save_profiler_current_and_snapshots(std::ostream& stream) const = 0;
+	virtual std::ostream& save_profiler_total_and_snapshots(std::ostream& stream) const = 0;
 
 private:
 	// Actual method called by profilescope to initiate sample creation
@@ -98,10 +98,10 @@ public:
 	void create_snapshot_all();
 	void save_current_state(std::string_view path) const;
 	void save_snapshots(std::string_view path) const;
-	void save_current_and_snapshots(std::string_view path) const;
+	void save_total_and_snapshots(std::string_view path) const;
 	std::string save_current_state() const;
 	std::string save_snapshots() const;
-	std::string save_current_and_snapshots() const;
+	std::string save_total_and_snapshots() const;
 
 	// Sets the level of profiling
 	constexpr ProfileLevel get_profile_level() const noexcept {

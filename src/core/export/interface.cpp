@@ -2069,9 +2069,9 @@ Boolean profiling_save_snapshots(const char* path) {
 	return true;
 }
 
-Boolean profiling_save_current_and_snapshots(const char* path) {
+Boolean profiling_save_total_and_snapshots(const char* path) {
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_current_and_snapshots(path);
+	Profiler::instance().save_total_and_snapshots(path);
 	return true;
 }
 
@@ -2109,8 +2109,8 @@ const char* profiling_get_snapshots() {
 	return buffer;
 }
 
-const char* profiling_get_current_and_snapshots() {
-	std::string str = Profiler::instance().save_current_and_snapshots();
+const char* profiling_get_total_and_snapshots() {
+	std::string str = Profiler::instance().save_total_and_snapshots();
 #ifdef _WIN32
 	// For C# interop
 	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
