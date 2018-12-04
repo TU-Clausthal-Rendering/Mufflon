@@ -1426,6 +1426,9 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 		case 1: format = textures::Format::R32F; break;
 		case 2: format = textures::Format::RG32F; break;
 		case 4: format = textures::Format::RGBA32F; break;
+		default:
+			logError("[", FUNCTION_NAME, "] Invalid number of channels (", num, ')');
+			return nullptr;
 	}
 
 	// Create new
@@ -2004,6 +2007,10 @@ const char* profiling_get_current_state() {
 #else // _WIN32
 	char* buffer = new char[str.size() + 1u];
 #endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
@@ -2017,6 +2024,10 @@ const char* profiling_get_snapshots() {
 #else // _WIN32
 	char* buffer = new char[str.size() + 1u];
 #endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;

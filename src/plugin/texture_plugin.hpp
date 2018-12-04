@@ -19,9 +19,9 @@ public:
 	void set_logger(void(*logCallback)(const char*, int));
 	
 private:
-	bool(*m_canLoadFunc)(const char*);
-	bool(*m_loadFunc)(const char*, TextureData* texData);
-	void(*m_setLogger)(void(*logCallback)(const char*, int));
+	bool(*m_canLoadFunc)(const char*) = nullptr;
+	bool(*m_loadFunc)(const char*, TextureData* texData) = nullptr;
+	void(*m_setLogger)(void(*logCallback)(const char*, int)) = nullptr;
 };
 
 } // namespace mufflon

@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using gui.Properties;
 
 namespace gui
 {
@@ -19,6 +20,11 @@ namespace gui
         public static CultureInfo GetCulture()
         {
             return CultureInfo;
+        }
+
+        void App_Exit(object sender, ExitEventArgs e)
+        {
+            Settings.Default.Save();
         }
     }
 }

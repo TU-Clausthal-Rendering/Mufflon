@@ -433,8 +433,8 @@ private:
 	VertexAttributeHandle<OpenMesh::Vec2f> m_uvsAttrHdl;
 	FaceAttributeHandle<MaterialIndex> m_matIndexAttrHdl;
 	ei::Box m_boundingBox;
-	std::size_t m_triangles;
-	std::size_t m_quads;
+	std::size_t m_triangles = 0u;
+	std::size_t m_quads = 0u;
 };
 
 } // namespace mufflon::scene::geometry
