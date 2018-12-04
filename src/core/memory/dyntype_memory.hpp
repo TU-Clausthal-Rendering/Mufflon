@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/assert.hpp"
+#include "export/api.hpp"
 #include <memory>
 
 namespace mufflon { // There is no memory namespace on purpose
@@ -19,16 +20,20 @@ namespace mufflon { // There is no memory namespace on purpose
  * Helper function for a systactical more convienient reinterpretation of memory.
  * The nice trick with overloading is that you don't need to bother with const/ref/pointer.
  */
-template<typename TTarget, typename T> inline TTarget& as(T& t) {
+template<typename TTarget, typename T>
+CUDA_FUNCTION TTarget& as(T& t) {
 	return reinterpret_cast<TTarget&>(t);
 }
-template<typename TTarget, typename T> inline const TTarget& as(const T& t) {
+template<typename TTarget, typename T>
+CUDA_FUNCTION const TTarget& as(const T& t) {
 	return reinterpret_cast<const TTarget&>(t);
 }
-template<typename TTarget, typename T> inline TTarget* as(T* t) {
+template<typename TTarget, typename T>
+CUDA_FUNCTION TTarget* as(T* t) {
 	return reinterpret_cast<TTarget*>(t);
 }
-template<typename TTarget, typename T> inline const TTarget* as(const T* t) {
+template<typename TTarget, typename T>
+CUDA_FUNCTION const TTarget* as(const T* t) {
 	return reinterpret_cast<const TTarget*>(t);
 }
 

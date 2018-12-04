@@ -87,9 +87,9 @@ public:
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights,
-					std::optional<TextureHandle> envLightTexture = std::nullopt) {
+					TextureHandle envLightTexture = nullptr) {
 		m_lightTree.build(std::move(posLights), std::move(dirLights),
-						  m_boundingBox, std::move(envLightTexture));
+						  m_boundingBox, envLightTexture);
 	}
 
 	template < Device dev >

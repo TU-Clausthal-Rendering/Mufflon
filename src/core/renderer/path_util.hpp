@@ -2,6 +2,7 @@
 
 #include "util/types.hpp"
 #include "core/memory/dyntype_memory.hpp"
+#include "core/math/rng.hpp"
 #include "core/math/sampling.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/materials/material_sampling.hpp"

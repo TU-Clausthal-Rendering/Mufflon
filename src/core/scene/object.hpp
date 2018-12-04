@@ -164,6 +164,7 @@ public:
 	}
 
 	// Grants direct access to the mesh data (const only).
+	// Valid types for Geom are geometry::Polygons, geometry::Spheres
 	template < class Geom >
 	const auto& get_geometry() const {
 		return m_geometryData.template get<Geom>();

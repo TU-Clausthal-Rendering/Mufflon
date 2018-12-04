@@ -208,6 +208,9 @@
     <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\lights\lights.cpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
