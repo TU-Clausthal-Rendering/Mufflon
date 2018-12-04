@@ -59,9 +59,11 @@ class HashMap<Device::CPU, K, V> {
 public:
 	HashMap(int numExpectedEntries) {
 		m_dataSize = numExpectedEntries;
-		m_data.reset(new std::pair<K,V>[numExpectedEntries]);
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_map.reset(new std::atomic_uint32_t[m_mapSize]);
+		m_memSize = numExpectedEntries * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32);
+		m_memory.reset(new char[m_memSize]);
+		m_data = as<std::pair<K,V>>(m_memory.get() + m_mapSize * sizeof(u32));
+		m_map = as<std::atomic_uint32_t>(m_memory.get());
 		m_dataCount.store(0);
 	}
 
@@ -99,28 +101,35 @@ public:
 		return nullptr;
 	}
 	const V* find(K key) const { return const_cast<HashMap*>(this)->find(key); }
+
+	// Get the number of elements in the hash map
+	u32 size() const { return m_dataCount; }
 private:
-	std::unique_ptr<std::pair<K,V>[]> m_data;
-	std::unique_ptr<std::atomic_uint32_t[]> m_map;
+	std::unique_ptr<char[]> m_memory;
+	std::pair<K,V>* m_data;
+	std::atomic_uint32_t* m_map;
 	u32 m_mapSize;
 	u32 m_dataSize;
+	u32 m_memSize;
 	std::atomic_uint32_t m_dataCount;
+
+	friend HashMap<Device::CUDA, K, V>;
 };
 
 template < typename K, typename V >
 class HashMap<Device::CUDA, K, V> {
 public:
 	HashMap(int numExpectedEntries) noexcept {
-		m_data = Allocator<Device::CUDA>::alloc_array<std::pair<K,V>>(numExpectedEntries);
-		m_mapSize = ei::nextPrime(uint32(numExpectedEntries * 1.15f));
-		m_map = Allocator<Device::CUDA>::alloc_array<u32>(m_mapSize);
+		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
+		m_memSize = numExpectedEntries * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32);
+		m_memory = Allocator<Device::CUDA>::alloc_array<char>(m_memSize);
+		m_data = as<std::pair<K,V>>(m_memory + m_mapSize * sizeof(u32));
+		m_map = as<u32>(m_memory);
 		m_dataCount = 0;
 	}
 
 	void free() noexcept {
-		//Allocator<Device::CUDA>::free(m_data, m_dataCount); // numExpectedEntries?, DOES NOT COMPILE
-		cudaFree(m_data);
-		Allocator<Device::CUDA>::free(m_map, m_mapSize);
+		Allocator<Device::CUDA>::free(m_memory, m_memSize);
 	}
 	// Creepy: CUDA requires the copy to push the data to the GPU.
 	// However, any copy should never call ~HashMap();
@@ -157,9 +166,20 @@ public:
 		return nullptr;
 	}
 	__device__ const V* find(K key) const { return const_cast<HashMap*>(this)->find(); }
+
+	// Get the number of elements in the hash map
+	__host__ __device__ u32 size() const { return m_dataCount; }
+
+	void synchornize(const HashMap<Device::CPU, K, V>& other) {
+		mAssert(m_memSize == other.m_memSize);
+		m_dataCount = other.m_dataCount;
+		cudaMemcpy(m_memory, other.m_memory.get(), m_memSize, cudaMemcpyHostToDevice);
+	}
 private:
-	ArrayDevHandle_t<Device::CUDA, std::pair<K,V>[]> m_data;
-	ArrayDevHandle_t<Device::CUDA, u32> m_map;
+	ArrayDevHandle_t<Device::CUDA, char> m_memory;
+	std::pair<K,V>* m_data;
+	u32* m_map;
+	u32 m_memSize;
 	u32 m_mapSize;
 	u32 m_dataCount;
 };

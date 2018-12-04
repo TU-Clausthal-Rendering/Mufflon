@@ -13,10 +13,7 @@
 #include "core/scene/textures/texture.hpp"
 #include "util/flag.hpp"
 #include <vector>
-
-#ifndef __CUDACC__
-#include <optional>
-#endif // __CUDACC__
+#include <unordered_map>
 
 // Forward declaration
 namespace ei {
@@ -119,10 +116,7 @@ public:
 	}
 
 	template < Device dev >
-	void synchronize() {
-		//m_envMapTexture.synchronize<dev>();
-		//mufflon::scene::synchronize<dev>(m_trees, m_flags, m_trees.get<LightTree<dev>>(), m_envMapTexture);
-	}
+	void synchronize();
 
 	template < Device dev >
 	void unload() {
@@ -138,17 +132,15 @@ public:
 	}
 
 private:
-	TextureHandle m_envMapTexture;
 	util::DirtyFlags<Device> m_flags;
 	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;
 	std::unique_ptr<LightTree<Device::CUDA>> m_treeCuda;
-};
+	// The tree is build on CPU side. For synchronization we need a possiblity to
+	// find the CUDA textures.
+	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;
 
-// Functions for synchronizing a light tree
-void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync, TextureHandle hdl);
-void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync, TextureHandle hdl);
-void unload(LightTree<Device::CPU>& tree);
-void unload(LightTree<Device::CUDA>& tree);
+	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);
+};
 
 #endif // __CUDACC__
 

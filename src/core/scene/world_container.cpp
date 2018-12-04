@@ -216,11 +216,63 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 
 	m_scenario = &scenario;
 	m_scene = std::make_unique<Scene>(scenario.get_camera());
+	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
 		if(!scenario.is_masked(&instance.get_object())) {
 			m_scene->add_instance(&instance);
-			// TODO: add area light here!
+			// Find all area lights, if the object contains some
+			if(instance.get_object().is_emissive()) {
+				u32 primIdx = 0;
+				// First search in polygons (PrimitiveHandle expects poly before sphere)
+				auto& polygons = instance.get_object().get_geometry<geometry::Polygons>();
+				const MaterialIndex* materials = *polygons.get_mat_indices().aquireConst();
+				const scene::Point* positions = as<scene::Point>(*polygons.get_points().aquireConst());
+				const scene::UvCoordinate* uvs = as<scene::UvCoordinate>(*polygons.get_uvs().aquireConst());
+				for(const auto& face : polygons.faces()) {
+					if(m_materials[materials[primIdx]]->is_emissive()) {
+						if(std::distance(face.begin(), face.end()) == 3) {
+							lights::AreaLightTriangleDesc al;
+							al.radianceTex = m_materials[materials[primIdx]]->get_emissive_texture();
+							int i = 0;
+							for(auto vHdl : face) {
+								al.points[i] = positions[vHdl.idx()];
+								al.uv[i] = uvs[vHdl.idx()];
+								++i;
+							}
+							posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
+						} else {
+							lights::AreaLightQuadDesc al;
+							al.radianceTex = m_materials[materials[primIdx]]->get_emissive_texture();
+							int i = 0;
+							for(auto vHdl : face) {
+								al.points[i] = positions[vHdl.idx()];
+								al.uv[i] = uvs[vHdl.idx()];
+								++i;
+							}
+							posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
+						}
+					}
+					++primIdx;
+				}
+
+				// Then get the sphere lights
+				auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
+				materials = *spheres.get_mat_indices().aquireConst();
+				const geometry::Spheres::Sphere* spheresData = *spheres.get_spheres().aquireConst();
+				for(std::size_t i = 0; i < spheres.get_mat_indices().get_size(); ++i) {
+					if(m_materials[materials[i]]->is_emissive()) {
+						lights::AreaLightSphereDesc al{
+							spheresData[i].m_radPos.position,
+							spheresData[i].m_radPos.radius,
+							m_materials[materials[i]]->get_emissive_texture()
+						};
+						posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
+					}
+					++primIdx;
+				}
+			}
 		}
+		++instIdx;
 	}
 
 	// Check if the resulting scene has issues with size

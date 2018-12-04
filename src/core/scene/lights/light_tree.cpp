@@ -235,7 +235,6 @@ LightSubTree::Node::Node(const char* base,
 
 
 LightTreeBuilder::LightTreeBuilder() :
-	m_envMapTexture(nullptr),
 	m_flags()
 {}
 
@@ -253,8 +252,9 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Construct the environment light
 	if(envLight) {
-		m_treeCpu->envLight = EnvMapLight<Device::CPU>{ *envLight->aquireConst<Device::CPU>(), ei::Vec3{0, 0, 0} };
 		// TODO: accumulate flux
+		m_treeCpu->envLight = EnvMapLight<Device::CPU>{ *envLight->aquireConst<Device::CPU>(), ei::Vec3{0, 0, 0} };
+		m_textureMap.emplace(m_treeCpu->envLight.texHandle, envLight);
 	}
 
 	if(posLights.size() == 0u && dirLights.size() == 0u) {
@@ -313,13 +313,15 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	{
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
 		for(const auto& light : posLights) {
-			std::visit([&mem](const auto& posLight) {
+			std::visit([&mem,this](const auto& posLight) {
 				using T = std::decay<decltype(posLight)>;
 				mem += sizeof(posLight);
 				if constexpr(std::is_same_v<T,AreaLightTriangleDesc>) {
 					auto* dst = as<AreaLightTriangle<Device::CPU>>(mem);
 					*dst = posLight;
 					dst->radianceTex = *posLight.radianceTex->aquireConst<Device::CPU>();
+					// Remember texture for synchronization
+					m_textureMap.emplace(dst->radianceTex, posLight.radianceTex);
 				}
 			}, light.light);
 		}
@@ -332,62 +334,78 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	m_flags.mark_changed(Device::CPU);
 }
 
-void synchronize(const LightTree<Device::CPU>& changed, LightTree<Device::CUDA>& sync,
-				 std::optional<TextureHandle> hdl) {
-	if(changed.length == 0u) {
-		// Remove all data since there are no lights
-		mAssert(changed.memory == nullptr);
-		sync.memory = Allocator<Device::CUDA>::free(sync.memory, sync.length);
-	} else {
-		// Still have data, (re)alloc and copy
-		if(sync.memory == nullptr) {
-			sync.memory = Allocator<Device::CUDA>::alloc_array<char>(changed.length);
-		} else if(sync.length != changed.length) {
-			sync.memory = Allocator<Device::CUDA>::realloc(sync.memory, sync.length,
-														   changed.length);
-		}
-		cudaMemcpy(sync.memory, changed.memory, changed.length, cudaMemcpyHostToDevice);
+void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {
+	switch(type) {
+		case LightSubTree::Node::INTERNAL_NODE_TYPE: {
+			// Recursive implementation necessary, because the type is stored at the parents and not known to the node itself
+			const auto* node = as<LightSubTree::Node>(cpuMem + offset);
+			remap_textures(cpuMem, node->left.offset, node->left.type, cudaMem);
+		} break;
+		case u16(LightType::AREA_LIGHT_TRIANGLE): {
+			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
+			textures::ConstTextureDevHandle_t<Device::CUDA> tex =
+				*m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
+			offset += u32((const char*)&light->radianceTex - (const char*)light);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
+		} break;
+		case u16(LightType::AREA_LIGHT_QUAD): {
+			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
+			textures::ConstTextureDevHandle_t<Device::CUDA> tex =
+				*m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
+			offset += u32((const char*)&light->radianceTex - (const char*)light);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
+		} break;
+		case u16(LightType::AREA_LIGHT_SPHERE): {
+			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem + offset);
+			textures::ConstTextureDevHandle_t<Device::CUDA> tex =
+				*m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
+			offset += u32((const char*)&light->radianceTex - (const char*)light);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
+		} break;
+		default:; // Other light type - nothing to do
 	}
-	// Equalize bookkeeping
-	sync.length = changed.length;
-	sync.dirLights.lightCount = changed.dirLights.lightCount;
-	sync.posLights.lightCount = changed.posLights.lightCount;
-
-	// Also copy the environment light
-	sync.envLight.flux = changed.envLight.flux;
-	if(hdl.has_value())
-		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CUDA>{ *hdl.value()->aquireConst<Device::CUDA>() };
-	else
-		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CUDA>{};
 }
 
-void synchronize(const LightTree<Device::CUDA>& changed, LightTree<Device::CPU>& sync,
-				 std::optional<TextureHandle> hdl) {
-	if(changed.length == 0u) {
-		// Remove all data since there are no lights
-		mAssert(changed.memory == nullptr);
-		sync.memory = Allocator<Device::CPU>::free(sync.memory, sync.length);
-	} else {
-		// Still have data, (re)alloc and copy
-		if(sync.memory == nullptr) {
-			sync.memory = Allocator<Device::CPU>::alloc_array<char>(changed.length);
-		} else if(sync.length != changed.length) {
-			sync.memory = Allocator<Device::CPU>::realloc(sync.memory, sync.length,
-														  changed.length);
+template < Device dev >
+void LightTreeBuilder::synchronize() {
+	if(dev == Device::CUDA) {
+		if(!m_treeCpu)
+			throw std::runtime_error("[LightTreeBuilder::synchronize] There is no source for light-tree synchronization!");
+		// Keep old memory if possible, any size change is better handled by a new allocation.
+		if(!m_treeCuda || m_treeCuda->length != m_treeCpu->length
+			|| m_treeCuda->primToNodePath.size() != m_treeCpu->primToNodePath.size()) {
+			unload<Device::CUDA>();
+			m_treeCuda = std::make_unique<LightTree<Device::CUDA>>( m_treeCpu->posLights.lightCount );
+			m_treeCuda->memory = Allocator<Device::CUDA>::alloc_array<char>(m_treeCpu->length);
 		}
-		cudaMemcpy(sync.memory, changed.memory, changed.length, cudaMemcpyHostToDevice);
-	}
-	// Equalize bookkeeping
-	sync.length = changed.length;
-	sync.dirLights.lightCount = changed.dirLights.lightCount;
-	sync.posLights.lightCount = changed.posLights.lightCount;
 
-	// Also copy the environment light
-	sync.envLight.flux = changed.envLight.flux;
-	if(hdl.has_value())
-		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CPU>{ *hdl.value()->aquireConst<Device::CPU>() };
-	else
-		sync.envLight.texHandle = textures::ConstTextureDevHandle_t<Device::CPU>{};
+		// Equalize bookkeeping
+		m_treeCuda->length = m_treeCpu->length;
+		m_treeCuda->dirLights = m_treeCpu->dirLights;
+		m_treeCuda->dirLights.memory = m_treeCuda->memory;
+		m_treeCuda->posLights = m_treeCpu->posLights;
+		m_treeCuda->posLights.memory = m_treeCuda->memory + (m_treeCpu->posLights.memory - m_treeCpu->memory);
+
+		// Remap the environment map
+		m_treeCuda->envLight = EnvMapLight<Device::CUDA>{
+			*m_textureMap.find(m_treeCpu->envLight.texHandle)->second->aquireConst<Device::CUDA>(),
+			m_treeCpu->envLight.flux
+		};
+
+		// Copy the real data
+		m_treeCuda->primToNodePath.synchornize(m_treeCpu->primToNodePath);
+		cudaMemcpy(&m_treeCuda->memory, m_treeCpu->memory, m_treeCpu->length, cudaMemcpyHostToDevice);
+
+		// Replace all texture handles inside the tree's data
+		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
+
+		m_flags.mark_synced(dev);
+	} else {
+		// TODO: backsync? Would need another hashmap for texture mapping.
+	}
 }
+
+template void LightTreeBuilder::synchronize<Device::CUDA>();
+template void LightTreeBuilder::synchronize<Device::CPU>();
 
 }}} // namespace mufflon::scene::lights

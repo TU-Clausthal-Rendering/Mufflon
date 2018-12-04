@@ -106,6 +106,9 @@ public:
 	virtual void get_parameter_pack_cpu(const HandlePack* handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
 	// TODO a similar method for CUDA
 
+	// Get only the texture for emissive materials
+	virtual TextureHandle get_emissive_texture() const = 0;
+
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {
 		return m_outerMedium;
