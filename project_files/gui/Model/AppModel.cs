@@ -1,5 +1,4 @@
-﻿using System;
-using gui.Dll;
+﻿using gui.Dll;
 
 namespace gui.Model
 {
@@ -12,12 +11,12 @@ namespace gui.Model
         public MainWindow Window { get; }
         public OpenGLHost GlHost { get; }
 
-        public AppModel(MainWindow window, ViewportModel viewport)
+        public AppModel(MainWindow window, ViewportModel viewport, RendererModel rendererModel)
         {
             Window = window;
 
             // init gl host
-            GlHost = new OpenGLHost(window.BorderHost, viewport);
+            GlHost = new OpenGLHost(window.BorderHost, viewport, rendererModel);
             GlHost.Error += window.GlHostOnError;
             window.Loaded += (sender, args) => window.BorderHost.Child = GlHost;
         }

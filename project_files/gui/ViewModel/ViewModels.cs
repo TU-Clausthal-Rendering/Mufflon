@@ -33,6 +33,7 @@ namespace gui.ViewModel
 
         public ToolbarViewModel Toolbar { get; }
         public StatusbarViewModel Statusbar { get; }
+        public ProfilerViewModel Profiler { get; }
 
         public ICommand AddLightCommand { get; }
         public ICommand AddMaterialCommand { get; }
@@ -55,6 +56,8 @@ namespace gui.ViewModel
 
             Toolbar = new ToolbarViewModel(m_models);
             Statusbar = new StatusbarViewModel(m_models);
+
+            Profiler = new ProfilerViewModel(window, m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

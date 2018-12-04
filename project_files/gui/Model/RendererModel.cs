@@ -15,6 +15,7 @@ namespace gui.Model
     public class RendererModel : INotifyPropertyChanged
     {
         private bool m_isRendering = false;
+        private uint m_iteration = 0u;
 
         public bool IsRendering
         {
@@ -25,6 +26,14 @@ namespace gui.Model
                 m_isRendering = value;
                 OnPropertyChanged(nameof(IsRendering));
             }
+        }
+
+        public uint Iteration { get => m_iteration; }
+
+        public void performedIteration()
+        {
+            ++m_iteration;
+            OnPropertyChanged(nameof(Iteration));
         }
 
         #region PropertyChanged

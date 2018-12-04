@@ -13,7 +13,6 @@ using namespace mufflon::scene::lights;
 namespace mufflon { namespace renderer {
 
 __global__ static void sample(Pixel imageDims,
-							  LightTree<Device::CUDA> lightTree,
 							  RenderBuffer<Device::CUDA> outputBuffer,
 							  const float* rnds) {
 	Pixel coord{
@@ -61,7 +60,6 @@ __global__ static void sample(Pixel imageDims,
 }
 
 void GpuPathTracer::iterate(Pixel imageDims,
-							scene::lights::LightTree<Device::CUDA> lightTree,
 							RenderBuffer<Device::CUDA> outputBuffer) const {
 	
 	std::unique_ptr<float[]> rnds = std::make_unique<float[]>(2 * imageDims.x * imageDims.y);
@@ -83,7 +81,7 @@ void GpuPathTracer::iterate(Pixel imageDims,
 	};
 
 	cuda::check_error(cudaPeekAtLastError());
-	sample<<<gridDims, blockDims>>>(imageDims, std::move(lightTree),
+	sample<<<gridDims, blockDims>>>(imageDims,
 									std::move(outputBuffer), devRnds);
 	cuda::check_error(cudaGetLastError());
 	cuda::check_error(cudaFree(devRnds));

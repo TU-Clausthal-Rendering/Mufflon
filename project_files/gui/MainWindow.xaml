@@ -101,7 +101,7 @@
                 BorderThickness="{StaticResource ThinBorder}"
                 BorderBrush="{StaticResource BorderBrush}"/>
         </Grid>
-        
+
         <Grid DockPanel.Dock="Bottom">
             <Grid.RowDefinitions>
                 <!-- renderer and property pages -->
@@ -117,7 +117,7 @@
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <!-- info page -->
-                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="5"/>
                     <!-- renderer -->
                     <ColumnDefinition Width="*"/>
@@ -126,12 +126,15 @@
                     <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
 
+                <TreeView Grid.Column="0"
+                          Name="ProfilerTreeView"/>
+
                 <GridSplitter
                     Grid.Column="1"
                     Width="5"
                     HorizontalAlignment="Stretch"
                     Background="{StaticResource BorderBrush}"/>
-                
+
                 <!-- Renderer with scroll bars -->
                 <Grid
                     Grid.Column="2">
@@ -169,7 +172,7 @@
                         ViewportSize="{Binding Viewport.ScrollWidth}"/>
 
                 </Grid>
-                
+
 
                 <GridSplitter
                     Grid.Column="3"
@@ -270,7 +273,7 @@
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 Background="{StaticResource BorderBrush}"/>
-            
+
             <!-- console -->
             <Grid Grid.Row="2">
                 <Grid.RowDefinitions>
@@ -301,7 +304,7 @@
                     SelectionBrush="{x:Null}"
                     x:Name="ConsoleInputBox"/>
             </Grid>
-            
+
 
             <!-- status bar -->
             <StatusBar
@@ -328,7 +331,7 @@
                 </StatusBarItem>
             </StatusBar>
         </Grid>
-        
+
     </DockPanel>
 </Window>
 

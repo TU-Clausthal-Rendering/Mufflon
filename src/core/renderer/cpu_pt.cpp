@@ -2,6 +2,7 @@
 #include "path_util.hpp"
 #include "random_walk.hpp"
 #include "output_handler.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/camera_sampling.hpp"
 #include "core/scene/materials/medium.hpp"
@@ -24,6 +25,7 @@ CpuPathTracer::CpuPathTracer(scene::SceneHandle scene) :
 }
 
 void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
+	auto scope = Profiler::instance().start<CpuProfileState>("CPU PT iteration", ProfileLevel::LOW);
 	// (Re) create the random number generators
 	if(m_rngs.size() != outputBuffer.get_num_pixels()
 		|| m_reset)
@@ -43,6 +45,8 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
+
+	Profiler::instance().create_snapshot_all();
 }
 
 void CpuPathTracer::reset() {

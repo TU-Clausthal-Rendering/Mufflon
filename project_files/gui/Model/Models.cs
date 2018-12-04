@@ -16,6 +16,7 @@ namespace gui.Model
     public class Models
     {
         public AppModel App { get; }
+        public RendererModel Renderer { get; }
         public ViewportModel Viewport { get; }
 
         public SceneModel Scene { get; }
@@ -25,17 +26,16 @@ namespace gui.Model
 
         public ToolbarModel Toolbar { get; }
 
-        public RendererModel Renderer { get; }
 
         public Models(MainWindow window)
         {
             Viewport = new ViewportModel();
-            App = new AppModel(window, Viewport);
+            Renderer = new RendererModel();
+            App = new AppModel(window, Viewport, Renderer);
             Scene = new SceneModel();
             Cameras = new SynchronizedModelList<CameraModel>();
             Lights = new SynchronizedModelList<LightModel>();
             Materials = new SynchronizedModelList<MaterialModel>();
-            Renderer = new RendererModel();
             Toolbar = new ToolbarModel();
         }
     }

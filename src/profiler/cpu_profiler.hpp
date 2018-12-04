@@ -80,6 +80,7 @@ protected:
 	virtual std::ostream& save_profiler_snapshots(std::ostream& stream) const override;
 	// Save the current profiler state
 	virtual std::ostream& save_profiler_current_state(std::ostream& stream) const override;
+	virtual std::ostream& save_profiler_current_and_snapshots(std::ostream& stream) const override;
 
 private:
 	// Sample data

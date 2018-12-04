@@ -133,6 +133,7 @@ typedef enum {
 } OuterMediumType;
 
 typedef enum {
+	PROFILING_NONE,
 	PROFILING_LOW,
 	PROFILING_HIGH,
 	PROFILING_ALL,
@@ -462,8 +463,10 @@ CORE_API void CDECL profiling_disable();
 CORE_API Boolean CDECL profiling_set_level(ProfilingLevel level);
 CORE_API Boolean CDECL profiling_save_current_state(const char* path);
 CORE_API Boolean CDECL profiling_save_snapshots(const char* path);
+CORE_API Boolean CDECL profiling_save_current_and_snapshots(const char* path);
 CORE_API const char* CDECL profiling_get_current_state();
 CORE_API const char* CDECL profiling_get_snapshots();
+CORE_API const char* CDECL profiling_get_current_and_snapshots();
 CORE_API void CDECL profiling_reset();
 CORE_API size_t CDECL profiling_get_total_cpu_memory();
 CORE_API size_t CDECL profiling_get_free_cpu_memory();

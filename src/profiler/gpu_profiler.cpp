@@ -36,7 +36,7 @@ void GpuProfileState::create_snapshot() {
 
 std::ostream& GpuProfileState::save_profiler_snapshots(std::ostream& stream) const {
 	// Stores the snapshots as a CSV
-	stream << ",snapshots:" << m_snapshots.size() << ",type:gpu\n";
+	stream << ",type:gpu,snapshots:" << m_snapshots.size() << '\n';
 	for(const auto& snapshot : m_snapshots) {
 		stream << snapshot.totalWallTime.count() << ','
 			<< snapshot.totalGpuTime.count() << ","
@@ -50,6 +50,20 @@ std::ostream& GpuProfileState::save_profiler_current_state(std::ostream& stream)
 	stream << ",type:gpu\n" << m_currentSample.totalWallTime.count() << ','
 		<< m_currentSample.totalGpuTime.count() << ","
 		<< m_currentSample.sampleCount << '\n';
+	return stream;
+}
+
+std::ostream& GpuProfileState::save_profiler_current_and_snapshots(std::ostream& stream) const {
+	// Stores the snapshots as a CSV
+	stream << ",type:gpu,currsnapshots:" << m_snapshots.size() << '\n';
+	stream << m_currentSample.totalWallTime.count() << ','
+		<< m_currentSample.totalGpuTime.count() << ","
+		<< m_currentSample.sampleCount << '\n';
+	for(const auto& snapshot : m_snapshots) {
+		stream << snapshot.totalWallTime.count() << ','
+			<< snapshot.totalGpuTime.count() << ","
+			<< snapshot.sampleCount << '\n';
+	}
 	return stream;
 }
 

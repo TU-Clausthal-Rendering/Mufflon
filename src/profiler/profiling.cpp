@@ -57,6 +57,16 @@ void ProfileState::create_snapshot_all() {
 		child.second->create_snapshot_all();
 }
 
+std::ostream& ProfileState::save_current_state(std::ostream& stream) const {
+	stream << "children:" << m_children.size();
+	this->save_profiler_current_state(stream);
+	for(auto& child : m_children) {
+		stream << '"' << child.first << "\",";
+		child.second->save_current_state(stream);
+	}
+	return stream;
+}
+
 std::ostream& ProfileState::save_snapshots(std::ostream& stream) const {
 	// Stores the snapshots as a CSV
 	stream << "children:" << m_children.size();
@@ -68,12 +78,13 @@ std::ostream& ProfileState::save_snapshots(std::ostream& stream) const {
 	return stream;
 }
 
-std::ostream& ProfileState::save_current_state(std::ostream& stream) const {
+std::ostream& ProfileState::save_current_and_snapshots(std::ostream& stream) const {
+	// Stores the snapshots as a CSV
 	stream << "children:" << m_children.size();
-	this->save_profiler_current_state(stream);
+	this->save_profiler_current_and_snapshots(stream);
 	for(auto& child : m_children) {
 		stream << '"' << child.first << "\",";
-		child.second->save_current_state(stream);
+		child.second->save_profiler_current_and_snapshots(stream);
 	}
 	return stream;
 }
@@ -191,6 +202,27 @@ void Profiler::save_snapshots(std::string_view path) const {
 	}
 }
 
+void Profiler::save_current_and_snapshots(std::string_view path) const {
+	fs::path file = path;
+	std::ofstream fileStream(file);
+	if(fileStream.bad()) {
+		logError("[Profiler::save_snapshots] could not open output file '",
+				 file.string(), "'");
+		return;
+	}
+	fileStream.exceptions(std::ios::failbit);
+
+	try {
+		for(auto& profiler : m_profilers) {
+			fileStream << '"' << profiler.first << "\",";
+			profiler.second->save_current_and_snapshots(fileStream);
+		}
+	} catch(const std::exception& e) {
+		logError("[Profiler::save_snapshots] Failed to save profiling results: ",
+				 e.what());
+	}
+}
+
 std::string Profiler::save_current_state() const {
 	std::ostringstream stream;
 	try {
@@ -211,6 +243,20 @@ std::string Profiler::save_snapshots() const {
 		for(auto& profiler : m_profilers) {
 			stream << '"' << profiler.first << "\",";
 			profiler.second->save_snapshots(stream);
+		}
+	} catch(const std::exception& e) {
+		logError("[Profiler::save_snapshots] Failed to save profiling results: ",
+				 e.what());
+	}
+	return stream.str();
+}
+
+std::string Profiler::save_current_and_snapshots() const {
+	std::ostringstream stream;
+	try {
+		for(auto& profiler : m_profilers) {
+			stream << '"' << profiler.first << "\",";
+			profiler.second->save_current_and_snapshots(stream);
 		}
 	} catch(const std::exception& e) {
 		logError("[Profiler::save_snapshots] Failed to save profiling results: ",

@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using gui.Model;
+using gui.ViewModel;
 
 namespace gui.Dll
 {
@@ -27,6 +28,7 @@ namespace gui.Dll
         private readonly Border m_parent;
         // information about the viewport
         private readonly ViewportModel m_viewport;
+        private readonly RendererModel m_rendererModel;
 
         // context creation
         private IntPtr m_hWnd = IntPtr.Zero;
@@ -51,10 +53,11 @@ namespace gui.Dll
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
-        public OpenGLHost(Border parent, ViewportModel viewport)
+        public OpenGLHost(Border parent, ViewportModel viewport, RendererModel rendererModel)
         {
             m_parent = parent;
             m_viewport = viewport;
+            m_rendererModel = rendererModel;
         }
 
         /// <summary>
@@ -76,6 +79,9 @@ namespace gui.Dll
             try
             {
                 InitializeOpenGl();
+                Core.profiling_enable();
+                if (!Core.profiling_set_level(Core.ProfilingLevel.ALL))
+                    throw new Exception(Core.GetDllError());
                 Core.RendererType rendererType = Core.RendererType.CPU_PT;
                 IntPtr light = Core.world_add_point_light("testPointLight", new Core.Vec3(0, 0, 0),
                    new Core.Vec3(1, 1, 1));
@@ -126,6 +132,7 @@ namespace gui.Dll
                             throw new Exception(Core.GetDllError());
                         if (!Gdi32.SwapBuffers(m_deviceContext))
                             throw new Win32Exception(Marshal.GetLastWin32Error());
+                        m_rendererModel.performedIteration();
                     }
                 }
             }

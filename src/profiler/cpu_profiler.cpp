@@ -40,10 +40,10 @@ CpuProfileState::Microsecond CpuProfileState::get_thread_time() {
 		logError("[CpuProfileState::get_process_time] Failed to optain process times");
 		return Microsecond(0u);
 	}
-	return Microsecond((static_cast<u64>(kernelTime.dwHighDateTime) << 32u)
+	return Microsecond(((static_cast<u64>(kernelTime.dwHighDateTime) << 32u)
 					   + static_cast<u64>(kernelTime.dwLowDateTime)
 					   + (static_cast<u64>(userTime.dwHighDateTime) << 32u)
-					   + static_cast<u64>(userTime.dwLowDateTime));
+					   + static_cast<u64>(userTime.dwLowDateTime)) / 10u);
 #else // _WIN32
 	struct timespec currTime;
 	clockid_t threadClockId;
@@ -70,10 +70,10 @@ CpuProfileState::Microsecond CpuProfileState::get_process_time() {
 		logError("[CpuProfileState::get_process_time] Failed to optain process times");
 		return Microsecond(0u);
 	}
-	return Microsecond((static_cast<u64>(kernelTime.dwHighDateTime) << 32u)
+	return Microsecond(((static_cast<u64>(kernelTime.dwHighDateTime) << 32u)
 		+ static_cast<u64>(kernelTime.dwLowDateTime)
 		+ (static_cast<u64>(userTime.dwHighDateTime) << 32u)
-		+ static_cast<u64>(userTime.dwLowDateTime));
+		+ static_cast<u64>(userTime.dwLowDateTime)) / 10u);
 #else // _WIN32
 	// TODO: this is kinda bad
 	return Microsecond(static_cast<u64>(static_cast<double>(std::clock()) / CLOCKS_PER_SEC));
@@ -111,7 +111,7 @@ void CpuProfileState::create_snapshot() {
 
 std::ostream& CpuProfileState::save_profiler_snapshots(std::ostream& stream) const {
 	// Stores the snapshots as a CSV
-	stream << ",snapshots:" << m_snapshots.size() << ",type:cpu\n";
+	stream << ",type:cpu,snapshots:" << m_snapshots.size() << '\n';
 	for(const auto& snapshot : m_snapshots) {
 		stream << snapshot.totalCpuCycles << ',' << snapshot.totalThreadTime.count() << ','
 			<< snapshot.totalProcessTime.count() << ',' << snapshot.totalWallTime.count() << ','
@@ -125,6 +125,20 @@ std::ostream& CpuProfileState::save_profiler_current_state(std::ostream& stream)
 	stream << ",type:cpu\n" << m_currentSample.totalCpuCycles << ',' << m_currentSample.totalThreadTime.count() << ','
 		<< m_currentSample.totalProcessTime.count() << ',' << m_currentSample.totalWallTime.count() << ','
 		<< m_currentSample.sampleCount << '\n';
+	return stream;
+}
+
+std::ostream& CpuProfileState::save_profiler_current_and_snapshots(std::ostream& stream) const {
+	// Stores the snapshots as a CSV
+	stream << ",type:cpu,currsnapshots:" << m_snapshots.size() << '\n';
+	stream << m_currentSample.totalCpuCycles << ',' << m_currentSample.totalThreadTime.count() << ','
+		<< m_currentSample.totalProcessTime.count() << ',' << m_currentSample.totalWallTime.count() << ','
+		<< m_currentSample.sampleCount << '\n';
+	for(const auto& snapshot : m_snapshots) {
+		stream << snapshot.totalCpuCycles << ',' << snapshot.totalThreadTime.count() << ','
+			<< snapshot.totalProcessTime.count() << ',' << snapshot.totalWallTime.count() << ','
+			<< snapshot.sampleCount << '\n';
+	}
 	return stream;
 }
 
