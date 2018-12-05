@@ -2,7 +2,7 @@
 
 #include "material_types.hpp"
 #include "material.hpp"
-#include "export/api.hpp"
+#include "core/export/api.h"
 #include "core/math/sampling.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"

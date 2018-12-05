@@ -1,8 +1,6 @@
 #pragma once
 
-#include "util/assert.hpp"
-#include "export/api.hpp"
-#include <memory>
+#include "core/export/api.h"
 
 namespace mufflon { // There is no memory namespace on purpose
 

@@ -1,4 +1,4 @@
-#include "plugin/texture_interface.h"
+#include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
 #include <gli/gl.hpp>
 #include <gli/gli.hpp>

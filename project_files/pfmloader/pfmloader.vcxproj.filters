@@ -5,9 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\export">
-      <UniqueIdentifier>{a09e5972-a536-4d14-9bb3-1cb6557c409c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\pfmloader">
       <UniqueIdentifier>{812333d9-c80e-4824-96c0-9ef33e2603e8}</UniqueIdentifier>
     </Filter>
@@ -19,13 +16,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\export\api.hpp">
-      <Filter>Source Files\export</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\plugin\texture_interface.h">
+    <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h">
       <Filter>Source Files\plugin</Filter>
     </ClInclude>
   </ItemGroup>

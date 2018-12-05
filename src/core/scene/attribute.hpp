@@ -1,6 +1,6 @@
 #pragma once
 
-#include "export/api.hpp"
+#include "core/export/api.h"
 #include "util/assert.hpp"
 #include "util/byte_io.hpp"
 #include "core/memory/allocator.hpp"

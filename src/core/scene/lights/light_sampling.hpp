@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lights.hpp"
-#include "export/api.hpp"
+#include "core/export/api.h"
 #include "ei/vector.hpp"
 #include "ei/conversions.hpp"
 #include "core/math/sampling.hpp"

@@ -2,7 +2,7 @@
 
 #include "lights.hpp"
 #include "light_sampling.hpp"
-#include "export/api.hpp"
+#include "core/export/api.h"
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"

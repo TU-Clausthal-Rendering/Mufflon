@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/log.hpp"
-#include "export/api.hpp"
+#include "core/export/api.h"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
 #include <cuda_runtime.h>

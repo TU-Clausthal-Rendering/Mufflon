@@ -6,17 +6,15 @@
 #    else
 #        define CORE_API __declspec(dllimport)
 #    endif
-#    ifdef LOADER_EXPORTS
-#        define LOADER_API __declspec(dllexport)
-#    else
-#        define LOADER_API __declspec(dllimport)
-#    endif
-#    define CDECL __cdecl
 #elif
 #    define CORE_API
-#    define LOADER_API
-#    define CDECL __attribute__((__cdecl__))
 #endif
+
+#ifdef _MSC_VER
+#    define CDECL __cdecl
+#else
+#    define CDECL __attribute__((__cdecl__))
+#endif // _MSC_VER
 
 #ifdef __CUDACC__
 #define CUDA_FUNCTION inline __host__ __device__

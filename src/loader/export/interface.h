@@ -1,5 +1,6 @@
 #pragma once
-#include "export/api.hpp"
+
+#include "api.h"
 #include "core/export/interface.h"
 
 extern "C" {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "export/api.hpp"
+#include "core/export/api.h"
 #include "texture.hpp"
 #include "cputexture.hpp"
 #include <cuda_runtime.h>

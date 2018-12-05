@@ -141,5 +141,8 @@
     <ClInclude Include="..\..\src\profiler\profiling.hpp">
       <Filter>Source Files\profiler</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\loader\export\api.h">
+      <Filter>Source Files\loader\export</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

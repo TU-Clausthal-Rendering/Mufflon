@@ -128,8 +128,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\export\api.hpp" />
-    <ClInclude Include="..\..\src\plugin\texture_interface.h" />
+    <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h" />
     <ClInclude Include="..\..\src\util\log.hpp" />
   </ItemGroup>
   <ItemGroup>

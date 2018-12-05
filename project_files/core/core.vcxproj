@@ -152,6 +152,7 @@
     <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp" />
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
+    <ClInclude Include="..\..\src\core\export\api.h" />
     <ClInclude Include="..\..\src\core\export\interface.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
     <ClInclude Include="..\..\src\core\math\rng.hpp" />
@@ -200,7 +201,6 @@
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
     <ClInclude Include="..\..\src\core\scene\types.hpp" />
     <ClInclude Include="..\..\src\core\scene\world_container.hpp" />
-    <ClInclude Include="..\..\src\export\api.hpp" />
     <ClInclude Include="..\..\src\plugin\plugin.hpp" />
     <ClInclude Include="..\..\src\plugin\texture_plugin.hpp" />
     <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp" />

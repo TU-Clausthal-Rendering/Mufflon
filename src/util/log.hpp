@@ -1,6 +1,5 @@
 #pragma once
 
-#include "export/api.hpp"
 #include <string>
 #ifndef __CUDACC__
 #include <string_view>
@@ -77,7 +76,7 @@ void logInfo(ArgTs&&... _args)
 }
 #else
 template<typename... ArgTs>
-CORE_API void logInfo(ArgTs&&... _args) {}
+void logInfo(ArgTs&&... _args) {}
 #endif
 
 #if CA_LOG_LEVEL <= 2
@@ -90,7 +89,7 @@ void logWarning(ArgTs&&... _args)
 }
 #else
 template<typename... ArgTs>
-CORE_API void logWarning(ArgTs&&... _args) {}
+void logWarning(ArgTs&&... _args) {}
 #endif
 
 template<typename... ArgTs>

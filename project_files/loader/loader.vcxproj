@@ -114,6 +114,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\deps\miniz\miniz\miniz.h" />
+    <ClInclude Include="..\..\src\loader\export\api.h" />
     <ClInclude Include="..\..\src\loader\export\interface.h" />
     <ClInclude Include="..\..\src\loader\parsing\binary.hpp" />
     <ClInclude Include="..\..\src\loader\parsing\json_helper.hpp" />
