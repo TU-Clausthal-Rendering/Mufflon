@@ -22,6 +22,7 @@ public:
 
 	virtual void iterate(OutputHandler& outputBuffer) override;
 	virtual void reset() override;
+	virtual IParameterHandler& get_parameters() final { return m_params; }
 private:
 	// Create one sample path (actual PT algorithm)
 	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer);
@@ -32,6 +33,7 @@ private:
 	}
 
 	bool m_reset = true;
+	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;
 	scene::SceneHandle m_currentScene;
 	std::vector<math::Xoroshiro128> m_rngs;
 	u8 m_camParams[cameras::MAX_CAMERA_PARAM_SIZE];

@@ -1962,6 +1962,76 @@ Boolean render_disable_all_render_targets() {
 		&& render_disable_non_variance_render_targets();
 }
 
+uint32_t renderer_get_num_parameters() {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return 0;
+	}
+	return s_currentRenderer->get_parameters().get_num_parameters();
+}
+
+ParamDesc renderer_get_parameter_desc(uint32_t idx) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return ParamDesc{nullptr, ParameterType(-1)};
+	}
+	return util::pun<ParamDesc>( s_currentRenderer->get_parameters().get_param_desc(idx) );
+}
+
+Boolean renderer_set_parameter_int(const char* name, int32_t value) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	s_currentRenderer->get_parameters().set_param(name, value);
+	return true;
+}
+
+Boolean renderer_get_parameter_int(const char* name, int32_t* value) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*value = s_currentRenderer->get_parameters().get_param_int(name);
+	return true;
+}
+
+Boolean renderer_set_parameter_float(const char* name, float value) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	s_currentRenderer->get_parameters().set_param(name, value);
+	return true;
+}
+
+Boolean renderer_get_parameter_float(const char* name, float* value) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*value = s_currentRenderer->get_parameters().get_param_float(name);
+	return true;
+}
+
+Boolean renderer_set_parameter_bool(const char* name, Boolean value) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	s_currentRenderer->get_parameters().set_param(name, bool(value));
+	return true;
+}
+
+Boolean renderer_get_parameter_bool(const char* name, Boolean* value) {
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*value = s_currentRenderer->get_parameters().get_param_bool(name);
+	return true;
+}
+
 void profiling_enable() {
 	Profiler::instance().set_enabled(true);
 }

@@ -26,6 +26,7 @@ public:
 	// This is just a test method, don't use this as an actual interface
 	virtual void iterate(OutputHandler& handler) override;
 	virtual void reset() override;
+	virtual IParameterHandler& get_parameters() final { return m_params; } 
 
 private:
 	// Used so that we don't need to include everything in CU files
@@ -34,6 +35,7 @@ private:
 				 RenderBuffer<Device::CUDA> outputBuffer) const;
 
 	bool m_reset = true;
+	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;
 	scene::SceneHandle m_currentScene;
 };
 

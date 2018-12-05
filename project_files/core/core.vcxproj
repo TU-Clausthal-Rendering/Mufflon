@@ -167,6 +167,7 @@
     <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\gpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />

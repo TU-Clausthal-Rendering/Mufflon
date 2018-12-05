@@ -237,6 +237,18 @@ typedef struct MaterialParamsStruct {
 	} inner;
 } MaterialParams;
 
+// Renderer parameter data
+enum ParameterType {
+	PARAM_INT,
+	PARAM_FLOAT,
+	PARAM_BOOL
+};
+
+struct ParamDesc {
+	const char* name;
+	ParameterType type;
+};
+
 // TODO: how to handle errors
 
 // Polygon interface
@@ -435,6 +447,14 @@ CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_non_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
+CORE_API uint32_t CDECL renderer_get_num_parameters();
+CORE_API ParamDesc CDECL renderer_get_parameter_desc(uint32_t idx);
+CORE_API Boolean CDECL renderer_set_parameter_int(const char* name, int32_t value);
+CORE_API Boolean CDECL renderer_get_parameter_int(const char* name, int32_t* value);
+CORE_API Boolean CDECL renderer_set_parameter_float(const char* name, float value);
+CORE_API Boolean CDECL renderer_get_parameter_float(const char* name, float* value);
+CORE_API Boolean CDECL renderer_set_parameter_bool(const char* name, Boolean value);
+CORE_API Boolean CDECL renderer_get_parameter_bool(const char* name, Boolean* value);
 
 // Interface for profiling
 CORE_API void CDECL profiling_enable();

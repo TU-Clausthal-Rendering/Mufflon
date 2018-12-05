@@ -723,6 +723,9 @@
     <ClInclude Include="..\..\src\core\memory\hashmap.hpp">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\parameter.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">

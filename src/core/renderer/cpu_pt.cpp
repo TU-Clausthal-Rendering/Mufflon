@@ -64,8 +64,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 	int pathLen = 0;
 	do {
-		if(pathLen < 666) { // TODO: min and max pathLen bounds
-
+		if(pathLen+1 >= m_params.maxPathLength) {
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
@@ -80,28 +79,30 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 				outputBuffer.contribute(coord, throughput, { Spectrum{nee.intensity}, 1.0f },
 					value.cosThetaOut, value.value * mis);
 			}
+		}
 
-			// Walk
-			scene::Point lastPosition = vertex->get_position();
-			math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-			if(!walk(*vertex, media, rnd, 0.0f, false, throughput, vertex))
-				break;
+		// Walk
+		scene::Point lastPosition = vertex->get_position();
+		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
+		if(!walk(*vertex, media, rnd, 0.0f, false, throughput, vertex))
+			break;
+		++pathLen;
 
-			// Evaluate direct hit of area ligths
+		// Evaluate direct hit of area ligths
+		if(pathLen >= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(m_currentScene->get_light_tree<Device::CPU>(), 0,
-												  lastPosition, scene::lights::guide_flux);
+													lastPosition, scene::lights::guide_flux);
 				float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 					vertex->get_normal(), vertex->get_albedo());
 			}
 		}
-		++pathLen;
-	} while(pathLen < 666);
+	} while(pathLen < m_params.maxPathLength);
 
 	// Random walk ended because of missing the scene?
-	if(pathLen < 666) {
+	if(pathLen < m_params.maxPathLength) {
 		// TODO: fetch background
 		// TODO: normals, position???
 		constexpr ei::Vec3 colors[4]{
