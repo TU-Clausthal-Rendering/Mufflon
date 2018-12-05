@@ -723,6 +723,12 @@
     <ClInclude Include="..\..\src\core\export\api.h">
       <Filter>Source Files\core\export</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\background.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\importance_sampling.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">

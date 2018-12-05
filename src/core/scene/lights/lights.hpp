@@ -106,9 +106,10 @@ struct alignas(16) DirectionalLight {
  * Environment-map light.
  */
 template < Device dev >
-struct EnvMapLight {
-	alignas(16) textures::ConstTextureDevHandle_t<dev> texHandle;
-	alignas(16) ei::Vec3 flux;
+struct alignas(16) EnvMapLight {
+	textures::ConstTextureDevHandle_t<dev> texHandle;
+	textures::ConstTextureDevHandle_t<dev> summedAreaTable;
+	ei::Vec3 flux;
 };
 
 // Asserts to make sure the compiler actually followed our orders

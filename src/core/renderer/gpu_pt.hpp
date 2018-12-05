@@ -31,7 +31,8 @@ public:
 private:
 	// Used so that we don't need to include everything in CU files
 	void iterate(Pixel imageDims,
-				 RenderBuffer<Device::CUDA> outputBuffer) const;
+				 RenderBuffer<Device::CUDA> outputBuffer,
+				 scene::lights::LightTree<Device::CUDA> lightTree) const;
 
 	bool m_reset = true;
 	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;

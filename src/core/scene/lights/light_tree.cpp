@@ -269,9 +269,20 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Construct the environment light
 	if(envLight) {
-		// TODO: accumulate flux
-		m_treeCpu->envLight = EnvMapLight<Device::CPU>{ *envLight->aquireConst<Device::CPU>(), ei::Vec3{0, 0, 0} };
-		m_textureMap.emplace(m_treeCpu->envLight.texHandle, envLight);
+		// First create an appropriate summed area table; this depends on if we have a cube or a spherical map
+		if(envLight->get_num_layers() == 6)
+			m_envmapSum = std::make_unique<textures::Texture>(6u * envLight->get_width(), envLight->get_height(), 1u,
+															  envLight->get_format(), textures::SamplingMode::LINEAR,
+															  false);
+		else
+			m_envmapSum = std::make_unique<textures::Texture>(envLight->get_width(), envLight->get_height(), 1u,
+															  envLight->get_format(), textures::SamplingMode::LINEAR,
+															  false);
+		m_treeCpu->background = Background<Device::CPU>::envmap(envLight, m_envmapSum.get());
+		m_textureMap.emplace(*envLight->aquireConst<Device::CPU>(), envLight);
+	} else {
+		// TODO: make more generic (different colors, analytic model...)
+		m_treeCpu->background = Background<Device::CPU>::black();
 	}
 
 	if(posLights.size() == 0u && dirLights.size() == 0u) {
@@ -404,10 +415,11 @@ void LightTreeBuilder::synchronize() {
 		m_treeCuda->posLights.memory = m_treeCuda->memory + (m_treeCpu->posLights.memory - m_treeCpu->memory);
 
 		// Remap the environment map
-		m_treeCuda->envLight = EnvMapLight<Device::CUDA>{
-			*m_textureMap.find(m_treeCpu->envLight.texHandle)->second->aquireConst<Device::CUDA>(),
-			m_treeCpu->envLight.flux
-		};
+		TextureHandle envMapTex = nullptr;
+		auto envMapIter = m_textureMap.find(m_treeCpu->background.get_envmap_light().texHandle);
+		if(envMapIter != m_textureMap.end())
+			envMapTex = envMapIter->second;
+		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(envMapTex, m_envmapSum.get());
 
 		// Copy the real data
 		m_treeCuda->primToNodePath.synchornize(m_treeCpu->primToNodePath);

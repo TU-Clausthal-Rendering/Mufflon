@@ -65,4 +65,56 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 #endif
 }
 
+// Samples an environment map
+inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction) {
+#ifndef __CUDA_ARCH__
+	int layers = envmap->get_num_layers();
+#else // __CUDA_ARCH__
+	int layers = envmap.depth;
+#endif // __CUDA_ARCH__
+	if(layers == 6) {
+		// Cubemap
+		// Find out which face by elongating the direction
+		ei::Vec3 projDir = direction / ei::max(direction);
+		// Set the layer and UV coordinates
+		int layer;
+		float u, v;
+		if(ei::approx(projDir.x, 1.f)) {
+			layer = 0u;
+			u = projDir.y;
+			v = -projDir.z;
+		} else if(ei::approx(projDir.x, -1.f)) {
+			layer = 1u;
+			u = projDir.y;
+			v = projDir.z;
+		} else if(ei::approx(projDir.y, 1.f)) {
+			layer = 2u;
+			u = -projDir.z;
+			v = projDir.x;
+		} else if(ei::approx(projDir.y, -1.f)) {
+			layer = 3u;
+			u = projDir.z;
+			v = projDir.x;
+		} else if(ei::approx(projDir.z, 1.f)) {
+			layer = 4u;
+			u = projDir.y;
+			v = projDir.x;
+		} else {
+			layer = 5u;
+			u = projDir.y;
+			v = -projDir.x;
+		}
+		// Normalize the UV coordinates into [0, 1]
+		u = (u + 1.f) / 2.f;
+		v = (v + 1.f) / 2.f;
+		return sample(envmap, UvCoordinate{ u, v }, layer);
+	} else {
+		// Spherical map
+		// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
+		const float u = atan2(direction.y, direction.x) / (ei::PI * 2.f);
+		const float v = acos(direction.z) / ei::PI;
+		return sample(envmap, UvCoordinate{ u, v });
+	}
+}
+
 }}} // namespace mufflon::scene::textures

@@ -19,7 +19,8 @@ void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// TODO: pass scene data to kernel!
 	auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 	this->iterate(outputBuffer.get_resolution(),
-				  std::move(outputBuffer.begin_iteration<Device::CUDA>(m_reset)));
+				  std::move(outputBuffer.begin_iteration<Device::CUDA>(m_reset)),
+				  std::move(m_currentScene->get_light_tree<Device::CUDA>()));
 	m_reset = false;
 
 	outputBuffer.end_iteration<Device::CUDA>();

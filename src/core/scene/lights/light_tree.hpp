@@ -2,6 +2,7 @@
 
 #include "lights.hpp"
 #include "light_sampling.hpp"
+#include "background.hpp"
 #include "core/export/api.h"
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
@@ -77,7 +78,7 @@ template < Device dev >
 struct LightTree {
 	static constexpr Device DEVICE = dev;
 
-	EnvMapLight<dev> envLight;
+	Background<dev> background;
 	// Pointer to the tree elements
 	LightSubTree dirLights;
 	LightSubTree posLights;
@@ -138,6 +139,8 @@ private:
 	// The tree is build on CPU side. For synchronization we need a possiblity to
 	// find the CUDA textures.
 	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;
+	// 'Local' summed area table, which the light tree holds ownership of
+	std::unique_ptr<textures::Texture> m_envmapSum;
 
 	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);
 };
@@ -273,12 +276,8 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
 								   : seed;
 
-	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
-	float envProb = 0.f;
-	if(is_valid(tree.envLight.texHandle)) {
-		fluxSum += ei::sum(tree.envLight.flux);
-		envProb = ei::sum(tree.envLight.flux) / fluxSum;
-	}
+	float fluxSum = ei::sum(tree.background.get_flux()) + tree.dirLights.root.flux + tree.posLights.root.flux;
+	float envProb = ei::sum(tree.background.get_flux()) / fluxSum;;
 	float dirProb = tree.dirLights.root.flux / fluxSum;
 	float posProb = tree.posLights.root.flux / fluxSum;
 
@@ -286,8 +285,9 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	// First is envmap...
 	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
 	if(rndChoice < rightEnv) {
-		mAssert(is_valid(tree.envLight.texHandle));
-		return adjustPdf(sample_light_pos(tree.envLight, bounds, rnd), envProb);
+		// TODO: sample background, if there is one
+		return {};
+		//return adjustPdf(sample_light_pos(tree.background, bounds, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = static_cast<u64>(std::numeric_limits<u64>::max() * (envProb + dirProb));
@@ -389,12 +389,8 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
 								   : seed;
 
-	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
-	float envProb = 0.f;
-	if(is_valid(tree.envLight.texHandle)) {
-		fluxSum += ei::sum(tree.envLight.flux);
-		envProb = ei::sum(tree.envLight.flux) / fluxSum;
-	}
+	float fluxSum = ei::sum(tree.background.get_flux()) + tree.dirLights.root.flux + tree.posLights.root.flux;
+	float envProb = ei::sum(tree.background.get_flux()) / fluxSum;
 	float dirProb = tree.dirLights.root.flux / fluxSum;
 	float posProb = tree.posLights.root.flux / fluxSum;
 
@@ -402,8 +398,9 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	// First is envmap...
 	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
 	if(rndChoice < rightEnv) {
-		mAssert(is_valid(tree.envLight.texHandle));
-		return lighttree_detail::adjustPdf(connect_light(tree.envLight, position, rnd), envProb);
+		// TODO: sample background
+		return {};
+		//return lighttree_detail::adjustPdf(connect_light(tree.envLight, position, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = static_cast<u64>(std::numeric_limits<u64>::max() * (envProb + dirProb));
@@ -434,7 +431,7 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 	mAssert(primitive != ~0u);
 	using namespace lighttree_detail;
 
-	float p = tree.posLights.root.flux / (tree.dirLights.root.flux + tree.posLights.root.flux + ei::sum(tree.envLight.flux));
+	float p = tree.posLights.root.flux / (tree.dirLights.root.flux + tree.posLights.root.flux + ei::sum(tree.background.get_flux()));
 	u32 code = *tree.primToNodePath.find(primitive); // If crash here, you have hit an emissive surface which is not in the light tree. This is a fundamental problem and not only an access violation.
 
 	// Travers through the tree to compute the complete, guide dependent pdf
