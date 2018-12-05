@@ -19,12 +19,7 @@ public:
 	using WallTimePoint = WallClock::time_point;
 
 	CpuProfileState(ProfileState*& active);
-
-	// Abstractions from OS APIs
-	static u64 get_cpu_cycle();
-	static Microsecond get_thread_time();
-	static Microsecond get_process_time();
-	static WallTimePoint get_wall_timepoint();
+	~CpuProfileState() = default;
 
 	// CPU cylces
 	constexpr u64 get_total_cpu_cycles() const noexcept {
@@ -83,6 +78,12 @@ protected:
 	virtual std::ostream& save_profiler_total_and_snapshots(std::ostream& stream) const override;
 
 private:
+	// Abstractions from OS APIs
+	static u64 get_cpu_cycle();
+	static Microsecond get_thread_time();
+	static Microsecond get_process_time();
+	static WallTimePoint get_wall_timepoint();
+
 	// Sample data
 	struct SampleData {
 		u64 totalCpuCycles = 0u;

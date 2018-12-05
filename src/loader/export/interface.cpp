@@ -6,6 +6,9 @@
 #include <stdexcept>
 #include <mutex>
 #include <iostream>
+#ifdef _WIN32
+#include <combaseapi.h>
+#endif // _WIN32
 
 #define FUNCTION_NAME __func__
 
@@ -104,9 +107,27 @@ Boolean loader_profiling_save_snapshots(const char* path) {
 	return true;
 }
 
+Boolean loader_profiling_save_total_and_snapshots(const char* path) {
+	if(path == nullptr) {
+		logError("[", FUNCTION_NAME, "] Invalid file path (nullptr)");
+		return false;
+	}
+	Profiler::instance().save_total_and_snapshots(path);
+	return true;
+}
+
 const char* loader_profiling_get_current_state() {
 	std::string str = Profiler::instance().save_current_state();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
+#else // _WIN32
 	char* buffer = new char[str.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
@@ -114,7 +135,33 @@ const char* loader_profiling_get_current_state() {
 
 const char* loader_profiling_get_snapshots() {
 	std::string str = Profiler::instance().save_snapshots();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
+#else // _WIN32
 	char* buffer = new char[str.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, str.c_str(), str.size());
+	buffer[str.size()] = '\0';
+	return buffer;
+}
+
+const char* loader_profiling_get_total_and_snapshots() {
+	std::string str = Profiler::instance().save_total_and_snapshots();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
+#else // _WIN32
+	char* buffer = new char[str.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;

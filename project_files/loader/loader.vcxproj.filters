@@ -35,6 +35,9 @@
     <Filter Include="Source Files\profiler">
       <UniqueIdentifier>{0ebc98a5-a258-48ec-9fe9-d56a906b738e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\export">
+      <UniqueIdentifier>{7875ae35-a123-434f-b195-f62080099bc7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -61,14 +64,8 @@
     <ClCompile Include="..\..\deps\miniz\miniz\miniz.c">
       <Filter>Source Files\deps\miniz</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp">
-      <Filter>Source Files\profiler</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\util\log.cpp">
       <Filter>Source Files\util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\profiler\profiling.cpp">
-      <Filter>Source Files\profiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -132,11 +129,14 @@
     <ClInclude Include="..\..\deps\miniz\miniz\miniz.h">
       <Filter>Source Files\deps\miniz</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp">
-      <Filter>Source Files\profiler</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\filesystem.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\interface.h">
+      <Filter>Source Files\core\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp">
+      <Filter>Source Files\profiler</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\profiler\profiling.hpp">
       <Filter>Source Files\profiler</Filter>

@@ -19,8 +19,7 @@ namespace gui.Command
 
         public bool CanExecute(object parameter)
         {
-            // TODO replace (only executable if scene loaded)
-            return true;
+            return m_models.Scene.IsLoaded;
         }
 
         public void Execute(object parameter)
@@ -30,8 +29,14 @@ namespace gui.Command
 
         public event EventHandler CanExecuteChanged
         {
-            add { }
-            remove { }
+            add
+            {
+                CommandManager.RequerySuggested += value;
+            }
+            remove
+            {
+                CommandManager.RequerySuggested -= value;
+            }
         }
     }
 }

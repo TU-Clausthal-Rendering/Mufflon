@@ -10,7 +10,7 @@ namespace gui.Dll
     /// <summary>
     /// DLL communication with core.dll
     /// </summary>
-    static class Core
+    static public class Core
     {
         [StructLayout(LayoutKind.Sequential)]
         internal struct Vec3
@@ -34,7 +34,7 @@ namespace gui.Dll
             PINHOLE
         };
 
-        internal enum RendererType
+        public enum RendererType
         {
             CPU_PT,
             GPU_PT

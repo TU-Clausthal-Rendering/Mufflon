@@ -11,8 +11,13 @@ namespace gui.ViewModel
 {
     public class ProfilerViewModel : INotifyPropertyChanged
     {
+        private static int RENDERING_INDEX = 0;
+        private static int LOADING_INDEX = 1;
+
         private Models m_models;
         private TreeView m_profilerTree;
+        private TreeViewItem m_renderTree;
+        private TreeViewItem m_loaderTree;
 
         public ProfilerViewModel(MainWindow window, Models models)
         {
@@ -20,11 +25,14 @@ namespace gui.ViewModel
             m_profilerTree = (TreeView)window.FindName("ProfilerTreeView");
             if (m_profilerTree == null)
                 throw new System.Exception("Failed to aquire profiler tree");
-            TreeViewItem top = new TreeViewItem();
-            top.FontFamily = new FontFamily("Courier New");
-            top.Header = "Profiler Data";
-            m_profilerTree.Items.Add(top);
+            m_renderTree = (TreeViewItem)m_profilerTree.Items[RENDERING_INDEX];
+            if (m_renderTree == null)
+                throw new System.Exception("Failed to aquire render tree item");
+            m_loaderTree = (TreeViewItem)m_profilerTree.Items[LOADING_INDEX];
+            if (m_loaderTree == null)
+                throw new System.Exception("Failed to aquire loader tree item");
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
+            m_models.Scene.PropertyChanged += SceneOnPropertyChanged;
         }
 
         private void RendererOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -32,27 +40,37 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(RendererModel.Iteration):
-                    System.Windows.Application.Current.Dispatcher.Invoke(new Action( () => {
-                        initProfilerData();
-                    } ));
+                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                        updateRenderingData();
+                    }));
                     break;
                 case nameof(RendererModel.IsRendering):
-                    if(m_models.Renderer.IsRendering)
+                    if (m_models.Renderer.IsRendering)
                         System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
-                            initProfilerData();
+                            updateRenderingData();
                         }));
                     break;
             }
         }
 
-        // Initializes the 
-        private void initProfilerData()
+        private void SceneOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
-            string csv = Core.profiling_get_total_and_snapshots();
+            switch (args.PropertyName)
+            {
+                case nameof(SceneModel.FullPath):
+                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                        updateLoadingData();
+                    }));
+                    break;
+            }
+        }
 
-            TreeViewItem top = new TreeViewItem();
-            top.FontFamily = new FontFamily("Courier New");
-            top.Header = "Profiler Data";
+        // Initializes the rendering profile data
+        private void updateRenderingData()
+        {
+            TreeViewItem renderItem = new TreeViewItem();
+            renderItem.FontFamily = m_renderTree.FontFamily;
+            renderItem.Header = m_renderTree.Header;
 
             // Parse the CSV string
             // Layout:
@@ -60,28 +78,64 @@ namespace gui.ViewModel
             // csv-data\n
             // Children (see above) if applicable
 
-            string[] lines = csv?.Split('\n');
-
-            // Parse the top-level items
-            uint currentLine = 0u;
-            // Ignore last newline
-            while ((currentLine + 1u) < lines.Length)
+            // Renderer
             {
-                currentLine = appendChild(lines, currentLine, ref top);
-            }
+                string csv = Core.profiling_get_total_and_snapshots();
+                string[] lines = csv?.Split('\n');
 
-            // Expand the tree if necessary
-            if(m_profilerTree.Items.Count >= 1)
-            {
-                TreeViewItem oldTop = ((TreeViewItem)m_profilerTree.Items[0]);
-                if (oldTop.IsExpanded)
+                // Parse the top-level items
+                uint currentLine = 0u;
+                // Ignore last newline
+                while ((currentLine + 1u) < lines.Length)
                 {
-                    top.IsExpanded = true;
-                    expandPreviouslyExpanded(oldTop, ref top);
+                    currentLine = appendChild(lines, currentLine, ref renderItem);
                 }
             }
-            m_profilerTree.Items.Clear();
-            m_profilerTree.Items.Add(top);
+
+            if (m_renderTree.IsExpanded)
+            {
+                renderItem.IsExpanded = true;
+                expandPreviouslyExpanded(m_renderTree, ref renderItem);
+            }
+            m_profilerTree.Items[RENDERING_INDEX] = renderItem;
+            m_renderTree = renderItem;
+            m_profilerTree.UpdateLayout();
+        }
+
+        // Initializes the loading profiile data
+        private void updateLoadingData()
+        {
+            TreeViewItem loadingItem = new TreeViewItem();
+            loadingItem.FontFamily = m_loaderTree.FontFamily;
+            loadingItem.Header = m_loaderTree.Header;
+
+            // Parse the CSV string
+            // Layout:
+            // 'name',children:#,type:(cpu|gpu)(,(curr)snapshots:#)\n
+            // csv-data\n
+            // Children (see above) if applicable
+
+            // Renderer
+            {
+                string csv = Loader.loader_profiling_get_total_and_snapshots();
+                string[] lines = csv?.Split('\n');
+
+                // Parse the top-level items
+                uint currentLine = 0u;
+                // Ignore last newline
+                while ((currentLine + 1u) < lines.Length)
+                {
+                    currentLine = appendChild(lines, currentLine, ref loadingItem);
+                }
+            }
+
+            if (m_loaderTree.IsExpanded)
+            {
+                loadingItem.IsExpanded = true;
+                expandPreviouslyExpanded(m_loaderTree, ref loadingItem);
+            }
+            m_profilerTree.Items[LOADING_INDEX] = loadingItem;
+            m_loaderTree = loadingItem;
             m_profilerTree.UpdateLayout();
         }
 

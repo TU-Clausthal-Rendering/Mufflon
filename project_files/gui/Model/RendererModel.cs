@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using gui.Annotations;
+using gui.Dll;
 
 namespace gui.Model
 {
@@ -16,6 +17,7 @@ namespace gui.Model
     {
         private bool m_isRendering = false;
         private uint m_iteration = 0u;
+        private Core.RendererType m_type = Core.RendererType.CPU_PT;
 
         public bool IsRendering
         {
@@ -30,10 +32,28 @@ namespace gui.Model
 
         public uint Iteration { get => m_iteration; }
 
+        public Core.RendererType Type
+        {
+            get => m_type;
+            set
+            {
+                if (m_type == value) return;
+                m_type = value;
+                OnPropertyChanged(nameof(Type));
+            }
+        }
+
         public void performedIteration()
         {
             ++m_iteration;
             OnPropertyChanged(nameof(Iteration));
+        }
+
+        public void reset()
+        {
+            m_iteration = 0u;
+            if (!Core.render_reset())
+                throw new Exception(Core.GetDllError());
         }
 
         #region PropertyChanged

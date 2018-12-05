@@ -80,49 +80,16 @@ namespace gui.Dll
             {
                 InitializeOpenGl();
                 Core.profiling_enable();
+                Loader.loader_profiling_enable();
                 if (!Core.profiling_set_level(Core.ProfilingLevel.ALL))
                     throw new Exception(Core.GetDllError());
-                Core.RendererType rendererType = Core.RendererType.CPU_PT;
-                IntPtr light = Core.world_add_point_light("testPointLight", new Core.Vec3(0, 0, 0),
-                   new Core.Vec3(1, 1, 1));
-                if(light == IntPtr.Zero)
-                    throw new Exception(Core.GetDllError());
-                IntPtr cam = Core.world_add_pinhole_camera("testPinholeCam", new Core.Vec3(0, 0, 0),
-                    new Core.Vec3(0, 0, 1), new Core.Vec3(0, 1, 0), 1e-10f, 1e10f, 2.3f);
-                if(cam == IntPtr.Zero)
-                    throw new Exception(Core.GetDllError());
-                IntPtr scenario = Core.world_create_scenario("testscenario");
-                if(scenario == IntPtr.Zero)
-                    throw new Exception(Core.GetDllError());
-                if(!Core.scenario_add_light(scenario, "testPointLight"))
-                    throw new Exception(Core.GetDllError());
-                if(!Core.scenario_set_camera(scenario, cam))
-                    throw new Exception(Core.GetDllError());
-                if (!Core.scenario_set_resolution(scenario, 800, 600))
-                    throw new Exception(Core.GetDllError());
-                if (Core.world_load_scenario(scenario) == IntPtr.Zero)
-                    throw new Exception(Core.GetDllError());
-                if(!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
-                    throw new Exception(Core.GetDllError());
-                if(!Core.render_enable_renderer(rendererType))
+                if (!Loader.loader_profiling_set_level(Loader.ProfilingLevel.ALL))
                     throw new Exception(Core.GetDllError());
 
                 while (m_isRunning)
                 {
                     HandleCommands();
                     HandleResize();
-
-                    /*if(toggleRenderer)
-                    {
-                        if (rendererType == Core.RendererType.CPU_PT)
-                            rendererType = Core.RendererType.GPU_PT;
-                        else
-                            rendererType = Core.RendererType.CPU_PT;
-
-                        if (!Core.render_enable_renderer(rendererType))
-                            throw new Exception(Core.GetDllError());
-                        toggleRenderer = false;
-                    }*/
 
                     if (m_isRendering)
                     {

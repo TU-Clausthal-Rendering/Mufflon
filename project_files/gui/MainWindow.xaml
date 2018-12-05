@@ -32,7 +32,7 @@
                 BorderThickness="{StaticResource ThinBorder}"
                 BorderBrush="{StaticResource BorderBrush}">
                 <MenuItem Header="File">
-                    <MenuItem Header="Load Renderer"/>
+                    <MenuItem Header="Load Renderer" Command="{Binding SelectRendererCommand}"/>
                     <MenuItem Header="Load Scene" Command="{Binding LoadSceneCommand}"/>
                 </MenuItem>
                 <MenuItem Header="Help">
@@ -127,7 +127,12 @@
                 </Grid.ColumnDefinitions>
 
                 <TreeView Grid.Column="0"
-                          Name="ProfilerTreeView"/>
+                          Name="ProfilerTreeView">
+                    <TreeViewItem Header="Rendering"
+                                  FontFamily="Courier New"/>
+                    <TreeViewItem Header="Loading"
+                                  FontFamily="Courier New"/>
+                </TreeView>
 
                 <GridSplitter
                     Grid.Column="1"

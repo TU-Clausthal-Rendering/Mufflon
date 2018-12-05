@@ -35,10 +35,14 @@ namespace gui.ViewModel
         public StatusbarViewModel Statusbar { get; }
         public ProfilerViewModel Profiler { get; }
 
+        public RendererViewModel Renderer { get; }
+
         public ICommand AddLightCommand { get; }
         public ICommand AddMaterialCommand { get; }
         public ICommand AddCameraCommand { get; }
         public ICommand LoadSceneCommand { get; }
+
+        public ICommand SelectRendererCommand { get; }
 
         private readonly Models m_models;
 
@@ -59,11 +63,14 @@ namespace gui.ViewModel
 
             Profiler = new ProfilerViewModel(window, m_models);
 
+            Renderer = new RendererViewModel(m_models);
+
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);
             AddCameraCommand = new AddCameraCommand(m_models);
             AddMaterialCommand = new AddMaterialCommand(m_models);
             LoadSceneCommand = new LoadSceneCommand(m_models);
+            SelectRendererCommand = new SelectRendererCommand(m_models);
         }
     }
 }

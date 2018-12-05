@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.ComponentModel;
 using gui.Model;
 using gui.Dll;
 using gui.Properties;
@@ -24,7 +25,7 @@ namespace gui.Command
 
         public bool CanExecute(object parameter)
         {
-            return true;
+            return !m_models.Renderer.IsRendering;
         }
 
         public virtual void Execute(object parameter)
@@ -51,15 +52,10 @@ namespace gui.Command
                             MessageBoxIcon.Error);
                     } else
                     {
-                        if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
-                            throw new Exception(Core.GetDllError());
-                        if (!Core.render_enable_renderer(Core.RendererType.GPU_PT))
-                            throw new Exception(Core.GetDllError());
+                        m_models.Scene.FullPath = file;
                     }
-
                 }
             }
-            
         }
 
         public event EventHandler CanExecuteChanged

@@ -87,6 +87,7 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
+    <Compile Include="Command\SelectRendererCommand.cs" />
     <Compile Include="Command\LoadSceneCommand.cs" />
     <Compile Include="Command\PlayPauseCommand.cs" />
     <Compile Include="Command\RemoveCameraCommand.cs" />
@@ -149,6 +150,8 @@
     <Compile Include="ViewModel\Material\TorranceMaterialViewModel.cs" />
     <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
     <Compile Include="ViewModel\ProfilerViewModel.cs" />
+    <Compile Include="ViewModel\RendererViewModel.cs" />
+    <Compile Include="ViewModel\SelectRendererViewModel.cs" />
     <Compile Include="ViewModel\StatusbarViewModel.cs" />
     <Compile Include="ViewModel\ToolbarViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
@@ -168,6 +171,9 @@
     </Compile>
     <Compile Include="View\Dialog\AddPropertyDialog.xaml.cs">
       <DependentUpon>AddPropertyDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Dialog\SelectRendererDialog.xaml.cs">
+      <DependentUpon>SelectRendererDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\Helper\ComboBoxItem.cs" />
     <Compile Include="View\Helper\EnterTextBox.cs" />
@@ -250,6 +256,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Dialog\AddPropertyDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Dialog\SelectRendererDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -33,7 +33,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            Core.render_reset();
+            m_models.Renderer.reset();
         }
 
         public event EventHandler CanExecuteChanged;
