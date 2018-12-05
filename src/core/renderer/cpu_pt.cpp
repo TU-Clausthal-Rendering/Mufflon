@@ -53,7 +53,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
 	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	/*u8 vertexBuffer[256];
+	u8 vertexBuffer[256];
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	const scene::materials::Medium* media = m_currentScene->get_media<Device::CPU>();
 	// Create a start for the path
@@ -66,7 +66,20 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	do {
 		if(pathLen < 666) { // TODO: min and max pathLen bounds
 
-			// TODO: Call NEE member function for the camera start/recursive vertices
+			// Call NEE member function for the camera start/recursive vertices
+			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
+			u64 neeSeed = m_rngs[pixel].next();
+			auto nee = connect(m_currentScene->get_light_tree<Device::CPU>(), 0, 1, neeSeed,
+				vertex->get_position(), m_currentScene->get_bounding_box(),
+				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
+			bool anyhit = false; // TODO use a real anyhit method
+			if(!anyhit) {
+				auto value = vertex->evaluate(nee.direction, media);
+				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
+				float mis = 1.0f / (1.0f + hitPdf / nee.pos.pdf);
+				outputBuffer.contribute(coord, throughput, { Spectrum{nee.intensity}, 1.0f },
+					value.cosThetaOut, value.value * mis);
+			}
 
 			// Walk
 			scene::Point lastPosition = vertex->get_position();
@@ -79,14 +92,15 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(m_currentScene->get_light_tree<Device::CPU>(), 0,
 												  lastPosition, scene::lights::guide_flux);
-				float mis = backwardPdf / vertex->get_incident_pdf();
+				float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
+					vertex->get_normal(), vertex->get_albedo());
 			}
 		}
 		++pathLen;
-	} while(pathLen < 666);*/
+	} while(pathLen < 666);
 
 	// Random walk ended because of missing the scene?
-	int pathLen = 0;
 	if(pathLen < 666) {
 		// TODO: fetch background
 		// TODO: normals, position???

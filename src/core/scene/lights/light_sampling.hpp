@@ -48,10 +48,12 @@ struct PhotonDir {
 
 struct NextEventEstimation {
 	math::PositionSample pos;
-	math::DirectionSample dir;
-	Spectrum diffIrradiance; // Unit: W/m²
-	float distSqr;
-	LightType type;
+	//math::DirectionSample dir;	// PDF not needed, because PT is the only user of NEE, maybe required later again??
+	scene::Direction direction;		// From surface to the light source
+	float cosOut;					// Cos of the surface or 0 for non-hitable sources
+	Spectrum intensity;				// Unit: W/sr²
+	float distSq;
+	//LightType type; // Not required ATM
 };
 
 
@@ -232,8 +234,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight
 	const ei::Vec3 direction = (light.position - pos) / sqrtf(distSqr);
 	return NextEventEstimation{
 		math::PositionSample{ light.position, AreaPdf::infinite() },
-		math::DirectionSample{ direction, math::get_uniform_dir_pdf() },
-		light.intensity / distSqr, distSqr, LightType::POINT_LIGHT
+		direction, 0.0f, light.intensity, distSqr
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight& light,
@@ -247,46 +248,35 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 									  cosThetaMax, __half2float(light.cosFalloffStart));
 	return NextEventEstimation{
 		math::PositionSample{ light.position, AreaPdf::infinite() },
-		math::DirectionSample{ direction, math::get_uniform_cone_pdf(cosThetaMax) },
-		light.intensity * falloff / distSqr, distSqr, LightType::SPOT_LIGHT
+		direction, 0.0f, light.intensity * falloff, distSqr
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightTriangle<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
-	ei::Vec3 direction = pos - posSample.pos.position;
+	ei::Vec3 direction = posSample.pos.position - pos;
 	const float distSqr = ei::lensq(direction);
 	direction /= sqrtf(distSqr);
 	// Compute the differential irradiance and make sure we went out the right
 	// direction.
-	float cosOut = ei::dot(posSample.source_param.area.normal, direction);
-	const ei::Vec3 diffIrradiance = (cosOut > 0u)
-										? (posSample.intensity * cosOut / (distSqr * float(posSample.pos.pdf)))
-										: ei::Vec3{ 0 };
+	float cosOut = ei::max(0.0f, ei::dot(posSample.source_param.area.normal, direction));
 	return NextEventEstimation{
-		posSample.pos,
-		math::DirectionSample{ direction, math::get_cosine_dir_pdf(cosOut)},
-		diffIrradiance, distSqr, LightType::AREA_LIGHT_TRIANGLE
+		posSample.pos, direction, cosOut, posSample.intensity * cosOut, distSqr
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQuad<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
-	ei::Vec3 direction = pos - posSample.pos.position;
+	ei::Vec3 direction = posSample.pos.position - pos;
 	const float distSqr = ei::lensq(direction);
 	direction /= sqrtf(distSqr);
 	// Compute the differential irradiance and make sure we went out the right
 	// direction.
-	float cosOut = ei::dot(posSample.source_param.area.normal, direction);
-	const ei::Vec3 diffIrradiance = (cosOut > 0u)
-										? (posSample.intensity * cosOut / (distSqr * float(posSample.pos.pdf)))
-										: ei::Vec3{ 0 };
+	float cosOut = ei::max(0.0f, ei::dot(posSample.source_param.area.normal, direction));
 	return NextEventEstimation{
-		posSample.pos, math::DirectionSample{ direction,
-											  math::get_cosine_dir_pdf(cosOut)},
-		diffIrradiance, distSqr, LightType::AREA_LIGHT_QUAD
+		posSample.pos, direction, cosOut, posSample.intensity * cosOut, distSqr
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightSphere<CURRENT_DEV>& light,
@@ -295,9 +285,9 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 	// TODO
 	return NextEventEstimation{
 		math::PositionSample{},
-		math::DirectionSample{},
+		scene::Direction{}, 0.0f,
 		ei::Vec3{},
-		float{}, LightType::AREA_LIGHT_SPHERE
+		float{}
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const DirectionalLight& light,
@@ -307,9 +297,9 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Directiona
 	// TODO
 	return NextEventEstimation{
 		math::PositionSample{},
-		math::DirectionSample{},
+		scene::Direction{}, 0.0f,
 		ei::Vec3{},
-		float{}, LightType::DIRECTIONAL_LIGHT
+		float{}
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLight<CURRENT_DEV>& light,
@@ -318,9 +308,9 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLigh
 	// TODO
 	return NextEventEstimation{
 		math::PositionSample{},
-		math::DirectionSample{},
+		scene::Direction{}, 0.0f,
 		ei::Vec3{},
-		float{}, LightType::ENVMAP_LIGHT
+		float{}
 	};
 }
 

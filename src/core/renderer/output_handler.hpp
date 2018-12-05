@@ -38,16 +38,20 @@ struct RenderBuffer {
 	scene::textures::TextureDevHandle_t<dev> m_lightness = {};
 	ei::IVec2 m_resolution;
 
-	// Handle contribution of connection and merge events
+	/*
+	 * Handle contribution of connection and merge events
+	 * value: The radiance estimate from the event. This can be the BxDF (merge) or
+	 *		BxDF * BxDF / distSq for connections.
+	 */
 	__host__ __device__ void contribute(Pixel pixel,
 										const Throughput & viewThroughput,
 										const Throughput & lightThroughput,
-										float cosines, const ei::Vec3& brdfs
+										float cosines, const ei::Vec3& value
 	) {
 		using namespace scene::textures;
 		if(is_valid(m_radiance)) {
 			ei::Vec4 prev = read(m_radiance, pixel);
-			ei::Vec3 newVal = viewThroughput.weight * lightThroughput.weight * brdfs * cosines;
+			ei::Vec3 newVal = viewThroughput.weight * lightThroughput.weight * value * cosines;
 			write(m_radiance, pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_lightness)) {

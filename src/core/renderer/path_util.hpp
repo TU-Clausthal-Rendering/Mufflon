@@ -122,6 +122,19 @@ public:
 		return 0.0f;
 	}
 
+	// Get a normal if there is any. Otherwise returns a 0-vector.
+	scene::Direction get_normal() const {
+		if(m_type == Interaction::LIGHT_AREA) {
+			auto* alDesc = as<AreaLightDesc>(desc());
+			return alDesc->normal;
+		}
+		if(m_type == Interaction::SURFACE) {
+			auto* surfDesc = as<SurfaceDesc>(desc());
+			return surfDesc->tangentSpace.shadingN;
+		}
+		return scene::Direction{0.0f};
+	}
+
 	// Get the sampling PDFs of this vertex (not defined, if
 	// the vertex is an end point on a surface). Details at the members
 	//AngularPdf get_forward_pdf() const { return m_pdfF; }
@@ -290,7 +303,7 @@ public:
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
-	Spectrum get_emission() {
+	Spectrum get_emission() const {
 		switch(m_type) {
 			case Interaction::VOID:
 			case Interaction::LIGHT_POINT:
@@ -307,6 +320,17 @@ public:
 				return scene::materials::emission(desc->params, m_incident);
 			}
 		}
+		return Spectrum{0.0f};
+	}
+
+	Spectrum get_albedo() const {
+		if(m_type == Interaction::SURFACE) {
+			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
+			return scene::materials::albedo(desc->params);
+		}
+		// Area light source vertices are on surfaces with an albedo too.
+		// However, it is likely that they are never asked for their albedo().
+		mAssert(m_type != Interaction::LIGHT_AREA);
 		return Spectrum{0.0f};
 	}
 

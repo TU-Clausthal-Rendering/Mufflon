@@ -149,10 +149,12 @@ namespace lighttree_detail {
 // Helper to adjust PDF by the chance to pick light type
 CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
 	sample.pos.pdf *= chance;
+	sample.intensity /= chance;
 	return sample;
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&& sample, float chance) {
 	sample.pos.pdf *= chance;
+	sample.intensity /= chance;
 	return sample;
 }
 
@@ -330,8 +332,8 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		mAssert(intervalLeft <= intervalRight);
 		
 		// Find out the two cluster centers
-		const ei::Vec3 leftCenter = get_cluster_center(currentNode->left, tree);
-		const ei::Vec3 rightCenter = get_cluster_center(currentNode->right, tree);
+		const ei::Vec3 leftCenter = get_center(tree.memory + currentNode->left.offset, currentNode->left.type);
+		const ei::Vec3 rightCenter = get_center(tree.memory + currentNode->right.offset, currentNode->right.type);
 
 		// Scale the flux up
 		float probLeft = guide(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
@@ -401,14 +403,14 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
 	if(rndChoice < rightEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
-		return adjustPdf(connect_light(tree.envLight, position, rnd), envProb);
+		return lighttree_detail::adjustPdf(connect_light(tree.envLight, position, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = static_cast<u64>(std::numeric_limits<u64>::max() * (envProb + dirProb));
 	u64 left = rightEnv;
 	float p = dirProb;	// TODO: the correct probability would be (right-left) / <64>max, but the differenze might not even noticable in a 23bit float mantissa
 	const LightSubTree* subTree = &tree.dirLights;
-	if(rndChoice < rightDir) {
+	if(rndChoice < right) {
 		mAssert(tree.dirLights.lightCount > 0u);
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
@@ -417,7 +419,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 		subTree = &tree.posLights;
 		p = posProb;
 	}
-	return connect(*subTree, left, right, p, rndChoice, position, bounds, rnd, guide);
+	return connect(*subTree, left, right, rndChoice, p, position, bounds, rnd, guide);
 }
 
 /*
