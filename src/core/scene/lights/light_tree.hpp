@@ -151,6 +151,10 @@ CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
 	sample.pos.pdf *= chance;
 	return sample;
 }
+CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&& sample, float chance) {
+	sample.pos.pdf *= chance;
+	return sample;
+}
 
 CUDA_FUNCTION __forceinline__ ei::Vec3 get_center(const void* node, u16 type) {
 	switch(type) {
@@ -209,23 +213,17 @@ CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* ligh
  * and flux distribution of 50/50).
  */
 CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
-								u64 index, u64 rng, const ei::Box& bounds,
+								u64 rndChoice, float treeProb, const ei::Box& bounds,
 								const math::RndSet2& rnd) {
-	// Check: do we have more than one light here?
-	if(tree.lightCount == 1u) {
-		// Nothing to do but sample the photon
-		mAssert(tree.root.type < static_cast<u16>(LightType::NUM_LIGHTS));
-		return lighttree_detail::sample_light(static_cast<LightType>(tree.root.type),
-											  tree.memory, bounds, rnd);
-	}
+	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
 	const LightSubTree::Node* currentNode = as<LightSubTree::Node>(tree.memory);
-	u16 type = LightSubTree::Node::INTERNAL_NODE_TYPE;
+	u16 type = tree.root.type;
 	u32 offset = 0u;
 	u64 intervalLeft = left;
 	u64 intervalRight = right;
-	float lightPdf = 1.f;
+	float lightProb = treeProb;
 
 	// Iterate until we hit a leaf
 	while(type == LightSubTree::Node::INTERNAL_NODE_TYPE) {
@@ -233,101 +231,98 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 		mAssert(intervalLeft <= intervalRight);
 
 		// Scale the flux up
-		const float fluxSum = currentNode->left.flux + currentNode->right.flux;
-		const float probLeft = currentNode->left.flux / fluxSum;
+		float probLeft = currentNode->left.flux / (currentNode->left.flux + currentNode->right.flux);
 		// Compute the integer bounds: once rounded down, once rounded up
-		u64 leftRight = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
-										 * probLeft);
-		u64 rightLeft = static_cast<u64>(std::ceilf(intervalLeft + (intervalRight - intervalLeft)
-													* probLeft));
-		// Check if our index falls into one of these
-		if(index < leftRight) {
-			lightPdf *= probLeft;
-			if(currentNode->left.is_light()) {
-				type = currentNode->left.type;
-				offset = currentNode->left.offset;
-				break;
-			}
-			currentNode = tree.get_node(currentNode->left.offset);
-			intervalRight = leftRight;
-		} else if(index >= rightLeft) {
-			lightPdf *= 1.f - probLeft;
-			if(currentNode->right.is_light()) {
-				type = currentNode->right.type;
-				offset = currentNode->right.offset;
-				break;
-			}
-			currentNode = tree.get_node(currentNode->right.offset);
-			intervalLeft = rightLeft;
+		u64 intervalBoundary = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft) * probLeft);
+		if(rndChoice <= intervalBoundary) {
+			type = currentNode->left.type;
+			offset = currentNode->left.offset;
+			intervalRight = intervalBoundary+1;	//+1 because <=, <= because we floor() anyway
+			lightProb *= probLeft;
 		} else {
-			// In the middle: gotta let RNG decide this one
-			intervalLeft = 0u;
-			intervalRight = std::numeric_limits<u64>::max();
-			std::size_t split = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
-												 * probLeft);
-			if(rng < split) {
-				lightPdf *= probLeft;
-				if(currentNode->left.is_light()) {
-					type = currentNode->left.type;
-					offset = currentNode->left.offset;
-					break;
-				}
-				currentNode = tree.get_node(currentNode->left.offset);
-				intervalRight = split;
-			} else {
-				lightPdf *= 1.f - probLeft;
-				if(currentNode->right.is_light()) {
-					type = currentNode->right.type;
-					offset = currentNode->right.offset;
-					break;
-				}
-				currentNode = tree.get_node(currentNode->right.offset);
-				intervalLeft = split;
-			}
-
-			// Make sure that for following iterations, we use index as well
-			index = rng;
+			type = currentNode->right.type;
+			offset = currentNode->right.offset;
+			intervalLeft = intervalBoundary+1;
+			lightProb *= (1.0f-probLeft);
 		}
+		currentNode = tree.get_node(offset);
 	}
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
-	using namespace lighttree_detail;
 	return adjustPdf(sample_light(static_cast<LightType>(type),
-								  tree.memory + offset, bounds, rnd),
-					 lightPdf);
+							 tree.memory + offset, bounds, rnd), lightProb);
+}
+
+/**
+ * Emits a single photon from a light source.
+ * To ensure a good distribution, we also take an index, which is used to guide
+ * the descent into the tree when it is possible to do so without using RNG.
+ * index: Some arbitrary index. The events are evenly distributed among the indices.
+ * numIndices: Range (number) of the indices.
+ * seed: A random seed to randomize the dicision. All events (enumerated by indices)
+ *		must use the same number.
+ */
+CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
+								u64 numIndices, u64 seed, const ei::Box& bounds,
+								const math::RndSet2_1& rnd) {
+	using namespace lighttree_detail;
+	// See connect() for details on the rndChoice
+	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
+								   : seed;
+
+	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
+	float envProb = 0.f;
+	if(is_valid(tree.envLight.texHandle)) {
+		fluxSum += ei::sum(tree.envLight.flux);
+		envProb = ei::sum(tree.envLight.flux) / fluxSum;
+	}
+	float dirProb = tree.dirLights.root.flux / fluxSum;
+	float posProb = tree.posLights.root.flux / fluxSum;
+
+	// Now split up based on flux
+	// First is envmap...
+	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
+	if(rndChoice < rightEnv) {
+		mAssert(is_valid(tree.envLight.texHandle));
+		return adjustPdf(sample_light_pos(tree.envLight, bounds, rnd), envProb);
+	}
+	// ...then the directional lights come...
+	u64 right = static_cast<u64>(std::numeric_limits<u64>::max() * (envProb + dirProb));
+	u64 left = rightEnv;
+	float p = dirProb;	// TODO: the correct probability would be (right-left) / <64>max, but the differenze might not even noticable in a 23bit float mantissa
+	const LightSubTree* subTree = &tree.dirLights;
+	if(rndChoice < right) {
+		mAssert(tree.dirLights.lightCount > 0u);
+	} else {
+		mAssert(tree.posLights.lightCount > 0u);
+		left = right;
+		right = std::numeric_limits<u64>::max();
+		subTree = &tree.posLights;
+		p = posProb;
+	}
+	return emit(*subTree, left, right, rndChoice, p, bounds, rnd);
 }
 
 
-/** Shared code for emitting a single photon from the tree.
+/*
+ * Shared code for connecting to a subtree.
  * Takes the light tree, initial interval limits, and RNG number as inputs.
- * Also takes an index, which is initially used to distribute the photon
- * until it cannot uniquely identify a subtree (ie. index 1 for interval [0,2]
- * and flux distribution of 50/50).
  */
 template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u64 right,
-										  u64 index, u64 rng, const ei::Vec3& position,
+										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const ei::Box& bounds, const math::RndSet2& rnd,
 										  Guide&& guide) {
 	using namespace lighttree_detail;
-	// Check: do we have more than one light here?
-	if(tree.lightCount == 1u) {
-		// Nothing to do but sample the photon
-		mAssert(tree.root.type < static_cast<u16>(LightType::NUM_LIGHTS));
-		return lighttree_detail::connect_light(static_cast<LightType>(tree.root.type),
-											   tree.memory, position,
-											   ei::lensq(tree.root.center - position),
-											   bounds, rnd);
-	}
 
 	// Traverse the tree to split chance between lights
 	const LightSubTree::Node* currentNode = as<LightSubTree::Node>(tree.memory);
-	u16 type = LightSubTree::Node::INTERNAL_NODE_TYPE;
+	u16 type = tree.root.type;
 	u32 offset = 0u;
 	u64 intervalLeft = left;
 	u64 intervalRight = right;
-	float lightPdf = 1.f;
+	float lightProb = treeProb;
 
 	// Iterate until we hit a leaf
 	while(type == LightSubTree::Node::INTERNAL_NODE_TYPE) {
@@ -341,161 +336,56 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		// Scale the flux up
 		float probLeft = guide(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
 		// Compute the integer bounds: once rounded down, once rounded up
-		u64 leftRight = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
-										 * probLeft);
-		u64 rightLeft = static_cast<u64>(std::ceilf(intervalLeft + (intervalRight - intervalLeft)
-													* probLeft));
-		// Check if our index falls into one of these
-		if(index < leftRight) {
-			lightPdf *= probLeft;
-			if(currentNode->left.is_light()) {
-				type = currentNode->left.type;
-				offset = currentNode->left.offset;
-				break;
-			}
-			currentNode = tree.get_node(currentNode->left.offset);
-			intervalRight = leftRight;
-		} else if(index >= rightLeft) {
-			lightPdf *= 1.f - probLeft;
-			if(currentNode->right.is_light()) {
-				type = currentNode->right.type;
-				offset = currentNode->right.offset;
-				break;
-			}
-			currentNode = tree.get_node(currentNode->right.offset);
-			intervalLeft = rightLeft;
+		u64 intervalBoundary = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft) * probLeft);
+		if(rndChoice <= intervalBoundary) {
+			type = currentNode->left.type;
+			offset = currentNode->left.offset;
+			intervalRight = intervalBoundary+1;	//+1 because <=, <= because we floor() anyway
+			lightProb *= probLeft;
 		} else {
-			// In the middle: gotta let RNG decide this one
-			intervalLeft = 0u;
-			intervalRight = std::numeric_limits<u64>::max();
-			std::size_t split = static_cast<u64>(intervalLeft + (intervalRight - intervalLeft)
-												 * probLeft);
-			if(rng < split) {
-				lightPdf *= probLeft;
-				if(currentNode->left.is_light()) {
-					type = currentNode->left.type;
-					offset = currentNode->left.offset;
-					break;
-				}
-				currentNode = tree.get_node(currentNode->left.offset);
-				intervalRight = split;
-			} else {
-				lightPdf *= 1.f - probLeft;
-				if(currentNode->right.is_light()) {
-					type = currentNode->right.type;
-					offset = currentNode->right.offset;
-					break;
-				}
-				currentNode = tree.get_node(currentNode->right.offset);
-				intervalLeft = split;
-			}
-
-			// Make sure that for following iterations, we use index as well
-			index = rng;
+			type = currentNode->right.type;
+			offset = currentNode->right.offset;
+			intervalLeft = intervalBoundary+1;
+			lightProb *= (1.0f-probLeft);
 		}
+		currentNode = tree.get_node(offset);
 	}
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
-	// TODO: incorporate light selection probability
-	return connect_light(static_cast<LightType>(type), tree.memory + offset,
-						 position, ei::lensq(currentNode->center - position),
-						 bounds, rnd);
+	return adjustPdf(connect_light(static_cast<LightType>(type), tree.memory + offset,
+							 position, ei::lensq(currentNode->center - position),
+							 bounds, rnd), lightProb);
 }
 
-/**
- * Emits a single photon from a light source.
- * To ensure a good distribution, we also take an index, which is used to guide
- * the descent into the tree when it is possible to do so without using RNG.
- */
-CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
-								u64 indexMax, u64 rng, const ei::Box& bounds,
-								const math::RndSet2_1& rnd) {
-	using namespace lighttree_detail;
-	// Figure out which of the three top-level light types get the photon
-	// Implicit left boundary of 0 for the interval
-	u64 intervalRight = indexMax;
-
-	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
-	float envProb = 0.f;
-	if(is_valid(tree.envLight.texHandle)) {
-		fluxSum += ei::sum(tree.envLight.flux);
-		envProb = ei::sum(tree.envLight.flux) / fluxSum;
-	}
-	float dirProb = tree.dirLights.root.flux / fluxSum;
-	float posProb = tree.posLights.root.flux / fluxSum;
-
-	// Now split up based on flux
-	// First is envmap...
-	u64 rightEnv = static_cast<u64>(intervalRight * envProb);
-	if(index < rightEnv) {
-		mAssert(is_valid(tree.envLight.texHandle));
-		return adjustPdf(sample_light_pos(tree.envLight, bounds, rnd), envProb);
-	}
-	// ...then come directional lights...
-	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * envProb));
-	u64 rightDir = static_cast<u64>(intervalRight
-									* (ei::sum(tree.envLight.flux)
-									   + tree.dirLights.root.flux) / fluxSum);
-	if(index >= leftDir && index < rightDir) {
-		mAssert(tree.dirLights.lightCount > 0u);
-		return adjustPdf(emit(tree.dirLights, leftDir, rightDir,
-							  index, rng, bounds, rnd), dirProb);
-	}
-	// ...and last positional lights
-	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight
-											  * (ei::sum(tree.envLight.flux)
-												 + tree.dirLights.root.flux / fluxSum)));
-	if(index >= leftPos) {
-		mAssert(tree.posLights.lightCount > 0u);
-		return adjustPdf(emit(tree.posLights, leftPos, intervalRight,
-							  index, rng, bounds, rnd), posProb);
-	}
-
-	// If we made it until here, it means that we fell between
-	// the integer bounds of photon distribution
-	// Thus we need RNG to decide
-	// TODO: it could fall onto a boundary repeatedly, but that costs
-	// performance (even more divergence)
-	u64 splitEnv = static_cast<u64>(std::numeric_limits<u64>::max()
-									* envProb);
-	u64 splitDir = static_cast<u64>(std::numeric_limits<u64>::max()
-									* (ei::sum(tree.envLight.flux)
-									   + tree.dirLights.root.flux) / fluxSum);
-	if(rng < splitEnv) {
-		mAssert(is_valid(tree.envLight.texHandle));
-		return adjustPdf(sample_light_pos(tree.envLight, bounds, rnd), envProb);
-	} else if(rng < splitDir) {
-		mAssert(tree.dirLights.lightCount > 0u);
-		return adjustPdf(emit(tree.dirLights, splitEnv, splitDir, rng, rng, bounds, rnd),
-						 dirProb);
-	} else {
-		mAssert(tree.posLights.lightCount > 0u);
-		return adjustPdf(emit(tree.posLights, splitDir, std::numeric_limits<u64>::max(),
-							  rng, rng, bounds, rnd), posProb);
-	}
-}
-
-// Emits a single photon from a light source.
-CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 rng,
-						  const ei::Box& bounds, const math::RndSet2_1& rnd) {
-	// No index means our RNG serves as an index
-	return emit(tree, rng, std::numeric_limits<u64>::max(), rng, bounds, rnd);
-}
-
-/**
+/*
  * Performs next-event estimation.
- * For selecting the light source we want to connect against we try to maximize
- * the radiance.
+ * For selecting the light source we want to connect to, we try to maximize
+ * the irradiance. Also, this method is able to stratify samples if index ranges are used.
+ * Stratification in this method increases the correllation.
+ *
+ * index: Some arbitrary index. The events are evenly distributed among the indices.
+ * numIndices: Range (number) of the indices.
+ * seed: A random seed to randomize the dicision. All events (enumerated by indices)
+ *		must use the same number.
+ * position: A reference position to estimate the expected irradiance.
+ * bounds: The scenes bounding box.
+ * rnd: A randset used to sample the position on the light source
+ * guide: A function to get a cheap prediction of irradiance.
+ *		Ready to use implementations: guide_flux (ignores the reference position)
+ *		or guide_flux_pos
  */
 template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u64 index,
-										  u64 indexMax, u64 rng, const ei::Vec3& position,
+										  u64 numIndices, u64 seed, const ei::Vec3& position,
 										  const ei::Box& bounds, const math::RndSet2& rnd,
 										  Guide&& guide) {
-	// Figure out which of the three top-level light types get the photon
-	// Implicit left boundary of 0 for the interval
-	u64 intervalRight = indexMax;
+	// Scale the indices such that they sample the u64-intervall equally.
+	// The (modulu) addition with the seed randomizes the choice.
+	// Since the distance between samples is constant this will lead to a
+	// correllation, but also a maximized equal distribution.
+	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
+								   : seed;
 
 	float fluxSum = tree.dirLights.root.flux + tree.posLights.root.flux;
 	float envProb = 0.f;
@@ -508,59 +398,26 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 
 	// Now split up based on flux
 	// First is envmap...
-	u64 rightEnv = static_cast<u64>(intervalRight * envProb);
-	if(index < rightEnv) {
+	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
+	if(rndChoice < rightEnv) {
 		mAssert(is_valid(tree.envLight.texHandle));
-		// TODO: adjust light probability
-		return connect_light(tree.envLight, position, rnd);
+		return adjustPdf(connect_light(tree.envLight, position, rnd), envProb);
 	}
-	// ...then come directional lights...
-	u64 leftDir = static_cast<u64>(std::ceilf(intervalRight * envProb));
-	u64 rightDir = static_cast<u64>(intervalRight
-									* (ei::sum(tree.envLight.flux)
-									   + tree.dirLights.root.flux) / fluxSum);
-	if(index >= leftDir && index < rightDir) {
+	// ...then the directional lights come...
+	u64 right = static_cast<u64>(std::numeric_limits<u64>::max() * (envProb + dirProb));
+	u64 left = rightEnv;
+	float p = dirProb;	// TODO: the correct probability would be (right-left) / <64>max, but the differenze might not even noticable in a 23bit float mantissa
+	const LightSubTree* subTree = &tree.dirLights;
+	if(rndChoice < rightDir) {
 		mAssert(tree.dirLights.lightCount > 0u);
-		return connect(tree.dirLights, leftDir, rightDir, index, rng, position,
-					   bounds, rnd, guide);
-	}
-	// ...and last positional lights
-	u64 leftPos = static_cast<u64>(std::ceilf(intervalRight
-											  * (ei::sum(tree.envLight.flux)
-												 + tree.dirLights.root.flux / fluxSum)));
-	if(index >= leftPos) {
-		mAssert(tree.posLights.lightCount > 0u);
-		// TODO: adjust light probability
-		return connect(tree.posLights, leftPos, intervalRight, index, rng, position,
-					   bounds, rnd, guide);
-	}
-
-	// If we made it until here, it means that we fell between
-	// the integer bounds of photon distribution
-	// Thus we need RNG to decide
-	u64 splitEnv = static_cast<u64>(std::numeric_limits<u64>::max()
-									* envProb);
-	u64 splitDir = static_cast<u64>(std::numeric_limits<u64>::max()
-									* (ei::sum(tree.envLight.flux)
-									   + tree.dirLights.root.flux) / fluxSum);
-	if(rng < splitEnv) {
-		mAssert(is_valid(tree.envLight.texHandle));
-		// TODO: adjust light probability
-		return connect_light(tree.envLight, position, rnd);
-	} else if(rng < splitDir) {
-		mAssert(tree.dirLights.lightCount > 0u);
-		// TODO: adjust light probability
-		return connect(tree.dirLights, splitEnv,
-					   splitDir, rng, rng, position,
-					   bounds, rnd, guide);
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
-		// TODO: adjust light probability
-		return connect(tree.posLights, splitDir,
-					   std::numeric_limits<u64>::max(),
-					   rng, rng, position, bounds,
-					   rnd, guide);
+		left = right;
+		right = std::numeric_limits<u64>::max();
+		subTree = &tree.posLights;
+		p = posProb;
 	}
+	return connect(*subTree, left, right, p, rndChoice, position, bounds, rnd, guide);
 }
 
 /*
