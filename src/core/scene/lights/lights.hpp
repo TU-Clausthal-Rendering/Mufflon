@@ -7,6 +7,7 @@
 #include "core/scene/types.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
+#include "core/math/sampling.hpp"
 #include <cuda_fp16.h>
 #include <type_traits>
 
@@ -172,6 +173,11 @@ Spectrum get_flux(const AreaLightSphere<Device::CPU>& light);
 Spectrum get_flux(const DirectionalLight& light, const ei::Vec3& aabbDiag);
 inline Spectrum get_flux(const EnvMapLight<Device::CPU>& light) { return light.flux; }
 
+
+// ************************************************************************* //
+// *** LIGHT SOURCE EVALUATION ********************************************* //
+// ************************************************************************* //
+
 // Computes the falloff of a spotlight
 CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 												const float cosThetaMax,
@@ -185,35 +191,43 @@ CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 	return 0.f;
 }
 
-
-
-#ifndef __CUDACC__
-// Kind of code duplication, but for type-safety use this when constructing a light tree
-struct PositionalLights {
-	std::variant<PointLight, SpotLight, AreaLightTriangleDesc,
-				 AreaLightQuadDesc, AreaLightSphereDesc> light;
-	PrimitiveHandle primitive { ~0u };
-};
-
-// Gets the light type as an enum value
-inline LightType get_light_type(const PositionalLights& light) {
-	return std::visit([](const auto& posLight) constexpr -> LightType {
-		using Type = std::decay_t<decltype(posLight)>;
-		if constexpr(std::is_same_v<Type, PointLight>)
-			return LightType::POINT_LIGHT;
-		else if constexpr(std::is_same_v<Type, SpotLight>)
-			return LightType::SPOT_LIGHT;
-		else if constexpr(std::is_same_v<Type, AreaLightTriangle<CURRENT_DEV>>)
-			return LightType::AREA_LIGHT_TRIANGLE;
-		else if constexpr(std::is_same_v<Type, AreaLightQuad<CURRENT_DEV>>)
-			return LightType::AREA_LIGHT_QUAD;
-		else if constexpr(std::is_same_v<Type, AreaLightSphere<CURRENT_DEV>>)
-			return LightType::AREA_LIGHT_SPHERE;
-		else
-			return LightType::NUM_LIGHTS;
-	}, light.light);
+CUDA_FUNCTION __forceinline__ math::EvalValue
+evaluate_point(const Spectrum& intensity) {
+	return { intensity, 0.0f, AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } };
 }
 
-#endif // __CUDACC__
+CUDA_FUNCTION __forceinline__ math::EvalValue
+evaluate_spot(const scene::Direction& excident,
+			  const Spectrum& intensity,
+			  const scene::Direction& spotDir,
+			  half cosThetaMax, half cosFalloffStart) {
+	const float cosOut = dot(spotDir, excident);
+	// Early out
+	const float cosThetaMaxf = __half2float(cosThetaMax);
+	if(cosOut <= cosThetaMaxf) return math::EvalValue{};
+	// OK, there will be some contribution
+	const float cosFalloffStartf = __half2float(cosFalloffStart);
+	const float falloff = get_falloff(cosOut, cosThetaMaxf, cosFalloffStartf);
+	return { intensity * falloff, 0.0f,
+			 AngularPdf{ math::get_uniform_cone_pdf(cosThetaMaxf) },
+			 AngularPdf{ 0.0f } };
+}
+
+CUDA_FUNCTION __forceinline__ math::EvalValue
+evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
+			  const scene::Direction& normal) {
+	const float cosOut = dot(normal, excident);
+	// Early out (wrong hemisphere)
+	if(cosOut <= 0.0f) return math::EvalValue{};
+	return { intensity * cosOut, cosOut, AngularPdf{ cosOut / ei::PI },
+			 AngularPdf{ 0.0f } };
+}
+
+CUDA_FUNCTION __forceinline__ math::EvalValue
+evaluate_dir(const Spectrum& intensity, bool isEnvMap, AngularPdf pdf) {
+	// Special case: the incindent area PDF is directly projected.
+	// To avoid the wrong conversion later we need to do its reversal here.
+	return { intensity, isEnvMap ? 1.0f : 0.0f, pdf, AngularPdf{0.0f} };
+}
 
 }}} // namespace mufflon::scene::lights

@@ -156,6 +156,7 @@
     <ClInclude Include="..\..\src\core\export\interface.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
     <ClInclude Include="..\..\src\core\math\rng.hpp" />
+    <ClInclude Include="..\..\src\core\math\sample_types.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
     <ClInclude Include="..\..\src\core\math\sfcurves.hpp" />
     <ClInclude Include="..\..\src\core\memory\accessor.hpp" />
@@ -193,7 +194,6 @@
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp" />
-    <ClInclude Include="..\..\src\core\scene\materials\material_types.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />

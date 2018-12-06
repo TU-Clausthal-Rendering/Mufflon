@@ -2,7 +2,7 @@
 
 #include "util/types.hpp"
 #include "util/assert.hpp"
-#include "export/api.hpp"
+#include "core/export/api.h"
 
 namespace mufflon {
 namespace scene {

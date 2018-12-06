@@ -47,12 +47,14 @@ struct PhotonDir {
 };
 
 struct NextEventEstimation {
-	math::PositionSample pos;
+	//math::PositionSample pos;		// Not required ATM
 	//math::DirectionSample dir;	// PDF not needed, because PT is the only user of NEE, maybe required later again??
 	scene::Direction direction;		// From surface to the light source
 	float cosOut;					// Cos of the surface or 0 for non-hitable sources
 	Spectrum intensity;				// Unit: W/sr²
+	float dist;
 	float distSq;
+	AreaPdf creationPdf;			// Pdf to create this connection event (depends on light choice probability and positional sampling)
 	//LightType type; // Not required ATM
 };
 
@@ -231,24 +233,24 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight
 																const ei::Vec3& pos,
 																const float distSqr,
 																const math::RndSet2& rnd) {
-	const ei::Vec3 direction = (light.position - pos) / sqrtf(distSqr);
+	const float dist = sqrtf(distSqr);
+	const ei::Vec3 direction = (light.position - pos) / dist;
+	const math::EvalValue value = evaluate_point(light.intensity);
 	return NextEventEstimation{
-		math::PositionSample{ light.position, AreaPdf::infinite() },
-		direction, 0.0f, light.intensity, distSqr
+		direction, value.cosOut, value.value, dist, distSqr, AreaPdf::infinite()
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight& light,
 																const ei::Vec3& pos,
 																const float distSqr,
 																const math::RndSet2& rnd) {
-	float cosThetaMax = __half2float(light.cosThetaMax);
-	const ei::Vec3 direction = (light.position - pos) / sqrtf(distSqr);
-	const float falloff = get_falloff(-ei::dot(ei::unpackOctahedral32(light.direction),
-											   direction),
-									  cosThetaMax, __half2float(light.cosFalloffStart));
+	const float dist = sqrtf(distSqr);
+	const ei::Vec3 direction = (light.position - pos) / dist;
+	const math::EvalValue value = evaluate_spot(-direction, light.intensity,
+										ei::unpackOctahedral32(light.direction),
+										light.cosThetaMax, light.cosFalloffStart);
 	return NextEventEstimation{
-		math::PositionSample{ light.position, AreaPdf::infinite() },
-		direction, 0.0f, light.intensity * falloff, distSqr
+		direction, value.cosOut, value.value, dist, distSqr, AreaPdf::infinite()
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightTriangle<CURRENT_DEV>& light,
@@ -257,12 +259,12 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightT
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
 	const float distSqr = ei::lensq(direction);
-	direction /= sqrtf(distSqr);
-	// Compute the differential irradiance and make sure we went out the right
-	// direction.
-	float cosOut = ei::max(0.0f, ei::dot(posSample.source_param.area.normal, direction));
+	const float dist = sqrtf(distSqr);
+	direction /= dist;
+	const math::EvalValue value = evaluate_area(-direction, posSample.intensity,
+										posSample.source_param.area.normal);
 	return NextEventEstimation{
-		posSample.pos, direction, cosOut, posSample.intensity * cosOut, distSqr
+		direction, value.cosOut, value.value, dist, distSqr, posSample.pos.pdf
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQuad<CURRENT_DEV>& light,
@@ -271,12 +273,12 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
 	const float distSqr = ei::lensq(direction);
-	direction /= sqrtf(distSqr);
-	// Compute the differential irradiance and make sure we went out the right
-	// direction.
-	float cosOut = ei::max(0.0f, ei::dot(posSample.source_param.area.normal, direction));
+	const float dist = sqrtf(distSqr);
+	direction /= dist;
+	const math::EvalValue value = evaluate_area(-direction, posSample.intensity,
+										posSample.source_param.area.normal);
 	return NextEventEstimation{
-		posSample.pos, direction, cosOut, posSample.intensity * cosOut, distSqr
+		direction, value.cosOut, value.value, dist, distSqr, posSample.pos.pdf
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightSphere<CURRENT_DEV>& light,
@@ -284,33 +286,43 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 																const math::RndSet2& rnd) {
 	// TODO
 	return NextEventEstimation{
-		math::PositionSample{},
 		scene::Direction{}, 0.0f,
 		ei::Vec3{},
-		float{}
+		float{}, float{},
+		AreaPdf{}
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const DirectionalLight& light,
 																const ei::Vec3& pos,
-																const ei::Box& bounds,
-																const math::RndSet2& rnd) {
-	// TODO
+																const ei::Box& bounds) {
+	AreaPdf posPdf { 1.0f / math::projected_area(light.direction, bounds) };
+	// For Directional lights AngularPdf and AreaPdf are exchanged. This simplifies all
+	// dependent code. The fictive connection point always has a connection distance
+	// of MAX_SCENE_SIZE, independent of the real sampled position (orthographic projection
+	// anyway). This makes it possible to convert the pdf in known ways at every
+	// kind of event.
+	const math::EvalValue value = evaluate_dir(light.radiance, false,
+							posPdf.to_angular_pdf(1.0f, ei::sq(MAX_SCENE_SIZE)));
 	return NextEventEstimation{
-		math::PositionSample{},
-		scene::Direction{}, 0.0f,
-		ei::Vec3{},
-		float{}
+		light.direction, value.cosOut, value.value, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
+		AreaPdf::infinite()	// Dummy pdf (the directional sampling pdf, converted)
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLight<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
+																const ei::Box& bounds,
 																const math::RndSet2& rnd) {
-	// TODO
+	// TODO: sample a direction
+	math::DirectionSample dir;
+	Spectrum radiance;
+
+	// See connect_light(DirectionalLight) for pdf argumentation.
+	AreaPdf posPdf { 1.0f / math::projected_area(dir.direction, bounds) };
+	const math::EvalValue value = evaluate_dir(radiance, true,
+							posPdf.to_angular_pdf(1.0f, ei::sq(MAX_SCENE_SIZE)));
 	return NextEventEstimation{
-		math::PositionSample{},
-		scene::Direction{}, 0.0f,
-		ei::Vec3{},
-		float{}
+		dir.direction, value.cosOut, value.value, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
+		dir.pdf.to_area_pdf(1.0f, ei::sq(MAX_SCENE_SIZE))
 	};
 }
 

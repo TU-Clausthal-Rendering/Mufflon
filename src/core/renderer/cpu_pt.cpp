@@ -79,9 +79,9 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			if(!anyhit) {
 				auto value = vertex->evaluate(nee.direction, media);
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
-				float mis = 1.0f / (1.0f + hitPdf / nee.pos.pdf);
+				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				outputBuffer.contribute(coord, throughput, { Spectrum{nee.intensity}, 1.0f },
-					value.cosThetaOut, value.value * mis);
+					value.cosOut, value.value * mis);
 			}
 		}
 

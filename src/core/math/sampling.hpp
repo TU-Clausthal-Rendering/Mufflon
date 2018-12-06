@@ -3,19 +3,10 @@
 #include "ei/3dtypes.hpp"
 #include "core/export/api.h"
 #include "core/scene/types.hpp"
+#include "sample_types.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace math {
-
-struct DirectionSample {
-	scene::Direction direction;
-	AngularPdf pdf;
-};
-
-struct PositionSample {
-	scene::Point position;
-	AreaPdf pdf;
-};
 
 // Evaluate PDF
 CUDA_FUNCTION constexpr AngularPdf get_uniform_dir_pdf() {
@@ -88,9 +79,9 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 															 float u0, float u1) {
 	// Compute projected cube area
 	ei::Vec3 sides = bounds.max - bounds.min;
-	float projAx = sides.y * sides.z * fabsf(dir.x);
-	float projAy = sides.x * sides.z * fabsf(dir.y);
-	float projAz = sides.x * sides.y * fabsf(dir.z);
+	float projAx = sides.y * sides.z * ei::abs(dir.x);
+	float projAy = sides.x * sides.z * ei::abs(dir.y);
+	float projAz = sides.x * sides.y * ei::abs(dir.z);
 	float area = projAx + projAy + projAz;
 	// Sample a position on one of the cube faces
 	ei::Vec3 position;
@@ -106,6 +97,15 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 		position = ei::Vec3{ u1, u0, (dir.z < 0.f) ? 1.f : 0.f };
 	}
 	return PositionSample{ bounds.min + position * sides, AreaPdf{ 1.f / area } };
+}
+
+CUDA_FUNCTION __forceinline__ float projected_area(const scene::Direction& dir,
+												   const ei::Box& bounds) {
+	ei::Vec3 sides = bounds.max - bounds.min;
+	float projAx = sides.y * sides.z * ei::abs(dir.x);
+	float projAy = sides.x * sides.z * ei::abs(dir.y);
+	float projAz = sides.x * sides.y * ei::abs(dir.z);
+	return projAx + projAy + projAz;
 }
 
 /*

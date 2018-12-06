@@ -687,9 +687,6 @@
     <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\materials\material_types.hpp">
-      <Filter>Source Files\core\scene\materials</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\filesystem.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -728,6 +725,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\importance_sampling.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\math\sample_types.hpp">
+      <Filter>Source Files\core\math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

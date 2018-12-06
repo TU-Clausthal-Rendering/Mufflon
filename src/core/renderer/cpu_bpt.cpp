@@ -38,7 +38,7 @@ float get_mis_part(const BptPathVertex& path,
 	const scene::Direction& connection, float distSq,
 	const void* pathMem
 ) {
-	AreaPdf reversePdf = pdfBack.to_area_pdf(value.cosThetaOut, distSq);
+	AreaPdf reversePdf = pdfBack.to_area_pdf(value.cosOut, distSq);
 	// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
 	float relPdf = reversePdf / path.get_incident_pdf();
 	// Sum up all previous relative probability (cached recursion).
@@ -84,7 +84,7 @@ connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	auto val0 = path0.evaluate( connection, media, false);
 	auto val1 = path1.evaluate(-connection, media, true);
 	float mis = get_mis_weight(path0, val0, path1, val1, connection, distSq, pathMem0, pathMem1);
-	return {val0.value * val1.value, val0.cosThetaOut * val1.cosThetaOut};
+	return {val0.value * val1.value, val0.cosOut * val1.cosOut};
 }
 
 } // namespace ::

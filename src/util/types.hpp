@@ -53,6 +53,7 @@ public:
 		return AreaPdf{ 4294967296.f }; // In theory infinite, but must behave well in float32 (power of two does not change the mantissa, shortens out anyway)
 	}
 
+	__host__ __device__ bool is_infinite() const { return m_pdf >= float(infinite()); }
 private:
 	Real m_pdf = 0.f;
 };
@@ -96,6 +97,7 @@ public:
 		return AngularPdf{ 4294967296.f }; // In theory infinite, but must behave well in float32 (power of two does not change the mantissa, shortens out anyway)
 	}
 
+	__host__ __device__ bool is_infinite() const { return m_pdf >= float(infinite()); }
 private:
 	Real m_pdf = 0.f;
 };

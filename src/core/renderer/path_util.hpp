@@ -18,7 +18,8 @@ enum class Interaction : u16 {
 	CAMERA_PINHOLE,		// A perspective camera start vertex
 	CAMERA_ORTHO,		// An orthographic camera start vertex
 	LIGHT_POINT,		// A point-light vertex
-	LIGHT_DIRECTIONAL,	// A directional-light vertex (include environment map vertices)
+	LIGHT_DIRECTIONAL,	// A directional-light vertex
+	LIGHT_ENVMAP,		// A directional-light from an environment map
 	LIGHT_SPOT,			// A spot-light vertex
 	LIGHT_AREA,			// An area-light vertex
 };
@@ -60,6 +61,7 @@ public:
 	}
 	bool is_orthographic() const {
 		return m_type == Interaction::LIGHT_DIRECTIONAL
+			|| m_type == Interaction::LIGHT_ENVMAP
 			|| m_type == Interaction::CAMERA_ORTHO;
 	}
 	bool is_camera() const {
@@ -69,7 +71,8 @@ public:
 	// Get the position of the vertex. For orthographic vertices this
 	// position is computed with respect to a referencePosition.
 	scene::Point get_position(const scene::Point& referencePosition) const {
-		if(m_type == Interaction::LIGHT_DIRECTIONAL)
+		if(m_type == Interaction::LIGHT_DIRECTIONAL
+			|| m_type == Interaction::LIGHT_ENVMAP)
 			return referencePosition - m_position * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
 		if(m_type == Interaction::CAMERA_ORTHO)
 			return referencePosition; // TODO project to near plane
@@ -103,13 +106,14 @@ public:
 			case Interaction::CAMERA_PINHOLE:
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_SPOT:
-				return 0.0f;
 			case Interaction::LIGHT_DIRECTIONAL:
+				return 0.0f;
+			case Interaction::LIGHT_ENVMAP:
 				// There is no geometrical conversion factor for hitting environment maps.
 				// However, it is expected that the scene exit-distance is always the same
 				// and can be used in both directions without changing the result of a
 				// comparison.
-				return ei::sq(scene::MAX_SCENE_SIZE);
+				return 1.0f;
 			case Interaction::LIGHT_AREA: {
 				auto* alDesc = as<AreaLightDesc>(desc());
 				return dot(connection, alDesc->normal);
@@ -150,40 +154,26 @@ public:
 							 const scene::materials::Medium* media,
 							 bool adjoint = false, bool merge = false
 	) const {
+		using namespace scene;
 		switch(m_type) {
 			case Interaction::VOID: return math::EvalValue{};
 			case Interaction::LIGHT_POINT: {
-				return math::EvalValue{ m_intensity, 0.0f,
-										AngularPdf{ 1.0f / (4*ei::PI) },
-										AngularPdf{ 0.0f } };
+				return lights::evaluate_point(m_intensity);
 			}
-			case Interaction::LIGHT_DIRECTIONAL: {
+			case Interaction::LIGHT_DIRECTIONAL:
+			case Interaction::LIGHT_ENVMAP: {
 				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
-				// Special case: the incindent area PDF is directly projected.
-				// To avoid the wrong conversion later we need to do its reversal here.
-				AngularPdf pdfF = m_incidentPdf.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE * scene::MAX_SCENE_SIZE);
-				return math::EvalValue{ m_intensity, 0.0f, pdfF, AngularPdf{ 0.0f } };
+				return lights::evaluate_dir(m_intensity, m_type==Interaction::LIGHT_ENVMAP,
+									desc->dirPdf);
 			}
 			case Interaction::LIGHT_SPOT: {
 				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
-				const float cosThetaMax = __half2float(desc->cosThetaMax);
-				const float cosOut = dot(desc->direction, excident);
-				// Early out
-				if(cosOut <= cosThetaMax) return math::EvalValue{};
-				// OK, there will be some contribution
-				const float cosFalloffStart = __half2float(desc->cosThetaMax);
-				float falloff = scene::lights::get_falloff(cosOut, cosThetaMax, cosFalloffStart);
-				return math::EvalValue{ m_intensity * falloff, 0.0f,
-										AngularPdf{ math::get_uniform_cone_pdf(cosThetaMax) },
-										AngularPdf{ 0.0f } };
+				return lights::evaluate_spot(excident, m_intensity, desc->direction,
+									desc->cosThetaMax, desc->cosFalloffStart);
 			}
 			case Interaction::LIGHT_AREA: {
 				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
-				const float cosOut = dot(desc->normal, excident);
-				// Early out (wrong hemisphere)
-				if(cosOut <= 0.0f) return math::EvalValue{};
-				return math::EvalValue{ m_intensity * cosOut, 0.0f,
-										AngularPdf{ cosOut / ei::PI }, AngularPdf{ 0.0f } };
+				return lights::evaluate_area(excident, m_intensity, desc->normal);
 			}
 			case Interaction::CAMERA_PINHOLE: {
 				const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
@@ -193,9 +183,8 @@ public:
 			}
 			case Interaction::SURFACE: {
 				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-				return scene::materials::evaluate(desc->tangentSpace, desc->params,
-												  m_incident, excident,
-												  media, adjoint, merge);
+				return materials::evaluate(desc->tangentSpace, desc->params, m_incident,
+										   excident, media, adjoint, merge);
 			}
 		}
 		return math::EvalValue{};
@@ -219,7 +208,9 @@ public:
 									   lout.dir.pdf, AngularPdf{0.0f} },
 									 m_position };
 			}
-			case Interaction::LIGHT_DIRECTIONAL: {
+			case Interaction::LIGHT_DIRECTIONAL:
+			case Interaction::LIGHT_ENVMAP: {
+				// TODO: sample new positions on a boundary?
 				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
 				return VertexSample{ { m_intensity, math::PathEventType::REFLECTED,
 									   desc->direction, desc->dirPdf, AngularPdf{0.0f} },
@@ -308,12 +299,13 @@ public:
 			case Interaction::VOID:
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_DIRECTIONAL:
+			case Interaction::LIGHT_ENVMAP:
 			case Interaction::LIGHT_SPOT:
 			case Interaction::CAMERA_PINHOLE:
 				return Spectrum{0.0f};
 			case Interaction::LIGHT_AREA: {
 				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
-				return m_intensity; // TODO: / area
+				return m_intensity; // TODO: / area?
 			}
 			case Interaction::SURFACE: {
 				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
@@ -411,16 +403,20 @@ public:
 				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
 				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
 				desc->direction = lightSample.source_param.dir.direction;
-				desc->dirPdf = lightSample.source_param.dir.dirPdf;
+				// Swap PDFs. The rules of sampling are reverted in directional
+				// lights (first dir then pos is sampled). The vertex unifies
+				// the view for MIS computation where the usage order is reverted.
+				// Scale the pdfs to make sure later conversions lead to the original pdf.
+				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->m_incidentPdf = lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(DirLightDesc));
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
-				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
-				// Environment lights are not fully sampled
-				// TODO: complete sampling, REQUIRES scene BB
+				vert->m_type = Interaction::LIGHT_ENVMAP;
 				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
 				desc->direction = lightSample.source_param.dir.direction;
-				desc->dirPdf = lightSample.source_param.dir.dirPdf;
+				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->m_incidentPdf = lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(DirLightDesc));
 			}
 		}

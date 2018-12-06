@@ -23,6 +23,35 @@ struct Box;
 
 namespace mufflon { namespace scene { namespace lights {
 
+#ifndef __CUDACC__
+// Kind of code duplication, but for type-safety use this when constructing a light tree
+struct PositionalLights {
+	std::variant<PointLight, SpotLight, AreaLightTriangleDesc,
+				 AreaLightQuadDesc, AreaLightSphereDesc> light;
+	PrimitiveHandle primitive { ~0u };
+};
+
+// Gets the light type as an enum value
+inline LightType get_light_type(const PositionalLights& light) {
+	return std::visit([](const auto& posLight) constexpr -> LightType {
+		using Type = std::decay_t<decltype(posLight)>;
+		if constexpr(std::is_same_v<Type, PointLight>)
+			return LightType::POINT_LIGHT;
+		else if constexpr(std::is_same_v<Type, SpotLight>)
+			return LightType::SPOT_LIGHT;
+		else if constexpr(std::is_same_v<Type, AreaLightTriangle<CURRENT_DEV>>)
+			return LightType::AREA_LIGHT_TRIANGLE;
+		else if constexpr(std::is_same_v<Type, AreaLightQuad<CURRENT_DEV>>)
+			return LightType::AREA_LIGHT_QUAD;
+		else if constexpr(std::is_same_v<Type, AreaLightSphere<CURRENT_DEV>>)
+			return LightType::AREA_LIGHT_SPHERE;
+		else
+			return LightType::NUM_LIGHTS;
+	}, light.light);
+}
+
+#endif // __CUDACC__
+
 struct LightSubTree {
 #pragma pack(push, 1)
 	struct alignas(16) Node {
@@ -156,7 +185,7 @@ CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
 	return sample;
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&& sample, float chance) {
-	sample.pos.pdf *= chance;
+	sample.creationPdf *= chance;
 	sample.intensity /= chance;
 	return sample;
 }
@@ -204,7 +233,7 @@ CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* ligh
 		case LightType::AREA_LIGHT_TRIANGLE: return connect_light(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), position, rnd);
 		case LightType::AREA_LIGHT_QUAD: return connect_light(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), position, rnd);
 		case LightType::AREA_LIGHT_SPHERE: return connect_light(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), position, rnd);
-		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, bounds, rnd);
+		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, bounds);
 		default: mAssert(false); return {};
 	}
 }
@@ -400,7 +429,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	if(rndChoice < rightEnv) {
 		// TODO: sample background
 		return {};
-		//return lighttree_detail::adjustPdf(connect_light(tree.envLight, position, rnd), envProb);
+		//return lighttree_detail::adjustPdf(connect_light(tree.envLight, position, bounds, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = static_cast<u64>(std::numeric_limits<u64>::max() * (envProb + dirProb));

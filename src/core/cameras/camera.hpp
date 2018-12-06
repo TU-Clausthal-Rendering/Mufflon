@@ -2,7 +2,7 @@
 
 #include "core/scene/types.hpp"
 #include "core/memory/residency.hpp"
-#include "core/math/sampling.hpp"
+#include "core/math/sample_types.hpp"
 #include "util/assert.hpp"
 #include <string>
 
