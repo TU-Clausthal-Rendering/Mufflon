@@ -3,6 +3,7 @@
 #include "polygon_mesh.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
+#include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/attribute_list.hpp"
 #include "util/range.hpp"
@@ -226,6 +227,54 @@ public:
 		return m_faceAttributes.aquire(attrHandle.customHandle);
 	}
 
+	/**
+	 * Returns a descriptor (on CPU side) with pointers to resources (on Device side).
+	 * Takes two tuples: they must each contain the aquired attributes which the
+	 * renderer wants to have access to.
+	 */
+	template < Device dev, class... VArgs, class... FArgs >
+	PolymeshDescriptor<dev> get_descriptor(std::tuple<VArgs...>& vertexAttribs,
+									  std::tuple<FArgs...>& faceAttribs) {
+		this->synchronize<dev>();
+		constexpr std::size_t numVertexAttribs = sizeof...(VArgs);
+		constexpr std::size_t numFaceAttribs = sizeof...(FArgs);
+		void** devVertexAttribs = nullptr;
+		void** devFaceAttribs = nullptr;
+		// Collect the attributes; for that, we iterate the given Attributes and
+		// gather them on CPU side (or rather, their device pointers); then
+		// we copy it to the actual device
+		if(numVertexAttribs > 0) {
+			std::vector<void*> cpuVertAttibs(numVertexAttribs);
+			push_back_attrib<0u, dev>(cpuVertAttibs, vertexAttribs);
+			devVertexAttribs = Allocator<dev>::template alloc_array<void*>(numVertexAttribs);
+			Allocator<Device::CPU>::template copy<void*, dev>(devVertexAttribs, cpuVertAttibs.data(),
+													 numVertexAttribs);
+		}
+		if(numFaceAttribs > 0) {
+			std::vector<void*> cpuFaceAttibs(numFaceAttribs);
+			push_back_attrib<0u, dev>(cpuFaceAttibs, faceAttribs);
+			devFaceAttribs = Allocator<dev>::template alloc_array<void*>(numFaceAttribs);
+			Allocator<Device::CPU>::template copy<void*, dev>(devFaceAttribs, cpuFaceAttibs.data(),
+													 numFaceAttribs);
+		}
+		
+		// TODO: face indices
+		return PolymeshDescriptor{
+			static_cast<u32>(this->get_vertex_count()),
+			static_cast<u32>(this->get_triangle_count()),
+			static_cast<u32>(this->get_quad_count()),
+			static_cast<u32>(numVertexAttribs),
+			static_cast<u32>(numFaceAttribs),
+			reinterpret_cast<const ei::Vec3*>(*this->get_points().aquireConst<dev>()),
+			reinterpret_cast<const ei::Vec3*>(*this->get_normals().aquireConst<dev>()),
+			reinterpret_cast<const ei::Vec2*>(*this->get_uvs().aquireConst<dev>()),
+			*this->get_mat_indices().aquireConst<dev>(),
+			this->get_index_buffer(),
+			devVertexAttribs,
+			devFaceAttribs
+		};
+	}
+
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
 	// Adds a new triangle.
@@ -375,6 +424,13 @@ public:
 		};
 	}
 
+	template < Device dev >
+	ConstArrayDevHandle_t<dev, u32> get_index_buffer() {
+		return ConstArrayDevHandle_t<dev, u32>{
+			m_indexBuffer.get<IndexBuffer<dev>>().indices
+		};
+	}
+
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;
 	}
@@ -399,6 +455,14 @@ public:
 		return m_meshData->n_faces();
 	}
 
+	std::size_t get_vertex_attribute_count() const noexcept {
+		return m_vertexAttributes.get_num_attributes();
+	}
+
+	std::size_t get_face_attribute_count() const noexcept {
+		return m_faceAttributes.get_num_attributes();
+	}
+
 private:
 	// Helper struct for identifying handle type
 	template < class >
@@ -414,6 +478,21 @@ private:
 		else
 			return m_faceAttributes;
 	}
+
+	// Helper for iterating a tuple
+	template < std::size_t I, Device dev, class... Args >
+	static void push_back_attrib(std::vector<void*>& vec, std::tuple<Args...>& attribs) {
+		if constexpr(I < sizeof...(Args)) {
+			vec.push_back(*std::get<I>(attribs).aquire<dev>());
+			push_back_attrib<I + 1u, dev>(vec, attribs);
+		}
+	}
+
+	// Helper class for distinct array handle types
+	template < Device dev >
+	struct IndexBuffer {
+		ArrayDevHandle_t<dev, u32> indices;
+	};
 
 	// These methods simply create references to the attributes
 	// By holding references to them, if they ever get removed, we're in a bad spot
@@ -432,6 +511,8 @@ private:
 	VertexAttributeHandle<OpenMesh::Vec3f> m_normalsAttrHdl;
 	VertexAttributeHandle<OpenMesh::Vec2f> m_uvsAttrHdl;
 	FaceAttributeHandle<MaterialIndex> m_matIndexAttrHdl;
+	// Vertex-index buffer, first for the triangles, then for quads
+	util::TaggedTuple<IndexBuffer<Device::CPU>, IndexBuffer<Device::CUDA>> m_indexBuffer;
 	ei::Box m_boundingBox;
 	std::size_t m_triangles = 0u;
 	std::size_t m_quads = 0u;

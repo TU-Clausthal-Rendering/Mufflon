@@ -180,6 +180,7 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp" />
+    <ClInclude Include="..\..\src\core\scene\descriptors.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\sphere.hpp" />

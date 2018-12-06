@@ -665,7 +665,7 @@ void AttributePool<Device::CUDA>::synchronize(OmAttributePool<isFace>& pool) {
 		if(attrib.is_valid()) {
 			// Copy from the contiguous buffer into the attributes
 			auto[propPtr, currLength] = pool.m_accessors[i](attrib, pool.m_mesh);
-			Allocator::copy_cpu<char>(propPtr, &this->get_pool_data()[currOffset], currLength);
+			Allocator::copy<char, Device::CPU>(propPtr, &this->get_pool_data()[currOffset], currLength);
 			currOffset += currLength;
 		}
 	}

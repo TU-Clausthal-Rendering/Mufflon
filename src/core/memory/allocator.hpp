@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "util/assert.hpp"
 #include "core/cuda/error.hpp"
 #include <stdexcept>
 
@@ -68,16 +69,20 @@ return ptr;
 		return nullptr;
 	}
 
-	template < class T >
+	template < class T, Device dev = Device::CPU >
 	static void copy(T* dst, const T* src, std::size_t n) {
-		std::memcpy(dst, src, sizeof(T) * n);
-	}
-
-	template < class T >
-	static void copy_cuda(T* dst, const T* src, std::size_t n) {
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyHostToDevice));
+		switch(dev) {
+			case Device::CPU:
+				std::memcpy(dst, src, sizeof(T) * n); 
+				break;
+			case Device::CUDA:
+				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyHostToDevice));
+				break;
+			default:
+				mAssert(false);
+		}
 	}
 };
 
@@ -136,18 +141,20 @@ public:
 		return nullptr;
 	}
 
-	template < class T >
+	template < class T, Device dev = Device::CUDA >
 	static void copy(T* dst, const T* src, std::size_t n) {
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
-	}
-
-	template < class T >
-	static void copy_cpu(T* dst, const T* src, std::size_t n) {
-		static_assert(std::is_trivially_copyable<T>::value,
-					  "Must be trivially copyable");
-		cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
+		switch(dev) {
+			case Device::CPU:
+				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
+				break;
+			case Device::CUDA:
+				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
+				break;
+			default:
+				mAssert(false);
+		}
 	}
 };
 

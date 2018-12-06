@@ -236,6 +236,7 @@ public:
 		for(auto iter = m_mapping.begin(); iter != m_mapping.end(); ++iter) {
 			if(iter->second == handle.index()) {
 				m_mapping.erase(iter);
+				--m_numAttributes;
 				break;
 			}
 		}
@@ -282,6 +283,10 @@ public:
 		m_flags.mark_changed(dev);
 	}
 
+	std::size_t get_num_attributes() const noexcept {
+		return m_numAttributes;
+	}
+
 	// Aquires an attribute from its handle
 	template < class T >
 	BaseAttribute<T>& aquire(const AttributeHandle<T>& hdl) {
@@ -299,6 +304,7 @@ public:
 protected:
 	AttributePools m_attributePools;
 	std::vector<std::unique_ptr<IBaseAttribute>> m_attributes;
+	std::size_t m_numAttributes = 0u;
 	util::DirtyFlags<Device> m_flags;
 	std::unordered_map<std::string, std::size_t> m_mapping;
 };
@@ -366,6 +372,7 @@ public:
 		// Create a new attribute
 		BaseType::m_attributes.push_back(std::make_unique<Attribute<T>>(BaseType::m_attributePools,
 																		BaseType::m_flags, hdl));
+		++BaseType::m_numAttributes;
 		return { BaseType::m_attributes.size() - 1u };
 	}
 
@@ -430,6 +437,7 @@ public:
 		// Create a new attribute
 		BaseType::m_attributes.push_back(std::make_unique<Attribute<T>>(BaseType::m_attributePools,
 																		BaseType::m_flags));
+		++BaseType::m_numAttributes;
 		return { BaseType::m_attributes.size() - 1u };
 	}
 

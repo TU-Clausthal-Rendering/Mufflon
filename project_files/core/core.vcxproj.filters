@@ -729,6 +729,9 @@
     <ClInclude Include="..\..\src\core\math\sample_types.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\descriptors.hpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">

@@ -79,8 +79,16 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData->n_vertices());
 	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData->n_vertices());
 	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData->n_vertices());
+	mAssert(m_quads == 0u); // To keep the order implicitly
 	FaceHandle hdl = m_meshData->add_face(v0, v1, v2);
 	mAssert(hdl.is_valid());
+	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices;
+	std::size_t currIndexCount = 3u * m_triangles;
+	// TODO: keep track of reserved size to avoid unnecessary reallocs
+	Allocator<Device::CPU>::realloc(indexBuffer, currIndexCount, 3u + currIndexCount);
+	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
+	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
+	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
 	++m_triangles;
@@ -120,6 +128,14 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData->n_vertices());
 	FaceHandle hdl = m_meshData->add_face(v0, v1, v2, v3);
 	mAssert(hdl.is_valid());
+	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices;
+	std::size_t currIndexCount = 3u * m_triangles + 4u * m_quads;
+	// TODO: keep track of reserved size to avoid unnecessary reallocs
+	Allocator<Device::CPU>::realloc(indexBuffer, currIndexCount, 4u + currIndexCount);
+	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
+	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
+	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
+	indexBuffer[currIndexCount + 3u] = static_cast<u32>(v3.idx());
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
 	++m_quads;
