@@ -33,6 +33,8 @@ namespace gui.ViewModel
                         throw new Exception(Core.GetDllError());
                     if (!Core.render_enable_renderer(m_models.Renderer.Type))
                         throw new Exception(Core.GetDllError());
+                    if (!Core.render_reset())
+                        throw new Exception(Core.GetDllError());
                     break;
             }
         }
@@ -46,10 +48,13 @@ namespace gui.ViewModel
                         throw new Exception(Core.GetDllError());
                     if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
                         throw new Exception(Core.GetDllError());
-                    if (!Core.render_enable_renderer(m_models.Renderer.Type))
-                        throw new Exception(Core.GetDllError());
-                    if(!Core.render_reset())
-                        throw new Exception(Core.GetDllError());
+                    if (m_models.Scene.IsLoaded)
+                    {
+                        if (!Core.render_enable_renderer(m_models.Renderer.Type))
+                            throw new Exception(Core.GetDllError());
+                        if (!Core.render_reset())
+                            throw new Exception(Core.GetDllError());
+                    }
                     break;
             }
         }

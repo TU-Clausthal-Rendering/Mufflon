@@ -25,7 +25,8 @@ public:
 	virtual IParameterHandler& get_parameters() final { return m_params; }
 private:
 	// Create one sample path (actual PT algorithm)
-	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer);
+	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+				const scene::lights::LightTree<Device::CPU>& lightTree);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 	const cameras::CameraParams& get_cam() const {

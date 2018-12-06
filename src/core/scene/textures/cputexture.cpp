@@ -1,6 +1,7 @@
 #include "cputexture.hpp"
 #include "core/memory/dyntype_memory.hpp"
 #include <ei/conversions.hpp>
+#include <cuda_fp16.h>
 
 using namespace ei;
 
@@ -34,12 +35,19 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 			m_write = &CpuTexture::write_RG16U; break;
 		case Format::RGBA16U: m_fetch = &CpuTexture::fetch_RGBA16U;
 			m_write = &CpuTexture::write_RGBA16U; break;
+		case Format::R16F: m_fetch = &CpuTexture::fetch_R16F;
+			m_write = &CpuTexture::write_R16F; break;
+		case Format::RG16F: m_fetch = &CpuTexture::fetch_RG16F;
+			m_write = &CpuTexture::write_RG16F; break;
+		case Format::RGBA16F: m_fetch = &CpuTexture::fetch_RGBA16F;
+			m_write = &CpuTexture::write_RGBA16F; break;
 		case Format::R32F: m_fetch = &CpuTexture::fetch_R32F;
 			m_write = &CpuTexture::write_R32F; break;
 		case Format::RG32F: m_fetch = &CpuTexture::fetch_RG32F;
 			m_write = &CpuTexture::write_RG32F; break;
 		case Format::RGBA32F: m_fetch = &CpuTexture::fetch_RGBA32F;
 			m_write = &CpuTexture::write_RGBA32F; break;
+		default: mAssert(false);
 	};
 }
 
@@ -137,6 +145,28 @@ Vec4 CpuTexture::fetch_RGBA16U(int texelIdx) const {
 	return data[texelIdx] / 65535.0f;
 }
 
+Vec4 CpuTexture::fetch_R16F(int texelIdx) const {
+	const __half* data = as<__half>(m_imageData.get());
+	return { __half2float(data[texelIdx]), 0.0f, 0.0f, 1.0f };
+}
+
+Vec4 CpuTexture::fetch_RG16F(int texelIdx) const {
+	const Vec<__half, 2>* data = as<Vec<__half, 2>>(m_imageData.get());
+	return { __half2float(data[texelIdx].x), __half2float(data[texelIdx].y), 0.0f, 1.0f };
+}
+
+Vec4 CpuTexture::fetch_RGB16F(int texelIdx) const {
+	const Vec<__half, 3>* data = as<Vec<__half, 3>>(m_imageData.get());
+	return { __half2float(data[texelIdx].x), __half2float(data[texelIdx].y),
+		__half2float(data[texelIdx].z), 1.0f };
+}
+
+Vec4 CpuTexture::fetch_RGBA16F(int texelIdx) const {
+	const Vec<__half, 4>* data = as<Vec<__half, 4>>(m_imageData.get());
+	return { __half2float(data[texelIdx].x), __half2float(data[texelIdx].y),
+		__half2float(data[texelIdx].z), __half2float(data[texelIdx].z) };
+}
+
 Vec4 CpuTexture::fetch_R32F(int texelIdx) const {
 	return {as<float>(m_imageData.get())[texelIdx], 0.0f, 0.0f, 1.0f};
 }
@@ -200,7 +230,6 @@ void CpuTexture::write_sRGBA8U(int texelIdx, const Vec4& value) {
 	data[texelIdx] = Vec<u8,4>{rgbToSRgb(clamp(Vec3{value}, 0.0f, 1.0f)) * 255.0f, u8(clamp(value.a, 0.0f, 1.0f) * 255.0f)};
 }
 
-
 void CpuTexture::write_R16U(int texelIdx, const Vec4& value) {
 	u16* data = as<u16>(m_imageData.get());
 	data[texelIdx] = static_cast<u16>(clamp(value.x, 0.0f, 1.0f) * 65535.0f);
@@ -219,6 +248,28 @@ void CpuTexture::write_RGB16U(int texelIdx, const Vec4& value) {
 void CpuTexture::write_RGBA16U(int texelIdx, const Vec4& value) {
 	Vec<u16,4>* data = as<Vec<u16,4>>(m_imageData.get());
 	data[texelIdx] = Vec<u16,4>{clamp(value, 0.0f, 1.0f) * 65535.0f};
+}
+
+void CpuTexture::write_R16F(int texelIdx, const Vec4& value) {
+	__half* data = as<__half>(m_imageData.get());
+	data[texelIdx] = __float2half(value.x);
+}
+
+void CpuTexture::write_RG16F(int texelIdx, const Vec4& value) {
+	Vec<__half, 2>* data = as<Vec<__half, 2>>(m_imageData.get());
+	data[texelIdx] = { __float2half(value.x), __float2half(value.y) };
+}
+
+void CpuTexture::write_RGB16F(int texelIdx, const Vec4& value) {
+	Vec<__half, 3>* data = as<Vec<__half, 3>>(m_imageData.get());
+	data[texelIdx] = { __float2half(value.x), __float2half(value.y),
+						__float2half(value.z) };
+}
+
+void CpuTexture::write_RGBA16F(int texelIdx, const Vec4& value) {
+	Vec<__half, 4>* data = as<Vec<__half, 4>>(m_imageData.get());
+	data[texelIdx] = { __float2half(value.x), __float2half(value.y),
+						__float2half(value.z), __float2half(value.w) };
 }
 
 void CpuTexture::write_R32F(int texelIdx, const Vec4& value) {

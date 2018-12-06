@@ -14,7 +14,7 @@ namespace mufflon { namespace renderer {
 
 __global__ static void sample(Pixel imageDims,
 							  RenderBuffer<Device::CUDA> outputBuffer,
-							  LightTree<Device::CUDA> lightTree,
+							  LightTree<Device::CUDA>* lightTree,
 							  const float* rnds) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
@@ -40,27 +40,14 @@ __global__ static void sample(Pixel imageDims,
 
 	// Random walk ended because of missing the scene?
 	if(pathLen < 666) {
-
 		if(coord.x < imageDims.x && coord.y < imageDims.y) {
-			const float phi = 2.f * ei::PI * coord.x / static_cast<float>(imageDims.x);
-			const float theta = ei::PI * coord.y / static_cast<float>(imageDims.y);
-			ei::Vec3 testRadiance = lightTree.background.get_color(ei::Vec3{
+			const float phi = 2.f * ei::PI * (coord.x + 0.5f) / static_cast<float>(imageDims.x);
+			const float theta = ei::PI * (coord.y + 0.5f) / static_cast<float>(imageDims.y);
+			ei::Vec3 testRadiance = lightTree->background.get_color(ei::Vec3{
 				sinf(theta) * cosf(phi),
 				sinf(theta) * sinf(phi),
 				cosf(theta)
 			});
-			/*constexpr ei::Vec3 colors[4]{
-					ei::Vec3{0, 0, 1},
-					ei::Vec3{0, 1, 0},
-					ei::Vec3{1, 0, 0},
-					ei::Vec3{1, 1, 1}
-			};
-			float x = coord.x / static_cast<float>(imageDims.x);
-			float y = coord.y / static_cast<float>(imageDims.y);
-			x *= rnds[2 * (coord.x + coord.y * imageDims.x)];
-			y *= rnds[2 * (coord.x + coord.y * imageDims.x) + 1];
-			ei::Vec3 testRadiance = colors[0u] * (1.f - x)*(1.f - y) + colors[1u] * x*(1.f - y)
-				+ colors[2u] * (1.f - x)*y + colors[3u] * x*y;*/
 			outputBuffer.contribute(coord, throughput, testRadiance,
 									ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 									ei::Vec3{ 0, 0, 0 });
@@ -90,11 +77,16 @@ void GpuPathTracer::iterate(Pixel imageDims,
 		1u
 	};
 
+	// TODO
+	LightTree<Device::CUDA>* cudaLightTree = nullptr;
+	cuda::check_error(cudaMalloc(&cudaLightTree, sizeof(lightTree)));
+	cuda::check_error(cudaMemcpy(cudaLightTree, &lightTree, sizeof(lightTree), cudaMemcpyHostToDevice));
 	cuda::check_error(cudaGetLastError());
 	sample<<<gridDims, blockDims>>>(imageDims,
 									std::move(outputBuffer),
-									std::move(lightTree), devRnds);
+									cudaLightTree, devRnds);
 	cuda::check_error(cudaGetLastError());
+	cuda::check_error(cudaFree(cudaLightTree));
 	cuda::check_error(cudaFree(devRnds));
 }
 

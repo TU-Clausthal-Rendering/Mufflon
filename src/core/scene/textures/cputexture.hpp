@@ -71,6 +71,10 @@ private:
 	ei::Vec4 fetch_RG16U(int texelIdx) const;
 	ei::Vec4 fetch_RGB16U(int texelIdx) const;
 	ei::Vec4 fetch_RGBA16U(int texelIdx) const;
+	ei::Vec4 fetch_R16F(int texelIdx) const;
+	ei::Vec4 fetch_RG16F(int texelIdx) const;
+	ei::Vec4 fetch_RGB16F(int texelIdx) const;
+	ei::Vec4 fetch_RGBA16F(int texelIdx) const;
 	ei::Vec4 fetch_R32F(int texelIdx) const;
 	ei::Vec4 fetch_RG32F(int texelIdx) const;
 	ei::Vec4 fetch_RGB32F(int texelIdx) const;
@@ -90,6 +94,10 @@ private:
 	void write_RG16U(int texelIdx, const ei::Vec4& value);
 	void write_RGB16U(int texelIdx, const ei::Vec4& value);
 	void write_RGBA16U(int texelIdx, const ei::Vec4& value);
+	void write_R16F(int texelIdx, const ei::Vec4& value);
+	void write_RG16F(int texelIdx, const ei::Vec4& value);
+	void write_RGB16F(int texelIdx, const ei::Vec4& value);
+	void write_RGBA16F(int texelIdx, const ei::Vec4& value);
 	void write_R32F(int texelIdx, const ei::Vec4& value);
 	void write_RG32F(int texelIdx, const ei::Vec4& value);
 	void write_RGB32F(int texelIdx, const ei::Vec4& value);

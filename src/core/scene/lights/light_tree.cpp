@@ -423,7 +423,7 @@ void LightTreeBuilder::synchronize() {
 
 		// Copy the real data
 		m_treeCuda->primToNodePath.synchornize(m_treeCpu->primToNodePath);
-		cudaMemcpy(&m_treeCuda->memory, m_treeCpu->memory, m_treeCpu->length, cudaMemcpyHostToDevice);
+		cuda::check_error(cudaMemcpy(m_treeCuda->memory, m_treeCpu->memory, m_treeCpu->length, cudaMemcpyHostToDevice));
 
 		// Replace all texture handles inside the tree's data
 		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);

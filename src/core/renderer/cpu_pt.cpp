@@ -35,13 +35,14 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	m_currentScene->get_camera()->get_parameter_pack(as<cameras::CameraParams>(m_camParams),
 													 Device::CPU, buffer.get_resolution());
 	m_reset = false;
+	const scene::lights::LightTree<Device::CPU>& lightTree = m_currentScene->get_light_tree<Device::CPU>();
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 //#pragma omp parallel for
 	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer);
+		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, lightTree);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
@@ -53,21 +54,22 @@ void CpuPathTracer::reset() {
 	this->m_reset = true;
 }
 
-void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer) {
+void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+						   const scene::lights::LightTree<Device::CPU>& lightTree) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
 	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256];
+	/*u8 vertexBuffer[256];
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	const scene::materials::Medium* media = m_currentScene->get_media<Device::CPU>();
 	// Create a start for the path
 	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
 														 m_rngs[pixel].next());
 	int s = PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos);
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
+	mAssertMsg(s < 256, "vertexBuffer overflow.");*/
 
 	int pathLen = 0;
-	do {
+	/*do {
 		if(pathLen+1 >= m_params.maxPathLength) {
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
@@ -103,24 +105,19 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 					vertex->get_normal(), vertex->get_albedo());
 			}
 		}
-	} while(pathLen < m_params.maxPathLength);
+	} while(pathLen < m_params.maxPathLength);*/
 
 	// Random walk ended because of missing the scene?
 	if(pathLen < m_params.maxPathLength) {
 		// TODO: fetch background
 		// TODO: normals, position???
-		constexpr ei::Vec3 colors[4]{
-			ei::Vec3{1, 0, 0},
-			ei::Vec3{0, 1, 0},
-			ei::Vec3{0, 0, 1},
-			ei::Vec3{1, 1, 1}
-		};
-		
-		ei::Vec2 xy { coord.x / static_cast<float>(outputBuffer.get_width()),
-					  coord.y / static_cast<float>(outputBuffer.get_height()) };
-		xy *= math::sample_uniform( m_rngs[pixel].next() );
-		ei::Vec3 testRadiance = colors[0u] * (1.f - xy.x)*(1.f - xy.y) + colors[1u] * xy.x*(1.f - xy.y)
-			+ colors[2u] * (1.f - xy.x)*xy.y + colors[3u] * xy.x*xy.y;
+		const float phi = 2.f * ei::PI * coord.x  / static_cast<float>(outputBuffer.get_width());
+		const float theta = ei::PI * coord.y / static_cast<float>(outputBuffer.get_height());
+		ei::Vec3 testRadiance = lightTree.background.get_color(ei::Vec3{
+			sinf(theta) * cosf(phi),
+			sinf(theta) * sinf(phi),
+			cosf(theta)
+		});
 		outputBuffer.contribute(coord, throughput, testRadiance,
 								ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 								ei::Vec3{ 0, 0, 0 });

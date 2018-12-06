@@ -78,18 +78,16 @@ Boolean load_texture(const char* path, TextureData* texData) {
 	int width = 0;
 	int height = 0;
 	int components = 0;
-	std::size_t bytes = 0u;
-	void* data = nullptr;
+	std::size_t perElemBytes = 0u;
+	char* data = nullptr;
 	// Load either LDR or HDR
 	if(stbi_is_hdr(path)) {
 		data = reinterpret_cast<char*>(stbi_loadf(path, &width, &height, &components, 0));
-		bytes = sizeof(float);
-		texData->format = get_float_format(components);
+		perElemBytes = sizeof(float);
 		texData->sRgb = 0u;
 	} else {
 		data = reinterpret_cast<char*>(stbi_load(path, &width, &height, &components, 0));
-		bytes = sizeof(char);
-		texData->format = get_int_format(components);
+		perElemBytes = sizeof(char);
 		texData->sRgb = 1u;
 	}
 
@@ -98,11 +96,28 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		return false;
 	}
 
+	// Make sure that we have either 1, 2, or 4 channels
+	if(components == 3) {
+		components = 4;
+		// Copy over the image data one by one
+		std::size_t bytes = perElemBytes * width * height * components;
+		texData->data = new uint8_t[bytes];
+		for(std::size_t t = 0u; t < width * height; ++t) {
+			std::memcpy(&texData->data[components * perElemBytes * t],
+						&data[3u * perElemBytes * t],
+						3u * perElemBytes);
+			// Ignore alpha channel
+			std::memset(&texData->data[components * perElemBytes * t + 3u * perElemBytes],
+						0, perElemBytes);
+		}
+	} else {
+		// May use memcpy
+		std::size_t bytes = perElemBytes * width * height * components;
+		texData->data = new uint8_t[bytes];
+		std::memcpy(texData->data, data, bytes);
+	}
 
-	// Copy over the image data
-	bytes *= width * height * components;
-	texData->data = new uint8_t[bytes];
-	std::memcpy(texData->data, data, bytes);
+	texData->format = perElemBytes == sizeof(float) ? get_float_format(components) : get_int_format(components);
 	stbi_image_free(data);
 
 	texData->width = static_cast<uint32_t>(width);

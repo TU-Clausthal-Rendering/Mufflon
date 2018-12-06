@@ -111,8 +111,8 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 	} else {
 		// Spherical map
 		// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
-		const float u = atan2(direction.y, direction.x) / (ei::PI * 2.f);
 		const float v = acos(direction.z) / ei::PI;
+		float u = atan2(direction.y, direction.x) / (ei::PI * 2.f);
 		return sample(envmap, UvCoordinate{ u, v });
 	}
 }
