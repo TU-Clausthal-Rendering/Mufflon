@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "lights.hpp"
+#include "importance_sampling.hpp"
 #include "core/export/api.h"
 #include "ei/vector.hpp"
 #include "ei/conversions.hpp"
@@ -209,18 +210,79 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const DirectionalLight& li
 		{light.direction, AngularPdf::infinite()}
 	};
 }
+
+// *** ENVMAP ***
+// Samples a direction and evaluates the envmap's radiance in that direction
+CUDA_FUNCTION __forceinline__ math::DirectionSample sample_light_dir(const EnvMapLight<CURRENT_DEV>& light,
+																	 const float u0, const float u1,
+																	 Spectrum& radiance) {
+	// First we sample the envmap texel
+	EnvmapSampleResult sample = importance_sample_envmap(light, u0, u1);
+	// Depending on the type of envmap we will sample a different layer of the texture
+	const u16 layers = textures::get_texture_layers(light.texHandle);
+	int layer = 0u;
+	math::DirectionSample dir{};
+	if(layers == 6u) {
+		// Cubemap: adjust the layer and texel
+		const Pixel texSize = textures::get_texture_size(light.texHandle);
+		int layer = sample.texel.x / texSize.x;
+		sample.texel.x -= layer * texSize.x;
+		// Bring the UV into the interval as well
+		sample.uv.x -= static_cast<float>(layer);
+		// Turn the texel coordinates into UVs and remap from [0, 1] to [-1, 1]
+
+		// See interface.hpp::sample for the reverse
+		switch(layer) {
+			case 0: dir.direction = ei::Vec3{ 1.f, sample.uv.x, -sample.uv.y }; break;
+			case 1: dir.direction = ei::Vec3{ -1.f, sample.uv.x, sample.uv.y }; break;
+			case 2: dir.direction = ei::Vec3{ sample.uv.y, 1.f, -sample.uv.x }; break;
+			case 3: dir.direction = ei::Vec3{ sample.uv.y, -1.f, sample.uv.x }; break;
+			case 4: dir.direction = ei::Vec3{ sample.uv.y, sample.uv.y, 1.f }; break;
+			case 5:
+			default:
+				dir.direction = ei::Vec3{ -sample.uv.y, sample.uv.y, -1.f }; break;
+		}
+		const float lsq = ei::lensq(dir.direction);
+		const float l = ei::sqrt(lsq);
+		dir.direction *= 1.f / l;
+		// See Johannes' renderer
+		dir.pdf = AngularPdf(sample.pdf * lsq * l / 24.f);
+	} else {
+		// Spherical map
+		// Convert UV to spherical...
+		sample.uv.x *= 2.f * ei::PI;
+		sample.uv.y *= ei::PI;
+		// ...and then to cartesian
+		const float sinTheta = sin(sample.uv.y);
+		const float cosTheta = cos(sample.uv.y);
+		const float sinPhi = sin(sample.uv.x);
+		const float cosPhi = cos(sample.uv.x);
+		dir.direction = ei::Vec3{
+			sinTheta * cosPhi,
+			sinTheta * sinPhi,
+			cosTheta
+		};
+		dir.pdf = AngularPdf{ sample.pdf / (2.f * ei::PI * ei::PI * sinTheta) };
+	}
+
+	radiance = ei::Vec3(textures::read(light.texHandle, sample.texel, layer));
+	return dir;
+}
+
 CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const EnvMapLight<CURRENT_DEV>& light,
 													  const ei::Box& bounds,
 													  const math::RndSet2_1& rnd) {
-	// TODO: sample direction from texture
-	math::DirectionSample dir{};
-	Spectrum envValue = light.flux;	// THIS IS JUST A DUMMY. Insert the value from the texture here
+	Spectrum radiance;
+	math::DirectionSample dir = sample_light_dir(light, rnd.u0, rnd.u1, radiance);
+
 	// Sample a start position on the bounding box
-	math::RndSet2 rnd2{rnd.i0};
+	math::RndSet2 rnd2{ rnd.i0 };
+
 	return Photon{
 		math::sample_position(dir.direction, bounds, rnd2.u0, rnd2.u1),
-		envValue, LightType::ENVMAP_LIGHT,
-		{dir.direction, dir.pdf}
+		radiance,
+		LightType::ENVMAP_LIGHT,
+		Photon::SourceParam{dir.direction, dir.pdf}
 	};
 }
 
@@ -326,9 +388,8 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLigh
 																const ei::Vec3& pos,
 																const ei::Box& bounds,
 																const math::RndSet2& rnd) {
-	// TODO: sample a direction
-	math::DirectionSample dir;
 	Spectrum radiance;
+	math::DirectionSample dir = sample_light_dir(light, rnd.u0, rnd.u1, radiance);
 
 	// See connect_light(DirectionalLight) for pdf argumentation.
 	AreaPdf posPdf { 1.0f / math::projected_area(dir.direction, bounds) };

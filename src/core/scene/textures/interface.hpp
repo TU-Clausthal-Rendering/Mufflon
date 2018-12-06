@@ -79,23 +79,23 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 		// Set the layer and UV coordinates
 		int layer;
 		float u, v;
-		if(ei::approx(projDir.x, 1.f)) {
+		if(projDir.x == 1.f) {
 			layer = 0u;
 			u = projDir.y;
 			v = -projDir.z;
-		} else if(ei::approx(projDir.x, -1.f)) {
+		} else if(projDir.x == -1.f) {
 			layer = 1u;
 			u = projDir.y;
 			v = projDir.z;
-		} else if(ei::approx(projDir.y, 1.f)) {
+		} else if(projDir.y == 1.f) {
 			layer = 2u;
 			u = -projDir.z;
 			v = projDir.x;
-		} else if(ei::approx(projDir.y, -1.f)) {
+		} else if(projDir.y == -1.f) {
 			layer = 3u;
 			u = projDir.z;
 			v = projDir.x;
-		} else if(ei::approx(projDir.z, 1.f)) {
+		} else if(projDir.z == 1.f) {
 			layer = 4u;
 			u = projDir.y;
 			v = projDir.x;

@@ -117,6 +117,18 @@ using TextureDevHandle_t = typename TextureDevHandle<dev>::HandleType;
 template < Device dev >
 using ConstTextureDevHandle_t = typename TextureDevHandle<dev>::ConstHandleType;
 
+// Returns the size of a texture based on its handle
+// The other overload is located in cputexture.hpp
+inline __host__ __device__ __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
+	return { texture.width, texture.height };
+}
+
+// Returns the number of layers of a texture based on its handle
+// The other specialization is located in cputexture.hpp
+inline __host__ __device__ __forceinline__ u16 get_texture_layers(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
+	return texture.depth;
+}
+
 
 inline constexpr size_t PIXEL_SIZE(Format format) {
 	constexpr u8 PIXEL_SIZES[int(Format::NUM)] = {

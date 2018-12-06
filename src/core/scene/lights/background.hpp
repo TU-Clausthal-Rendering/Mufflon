@@ -71,12 +71,12 @@ public:
 		return newBck;
 	}
 
-	CUDA_FUNCTION ei::Vec3 get_color(const ei::Vec3& direction) const {
+	CUDA_FUNCTION Spectrum get_color(const ei::Vec3& direction) const {
 		switch(m_type) {
 			case BackgroundType::COLORED: return m_color;
 			case BackgroundType::ENVMAP: {
 				ei::Vec4 sample = textures::sample(m_envLight.texHandle, direction);
-				return ei::Vec3{ sample.x, sample.y, sample.z };
+				return Spectrum{ sample.x, sample.y, sample.z };
 			}
 			default: mAssert(false); return {};
 		}
@@ -107,7 +107,7 @@ private:
 	Background(BackgroundType type) : m_type(type) {}
 
 	BackgroundType m_type;
-	ei::Vec3 m_color;
+	Spectrum m_color;
 	EnvMapLight<DEVICE> m_envLight;
 };
 

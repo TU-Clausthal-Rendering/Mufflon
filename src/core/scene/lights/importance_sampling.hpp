@@ -9,22 +9,6 @@ namespace mufflon { namespace scene { namespace lights {
 
 namespace summed_details {
 
-// Returns the size of a texture based on its handle
-template < Device dev >
-CUDA_FUNCTION __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<dev>& texture) noexcept;
-template <>
-inline __host__ __forceinline__ Pixel get_texture_size<Device::CPU>(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
-#ifndef __CUDA_ARCH__
-	return { texture->get_width(), texture->get_height() };
-#else // __CUDA_ARCH__
-	return Pixel{};
-#endif // __CUDA_ARCH__
-}
-template <>
-CUDA_FUNCTION __forceinline__ Pixel get_texture_size<Device::CUDA>(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
-	return { texture.width, texture.height };
-}
-
 /**
 	 * Binary search on texel range (either row- or columnwise).
 	 * val: Value to compare against (lower bound)
@@ -105,35 +89,54 @@ inline __host__ void create_summed_area_table(TextureHandle envmap, TextureHandl
 }
 #endif // __CUDA_ARCH__
 
+// The resuult of importance sampling an envmap
+struct EnvmapSampleResult {
+	Pixel texel;
+	ei::Vec2 uv;
+	float pdf;
+};
+
 /**
  * Importance-samples a texel from a spherical envmap.
  * Expects both the envmap and a summed area table of its luminance.
  * Requires two uniform random numbers in [0, 1].
+ * If the envmap is a cube map, the UV.x coordinate will be in [0, 6] instead.
+ * Similarly, texel.x will range from 0 to 6*envmap width.
  */
-CUDA_FUNCTION Pixel importance_sample_envmap(const textures::ConstTextureDevHandle_t<CURRENT_DEV>& envmap,
-											 const textures::ConstTextureDevHandle_t<CURRENT_DEV>& summedAreaTable,
-											 float u0, float u1) {
+CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURRENT_DEV>& envLight,
+														  float u0, float u1) {
 	using namespace summed_details;
 
 		// First decide on the row
-	const Pixel texSize = get_texture_size<CURRENT_DEV>(envmap);
+	const Pixel texSize = textures::get_texture_size(envLight.texHandle);
 	const Pixel bottomRight = texSize - 1;
-	const float highestRowwise = textures::read(summedAreaTable, bottomRight).x;
+	const float highestRowwise = textures::read(envLight.summedAreaTable, bottomRight).x;
 
 	// Find the row via binary search
 	const float x = highestRowwise * u0;
-	const int row = lower_bound(summedAreaTable, x, bottomRight.y, bottomRight.x, true);
+	const int row = lower_bound(envLight.summedAreaTable, x, bottomRight.y, bottomRight.x, true);
+	// Perform inverse linear interpolation
+	const float vr0 = row == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ row - 1, bottomRight.y }).x;
+	const float vr1 = textures::read(envLight.summedAreaTable, Pixel{ row, bottomRight.y }).x;
+	const float rowPdf = (vr1 - vr0) * texSize.y / highestRowwise;
+	const float rowVal = (row + (x - vr0) / (vr1 - vr0)) / static_cast<float>(texSize.y);
 
 	// Decide on a column
-	float highestColumnwise = textures::read(summedAreaTable, Pixel{ bottomRight.x, row }).x;
+	float highestColumnwise = textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row }).x;
 	// Adjust the value due to the summing at the end
 	if(row > 0)
-		highestColumnwise -= textures::read(summedAreaTable, Pixel{ bottomRight.x, row - 1 }).x;
+		highestColumnwise -= textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row - 1 }).x;
 
 	// Find the column via binary search
 	const float y = highestColumnwise * u1;
-	const int column = lower_bound(summedAreaTable, y, bottomRight.x, row, false);
-	return Pixel{ row, column };
+	const int column = lower_bound(envLight.summedAreaTable, y, bottomRight.x, row, false);
+	// Perform inverse linear interpolation
+	const float vc0 = column == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ row, column - 1 }).x;
+	const float vc1 = textures::read(envLight.summedAreaTable, Pixel{ row, column }).x;
+	const float columnPdf = (vc1 - vc0) * texSize.x / highestColumnwise;
+	const float columnVal = (column + (y - vc0) / (vc1 - vc0)) / static_cast<float>(texSize.x);
+
+	return EnvmapSampleResult{ Pixel{row, column}, ei::Vec2{ rowVal, columnVal }, rowPdf * columnPdf };
 }
 
 }}} // namespace mufflon::scene::lights
