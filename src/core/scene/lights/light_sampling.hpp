@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "lights.hpp"
 #include "core/export/api.h"
@@ -51,7 +51,7 @@ struct NextEventEstimation {
 	//math::DirectionSample dir;	// PDF not needed, because PT is the only user of NEE, maybe required later again??
 	scene::Direction direction;		// From surface to the light source
 	float cosOut;					// Cos of the surface or 0 for non-hitable sources
-	Spectrum intensity;				// Unit: W/sr�
+	Spectrum intensity;				// Unit: W/sr²
 	float dist;
 	float distSq;
 	AreaPdf creationPdf;			// Pdf to create this connection event (depends on light choice probability and positional sampling)
@@ -178,12 +178,10 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightSphere<CURR
 													  const math::RndSet2& rnd) {
 	// We don't need to convert the "normal" due to sphere symmetry
 	const math::DirectionSample normal = math::sample_dir_sphere_uniform(rnd.u0, rnd.u1);
-	const ei::Vec2 uv {atan2(normal.direction.y, normal.direction.x), acos(normal.direction.z)}; // TODO: not using the sampler (inline) would allow to avoid the atan function here
-	// TODO: what is the outgoing size?
 	return Photon{
 		math::PositionSample{ light.position + normal.direction * light.radius,
 							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		Spectrum{sample(light.radianceTex, uv)}, LightType::AREA_LIGHT_SPHERE,
+		Spectrum{sample(light.radianceTex, normal.direction)}, LightType::AREA_LIGHT_SPHERE,
 		{normal.direction, 4*ei::PI*ei::sq(light.radius)}
 	};
 }
@@ -284,12 +282,28 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightSphere<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
-	// TODO
+	scene::Direction centerDir = pos - light.position;
+	float dist = len(centerDir);
+	centerDir /= dist;
+	// Compute the cosθ inside the sphere, to sample the solid angle extended by
+	// the spherical cap.
+	const float cosSphere = light.radius / dist;
+	// Sample using the same method as spot lights
+	const math::DirectionSample dir = math::sample_cone_uniform(cosSphere, rnd.u0, rnd.u1);
+	// TODO: improve and use ei::base
+	const scene::Direction tangentX = normalize(perpendicular(centerDir));
+	const scene::Direction tangentY = cross(centerDir, tangentX);
+	const scene::Direction globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * centerDir;
+	// Now, connect to the point on the surface
+	const scene::Point surfPos = light.position + light.radius * globalDir;
+	scene::Direction connectionDir = surfPos - pos;
+	const float cDistSq = lensq(connectionDir);
+	const float cDist = sqrtf(cDistSq);
+	connectionDir /= cDist;
 	return NextEventEstimation{
-		scene::Direction{}, 0.0f,
-		ei::Vec3{},
-		float{}, float{},
-		AreaPdf{}
+		connectionDir, -dot(globalDir, connectionDir),
+		Spectrum{sample(light.radianceTex, globalDir)},
+		cDist, cDistSq, dir.pdf.to_area_pdf(1.0f, ei::sq(light.radius))
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const DirectionalLight& light,
