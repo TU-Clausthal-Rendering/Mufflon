@@ -39,7 +39,6 @@ void any_intersectionD(
 	const ei::Vec4* __restrict__ bvh,
 	const i32 bvhSize,
 	const ei::Vec3* __restrict__ meshVertices,
-	const ei::Vec2* __restrict__ meshUVs,
 	const i32* __restrict__ triIndices,
 	const i32* __restrict__ quadIndices,
 	const ei::Vec4* __restrict__ spheres,
@@ -496,20 +495,20 @@ void first_intersection_CUDA(
 	RayIntersectionResult* result) {
 	
 	first_intersectionD << <1, 1 >> > (
-		bvh.bvh,
-		bvh.bvhSize,
-		bvh.meshVertices,
-		bvh.meshUVs,
-		bvh.triIndices,
-		bvh.quadIndices,
-		bvh.spheres,
-		bvh.offsetQuads, bvh.offsetSpheres,
-		bvh.primIds,
-		bvh.numPrimives,
+		bvh.outputs.bvh,
+		bvh.sizes.bvhSize,
+		bvh.inputs.meshVertices,
+		bvh.inputs.meshUVs,
+		bvh.inputs.triIndices,
+		bvh.inputs.quadIndices,
+		bvh.inputs.spheres,
+		bvh.sizes.offsetQuads, bvh.sizes.offsetSpheres,
+		bvh.outputs.primIds,
+		bvh.sizes.numPrimives,
 		rayInfo.ray, rayInfo.startPrimId,
 		rayInfo.tmin, rayInfo.tmax,
 		result
-		);
+		);	
 
 }
 
@@ -520,16 +519,15 @@ bool any_intersection_CUDA(
 	i32* resultD;
 	cudaMalloc((void**)&resultD, sizeof(i32));
 	any_intersectionD << <1, 1 >> > (
-		bvh.bvh,
-		bvh.bvhSize,
-		bvh.meshVertices,
-		bvh.meshUVs,
-		bvh.triIndices,
-		bvh.quadIndices,
-		bvh.spheres,
-		bvh.offsetQuads, bvh.offsetSpheres,
-		bvh.primIds,
-		bvh.numPrimives,
+		bvh.outputs.bvh,
+		bvh.sizes.bvhSize,
+		bvh.inputs.meshVertices,
+		bvh.inputs.triIndices,
+		bvh.inputs.quadIndices,
+		bvh.inputs.spheres,
+		bvh.sizes.offsetQuads, bvh.sizes.offsetSpheres,
+		bvh.outputs.primIds,
+		bvh.sizes.numPrimives,
 		rayInfo.ray, rayInfo.startPrimId,
 		rayInfo.tmin, rayInfo.tmax,
 		resultD

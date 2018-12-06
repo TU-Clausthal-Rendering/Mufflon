@@ -767,18 +767,33 @@ __global__ void copy_to_collapsed_bvhD(
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
-ei::Vec4* build_lbvh64(ei::Vec3* meshVertices,
+void build_lbvh64_info(AccelStructInfo::Size& sizes,
+	AccelStructInfo::InputArrays& inputs, AccelStructInfo::OutputArrays& ouputs,
+	ei::Box& bbox, ei::Vec4& traverseCost) {
+	
+	build_lbvh64(
+		inputs.meshVertices,
+		inputs.spheres,
+		inputs.triIndices,
+		inputs.quadIndices,
+		bbox.min,
+		bbox.max,
+		traverseCost,
+		sizes.numPrimives,
+		sizes.offsetQuads,
+		sizes.offsetSpheres,
+		&ouputs.primIds,
+		&ouputs.bvh,
+		sizes.bvhSize
+	);
+}
+
+void build_lbvh64(ei::Vec3* meshVertices,
 	ei::Vec4* spheres,
 	i32* triIndices,
 	i32* quadIndices,
-	ei::Vec3 lo, ei::Vec3 hi, ei::Vec4 traverseCosts,
-	i32 numTriangles, i32 numQuads, i32 numSpheres,
-	i32** primIds, i32& offsetQuads, i32& offsetSpheres, i32& bvhSize) {
-	// Calculate offsets for each kind of primitives.
-	offsetQuads = numTriangles;
-	offsetSpheres = offsetQuads + numQuads;
-	i32 numPrimitives = offsetSpheres + numSpheres;
-
+	ei::Vec3 lo, ei::Vec3 hi, ei::Vec4 traverseCosts, i32 numPrimitives,
+	i32 offsetQuads, i32 offsetSpheres, i32** primIds, ei::Vec4** bvh, i32& bvhSize) {
 	i32 numBlocks, numThreads;
 
 	// Calculate Morton codes.
@@ -897,12 +912,12 @@ ei::Vec4* build_lbvh64(ei::Vec3* meshVertices,
 	// Free device memory.
 	cudaFree(leafMarks);// aka mortonCodes.
 	//cudaFree(sortIndices);
-	(*primIds) = sortIndices;
 	cudaFree(parents);
 	cudaFree(removedMarks);// aka deviceCounters.
 	cudaFree(boundingBoxes);
 	cudaFree(collapseOffsets);
 
-	return collapsedBVH;
+	(*primIds) = sortIndices;
+	(*bvh) = collapsedBVH;
 }
 }}} // namespace mufflon

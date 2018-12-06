@@ -23,6 +23,10 @@ inline Device operator^(Device a, Device b) {
 	return Device(static_cast<int>(a) ^ static_cast<int>(b));
 }
 
+inline Device operator~(Device a) {
+	return Device(~static_cast<int>(a));
+}
+
 // Many code snippets are either CPU or CUDA. This can be detected at compile time.
 // => no template parameter Device for algorithms.
 #ifdef __CUDA_ARCH__

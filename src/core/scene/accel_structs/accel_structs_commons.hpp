@@ -20,6 +20,29 @@ CUDA_FUNCTION constexpr void extract_prim_counts(i32 primitiveCount, ei::IVec4& 
 	count.w = count.x + count.y + count.z;
 }
 
+struct AccelStructInfo {
+	struct Size
+	{
+		i32 offsetSpheres;
+		i32 offsetQuads;
+		i32 numVertices;
+		i32 numPrimives;
+		i32 bvhSize; // Number of ei::Vec4 in bvh.
+	} sizes;
+	struct InputArrays
+	{
+		ei::Vec3* meshVertices;
+		ei::Vec2* meshUVs;
+		i32* triIndices;
+		i32* quadIndices;
+		ei::Vec4* spheres;
+	} inputs;
+	struct OutputArrays {
+		ei::Vec4* bvh;
+		i32* primIds;
+	} outputs;
+};
+
 }
 }
 }

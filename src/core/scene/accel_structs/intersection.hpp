@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/types.hpp"
+#include "accel_structs_commons.hpp"
 #include "core/scene/handles.hpp"
 #include <ei/3dtypes.hpp>
 
@@ -22,20 +22,6 @@ struct RayInfo {
 	i32 startPrimId;
 	float tmin;
 	float tmax;
-};
-
-struct AccelStructInfo {
-	ei::Vec4* bvh;
-	i32 bvhSize;
-	ei::Vec3* meshVertices;
-	ei::Vec2* meshUVs;
-	i32* triIndices;
-	i32* quadIndices;
-	ei::Vec4* spheres;
-	i32 offsetQuads; 
-	i32 offsetSpheres;
-	i32* primIds;
-	i32 numPrimives;
 };
 
 void first_intersection_CUDA(
