@@ -351,6 +351,7 @@ CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat4
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max);
 
 // World container interface
+CORE_API void CDECL world_clear_all();
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);

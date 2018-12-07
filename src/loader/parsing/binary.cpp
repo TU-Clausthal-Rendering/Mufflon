@@ -31,9 +31,11 @@ public:
 	}
 
 	void close() {
-		if(m_desc != nullptr)
-			if(std::fclose(m_desc) != 0)
-				throw std::ios_base::failure("Failed to close file descriptor");
+		if(m_desc != nullptr) {
+			// Nothing we can do if this fails - not like we care, either
+			(void) std::fclose(m_desc);
+			m_desc = nullptr;
+		}
 	}
 
 	FILE* get() {
@@ -60,7 +62,7 @@ public:
 	}
 
 private:
-	FILE* m_desc;
+	FILE* m_desc = nullptr;
 };
 
 constexpr std::size_t get_attribute_size(AttribDesc desc) {

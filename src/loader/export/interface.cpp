@@ -54,6 +54,8 @@ Boolean loader_load_json(const char* path) {
 		logWarning("[", FUNCTION_NAME, "] Scene file does not end with '.json'; attempting to parse it anyway");
 
 	try {
+		// Clear the world
+		world_clear_all();
 		json::JsonLoader loader{ filePath };
 		loader.load_file();
 	} catch(const std::exception& e) {

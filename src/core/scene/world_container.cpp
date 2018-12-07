@@ -1,6 +1,7 @@
 #include "world_container.hpp"
 #include "util/log.hpp"
 #include "core/cameras/camera.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"
 #include <iostream>
@@ -208,6 +209,7 @@ WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path
 }
 
 SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
+	auto scope = Profiler::instance().start<CpuProfileState>("WorldContainer::load_scene", ProfileLevel::LOW);
 	std::vector<lights::PositionalLights> posLights;
 	std::vector<lights::DirectionalLight> dirLights;
 	std::optional<EnvLightHandle> envLightTex;
