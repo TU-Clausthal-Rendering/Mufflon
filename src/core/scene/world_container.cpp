@@ -258,12 +258,12 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 				// Then get the sphere lights
 				auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
 				materials = *spheres.get_mat_indices().aquireConst();
-				const geometry::Spheres::Sphere* spheresData = *spheres.get_spheres().aquireConst();
+				const ei::Sphere* spheresData = *spheres.get_spheres().aquireConst();
 				for(std::size_t i = 0; i < spheres.get_mat_indices().get_size(); ++i) {
 					if(m_materials[materials[i]]->is_emissive()) {
 						lights::AreaLightSphereDesc al{
-							spheresData[i].m_radPos.position,
-							spheresData[i].m_radPos.radius,
+							spheresData[i].center,
+							spheresData[i].radius,
 							m_materials[materials[i]]->get_emissive_texture()
 						};
 						posLights.push_back({al, u64(instIdx) << 32ull | primIdx});

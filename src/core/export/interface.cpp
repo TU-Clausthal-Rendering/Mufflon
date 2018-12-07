@@ -361,11 +361,9 @@ void execute_command(const char* command) {
 	// TODO
 }
 
-
-
-Boolean polygon_resize(ObjectHdl obj, size_t vertices, size_t edges, size_t faces) {
+Boolean polygon_resize(ObjectHdl obj, size_t vertices, size_t edges, size_t tris, size_t quads) {
 	CHECK_NULLPTR(obj, "object handle", false);
-	static_cast<Object*>(obj)->template resize<Polygons>(vertices, edges, faces);
+	static_cast<Object*>(obj)->template resize<Polygons>(vertices, edges, tris, quads);
 	return true;
 }
 
@@ -1110,7 +1108,7 @@ Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat4x3* mat) 
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
 	Instance& instance = *static_cast<InstanceHandle>(inst);
-	instance.set_transformation_matrix(util::pun<ei::Matrix<float, 4u, 3u>>(*mat));
+	instance.set_transformation_matrix(util::pun<ei::Matrix<float, 3u, 4u>>(*mat));
 	return true;
 }
 

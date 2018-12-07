@@ -88,6 +88,18 @@ public:
 		CustomAttrHandle customHandle;
 	};
 
+	// Associates an attribute name with a type (vertex- or faceattributehandle)
+	template < class T >
+	struct VAttrDesc {
+		using Type = T;
+		std::string name;
+	};
+	template < class T >
+	struct FAttrDesc {
+		using Type = T;
+		std::string name;
+	};
+	
 	class FaceIterator {
 	public:
 		static FaceIterator cbegin(const PolygonMeshType& mesh) {
@@ -157,12 +169,13 @@ public:
 	Polygons(PolygonMeshType&& mesh);
 
 	Polygons(const Polygons&) = delete;
-	Polygons(Polygons&&) = default;
+	Polygons(Polygons&&);
 	Polygons& operator=(const Polygons&) = delete;
 	Polygons& operator=(Polygons&&) = delete;
-	~Polygons() = default;
+	~Polygons();
 
-	void resize(std::size_t vertices, std::size_t edges, std::size_t faces);
+	void resize(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
+	void reserve(std::size_t vertices, std::size_t egdes, std::size_t tris, std::size_t quads);
 
 	// Requests a new attribute, either for face or vertex.
 	template < class AttrHandle >
@@ -229,50 +242,38 @@ public:
 
 	/**
 	 * Returns a descriptor (on CPU side) with pointers to resources (on Device side).
-	 * Takes two tuples: they must each contain the aquired attributes which the
-	 * renderer wants to have access to.
+	 * Takes two tuples: they must each contain the name and type of attributes which the
+	 * renderer wants to have access to. If an attribute gets written to, it is the
+	 * renderer's task to aquire it once more after that, since we cannot hand out
+	 * Accessors to the concrete device.
 	 */
 	template < Device dev, class... VArgs, class... FArgs >
-	PolymeshDescriptor<dev> get_descriptor(std::tuple<VArgs...>& vertexAttribs,
-									  std::tuple<FArgs...>& faceAttribs) {
+	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs...>>& vertexAttribs,
+										   const std::tuple<FAttrDesc<FArgs...>>& faceAttribs) {
 		this->synchronize<dev>();
-		constexpr std::size_t numVertexAttribs = sizeof...(VArgs);
-		constexpr std::size_t numFaceAttribs = sizeof...(FArgs);
-		void** devVertexAttribs = nullptr;
-		void** devFaceAttribs = nullptr;
-		// Collect the attributes; for that, we iterate the given Attributes and
-		// gather them on CPU side (or rather, their device pointers); then
-		// we copy it to the actual device
-		if(numVertexAttribs > 0) {
-			std::vector<void*> cpuVertAttibs(numVertexAttribs);
-			push_back_attrib<0u, dev>(cpuVertAttibs, vertexAttribs);
-			devVertexAttribs = Allocator<dev>::template alloc_array<void*>(numVertexAttribs);
-			Allocator<Device::CPU>::template copy<void*, dev>(devVertexAttribs, cpuVertAttibs.data(),
-													 numVertexAttribs);
-		}
-		if(numFaceAttribs > 0) {
-			std::vector<void*> cpuFaceAttibs(numFaceAttribs);
-			push_back_attrib<0u, dev>(cpuFaceAttibs, faceAttribs);
-			devFaceAttribs = Allocator<dev>::template alloc_array<void*>(numFaceAttribs);
-			Allocator<Device::CPU>::template copy<void*, dev>(devFaceAttribs, cpuFaceAttibs.data(),
-													 numFaceAttribs);
-		}
-		
-		// TODO: face indices
-		return PolymeshDescriptor{
-			static_cast<u32>(this->get_vertex_count()),
-			static_cast<u32>(this->get_triangle_count()),
-			static_cast<u32>(this->get_quad_count()),
-			static_cast<u32>(numVertexAttribs),
-			static_cast<u32>(numFaceAttribs),
-			reinterpret_cast<const ei::Vec3*>(*this->get_points().aquireConst<dev>()),
-			reinterpret_cast<const ei::Vec3*>(*this->get_normals().aquireConst<dev>()),
-			reinterpret_cast<const ei::Vec2*>(*this->get_uvs().aquireConst<dev>()),
-			*this->get_mat_indices().aquireConst<dev>(),
-			this->get_index_buffer(),
-			devVertexAttribs,
-			devFaceAttribs
-		};
+		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
+		set_vertex_attrib_descriptor<dev>(desc, vertexAttribs);
+		set_face_attrib_descriptor<dev>(desc, faceAttribs);
+		return desc;
+	}
+	template < Device dev, class... VArgs >
+	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs...>>& vertexAttribs) {
+		this->synchronize<dev>();
+		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
+		set_vertex_attrib_descriptor<dev>(desc, vertexAttribs);
+		return desc;
+	}
+	template < Device dev, class... FArgs >
+	PolygonsDescriptor<dev> get_descriptor(const std::tuple<FAttrDesc<FArgs...>>& faceAttribs) {
+		this->synchronize<dev>();
+		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
+		set_face_attrib_descriptor<dev>(desc, faceAttribs);
+		return desc;
+	}
+	template < Device dev >
+	PolygonsDescriptor<dev> get_descriptor() {
+		this->synchronize<dev>();
+		return get_common_descriptor<dev>();
 	}
 
 	// Adds a new vertex.
@@ -392,6 +393,17 @@ public:
 	template < Device dev >
 	void synchronize() {
 		m_vertexAttributes.synchronize<dev>();
+		m_faceAttributes.synchronize<dev>();
+		// Synchronize the index buffer
+		if(m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
+			if(m_indexFlags.has_competing_changes()) {
+				logError("[Polygons::synchronize] Competing device changes; ignoring one");
+			}
+			m_indexBuffer.for_each([&](auto& buffer) {
+				using ChangedBuffer = std::decay_t<decltype(buffer)>;
+				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
+			});
+		}
 	}
 
 	template < Device dev >
@@ -464,35 +476,170 @@ public:
 	}
 
 private:
-	// Helper struct for identifying handle type
+	// Helper structs for identifying handle type
 	template < class >
-	struct IsvertexHandleType : std::false_type {};
+	struct IsVertexHandleType : std::false_type {};
 	template < class T >
-	struct IsvertexHandleType<VertexAttributeHandle<T>> : std::true_type {};
+	struct IsVertexHandleType<VertexAttributeHandle<T>> : std::true_type {};
+	template < class >
+	struct IsFaceHandleType : std::false_type {};
+	template < class T >
+	struct IsFaceHandleType<FaceAttributeHandle<T>> : std::true_type {};
 
 	// Helper function for adding attributes since functions cannot be partially specialized
 	template < class AttributeHandle >
 	auto& select_list() {
-		if constexpr(IsvertexHandleType<AttributeHandle>::value)
+		if constexpr(IsVertexHandleType<AttributeHandle>::value)
 			return m_vertexAttributes;
 		else
 			return m_faceAttributes;
 	}
 
 	// Helper for iterating a tuple
-	template < std::size_t I, Device dev, class... Args >
-	static void push_back_attrib(std::vector<void*>& vec, std::tuple<Args...>& attribs) {
+	template < std::size_t I, Device dev, template < class > class AttribType, class... Args >
+	void push_back_attrib(std::vector<void*>& vec, const std::tuple<Args...>& attribs) {
 		if constexpr(I < sizeof...(Args)) {
-			vec.push_back(*std::get<I>(attribs).aquire<dev>());
-			push_back_attrib<I + 1u, dev>(vec, attribs);
+			// First extract the underlying attribute type...
+			using Type = std::tuple_element_t<I, std::tuple<Args...>>;
+			// ...then create the proper handle type...
+			using AttrHdl = AttribType<Type>;
+			// ...and mix it with the presumed name to find it
+			const std::string& name = std::get<I>(attribs).name;
+			std::optional<AttrHdl> attribHdl = this->find<AttrHdl>(name);
+
+			if(!attribHdl.has_value()) {
+				logWarning("[Polygons::push_back_attrib] Could not find attribute '",
+						 name, '\'');
+				vec.push_back(nullptr);
+			} else {
+				vec.push_back(*this->aquire(attribHdl.value()).aquire<dev>());
+			}
+			push_back_attrib<I + 1u, dev, AttribType>(vec, attribs);
 		}
 	}
 
 	// Helper class for distinct array handle types
 	template < Device dev >
 	struct IndexBuffer {
+		static constexpr Device DEVICE = dev;
 		ArrayDevHandle_t<dev, u32> indices;
+		std::size_t reserved = 0u;
 	};
+	template < Device dev >
+	struct AttribBuffer {
+		static constexpr Device DEVICE = dev;
+		ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> vertex;
+		ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> face;
+		std::size_t vertSize = 0u;
+		std::size_t faceSize = 0u;
+	};
+
+	using IndexBuffers = util::TaggedTuple<IndexBuffer<Device::CPU>,
+		IndexBuffer<Device::CUDA>>;
+	using AttribBuffers = util::TaggedTuple<AttribBuffer<Device::CPU>,
+		AttribBuffer<Device::CUDA>>;
+
+	// Reserves more space for the index buffer
+	template < Device dev >
+	void reserve_index_buffer(std::size_t capacity) {
+		auto& buffer = m_indexBuffer.get<IndexBuffer<dev>>();
+		if(capacity > buffer.reserved) {
+			if(buffer.reserved == 0u)
+				buffer.indices = Allocator<dev>::template alloc_array<u32>(capacity);
+			else
+				buffer.indices = Allocator<Device::CPU>::realloc(buffer.indices, buffer.reserved,
+															 capacity);
+			buffer.reserved = capacity;
+			m_indexFlags.mark_changed(dev);
+		}
+	}
+
+	// Synchronizes two device index buffers
+	template < Device changed, Device sync >
+	void synchronize_index_buffer() {
+		if constexpr(changed != sync) {
+			if(m_indexFlags.has_changes(changed)) {
+				auto& changedBuffer = m_indexBuffer.get<IndexBuffer<changed>>();
+				auto& syncBuffer = m_indexBuffer.get<IndexBuffer<sync>>();
+
+				// Check if we need to realloc
+				if(syncBuffer.reserved < m_triangles + m_quads)
+					this->reserve_index_buffer<sync>(m_triangles + m_quads);
+
+				if(changedBuffer.reserved != 0u)
+					Allocator<changed>::copy<u32, sync>(syncBuffer.indices, changedBuffer.indices,
+														m_triangles + m_quads);
+				m_indexFlags.mark_synced(sync);
+			}
+		}
+	}
+
+	// Helper functions to set the attribute descriptors properly
+	template < Device dev, class... FAttrs >
+	void set_face_attrib_descriptor(PolygonsDescriptor<dev>& desc, const std::tuple<FAttrs...>& faceAttribs) {
+		constexpr std::size_t numFaceAttribs = sizeof...(FAttrs);
+		// Collect the attributes; for that, we iterate the given Attributes and
+		// gather them on CPU side (or rather, their device pointers); then
+		// we copy it to the actual device
+		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+			// Resize the attribute array if necessary
+		if(attribBuffer.faceSize < numFaceAttribs) {
+			if(attribBuffer.faceSize == 0)
+				attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(numFaceAttribs);
+			else
+				attribBuffer.face = Allocator<dev>::realloc(attribBuffer.face, attribBuffer.faceSize,
+															numFaceAttribs);
+			attribBuffer.faceSize = numFaceAttribs;
+		}
+
+		std::vector<void*> cpuFaceAttribs(numFaceAttribs);
+		push_back_attrib<0u, dev, FaceAttributeHandle>(cpuFaceAttribs, faceAttribs);
+		Allocator<Device::CPU>::template copy<void*, dev>(attribBuffer.face, cpuFaceAttribs.data(),
+														  numFaceAttribs);
+		desc.numFaceAttributes = numFaceAttribs;
+		desc.faceAttributes = attribBuffer.face;
+	}
+	template < Device dev, class... VAttrs >
+	void set_vertex_attrib_descriptor(PolygonsDescriptor<dev>& desc, const std::tuple<VAttrs...>& vertexAttribs) {
+		constexpr std::size_t numVertexAttribs = sizeof...(VAttrs);
+		// Collect the attributes; for that, we iterate the given Attributes and
+		// gather them on CPU side (or rather, their device pointers); then
+		// we copy it to the actual device
+		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+			// Resize the attribute array if necessary
+		if(attribBuffer.vertSize < numVertexAttribs) {
+			if(attribBuffer.vertSize == 0)
+				attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(numVertexAttribs);
+			else
+				attribBuffer.vertex = Allocator<dev>::realloc(attribBuffer.vertex, attribBuffer.vertSize,
+															numVertexAttribs);
+			attribBuffer.vertSize = numVertexAttribs;
+		}
+
+		std::vector<void*> cpuVertexAttribs(numVertexAttribs);
+		push_back_attrib<0u, dev, FaceAttributeHandle>(cpuVertexAttribs, vertexAttribs);
+		Allocator<Device::CPU>::template copy<void*, dev>(attribBuffer.vertex, cpuVertexAttribs.data(),
+														  numVertexAttribs);
+		desc.numVertexAttributes = numVertexAttribs;
+		desc.vertexAttributes = attribBuffer.vertex;
+	}
+	template < Device dev >
+	PolygonsDescriptor<dev> get_common_descriptor() {
+		return PolygonsDescriptor<dev>{
+			static_cast<u32>(this->get_vertex_count()),
+			static_cast<u32>(this->get_triangle_count()),
+			static_cast<u32>(this->get_quad_count()),
+			0u,
+			0u,
+			reinterpret_cast<const ei::Vec3*>(*this->get_points().aquireConst<dev>()),
+			reinterpret_cast<const ei::Vec3*>(*this->get_normals().aquireConst<dev>()),
+			reinterpret_cast<const ei::Vec2*>(*this->get_uvs().aquireConst<dev>()),
+			*this->get_mat_indices().aquireConst<dev>(),
+			this->get_index_buffer<dev>(),
+			ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
+			ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
+		};
+	}
 
 	// These methods simply create references to the attributes
 	// By holding references to them, if they ever get removed, we're in a bad spot
@@ -512,7 +659,11 @@ private:
 	VertexAttributeHandle<OpenMesh::Vec2f> m_uvsAttrHdl;
 	FaceAttributeHandle<MaterialIndex> m_matIndexAttrHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
-	util::TaggedTuple<IndexBuffer<Device::CPU>, IndexBuffer<Device::CUDA>> m_indexBuffer;
+	IndexBuffers m_indexBuffer;
+	util::DirtyFlags<Device> m_indexFlags;
+	// Array for aquired attribute descriptors
+	AttribBuffers m_attribBuffer;
+
 	ei::Box m_boundingBox;
 	std::size_t m_triangles = 0u;
 	std::size_t m_quads = 0u;

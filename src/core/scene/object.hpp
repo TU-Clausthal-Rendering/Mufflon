@@ -9,6 +9,7 @@
 #include "util/range.hpp"
 #include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
+#include "core/scene/descriptors.hpp"
 #include <climits>
 #include <cstdint>
 #include <memory>
@@ -33,7 +34,7 @@ struct ObjectData {
 	ei::Box aabb;
 	util::Range<geometry::Polygons::FaceIterator> faces;
 	geometry::Polygons::VertexAttribute<OpenMesh::Vec3f>& faceVertices;
-	geometry::Spheres::Attribute<geometry::Spheres::Sphere>& spheres;
+	geometry::Spheres::Attribute<ei::Sphere>& spheres;
 };
 
 struct ObjectFlags : public util::Flags<u32> {
@@ -186,6 +187,101 @@ public:
 	// Is there any emissive polygon in this object
 	bool is_emissive() const noexcept {
 		return m_flags.is_set(ObjectFlags::EMISSIVE);
+	}
+
+	// Get the descriptor of the object (including all geometry
+	template < Device dev >
+	ObjectDescriptor<dev> get_descriptor() {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...VAttrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...FAttrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(faceAttribs),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...Attrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...VAttrs, class...FAttrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs,
+										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...VAttrs, class...Attrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs,
+										 const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...FAttrs, class...Attrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs,
+										 const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(faceAttribs),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
+	}
+	template < Device dev, class...VAttrs, class...FAttrs, class... Attrs >
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs,
+										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs,
+										 const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+		ObjectDescriptor<dev> desc{
+			m_boundingBox,
+			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
+			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
+			ArrayDevHandle_t<dev, void>{}
+		};
+		// TODO: build object BVH if necessary
+		return desc;
 	}
 
 	// Checks if the acceleration structure on one of the system parts has been modified.

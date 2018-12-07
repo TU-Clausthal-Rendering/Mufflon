@@ -21,7 +21,7 @@ namespace scene {
 
 // Geometric descriptors
 template < Device dev >
-struct PolymeshDescriptor {
+struct PolygonsDescriptor {
 	u32 numVertices;
 	u32 numTriangles;
 	u32 numQuads;
@@ -34,43 +34,49 @@ struct PolymeshDescriptor {
 	ConstArrayDevHandle_t<dev, u16> matIndices;
 	// First come triangles, then come quads
 	ConstArrayDevHandle_t<dev, u32> vertexIndices;
-	ConstArrayDevHandle_t<dev, ConstArrayDevHandle_t<dev, void>> vertexAttributes;
-	ConstArrayDevHandle_t<dev, ConstArrayDevHandle_t<dev, void>> faceAttributes;
+	// Access to these must be followed by a mark_dirty/aquire after
+	ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> vertexAttributes;
+	ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> faceAttributes;
 };
 
 template < Device dev >
 struct SpheresDescriptor {
 	u32 numSpheres;
 	u32 numAttributes;
-	ConstArrayDevHandle_t<dev, ei::Vec4> radiiPositions;
+	ConstArrayDevHandle_t<dev, ei::Sphere> spheres;
 	ConstArrayDevHandle_t<dev, u16> matIndices;
-	ConstArrayDevHandle_t<dev, ConstArrayDevHandle_t<dev, void>> attributes;
+	// Access to these must be followed by a mark_dirty/aquire after
+	ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> attributes;
 };
 
 template < Device dev >
 struct ObjectDescriptor {
 	ei::Box aabb;
-	PolymeshDescriptor<dev> polygon;
+	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
 	ArrayDevHandle_t<dev, void> bvhData;
 };
 
 template < Device dev >
 struct InstanceDescriptor {
-	ei::Matrix<Real, 4, 3> transformation;
-	// TODO: pointer or index?
-	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> object;
+	ei::Matrix<Real, 3, 4> transformation;
+	// Index into the object array of the scene descriptor
+	// TODO: replace with direct pointer? wouldn't work for OpenGL
+	u32 objectIndex;
 };
 
 // Light, camera etc.
 template < Device dev >
 struct SceneDescriptor {
-	u32 numInstances;
 	u32 numObjects;
+	u32 numInstances;
 	ei::Box aabb;	// Scene-wide bounding box
-	// TODO: objects etc
+	// The receiver of this struct is responsible for deallocating these two arrays!
+	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> objects;
+	ArrayDevHandle_t<dev, InstanceDescriptor<dev>> instances;
 
-	lights::LightTree<dev>* lightTree;
+	// The receiver of this struct is responsible for deallocating this memory!
+	ConstArrayDevHandle_t<dev, lights::LightTree<dev>> lightTree;
 	// TODO: materials, cameras
 };
 

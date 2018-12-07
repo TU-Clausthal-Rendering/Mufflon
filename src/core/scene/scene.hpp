@@ -1,13 +1,17 @@
 #pragma once
 
+#include "descriptors.hpp"
 #include "instance.hpp"
 #include "handles.hpp"
 #include "types.hpp"
-#include "core/scene/accel_structs/accel_struct.hpp"
 #include "lights/light_tree.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/memory/generic_resource.hpp"
+#include "core/scene/accel_structs/accel_struct.hpp"
+#include "core/scene/geometry/polygon.hpp"
+#include "core/scene/geometry/sphere.hpp"
 #include <memory>
+#include <tuple>
 #include <vector>
 
 namespace mufflon { namespace scene {
@@ -112,6 +116,63 @@ public:
 		return m_media.get<dev, materials::Medium>();
 	}
 
+
+	/**
+	 * Creates a single structure which grants access to all scene data
+	 * needed on the specified device.
+	 * It needs to be passed up to three tuples, each coupling names and types for
+	 * vertex, face, and sphere attributes which the renderer wants to have
+	 * access to.
+	 */
+	template < Device dev, class... Args >
+	SceneDescriptor<dev> get_descriptor(Args&& ...args) {
+		std::vector<ObjectDescriptor<dev>> objectDescs;
+		std::vector<InstanceDescriptor<dev>> instanceDescs;
+		// We need this to ensure we only create one descriptor per object
+		std::unordered_map<Object*, u32> objectDescMap;
+
+		// Create the object and instance descriptors hand-in-hand
+		for(InstanceHandle inst : m_instances) {
+			instanceDescs.push_back(inst->get_descriptor<dev>());
+			// Create the object descriptor, if not already present, and its index
+			Object* objHdl = &inst->get_object();
+			auto entry = objectDescMap.find(objHdl);
+			if(entry == objectDescMap.end()) {
+				entry = objectDescMap.emplace(objHdl, static_cast<u32>(objectDescs.size())).first;
+				objectDescs.push_back(objHdl->get_descriptor<dev>(std::forward<Args>(args)...));
+			}
+			instanceDescs.back().objectIndex = entry->second;
+		}
+		// Allocate the device memory and copy over the descriptors
+		auto& objDevDesc = m_objDevDesc.get<unique_device_ptr<dev, ObjectDescriptor<dev>>>();
+		auto& instDevDesc = m_instDevDesc.get<unique_device_ptr<dev, InstanceDescriptor<dev>>>();
+		objDevDesc = make_udevptr_array<dev, ObjectDescriptor<dev>>(objectDescs.size());
+		instDevDesc = make_udevptr_array<dev, InstanceDescriptor<dev>>(instanceDescs.size());
+		Allocator<Device::CPU>::template copy<ObjectDescriptor<dev>, dev>(objDevDesc.get(), objectDescs.data(),
+																		  objectDescs.size());
+		Allocator<Device::CPU>::template copy<InstanceDescriptor<dev>, dev>(instDevDesc.get(), instanceDescs.data(),
+																			instanceDescs.size());
+
+		// Bring the light tree to the device
+		// We cannot use the make_unique because the light tree doesn't have a proper copy constructor
+		auto& lightDevDesc = m_lightDevDesc.get<unique_device_ptr<dev, lights::LightTree<dev>>>();
+		lightDevDesc.reset(reinterpret_cast<lights::LightTree<Device::CUDA>*>(Allocator<dev>::template alloc_array<char>(sizeof(lights::LightTree<Device::CUDA>))));
+		Allocator<Device::CPU>::copy<lights::LightTree<dev>, dev>(lightDevDesc.get(), &m_lightTree.aquire_tree<dev>(),
+																  1u);
+
+		// TODO: bring camera, materials etc. to the device
+
+		return SceneDescriptor<dev>{
+			static_cast<u32>(objectDescs.size()),
+				static_cast<u32>(instanceDescs.size()),
+				m_boundingBox,
+				objDevDesc.get(),
+				instDevDesc.get(),
+				lightDevDesc.get()
+		};
+	}
+
+
 private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
@@ -124,6 +185,14 @@ private:
 	// Acceleration structure over all instances
 	bool m_accelDirty = false;
 	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
+
+	// Resources for descriptors
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ObjectDescriptor<Device::CPU>>,
+		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>>> m_objDevDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, InstanceDescriptor<Device::CPU>>,
+		unique_device_ptr<Device::CUDA, InstanceDescriptor<Device::CUDA>>> m_instDevDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, lights::LightTree<Device::CPU>*>,
+		unique_device_ptr<Device::CUDA, lights::LightTree<Device::CUDA>>> m_lightDevDesc;
 
 	ei::Box m_boundingBox;
 };

@@ -38,6 +38,7 @@ private:
 	scene::SceneHandle m_currentScene;
 	std::vector<math::Xoroshiro128> m_rngs;
 	u8 m_camParams[cameras::MAX_CAMERA_PARAM_SIZE];
+	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };
 
 } // namespace mufflon::renderer

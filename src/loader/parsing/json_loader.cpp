@@ -19,6 +19,7 @@ namespace {
 
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
+	auto scope = Profiler::instance().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
 	fileString.resize(fileSize);
@@ -63,6 +64,7 @@ void JsonLoader::clear_state() {
 }
 
 TextureHdl JsonLoader::load_texture(const char* name) {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	// Make the path relative to the file
 	fs::path path(name);
 	if(!path.is_absolute())
@@ -76,6 +78,7 @@ TextureHdl JsonLoader::load_texture(const char* name) {
 }
 
 MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator matIter) {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_material", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	MaterialParams* mat = new MaterialParams{};
 
@@ -263,6 +266,7 @@ void JsonLoader::free_material(MaterialParams* mat) {
 }
 
 void JsonLoader::load_cameras(const ei::Box& aabb) {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& cameras = m_cameras->value;
 	assertObject(m_state, cameras);
@@ -318,6 +322,7 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 }
 
 void JsonLoader::load_lights() {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& lights = m_lights->value;
 	assertObject(m_state, lights);
@@ -400,6 +405,7 @@ void JsonLoader::load_lights() {
 }
 
 void JsonLoader::load_materials() {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& materials = m_materials->value;
 	assertObject(m_state, materials);
@@ -420,6 +426,7 @@ void JsonLoader::load_materials() {
 }
 
 void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& scenarios = m_scenarios->value;
 	assertObject(m_state, scenarios);

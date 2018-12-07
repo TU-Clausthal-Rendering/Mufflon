@@ -254,7 +254,7 @@ struct ParamDesc {
 
 // Polygon interface
 CORE_API Boolean CDECL CDECL polygon_resize(ObjectHdl obj, size_t vertices, size_t edges,
-								size_t faces);
+											size_t tris, size_t quads);
 CORE_API PolygonAttributeHandle CDECL polygon_request_vertex_attribute(ObjectHdl obj,
 																	const char* name,
 																	AttribDesc type);

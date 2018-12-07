@@ -53,10 +53,63 @@ Polygons::Polygons(PolygonMeshType&& mesh) :
 	};
 }
 
-void Polygons::resize(std::size_t vertices, std::size_t edges, std::size_t faces) {
-	m_meshData->resize(vertices, edges, faces);
+Polygons::Polygons(Polygons&& poly) :
+	m_meshData(std::move(poly.m_meshData)),
+	m_vertexAttributes(std::move(poly.m_vertexAttributes)),
+	m_faceAttributes(std::move(poly.m_faceAttributes)),
+	m_pointsAttrHdl(std::move(poly.m_pointsAttrHdl)),
+	m_normalsAttrHdl(std::move(poly.m_normalsAttrHdl)),
+	m_uvsAttrHdl(std::move(poly.m_uvsAttrHdl)),
+	m_matIndexAttrHdl(std::move(poly.m_matIndexAttrHdl)),
+	m_indexFlags(std::move(poly.m_indexFlags)),
+	m_boundingBox(std::move(poly.m_boundingBox)),
+	m_triangles(poly.m_triangles),
+	m_quads(poly.m_quads) {
+
+	// Move the index and attribute buffers
+	poly.m_indexBuffer.for_each([&](auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		m_indexBuffer.get<ChangedBuffer>() = buffer;
+		buffer.reserved = 0u;
+		buffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
+	});
+	poly.m_attribBuffer.for_each([&](auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		m_attribBuffer.get<ChangedBuffer>() = buffer;
+		buffer.vertSize = 0u;
+		buffer.faceSize = 0u;
+		buffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+		buffer.face = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+	});
+}
+
+Polygons::~Polygons() {
+	m_indexBuffer.for_each([&](auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		if(buffer.reserved != 0)
+			Allocator<ChangedBuffer::DEVICE>::free(buffer.indices, buffer.reserved);
+	});
+	m_attribBuffer.for_each([&](auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		if(buffer.vertSize != 0)
+			Allocator<ChangedBuffer::DEVICE>::free(buffer.vertex, buffer.vertSize);
+		if(buffer.faceSize != 0)
+			Allocator<ChangedBuffer::DEVICE>::free(buffer.face, buffer.faceSize);
+	});
+}
+
+void Polygons::resize(std::size_t vertices, std::size_t edges,
+					  std::size_t tris, std::size_t quads) {
+	m_meshData->resize(vertices, edges, tris + quads);
 	m_vertexAttributes.resize(vertices);
-	m_faceAttributes.resize(faces);
+	m_faceAttributes.resize(tris + quads);
+	this->reserve_index_buffer<Device::CPU>(3u * tris + 4u * quads);
+}
+
+void Polygons::reserve(std::size_t vertices, std::size_t egdes,
+					   std::size_t tris, std::size_t quads) {
+	// TODO: reserve attributes
+	this->reserve_index_buffer<Device::CPU>(3u * tris + 4u * quads);
 }
 
 Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
@@ -71,6 +124,11 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	(*get_uvs().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
+
+	auto vAttribs = std::make_tuple(VAttrDesc<float>{"hi"});
+	auto fAttribs = std::make_tuple(FAttrDesc<int>{"test"});
+	auto desc = get_descriptor<Device::CUDA>(vAttribs, fAttribs);
+
 	return vh;
 }
 
@@ -82,13 +140,15 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 	mAssert(m_quads == 0u); // To keep the order implicitly
 	FaceHandle hdl = m_meshData->add_face(v0, v1, v2);
 	mAssert(hdl.is_valid());
+	// Expand the index buffer
+	this->reserve_index_buffer<Device::CPU>(3u * (m_triangles + 1u));
 	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices;
 	std::size_t currIndexCount = 3u * m_triangles;
-	// TODO: keep track of reserved size to avoid unnecessary reallocs
-	Allocator<Device::CPU>::realloc(indexBuffer, currIndexCount, 3u + currIndexCount);
 	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
 	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
 	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
+	m_indexFlags.mark_changed(Device::CPU);
+
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
 	++m_triangles;
@@ -128,14 +188,15 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData->n_vertices());
 	FaceHandle hdl = m_meshData->add_face(v0, v1, v2, v3);
 	mAssert(hdl.is_valid());
+	// Expand the index buffer
+	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * (m_quads + 1u));
 	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices;
 	std::size_t currIndexCount = 3u * m_triangles + 4u * m_quads;
-	// TODO: keep track of reserved size to avoid unnecessary reallocs
-	Allocator<Device::CPU>::realloc(indexBuffer, currIndexCount, 4u + currIndexCount);
 	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
 	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
 	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
 	indexBuffer[currIndexCount + 3u] = static_cast<u32>(v3.idx());
+	m_indexFlags.mark_changed(Device::CPU);
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_size() + 1u);
 	++m_quads;
@@ -177,7 +238,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = get_points().restore(pointStream, start, count);
@@ -201,7 +262,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = get_points().restore(pointStream, start, count);
@@ -221,7 +282,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = get_points().restore(pointStream, start, count);
@@ -243,7 +304,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	VertexHandle hdl(static_cast<int>(start));
 
 	// Resize the attributes prior
-	this->resize(start + count, m_meshData->n_edges(), m_meshData->n_faces());
+	this->resize(start + count, m_meshData->n_edges(), m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = get_points().restore(pointStream, start, count);

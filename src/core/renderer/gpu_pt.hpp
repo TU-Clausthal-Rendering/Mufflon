@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer.hpp"
+#include "core/scene/descriptors.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/lights/light_tree.hpp"
 
@@ -22,6 +23,7 @@ struct RenderBuffer;
 class GpuPathTracer : public IRenderer {
 public:
 	GpuPathTracer(scene::SceneHandle scene);
+	~GpuPathTracer();
 
 	// This is just a test method, don't use this as an actual interface
 	virtual void iterate(OutputHandler& handler) override;
@@ -31,12 +33,12 @@ public:
 private:
 	// Used so that we don't need to include everything in CU files
 	void iterate(Pixel imageDims,
-				 RenderBuffer<Device::CUDA> outputBuffer,
-				 scene::lights::LightTree<Device::CUDA> lightTree) const;
+				 RenderBuffer<Device::CUDA> outputBuffer) const;
 
 	bool m_reset = true;
 	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;
-	scene::SceneHandle m_currentScene;
+	scene::SceneHandle m_currentScene = nullptr;
+	scene::SceneDescriptor<Device::CUDA>* m_scenePtr = nullptr;
 };
 
 }} // namespace mufflon::renderer

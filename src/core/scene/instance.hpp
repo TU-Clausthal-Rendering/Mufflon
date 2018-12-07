@@ -3,6 +3,7 @@
 #include "types.hpp"
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
+#include "core/scene/descriptors.hpp"
 
 namespace mufflon { namespace scene {
 
@@ -10,7 +11,7 @@ class Object;
 
 class Instance {
 public:
-	using TransMatrixType = ei::Matrix<Real, 4, 3>;
+	using TransMatrixType = ei::Matrix<Real, 3, 4>;
 
 	// TODO: identity matrix
 	Instance(Object& obj, TransMatrixType trans = {});
@@ -35,6 +36,17 @@ public:
 	}
 	const Object& get_object() const noexcept {
 		return m_objRef;
+	}
+
+	template < Device dev >
+	InstanceDescriptor<dev> get_descriptor() {
+		// We need to leave the objectdescriptor empty and leave it
+		// up to the scene to properly fill it in, since we do not
+		// yet have an array of object descriptors
+		return InstanceDescriptor<dev>{
+			m_transMat,
+			0u
+		};
 	}
 
 private:

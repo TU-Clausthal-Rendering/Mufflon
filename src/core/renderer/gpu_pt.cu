@@ -14,7 +14,7 @@ namespace mufflon { namespace renderer {
 
 __global__ static void sample(Pixel imageDims,
 							  RenderBuffer<Device::CUDA> outputBuffer,
-							  LightTree<Device::CUDA>* lightTree,
+							  scene::SceneDescriptor<Device::CUDA>* sceneDesc,
 							  const float* rnds) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
@@ -41,9 +41,11 @@ __global__ static void sample(Pixel imageDims,
 	// Random walk ended because of missing the scene?
 	if(pathLen < 666) {
 		if(coord.x < imageDims.x && coord.y < imageDims.y) {
+			const LightTree<Device::CUDA>& lightTree = *sceneDesc->lightTree;
+
 			const float phi = 2.f * ei::PI * (coord.x + 0.5f) / static_cast<float>(imageDims.x);
 			const float theta = ei::PI * (coord.y + 0.5f) / static_cast<float>(imageDims.y);
-			ei::Vec3 testRadiance = lightTree->background.get_color(ei::Vec3{
+			ei::Vec3 testRadiance = lightTree.background.get_color(ei::Vec3{
 				sinf(theta) * cosf(phi),
 				sinf(theta) * sinf(phi),
 				cosf(theta)
@@ -56,8 +58,7 @@ __global__ static void sample(Pixel imageDims,
 }
 
 void GpuPathTracer::iterate(Pixel imageDims,
-							RenderBuffer<Device::CUDA> outputBuffer,
-							LightTree<Device::CUDA> lightTree) const {
+							RenderBuffer<Device::CUDA> outputBuffer) const {
 	
 	std::unique_ptr<float[]> rnds = std::make_unique<float[]>(2 * imageDims.x * imageDims.y);
 	math::Xoroshiro128 rng{ static_cast<u32>(std::random_device()()) };
@@ -78,15 +79,11 @@ void GpuPathTracer::iterate(Pixel imageDims,
 	};
 
 	// TODO
-	LightTree<Device::CUDA>* cudaLightTree = nullptr;
-	cuda::check_error(cudaMalloc(&cudaLightTree, sizeof(lightTree)));
-	cuda::check_error(cudaMemcpy(cudaLightTree, &lightTree, sizeof(lightTree), cudaMemcpyHostToDevice));
 	cuda::check_error(cudaGetLastError());
 	sample<<<gridDims, blockDims>>>(imageDims,
 									std::move(outputBuffer),
-									cudaLightTree, devRnds);
+									m_scenePtr, devRnds);
 	cuda::check_error(cudaGetLastError());
-	cuda::check_error(cudaFree(cudaLightTree));
 	cuda::check_error(cudaFree(devRnds));
 }
 

@@ -593,7 +593,8 @@ public:
 				// Copy the current attribute into the buffer
 				auto[propPtr, currLength] = m_accessors[i](attrib, m_mesh);
 				if constexpr(dev == Device::CUDA)
-					Allocator::copy_cuda<char>(&pool.get_pool_data()[currOffset], propPtr, currLength);
+					Allocator<Device::CPU>::template copy<char, Device::CUDA>(&pool.get_pool_data()[currOffset],
+																			  propPtr, currLength);
 				else
 					throw std::runtime_error("Missing OpenGL copy");
 				currOffset += currLength;

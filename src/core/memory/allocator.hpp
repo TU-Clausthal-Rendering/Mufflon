@@ -39,7 +39,7 @@ public:
 		// Initialize it
 		for(std::size_t i = 0; i < n; ++i)
 			new (ptr+i) T {std::forward<Args>(args)...};
-return ptr;
+		return ptr;
 	}
 
 	// Danger: realloc does not handle construction/destruction
