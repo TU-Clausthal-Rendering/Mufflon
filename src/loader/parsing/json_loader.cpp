@@ -619,6 +619,8 @@ void JsonLoader::load_file() {
 		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
 		if(defScenHdl == nullptr)
 			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + '\'');
+
+		auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + '\'');
 	} catch(const std::runtime_error& e) {

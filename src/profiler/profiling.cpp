@@ -84,7 +84,7 @@ std::ostream& ProfileState::save_total_and_snapshots(std::ostream& stream) const
 	this->save_profiler_total_and_snapshots(stream);
 	for(auto& child : m_children) {
 		stream << '"' << child.first << "\",";
-		child.second->save_profiler_total_and_snapshots(stream);
+		child.second->save_total_and_snapshots(stream);
 	}
 	return stream;
 }
