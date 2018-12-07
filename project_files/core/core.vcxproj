@@ -16,6 +16,7 @@
     <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp" />
     <ClCompile Include="..\..\deps\glad\glad.c" />
     <ClCompile Include="..\..\src\core\cameras\camera.cpp" />
+    <ClCompile Include="..\..\src\core\cameras\focus.cpp" />
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
@@ -148,6 +149,7 @@
     <ClInclude Include="..\..\deps\glad\glad\glad.h" />
     <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h" />
     <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
+    <ClInclude Include="..\..\src\core\cameras\focus.hpp" />
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
     <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp" />
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h" />

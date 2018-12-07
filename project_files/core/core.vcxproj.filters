@@ -208,6 +208,9 @@
     <ClCompile Include="..\..\src\core\scene\lights\lights.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\cameras\focus.cpp">
+      <Filter>Source Files\core\cameras</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -731,6 +734,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\descriptors.hpp">
       <Filter>Source Files\core\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cameras\focus.hpp">
+      <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
