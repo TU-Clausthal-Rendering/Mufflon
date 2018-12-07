@@ -27,6 +27,8 @@ float DeviceSort(u32 numElements, u64** keysIn, u64** keysOut,
 
 float DeviceSort(u32 numElements, u64 ** keysIn, u64 ** keysOut, i32 ** valuesIn, i32 ** valuesOut);
 
+float DeviceSort(u32 numElements, u32 ** keysIn, u32 ** keysOut, i32 ** valuesIn, i32 ** valuesOut);
+
 float DeviceSort(u32 numElements, u32** keysIn, u32** keysOut,
 	u32** valuesIn, u32** valuesOut);
 

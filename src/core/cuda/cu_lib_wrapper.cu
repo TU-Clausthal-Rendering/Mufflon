@@ -262,6 +262,11 @@ float DeviceSort(u32 numElements, u64 ** keysIn, u64 ** keysOut, i32 ** valuesIn
 	return DeviceSort<u64, i32>(numElements, keysIn, keysOut, valuesIn, valuesOut);
 }
 
+float DeviceSort(u32 numElements, u32 ** keysIn, u32 ** keysOut, i32 ** valuesIn, i32 ** valuesOut)
+{
+	return DeviceSort<u32, i32>(numElements, keysIn, keysOut, valuesIn, valuesOut);
+}
+
 float DeviceSort(u32 numElements, u32** keysIn, u32** keysOut,
 	u32** valuesIn, u32** valuesOut)
 {

@@ -26,6 +26,17 @@ __host__ __device__ ei::Vec3 get_quad_centroid(ei::Vec3 v0, ei::Vec3 v1,
 }
 
 // Calculates the point morton code using 63 bits.
+__forceinline__ __host__ __device__ u32 calculate_morton_code32(ei::Vec3 point)
+{
+	// Discretize the unit cube into a 21 bit integer
+	ei::UVec3 discretized{ ei::clamp(point * 1024.0f, 0.0f, 1023.0f) };
+
+	return math::part_by_two10(discretized[0]) * 4
+		+ math::part_by_two10(discretized[1]) * 2
+		+ math::part_by_two10(discretized[2]);
+}
+
+// Calculates the point morton code using 63 bits.
 __forceinline__ __host__ __device__ u64 calculate_morton_code64(ei::Vec3 point)
 {
 	// Discretize the unit cube into a 21 bit integer
@@ -55,7 +66,6 @@ __global__ void calculate_morton_codes64D(
 	if (idx >= numPrimitives)
 		return;
 
-	u64 mortonCode;
 	ei::Vec3 centroid;
 	if (idx >= offsetSpheres) {
 		// Calculate Morton codes for spheres.
@@ -82,8 +92,31 @@ __global__ void calculate_morton_codes64D(
 			centroid = get_triangle_centroid(v0, v1, v2);
 		}
 	}
-	ei::Vec3 normalizedPos = normalize_position(centroid, lo, hi);
-	mortonCode = calculate_morton_code64(normalizedPos);
+	const ei::Vec3 normalizedPos = normalize_position(centroid, lo, hi);
+	const u64 mortonCode = calculate_morton_code64(normalizedPos);
+	mortonCodes[idx] = mortonCode;
+	sortIndices[idx] = idx;
+}
+
+__global__ void calculate_morton_codes32D(
+	ei::Mat3x4* matrixs,
+	i32* objIds,
+	ei::Box* aabbs,
+	ei::Vec3 lo, ei::Vec3 hi,
+	u32* mortonCodes,
+	i32* sortIndices,
+	i32 numInstances) {
+	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
+
+	if (idx >= numInstances)
+		return;
+
+	const i32 objId = objIds[idx];
+	const ei::Box aabb = ei::transform(aabbs[objId], matrixs[idx]);
+	const ei::Vec3 centroid = (aabb.max + aabb.max) * .5f;
+
+	const ei::Vec3 normalizedPos = normalize_position(centroid, lo, hi);
+	const u32 mortonCode = calculate_morton_code32(normalizedPos);
 	mortonCodes[idx] = mortonCode;
 	sortIndices[idx] = idx;
 }
@@ -147,6 +180,26 @@ __device__ i32 longestCommonPrefix(u64* sortedKeys,
 	}
 
 	return __clzll(key1 ^ key2);
+}
+
+__device__ i32 longestCommonPrefix(u32* sortedKeys,
+	u32 numberOfElements, i32 index1, i32 index2, u32 key1)
+{
+	// No need to check the upper bound, since i+1 will be at most numberOfElements - 1 (one 
+	// thread per internal node)
+	if (index2 < 0 || index2 >= numberOfElements)
+	{
+		return 0;
+	}
+
+	u32 key2 = sortedKeys[index2];
+
+	if (key1 == key2)
+	{
+		return 32 + __clz(index1 ^ index2);
+	}
+
+	return __clz(key1 ^ key2);
 }
 
 __device__ i32 sgn(i32 number)
@@ -520,6 +573,209 @@ __global__ void calculate_bounding_boxesD(
 	}
 }
 
+__global__ void calculate_bounding_boxes_insD(
+	u32 numInstances,
+	ei::Mat3x4* matrixs,
+	i32* objIds,
+	ei::Box* aabbs,
+	ei::Vec4 * __restrict__ boundingBoxes, //TODO remove __restricts?
+	i32 *sortedIndices,
+	i32 * __restrict__ parents,
+	i32 *collapseOffsets,
+	float ci, float ct,
+	u32* counters)
+{
+	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
+	const i32 firstThreadInBlock = blockIdx.x * blockDim.x;
+	const i32 lastThreadInBlock = firstThreadInBlock + blockDim.x - 1;
+
+	// Initialize cache of bounding boxes in shared memory.
+	extern __shared__ BBCache sharedBb[];
+
+	// Check for valid threads.
+	if (idx >= numInstances)
+	{
+		return;
+	}
+
+	// If node is to be collapsed, offsets, dataIndices need to be updated.
+	bool checkCollapse = true;
+
+	// Calculate leaves bounding box and set primitives count and intersection test cost.
+	float costAsLeaf;
+	const i32 objId = objIds[idx];
+	ei::Box currentBb = ei::transform(aabbs[objId], matrixs[idx]);
+	// Some auxilary variables for calculating primitiveCount.
+	i32 instanceCount = 1;
+	float cost = ci + ct;
+
+	// Store cost and primitiveCount.
+	cost *= ei::surface(currentBb);
+
+	// Update node bounding boxes of current node.
+	sharedBb[threadIdx.x] = { currentBb, cost, instanceCount };
+	const i32 numInternalNodes = numInstances - 1;
+	i32 leafIndex = idx + numInternalNodes;
+	i32 boxId = leafIndex << 1;
+	boundingBoxes[boxId] = { currentBb.min, __int_as_float(instanceCount) };
+	boundingBoxes[boxId + 1] = { currentBb.max, cost };
+
+	__syncthreads(); // TODO check this.
+
+	// Initialize.
+	i32 current = parents[leafIndex];
+	bool lastNodeIsLeftChild = false;
+	if (current < 0) {
+		current = ~current;
+		lastNodeIsLeftChild = true;
+	}
+	i32 lastNode = idx; // Does not need to be initialized, since leaves will not be collapsed
+				  // due to positive values of primitiveCount
+
+			// In the counters array, we have stored the id of the thread that processed the other
+		// children of this node.
+	u32 childThreadId = atomicExch(&counters[current], leafIndex);
+
+	// The first thread to reach a node will just die.
+	if (childThreadId == 0xFFFFFFFF)
+	{
+		return;
+	}
+
+	while (true)
+	{
+		// Fetch bounding boxes and counts information.
+		BBCache childInfo;
+		i32 anotherChildId = (lastNodeIsLeftChild) ? lastNode + 1 : lastNode - 1;
+		if (childThreadId >= numInternalNodes) {
+			childThreadId -= numInternalNodes;
+			anotherChildId += numInternalNodes;
+		}
+		if (childThreadId >= firstThreadInBlock && childThreadId <= lastThreadInBlock) {
+			// If both child nodes were processed by the same block, we can reuse the values
+			// cached in shared memory.
+			i32 childThreadIdInBlock = childThreadId - firstThreadInBlock;
+			childInfo = sharedBb[childThreadIdInBlock];
+		}
+		else {
+			// The children were processed in different blocks, so we have to find out if the one
+			// that was not processed by this thread was the left or right one.
+			boxId = anotherChildId << 1;
+			ei::Vec4 childBbMin = boundingBoxes[boxId];
+			ei::Vec4 childBbMax = boundingBoxes[boxId + 1];
+			childInfo = BBCache{
+				ei::Box{ei::Vec3{childBbMin}, ei::Vec3{childBbMax}},
+				childBbMax.w, __float_as_int(childBbMin.w)
+			};
+		}
+
+		__syncthreads(); // @todo check.
+		currentBb = ei::Box{ currentBb, childInfo.bb };
+		if (checkCollapse) {
+			// Calculate primitves counts.
+			// Set offsets.
+			if (instanceCount < 0) { // Count < 0 means the node should be collapsed.
+				instanceCount &= 0x7FFFFFFF;
+				// offset is the number of internal nodes below the child lastNode.
+				i32 offset = instanceCount - 2;
+				if (lastNodeIsLeftChild)
+					collapseOffsets[lastNode] = offset;
+				else
+					// Since lastNode as right child should be collapsed, lastNode + 1
+					// must be one child of lastNode if it has more than 2 primitves.
+					collapseOffsets[lastNode + 1] = offset;
+			}
+
+			if (childInfo.primCount < 0) {
+				// & 0x3FFFFFFF is used to avoid intervention of the leftChildMarkBit.
+				childInfo.primCount &= 0x3FFFFFFF;
+				// offset is the number of internal nodes below the other child.
+				i32 offset = childInfo.primCount - 2;
+				if (lastNodeIsLeftChild)
+					collapseOffsets[anotherChildId + 1] = offset;
+				else
+					// Since theOtherChild as right child should be collapsed, lastNode + 1
+					// must be one child of theOtherChild if it has more than 2 primitves.
+					collapseOffsets[anotherChildId] = offset;
+			}
+
+			// Update primtivesCount.
+			instanceCount += childInfo.primCount;
+
+			if (instanceCount > 1023) {
+				checkCollapse = false;
+				// Setting cacheMin.w is here to make sure:
+				// even if the current node has checkCollapse = false but be killed in 
+				// the next round, however, primitiveCount will be read to disable checkCollapse.
+				instanceCount = 0x00000FFF;
+			}
+			else {
+				// Calculate costs.
+				float area = ei::surface(currentBb);
+				cost = ci * area + childInfo.cost + cost;
+				costAsLeaf = area * instanceCount * ct;
+				if (costAsLeaf < cost) {
+					// Collapse.
+					instanceCount |= 0x80000000;
+					// Update cost.
+					cost = costAsLeaf;
+				}
+			}
+		}
+
+		// Update last processed node
+		lastNode = current;
+
+		// Update current node pointer
+		current = parents[current];
+		// If current == 0, both left/right children are taken as left children
+		// for setting offset if needed.
+		if (current < 0) {
+			current = ~current;
+			lastNodeIsLeftChild = true;
+		}
+		else {
+			lastNodeIsLeftChild = false;
+		}
+
+		// Update node bounding box of the last node.
+		// Put this operation here because we need to 
+		// mark the 2. highest bit of cacheMin.w as 1
+		// is the lastNode is left child, else mark as 0.
+		// This is for simplifying mark_nodesD.
+		if (checkCollapse) {
+			if (lastNodeIsLeftChild)
+				sharedBb[threadIdx.x] = BBCache{ currentBb, cost, instanceCount | 0x40000000 };
+			else
+				sharedBb[threadIdx.x] = BBCache{ currentBb, cost, i32(instanceCount & 0xBFFFFFFF) };
+		}
+
+		boxId = lastNode << 1;
+		boundingBoxes[boxId] = { currentBb.min, __int_as_float(instanceCount) };
+		boundingBoxes[boxId + 1] = { currentBb.max, cost };
+
+		__syncthreads(); //@todo check.
+
+		if (lastNode == 0) {
+			// Print the bounding box of the base node.
+			printf("root bounding box:\n%f %f %f\n%f %f %f\n",
+				currentBb.min.x, currentBb.min.y, currentBb.min.z,
+				currentBb.max.x, currentBb.max.y, currentBb.max.z);
+			return;
+		}
+
+		// In the counters array, we have stored the id of the thread that processed the other
+// children of this node.
+		childThreadId = atomicExch(&counters[current], idx);
+
+		// The first thread to reach a node will just die.
+		if (childThreadId == 0xFFFFFFFF)
+		{
+			return;
+		}
+	}
+}
+
 __global__ void mark_nodesD(
 	u32 numInternalNodes,
 	ei::Vec4* __restrict__ boundingBoxes,
@@ -761,6 +1017,96 @@ __global__ void copy_to_collapsed_bvhD(
 	}
 }
 
+__global__ void copy_to_collapsed_bvh_insD(
+	i32 numNodes,
+	i32 numInternalNodes,
+	i32 simpleLeafOffset,
+	ei::Vec4* collapsedBVH,
+	ei::Vec4 * __restrict__ boundingBoxes,
+	i32* __restrict__ parents,
+	i32* __restrict__ removedMarks,
+	i32* __restrict__ sortIndices,
+	i32* __restrict__ preInternalLeaves,
+	i32* __restrict__ reduceOffsets
+) {
+	i32 idx = threadIdx.x + blockIdx.x * blockDim.x + 1;
+
+	if (idx >= numNodes)
+		return;
+
+
+	if (idx >= numInternalNodes) {
+		i32 parent = parents[idx];
+		i32 offset = 1;
+		if (parent < 0) {// Is left child.
+			parent = ~parent;
+			offset = 0;
+		}
+
+		const i32 boxId = parent << 1;
+		i32 primitiveCount = __float_as_int(boundingBoxes[boxId].w);
+		if (primitiveCount >= 0 && removedMarks[parent] != 0xFFFFFFFF) {
+
+			// Copy bounding boxes to parent.
+			// Set to parent id in collapsed bvh.
+			const i32 removedLeaves = reduceOffsets[parent];
+			i32 nodeId = idx << 1;
+			ei::Vec4 lo = boundingBoxes[nodeId];
+			ei::Vec4 hi = boundingBoxes[nodeId + 1];
+			const i32 insertId = insert_id(parent, preInternalLeaves, removedLeaves);
+			collapsedBVH[insertId + offset] = ei::Vec4(lo.x, hi.x, lo.y, hi.y);
+			*(((ei::Vec2*)&collapsedBVH[insertId + 2]) + offset) = ei::Vec2(lo.z, hi.z);
+
+			// Set child pointers to parent.
+			// set to current node id in collapsed bvh.
+			*(((i32*)&collapsedBVH[insertId + 3]) + offset) =
+				~(simpleLeafOffset + idx);
+		}
+
+	}
+	else
+		if (removedMarks[idx] != 0xFFFFFFFF) {
+			i32 parent = parents[idx];
+			i32 offset = 1;
+			if (parent < 0) {// Is left child.
+				parent = ~parent;
+				offset = 0;
+			}
+
+			// Copy bounding boxes to parent.
+			// Set to parent id in collapsed bvh.
+			i32 removedInternalLeaves = reduceOffsets[parent];
+			i32 nodeId = idx << 1;
+			const ei::Vec4 lo = boundingBoxes[nodeId];
+			const ei::Vec4 hi = boundingBoxes[nodeId + 1];
+			const i32 insertId = insert_id(parent, preInternalLeaves, removedInternalLeaves);
+			collapsedBVH[insertId + offset] = ei::Vec4(lo.x, hi.x, lo.y, hi.y);
+			*(((ei::Vec2*)&collapsedBVH[insertId + 2]) + offset) = ei::Vec2(lo.z, hi.z);
+
+			// Set child pointers to parent.
+			// set to current node id in collapsed bvh.
+			removedInternalLeaves = reduceOffsets[idx];
+			int pointerId = insert_id(idx, preInternalLeaves, removedInternalLeaves);
+			// Leaf with negative sign to the pointer.
+			*(((i32*)&collapsedBVH[insertId + 3]) + offset) = (lo.w < 0) ? ~pointerId : pointerId;
+
+			// Set the pointer to instances.
+			// Copy data indices is no longer needed.
+			if (lo.w < 0) {
+				i32 instanceCount = __float_as_int(lo.w) & 0x3FFFFFFF;
+				i32 startId;
+				if (offset) { // The current node is right child.
+					startId = idx;
+				}
+				else {
+					startId = idx - instanceCount + 1;
+				}
+				collapsedBVH[pointerId] = ei::Vec4(
+					instanceCount, __int_as_float(startId), 0.f, 0.f);
+			}
+		}
+}
+
 }} // namespace mufflon:: {
 
 
@@ -920,4 +1266,137 @@ void build_lbvh64(ei::Vec3* meshVertices,
 	(*primIds) = sortIndices;
 	(*bvh) = collapsedBVH;
 }
+
+// For the scene.
+void build_lbvh64(ei::Mat3x4* matrixs,
+	i32* objIds,
+	ei::Box* aabbs,
+	ei::Vec3 lo, ei::Vec3 hi, ei::Vec2 traverseCosts, i32 numInstances,
+	i32** instanceIds, ei::Vec4** bvh, i32& bvhSize) {
+	i32 numBlocks, numThreads;
+
+	// Calculate Morton codes.
+	u32* mortonCodes;
+	cudaMalloc((void**)&mortonCodes, numInstances * sizeof(i32));
+	i32* sortIndices;
+	cudaMalloc((void**)&sortIndices, numInstances * sizeof(i32));
+	get_maximum_occupancy(numBlocks, numThreads, numInstances, calculate_morton_codes64D);
+	calculate_morton_codes32D << < numBlocks, numThreads >> > (
+		matrixs, objIds, aabbs, lo, hi,
+		mortonCodes, sortIndices, numInstances);
+
+	// Sort based on Morton codes.
+	CuLib::DeviceSort(numInstances, &mortonCodes, &mortonCodes,
+		&sortIndices, &sortIndices);
+
+	// Create BVH.
+	// Layout: first internal nodes, then leves.
+	const i32 numInternalNodes = numInstances - 1;
+	const u32 numNodes = numInternalNodes + numInstances;
+	i32 *parents; // size numNodes.
+	u32 totalBytes = numNodes * sizeof(i32);
+	cudaMalloc((void**)&parents, totalBytes);
+	cudaFuncSetCacheConfig(build_lbvh_treeD<u64>, cudaFuncCachePreferL1);
+	get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<u32>);
+	build_lbvh_treeD<u32> << <numBlocks, numThreads >> > (//TODO check <u64>
+		numInstances,
+		mortonCodes,
+		parents);
+
+	// Calcualte bounding boxes and SAH.
+	// Create atomic counters buffer.
+	u32* deviceCounters;
+	cudaMalloc((void**)&deviceCounters, numInternalNodes * sizeof(u32));
+	cudaMemset(deviceCounters, 0xFF, numInternalNodes * sizeof(u32));
+	// Allocate bounding boxes.
+	ei::Vec4 *boundingBoxes;
+	cudaMalloc((void**)&boundingBoxes, numNodes * 2 * sizeof(ei::Vec4));
+	// Allocate collapseOffsets.
+	i32* collapseOffsets;
+	// The last position for collapseOffsets is to avoid access violations,
+	// since if the last internal node needs to be collapsed, it will write 
+	// to this positions with offset = 0, but this info will not be used further.
+	cudaMalloc((void**)& collapseOffsets, numInstances * sizeof(i32));
+	cudaMemset(collapseOffsets, 0, numInternalNodes * sizeof(i32));
+	// Calculate BVH bounding boxes.
+	i32 bboxCacheSize = numThreads * sizeof(ei::Vec4) * 2;
+	cudaFuncSetCacheConfig(calculate_bounding_boxes_insD, cudaFuncCachePreferShared);
+	BoundingBoxFunctor functor;
+	get_maximum_occupancy_variable_smem(numBlocks, numThreads, numInstances,
+		calculate_bounding_boxes_insD, functor);
+	calculate_bounding_boxes_insD << <numBlocks, numThreads, bboxCacheSize >> > (
+		numInstances,
+		matrixs,
+		objIds,
+		aabbs,
+		boundingBoxes,
+		sortIndices,
+		parents,
+		collapseOffsets,
+		traverseCosts.x, traverseCosts.y,
+		deviceCounters);
+
+	// Mark all children of collapsed nodes as removed and themselves as leaves (=1).
+	get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, mark_nodesD);
+	i32* removedMarks = (i32*)deviceCounters;
+	i32* leafMarks = (i32*)mortonCodes;
+	mark_nodesD << <numBlocks, numThreads, bboxCacheSize >> > (
+		numInternalNodes,
+		boundingBoxes,
+		removedMarks,
+		collapseOffsets,
+		leafMarks);
+
+	// Scan to get values for offsets.
+	CuLib::DeviceInclusiveSum(numInternalNodes, &collapseOffsets, &collapseOffsets);
+	//cudaDeviceSynchronize();//testing
+	i32 numRemovedInternalNodes;
+	cudaMemcpy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32),
+		cudaMemcpyDeviceToHost);
+	// Scan to get number of leaves arised from internal nodes before current node.
+	CuLib::DeviceExclusiveSum(numInternalNodes + 1, &leafMarks, &leafMarks);
+
+
+	// Copy values for collapsed BVH.	
+	ei::Vec4* collapsedBVH;
+	// Here uses a compact memory layout so that each leaf only uses 16 bytes.
+	i32 numInternLeavesCollapsedBVH; //!= (numNodesCollapsedBVH + 1) >> 1; since there are simple leaves.
+	// and it includes the removed ones.
+	cudaMemcpy(&numInternLeavesCollapsedBVH, leafMarks + numInternalNodes, sizeof(i32),
+		cudaMemcpyDeviceToHost);
+	i32 numInternalNodesCollapsedBVH = numInternalNodes - numInternLeavesCollapsedBVH;
+	numInternLeavesCollapsedBVH -= numRemovedInternalNodes;
+	i32 numFloat4InCollapsedBVH = numInternLeavesCollapsedBVH + 4 * numInternalNodesCollapsedBVH;
+	bvhSize = numFloat4InCollapsedBVH;
+	//printf("bvhSize %d %d %d\n", bvhSize, 
+	//	numInternLeavesCollapsedBVH + numRemovedInternalNodes, numRemovedInternalNodes);
+	cudaMalloc((void**)&collapsedBVH, numFloat4InCollapsedBVH * sizeof(ei::Vec4));
+	get_maximum_occupancy(numBlocks, numThreads, numNodes, copy_to_collapsed_bvh_insD);
+	copy_to_collapsed_bvh_insD << < numBlocks, numThreads >> > (
+		numNodes,
+		numInternalNodes,
+		numFloat4InCollapsedBVH - numInternalNodes,
+		collapsedBVH,
+		boundingBoxes,
+		parents,
+		removedMarks,
+		sortIndices,
+		leafMarks,
+		collapseOffsets
+		);
+
+
+	// Free device memory.
+	cudaFree(leafMarks);// aka mortonCodes.
+	//cudaFree(sortIndices);
+	cudaFree(parents);
+	cudaFree(removedMarks);// aka deviceCounters.
+	cudaFree(boundingBoxes);
+	cudaFree(collapseOffsets);
+
+	(*instanceIds) = sortIndices;
+	(*bvh) = collapsedBVH;
+}
+
+
 }}} // namespace mufflon

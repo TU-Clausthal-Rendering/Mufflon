@@ -34,6 +34,16 @@ CUDA_FUNCTION constexpr u64 part_by_two21(const u32 x) {
 	return r;
 }
 
+CUDA_FUNCTION constexpr u32 part_by_two10(const u32 x) {
+	mAssert((x & 0xfffffc00) == 0);
+	u32 r = x;
+	r = (r * 0x00010001u) & 0xFF0000FFu;
+	r = (r * 0x00000101u) & 0x0F00F00Fu;
+	r = (r * 0x00000011u) & 0xC30C30C3u;
+	r = (r * 0x00000005u) & 0x49249249u;
+	return r;
+}
+
 // Converts gray-code to regular binary
 CUDA_FUNCTION constexpr u64 gray_to_binary(u64 num) {
 	num = num ^ (num >> 32);
