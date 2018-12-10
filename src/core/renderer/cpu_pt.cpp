@@ -59,17 +59,17 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
 	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	/*u8 vertexBuffer[256];
+	u8 vertexBuffer[256];
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	const scene::materials::Medium* media = m_currentScene->get_media<Device::CPU>();
 	// Create a start for the path
 	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
 														 m_rngs[pixel].next());
-	int s = PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos);
-	mAssertMsg(s < 256, "vertexBuffer overflow.");*/
+	int s = PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos, coord);
+	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 	int pathLen = 0;
-	/*do {
+	do {
 		if(pathLen+1 >= m_params.maxPathLength) {
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
@@ -105,7 +105,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 					vertex->get_normal(), vertex->get_albedo());
 			}
 		}
-	} while(pathLen < m_params.maxPathLength);*/
+	} while(pathLen < m_params.maxPathLength);
 
 	// Random walk ended because of missing the scene?
 	if(pathLen < m_params.maxPathLength) {

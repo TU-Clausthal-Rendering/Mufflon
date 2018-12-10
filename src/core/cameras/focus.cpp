@@ -13,6 +13,7 @@ void Focus::get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel&
 		m_near,
 		get_up_dir(),
 		m_far,
+		m_sensorHeight,
 		m_focalDistance,
 		m_lensRadius,
 		ei::Vec<u16,2>{resolution}

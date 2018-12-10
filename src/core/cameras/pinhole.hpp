@@ -65,11 +65,12 @@ pinholecam_sample_position(const PinholeParams& params, const Pixel& pixel, cons
 
 CUDA_FUNCTION Importon
 pinholecam_sample_ray(const PinholeParams& params, const scene::Point& exitPosWorld) {
-	ei::Vec3 dirWorldNormalized = normalize(exitPosWorld);
+	ei::Vec3 dirWorldNormalized = normalize(exitPosWorld - params.position);
 	float aspectRatio = params.resolution.x / float(params.resolution.y);
 	// Get the PDF of the pixel sampling procedure
 	float pixelArea = ei::sq(2 * params.tanVFov) * aspectRatio;
-	float pdf = 1.0f / (pixelArea * dirWorldNormalized.z * dirWorldNormalized.z * dirWorldNormalized.z);
+	float cosOut = ei::dot(params.viewDir, dirWorldNormalized);
+	float pdf = 1.0f / (pixelArea * cosOut * cosOut * cosOut);
 	return Importon{
 		math::DirectionSample{ dirWorldNormalized, AngularPdf{ pdf } },
 		pdf		// W is the same as the PDF by construction
@@ -80,7 +81,7 @@ pinholecam_sample_ray(const PinholeParams& params, const scene::Point& exitPosWo
 // Compute pixel position and PDF
 // position: a direction in world space.
 CUDA_FUNCTION ProjectionResult
-pinholecam_project(const PinholeParams& params, const scene::Point& excident) {
+pinholecam_project(const PinholeParams& params, const scene::Direction& excident) {
 	float cosOut = dot(params.viewDir, excident);
 
 	// Compute screen coordinate for this position

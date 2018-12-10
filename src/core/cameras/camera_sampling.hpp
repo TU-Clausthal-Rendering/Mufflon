@@ -4,6 +4,7 @@
 #include "core/export/api.h"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
+#include "core/cameras/focus.hpp"
 #include <cuda_runtime.h>
 
 
@@ -19,6 +20,9 @@ camera_sample_position(const CameraParams& params, const Pixel& pixel, const mat
 	switch(params.type) {
 		case CameraModel::PINHOLE: {
 			return pinholecam_sample_position(static_cast<const PinholeParams&>(params), pixel, rndSet);
+		}
+		case CameraModel::FOCUS: {
+			return focuscam_sample_position(static_cast<const FocusParams&>(params), rndSet);
 		}
 		default:
 #ifndef __CUDA_ARCH__
@@ -40,6 +44,9 @@ camera_sample_ray(const CameraParams& params, const scene::Point& exitPosWorld, 
 		case CameraModel::PINHOLE: {
 			return pinholecam_sample_ray(static_cast<const PinholeParams&>(params), exitPosWorld);
 		}
+		case CameraModel::FOCUS: {
+			// TODO
+		}
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[cameras::sample_ray] Trying to evaluate unimplemented camera model ", params.type);
@@ -51,10 +58,13 @@ camera_sample_ray(const CameraParams& params, const scene::Point& exitPosWorld, 
 // Compute pixel position and PDF
 // excident: a direction in world space (from camera to object).
 CUDA_FUNCTION ProjectionResult
-camera_project(const CameraParams& params, const scene::Point& excident) {
+camera_project(const CameraParams& params, const scene::Direction& excident) {
 	switch(params.type) {
 		case CameraModel::PINHOLE: {
 			return pinholecam_project(static_cast<const PinholeParams&>(params), excident);
+		}
+		case CameraModel::FOCUS: {
+			// TODO:
 		}
 		default: ;
 #ifndef __CUDA_ARCH__
