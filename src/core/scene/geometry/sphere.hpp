@@ -141,7 +141,7 @@ public:
 	 * Accessors to the concrete device.
 	 */
 	template < Device dev, class... Args >
-	SpheresDescriptor<dev> get_descriptor(const std::tuple<AttrDesc<Args...>>& attribs) {
+	SpheresDescriptor<dev> get_descriptor(const std::tuple<AttrDesc<Args>...>& attribs) {
 		this->synchronize<dev>();
 		constexpr std::size_t numAttribs = sizeof...(Args);
 		// Collect the attributes; for that, we iterate the given Attributes and
@@ -171,18 +171,6 @@ public:
 			this->get_spheres().aquireConst<dev>(),
 			this->get_mat_indices().aquireConst<dev>(),
 			attribBuffer.buffer
-		};
-	}
-	template < Device dev >
-	SpheresDescriptor<dev> get_descriptor() {
-		this->synchronize<dev>();
-		
-		return SpheresDescriptor<dev>{
-			static_cast<u32>(this->get_sphere_count()),
-				0u,
-				this->get_spheres().aquireConst<dev>(),
-				this->get_mat_indices().aquireConst<dev>(),
-				ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
 		};
 	}
 	

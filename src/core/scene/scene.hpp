@@ -123,9 +123,19 @@ public:
 	 * It needs to be passed up to three tuples, each coupling names and types for
 	 * vertex, face, and sphere attributes which the renderer wants to have
 	 * access to.
+	 *
+	 * Usage example:
+	 * scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(
+	 *		std::make_tuple(scene::geometry::Polygons::VAttrDesc<int>{"T1"},
+	 *						scene::geometry::Polygons::VAttrDesc<int>{"T2"}),
+	 *		{}, // No face attributes
+	 *		std::make_tuple(scene::geometry::Spheres::AttrDesc<float>{"S1"})
+	 * );
 	 */
-	template < Device dev, class... Args >
-	SceneDescriptor<dev> get_descriptor(Args&& ...args) {
+	template < Device dev, class... VAttrs, class... FAttrs, class... Attrs >
+	SceneDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
+										const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
+										const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
 		std::vector<ObjectDescriptor<dev>> objectDescs;
 		std::vector<InstanceDescriptor<dev>> instanceDescs;
 		// We need this to ensure we only create one descriptor per object
@@ -139,7 +149,7 @@ public:
 			auto entry = objectDescMap.find(objHdl);
 			if(entry == objectDescMap.end()) {
 				entry = objectDescMap.emplace(objHdl, static_cast<u32>(objectDescs.size())).first;
-				objectDescs.push_back(objHdl->get_descriptor<dev>(std::forward<Args>(args)...));
+				objectDescs.push_back(objHdl->get_descriptor<dev>(vertexAttribs, faceAttribs, sphereAttribs));
 			}
 			instanceDescs.back().objectIndex = entry->second;
 		}

@@ -256,25 +256,6 @@ public:
 		set_face_attrib_descriptor<dev>(desc, faceAttribs);
 		return desc;
 	}
-	template < Device dev, class... VArgs >
-	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs>...>& vertexAttribs) {
-		this->synchronize<dev>();
-		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
-		set_vertex_attrib_descriptor<dev>(desc, vertexAttribs);
-		return desc;
-	}
-	template < Device dev, class... FArgs >
-	PolygonsDescriptor<dev> get_descriptor(const std::tuple<FAttrDesc<FArgs>...>& faceAttribs) {
-		this->synchronize<dev>();
-		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
-		set_face_attrib_descriptor<dev>(desc, faceAttribs);
-		return desc;
-	}
-	template < Device dev >
-	PolygonsDescriptor<dev> get_descriptor() {
-		this->synchronize<dev>();
-		return get_common_descriptor<dev>();
-	}
 
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
