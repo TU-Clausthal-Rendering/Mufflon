@@ -168,8 +168,8 @@ public:
 		return SpheresDescriptor<dev>{
 			static_cast<u32>(this->get_sphere_count()),
 			static_cast<u32>(numAttribs),
-			*this->get_spheres().aquireConst<dev>(),
-			*this->get_mat_indices().aquireConst<dev>(),
+			this->get_spheres().aquireConst<dev>(),
+			this->get_mat_indices().aquireConst<dev>(),
 			attribBuffer.buffer
 		};
 	}
@@ -231,7 +231,7 @@ private:
 						   name, '\'');
 				vec.push_back(nullptr);
 			} else {
-				vec.push_back(*this->aquire(attribHdl.value()).aquire<dev>());
+				vec.push_back(this->aquire(attribHdl.value()).aquire<dev>());
 			}
 			push_back_attrib<I + 1u, dev>(vec, attribs);
 		}

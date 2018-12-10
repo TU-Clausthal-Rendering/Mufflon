@@ -202,7 +202,7 @@ public:
 		return desc;
 	}
 	template < Device dev, class...VAttrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs),
@@ -213,7 +213,7 @@ public:
 		return desc;
 	}
 	template < Device dev, class...FAttrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(faceAttribs),
@@ -224,7 +224,7 @@ public:
 		return desc;
 	}
 	template < Device dev, class...Attrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(),
@@ -235,8 +235,8 @@ public:
 		return desc;
 	}
 	template < Device dev, class...VAttrs, class...FAttrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs,
-										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
+										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
@@ -247,8 +247,8 @@ public:
 		return desc;
 	}
 	template < Device dev, class...VAttrs, class...Attrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs,
-										 const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
+										 const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs),
@@ -259,8 +259,8 @@ public:
 		return desc;
 	}
 	template < Device dev, class...FAttrs, class...Attrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs,
-										 const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
+										 const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(faceAttribs),
@@ -271,9 +271,9 @@ public:
 		return desc;
 	}
 	template < Device dev, class...VAttrs, class...FAttrs, class... Attrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs...>>& vertexAttribs,
-										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs...>>& faceAttribs,
-										 const std::tuple<geometry::Spheres::AttrDesc<Attrs...>>& sphereAttribs) {
+	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
+										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
+										 const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),

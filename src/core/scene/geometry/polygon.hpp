@@ -248,8 +248,8 @@ public:
 	 * Accessors to the concrete device.
 	 */
 	template < Device dev, class... VArgs, class... FArgs >
-	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs...>>& vertexAttribs,
-										   const std::tuple<FAttrDesc<FArgs...>>& faceAttribs) {
+	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs>...>& vertexAttribs,
+										   const std::tuple<FAttrDesc<FArgs>...>& faceAttribs) {
 		this->synchronize<dev>();
 		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
 		set_vertex_attrib_descriptor<dev>(desc, vertexAttribs);
@@ -257,14 +257,14 @@ public:
 		return desc;
 	}
 	template < Device dev, class... VArgs >
-	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs...>>& vertexAttribs) {
+	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs>...>& vertexAttribs) {
 		this->synchronize<dev>();
 		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
 		set_vertex_attrib_descriptor<dev>(desc, vertexAttribs);
 		return desc;
 	}
 	template < Device dev, class... FArgs >
-	PolygonsDescriptor<dev> get_descriptor(const std::tuple<FAttrDesc<FArgs...>>& faceAttribs) {
+	PolygonsDescriptor<dev> get_descriptor(const std::tuple<FAttrDesc<FArgs>...>& faceAttribs) {
 		this->synchronize<dev>();
 		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
 		set_face_attrib_descriptor<dev>(desc, faceAttribs);
