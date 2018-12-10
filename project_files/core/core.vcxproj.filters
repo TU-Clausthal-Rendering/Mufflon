@@ -363,9 +363,6 @@
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\memory\accessor.hpp">
-      <Filter>Source Files\core\memory</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\memory\generic_resource.hpp">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>

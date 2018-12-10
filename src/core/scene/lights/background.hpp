@@ -42,10 +42,10 @@ public:
 	__host__ static Background envmap(TextureHandle envmap, TextureHandle summedAreaTable) {
 		mAssert(envmap != nullptr);
 		Background bck{ BackgroundType::ENVMAP };
-		bck.m_envLight.texHandle = *envmap->aquireConst<DEVICE>();
+		bck.m_envLight.texHandle = envmap->aquireConst<DEVICE>();
 		// Fill the summed area table with life
 		create_summed_area_table(envmap, summedAreaTable);
-		bck.m_envLight.summedAreaTable = *summedAreaTable->aquireConst<DEVICE>();
+		bck.m_envLight.summedAreaTable = summedAreaTable->aquireConst<DEVICE>();
 
 		// TODO: accumulate flux for envmap
 		bck.m_envLight.flux = ei::Vec3{ 0.f };
@@ -64,8 +64,8 @@ public:
 			case BackgroundType::ENVMAP:
 				mAssert(envmap != nullptr);
 				newBck.m_envLight.flux = m_envLight.flux;
-				newBck.m_envLight.texHandle = *envmapOpt->aquireConst<newDev>();
-				newBck.m_envLight.summedAreaTable = *summedOpt->aquireConst<newDev>();
+				newBck.m_envLight.texHandle = envmapOpt->aquireConst<newDev>();
+				newBck.m_envLight.summedAreaTable = summedOpt->aquireConst<newDev>();
 				break;
 		}
 		return newBck;

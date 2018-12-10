@@ -41,8 +41,8 @@ CUDA_FUNCTION __forceinline__ int lower_bound(const textures::ConstTextureDevHan
 
 #ifndef __CUDA_ARCH__
 inline __host__ void create_summed_area_table(TextureHandle envmap, TextureHandle sums) {
-	auto envmapTex = *envmap->aquireConst<Device::CPU>();
-	auto sumSurf = *sums->aquire<Device::CPU>();
+	auto envmapTex = envmap->aquireConst<Device::CPU>();
+	auto sumSurf = sums->aquire<Device::CPU>();
 	// Conversion to luminance
 	constexpr ei::Vec4 lumWeight{ 0.212671f, 0.715160f, 0.072169f, 0.f };
 	const int width = static_cast<int>(envmap->get_width());

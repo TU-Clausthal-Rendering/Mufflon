@@ -145,12 +145,12 @@ void LBVH::build(ObjectData data)
 	m_sizes.numVertices = numVertices;
 
 	// Set m_inputCPU.
-	m_inputCPU.meshVertices = (ei::Vec3*)(*faceVertices.aquireConst());
+	m_inputCPU.meshVertices = (ei::Vec3*)(faceVertices.aquireConst<Device::CPU>());
 	// m_infoCPU.meshUVs // TODO adjusted it.
 	m_inputCPU.meshUVs = (ei::Vec2*)malloc(m_sizes.numVertices * sizeof(ei::Vec2));
 	m_inputCPU.triIndices = triIndices;
 	m_inputCPU.quadIndices = quadIndices;
-	m_inputCPU.spheres = (ei::Vec4*)(*spheres.aquireConst());
+	m_inputCPU.spheres = (ei::Vec4*)(spheres.aquireConst<Device::CPU>());
 
 	// Copy arrays into m_inputCUDA.
 	// Allocate memory.

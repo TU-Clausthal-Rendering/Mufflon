@@ -119,9 +119,9 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	VertexHandle vh = m_meshData->add_vertex(util::pun<OpenMesh::Vec3f>(point));
 	// Resize the attribute and set the vertex data
 	m_vertexAttributes.resize(m_vertexAttributes.get_size() + 1u);
-	(*get_points().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
-	(*get_normals().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
-	(*get_uvs().aquire<>())[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
+	get_points().aquire<Device::CPU>()[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);	get_points().mark_changed(Device::CPU);
+	get_normals().aquire<Device::CPU>()[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);	get_normals().mark_changed(Device::CPU);
+	get_uvs().aquire<Device::CPU>()[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);			get_uvs().mark_changed(Device::CPU);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
 
@@ -158,7 +158,8 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
-	(*get_mat_indices().aquire<>())[hdl.idx()] = idx;
+	get_mat_indices().aquire<Device::CPU>()[hdl.idx()] = idx;
+	get_mat_indices().mark_changed(Device::CPU);
 	return hdl;
 }
 
@@ -207,7 +208,8 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   const VertexHandle& v2, const VertexHandle& v3,
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
-	(*get_mat_indices().aquire<>())[hdl.idx()] = idx;
+	get_mat_indices().aquire<Device::CPU>()[hdl.idx()] = idx;
+	get_mat_indices().mark_changed(Device::CPU);
 	return hdl;
 }
 
@@ -245,7 +247,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	std::size_t readNormals = get_normals().restore(normalStream, start, count);
 	std::size_t readUvs = get_uvs().restore(uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = *get_points().aquireConst();
+	const OpenMesh::Vec3f* points = get_points().aquireConst<Device::CPU>();
 	for(std::size_t i = start; i < start + readPoints; ++i) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
@@ -288,7 +290,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	std::size_t readPoints = get_points().restore(pointStream, start, count);
 	std::size_t readUvs = get_uvs().restore(uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = *get_points().aquireConst();
+	const OpenMesh::Vec3f* points = get_points().aquireConst<Device::CPU>();
 	for(std::size_t i = start; i < start + readPoints; ++i) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
@@ -321,7 +323,7 @@ void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMesh
 	tessellater(*m_meshData, divisions);
 	// TODO: change number of triangles/quads!
 	// Flag the entire polygon as dirty
-	m_vertexAttributes.mark_changed<>();
+	m_vertexAttributes.mark_changed<Device::CPU>();
 	logInfo("Uniformly tessellated polygon mesh with ", divisions, " subdivisions");
 }
 /*void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
@@ -342,7 +344,7 @@ void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& deci
 	std::size_t actualDecimations = decimater.decimate_to(target_vertices);
 	// Flag the entire polygon as dirty
 	// TODO: change number of triangles/quads!
-	m_vertexAttributes.mark_changed<>();
+	m_vertexAttributes.mark_changed<Device::CPU>();
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
 			" decimations performed");
 	// TODO: this leaks mesh outside

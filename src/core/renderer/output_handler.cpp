@@ -53,7 +53,8 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 		if(m_targets.is_set(flag)) {
 			if(m_targets.is_set(flag << 8)) { // Variance flag set?
 				// Variance case: needs to cumulate samples per iteration
-				rb.m_radiance = *m_iterationTex[i].aquire<dev>();	// Allocates if necessary
+				rb.m_radiance = m_iterationTex[i].aquire<dev>();	// Allocates if necessary
+				m_iterationTex[i].mark_changed(dev);
 				m_iterationTex[i].clear<dev>();
 				if(reset) {
 					m_cumulativeTex[i].aquire<dev>();		// Allocates if necessary
@@ -62,7 +63,8 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 					m_cumulativeVarTex[i].clear<dev>(); // TODO: async
 				}
 			} else {
-				rb.m_radiance = *m_cumulativeTex[i].aquire<dev>();	// Allocates if necessary
+				rb.m_radiance = m_cumulativeTex[i].aquire<dev>();	// Allocates if necessary
+				m_cumulativeTex[i].mark_changed(dev);
 				if(reset) m_cumulativeTex[i].clear<dev>();
 			}
 		}
@@ -89,14 +91,14 @@ void OutputHandler::end_iteration() {
 				// Looks like inavitable redundancy. update_variance<<<>>> call is only valid
 				// for one type. Without 'if constexpr' this branch would not compile. if 
 				// handles are initialized TextureDevHandle_t<dev> iterTex...
-				TextureDevHandle_t<Device::CUDA> iterTex = *m_iterationTex[i].aquire<Device::CUDA>();
-				TextureDevHandle_t<Device::CUDA> cumTex = *m_cumulativeTex[i].aquire<Device::CUDA>();
-				TextureDevHandle_t<Device::CUDA> varTex = *m_cumulativeVarTex[i].aquire<Device::CUDA>();
+				TextureDevHandle_t<Device::CUDA> iterTex = m_iterationTex[i].aquire<Device::CUDA>(); // TODO: aquire const
+				TextureDevHandle_t<Device::CUDA> cumTex = m_cumulativeTex[i].aquire<Device::CUDA>(); m_cumulativeTex[i].mark_changed(Device::CUDA);
+				TextureDevHandle_t<Device::CUDA> varTex = m_cumulativeVarTex[i].aquire<Device::CUDA>(); m_cumulativeVarTex[i].mark_changed(Device::CUDA);
 				update_variance_cuda(iterTex, cumTex, varTex);
 			} else {
-				TextureDevHandle_t<Device::CPU> iterTex = *m_iterationTex[i].aquire<Device::CPU>();
-				TextureDevHandle_t<Device::CPU> cumTex = *m_cumulativeTex[i].aquire<Device::CPU>();
-				TextureDevHandle_t<Device::CPU> varTex = *m_cumulativeVarTex[i].aquire<Device::CPU>();
+				TextureDevHandle_t<Device::CPU> iterTex = m_iterationTex[i].aquire<Device::CPU>(); // TODO: aquire const
+				TextureDevHandle_t<Device::CPU> cumTex = m_cumulativeTex[i].aquire<Device::CPU>(); m_cumulativeTex[i].mark_changed(Device::CPU);
+				TextureDevHandle_t<Device::CPU> varTex = m_cumulativeVarTex[i].aquire<Device::CPU>(); m_cumulativeVarTex[i].mark_changed(Device::CPU);
 				// TODO: openmp
 				for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x)
 					update_variance(iterTex, cumTex, varTex, x, y, float(m_iteration));
@@ -132,8 +134,8 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 
 	// Upload to CPU / synchronize if necessary
 	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
-		*m_cumulativeVarTex[quantity].aquireConst<Device::CPU>() :
-		*m_cumulativeTex[quantity].aquireConst<Device::CPU>();
+		m_cumulativeVarTex[quantity].aquireConst<Device::CPU>() :
+		m_cumulativeTex[quantity].aquireConst<Device::CPU>();
 
 	// TODO: openmp
 	for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x) {

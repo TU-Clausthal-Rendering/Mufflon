@@ -45,9 +45,10 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 	std::size_t newIndex = m_attributes.get_size();
 	SphereHandle hdl(newIndex);
 	m_attributes.resize(newIndex + 1u);
-	auto posRadAccessor = get_spheres().aquire<>();
-	(*posRadAccessor)[newIndex].center = point;
-	(*posRadAccessor)[newIndex].radius = radius;
+	auto posRadAccessor = get_spheres().aquire<Device::CPU>();
+	get_spheres().mark_changed(Device::CPU);
+	posRadAccessor[newIndex].center = point;
+	posRadAccessor[newIndex].radius = radius;
 	// Expand bounding box
 	m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ei::Sphere{ point, radius }} };
 	return hdl;
@@ -55,7 +56,8 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 
 Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
 	SphereHandle hdl = this->add(point, radius);
-	(*get_mat_indices().aquire<>())[hdl] = idx;
+	get_mat_indices().aquire<Device::CPU>()[hdl] = idx;
+	get_mat_indices().mark_changed(Device::CPU);
 	return hdl;
 }
 
@@ -66,7 +68,7 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 	auto& spheres = get_spheres();
 	std::size_t readRadPos = spheres.restore(radPosStream, start, count);
 	// Expand bounding box
-	const ei::Sphere* radPos = *spheres.aquireConst();
+	const ei::Sphere* radPos = spheres.aquireConst<Device::CPU>();
 	for(std::size_t i = start; i < start + readRadPos; ++i)
 		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{radPos[i]} };
 	return { hdl, readRadPos };

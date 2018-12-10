@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/memory/accessor.hpp"
 #include "attribute.hpp"
 #include "core/memory/synchronize.hpp"
 #include "util/assert.hpp"
@@ -37,10 +36,9 @@ struct AttributeListTypes {
  * Access may happen via handles only, ie. one needs to aquire an attribute first.
  * Attribute pools may be synchronized to or unloaded from devices.
  */
-template < Device defaultDev, class List, class Types >
+template < class List, class Types >
 class AttributeListBase {
 public:
-	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	using ListType = List;
 	using AttributePools = typename Types::AttributePools;
 	template < class T >
@@ -113,7 +111,7 @@ public:
 		// Hide the construction from public eye
 		BaseAttribute(AttributePools& pools, util::DirtyFlags<Device>& flags) :
 			m_pools(&pools),
-			m_flags(flags) {
+			m_dirty(flags) {
 			// In the inheriting attribute you MUST initialize the handles!
 		}
 
@@ -127,34 +125,38 @@ public:
 		}
 
 		// Aquires a read-write accessor to the attribute
-		template < Device dev = DEFAULT_DEVICE >
-		auto aquire() {
+		template < Device dev >
+		ArrayDevHandle_t<dev,T> aquire() {
 			mAssert(m_pools != nullptr);
 			this->synchronize<dev>();
 			auto& pool = ListType::template getPool<dev>(*m_pools);
 			using PoolType = std::decay_t<decltype(pool)>;
 			constexpr std::size_t POOL_INDEX = m_pools->template get_index<PoolType>();
 			auto& handle = m_handles.template get<POOL_INDEX>();
-			return Accessor<ArrayDevHandle<dev, Type>>{ pool.aquire(handle), m_flags };
+			return pool.aquire(handle);
 		}
 
 		// Aquires a read-only accessor to the attribute
-		template < Device dev = DEFAULT_DEVICE >
-		auto aquireConst() {
+		template < Device dev >
+		ConstArrayDevHandle_t<dev,T> aquireConst() {
 			mAssert(m_pools != nullptr);
 			this->synchronize<dev>();
 			const auto& pool = ListType::template getPool<dev>(*m_pools);
 			using PoolType = std::decay_t<decltype(pool)>;
 			constexpr std::size_t POOL_INDEX = m_pools->template get_index<PoolType>();
 			const auto& handle = m_handles.template get<POOL_INDEX>();
-			return ConstAccessor<ArrayDevHandle<dev, Type>>{ pool.aquireConst(handle) };
+			return pool.aquireConst(handle);
+		}
+
+		void mark_changed(Device changed) {
+			m_dirty.mark_changed(changed);
 		}
 
 		// Synchronizes the attribute pool to the given device
-		template < Device dev = DEFAULT_DEVICE >
+		template < Device dev >
 		void synchronize() {
 			mAssert(m_pools != nullptr);
-			mufflon::synchronize<dev>(*m_pools, m_flags, ListType::template getPool<dev>(*m_pools));
+			mufflon::synchronize<dev>(*m_pools, m_dirty, ListType::template getPool<dev>(*m_pools));
 		}
 
 		std::size_t get_size() const noexcept {
@@ -173,19 +175,19 @@ public:
 		// Restore the attribute from a stream (CPU only)
 		std::size_t restore(util::IByteReader& stream, std::size_t start, std::size_t count) {
 			mAssert(m_pools != nullptr);
-			auto& pool = ListType::template getPool<DEFAULT_DEVICE>(*m_pools);
+			auto& pool = ListType::template getPool<Device::CPU>(*m_pools);
 			using PoolType = std::decay_t<decltype(pool)>;
 			constexpr std::size_t POOL_INDEX = m_pools->template get_index<PoolType>();
 			const auto& handle = m_handles.template get<POOL_INDEX>();
 			std::size_t read = pool.restore<T>(handle, stream, start, count);
 			if(read > 0u)
-				m_flags.mark_changed(Device::CPU);
+				m_dirty.mark_changed(Device::CPU);
 			return read;
 		}
 
 		// Store the attribute into a stream (CPU only)
 		std::size_t store(util::IByteWriter& stream, std::size_t start, std::size_t count) const {
-			auto& pool = ListType::template getPool<DEFAULT_DEVICE>(*m_pools);
+			auto& pool = ListType::template getPool<Device::CPU>(*m_pools);
 			using PoolType = std::decay_t<decltype(pool)>;
 			constexpr std::size_t POOL_INDEX = m_pools->template get_index<PoolType>();
 			const auto& handle = m_handles.template get<POOL_INDEX>();
@@ -200,7 +202,7 @@ public:
 
 		AttributePools* m_pools;
 		AttributeHandles<T> m_handles;
-		util::DirtyFlags<Device>& m_flags;
+		util::DirtyFlags<Device>& m_dirty;
 
 	private:
 		// Removes the attribute from all devices
@@ -261,13 +263,13 @@ public:
 	}
 
 	// Synchronizes all attributes on the given device from the last changed device
-	template < Device dev = DEFAULT_DEVICE >
+	template < Device dev >
 	void synchronize() {
 		mufflon::synchronize<dev>(m_attributePools, m_flags, ListType::template getPool<dev>(m_attributePools));
 	}
 
 	// Unloads all attributes from the given device
-	template < Device dev = DEFAULT_DEVICE >
+	template < Device dev >
 	void unload() {
 		// TODO: make sure that we have at least one loaded device
 		if(m_flags.is_last_present(dev)) {
@@ -278,7 +280,7 @@ public:
 		}
 	}
 
-	template < Device dev = DEFAULT_DEVICE >
+	template < Device dev >
 	void mark_changed() {
 		m_flags.mark_changed(dev);
 	}
@@ -313,12 +315,11 @@ protected:
  * Specialized attribute class for using OpenMesh-properties on CPU side.
  * isFace specifies whether the attribute is a face attribute or a vertex attribute.
  */
-template < bool isFace, Device defaultDev = Device::CPU >
-class OmAttributeList : public AttributeListBase<defaultDev, OmAttributeList<isFace, defaultDev>, OmAttributeListTypes<isFace>> {
+template < bool isFace >
+class OmAttributeList : public AttributeListBase<OmAttributeList<isFace>, OmAttributeListTypes<isFace>> {
 public:
-	static constexpr Device DEFAULT_DEVICE = defaultDev;
 	static constexpr bool IS_FACE = isFace;
-	using BaseType = AttributeListBase<defaultDev, OmAttributeList<isFace, defaultDev>, OmAttributeListTypes<isFace>>;
+	using BaseType = AttributeListBase<OmAttributeList<isFace>, OmAttributeListTypes<isFace>>;
 	using AttributePools = typename BaseType::AttributePools;
 	template < class T >
 	using AttributeHandle = typename BaseType::template AttributeHandle<T>;
@@ -388,11 +389,9 @@ public:
 /**
  * Specialization for regular attributes which manage their own mememory.
  */
-template < Device defaultDev = Device::CPU >
-class AttributeList : public AttributeListBase<defaultDev, AttributeList<defaultDev>, AttributeListTypes> {
+class AttributeList : public AttributeListBase<AttributeList, AttributeListTypes> {
 public:
-	static constexpr Device DEFAULT_DEVICE = defaultDev;
-	using BaseType = AttributeListBase<defaultDev, AttributeList<defaultDev>, AttributeListTypes>;
+	using BaseType = AttributeListBase<AttributeList, AttributeListTypes>;
 	using AttributePools = typename BaseType::AttributePools;
 	template < class T >
 	using AttributeHandle = typename BaseType::template AttributeHandle<T>;

@@ -678,7 +678,8 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 	return switchAttributeType(attr->type, [&object, attr, vertex, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr));
-		(*attribute.template aquire<Device::CPU>())[vertex] = *static_cast<const Type*>(value);
+		attribute.template aquire<Device::CPU>()[vertex] = *static_cast<const Type*>(value);
+		attribute.mark_changed(Device::CPU);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -698,7 +699,7 @@ Boolean polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal) 
 		return false;
 	}
 
-	(*object.get_geometry<geometry::Polygons>().get_normals().aquire<>())[vertex] = util::pun<OpenMesh::Vec3f>(normal);
+	object.get_geometry<geometry::Polygons>().get_normals().aquire<Device::CPU>()[vertex] = util::pun<OpenMesh::Vec3f>(normal);
 	return true;
 }
 
@@ -713,7 +714,7 @@ Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
 		return false;
 	}
 
-	(*object.get_geometry<geometry::Polygons>().get_uvs().aquire<>())[vertex] = util::pun<OpenMesh::Vec2f>(uv);
+	object.get_geometry<geometry::Polygons>().get_uvs().aquire<Device::CPU>()[vertex] = util::pun<OpenMesh::Vec2f>(uv);
 	return true;
 }
 
@@ -737,7 +738,8 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 	return switchAttributeType(attr->type, [&object, attr, face, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr));
-		(*attribute.template aquire<Device::CPU>())[face] = *static_cast<const Type*>(value);
+		attribute.template aquire<Device::CPU>()[face] = *static_cast<const Type*>(value);
+		attribute.mark_changed(Device::CPU);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -757,7 +759,8 @@ Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
 		return false;
 	}
 
-	(*object.template get_mat_indices<Polygons>().aquire())[face] = idx;
+	object.template get_mat_indices<Polygons>().aquire<Device::CPU>()[face] = idx;
+	object.template get_mat_indices<Polygons>().mark_changed(Device::CPU);
 	return true;
 }
 
@@ -1013,7 +1016,8 @@ Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttr<Type> sphereAttr{ static_cast<size_t>(attr->index) };
 		auto& attribute = object.template aquire<Spheres>(sphereAttr);
-		(*attribute.template aquire<Device::CPU>())[sphere] = *static_cast<const Type*>(value);
+		attribute.template aquire<Device::CPU>()[sphere] = *static_cast<const Type*>(value);
+		attribute.mark_changed(Device::CPU);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -1033,7 +1037,8 @@ Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
 		return false;
 	}
 
-	(*object.template get_mat_indices<Spheres>().aquire())[sphere] = idx;
+	object.template get_mat_indices<Spheres>().aquire<Device::CPU>()[sphere] = idx;
+	object.template get_mat_indices<Spheres>().mark_changed(Device::CPU);
 	return true;
 }
 

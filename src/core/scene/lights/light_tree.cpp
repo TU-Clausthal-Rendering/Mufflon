@@ -279,7 +279,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 															  envLight->get_format(), textures::SamplingMode::LINEAR,
 															  false);
 		m_treeCpu->background = Background<Device::CPU>::envmap(envLight, m_envmapSum.get());
-		m_textureMap.emplace(*envLight->aquireConst<Device::CPU>(), envLight);
+		m_textureMap.emplace(envLight->aquireConst<Device::CPU>(), envLight);
 	} else {
 		// TODO: make more generic (different colors, analytic model...)
 		m_treeCpu->background = Background<Device::CPU>::black();
@@ -371,22 +371,19 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 		} break;
 		case u16(LightType::AREA_LIGHT_TRIANGLE): {
 			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
-			textures::ConstTextureDevHandle_t<Device::CUDA> tex =
-				*m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
+			auto tex = m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
 			offset += u32((const char*)&light->radianceTex - (const char*)light);
 			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
 		} break;
 		case u16(LightType::AREA_LIGHT_QUAD): {
 			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
-			textures::ConstTextureDevHandle_t<Device::CUDA> tex =
-				*m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
+			auto tex = m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
 			offset += u32((const char*)&light->radianceTex - (const char*)light);
 			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
 		} break;
 		case u16(LightType::AREA_LIGHT_SPHERE): {
 			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem + offset);
-			textures::ConstTextureDevHandle_t<Device::CUDA> tex =
-				*m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
+			auto tex = m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
 			offset += u32((const char*)&light->radianceTex - (const char*)light);
 			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
 		} break;

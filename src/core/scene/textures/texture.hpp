@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/memory/residency.hpp"
-#include "core/memory/accessor.hpp"
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/flag.hpp"
@@ -175,7 +174,6 @@ enum class SamplingMode {
  */
 class Texture {
 public:
-	static constexpr Device DEFAULT_DEVICE = Device::CPU;
 	using HandleTypes = util::TaggedTuple<TextureDevHandle_t<Device::CPU>,
 										  TextureDevHandle_t<Device::CUDA>,
 										  TextureDevHandle_t<Device::OPENGL>>;
@@ -194,17 +192,21 @@ public:
 
 	// Aquire a read-only accessor
 	template < Device dev >
-	ConstAccessor<TextureDevHandle<dev>> aquireConst() {
+	ConstTextureDevHandle_t<dev> aquireConst() {
 		this->synchronize<dev>();
-		return ConstAccessor<TextureDevHandle<dev>>{m_constHandles.get<ConstTextureDevHandle_t<dev>>()};
+		return m_constHandles.get<ConstTextureDevHandle_t<dev>>();
 	}
 
 	// Aquire a writing (and thus dirtying) accessor
 	template < Device dev >
-	Accessor<TextureDevHandle<dev>> aquire() {
+	TextureDevHandle_t<dev> aquire() {
 		mAssertMsg(NUM_CHANNELS(m_format) != 3, "Write access to RGB formats is not possible on the GPU -> not allowed in all our code.");
 		this->synchronize<dev>();
-		return Accessor<TextureDevHandle<dev>>{m_handles.get<TextureDevHandle_t<dev>>(), m_dirty};
+		return m_handles.get<TextureDevHandle_t<dev>>();
+	}
+
+	void mark_changed(Device changed) noexcept {
+		m_dirty.mark_changed(changed);
 	}
 
 	// Explicitly synchronize the given device

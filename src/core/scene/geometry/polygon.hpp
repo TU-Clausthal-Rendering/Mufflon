@@ -512,7 +512,7 @@ private:
 						 name, '\'');
 				vec.push_back(nullptr);
 			} else {
-				vec.push_back(*this->aquire(attribHdl.value()).aquire<dev>());
+				vec.push_back(this->aquire(attribHdl.value()).aquire<dev>());
 			}
 			push_back_attrib<I + 1u, dev, AttribType>(vec, attribs);
 		}
@@ -631,10 +631,10 @@ private:
 			static_cast<u32>(this->get_quad_count()),
 			0u,
 			0u,
-			reinterpret_cast<const ei::Vec3*>(*this->get_points().aquireConst<dev>()),
-			reinterpret_cast<const ei::Vec3*>(*this->get_normals().aquireConst<dev>()),
-			reinterpret_cast<const ei::Vec2*>(*this->get_uvs().aquireConst<dev>()),
-			*this->get_mat_indices().aquireConst<dev>(),
+			reinterpret_cast<const ei::Vec3*>(this->get_points().aquireConst<dev>()),
+			reinterpret_cast<const ei::Vec3*>(this->get_normals().aquireConst<dev>()),
+			reinterpret_cast<const ei::Vec2*>(this->get_uvs().aquireConst<dev>()),
+			this->get_mat_indices().aquireConst<dev>(),
 			this->get_index_buffer<dev>(),
 			ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
 			ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}

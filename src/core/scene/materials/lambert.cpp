@@ -23,15 +23,15 @@ void Lambert::get_handle_pack(Device device, HandlePack* outBuffer) const {
 	switch(device) {
 		case Device::CPU: {
 			*reinterpret_cast<LambertHandlePack<Device::CPU>*>(outBuffer) =
-				LambertHandlePack<Device::CPU>{ matProps, *m_albedo->aquireConst<Device::CPU>() };
+				LambertHandlePack<Device::CPU>{ matProps, m_albedo->aquireConst<Device::CPU>() };
 		} break;
 		case Device::CUDA: {
 			*reinterpret_cast<LambertHandlePack<Device::CUDA>*>(outBuffer) =
-				LambertHandlePack<Device::CUDA>{ matProps, *m_albedo->aquireConst<Device::CUDA>() };
+				LambertHandlePack<Device::CUDA>{ matProps, m_albedo->aquireConst<Device::CUDA>() };
 		} break;
 		case Device::OPENGL: {
 			*reinterpret_cast<LambertHandlePack<Device::OPENGL>*>(outBuffer) =
-				LambertHandlePack<Device::OPENGL>{ matProps, *m_albedo->aquireConst<Device::OPENGL>() };
+				LambertHandlePack<Device::OPENGL>{ matProps, m_albedo->aquireConst<Device::OPENGL>() };
 		} break;
 	}
 }

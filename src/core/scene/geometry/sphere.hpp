@@ -27,11 +27,10 @@ public:
 	// Basic type definitions
 	using Index = u32;
 	using SphereHandle = std::size_t;
-	using AttributeListType = AttributeList<Device::CPU>;
 	template < class T >
-	using AttributeHandle = typename AttributeListType::template AttributeHandle<T>;
+	using AttributeHandle = typename AttributeList::template AttributeHandle<T>;
 	template < class T >
-	using Attribute = typename AttributeListType::template BaseAttribute<T>;
+	using Attribute = typename AttributeList::template BaseAttribute<T>;
 
 	// Struct communicating the number of bulk-read spheres
 	struct BulkReturn {
@@ -181,8 +180,8 @@ public:
 		return SpheresDescriptor<dev>{
 			static_cast<u32>(this->get_sphere_count()),
 				0u,
-				*this->get_spheres().aquireConst<dev>(),
-				*this->get_mat_indices().aquireConst<dev>(),
+				this->get_spheres().aquireConst<dev>(),
+				this->get_mat_indices().aquireConst<dev>(),
 				ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
 		};
 	}
@@ -241,7 +240,7 @@ private:
 	// Make sure that spheres are tightly packed
 	static_assert(sizeof(ei::Sphere) == 4u * sizeof(float));
 
-	AttributeListType m_attributes;
+	AttributeList m_attributes;
 	AttributeHandle<ei::Sphere> m_sphereData;
 	AttributeHandle<MaterialIndex> m_matIndex;
 	// Array for aquired attribute descriptors
