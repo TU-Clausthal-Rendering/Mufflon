@@ -46,5 +46,16 @@ namespace gui.Properties {
                 this["lastScenePath"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        public int LastSelectedRenderer {
+            get {
+                return ((int)(this["LastSelectedRenderer"]));
+            }
+            set {
+                this["LastSelectedRenderer"] = value;
+            }
+        }
     }
 }

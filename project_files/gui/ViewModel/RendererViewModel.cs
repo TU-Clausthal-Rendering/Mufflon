@@ -1,22 +1,49 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using gui.Annotations;
 using gui.Dll;
 using gui.Model;
+using gui.Properties;
 
 namespace gui.ViewModel
 {
     public class RendererViewModel : INotifyPropertyChanged
     {
+        public class RendererItem
+        {
+            public Core.RendererType Type { get; set; }
+            public string Name { get; set; }
+        }
+
+        private static readonly string LAST_SELECTED_RENDERER_PATH = "LastSelectedRenderer";
         private readonly Models m_models;
+        private readonly ObservableCollection<RendererItem> m_renderers = new ObservableCollection<RendererItem>()
+        {
+            new RendererItem{ Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
+            new RendererItem{ Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" },
+        };
+        private RendererItem m_selectedRenderer;
+        
+        public RendererItem SelectedRenderer
+        {
+            get { return m_selectedRenderer; }
+            set
+            {
+                if (m_selectedRenderer == value) return;
+                m_selectedRenderer = value;
+                Settings.Default[LAST_SELECTED_RENDERER_PATH] = (int)m_selectedRenderer.Type;
+                m_models.Renderer.Type = m_selectedRenderer.Type;
+            }
+        }
+        // TODO: save last selected renderer
+
+        public ObservableCollection<RendererItem> Renderers { get => m_renderers; }
 
         public RendererViewModel(Models models)
         {
+            m_selectedRenderer = m_renderers[(int) Settings.Default[LAST_SELECTED_RENDERER_PATH]];
             m_models = models;
             m_models.Scene.PropertyChanged += sceneChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;

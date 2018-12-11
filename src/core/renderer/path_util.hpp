@@ -369,7 +369,10 @@ public:
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position.position;
 		vert->init_prev_offset(mem, previous);
-		vert->m_incident = ei::Vec3{pixel}; // will be (ab)used as pixel position storage
+		vert->m_incident = ei::Vec3{
+			static_cast<float>(pixel.x),
+			static_cast<float>(pixel.y),
+			0.f}; // will be (ab)used as pixel position storage
 		vert->m_incidentPdf = position.pdf;
 		vert->m_extension = ExtensionT{};
 		if(camera.type == cameras::CameraModel::PINHOLE) {
