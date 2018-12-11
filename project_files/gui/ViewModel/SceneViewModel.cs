@@ -39,7 +39,9 @@ namespace gui.ViewModel
 
             public void Execute(object parameter)
             {
-                m_models.Scene.loadScene(Path);
+                if(!m_models.Scene.loadScene(Path))
+                {
+                }
             }
 
             public event EventHandler CanExecuteChanged
@@ -49,7 +51,6 @@ namespace gui.ViewModel
             }
         }
 
-        private static readonly int MAX_LAST_SCENES = 10;
         private Models m_models;
         private ObservableCollection<SceneMenuItem> m_lastScenes;
         public ObservableCollection<SceneMenuItem> LastScenes { get => m_lastScenes; }
@@ -59,52 +60,33 @@ namespace gui.ViewModel
         {
             m_models = models;
             m_lastScenes = new ObservableCollection<SceneMenuItem>();
-            if (Settings.Default.LastScenes == null)
-                Settings.Default.LastScenes = new System.Collections.Specialized.StringCollection();
-            foreach (var path in Settings.Default.LastScenes)
-                m_lastScenes.Add(new SceneMenuItem(m_models) { Filename = Path.GetFileName(path), Path = path });
-            m_models.Scene.PropertyChanged += addNewScene;
+            foreach (string path in m_models.Scene.LastScenes)
+            {
+                m_lastScenes.Add(new SceneMenuItem(m_models)
+                {
+                    Filename = Path.GetFileName(path),
+                    Path = path
+                });
+            }
+            m_models.Scene.PropertyChanged += changeLastScenes;
             m_models.Renderer.PropertyChanged += renderStatusChanged;
         }
 
-
-        private void addNewScene(object sender, PropertyChangedEventArgs args)
+        private void changeLastScenes(object sender, PropertyChangedEventArgs args)
         {
             switch(args.PropertyName)
             {
-                case nameof(SceneModel.FullPath):
+                case nameof(SceneModel.LastScenes):
                     {
-                        string newScenePath = m_models.Scene.FullPath;
-                        // Check if the scene is already present in the list
-                        int index = Settings.Default.LastScenes.IndexOf(newScenePath);
-                        if(index > 0)
+                        m_lastScenes.Clear();
+                        foreach(string path in m_models.Scene.LastScenes)
                         {
-                            // Present, but not first
-                            SceneMenuItem first = m_lastScenes.First();
-                            m_lastScenes[0] = m_lastScenes[index];
-                            m_lastScenes[index] = first;
-                            Settings.Default.LastScenes[0] = newScenePath;
-                            Settings.Default.LastScenes[index] = first.Path;
-                            OnPropertyChanged(nameof(LastScenes));
-                            OnPropertyChanged(nameof(CanLoadLastScenes));
-                        } else if(index < 0)
-                        {
-                            // Not present
-                            if (m_lastScenes.Count >= MAX_LAST_SCENES)
+                            m_lastScenes.Add(new SceneMenuItem(m_models)
                             {
-                                m_lastScenes.RemoveAt(m_lastScenes.Count - 1);
-                                Settings.Default.LastScenes.RemoveAt(m_lastScenes.Count - 1);
-                            }
-                            m_lastScenes.Insert(0, new SceneMenuItem(m_models)
-                            {
-                                Filename = m_models.Scene.Filename,
-                                Path = newScenePath
+                                Filename = Path.GetFileName(path),
+                                Path = path
                             });
-                            Settings.Default.LastScenes.Insert(0, newScenePath);
-                            OnPropertyChanged(nameof(LastScenes));
-                            OnPropertyChanged(nameof(CanLoadLastScenes));
                         }
-
                         
                         break;
                     }
