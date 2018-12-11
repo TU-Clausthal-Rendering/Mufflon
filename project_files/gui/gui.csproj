@@ -152,6 +152,7 @@
     <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
     <Compile Include="ViewModel\ProfilerViewModel.cs" />
     <Compile Include="ViewModel\RendererViewModel.cs" />
+    <Compile Include="ViewModel\SceneViewModel.cs" />
     <Compile Include="ViewModel\SelectRendererViewModel.cs" />
     <Compile Include="ViewModel\StatusbarViewModel.cs" />
     <Compile Include="ViewModel\ToolbarViewModel.cs" />

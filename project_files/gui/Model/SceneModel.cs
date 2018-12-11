@@ -1,12 +1,8 @@
-﻿using gui.Annotations;
-using gui.Properties;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows;
+using gui.Annotations;
+using gui.Dll;
 
 namespace gui.Model
 {
@@ -26,7 +22,6 @@ namespace gui.Model
                 if (m_fullPath == value) return;
                 m_fullPath = value;
                 OnPropertyChanged(nameof(FullPath));
-
             }
         }
 
@@ -40,6 +35,15 @@ namespace gui.Model
 
         // filename with extension
         public string Filename => System.IO.Path.GetFileName(FullPath);
+
+        public void loadScene(string path)
+        {
+            if (!Loader.loader_load_json(path))
+                MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            else
+                FullPath = path;
+        }
 
         #region PropertyChanged
 

@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:gui"
         xmlns:view="clr-namespace:gui.View"
         xmlns:camera="clr-namespace:gui.View.Camera"
+        xmlns:viewmodel="clr-namespace:gui.ViewModel"
         mc:Ignorable="d"
         Title="MainWindow" 
         Height="600" 
@@ -33,7 +34,23 @@
                 BorderThickness="{StaticResource ThinBorder}"
                 BorderBrush="{StaticResource BorderBrush}">
                 <MenuItem Header="File">
-                    <MenuItem Header="Load Scene" Command="{Binding LoadSceneCommand}"/>
+                    <MenuItem Header="Load Scene"
+                              Command="{Binding LoadSceneCommand}"
+                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                    <Separator/>
+                    <MenuItem Header="Recent scenes..."
+                              ItemsSource="{Binding Scene.LastScenes}"
+                              DisplayMemberPath="Filename"
+                              IsEnabled="{Binding Scene.CanLoadLastScenes}">
+                        <MenuItem.ItemContainerStyle>
+                            <Style TargetType="{x:Type MenuItem}">
+                                <Setter Property="Command"
+                                        Value="{Binding Path=Command}"/>
+                                <Setter Property="ToolTip"
+                                        Value="{Binding Path=Path}"/>
+                            </Style>
+                        </MenuItem.ItemContainerStyle>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Help">
                     <MenuItem Header="About"/>

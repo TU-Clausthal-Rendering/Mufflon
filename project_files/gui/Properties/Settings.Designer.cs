@@ -58,5 +58,16 @@ namespace gui.Properties {
                 this["LastSelectedRenderer"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        public global::System.Collections.Specialized.StringCollection LastScenes {
+            get {
+                return ((global::System.Collections.Specialized.StringCollection)(this["LastScenes"]));
+            }
+            set {
+                this["LastScenes"] = value;
+            }
+        }
     }
 }

@@ -36,6 +36,7 @@ namespace gui.ViewModel
         public ProfilerViewModel Profiler { get; }
 
         public RendererViewModel Renderer { get; }
+        public SceneViewModel Scene { get; }
 
         public ICommand AddLightCommand { get; }
         public ICommand AddMaterialCommand { get; }
@@ -64,6 +65,7 @@ namespace gui.ViewModel
             Profiler = new ProfilerViewModel(window, m_models);
 
             Renderer = new RendererViewModel(m_models);
+            Scene = new SceneViewModel(m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

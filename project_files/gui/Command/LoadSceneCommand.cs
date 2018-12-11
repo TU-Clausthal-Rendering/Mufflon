@@ -45,14 +45,7 @@ namespace gui.Command
                     string file = dialog.FileName;
                     m_lastDirectory = Path.GetDirectoryName(file);
                     Settings.Default.lastScenePath = m_lastDirectory;
-                    if (!Loader.loader_load_json(file))
-                    {
-                        MessageBox.Show("Failed to load scene!", "Error", MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                    } else
-                    {
-                        m_models.Scene.FullPath = file;
-                    }
+                    m_models.Scene.loadScene(file);
                 }
             }
         }
