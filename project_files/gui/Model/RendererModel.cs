@@ -17,7 +17,7 @@ namespace gui.Model
     {
         private bool m_isRendering = false;
         private uint m_iteration = 0u;
-        private Core.RendererType m_type = Core.RendererType.CPU_PT;
+        private Core.RendererType m_type;
 
         public bool IsRendering
         {

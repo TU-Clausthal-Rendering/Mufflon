@@ -13,12 +13,11 @@ namespace gui.Command
     {
         private readonly Models m_models;
         private string m_lastDirectory;
-        private static readonly string SCENE_PATH_PROPERTY = "lastScenePath";
 
         public LoadSceneCommand(Models models)
         {
             m_models = models;
-            m_lastDirectory = (string) Settings.Default[SCENE_PATH_PROPERTY];
+            m_lastDirectory = Settings.Default.lastScenePath;
             if(m_lastDirectory.Length == 0)
                 m_lastDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
@@ -45,7 +44,7 @@ namespace gui.Command
                 {
                     string file = dialog.FileName;
                     m_lastDirectory = Path.GetDirectoryName(file);
-                    Settings.Default[SCENE_PATH_PROPERTY] = m_lastDirectory;
+                    Settings.Default.lastScenePath = m_lastDirectory;
                     if (!Loader.loader_load_json(file))
                     {
                         MessageBox.Show("Failed to load scene!", "Error", MessageBoxButtons.OK,

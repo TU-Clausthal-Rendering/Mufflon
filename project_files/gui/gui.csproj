@@ -119,6 +119,7 @@
     <Compile Include="Model\SceneModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
+    <Compile Include="NegateBooleanConverter.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\SynchronizedModelList.cs" />
     <Compile Include="Utility\SynchronizedViewModelList.cs" />

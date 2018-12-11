@@ -15,6 +15,7 @@
         <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
         <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
         <Thickness x:Key="ThinBorder" Bottom="1"/>
+        <local:NegateBooleanConverter x:Key="inverter"/>
     </Window.Resources>
     <DockPanel Background="{StaticResource BackgroundBrush}">
         <!-- Menu Bar and Status bar grid -->
@@ -50,7 +51,8 @@
                               ItemsSource="{Binding Renderer.Renderers}"
                               SelectedItem="{Binding Renderer.SelectedRenderer}"
                               DisplayMemberPath="Name"
-                              SelectedValuePath="Type"/>
+                              SelectedValuePath="Type"
+                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.PlayPauseCommand}">

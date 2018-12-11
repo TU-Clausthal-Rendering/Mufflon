@@ -13,16 +13,16 @@ namespace gui.ViewModel
     {
         public class RendererItem
         {
+            public int Id { get; set; }
             public Core.RendererType Type { get; set; }
             public string Name { get; set; }
         }
 
-        private static readonly string LAST_SELECTED_RENDERER_PATH = "LastSelectedRenderer";
         private readonly Models m_models;
         private readonly ObservableCollection<RendererItem> m_renderers = new ObservableCollection<RendererItem>()
         {
-            new RendererItem{ Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
-            new RendererItem{ Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" },
+            new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
+            new RendererItem{ Id = 1, Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" },
         };
         private RendererItem m_selectedRenderer;
         
@@ -33,18 +33,23 @@ namespace gui.ViewModel
             {
                 if (m_selectedRenderer == value) return;
                 m_selectedRenderer = value;
-                Settings.Default[LAST_SELECTED_RENDERER_PATH] = (int)m_selectedRenderer.Type;
+                Settings.Default.LastSelectedRenderer = m_selectedRenderer.Id;
                 m_models.Renderer.Type = m_selectedRenderer.Type;
             }
         }
-        // TODO: save last selected renderer
+
+        public bool IsRendering {
+            get => m_models.Renderer.IsRendering;
+        }
 
         public ObservableCollection<RendererItem> Renderers { get => m_renderers; }
 
         public RendererViewModel(Models models)
         {
-            m_selectedRenderer = m_renderers[(int) Settings.Default[LAST_SELECTED_RENDERER_PATH]];
             m_models = models;
+            int lastSelected = Settings.Default.LastSelectedRenderer;
+            m_selectedRenderer = m_renderers[Settings.Default.LastSelectedRenderer];
+            m_models.Renderer.Type = (Core.RendererType)m_selectedRenderer.Type;
             m_models.Scene.PropertyChanged += sceneChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;
         }
@@ -82,6 +87,9 @@ namespace gui.ViewModel
                         if (!Core.render_reset())
                             throw new Exception(Core.GetDllError());
                     }
+                    break;
+                case nameof(Models.Renderer.IsRendering):
+                    OnPropertyChanged(nameof(IsRendering));
                     break;
             }
         }
