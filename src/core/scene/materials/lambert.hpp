@@ -5,8 +5,17 @@
 #include "core/math/sampling.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
+#include "core/scene/textures/interface.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
+
+struct LambertParameterPack : public ParameterPack {
+	CUDA_FUNCTION LambertParameterPack(const ParameterPack& baseParameters, Spectrum albedo) :
+		ParameterPack(baseParameters),
+		albedo(albedo)
+	{}
+	Spectrum albedo; // TODO: alignment is bad
+};
 
 template<Device dev>
 struct LambertHandlePack : public HandlePack {
@@ -17,27 +26,23 @@ struct LambertHandlePack : public HandlePack {
 	{}
 
 	textures::ConstTextureDevHandle_t<dev> albedoTex;
-};
 
-struct LambertParameterPack : public ParameterPack {
-	LambertParameterPack(const ParameterPack& baseParameters, Spectrum albedo) :
-		ParameterPack(baseParameters),
-		albedo(albedo)
-	{}
-	Spectrum albedo; // TODO: alignment is bad
+	CUDA_FUNCTION void fetch(const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const {
+		*as<LambertParameterPack>(outBuffer) = LambertParameterPack{
+			ParameterPack{ Materials::LAMBERT, flags, innerMedium, outerMedium },
+			Spectrum{ sample(albedoTex, uvCoordinate) }
+		};
+	}
 };
 
 // Class for the handling of the Lambertian material.
-class Lambert :
-	public IMaterial {
+class Lambert : public IMaterial {
 public:
-	// TODO: constructor
 	Lambert(TextureHandle albedo);
 
 	std::size_t get_handle_pack_size(Device device) const final;
 	std::size_t get_parameter_pack_size() const final { return sizeof(LambertParameterPack); }
 	void get_handle_pack(Device device, HandlePack* outBuffer) const final;
-	void get_parameter_pack_cpu(const HandlePack* handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const final;
 	TextureHandle get_emissive_texture() const final { return nullptr; }
 	Medium compute_medium() const final;
 	bool is_emissive() const final { return false; }

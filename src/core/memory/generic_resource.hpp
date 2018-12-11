@@ -32,7 +32,7 @@ public:
 	 * The const version will break instead (assertion).
 	 */
 	template < Device dev, typename T >
-	T* get() {
+	T* acquire() {
 		if(m_mem.template get<unique_device_ptr<dev, char>>() == nullptr)
 			m_mem.template get<unique_device_ptr<dev, char>>() = make_udevptr_array<dev, char>(m_size);
 		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
@@ -40,7 +40,7 @@ public:
 		return as<T>(pMem);
 	}
 	template < Device dev, typename T >
-	const T* get() const {
+	const T* acquireConst() const {
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
 		mAssert(pMem != nullptr);
 		return as<T>(pMem);

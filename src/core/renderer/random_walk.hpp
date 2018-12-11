@@ -4,6 +4,7 @@
 #include "core/scene/materials/material_sampling.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
+#include "core/scene/descriptors.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -40,15 +41,15 @@ struct PathHead {
  * returns: true if there is a nextHit. false if the path is canceled/misses the scene.
  */
 template < typename VertexType >
-CUDA_FUNCTION bool walk(const VertexType& vertex,
-						const scene::materials::Medium* media,
+CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+						const VertexType& vertex,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
 						Throughput& throughput,
 						VertexType* outVertex
 ) {
 	// Sample the vertex's outgoing direction
-	VertexSample sample = vertex.sample(media, rndSet, adjoint);
+	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
 	if(sample.type == math::PathEventType::INVALID) return false;
 
 	// Update throughputs
@@ -73,7 +74,7 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 	//bool didHit = first_hit(, nextHit);
 
 	// Compute attenuation
-	const scene::materials::Medium& currentMedium = media[sample.medium];
+	const scene::materials::Medium& currentMedium = scene.media[sample.medium];
 	Spectrum transmission = currentMedium.get_transmission( nextHit.hitT );
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
@@ -84,7 +85,10 @@ CUDA_FUNCTION bool walk(const VertexType& vertex,
 	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
 	float incidentCos = dot(nextHit.normal, sample.excident); // TODO: shading normal?
 	// TODO: get tangent space and parameter pack from nextHit
-	VertexType::create_surface(outVertex, &vertex, scene::materials::ParameterPack{},
+	scene::MaterialIndex matIdx = 0; // TODO
+	char materialBuffer[scene::materials::MAX_MATERIAL_PARAMETER_SIZE];
+	scene::materials::fetch(scene.get_material(matIdx), scene::UvCoordinate{}, as<scene::materials::ParameterPack>(materialBuffer));
+	VertexType::create_surface(outVertex, &vertex, *as<scene::materials::ParameterPack>(materialBuffer),
 				{ position, sample.pdfF.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
 				scene::TangentSpace{}, sample.excident);
 

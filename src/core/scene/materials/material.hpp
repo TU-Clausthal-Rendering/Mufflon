@@ -57,6 +57,8 @@ struct ParameterPack {
 	}
 };
 
+constexpr std::size_t MAX_MATERIAL_PARAMETER_SIZE = 256;
+
 /**
  * High level material abstraction. A material manages a set of texture handles for
  * its own parametrization.
@@ -77,6 +79,14 @@ public:
 	 * Size of the material descriptor itself (mainly texture handles)
 	 * The size may vary per device.
 	 */
+	/*template< Device dev >
+	std::size_t get_handle_pack_size() const {
+		switch(m_type) {
+			case Materials::LAMBERT: return sizeof(LambertHandlePack<dev>);
+		}
+		mAssertMsg(false, "Material not (fully) implemented!");
+	}*/
+
 	virtual std::size_t get_handle_pack_size(Device device) const = 0;
 
 	/*
@@ -93,18 +103,6 @@ public:
 	 *		get_handle_pack_size(device) memory.
 	 */
 	virtual void get_handle_pack(Device device, HandlePack* outBuffer) const = 0;
-
-	/*
-	 * Get the instanciated parameters for the evaluation of the material.
-	 * A parameter pack consits of the material type (see Materials) followed
-	 * by the two media handles and and specific parameters used in the
-	 * sampling/evaluation routines.
-	 * texCoord: surface texture coordinate for fetching the textures.
-	 * outBuffer: pointer to a writeable buffer with at least get
-	 *		get_parameter_pack_size(device) memory.
-	 */
-	virtual void get_parameter_pack_cpu(const HandlePack* handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const = 0;
-	// TODO a similar method for CUDA
 
 	// Get only the texture for emissive materials
 	virtual TextureHandle get_emissive_texture() const = 0;
@@ -142,6 +140,7 @@ protected:
 	MediumHandle m_outerMedium;
 private:
 	std::string m_name;
+	Materials m_type;
 };
 
 }}} // namespace mufflon::scene::materials

@@ -36,15 +36,6 @@ void Lambert::get_handle_pack(Device device, HandlePack* outBuffer) const {
 	}
 }
 
-void Lambert::get_parameter_pack_cpu(const HandlePack* handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const {
-	auto* in = reinterpret_cast<const LambertHandlePack<Device::CPU>*>(handles);
-	auto* out = reinterpret_cast<LambertParameterPack*>(outBuffer);
-	*out = LambertParameterPack{
-		ParameterPack{ Materials::LAMBERT, in->flags, in->innerMedium, in->outerMedium },
-		Spectrum{in->albedoTex->sample(uvCoordinate)}
-	};
-}
-
 Medium Lambert::compute_medium() const {
 	// Use some average dielectric refraction index and a maximum absorption
 	return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};

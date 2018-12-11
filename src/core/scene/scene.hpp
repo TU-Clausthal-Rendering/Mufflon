@@ -10,6 +10,7 @@
 #include "core/scene/accel_structs/accel_struct.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
+#include "core/scene/object.hpp"
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -24,8 +25,11 @@ namespace mufflon { namespace scene {
  */
 class Scene {
 public:
-	Scene(ConstCameraHandle cam) :
-		m_camera(cam) {}
+	Scene(ConstCameraHandle cam,
+		  const std::vector<std::unique_ptr<materials::IMaterial>>& materialsRef) :
+		m_camera(cam),
+		m_materialsRef(materialsRef)
+	{}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = default;
 	Scene& operator=(const Scene&) = delete;
@@ -48,7 +52,7 @@ public:
 			(void)instance;
 			// TODO
 		}
-		// TODO: materials etc.
+		m_lightTree.synchronize<dev>();
 		m_media.synchronize<dev, Device::CPU>();
 	}
 
@@ -59,6 +63,7 @@ public:
 			// TODO
 		}
 		// TODO: materials etc.
+		m_lightTree.unload<dev>();
 		m_media.unload<dev>();
 	}
 
@@ -96,10 +101,6 @@ public:
 						  m_boundingBox, envLightTexture);
 	}
 
-	template < Device dev >
-	const lights::LightTree<dev>& get_light_tree() {
-		return m_lightTree.aquire_tree<dev>();
-	}
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
@@ -111,15 +112,11 @@ public:
 		return m_camera;
 	}
 
-	template < Device dev >
-	const materials::Medium* get_media() const noexcept {
-		return m_media.get<dev, materials::Medium>();
-	}
-
 
 	/**
 	 * Creates a single structure which grants access to all scene data
 	 * needed on the specified device.
+	 * Synchronizes implicitly.
 	 * It needs to be passed up to three tuples, each coupling names and types for
 	 * vertex, face, and sphere attributes which the renderer wants to have
 	 * access to.
@@ -136,6 +133,7 @@ public:
 	SceneDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
 										const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
 										const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
+		synchronize<dev>();
 		std::vector<ObjectDescriptor<dev>> objectDescs;
 		std::vector<InstanceDescriptor<dev>> instanceDescs;
 		// We need this to ensure we only create one descriptor per object
@@ -166,11 +164,12 @@ public:
 		// Bring the light tree to the device
 		// We cannot use the make_unique because the light tree doesn't have a proper copy constructor
 		auto& lightDevDesc = m_lightDevDesc.get<unique_device_ptr<dev, lights::LightTree<dev>>>();
-		lightDevDesc.reset(reinterpret_cast<lights::LightTree<Device::CUDA>*>(Allocator<dev>::template alloc_array<char>(sizeof(lights::LightTree<Device::CUDA>))));
-		Allocator<Device::CPU>::copy<lights::LightTree<dev>, dev>(lightDevDesc.get(), &m_lightTree.aquire_tree<dev>(),
-																  1u);
+		//lightDevDesc = make_udevptr_array<dev, lights::LightTree<dev>>();
+		lightDevDesc.reset(reinterpret_cast<lights::LightTree<dev>*>(Allocator<dev>::template alloc_array<char>(sizeof(lights::LightTree<dev>))));
+		//Allocator<Device::CPU>::copy<lights::LightTree<dev>, dev>(lightDevDesc.get(), &m_lightTree.aquire_tree<dev>(),
+		//														  1u);
 
-		// TODO: bring camera, materials etc. to the device
+		load_materials<dev>();
 
 		return SceneDescriptor<dev>{
 			static_cast<u32>(objectDescs.size()),
@@ -178,7 +177,9 @@ public:
 				m_boundingBox,
 				objDevDesc.get(),
 				instDevDesc.get(),
-				lightDevDesc.get()
+				lightDevDesc.get(),
+				m_media.acquireConst<dev,materials::Medium>(),
+				m_materials.acquireConst<dev,int>()
 		};
 	}
 
@@ -188,10 +189,12 @@ private:
 	std::vector<InstanceHandle> m_instances;
 	GenericResource m_media;		// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
+	const std::vector<std::unique_ptr<materials::IMaterial>>& m_materialsRef;	// Refer the world's materials. There is no scenario dependent filtering because of global indexing.
+	GenericResource m_materials;	// Device instanciation of Material parameter packs and an offset table (first table then data).
 
 	// Light tree containing all light sources enabled for the scene
 	lights::LightTreeBuilder m_lightTree;
-	// TODO: materials
+
 	// Acceleration structure over all instances
 	bool m_accelDirty = false;
 	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
@@ -201,10 +204,14 @@ private:
 		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>>> m_objDevDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, InstanceDescriptor<Device::CPU>>,
 		unique_device_ptr<Device::CUDA, InstanceDescriptor<Device::CUDA>>> m_instDevDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, lights::LightTree<Device::CPU>*>,
+	util::TaggedTuple<unique_device_ptr<Device::CPU, lights::LightTree<Device::CPU>>,
 		unique_device_ptr<Device::CUDA, lights::LightTree<Device::CUDA>>> m_lightDevDesc;
 
 	ei::Box m_boundingBox;
+
+
+	template< Device dev >
+	void load_materials();
 };
 
 }} // namespace mufflon::scene

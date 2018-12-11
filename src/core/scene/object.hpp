@@ -190,6 +190,7 @@ public:
 	}
 
 	// Get the descriptor of the object (including all geometry)
+	// Synchronizes implicitly
 	template < Device dev, class... VAttrs, class... FAttrs, class... Attrs >
 	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
 										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
@@ -228,10 +229,6 @@ public:
 
 	// Makes the data of the geometric object resident in the memory system
 	// Eg. position, normal, uv, material index for poly, position, radius, mat index for sphere...
-	template < class Geom, Device dev >
-	void synchronize() {
-		m_geometryData.template get<Geom>().template synchronize<dev>();
-	}
 	template < Device dev >
 	void synchronize() {
 		m_geometryData.for_each([](auto& elem) {
@@ -240,10 +237,6 @@ public:
 	}
 
 	// Removes this object's data from the given memory system
-	template < class Geom, Device dev >
-	void unload() {
-		m_geometryData.template get<Geom>().template unload<dev>();
-	}
 	template < Device dev >
 	void unload() {
 		m_geometryData.for_each([](auto& elem) {

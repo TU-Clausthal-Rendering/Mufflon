@@ -215,7 +215,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	dirLights.reserve(m_dirLights.size());
 
 	m_scenario = &scenario;
-	m_scene = std::make_unique<Scene>(scenario.get_camera());
+	m_scene = std::make_unique<Scene>(scenario.get_camera(), m_materials);
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
 		if(!scenario.is_masked(&instance.get_object())) {
@@ -310,9 +310,6 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 
 	// Make media available / resident
 	m_scene->load_media(m_media);
-
-	// TODO: load the materials (make something resident?)
-	// TODO: cameras light, etc.
 
 	// Assign the newly created scene and destroy the old one?
 	return m_scene.get();

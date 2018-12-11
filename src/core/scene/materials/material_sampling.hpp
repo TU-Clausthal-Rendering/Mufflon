@@ -11,6 +11,23 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
+/*
+ * Get the instanciated parameters for the evaluation of the material.
+ * A parameter pack consits of the material type (see Materials) followed
+ * by the two media handles and and specific parameters used in the
+ * sampling/evaluation routines.
+ * uvCoordinate: surface texture coordinate for fetching the textures.
+ * outBuffer: pointer to a writeable buffer with at least get
+ *		get_parameter_pack_size(device) memory.
+ */
+CUDA_FUNCTION void fetch(const HandlePack& handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
+	switch(handles.type) {
+		case Materials::LAMBERT: as<LambertHandlePack<CURRENT_DEV>>(handles).fetch(uvCoordinate, outBuffer);
+	}
+	mAssertMsg(false, "Material not (fully) implemented!");
+}
+
+
 // Used for regularization to avoid fireflies based on shading normal correction
 constexpr float SHADING_NORMAL_EPS = 1e-3f;
 

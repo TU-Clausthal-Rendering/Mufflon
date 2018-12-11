@@ -35,14 +35,14 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	m_currentScene->get_camera()->get_parameter_pack(as<cameras::CameraParams>(m_camParams),
 													 Device::CPU, buffer.get_resolution());
 	m_reset = false;
-	const scene::lights::LightTree<Device::CPU>& lightTree = m_currentScene->get_light_tree<Device::CPU>();
+	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {});
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 //#pragma omp parallel for
 	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, lightTree);
+		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, sceneDesc);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
@@ -55,13 +55,12 @@ void CpuPathTracer::reset() {
 }
 
 void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-						   const scene::lights::LightTree<Device::CPU>& lightTree) {
+						   const scene::SceneDescriptor<Device::CPU>& scene) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
 	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256];
+	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
-	const scene::materials::Medium* media = m_currentScene->get_media<Device::CPU>();
 	// Create a start for the path
 	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
 														 m_rngs[pixel].next());
@@ -74,12 +73,12 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
-			auto nee = connect(m_currentScene->get_light_tree<Device::CPU>(), 0, 1, neeSeed,
+			auto nee = connect(*scene.lightTree, 0, 1, neeSeed,
 				vertex->get_position(), m_currentScene->get_bounding_box(),
 				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
 			bool anyhit = false; // TODO use a real anyhit method
 			if(!anyhit) {
-				auto value = vertex->evaluate(nee.direction, media);
+				auto value = vertex->evaluate(nee.direction, scene.media);
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				outputBuffer.contribute(coord, throughput, { Spectrum{nee.intensity}, 1.0f },
@@ -90,7 +89,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		// Walk
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-		if(!walk(*vertex, media, rnd, 0.0f, false, throughput, vertex))
+		if(!walk(scene, *vertex, rnd, 0.0f, false, throughput, vertex))
 			break;
 		++pathLen;
 
@@ -98,8 +97,8 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		if(pathLen >= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(m_currentScene->get_light_tree<Device::CPU>(), 0,
-													lastPosition, scene::lights::guide_flux);
+				AreaPdf backwardPdf = connect_pdf(*scene.lightTree, 0,
+												  lastPosition, scene::lights::guide_flux);
 				float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 					vertex->get_normal(), vertex->get_albedo());
@@ -113,7 +112,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		// TODO: normals, position???
 		const float phi = 2.f * ei::PI * coord.x  / static_cast<float>(outputBuffer.get_width());
 		const float theta = ei::PI * coord.y / static_cast<float>(outputBuffer.get_height());
-		ei::Vec3 testRadiance = lightTree.background.get_color(ei::Vec3{
+		ei::Vec3 testRadiance = scene.lightTree->background.get_color(ei::Vec3{
 			sinf(theta) * cosf(phi),
 			sinf(theta) * sinf(phi),
 			cosf(theta)

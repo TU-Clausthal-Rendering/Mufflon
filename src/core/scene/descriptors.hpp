@@ -3,6 +3,7 @@
 #include "util/int_types.hpp"
 #include "lights/light_tree.hpp"
 #include "core/memory/residency.hpp"
+#include "handles.hpp"
 #include <ei/vector.hpp>
 #include <ei/3dtypes.hpp>
 
@@ -77,7 +78,12 @@ struct SceneDescriptor {
 
 	// The receiver of this struct is responsible for deallocating this memory!
 	ConstArrayDevHandle_t<dev, lights::LightTree<dev>> lightTree;
-	// TODO: materials, cameras
+	ConstArrayDevHandle_t<dev, materials::Medium> media;
+	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
+
+	CUDA_FUNCTION const materials::HandlePack& get_material(MaterialIndex matIdx) const {
+		return *as<materials::HandlePack>(as<char>(materials) + materials[matIdx]);
+	}
 };
 
 }} // namespace mufflon::scene
