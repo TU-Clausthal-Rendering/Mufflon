@@ -173,7 +173,7 @@ public:
 	void synchornize(const HashMap<Device::CPU, K, V>& other) {
 		mAssert(m_memSize == other.m_memSize);
 		m_dataCount = other.m_dataCount;
-		cudaMemcpy(m_memory, other.m_memory.get(), m_memSize, cudaMemcpyHostToDevice);
+		cudaMemcpy(m_memory, other.m_memory.get(), m_memSize, cudaMemcpyDefault);
 	}
 private:
 	ArrayDevHandle_t<Device::CUDA, char> m_memory;

@@ -68,7 +68,7 @@ void GpuPathTracer::iterate(Pixel imageDims,
 	float* devRnds = nullptr;
 	cuda::check_error(cudaMalloc(&devRnds, sizeof(float) * 2 * imageDims.x * imageDims.y));
 	cuda::check_error(cudaMemcpy(devRnds, rnds.get(), sizeof(float) * 2 * imageDims.x * imageDims.y,
-		cudaMemcpyHostToDevice));
+		cudaMemcpyDefault));
 
 	// TODO: pass scene data to kernel!
 	dim3 blockDims{ 16u, 16u, 1u };

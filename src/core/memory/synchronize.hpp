@@ -54,7 +54,7 @@ void synchronize(ConstArrayDevHandle_t<Device::CPU, T> changed,
 	if(sync.handle == nullptr) {
 		cuda::check_error(cudaMalloc<T>(&sync, sizeof(T) * length));
 	}
-	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyHostToDevice));
+	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDefault));
 }
 template < class T >
 void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
@@ -62,7 +62,7 @@ void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
 	if(sync.handle == nullptr) {
 		sync.handle = new T[length];
 	}
-	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDeviceToHost));
+	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDefault));
 }
 
 // Functions for unloading a handle from the device
@@ -100,11 +100,11 @@ inline void copy<Device::CPU, Device::CPU>(void* dst, const void* src, std::size
 }
 template <>
 inline void copy<Device::CUDA, Device::CPU>(void* dst, const void* src, std::size_t size) {
-	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice));
+	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
 }
 template <>
 inline void copy<Device::CPU, Device::CUDA>(void* dst, const void* src, std::size_t size) {
-	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost));
+	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
 }
 template <>
 inline void copy<Device::CUDA, Device::CUDA>(void* dst, const void* src, std::size_t size) {

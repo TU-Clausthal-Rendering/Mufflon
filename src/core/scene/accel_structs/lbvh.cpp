@@ -33,9 +33,9 @@ void LBVH::make_resident(Device res)
 			}
 
 			// Copy output arrays from cuda to cpu.
-			/*cudaMemcpy(m_sizes.bvh, m_inputCUDA.bvh, m_inputCUDA.bvhSize * sizeof(ei::Vec4), cudaMemcpyDeviceToHost);
+			/*cudaMemcpy(m_sizes.bvh, m_inputCUDA.bvh, m_inputCUDA.bvhSize * sizeof(ei::Vec4), cudaMemcpyDefault);
 			m_sizes.primIds = (i32*)malloc(m_sizes.numPrimives * sizeof(i32));
-			cudaMemcpy(m_sizes.primIds, m_inputCUDA.primIds, m_sizes.numPrimives * sizeof(i32), cudaMemcpyDeviceToHost);*/
+			cudaMemcpy(m_sizes.primIds, m_inputCUDA.primIds, m_sizes.numPrimives * sizeof(i32), cudaMemcpyDefault);*/
 
 		}
 	}
@@ -164,12 +164,12 @@ void LBVH::build(ObjectData data)
 	m_inputCUDA.meshUVs = (ei::Vec2*)(m_inputCUDA.meshVertices + numVertices);
 	// Copy to cuda array.
 	cudaMemcpy(m_inputCUDA.triIndices, m_inputCPU.triIndices,
-		(numTriangles * 3 + numQuads * 4) * sizeof(i32), cudaMemcpyHostToDevice);
-	cudaMemcpy(m_inputCUDA.spheres, m_inputCPU.spheres, numSpheres * sizeof(ei::Vec4), cudaMemcpyHostToDevice);
+		(numTriangles * 3 + numQuads * 4) * sizeof(i32), cudaMemcpyDefault);
+	cudaMemcpy(m_inputCUDA.spheres, m_inputCPU.spheres, numSpheres * sizeof(ei::Vec4), cudaMemcpyDefault);
 	cudaMemcpy(m_inputCUDA.meshVertices, m_inputCPU.meshVertices,
-		numVertices * sizeof(ei::Vec3), cudaMemcpyHostToDevice);
+		numVertices * sizeof(ei::Vec3), cudaMemcpyDefault);
 	cudaMemcpy(m_inputCUDA.meshUVs, m_inputCPU.meshUVs,
-		numVertices * sizeof(ei::Vec2), cudaMemcpyHostToDevice);
+		numVertices * sizeof(ei::Vec2), cudaMemcpyDefault);
 
 	// Build lbvh.
 	ei::Vec4 traverseCost = { 0.8f, 1.2f, 2.4f, 1.f };

@@ -373,19 +373,19 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
 			auto tex = m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
 			offset += u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
 		} break;
 		case u16(LightType::AREA_LIGHT_QUAD): {
 			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
 			auto tex = m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
 			offset += u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
 		} break;
 		case u16(LightType::AREA_LIGHT_SPHERE): {
 			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem + offset);
 			auto tex = m_textureMap.find(light->radianceTex)->second->aquireConst<Device::CUDA>();
 			offset += u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyHostToDevice);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
 		} break;
 		default:; // Other light type - nothing to do
 	}
@@ -420,7 +420,7 @@ void LightTreeBuilder::synchronize() {
 
 		// Copy the real data
 		m_treeCuda->primToNodePath.synchornize(m_treeCpu->primToNodePath);
-		cuda::check_error(cudaMemcpy(m_treeCuda->memory, m_treeCpu->memory, m_treeCpu->length, cudaMemcpyHostToDevice));
+		cuda::check_error(cudaMemcpy(m_treeCuda->memory, m_treeCpu->memory, m_treeCpu->length, cudaMemcpyDefault));
 
 		// Replace all texture handles inside the tree's data
 		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);

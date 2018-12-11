@@ -54,7 +54,7 @@ void Texture::synchronize() {
 			copyParams.srcPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
 			copyParams.dstArray = m_cudaTexture;
 			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
-			copyParams.kind = cudaMemcpyHostToDevice;
+			copyParams.kind = cudaMemcpyDefault;
 			cuda::check_error(cudaMemcpy3D(&copyParams));
 		}
 		if((dev == Device::CPU) && m_dirty.has_changes(Device::CUDA)) {
@@ -62,7 +62,7 @@ void Texture::synchronize() {
 			copyParams.dstPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
 			copyParams.srcArray = m_cudaTexture;
 			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
-			copyParams.kind = cudaMemcpyDeviceToHost;
+			copyParams.kind = cudaMemcpyDefault;
 			cuda::check_error(cudaMemcpy3D(&copyParams));
 		}
 	} else {
@@ -148,7 +148,7 @@ void Texture::clear() {
 					s_zeroMem.resize(texMemSize);
 					memset(s_zeroMem.data(), 0, texMemSize);
 				}
-				cuda::check_error(cudaMemcpyToArray(m_cudaTexture, 0, 0, s_zeroMem.data(), texMemSize, cudaMemcpyHostToDevice));
+				cuda::check_error(cudaMemcpyToArray(m_cudaTexture, 0, 0, s_zeroMem.data(), texMemSize, cudaMemcpyDefault));
 			}
 		} break;
 		case Device::OPENGL: {

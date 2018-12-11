@@ -27,7 +27,7 @@ void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 
 	if(m_reset) {
 		scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {});
-		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyHostToDevice));
+		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
 	}
 
 	this->iterate(outputBuffer.get_resolution(),

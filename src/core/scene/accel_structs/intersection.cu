@@ -533,7 +533,7 @@ bool any_intersection_CUDA(
 		resultD
 		);
 	i32 result;
-	cudaMemcpy(&result, resultD, sizeof(i32), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&result, resultD, sizeof(i32), cudaMemcpyDefault);
 	return static_cast<bool>(result);
 }
 

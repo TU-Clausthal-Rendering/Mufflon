@@ -1220,7 +1220,7 @@ void build_lbvh64(ei::Vec3* meshVertices,
 	//cudaDeviceSynchronize();//testing
 	i32 numRemovedInternalNodes;
 	cudaMemcpy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32),
-		cudaMemcpyDeviceToHost);
+		cudaMemcpyDefault);
 	// Scan to get number of leaves arised from internal nodes before current node.
 	CuLib::DeviceExclusiveSum(numInternalNodes + 1, &leafMarks, &leafMarks);
 
@@ -1231,7 +1231,7 @@ void build_lbvh64(ei::Vec3* meshVertices,
 	i32 numInternLeavesCollapsedBVH; //!= (numNodesCollapsedBVH + 1) >> 1; since there are simple leaves.
 	// and it includes the removed ones.
 	cudaMemcpy(&numInternLeavesCollapsedBVH, leafMarks + numInternalNodes, sizeof(i32),
-		cudaMemcpyDeviceToHost);
+		cudaMemcpyDefault);
 	i32 numInternalNodesCollapsedBVH = numInternalNodes - numInternLeavesCollapsedBVH;
 	numInternLeavesCollapsedBVH -= numRemovedInternalNodes;
 	i32 numFloat4InCollapsedBVH = numInternLeavesCollapsedBVH + 4 * numInternalNodesCollapsedBVH;
@@ -1352,7 +1352,7 @@ void build_lbvh64(ei::Mat3x4* matrixs,
 	//cudaDeviceSynchronize();//testing
 	i32 numRemovedInternalNodes;
 	cudaMemcpy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32),
-		cudaMemcpyDeviceToHost);
+		cudaMemcpyDefault);
 	// Scan to get number of leaves arised from internal nodes before current node.
 	CuLib::DeviceExclusiveSum(numInternalNodes + 1, &leafMarks, &leafMarks);
 
@@ -1363,7 +1363,7 @@ void build_lbvh64(ei::Mat3x4* matrixs,
 	i32 numInternLeavesCollapsedBVH; //!= (numNodesCollapsedBVH + 1) >> 1; since there are simple leaves.
 	// and it includes the removed ones.
 	cudaMemcpy(&numInternLeavesCollapsedBVH, leafMarks + numInternalNodes, sizeof(i32),
-		cudaMemcpyDeviceToHost);
+		cudaMemcpyDefault);
 	i32 numInternalNodesCollapsedBVH = numInternalNodes - numInternLeavesCollapsedBVH;
 	numInternLeavesCollapsedBVH -= numRemovedInternalNodes;
 	i32 numFloat4InCollapsedBVH = numInternLeavesCollapsedBVH + 4 * numInternalNodesCollapsedBVH;

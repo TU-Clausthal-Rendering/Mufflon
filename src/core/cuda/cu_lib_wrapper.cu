@@ -310,7 +310,7 @@ template <class T> T DeviceSum(u32 numElements, T* elements)
 
 	// Read priorities sum from device memory
 	T elementsSum;
-	cudaMemcpy(&elementsSum, deviceElementsSum, sizeof(T), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&elementsSum, deviceElementsSum, sizeof(T), cudaMemcpyDefault);
 
 	// Free temporary memory
 	cudaFree(tempStorage);
@@ -339,7 +339,7 @@ template <class T> T DeviceMax(u32 numElements, T* elements)
 
 	// Read priorities sum from device memory
 	T elementsSum;
-	cudaMemcpy(&elementsSum, deviceElementsSum, sizeof(T), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&elementsSum, deviceElementsSum, sizeof(T), cudaMemcpyDefault);
 
 	// Free temporary memory
 	cudaFree(tempStorage);

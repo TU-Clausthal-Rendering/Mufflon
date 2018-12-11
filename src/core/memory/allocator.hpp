@@ -78,7 +78,7 @@ public:
 				std::memcpy(dst, src, sizeof(T) * n); 
 				break;
 			case Device::CUDA:
-				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyHostToDevice));
+				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDefault));
 				break;
 			default:
 				mAssert(false);
@@ -111,7 +111,7 @@ public:
 					  "Must be trivially copyable");
 		T prototype{ std::forward<Args>(args)... };
 		for(std::size_t i = 0; i < n; ++i)
-			cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyHostToDevice));
+			cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyDefault));
 		return ptr;
 	}
 
@@ -147,7 +147,7 @@ public:
 					  "Must be trivially copyable");
 		switch(dev) {
 			case Device::CPU:
-				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
+				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDefault));
 				break;
 			case Device::CUDA:
 				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
