@@ -735,6 +735,9 @@
     <ClInclude Include="..\..\src\core\cameras\focus.hpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\concepts.hpp">
+      <Filter>Source Files\core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">
