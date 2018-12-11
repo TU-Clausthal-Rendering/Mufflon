@@ -302,14 +302,19 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 			if(camPath.size() > 1u)
 				logWarning("[JsonLoader::load_cameras] Scene file: camera paths are not supported yet");
 			if(world_add_pinhole_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
-										util::pun<Vec3>(camViewDir[0u]),
-										util::pun<Vec3>(camUp[0u]), near, far,
-										static_cast<Radians>(Degrees(fovDegree))) == nullptr)
-				throw std::runtime_error("Failed to add camera");
-		} else if(type.compare("focus") == 0 == 0) {
-			// TODO: Focus camera
-			logWarning("[JsonLoader::load_cameras] Scene file: Focus cameras are not supported yet");
-		} else if(type.compare("ortho") == 0 == 0) {
+										util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
+										near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
+				throw std::runtime_error("Failed to add pinhole camera");
+		} else if(type.compare("focus") == 0) {
+			const float focalLength = read<float>(m_state, get(m_state, camera, "focalLength")) / 1000.f;
+			const float focusDistance = read<float>(m_state, get(m_state, camera, "focusDistance"));
+			const float sensorHeight = read<float>(m_state, get(m_state, camera, "chipHeight")) / 1000.f;
+			const float lensRadius = read<float>(m_state, get(m_state, camera, "aperture")) / (2.f * focalLength);
+			if(world_add_focus_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
+									   util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
+									   near, far, focalLength, focusDistance, lensRadius, sensorHeight) == nullptr)
+				throw std::runtime_error("Failed to add focus camera");
+		} else if(type.compare("ortho") == 0) {
 			// TODO: Orthogonal camera
 			logWarning("[JsonLoader::load_cameras] Scene file: Focus cameras are not supported yet");
 		} else {

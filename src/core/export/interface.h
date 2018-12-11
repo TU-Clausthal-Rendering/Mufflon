@@ -364,6 +364,10 @@ CORE_API MaterialHdl CDECL world_add_material(const char* name, const MaterialPa
 CORE_API CameraHdl CDECL world_add_pinhole_camera(const char* name, Vec3 position,
 											   Vec3 dir, Vec3 up, float near,
 											   float far, float vFov);
+CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
+												Vec3 up, float near, float far,
+												float focalLength, float focusDistance,
+												float lensRad, float chipHeight);
 CORE_API LightHdl CDECL world_add_point_light(const char* name, Vec3 position,
 										   Vec3 intensity);
 CORE_API LightHdl CDECL world_add_spot_light(const char* name, Vec3 position,

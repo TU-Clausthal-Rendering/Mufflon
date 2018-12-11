@@ -6,6 +6,7 @@
 #include "core/math/sampling.hpp"
 #include <ei/3dtypes.hpp>
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 
 namespace mufflon {
 namespace cameras {
@@ -17,27 +18,28 @@ class Focus : public Camera {
 public:
 	Focus() = default;
 	Focus(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
-			Radians vFov, float focalDist, float lensRad,
+			float focalLength, float focusDist, float lensRad,
 			float sensorHeight, float near = 1e-10f,
 			float far = 1e10f) :
 		Camera(std::move(position), std::move(dir),
 			   std::move(up), near, far),
-		m_vFov(vFov),
+		// TODO
+		m_vFov(2.f * std::atan(sensorHeight / (2.f * focalLength))),
 		m_tanVFov(std::tan(m_vFov / 2.f)),
+		m_focalLength(focalLength),
+		m_focusDistance(focusDist),
 		m_lensRadius(lensRad),
 		m_sensorHeight(sensorHeight)
-	{
-		set_focal_distance(focalDist);
-	}
+	{}
 
-	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = std::tan(fov / 2); }
-	void set_focal_distance(float distance) noexcept {
-		// We compute the focal distance such that the sensor is at nearplane distance to the lens:
-		// f = z*z' / (z - z') with z' = nearplane and z = distance
-		// f = distance² / ( distance - 1m)
-		m_focalDistance = distance * distance / (distance - m_near);
-	}
+	constexpr float get_focus_distance() const noexcept { return m_focusDistance; }
+	constexpr float get_focal_length() const noexcept { return m_focalLength; }
+	constexpr float get_lens_radius() const noexcept { return m_lensRadius; }
+	constexpr float get_sensor_height() const noexcept { return m_sensorHeight; }
+	void set_focus_distance(float distance) noexcept { m_focusDistance = distance; }
+	void set_focal_length(float length) noexcept { m_focalLength = length; }
 	void set_lens_radius(float radius) noexcept { m_lensRadius = radius; }
+	void set_sensor_height(float height) noexcept { m_sensorHeight = height; }
 
 	// Get the parameter bundle
 	void get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel& resolution) const final;
@@ -47,7 +49,8 @@ public:
 private:
 	Radians m_vFov;			// Vertical field of view in radiant.
 	float m_tanVFov;		// Tangents of the vfov halfed
-	float m_focalDistance;	// Focal distance in meter
+	float m_focalLength;	// Focal length in meter
+	float m_focusDistance;	// Focus distance in meter
 	float m_lensRadius;		// Lens radius in meter
 	float m_sensorHeight;	// Sensor height in meter
 };
@@ -58,11 +61,12 @@ struct FocusParams : public CameraParams {
 	scene::Point position;
 	float tanVFov;
 	scene::Direction viewDir;
-	float near;
-	scene::Direction up;
 	float far;
-	float sensorHeight;
-	float focalDistance;		// How far away is a sharp point from the lens
+	scene::Direction up;
+	__half sensorHalfHeight;
+	__half sensorDistance;
+	float focusDistance;		// How far away is a sharp point from the lens
+	float focalLength;			// Focal length of the lens
 	float lensRadius;
 	ei::Vec<u16, 2> resolution;	// Output buffer resoultion
 };
@@ -90,7 +94,7 @@ focuscam_sample_position(const FocusParams& params, const math::RndSet2& rndSet)
 	const ei::Vec3 xAxis = ei::cross(params.viewDir, params.up);
 	const ei::Vec3 yAxis = ei::cross(params.viewDir, xAxis);
 	const ei::Vec3 dirWorld = xAxis * nPos.x + yAxis * nPos.y + params.viewDir * nPos.z;
-	const ei::Vec3 pixelPos = params.position + dirWorld * params.near;
+	const ei::Vec3 pixelPos = params.position + dirWorld * __half2float(params.sensorDistance);
 	// Compute the PDF for sampling the given position on the lens
 	const AreaPdf lensPosPdf = AreaPdf{ 1.f / ei::PI };
 
@@ -106,13 +110,10 @@ focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 	ei::Vec2 canonicalPos = subPixel / params.resolution * 2.0f - 1.0f;
 	// Transform it into a point on the near plane (camera space)
 	canonicalPos *= params.tanVFov;
+	const float sensorHalfHeight = __half2float(params.sensorHalfHeight);
 	const float aspectRatio = params.resolution.x / float(params.resolution.y);
 	// Scale to fit the sensor
-	const ei::Vec3 nPos{
-		canonicalPos.x * aspectRatio * params.sensorHeight,
-		canonicalPos.y * params.sensorHeight,
-		0.0f
-	};
+	const ei::Vec3 nPos{ sensorHalfHeight * ei::Vec2{canonicalPos.x * aspectRatio, canonicalPos.y} };
 	// Go to world space
 	const ei::Vec3 xAxis = ei::cross(params.viewDir, params.up);
 	const ei::Vec3 yAxis = ei::cross(params.viewDir, xAxis);
@@ -122,14 +123,14 @@ focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 	// The actual focal point for the direction has to be computed first
 	const ei::Vec3 pixelToLens = ei::normalize(exitPosWorld - pixelPos);
 	const float cosPixel = ei::dot(pixelToLens, params.viewDir);
-	const float focalDistance = params.focalDistance;
-	float pixelSharpDist = params.near;
+	const float sensorDistance = __half2float(params.sensorDistance);
+	float pixelSharpDist = sensorDistance;
 	if(cosPixel != 1.f)
-		pixelSharpDist = params.near + canonicalPos.y / atan(acos(cosPixel));
+		pixelSharpDist = sensorDistance + canonicalPos.y / atan(acos(cosPixel));
 	// Compute the distance on the other side of the lens (where an object has to be to be sharp)
-	const float focalDist = pixelSharpDist * focalDistance / (pixelSharpDist - focalDistance);
+	const float focusDistance = pixelSharpDist * params.focalLength / (pixelSharpDist - params.focalLength);
 	// Compute the focal point for this pixel (cam distance(nearplane) + focal distance along view direction)
-	const ei::Vec3 focalPoint = params.position + (params.near + focalDist) * params.viewDir;
+	const ei::Vec3 focalPoint = params.position + (sensorDistance + focusDistance) * params.viewDir;
 	// Now we can compute the ray direction
 	const ei::Vec3 direction = ei::normalize(focalPoint - exitPosWorld);
 
@@ -151,9 +152,9 @@ focuscam_project(const FocusParams& params, const scene::Point& lensPoint, const
 	// Project the ray back onto the sensor
 	// Taken from PBRT
 	const float cosTheta = ei::dot(excident, params.viewDir);
-	const float focusDistance = params.focalDistance / cosTheta;
+	const float focusDistance = params.focusDistance / cosTheta;
 	const ei::Vec3 focusPoint = lensPoint - focusDistance * excident;
-	const ei::Vec3 sensorPoint = focusPoint - (params.near - focusDistance) * params.viewDir;
+	const ei::Vec3 sensorPoint = focusPoint - (__half2float(params.sensorDistance) - focusDistance) * params.viewDir;
 
 	// Map to UVs
 	const ei::Vec3 xAxis = ei::cross(params.viewDir, params.up);
@@ -162,9 +163,10 @@ focuscam_project(const FocusParams& params, const scene::Point& lensPoint, const
 	ei::Vec2 uv{ ei::dot(sensorDir, xAxis), ei::dot(sensorDir, yAxis) };
 
 	// Compute screen coordinate for this position
+	const float sensorHalfHeight = __half2float(params.sensorHalfHeight);
 	float aspectRatio = params.resolution.x / float(params.resolution.y);
-	uv.x *= params.sensorHeight / aspectRatio;
-	uv.y *= params.sensorHeight;
+	uv.x *= 1.f / aspectRatio;
+	uv *= sensorHalfHeight;
 
 	// On screen?
 	if(!(uv.x > -1 && uv.x <= 1 && uv.y > -1 && uv.y <= 1))

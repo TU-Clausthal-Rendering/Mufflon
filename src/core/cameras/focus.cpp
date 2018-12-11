@@ -5,17 +5,19 @@
 namespace mufflon::cameras {
 
 void Focus::get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel& resolution) const {
+	// We treat the near plane as a scaling factor for everything: focal length, focus distance etc.
 	FocusParams buffer{
 		CameraModel::PINHOLE,
 		m_position,
 		m_tanVFov,
 		get_view_dir(),
-		m_near,
-		get_up_dir(),
 		m_far,
-		m_sensorHeight,
-		m_focalDistance,
-		m_lensRadius,
+		get_up_dir(),
+		__float2half(m_sensorHeight * m_near / 2.f),
+		__float2half(m_focusDistance * m_focalLength / (m_focusDistance + m_focalLength)),
+		m_focusDistance * m_near,
+		m_focalLength * m_near,
+		m_lensRadius * m_near,
 		ei::Vec<u16,2>{resolution}
 	};
 	switch(dev) {

@@ -1236,6 +1236,24 @@ CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 	return static_cast<CameraHdl>(hdl);
 }
 
+CameraHdl world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
+								 Vec3 up, float near, float far,
+								 float focalLength, float focusDistance,
+								 float lensRad, float chipHeight) {
+	CHECK_NULLPTR(name, "camera name", nullptr);
+	CameraHandle hdl = WorldContainer::instance().add_camera(name,
+		std::make_unique<cameras::Focus>(
+			util::pun<ei::Vec3>(position), util::pun<ei::Vec3>(dir),
+			util::pun<ei::Vec3>(up), focalLength, focusDistance,
+			lensRad, chipHeight, near, far
+		));
+	if (hdl == nullptr) {
+		logError("[", FUNCTION_NAME, "] Error creating focus camera");
+		return nullptr;
+	}
+	return static_cast<CameraHdl>(hdl);
+}
+
 LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) {
 	CHECK_NULLPTR(name, "pointlight name", nullptr);
 	auto hdl = WorldContainer::instance().add_light(name, lights::PointLight{
@@ -2225,11 +2243,33 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
 		if (count > 0) {
-			cuda::check_error(cudaSetDevice(0u));
+			// We select the device with the highest compute capability
+			int devIndex = -1;
+			int major = -1;
+			int minor = -1;
+
 			cudaDeviceProp deviceProp;
-			cuda::check_error(cudaGetDeviceProperties(&deviceProp, 0u));
+			for (int c = 0; c < count; ++c) {
+				cudaGetDeviceProperties(&deviceProp, c);
+				if (deviceProp.unifiedAddressing) {
+					if (deviceProp.major > major ||
+						((deviceProp.major == major) && (deviceProp.minor > minor))) {
+						major = deviceProp.major;
+						minor = deviceProp.minor;
+						devIndex = c;
+					}
+				}
+			}
+			if (devIndex < 0) {
+				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none supports unified addressing; "
+						 "continuing without CUDA");
+			}
+
+			cuda::check_error(cudaSetDevice(devIndex));
 			logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
-				"devices; initializing device 0 (", deviceProp.name, ")");
+				"devices; initializing device ", devIndex, " (", deviceProp.name, ")");
+		} else {
+			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
 		}
 
 		initialized = true;
