@@ -77,7 +77,7 @@ struct SceneDescriptor {
 	ArrayDevHandle_t<dev, InstanceDescriptor<dev>> instances;
 
 	// The receiver of this struct is responsible for deallocating this memory!
-	ConstArrayDevHandle_t<dev, lights::LightTree<dev>> lightTree;
+	const lights::LightTree<dev> lightTree;
 	ConstArrayDevHandle_t<dev, materials::Medium> media;
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
 

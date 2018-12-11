@@ -252,7 +252,7 @@ LightSubTree::Node::Node(const char* base,
 
 
 LightTreeBuilder::LightTreeBuilder() :
-	m_flags()
+	m_dirty()
 {}
 
 LightTreeBuilder::~LightTreeBuilder() {
@@ -264,8 +264,12 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
 					  const ei::Box& boundingBox,
 					  TextureHandle envLight) {
+	// Make sure the hashmap memory is allocated
+	m_primToNodePath.resize(int(posLights.size()));
+
 	unload<Device::CPU>();
-	m_treeCpu = std::make_unique<LightTree<Device::CPU>>( posLights.size() );
+	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
+	m_treeCpu->primToNodePath = m_primToNodePath.aquire<Device::CPU>();
 
 	// Construct the environment light
 	if(envLight) {
@@ -325,12 +329,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	LightOffset<DirectionalLight> dirLightOffsets(dirLights, dirNodes * sizeof(LightSubTree::Node));
 	LightOffset<PositionalLights> posLightOffsets(posLights, posNodes * sizeof(LightSubTree::Node));
 
-	m_treeCpu->length = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
+	std::size_t treeMemSize = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightOffsets.mem_size() + posLightOffsets.mem_size();
-	m_treeCpu->memory = Allocator<Device::CPU>::alloc_array<char>(m_treeCpu->length);
+	m_treeMemory.resize(treeMemSize);
+	char* memory = m_treeMemory.acquire<Device::CPU, char>();
 	// Set up the node pointers
-	m_treeCpu->dirLights.memory = m_treeCpu->memory;
-	m_treeCpu->posLights.memory = m_treeCpu->memory + dirLightOffsets[0] + dirLightOffsets.mem_size();
+	m_treeCpu->dirLights.memory = memory;
+	m_treeCpu->posLights.memory = memory + dirLightOffsets[0] + dirLightOffsets.mem_size();
 
 	// Copy the lights into the tree
 	// Directional lights are easier, because they have a fixed size
@@ -359,7 +364,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	create_light_tree(dirLightOffsets, m_treeCpu->dirLights, scale);
 	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale);
 	fill_map(posLights, m_treeCpu->primToNodePath);
-	m_flags.mark_changed(Device::CPU);
+	m_dirty.mark_changed(Device::CPU);
 }
 
 void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {
@@ -393,23 +398,19 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 
 template < Device dev >
 void LightTreeBuilder::synchronize() {
-	if(dev == Device::CUDA) {
+	if(dev == Device::CUDA && m_dirty.needs_sync(dev)) {
 		if(!m_treeCpu)
 			throw std::runtime_error("[LightTreeBuilder::synchronize] There is no source for light-tree synchronization!");
-		// Keep old memory if possible, any size change is better handled by a new allocation.
-		if(!m_treeCuda || m_treeCuda->length != m_treeCpu->length
-			|| m_treeCuda->primToNodePath.size() != m_treeCpu->primToNodePath.size()) {
-			unload<Device::CUDA>();
-			m_treeCuda = std::make_unique<LightTree<Device::CUDA>>( m_treeCpu->posLights.lightCount );
-			m_treeCuda->memory = Allocator<Device::CUDA>::alloc_array<char>(m_treeCpu->length);
-		}
+		// Easiest way to synchronize this complicated type (espacially, if the size changed)
+		// is simply to start over.
+		m_treeCuda = std::make_unique<LightTree<Device::CUDA>>();
+		m_treeCuda->primToNodePath = m_primToNodePath.aquire<Device::CUDA>(); // Includes synchronization
 
-		// Equalize bookkeeping
-		m_treeCuda->length = m_treeCpu->length;
+		// Equalize bookkeeping of subtrees
 		m_treeCuda->dirLights = m_treeCpu->dirLights;
-		m_treeCuda->dirLights.memory = m_treeCuda->memory;
+		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA, char>();
 		m_treeCuda->posLights = m_treeCpu->posLights;
-		m_treeCuda->posLights.memory = m_treeCuda->memory + (m_treeCpu->posLights.memory - m_treeCpu->memory);
+		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
 		// Remap the environment map
 		TextureHandle envMapTex = nullptr;
@@ -419,13 +420,12 @@ void LightTreeBuilder::synchronize() {
 		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(envMapTex, m_envmapSum.get());
 
 		// Copy the real data
-		m_treeCuda->primToNodePath.synchornize(m_treeCpu->primToNodePath);
-		cuda::check_error(cudaMemcpy(m_treeCuda->memory, m_treeCpu->memory, m_treeCpu->length, cudaMemcpyDefault));
+		m_treeMemory.synchronize<Device::CUDA, Device::CPU>();
 
 		// Replace all texture handles inside the tree's data
 		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
 
-		m_flags.mark_synced(dev);
+		m_dirty.mark_synced(dev);
 	} else {
 		// TODO: backsync? Would need another hashmap for texture mapping.
 	}

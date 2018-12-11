@@ -111,16 +111,11 @@ struct LightTree {
 	// Pointer to the tree elements
 	LightSubTree dirLights;
 	LightSubTree posLights;
-	// Actual memory
-	std::size_t length { 0 };
-	ArrayDevHandle_t<DEVICE, char> memory { nullptr };
 	// A map to find the node of a given primitve.
 	// The map stores an encoded path to the node. Storing its pointer/offset
 	// would be useless in terms of finding its probability. Therefore,
 	// the tree must be traversed
 	HashMap<dev, PrimitiveHandle, u32> primToNodePath;
-
-	LightTree(std::size_t numPosLights) : primToNodePath{u32(numPosLights)} {}
 };
 
 #ifndef __CUDACC__
@@ -139,7 +134,7 @@ public:
 			   TextureHandle envLight = nullptr);
 
 	template < Device dev >
-	const LightTree<dev>& aquire_tree() noexcept {
+	const LightTree<dev>& acquireConst() noexcept {
 		this->synchronize<dev>();
 		if constexpr(dev == Device::CPU) return *m_treeCpu;
 		else return *m_treeCuda;
@@ -150,21 +145,22 @@ public:
 
 	template < Device dev >
 	void unload() {
+		m_treeMemory.unload<dev>();
+		m_primToNodePath.unload<dev>();
 		if(dev == Device::CPU && m_treeCpu) {
-			Allocator<dev>::free(m_treeCpu->memory, m_treeCpu->length);
 			m_treeCpu = nullptr;
 		} else if(m_treeCuda) {
-			Allocator<dev>::free(m_treeCuda->memory, m_treeCuda->length);
-			m_treeCuda->primToNodePath.free();
 			m_treeCuda = nullptr;
 		}
 		// TODO: unload envmap handle
 	}
 
 private:
-	util::DirtyFlags<Device> m_flags;
+	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;
 	std::unique_ptr<LightTree<Device::CUDA>> m_treeCuda;
+	HashMapManager<PrimitiveHandle, u32> m_primToNodePath;
+	GenericResource m_treeMemory;
 	// The tree is build on CPU side. For synchronization we need a possiblity to
 	// find the CUDA textures.
 	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;

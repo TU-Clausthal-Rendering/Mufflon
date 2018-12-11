@@ -41,7 +41,7 @@ __global__ static void sample(Pixel imageDims,
 	// Random walk ended because of missing the scene?
 	if(pathLen < 666) {
 		if(coord.x < imageDims.x && coord.y < imageDims.y) {
-			const LightTree<Device::CUDA>& lightTree = *sceneDesc->lightTree;
+			const LightTree<Device::CUDA>& lightTree = sceneDesc->lightTree;
 
 			const float phi = 2.f * ei::PI * (coord.x + 0.5f) / static_cast<float>(imageDims.x);
 			const float theta = ei::PI * (coord.y + 0.5f) / static_cast<float>(imageDims.y);

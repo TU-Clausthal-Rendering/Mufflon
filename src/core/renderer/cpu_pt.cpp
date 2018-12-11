@@ -17,7 +17,7 @@ CpuPathTracer::CpuPathTracer(scene::SceneHandle scene) :
 	m_currentScene(scene)
 {
 	// Make sure the scene is loaded completely for the use on CPU side
-	scene->synchronize<Device::CUDA>();
+	scene->synchronize<Device::CPU>();
 	// TODO: init one RNG per thread?
 	m_rngs.emplace_back(static_cast<u32>(std::random_device()()));
 
@@ -73,7 +73,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
-			auto nee = connect(*scene.lightTree, 0, 1, neeSeed,
+			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
 				vertex->get_position(), m_currentScene->get_bounding_box(),
 				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
 			bool anyhit = false; // TODO use a real anyhit method
@@ -97,7 +97,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		if(pathLen >= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(*scene.lightTree, 0,
+				AreaPdf backwardPdf = connect_pdf(scene.lightTree, 0,
 												  lastPosition, scene::lights::guide_flux);
 				float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
@@ -112,7 +112,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		// TODO: normals, position???
 		const float phi = 2.f * ei::PI * coord.x  / static_cast<float>(outputBuffer.get_width());
 		const float theta = ei::PI * coord.y / static_cast<float>(outputBuffer.get_height());
-		ei::Vec3 testRadiance = scene.lightTree->background.get_color(ei::Vec3{
+		ei::Vec3 testRadiance = scene.lightTree.background.get_color(ei::Vec3{
 			sinf(theta) * cosf(phi),
 			sinf(theta) * sinf(phi),
 			cosf(theta)

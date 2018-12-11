@@ -161,14 +161,6 @@ public:
 		Allocator<Device::CPU>::template copy<InstanceDescriptor<dev>, dev>(instDevDesc.get(), instanceDescs.data(),
 																			instanceDescs.size());
 
-		// Bring the light tree to the device
-		// We cannot use the make_unique because the light tree doesn't have a proper copy constructor
-		auto& lightDevDesc = m_lightDevDesc.get<unique_device_ptr<dev, lights::LightTree<dev>>>();
-		//lightDevDesc = make_udevptr_array<dev, lights::LightTree<dev>>();
-		lightDevDesc.reset(reinterpret_cast<lights::LightTree<dev>*>(Allocator<dev>::template alloc_array<char>(sizeof(lights::LightTree<dev>))));
-		//Allocator<Device::CPU>::copy<lights::LightTree<dev>, dev>(lightDevDesc.get(), &m_lightTree.aquire_tree<dev>(),
-		//														  1u);
-
 		load_materials<dev>();
 
 		return SceneDescriptor<dev>{
@@ -177,7 +169,7 @@ public:
 				m_boundingBox,
 				objDevDesc.get(),
 				instDevDesc.get(),
-				lightDevDesc.get(),
+				m_lightTree.acquireConst<dev>(),
 				m_media.acquireConst<dev,materials::Medium>(),
 				m_materials.acquireConst<dev,int>()
 		};
@@ -204,8 +196,6 @@ private:
 		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>>> m_objDevDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, InstanceDescriptor<Device::CPU>>,
 		unique_device_ptr<Device::CUDA, InstanceDescriptor<Device::CUDA>>> m_instDevDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, lights::LightTree<Device::CPU>>,
-		unique_device_ptr<Device::CUDA, lights::LightTree<Device::CUDA>>> m_lightDevDesc;
 
 	ei::Box m_boundingBox;
 

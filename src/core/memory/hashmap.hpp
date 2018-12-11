@@ -3,6 +3,7 @@
 #include "residency.hpp"
 #include "core/export/api.h"
 #include "allocator.hpp"
+#include "generic_resource.hpp"
 #include "util/types.hpp"
 #include "util/assert.hpp"
 #include <ei/prime.hpp>
@@ -41,6 +42,19 @@ u32 generic_hash(K key) {
 	return x;
 }
 
+// A copyable counter
+struct atomic_u32 : public std::atomic_uint32_t
+{
+//	using std::atomic_uint32_t::load;
+//	using std::atomic_uint32_t::store;
+	atomic_u32() = default;
+	atomic_u32(u32 value) { store(value); }
+	atomic_u32(const atomic_u32& other) { store(other.load()); }
+	atomic_u32(atomic_u32&& other) { store(other.load()); }
+	atomic_u32& operator = (const atomic_u32& other) { store(other.load()); return *this; };
+	atomic_u32& operator = (atomic_u32&& other) { store(other.load()); return *this; };
+};
+
 /*
  * Parallel hash map, which can be used on CPU and CUDA.
  * This hash map does not implement a resizing mechanism. Be sure to create
@@ -56,23 +70,26 @@ class HashMap;
 
 template < typename K, typename V >
 class HashMap<Device::CPU, K, V> {
+	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map) :
+		m_data(as<std::pair<K,V>>(data)),
+		m_map(as<std::atomic_uint32_t>(map)),
+		m_mapSize(mapSize),
+		m_dataCapacity(dataCapacity),
+		m_dataCount(0)
+	{}
 public:
-	HashMap(int numExpectedEntries) {
-		m_dataSize = numExpectedEntries;
-		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_memSize = numExpectedEntries * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32);
-		m_memory.reset(new char[m_memSize]);
-		m_data = as<std::pair<K,V>>(m_memory.get() + m_mapSize * sizeof(u32));
-		m_map = as<std::atomic_uint32_t>(m_memory.get());
-		m_dataCount.store(0);
-	}
+	HashMap() : m_data(nullptr), m_map(nullptr), m_mapSize(0), m_dataCount(0) {}
+	HashMap(const HashMap&) = default;
+	HashMap(HashMap&&) = default;
+	HashMap& operator = (const HashMap&) = default;
+	HashMap& operator = (HashMap&&) = default;
 
 	// Insert a pair without checking, if the key is contained. See documentation above for deteails.
 	void insert(K key, V value) {
 		u32 hash = generic_hash(key);
 		// Insert the datum
 		u32 dataIdx = m_dataCount.fetch_add(1);
-		mAssert(dataIdx < m_dataSize);
+		mAssert(dataIdx < m_dataCapacity);
 		m_data[dataIdx].first = key;
 		m_data[dataIdx].second = value;
 		// Try to insert until we find an empty entry
@@ -105,39 +122,30 @@ public:
 	// Get the number of elements in the hash map
 	u32 size() const { return m_dataCount; }
 private:
-	std::unique_ptr<char[]> m_memory;
 	std::pair<K,V>* m_data;
 	std::atomic_uint32_t* m_map;
 	u32 m_mapSize;
-	u32 m_dataSize;
-	u32 m_memSize;
-	std::atomic_uint32_t m_dataCount;
+	u32 m_dataCapacity;
+	atomic_u32 m_dataCount;
 
-	friend HashMap<Device::CUDA, K, V>;
+	template < typename K1, typename V1 >
+	friend class HashMapManager;
 };
 
 template < typename K, typename V >
 class HashMap<Device::CUDA, K, V> {
+	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map) :
+		m_data(as<std::pair<K,V>>(data)),
+		m_map(as<u32>(map)),
+		m_mapSize(mapSize),
+		m_dataCount(0)
+	{}
 public:
-	HashMap(int numExpectedEntries) noexcept {
-		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_memSize = numExpectedEntries * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32);
-		m_memory = Allocator<Device::CUDA>::alloc_array<char>(m_memSize);
-		m_data = as<std::pair<K,V>>(m_memory + m_mapSize * sizeof(u32));
-		m_map = as<u32>(m_memory);
-		m_dataCount = 0;
-	}
-
-	void free() noexcept {
-		Allocator<Device::CUDA>::free(m_memory, m_memSize);
-	}
-	// Creepy: CUDA requires the copy to push the data to the GPU.
-	// However, any copy should never call ~HashMap();
-	//HashMap(const HashMap&) = delete;
-	//HashMap& operator=(const HashMap&) = delete;
-	//HashMap(HashMap&&) = delete;
-	//HashMap& operator=(HashMap&&) = delete;
-
+	HashMap() : m_data(nullptr), m_map(nullptr), m_mapSize(0), m_dataCount(0) {}
+	HashMap(const HashMap&) = default;
+	HashMap(HashMap&&) = default;
+	HashMap& operator = (const HashMap&) = default;
+	HashMap& operator = (HashMap&&) = default;
 	// See CPU implementation for documentation
 
 	__device__ void insert(K key, V value) {
@@ -168,20 +176,62 @@ public:
 	__device__ const V* find(K key) const { return const_cast<HashMap*>(this)->find(); }
 
 	// Get the number of elements in the hash map
-	__host__ __device__ u32 size() const { return m_dataCount; }
-
-	void synchornize(const HashMap<Device::CPU, K, V>& other) {
-		mAssert(m_memSize == other.m_memSize);
-		m_dataCount = other.m_dataCount;
-		cudaMemcpy(m_memory, other.m_memory.get(), m_memSize, cudaMemcpyDefault);
-	}
+	__device__ u32 size() const { return m_dataCount; }
 private:
-	ArrayDevHandle_t<Device::CUDA, char> m_memory;
 	std::pair<K,V>* m_data;
 	u32* m_map;
-	u32 m_memSize;
 	u32 m_mapSize;
 	u32 m_dataCount;
+
+	template < typename K1, typename V1 >
+	friend class HashMapManager;
+};
+
+
+/*
+ * Management layer to support hashmap functionallity on all devices.
+ */
+template < typename K, typename V >
+class HashMapManager {
+public:
+	HashMapManager(int numExpectedEntries = 0) {
+		m_dataCapacity = numExpectedEntries;
+		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
+		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
+	}
+
+	// Reallocates the map (previous data is lost)
+	void resize(int numExpectedEntries) {
+		m_dataCapacity = numExpectedEntries;
+		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
+		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
+	}
+
+	template< Device dev >
+	void unload() {
+		m_memory.unload<dev>();
+	}
+
+	// Get the functional HashMap
+	template< Device dev >
+	HashMap<dev,K,V> aquire() {
+		// TODO: dirty flags
+		if(dev == Device::CUDA)
+			m_memory.synchronize<dev, Device::CPU>(); // TODO: unify acquire and synchronize of GenericResource
+		char* ptr = m_memory.acquire<dev,char>();
+		return HashMap<dev,K,V>{
+			m_dataCapacity, m_mapSize,
+			ptr, ptr + m_mapSize * sizeof(u32)
+		};
+	}
+	template< Device dev >
+	const HashMap<dev,K,V> aquireConst() {
+		return aquire<dev>();
+	}
+private:
+	GenericResource m_memory;	// Contains both: hash table and data
+	u32 m_mapSize;				// Size of the hash table
+	u32 m_dataCapacity;			// Maximum number of data elements
 };
 
 } // namespace mufflon
