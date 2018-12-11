@@ -107,10 +107,11 @@ public:
 	/*
 	 * Interface to obtain the architecture independent parameters required for sampling
 	 * and evaluation. The outBuffer must have a size of at least get_parameter_pack_size().
+	 * The outBuffer pointer can point to CUDA or CPU memory!
 	 * Each camera must implement a sample_ray and a project method (see cameras/sample.hpp
 	 * for details).
 	 */
-	virtual void get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel& resolution) const = 0;
+	virtual void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const = 0;
 
 	// Get the required size of a parameter bundle.
 	virtual std::size_t get_parameter_pack_size() const = 0;

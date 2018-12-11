@@ -33,7 +33,7 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_currentScene->get_camera()->get_parameter_pack(as<cameras::CameraParams>(m_camParams),
-													 Device::CPU, buffer.get_resolution());
+													 buffer.get_resolution());
 	m_reset = false;
 	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {});
 

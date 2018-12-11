@@ -41,14 +41,14 @@ void Scene::load_materials() {
 	// Allocate the memory
 	m_materials.resize(offset);
 	char* mem = m_materials.acquire<dev, char>();
-	copy<dev,Device::CPU>(mem, offsets.data(), sizeof(int) * m_materialsRef.size());
+	copy(mem, as<char>(offsets.data()), sizeof(int) * m_materialsRef.size());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_PARAMETER_SIZE];
 	int i = 0;
 	for(const auto& mat : m_materialsRef) {
 		mAssert(mat->get_handle_pack_size(dev) <= materials::MAX_MATERIAL_PARAMETER_SIZE);
 		mat->get_handle_pack(dev, as<materials::HandlePack>(buffer));
-		copy<dev,Device::CPU>(mem + offsets[i], buffer, mat->get_handle_pack_size(dev));
+		copy(mem + offsets[i], buffer, mat->get_handle_pack_size(dev));
 		++i;
 	}
 }

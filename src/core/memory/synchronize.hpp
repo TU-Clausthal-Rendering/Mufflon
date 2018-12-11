@@ -80,36 +80,15 @@ void unload(ArrayDevHandle_t<Device::CUDA, T>& hdl) {
 }
 
 
-// A number of copy primitives which call the internal required methods
-// NOTE: There are synchronize() methods above which have a similar
-// functionallity. However, they are too specialized (include allocations).
-// MAYBE they can be replaced by this one
-template < Device dev >
-using DevPtr = void*;
-template < Device dev >
-using ConstDevPtr = const void*;
-// TODO: OpenGL specialization
-template < Device dstDev, Device srcDev >
-inline void copy(DevPtr<dstDev> dst, ConstDevPtr<srcDev> src, std::size_t size ) {
-	mAssertMsg(false, "Unimplemented copy specialization.");
-}
-
-template <>
-inline void copy<Device::CPU, Device::CPU>(void* dst, const void* src, std::size_t size) {
-	std::memcpy(dst, src, size);
-}
-template <>
-inline void copy<Device::CUDA, Device::CPU>(void* dst, const void* src, std::size_t size) {
+// A number of copy primitives which call the internal required methods.
+// This relies on CUDA UVA
+template < typename T >
+inline void copy(T* dst, const T* src, std::size_t size ) {
+	static_assert(std::is_trivially_copyable<T>::value,
+					  "Must be trivially copyable");
 	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
 }
-template <>
-inline void copy<Device::CPU, Device::CUDA>(void* dst, const void* src, std::size_t size) {
-	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
-}
-template <>
-inline void copy<Device::CUDA, Device::CUDA>(void* dst, const void* src, std::size_t size) {
-	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice));
-}
+// mAssertMsg(dstDev != Device::OPENGL && srcDev != Device::OPENGL, "Unimplemented copy specialization.");
 // TODO: OpenGL (glBufferSubData with offset and object handle as target/src types
 
 } // namespace mufflon

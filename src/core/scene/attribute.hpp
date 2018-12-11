@@ -237,7 +237,7 @@ public:
 						if(m_present && m_size != 0) {
 							mAssert(newBlock != nullptr);
 							mAssert(m_memoryBlock != nullptr);
-							Allocator::copy(&newBlock[currEnd], &m_memoryBlock[iter->offset], iter->length);
+							copy(&newBlock[currEnd], &m_memoryBlock[iter->offset], iter->length);
 						}
 						iter->length = elemSize * length;
 						iter->offset = currEnd;
@@ -666,7 +666,7 @@ void AttributePool<Device::CUDA>::synchronize(OmAttributePool<isFace>& pool) {
 		if(attrib.is_valid()) {
 			// Copy from the contiguous buffer into the attributes
 			auto[propPtr, currLength] = pool.m_accessors[i](attrib, pool.m_mesh);
-			Allocator::copy<char, Device::CPU>(propPtr, &this->get_pool_data()[currOffset], currLength);
+			copy(propPtr, &this->get_pool_data()[currOffset], currLength);
 			currOffset += currLength;
 		}
 	}

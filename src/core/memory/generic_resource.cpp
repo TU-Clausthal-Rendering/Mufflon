@@ -16,7 +16,7 @@ void GenericResource::resize(std::size_t size) {
 template < Device dstDev, Device srcDev >
 void GenericResource::synchronize() {
 	if(dstDev != srcDev && m_size != 0u) {	// Otherwise we would do a useless copy inside the same memory
-		copy<dstDev, srcDev>(
+		copy(
 			this->acquire<dstDev, char>(),
 			this->acquireConst<srcDev, char>(),
 			m_size

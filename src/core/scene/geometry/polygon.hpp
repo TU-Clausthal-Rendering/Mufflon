@@ -548,8 +548,7 @@ private:
 					this->reserve_index_buffer<sync>(m_triangles + m_quads);
 
 				if(changedBuffer.reserved != 0u)
-					Allocator<changed>::copy<u32, sync>(syncBuffer.indices, changedBuffer.indices,
-														m_triangles + m_quads);
+					copy(syncBuffer.indices, changedBuffer.indices, m_triangles + m_quads);
 				m_indexFlags.mark_synced(sync);
 			}
 		}
@@ -575,8 +574,7 @@ private:
 
 		std::vector<void*> cpuFaceAttribs(numFaceAttribs);
 		push_back_attrib<0u, dev, FaceAttributeHandle>(cpuFaceAttribs, faceAttribs);
-		Allocator<Device::CPU>::template copy<void*, dev>(attribBuffer.face, cpuFaceAttribs.data(),
-														  numFaceAttribs);
+		copy<void*>(attribBuffer.face, cpuFaceAttribs.data(), numFaceAttribs);
 		desc.numFaceAttributes = numFaceAttribs;
 		desc.faceAttributes = attribBuffer.face;
 	}
@@ -599,8 +597,7 @@ private:
 
 		std::vector<void*> cpuVertexAttribs(numVertexAttribs);
 		push_back_attrib<0u, dev, FaceAttributeHandle>(cpuVertexAttribs, vertexAttribs);
-		Allocator<Device::CPU>::template copy<void*, dev>(attribBuffer.vertex, cpuVertexAttribs.data(),
-														  numVertexAttribs);
+		copy<void*>(attribBuffer.vertex, cpuVertexAttribs.data(), numVertexAttribs);
 		desc.numVertexAttributes = numVertexAttribs;
 		desc.vertexAttributes = attribBuffer.vertex;
 	}

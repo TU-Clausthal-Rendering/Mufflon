@@ -140,22 +140,6 @@ public:
 		}
 		return nullptr;
 	}
-
-	template < class T, Device dev = Device::CUDA >
-	static void copy(T* dst, const T* src, std::size_t n) {
-		static_assert(std::is_trivially_copyable<T>::value,
-					  "Must be trivially copyable");
-		switch(dev) {
-			case Device::CPU:
-				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDefault));
-				break;
-			case Device::CUDA:
-				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
-				break;
-			default:
-				mAssert(false);
-		}
-	}
 };
 
 // Deleter for the above custom allocated memories.

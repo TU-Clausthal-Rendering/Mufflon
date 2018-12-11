@@ -1,10 +1,11 @@
 #include "pinhole.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
+#include "core/memory/dyntype_memory.hpp"
 
 namespace mufflon::cameras {
 
-	void Pinhole::get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel& resolution) const {
+	void Pinhole::get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const {
 		PinholeParams buffer {
 			CameraModel::PINHOLE,
 			m_position,
@@ -15,11 +16,7 @@ namespace mufflon::cameras {
 			m_far,
 			ei::Vec<u16,2>{resolution}
 		};
-		switch(dev) {
-			case Device::CPU: copy<Device::CPU, Device::CPU>(outBuffer, &buffer, sizeof(PinholeParams)); break;
-			case Device::CUDA: copy<Device::CUDA, Device::CPU>(outBuffer, &buffer, sizeof(PinholeParams)); break;
-			//case Device::OPENGL: copy<, Device::CPU>(outBuffer, &buffer, sizeof(PinholeParams)); break;
-		}
+		copy(as<PinholeParams>(outBuffer), &buffer, sizeof(PinholeParams));
 	}
 
 	std::size_t Pinhole::get_parameter_pack_size() const {

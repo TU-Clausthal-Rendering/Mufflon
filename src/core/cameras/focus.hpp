@@ -42,7 +42,7 @@ public:
 	void set_sensor_height(float height) noexcept { m_sensorHeight = height; }
 
 	// Get the parameter bundle
-	void get_parameter_pack(CameraParams* outBuffer, Device dev, const Pixel& resolution) const final;
+	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const final;
 
 	// Get the required size of a parameter bundle.
 	std::size_t get_parameter_pack_size() const final;
