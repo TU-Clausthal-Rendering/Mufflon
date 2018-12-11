@@ -67,10 +67,11 @@ TextureHdl JsonLoader::load_texture(const char* name) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	// Make the path relative to the file
 	fs::path path(name);
-	if(!path.is_absolute())
-		path = fs::canonical(m_filePath.parent_path() / name);
-	if(!fs::exists(path))
+	if (!path.is_absolute())
+		path = m_filePath.parent_path() / name;
+	if (!fs::exists(path))
 		throw std::runtime_error("Cannot find texture file '" + path.string() + '\'');
+	path = fs::canonical(path);
 	TextureHdl tex = world_add_texture(path.string().c_str(), TextureSampling::SAMPLING_LINEAR);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
@@ -232,6 +233,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		}
 	} catch(const std::exception&) {
 		free_material(mat);
+		throw;
 	}
 
 	m_state.objectNames.pop_back();
@@ -602,6 +604,8 @@ void JsonLoader::load_file() {
 			if(lodIter != object.MemberEnd())
 				defaultLocalLods.insert({ subName, read<u64>(m_state, lodIter) });
 		}
+		m_state.objectNames.pop_back();
+		m_state.objectNames.pop_back();
 	}
 	// Load the binary file before we load the rest of the JSON
 	binLoader.load_file(defaultGlobalLod, defaultLocalLods);

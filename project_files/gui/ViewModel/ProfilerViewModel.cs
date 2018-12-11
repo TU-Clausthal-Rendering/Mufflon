@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -261,22 +262,22 @@ namespace gui.ViewModel
                 return "Invalid data";
 
             ulong totalCycles = UInt64.Parse(data[0u]);
-            ulong totalThreadMilliSecond = UInt64.Parse(data[1u]) / 1000;
-            ulong totalProcessMilliSecond = UInt64.Parse(data[2u]) / 1000;
-            ulong totalWallMilliSecond = UInt64.Parse(data[3u]) / 1000;
+            ulong totalThreadMicroSecond = UInt64.Parse(data[1u]);
+            ulong totalProcessMicroSecond = UInt64.Parse(data[2u]);
+            ulong totalWallMicroSecond = UInt64.Parse(data[3u]);
             ulong samples = UInt64.Parse(data[4u]);
 
             return String.Format("              |         Total  |       Average \n" +
                                  "Samples:      | {0,14} |\n" +
                                  "Cycles:       | {1,14} | {2,14}\n" +
-                                 "Thread time:  | {3,12}ms | {4,12}ms\n" +
-                                 "Process time: | {5,12}ms | {6,12}ms\n" +
-                                 "Wall time:    | {7,12}ms | {8,12}ms\n",
+                                 "Thread time:  | {3,14} | {4,14}\n" +
+                                 "Process time: | {5,14} | {6,14}\n" +
+                                 "Wall time:    | {7,14} | {8,14}\n",
                                  samples,
-                                 totalCycles, (ulong)(totalCycles / (float)samples),
-                                 totalThreadMilliSecond, (ulong)(totalThreadMilliSecond / (float)samples),
-                                 totalProcessMilliSecond, (ulong)(totalProcessMilliSecond / (float)samples),
-                                 totalWallMilliSecond, (ulong)(totalWallMilliSecond / (float)samples));
+                                 formatCount(totalCycles), formatCount((ulong)(totalCycles / (float)samples)),
+                                 formatTimePeriod(totalThreadMicroSecond), formatTimePeriod((ulong)(totalThreadMicroSecond / (float)samples)),
+                                 formatTimePeriod(totalProcessMicroSecond), formatTimePeriod((ulong)(totalProcessMicroSecond / (float)samples)),
+                                 formatTimePeriod(totalWallMicroSecond), formatTimePeriod((ulong)(totalWallMicroSecond / (float)samples)));
         }
 
         private static string formatGpuData(string[] data)
@@ -284,17 +285,56 @@ namespace gui.ViewModel
             if (data.Length != 3u)
                 return "Invalid data";
 
-            ulong totalWallMilliSecond = UInt64.Parse(data[0u]) / 1000;
-            ulong totalGpuMilliSecond = UInt64.Parse(data[1u]) / 1000;
+            ulong totalWallMicroSecond = UInt64.Parse(data[0u]) / 1000;
+            ulong totalGpuMicroSecond = UInt64.Parse(data[1u]) / 1000;
             ulong samples = UInt64.Parse(data[2u]);
 
             return String.Format("              |         Total  |       Average \n" +
                                  "Samples:      | {0,14} |\n" +
-                                 "Wall time:    | {1,12}ms | {2,12}ms\n" +
-                                 "GPU time:     | {3,12}ms | {4,12}ms\n",
+                                 "Wall time:    | {1,14} | {2,14}\n" +
+                                 "GPU time:     | {3,14} | {4,14}\n",
                                  samples,
-                                 totalWallMilliSecond, (ulong)(totalWallMilliSecond / (float)samples),
-                                 totalGpuMilliSecond, (ulong)(totalGpuMilliSecond / (float)samples));
+                                 formatTimePeriod(totalWallMicroSecond), formatTimePeriod((ulong)(totalWallMicroSecond / (float)samples)),
+                                 formatTimePeriod(totalGpuMicroSecond), formatTimePeriod((ulong)(totalGpuMicroSecond / (float)samples)));
+        }
+
+        private static string formatTimePeriod(ulong microseconds)
+        {
+            // Format the time so that it stays human-readable
+            string formatted;
+            if (microseconds < 1e4)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}µs", microseconds);
+            else if (microseconds < 1e7)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}ms", microseconds / 1e3f);
+            else if (microseconds < 6e7)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}s", microseconds / 1e6f);
+            else if (microseconds < 36e8)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:00}m:{1:00.00}s",
+                    microseconds / 6e7f, microseconds / 1e6f);
+            else if (microseconds < 864e8)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:00}h:{1:00}m:{2:00.00}s",
+                    microseconds / 36e8f, microseconds / 6e7f, microseconds / 1e6f);
+            else
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#}d:{1:00}h:{2:00}m:{3:00.00}s",
+                    microseconds / 864e8, microseconds / 36e8f, microseconds / 6e7f, microseconds / 1e6f);
+            return formatted;
+        }
+
+        private static string formatCount(ulong count)
+        {
+            // Format the count so that it stays human-readable
+            string formatted;
+            if (count < 1e4)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}", count);
+            else if (count < 1e7)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}K", count / 1e3f);
+            else if (count < 1e10)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}M", count / 1e6f);
+            else if (count < 1e13)
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}G", count / 1e9f);
+            else
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}T", count / 1e12f);
+            return formatted;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
