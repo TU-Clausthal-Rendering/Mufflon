@@ -3,6 +3,7 @@
 #include "core/cuda/cu_lib_wrapper.h"
 #include "core/math/sfcurves.hpp"
 #include "core/memory/residency.hpp"
+#include "accel_structs_commons.hpp"
 
 #include <cuda_runtime_api.h>
 #include <ei/3dtypes.hpp>
@@ -12,22 +13,6 @@
 
 
 namespace mufflon { namespace {
-
-CUDA_FUNCTION float int_as_float(i32 v) {
-#ifdef __CUDA_ARCH__
-	return __int_as_float(v);
-#else
-	return reinterpret_cast<float&>(v);
-#endif // __CUDA_ARCH__
-}
-
-CUDA_FUNCTION i32 float_as_int(float v) {
-#ifdef __CUDA_ARCH__
-	return __float_as_int(v);
-#else
-	return reinterpret_cast<i32&>(v);
-#endif // __CUDA_ARCH__
-}
 
 CUDA_FUNCTION void syncthreads() {
 #ifdef __CUDA_ARCH__
@@ -39,7 +24,11 @@ CUDA_FUNCTION u64 clzll(u64 v) {
 #ifdef __CUDA_ARCH__
 	return __clzll(v);
 #else
+#ifdef _MSC_VER
 	return __lzcnt64(v);
+#else
+	return (v == 0) ? 64 : 63 - (u64)log2f((float)v);
+#endif // _MSC_VER
 #endif // __CUDA_ARCH__
 }
 
@@ -47,7 +36,11 @@ CUDA_FUNCTION u32 clz(u32 v) {
 #ifdef __CUDA_ARCH__
 	return __clz(v);
 #else
+#ifdef _MSC_VER
 	return __lzcnt(v);
+#else
+	return (v == 0) ? 32 : 31 - (u32)log2f((float)v);
+#endif // _MSC_VER
 #endif // __CUDA_ARCH__
 }
 
@@ -1686,7 +1679,6 @@ void build_lbvh64(ei::Mat3x4* matrixs,
 		collapseOffsets = (i32*)malloc(numInstances * sizeof(i32));
 		memset(collapseOffsets, 0, numInternalNodes * sizeof(i32));
 	}
-	
 	i32* removedMarks = deviceCounters;
 	i32* leafMarks = (i32*)mortonCodes;
 	if (dev == Device::CUDA) {

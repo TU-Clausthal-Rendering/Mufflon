@@ -43,6 +43,22 @@ struct AccelStructInfo {
 	} outputs;
 };
 
+CUDA_FUNCTION float int_as_float(i32 v) {
+#ifdef __CUDA_ARCH__
+	return __int_as_float(v);
+#else
+	return reinterpret_cast<float&>(v);
+#endif // __CUDA_ARCH__
+}
+
+CUDA_FUNCTION i32 float_as_int(float v) {
+#ifdef __CUDA_ARCH__
+	return __float_as_int(v);
+#else
+	return reinterpret_cast<i32&>(v);
+#endif // __CUDA_ARCH__
+}
+
 }
 }
 }

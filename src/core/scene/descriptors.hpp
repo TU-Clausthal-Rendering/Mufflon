@@ -55,7 +55,7 @@ struct ObjectDescriptor {
 	ei::Box aabb;
 	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
-	ArrayDevHandle_t<dev, void> bvhData;
+	ArrayDevHandle_t<dev, void> accelStruct;
 };
 
 template < Device dev >
@@ -95,6 +95,12 @@ struct SceneDescriptor {
 	// The receiver of this struct is responsible for deallocating these two arrays!
 	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> objects;
 	ArrayDevHandle_t<dev, InstanceDescriptor<dev>> instances;
+
+	ArrayDevHandle_t<dev, void> accelStruct;
+	// TODO: use the following three or InstanceDescriptor?
+	ArrayDevHandle_t<dev, ei::Matrix<Real, 3, 4>> transformations;
+	ArrayDevHandle_t<dev, u32> objectIndices;
+	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 
 	// The receiver of this struct is responsible for deallocating this memory!
 	const lights::LightTree<dev> lightTree;
