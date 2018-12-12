@@ -1,7 +1,11 @@
 #pragma once
 
+#include "core/memory/residency.hpp"
+#include <type_traits>
+
 namespace mufflon {
 
+#ifndef __CUDACC__
 /* The manager concept is a host (cpu) class which provides access
  * and synchronization to some resource for rendering.
  * A manager should not implement any functions on the data. Rather,
@@ -18,19 +22,21 @@ namespace mufflon {
  *		template<Device dev> synchronize();
  * Optional, but not enforced:
  *		template<Device dev> acquire();
+ *
+ * Inspired by: https://stackoverflow.com/a/37117023/1913512
  */
 template<class T>
 struct DeviceManagerConcept {
 private:
 //	template<class T, typename S = decltype(&T::acquire_const)> static constexpr bool has_acquire_const() { return true; }
 	//template<class T> static constexpr bool has_acquire_const(...) { return false; }
-	template<class T, typename = decltype(std::declval<T>().acquire_const<mufflon::Device::CPU>())> static constexpr bool has_acquire_const() { return true; }
+	template<class T, typename = decltype(std::declval<T>().acquire_const<Device::CPU>())> static constexpr bool has_acquire_const() { return true; }
 	template<class T> static constexpr bool has_acquire_const(...) { return false; }
-	template<class T, typename = std::enable_if_t<std::is_trivially_copyable<decltype(std::declval<T>().acquire_const())>::value>> static constexpr bool descriptor_is_copyable() { return true; }
+	template<class T, typename = std::enable_if_t<std::is_trivially_copyable<decltype(std::declval<T>().acquire_const<Device::CPU>())>::value>> static constexpr bool descriptor_is_copyable() { return true; }
 	template<class T> static constexpr bool descriptor_is_copyable(...) { return false; }
-	template<class T, typename = decltype(std::declval<T>().unload<mufflon::Device::CPU>())> static constexpr bool has_unload() { return true; }
+	template<class T, typename = decltype(std::declval<T>().unload<Device::CPU>())> static constexpr bool has_unload() { return true; }
 	template<class T> static constexpr bool has_unload(...) { return false; }
-	template<class T, typename = decltype(std::declval<T>().synchronize<mufflon::Device::CPU>())> static constexpr bool has_sync() { return true; }
+	template<class T, typename = decltype(std::declval<T>().synchronize<Device::CPU>())> static constexpr bool has_sync() { return true; }
 	template<class T> static constexpr bool has_sync(...) { return false; }
 
 public:
@@ -42,6 +48,13 @@ public:
 	static_assert(has_unload<T>(), "Must have a member unload<Device>() without any arguments.");
 	static_assert(has_sync<T>(), "Must have a member synchronize<Device>() without any arguments.");
 };
+#else
+// There are compilation issues with the meta-programming above (although they are pure
+// C++14 and should work.
+template<class T>
+struct DeviceManagerConcept {};
+#endif
+
 
 
 /* Examples: 

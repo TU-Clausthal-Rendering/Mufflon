@@ -332,7 +332,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	std::size_t treeMemSize = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightOffsets.mem_size() + posLightOffsets.mem_size();
 	m_treeMemory.resize(treeMemSize);
-	char* memory = m_treeMemory.acquire<Device::CPU, char>();
+	char* memory = m_treeMemory.acquire<Device::CPU>();
 	// Set up the node pointers
 	m_treeCpu->dirLights.memory = memory;
 	m_treeCpu->posLights.memory = memory + dirLightOffsets[0] + dirLightOffsets.mem_size();
@@ -408,7 +408,7 @@ void LightTreeBuilder::synchronize() {
 
 		// Equalize bookkeeping of subtrees
 		m_treeCuda->dirLights = m_treeCpu->dirLights;
-		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA, char>();
+		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA>(); // Automatically sync
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
@@ -419,10 +419,8 @@ void LightTreeBuilder::synchronize() {
 			envMapTex = envMapIter->second;
 		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(envMapTex, m_envmapSum.get());
 
-		// Copy the real data
-		m_treeMemory.synchronize<Device::CUDA, Device::CPU>();
-
 		// Replace all texture handles inside the tree's data
+		// It was synchronized by m_treeMemory.acquire<Device::CUDA>, but contains the wrong pointers.
 		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
 
 		m_dirty.mark_synced(dev);

@@ -215,10 +215,7 @@ public:
 	// Get the functional HashMap
 	template< Device dev >
 	HashMap<dev,K,V> aquire() {
-		// TODO: dirty flags
-		if(dev == Device::CUDA)
-			m_memory.synchronize<dev, Device::CPU>(); // TODO: unify acquire and synchronize of GenericResource
-		char* ptr = m_memory.acquire<dev,char>();
+		char* ptr = m_memory.acquire<dev>();
 		return HashMap<dev,K,V>{
 			m_dataCapacity, m_mapSize,
 			ptr, ptr + m_mapSize * sizeof(u32)
@@ -227,6 +224,10 @@ public:
 	template< Device dev >
 	const HashMap<dev,K,V> aquireConst() {
 		return aquire<dev>();
+	}
+
+	void mark_changed(Device changed) noexcept {
+		m_memory.mark_changed(changed);
 	}
 private:
 	GenericResource m_memory;	// Contains both: hash table and data

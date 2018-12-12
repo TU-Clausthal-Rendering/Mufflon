@@ -53,7 +53,7 @@ public:
 			// TODO
 		}
 		m_lightTree.synchronize<dev>();
-		m_media.synchronize<dev, Device::CPU>();
+		m_media.synchronize<dev>();
 	}
 
 	template < Device dev >
@@ -170,8 +170,8 @@ public:
 				objDevDesc.get(),
 				instDevDesc.get(),
 				m_lightTree.acquireConst<dev>(),
-				m_media.acquireConst<dev,materials::Medium>(),
-				m_materials.acquireConst<dev,int>()
+				as<materials::Medium>(m_media.acquire_const<dev>()),
+				as<int>(m_materials.acquire_const<dev>())
 		};
 	}
 

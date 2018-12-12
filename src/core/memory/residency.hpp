@@ -10,6 +10,8 @@ enum class Device : unsigned char {
 	OPENGL	= 4u
 };
 
+//static constexpr Device DeviceIterator[3] = {Device::CPU, Device::CUDA, Device::OPENGL};
+
 // Inline bits operators for Device.
 inline Device operator&(Device a, Device b) {
 	return Device(static_cast<int>(a) & static_cast<int>(b));

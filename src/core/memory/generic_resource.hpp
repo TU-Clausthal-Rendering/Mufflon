@@ -4,6 +4,8 @@
 #include "dyntype_memory.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/assert.hpp"
+#include "util/flag.hpp"
+#include "core/concepts.hpp"
 
 namespace mufflon {
 
@@ -31,35 +33,44 @@ public:
 	 * exsist it will be created by the call.
 	 * The const version will break instead (assertion).
 	 */
-	template < Device dev, typename T >
-	T* acquire() {
-		if(m_mem.template get<unique_device_ptr<dev, char>>() == nullptr)
-			m_mem.template get<unique_device_ptr<dev, char>>() = make_udevptr_array<dev, char>(m_size);
+	template < Device dev >
+	char* acquire() {
+		synchronize<dev>();
 		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
-		return as<T>(pMem);
+		return pMem;
 	}
-	template < Device dev, typename T >
-	const T* acquireConst() const {
+	template < Device dev >
+	const char* acquire_const() {
+		synchronize<dev>();
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
-		mAssert(pMem != nullptr);
-		return as<T>(pMem);
+		return pMem;
 	}
 
 	// Template variant for the synchronization
-	template < Device dstDev, Device srcDev >
+	template < Device dstDev >
 	void synchronize();
 
 	template < Device dev >
 	void unload() {
 		m_mem.template get<unique_device_ptr<dev, char>>() = nullptr;
 	}
+
+	void mark_changed(Device changed) noexcept {
+		m_dirty.mark_changed(changed);
+	}
+
+	void mark_synced(Device synced) noexcept {
+		m_dirty.mark_synced(synced);
+	}
 private:
 	std::size_t m_size;
+	util::DirtyFlags<Device> m_dirty;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, char>,
 		unique_device_ptr<Device::CUDA, char>> m_mem;
 	//unique_device_ptr<Device::OPENGL, char> m_openglMem;
 };
+template DeviceManagerConcept<GenericResource>;
 
 } // namespace mufflon
