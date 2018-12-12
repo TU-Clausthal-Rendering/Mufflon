@@ -6,15 +6,6 @@
 
 namespace mufflon::renderer {
 
-GpuPathTracer::GpuPathTracer(scene::SceneHandle scene) :
-	m_currentScene(scene) {
-	// Make sure the scene is loaded completely for the use on CPU side
-	scene->synchronize<Device::CUDA>();
-	cuda::check_error(cudaMalloc(&m_scenePtr, sizeof(*m_scenePtr)));
-
-	// The PT does not need additional memory resources like photon maps.
-}
-
 GpuPathTracer::~GpuPathTracer() {
 	if(m_scenePtr != nullptr)
 		cuda::check_error(cudaFree(m_scenePtr));
@@ -26,8 +17,7 @@ void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 
 	if(m_reset) {
-		scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {}, outputBuffer.get_resolution());
-		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
+		// TODO: reset output buffer
 	}
 
 	this->iterate(outputBuffer.get_resolution(),
@@ -39,6 +29,18 @@ void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
 }
 
 void GpuPathTracer::reset() {
+	m_reset = true;
+}
+
+void GpuPathTracer::load_scene(scene::SceneHandle scene) {
+	m_currentScene = scene;
+	// Make sure the scene is loaded completely for the use on CPU side
+	m_currentScene->synchronize<Device::CPU>();
+	scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {});
+	if (m_scenePtr != nullptr)
+		cuda::check_error(cudaFree(m_scenePtr));
+	cuda::check_error(cudaMalloc(&m_scenePtr, sizeof(*m_scenePtr)));
+	cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
 	m_reset = true;
 }
 

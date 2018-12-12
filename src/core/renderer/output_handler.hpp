@@ -117,6 +117,8 @@ public:
 	template < Device dev >
 	void end_iteration();
 
+	void set_targets(OutputValue targets);
+
 	// Get the formated output of one quantity for the purpose of exporting screenshots.
 	// which: The quantity to export. Causes an error if the quantity is not recorded.
 	// exportFormat: The format of the pixels in the vector (includes elementary type and number of channels).

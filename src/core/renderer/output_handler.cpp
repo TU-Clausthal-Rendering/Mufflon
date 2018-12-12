@@ -113,6 +113,23 @@ template void OutputHandler::end_iteration<Device::CPU>();
 template void OutputHandler::end_iteration<Device::CUDA>();
 
 
+void OutputHandler::set_targets(OutputValue targets) {
+	if (targets != m_targets) {
+		int i = 0;
+		for (u32 flag : OutputValue::iterator) {
+			// Is this atttribute recorded at all?
+			if ((!targets.is_set(flag) && m_targets.is_set(flag))
+				|| (!targets.is_set(flag << 8) && m_targets.is_set(flag << 8))) {
+				// Unload (TODO: what if there's more devices?)
+				m_cumulativeTex[i].unload<Device::CPU>();
+				m_cumulativeTex[i].unload<Device::CUDA>();
+				m_cumulativeTex[i].unload<Device::OPENGL>();
+			}
+			++i;
+		}
+		m_targets = targets;
+	}
+}
 
 CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool exportSRgb) {
 	// Is the current flag, and in case of variance its basic value, set?

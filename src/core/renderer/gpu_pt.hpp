@@ -22,13 +22,15 @@ struct RenderBuffer;
 
 class GpuPathTracer : public IRenderer {
 public:
-	GpuPathTracer(scene::SceneHandle scene);
+	GpuPathTracer() = default;
 	~GpuPathTracer();
 
 	// This is just a test method, don't use this as an actual interface
 	virtual void iterate(OutputHandler& handler) override;
 	virtual void reset() override;
-	virtual IParameterHandler& get_parameters() final { return m_params; } 
+	virtual IParameterHandler& get_parameters() final { return m_params; }
+	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
+	virtual void load_scene(scene::SceneHandle scene) override;
 
 private:
 	// Used so that we don't need to include everything in CU files

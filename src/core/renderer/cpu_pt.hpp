@@ -17,11 +17,14 @@ struct RenderBuffer;
 class CpuPathTracer : public IRenderer {
 public:
 	// Initialize all resources required by this renderer.
-	CpuPathTracer(scene::SceneHandle scene);
+	CpuPathTracer();
+	~CpuPathTracer() = default;
 
 	virtual void iterate(OutputHandler& outputBuffer) override;
 	virtual void reset() override;
 	virtual IParameterHandler& get_parameters() final { return m_params; }
+	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
+	virtual void load_scene(scene::SceneHandle scene) override;
 private:
 	// Create one sample path (actual PT algorithm)
 	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
@@ -31,7 +34,7 @@ private:
 
 	bool m_reset = true;
 	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;
-	scene::SceneHandle m_currentScene;
+	scene::SceneHandle m_currentScene = nullptr;
 	std::vector<math::Xoroshiro128> m_rngs;
 	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };

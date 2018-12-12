@@ -12,11 +12,8 @@ namespace mufflon::renderer {
 
 using PtPathVertex = PathVertex<u8, 4>;
 
-CpuPathTracer::CpuPathTracer(scene::SceneHandle scene) :
-	m_currentScene(scene)
+CpuPathTracer::CpuPathTracer()
 {
-	// Make sure the scene is loaded completely for the use on CPU side
-	scene->synchronize<Device::CPU>();
 	// TODO: init one RNG per thread?
 	m_rngs.emplace_back(static_cast<u32>(std::random_device()()));
 
@@ -123,6 +120,13 @@ void CpuPathTracer::init_rngs(int num) {
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i);
+}
+
+void CpuPathTracer::load_scene(scene::SceneHandle scene) {
+	m_currentScene = scene;
+	// Make sure the scene is loaded completely for the use on CPU side
+	m_currentScene->synchronize<Device::CPU>();
+	m_reset = true;
 }
 
 } // namespace mufflon::renderer

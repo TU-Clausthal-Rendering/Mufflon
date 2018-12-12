@@ -83,7 +83,7 @@ namespace {
 // static variables for interacting with the renderer
 std::unique_ptr<renderer::IRenderer> s_currentRenderer;
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
-renderer::OutputValue s_outputTargets;
+renderer::OutputValue s_outputTargets{ 0 };
 WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
 // TODO: remove these (leftover from Felix' prototype)
@@ -1386,6 +1386,9 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
 		return nullptr;
 	}
+	s_currentRenderer->load_scene(hdl);
+	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
+	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);
 }
 
@@ -1806,23 +1809,13 @@ Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
 }
 
 Boolean render_enable_renderer(RendererType type) {
-	SceneHandle scene = WorldContainer::instance().get_current_scene();
-	if(scene == nullptr) {
-		logError("[", FUNCTION_NAME, "] Cannot enable renderer before scene hasn't been set");
-		return false;
-	}
-	ei::IVec2 res = WorldContainer::instance().get_current_scenario()->get_resolution();
-	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y,
-															s_outputTargets);
 	switch(type) {
 		case RendererType::RENDERER_CPU_PT: {
-			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>(
-				WorldContainer::instance().get_current_scene());
+			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>();
 			return true;
 		}
 		case RendererType::RENDERER_GPU_PT: {
-			s_currentRenderer = std::make_unique<renderer::GpuPathTracer>(
-				WorldContainer::instance().get_current_scene());
+			s_currentRenderer = std::make_unique<renderer::GpuPathTracer>();
 			return true;
 		}
 		default: {
@@ -1840,6 +1833,10 @@ Boolean render_iterate() {
 		}
 		if(s_imageOutput == nullptr) {
 			logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
+			return false;
+		}
+		if (!s_currentRenderer->has_scene()) {
+			logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 			return false;
 		}
 		s_currentRenderer->iterate(*s_imageOutput);
@@ -1933,6 +1930,8 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 			logError("[", FUNCTION_NAME, "] Unknown render target");
 			return false;
 	}
+	if (s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
 
@@ -1957,18 +1956,24 @@ Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 			logError("[", FUNCTION_NAME, "] Unknown render target");
 			return false;
 	}
+	if (s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
 
 Boolean render_enable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target << 8u);
+	if (s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
 
 Boolean render_enable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target);
+	if (s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
 
@@ -1980,12 +1985,16 @@ Boolean render_enable_all_render_targets() {
 Boolean render_disable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target << 8u);
+	if (s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
 
 Boolean render_disable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target);
+	if(s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
 
@@ -2002,12 +2011,29 @@ uint32_t renderer_get_num_parameters() {
 	return s_currentRenderer->get_parameters().get_num_parameters();
 }
 
-ParamDesc renderer_get_parameter_desc(uint32_t idx) {
+const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
-		return ParamDesc{nullptr, ParameterType(-1)};
+		return nullptr;
 	}
-	return util::pun<ParamDesc>( s_currentRenderer->get_parameters().get_param_desc(idx) );
+	renderer::ParamDesc rendererDesc = s_currentRenderer->get_parameters().get_param_desc(idx);
+
+	if (type != nullptr)
+		*type = static_cast<ParameterType>(rendererDesc.type);
+	std::size_t nameLength = std::strlen(rendererDesc.name) + 1u;
+#ifdef _WIN32
+	// For C# interop
+	char* name = reinterpret_cast<char*>(::CoTaskMemAlloc(nameLength));
+#else // _WIN32
+	char* name = new char[str.size() + 1u];
+#endif // _WIN32
+	if (name == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(name, rendererDesc.name, nameLength);
+
+	return name;
 }
 
 Boolean renderer_set_parameter_int(const char* name, int32_t value) {
