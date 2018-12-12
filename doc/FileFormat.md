@@ -11,16 +11,15 @@ The JSON properties file
 The order of the blocks in the following template can be freely changed.
 However, all information are mandatory if not flagged as optional.
 For optional attributes, the default value is given next to the flag.
-Text which is set like `"<stuff>"` can be chosen by the user (i.e. suff can be any name of the user choice).
+Text which is set like `"<stuff>"` is a meta-description of the contained string.
+It is not the string itself. The string can be user defined (eg. camera or light names), or depends on the content of a different section from this file format description.
 Curly brackets are used to declare a choice of different possible strings (e.g. `"{pinhole, focus}"` must be either "pinhole" or "focus").
 In the case of multiple type choices, details on further mandatory properties will be given below.
-The syntax `"[stuff:name]"` is used to make a link to the binary file information.
-The names must match the names stored in the binary itself.
 
     {
         "version": "1.0",
         "binary": "<file name relative to this json>",
-        "defaultScenario": "<name of a scenario>"  // OPTIONAL the scenario to load on startup.
+        "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
         "cameras": {
             "<name1>": {
@@ -56,20 +55,20 @@ The names must match the names stored in the binary itself.
         },
         "scenarios": {
             "<name1>: {
-                "camera": "<name of a camera>",
+                "camera": "<camera name (from json.cameras)>",
                 "resolution": [int,int],        // Target image resolution
-                "lights": ["<name of a light>", ...]  // List of light sources
+                "lights": ["<light name (from json.lights)>", ...]  // List of light sources
                 "lod": int,             // Global level of detail number [0,...] where 0 has the highest resolution, OPTIONAL 0
                 "materialAssignments": {
-                    "[mat:name1]": "<name of a material>",
-                    "[mat:name2]": "<name of a material>",
+                    "<material name (from binary)>": "<material name (from json.materials)>",
+                    "<material name (from binary)>": "<material name (from json.materials)>",
                     ....                    // Each material in the binary must be mapped to one of the above materials.
-                                            // A material can be used by multiple binray-materials.
+                                            // A material can be used by multiple binary-materials.
                 },
                 "objectProperties": {
-                    "[obj:name]": {         // OPTIONAL per object properties
-                        "mask",             // Do not render this object (blacklisted)
-                        "lod": int,         // Use a specific LOD different/independent from global LOD
+                    "<object name (from binary)>": {    // OPTIONAL per object properties
+                        "mask",                         // Do not render this object (blacklisted)
+                        "lod": int,                     // Use a specific LOD different/independent from global LOD
                         // More meta information
                     }
                 }

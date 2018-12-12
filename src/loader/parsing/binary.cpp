@@ -139,7 +139,6 @@ void BinaryLoader::clear_state() {
 	if(m_fileStream.is_open())
 		m_fileStream.close();
 	m_currObjState = ObjectState{};
-	m_materialNames.clear();
 }
 
 AttribDesc BinaryLoader::map_bin_attrib_type(AttribType type) {
@@ -778,11 +777,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 		// Read the material names (and implicitly their indices)
 		m_materialNames.reserve(numMaterials);
 		for(u32 i = 0u; i < numMaterials; ++i) {
-			std::string& name = m_materialNames.emplace_back();
-			u32 nameLength = read<u32>();
-			name.resize(nameLength + 6u); // Extra 6 chars for [mat:...] wrapping
-			for(u32 i = 0u; i < nameLength; ++i)
-				name[i + 5u] = read<char>();
+			m_materialNames.push_back(move(read<std::string>()));
 		}
 
 		// Jump to the location of objects

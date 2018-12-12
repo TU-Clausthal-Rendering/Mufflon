@@ -1183,11 +1183,13 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
 			auto tex = mat->inner.lambert.albedo;
-			hdl = s_world.add_material(std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex)));
-			hdl->set_outer_medium( s_world.add_medium(
+			auto newMaterial = std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex));
+			newMaterial->set_name(name);
+			newMaterial->set_outer_medium( s_world.add_medium(
 				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-			hdl->set_inner_medium( s_world.add_medium(hdl->compute_medium()) );
+			newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
+			hdl = s_world.add_material(move(newMaterial));
 		}	break;
 		case MATERIAL_TORRANCE:
 			// TODO
@@ -1831,15 +1833,20 @@ Boolean render_enable_renderer(RendererType type) {
 }
 
 Boolean render_iterate() {
-	if(s_currentRenderer == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is currently set");
+	try {
+		if(s_currentRenderer == nullptr) {
+			logError("[", FUNCTION_NAME, "] No renderer is currently set");
+			return false;
+		}
+		if(s_imageOutput == nullptr) {
+			logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
+			return false;
+		}
+		s_currentRenderer->iterate(*s_imageOutput);
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Exception occured:\n", e.what());
 		return false;
 	}
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
-		return false;
-	}
-	s_currentRenderer->iterate(*s_imageOutput);
 	return true;
 }
 

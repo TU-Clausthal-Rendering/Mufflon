@@ -486,20 +486,16 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				m_state.objectNames.push_back(&objectName[0u]);
 				const Value& object = objIter->value;
 				assertObject(m_state, object);
-				// Check for object name meta-tag
-				if(std::strncmp(&objectName[0u], "[obj:", 5u) != 0)
-					continue;
-				std::string subName{ objectName.substr(5u, objectName.length() - 6u) };
 				ObjectHdl objHdl = world_get_object(&objectName[0u]);
 				if(objHdl == nullptr)
-					throw std::runtime_error("Failed to find object '" + subName + "'");
+					throw std::runtime_error("Failed to find object '" + std::string(objectName) + "'");
 				// Check for LoD and masked
 				if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd())
 					if(!scenario_set_object_lod(scenarioHdl, objHdl, read<std::size_t>(m_state, lodIter)))
-						throw std::runtime_error("Failed to set LoD level of object '" + subName + "'");
+						throw std::runtime_error("Failed to set LoD level of object '" + std::string(objectName) + "'");
 				if(object.HasMember("masked"))
 					if(!scenario_mask_object(scenarioHdl, objHdl))
-						throw std::runtime_error("Failed to set mask for object '" + subName + "'");
+						throw std::runtime_error("Failed to set mask for object '" + std::string(objectName) + "'");
 
 				m_state.objectNames.pop_back();
 			}
@@ -514,8 +510,7 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			// The binary names from the loader already wrap the name in the desired format
 			std::string_view matName = read<const char*>(m_state, get(m_state, materialsIter->value,
 																 binName.c_str()));
-			// Offset to remove the [mat:...] wrapping
-			MatIdx slot = scenario_declare_material_slot(scenarioHdl, &binName.c_str()[5u], binName.length() - 6u);
+			MatIdx slot = scenario_declare_material_slot(scenarioHdl, binName.c_str(), binName.length());
 			if(slot == INVALID_MATERIAL)
 				throw std::runtime_error("Failed to declare material slot");
 			auto matHdl = m_materialMap.find(matName);
