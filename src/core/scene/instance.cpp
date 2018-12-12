@@ -8,9 +8,8 @@ Instance::Instance(Object& obj, TransMatrixType trans) :
 	m_transMat(std::move(trans)) {
 }
 
-const ei::Box& Instance::get_bounding_box() const noexcept {
-	// TODO: transform the bounding box into oriented box
-	return m_objRef.get_bounding_box();
+ei::Box Instance::get_bounding_box() const noexcept {
+	return transform(m_objRef.get_bounding_box(), m_transMat);
 }
 
 } // namespace mufflon::scene

@@ -29,7 +29,7 @@ public:
 		return m_transMat;
 	}
 
-	const ei::Box& get_bounding_box() const noexcept;
+	ei::Box get_bounding_box() const noexcept;
 
 	Object& get_object() noexcept {
 		return m_objRef;

@@ -55,7 +55,7 @@ typedef struct {
 
 typedef struct {
 	float v[12u];
-} Mat4x3;
+} Mat3x4;
 
 typedef enum {
 	ATTR_CHAR,
@@ -346,8 +346,8 @@ CORE_API size_t CDECL spheres_get_sphere_count(ObjectHdl obj);
 CORE_API Boolean CDECL spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
 
 // Instance interface
-CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat4x3* mat);
-CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat4x3* mat);
+CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat);
+CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max);
 
 // World container interface

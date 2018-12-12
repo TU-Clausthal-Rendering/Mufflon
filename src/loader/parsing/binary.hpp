@@ -20,6 +20,8 @@ public:
 	{
 		if(!fs::exists(m_filePath))
 			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
+		m_aabb.min = ei::Vec3{ 1e30f};
+		m_aabb.max = ei::Vec3{-1e30f};
 	}
 
 	void load_file(const mufflon::u64 globalLod,

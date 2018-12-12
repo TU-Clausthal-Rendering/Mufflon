@@ -1109,19 +1109,19 @@ Boolean spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	return true;
 }
 
-Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat4x3* mat) {
+Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat) {
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
 	Instance& instance = *static_cast<InstanceHandle>(inst);
-	instance.set_transformation_matrix(util::pun<ei::Matrix<float, 3u, 4u>>(*mat));
+	instance.set_transformation_matrix(util::pun<ei::Mat3x4>(*mat));
 	return true;
 }
 
-Boolean instance_get_transformation_matrix(InstanceHdl inst, Mat4x3* mat) {
+Boolean instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat) {
 	CHECK_NULLPTR(inst, "instance handle", false);
 	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
 	if(mat != nullptr)
-		*mat = util::pun<Mat4x3>(instance.get_transformation_matrix());
+		*mat = util::pun<Mat3x4>(instance.get_transformation_matrix());
 	return true;
 }
 

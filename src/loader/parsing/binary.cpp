@@ -111,8 +111,8 @@ ei::UVec4 BinaryLoader::read<ei::UVec4>() {
 }
 // Read a 3x4 matrix as specified by the file format
 template <>
-Mat4x3 BinaryLoader::read<Mat4x3>() {
-	return Mat4x3{ {
+Mat3x4 BinaryLoader::read<Mat3x4>() {
+	return Mat3x4{ {
 		read<float>(), read<float>(), read<float>(), read<float>(),
 		read<float>(), read<float>(), read<float>(), read<float>(),
 		read<float>(), read<float>(), read<float>(), read<float>()
@@ -140,7 +140,6 @@ void BinaryLoader::clear_state() {
 		m_fileStream.close();
 	m_currObjState = ObjectState{};
 	m_materialNames.clear();
-	m_aabb = ei::Box{};
 }
 
 AttribDesc BinaryLoader::map_bin_attrib_type(AttribType type) {
@@ -710,7 +709,7 @@ void BinaryLoader::read_instances() {
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
 		const u32 animInstId = read<u32>();
-		const Mat4x3 transMat = read<Mat4x3>();
+		const Mat3x4 transMat = read<Mat3x4>();
 		InstanceHdl instHdl = world_create_instance(m_objectHandles[objId]);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
@@ -719,24 +718,23 @@ void BinaryLoader::read_instances() {
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
 
-		Vec3 min;
-		Vec3 max;
-		if(!instance_get_bounding_box(instHdl, &min, &max))
+		ei::Box instanceAabb;
+		if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max)))
 			throw std::runtime_error("Failed to get bounding box for instance of object ID "
 									 + std::to_string(objId));
+		m_aabb = ei::Box(m_aabb, instanceAabb);
 
-		m_aabb = ei::Box(m_aabb, ei::Box(util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max)));
+		hasInstance[objId] = true;
 	}
 
 	for(std::size_t i = 0u; i < hasInstance.size(); ++i) {
 		if(!hasInstance[i]) {
 			// Add default instance
-			const Mat4x3 transMat = util::pun<Mat4x3>(ei::Matrix<float, 4, 3>{
-				1.f, 0.f, 0.f,
-				0.f, 1.f, 0.f,
-				0.f, 0.f, 1.f,
-				0.f, 0.f, 0.f
-			});
+			const Mat3x4 transMat = Mat3x4{
+				1.f, 0.f, 0.f, 0.f,
+				0.f, 1.f, 0.f, 0.f,
+				0.f, 0.f, 1.f, 0.f
+			};
 			InstanceHdl instHdl = world_create_instance(m_objectHandles[i]);
 			if(instHdl == nullptr)
 				throw std::runtime_error("Failed to create instance for object ID "
@@ -744,6 +742,12 @@ void BinaryLoader::read_instances() {
 			if(!instance_set_transformation_matrix(instHdl, &transMat))
 				throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 										 + std::to_string(i));
+
+			ei::Box instanceAabb;
+			if(!instance_get_bounding_box(instHdl,  reinterpret_cast<Vec3*>(&instanceAabb.min),  reinterpret_cast<Vec3*>(&instanceAabb.max)))
+				throw std::runtime_error("Failed to get bounding box for instance of object ID "
+										 + std::to_string(i));
+			m_aabb = ei::Box(m_aabb, instanceAabb);
 		}
 	}
 
