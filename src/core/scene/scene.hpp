@@ -132,7 +132,8 @@ public:
 	template < Device dev, class... VAttrs, class... FAttrs, class... Attrs >
 	SceneDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
 										const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
-										const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
+										const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs,
+										const ei::IVec2& resolution) {
 		synchronize<dev>();
 		std::vector<ObjectDescriptor<dev>> objectDescs;
 		std::vector<InstanceDescriptor<dev>> instanceDescs;
@@ -163,15 +164,20 @@ public:
 
 		load_materials<dev>();
 
+		// Camera
+		CameraDescriptor camera;
+		m_camera->get_parameter_pack(&camera.get(), resolution);
+
 		return SceneDescriptor<dev>{
+			camera,
 			static_cast<u32>(objectDescs.size()),
-				static_cast<u32>(instanceDescs.size()),
-				m_boundingBox,
-				objDevDesc.get(),
-				instDevDesc.get(),
-				m_lightTree.acquireConst<dev>(),
-				as<materials::Medium>(m_media.acquire_const<dev>()),
-				as<int>(m_materials.acquire_const<dev>())
+			static_cast<u32>(instanceDescs.size()),
+			m_boundingBox,
+			objDevDesc.get(),
+			instDevDesc.get(),
+			m_lightTree.acquireConst<dev>(),
+			as<materials::Medium>(m_media.acquire_const<dev>()),
+			as<int>(m_materials.acquire_const<dev>())
 		};
 	}
 

@@ -4,6 +4,7 @@
 
 namespace mufflon { namespace cameras {
 class Camera;
+struct CameraParams;
 }}// namespace mufflon::cameras
 
 namespace mufflon { namespace scene {

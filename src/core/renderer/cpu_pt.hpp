@@ -3,7 +3,6 @@
 #include "renderer.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
-#include "core/cameras/camera_sampling.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -29,15 +28,11 @@ private:
 				const scene::SceneDescriptor<Device::CPU>& scene);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
-	const cameras::CameraParams& get_cam() const {
-		return *as<cameras::CameraParams>(m_camParams);
-	}
 
 	bool m_reset = true;
 	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;
 	scene::SceneHandle m_currentScene;
 	std::vector<math::Xoroshiro128> m_rngs;
-	u8 m_camParams[cameras::MAX_CAMERA_PARAM_SIZE];
 	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };
 

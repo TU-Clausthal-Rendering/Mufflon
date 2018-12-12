@@ -151,7 +151,6 @@
     <ClInclude Include="..\..\src\core\cameras\camera.hpp" />
     <ClInclude Include="..\..\src\core\cameras\focus.hpp" />
     <ClInclude Include="..\..\src\core\cameras\pinhole.hpp" />
-    <ClInclude Include="..\..\src\core\cameras\camera_sampling.hpp" />
     <ClInclude Include="..\..\src\core\concepts.hpp" />
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />

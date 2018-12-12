@@ -4,7 +4,6 @@
 #include "output_handler.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "core/cameras/camera.hpp"
-#include "core/cameras/camera_sampling.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/math/rng.hpp"
 #include <random>
@@ -32,10 +31,8 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 		init_rngs(outputBuffer.get_num_pixels());
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
-	m_currentScene->get_camera()->get_parameter_pack(as<cameras::CameraParams>(m_camParams),
-													 buffer.get_resolution());
 	m_reset = false;
-	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {});
+	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, buffer.get_resolution());
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
@@ -62,9 +59,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
-	math::PositionSample camPos = camera_sample_position(get_cam(), coord,
-														 m_rngs[pixel].next());
-	int s = PtPathVertex::create_camera(&vertex, &vertex, get_cam(), camPos, coord);
+	int s = PtPathVertex::create_camera(&vertex, &vertex, scene.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 	int pathLen = 0;

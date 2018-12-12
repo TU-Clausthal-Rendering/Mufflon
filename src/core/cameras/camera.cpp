@@ -1,4 +1,7 @@
 #include "core/cameras/camera.hpp"
+#include "core/cameras/pinhole.hpp"
+#include "core/cameras/focus.hpp"
+#include "core/scene/descriptors.hpp"
 #include <array>
 #include <string>
 
@@ -13,5 +16,8 @@ const std::string& to_string(CameraModel type) {
 
 	return enumNames[int(type)];
 }
+
+static_assert(ei::max(sizeof(PinholeParams), sizeof(FocusParams)) == MAX_CAMERA_PARAM_SIZE,
+	"MAX_CAMERA_PARAM_SIZE outdated please change the number in the header file.");
 
 } // namespace mufflon::cameras

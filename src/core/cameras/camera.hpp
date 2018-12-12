@@ -135,11 +135,4 @@ struct ProjectionResult {
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 
-} // namespace cameras
-
-//template<> inline std::size_t predict_size<cameras::CameraParams>() {
-//	mAssertMsg(false, "An instance of an unspecific camera should never be created!");
-//	return 0;
-//}
-
-} // namespace mufflon
+}} // namespace mufflon::cameras

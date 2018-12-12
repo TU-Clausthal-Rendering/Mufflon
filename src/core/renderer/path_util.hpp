@@ -7,7 +7,8 @@
 #include "core/scene/types.hpp"
 #include "core/scene/materials/material_sampling.hpp"
 #include "core/scene/lights/light_sampling.hpp"
-#include "core/cameras/camera_sampling.hpp"
+#include "core/cameras/pinhole.hpp"
+#include "core/cameras/focus.hpp"
 #include <ei/conversions.hpp>
 
 namespace mufflon { namespace renderer {
@@ -16,7 +17,7 @@ enum class Interaction : u16 {
 	VOID,				// The ray missed the scene (no intersection)
 	SURFACE,			// A standard material interaction
 	CAMERA_PINHOLE,		// A perspective camera start vertex
-	CAMERA_FOCUS,
+	CAMERA_FOCUS,		// A perspective camera with DoF blur effect
 	CAMERA_ORTHO,		// An orthographic camera start vertex
 	LIGHT_POINT,		// A point-light vertex
 	LIGHT_DIRECTIONAL,	// A directional-light vertex
@@ -66,7 +67,9 @@ public:
 			|| m_type == Interaction::CAMERA_ORTHO;
 	}
 	bool is_camera() const {
-		return m_type == Interaction::CAMERA_PINHOLE || m_type == Interaction::CAMERA_ORTHO;
+		return m_type == Interaction::CAMERA_PINHOLE
+			|| m_type == Interaction::CAMERA_FOCUS
+			|| m_type == Interaction::CAMERA_ORTHO;
 	}
 
 	// Get the position of the vertex. For orthographic vertices this
@@ -105,6 +108,7 @@ public:
 			// Non-hitable vertices
 			case Interaction::VOID:
 			case Interaction::CAMERA_PINHOLE:
+			case Interaction::CAMERA_FOCUS:
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_SPOT:
 			case Interaction::LIGHT_DIRECTIONAL:
@@ -247,8 +251,8 @@ public:
 			case Interaction::CAMERA_FOCUS: {
 				const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
 				cameras::Importon importon = focuscam_sample_ray(*desc, m_position, Pixel{ m_incident }, math::RndSet2{ rndSet.i0 });
-				return VertexSample{ {Spectrum{1.f}, math::PathEventType::REFLECTED,
-									  importon.dir.direction, importon.dir.pdf, AngularPdf{0.f} },
+				return VertexSample{ { Spectrum{1.0f}, math::PathEventType::REFLECTED,
+									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.f} },
 									 m_position };
 			}
 			case Interaction::SURFACE: {
@@ -316,6 +320,7 @@ public:
 			case Interaction::LIGHT_ENVMAP:
 			case Interaction::LIGHT_SPOT:
 			case Interaction::CAMERA_PINHOLE:
+			case Interaction::CAMERA_FOCUS:
 				return Spectrum{0.0f};
 			case Interaction::LIGHT_AREA: {
 				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
@@ -364,26 +369,33 @@ public:
 
 	static int create_camera(void* mem, const void* previous,
 		const cameras::CameraParams& camera,
-		const math::PositionSample& position, const Pixel& pixel
+		const Pixel& pixel,
+		const math::RndSet2& rndSet
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		vert->m_position = position.position;
 		vert->init_prev_offset(mem, previous);
 		vert->m_incident = ei::Vec3{
 			static_cast<float>(pixel.x),
 			static_cast<float>(pixel.y),
 			0.f}; // will be (ab)used as pixel position storage
-		vert->m_incidentPdf = position.pdf;
 		vert->m_extension = ExtensionT{};
 		if(camera.type == cameras::CameraModel::PINHOLE) {
 			vert->m_type = Interaction::CAMERA_PINHOLE;
 			cameras::PinholeParams* desc = as<cameras::PinholeParams>(vert->desc());
 			*desc = static_cast<const cameras::PinholeParams&>(camera);
+			auto position = pinholecam_sample_position(*desc, pixel, rndSet);
+			vert->m_position = position.position;
+			vert->m_incidentPdf = position.pdf;
 			return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
 		}
 		else if (camera.type == cameras::CameraModel::FOCUS) {
 			vert->m_type = Interaction::CAMERA_FOCUS;
 			cameras::FocusParams* desc = as<cameras::FocusParams>(vert->desc());
+			*desc = static_cast<const cameras::FocusParams&>(camera);
+			auto position = focuscam_sample_position(*desc, rndSet);
+			vert->m_position = position.position;
+			vert->m_incidentPdf = position.pdf;
+			return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(cameras::FocusParams));
 		}
 		mAssertMsg(false, "Not implemented yet.");
 		return 0;

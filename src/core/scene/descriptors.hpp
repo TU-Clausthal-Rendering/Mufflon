@@ -66,9 +66,29 @@ struct InstanceDescriptor {
 	u32 objectIndex;
 };
 
+
+} namespace cameras {
+	// ei::max(sizeof(PinholeParams), sizeof(FocusParams));
+	// There is a static assert in camera.cpp checking if this number is correct.
+	// The max is not taken here to avoid the unessary include of the camera implementations.
+	constexpr std::size_t MAX_CAMERA_PARAM_SIZE = 68;
+} namespace scene {
+
+struct CameraDescriptor {
+	u8 cameraParameters[cameras::MAX_CAMERA_PARAM_SIZE];
+
+	CUDA_FUNCTION const cameras::CameraParams& get() const {
+		return *as<cameras::CameraParams>(cameraParameters);
+	}
+	CUDA_FUNCTION cameras::CameraParams& get() {
+		return *as<cameras::CameraParams>(cameraParameters);
+	}
+};
+
 // Light, camera etc.
 template < Device dev >
 struct SceneDescriptor {
+	CameraDescriptor camera;
 	u32 numObjects;
 	u32 numInstances;
 	ei::Box aabb;	// Scene-wide bounding box
