@@ -39,11 +39,14 @@ class Camera {
 public:
 	Camera() = default;
 	Camera(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
-		   float near = 1e-10f, float far = 1e10f) :
+		   float near = 1e-4f, float far = 1e10f) :
 		m_position(std::move(position)),
 		m_near(near),
 		m_far(far)
 	{
+		mAssert(near > 0.0f);
+		mAssert(far > near);
+
 		dir = ei::normalize(dir);
 		up = ei::normalize(up);
 		if(ei::dot(dir, up) > 0.999f)

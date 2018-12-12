@@ -19,7 +19,7 @@ public:
 	Focus() = default;
 	Focus(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
 			float focalLength, float focusDist, float lensRad,
-			float sensorHeight, float near = 1e-10f,
+			float sensorHeight, float near = 1e-4f,
 			float far = 1e10f) :
 		Camera(std::move(position), std::move(dir),
 			   std::move(up), near, far),

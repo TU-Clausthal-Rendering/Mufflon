@@ -22,9 +22,10 @@ namespace mufflon { namespace scene { namespace materials {
  */
 CUDA_FUNCTION void fetch(const HandlePack& handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
 	switch(handles.type) {
-		case Materials::LAMBERT: as<LambertHandlePack<CURRENT_DEV>>(handles).fetch(uvCoordinate, outBuffer);
+		case Materials::LAMBERT: as<LambertHandlePack<CURRENT_DEV>>(handles).fetch(uvCoordinate, outBuffer); break;
+		default:
+			mAssertMsg(false, "Material not (fully) implemented!");
 	}
-	mAssertMsg(false, "Material not (fully) implemented!");
 }
 
 

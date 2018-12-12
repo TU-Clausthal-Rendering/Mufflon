@@ -250,7 +250,7 @@ public:
 			}
 			case Interaction::CAMERA_FOCUS: {
 				const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
-				cameras::Importon importon = focuscam_sample_ray(*desc, m_position, Pixel{ m_incident }, math::RndSet2{ rndSet.i0 });
+				cameras::Importon importon = focuscam_sample_ray(*desc, m_position, Pixel{ m_incident }, rndSet);
 				return VertexSample{ { Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.f} },
 									 m_position };
