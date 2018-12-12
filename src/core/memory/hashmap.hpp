@@ -42,19 +42,6 @@ u32 generic_hash(K key) {
 	return x;
 }
 
-// A copyable counter
-struct atomic_u32 : public std::atomic_uint32_t
-{
-//	using std::atomic_uint32_t::load;
-//	using std::atomic_uint32_t::store;
-	atomic_u32() = default;
-	atomic_u32(u32 value) { store(value); }
-	atomic_u32(const atomic_u32& other) { store(other.load()); }
-	atomic_u32(atomic_u32&& other) { store(other.load()); }
-	atomic_u32& operator = (const atomic_u32& other) { store(other.load()); return *this; };
-	atomic_u32& operator = (atomic_u32&& other) { store(other.load()); return *this; };
-};
-
 /*
  * Parallel hash map, which can be used on CPU and CUDA.
  * This hash map does not implement a resizing mechanism. Be sure to create
@@ -70,15 +57,15 @@ class HashMap;
 
 template < typename K, typename V >
 class HashMap<Device::CPU, K, V> {
-	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map) :
+	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map, std::atomic_uint32_t* counter) :
 		m_data(as<std::pair<K,V>>(data)),
 		m_map(as<std::atomic_uint32_t>(map)),
+		m_dataCount(counter),
 		m_mapSize(mapSize),
-		m_dataCapacity(dataCapacity),
-		m_dataCount(0)
+		m_dataCapacity(dataCapacity)
 	{}
 public:
-	HashMap() : m_data(nullptr), m_map(nullptr), m_mapSize(0), m_dataCount(0) {}
+	HashMap() : m_data(nullptr), m_map(nullptr), m_dataCount(nullptr), m_mapSize(0) {}
 	HashMap(const HashMap&) = default;
 	HashMap(HashMap&&) = default;
 	HashMap& operator = (const HashMap&) = default;
@@ -88,7 +75,7 @@ public:
 	void insert(K key, V value) {
 		u32 hash = generic_hash(key);
 		// Insert the datum
-		u32 dataIdx = m_dataCount.fetch_add(1);
+		u32 dataIdx = m_dataCount->fetch_add(1);
 		mAssert(dataIdx < m_dataCapacity);
 		m_data[dataIdx].first = key;
 		m_data[dataIdx].second = value;
@@ -120,13 +107,13 @@ public:
 	const V* find(K key) const { return const_cast<HashMap*>(this)->find(key); }
 
 	// Get the number of elements in the hash map
-	u32 size() const { return m_dataCount; }
+	u32 size() const { return m_dataCount->load(); }
 private:
 	std::pair<K,V>* m_data;
 	std::atomic_uint32_t* m_map;
+	std::atomic_uint32_t* m_dataCount;
 	u32 m_mapSize;
 	u32 m_dataCapacity;
-	atomic_u32 m_dataCount;
 
 	template < typename K1, typename V1 >
 	friend class HashMapManager;
@@ -134,7 +121,7 @@ private:
 
 template < typename K, typename V >
 class HashMap<Device::CUDA, K, V> {
-	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map) :
+	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map, std::atomic_uint32_t*) :
 		m_data(as<std::pair<K,V>>(data)),
 		m_map(as<u32>(map)),
 		m_mapSize(mapSize),
@@ -194,7 +181,9 @@ private:
 template < typename K, typename V >
 class HashMapManager {
 public:
-	HashMapManager(int numExpectedEntries = 0) {
+	HashMapManager(int numExpectedEntries = 0) :
+		m_cpuHMCounter{0}
+	{
 		m_dataCapacity = numExpectedEntries;
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
 		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
@@ -207,6 +196,11 @@ public:
 		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
 	}
 
+	template < Device dstDev >
+	void synchronize() {
+		m_memory.synchronize<dstDev>();
+	}
+
 	template< Device dev >
 	void unload() {
 		m_memory.unload<dev>();
@@ -214,16 +208,17 @@ public:
 
 	// Get the functional HashMap
 	template< Device dev >
-	HashMap<dev,K,V> aquire() {
+	HashMap<dev,K,V> acquire() {
 		char* ptr = m_memory.acquire<dev>();
 		return HashMap<dev,K,V>{
 			m_dataCapacity, m_mapSize,
-			ptr, ptr + m_mapSize * sizeof(u32)
+			ptr, ptr + m_mapSize * sizeof(u32),
+			&m_cpuHMCounter
 		};
 	}
 	template< Device dev >
-	const HashMap<dev,K,V> aquireConst() {
-		return aquire<dev>();
+	const HashMap<dev,K,V> acquire_const() {
+		return acquire<dev>();
 	}
 
 	void mark_changed(Device changed) noexcept {
@@ -233,6 +228,8 @@ private:
 	GenericResource m_memory;	// Contains both: hash table and data
 	u32 m_mapSize;				// Size of the hash table
 	u32 m_dataCapacity;			// Maximum number of data elements
+	std::atomic_uint32_t m_cpuHMCounter;		// Store the atomic counter here, because the returned HashMap<CPU> is not trivially copyable otherwise
 };
+template DeviceManagerConcept<HashMapManager<int,int>>;
 
 } // namespace mufflon

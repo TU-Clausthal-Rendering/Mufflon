@@ -15,9 +15,9 @@ void GenericResource::resize(std::size_t size) {
 
 template < Device dstDev >
 void GenericResource::synchronize() {
+	if(m_mem.template get<unique_device_ptr<dstDev, char>>() == nullptr)
+		m_mem.template get<unique_device_ptr<dstDev, char>>() = make_udevptr_array<dstDev, char>(m_size);
 	if(m_dirty.needs_sync(dstDev) && m_size != 0u) {	// Otherwise we would do a useless copy inside the same memory
-		if(m_mem.template get<unique_device_ptr<dstDev, char>>() == nullptr)
-			m_mem.template get<unique_device_ptr<dstDev, char>>() = make_udevptr_array<dstDev, char>(m_size);
 		const char* srcDev = nullptr;
 		if(m_dirty.has_changes(Device::CPU))
 			srcDev = m_mem.template get<unique_device_ptr<Device::CPU, char>>().get();

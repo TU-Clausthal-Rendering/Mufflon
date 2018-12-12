@@ -269,7 +269,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	unload<Device::CPU>();
 	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
-	m_treeCpu->primToNodePath = m_primToNodePath.aquire<Device::CPU>();
+	m_treeCpu->primToNodePath = m_primToNodePath.acquire<Device::CPU>();
 
 	// Construct the environment light
 	if(envLight) {
@@ -404,7 +404,7 @@ void LightTreeBuilder::synchronize() {
 		// Easiest way to synchronize this complicated type (espacially, if the size changed)
 		// is simply to start over.
 		m_treeCuda = std::make_unique<LightTree<Device::CUDA>>();
-		m_treeCuda->primToNodePath = m_primToNodePath.aquire<Device::CUDA>(); // Includes synchronization
+		m_treeCuda->primToNodePath = m_primToNodePath.acquire<Device::CUDA>(); // Includes synchronization
 
 		// Equalize bookkeeping of subtrees
 		m_treeCuda->dirLights = m_treeCpu->dirLights;
