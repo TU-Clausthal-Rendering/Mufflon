@@ -57,12 +57,19 @@ namespace gui.Dll
             ENVMAP
         };
 
-        internal enum ProfilingLevel
+        public enum ProfilingLevel
         {
             OFF,
             LOW,
             HIGH,
             ALL
+        };
+
+        public enum ParameterType
+        {
+            PARAM_INT,
+            PARAM_FLOAT,
+            PARAM_BOOL
         };
 
 
@@ -188,6 +195,23 @@ namespace gui.Dll
         internal static extern bool render_disable_non_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_all_render_targets();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint renderer_get_num_parameters();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string renderer_get_parameter_desc(uint idx, ref ParameterType type);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_set_parameter_int(string name, int value);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_get_parameter_int(string name, ref int value);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_set_parameter_float(string name, float value);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_get_parameter_float(string name, ref float value);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_set_parameter_bool(string name, uint value);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_get_parameter_bool(string name, ref uint value);
 
         // Interface for profiling
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

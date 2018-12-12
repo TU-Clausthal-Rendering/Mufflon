@@ -64,7 +64,7 @@ namespace gui.ViewModel
 
             Profiler = new ProfilerViewModel(window, m_models);
 
-            Renderer = new RendererViewModel(m_models);
+            Renderer = new RendererViewModel(window, m_models);
             Scene = new SceneViewModel(m_models);
 
             // command initialization

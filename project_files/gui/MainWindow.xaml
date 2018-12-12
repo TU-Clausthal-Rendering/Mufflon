@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui"
         xmlns:view="clr-namespace:gui.View"
+        xmlns:renderer="clr-namespace:gui.View.Renderer"
         xmlns:camera="clr-namespace:gui.View.Camera"
         xmlns:viewmodel="clr-namespace:gui.ViewModel"
         mc:Ignorable="d"
@@ -36,8 +37,8 @@
                 <MenuItem Header="File">
                     <MenuItem Header="Load Scene"
                               Command="{Binding LoadSceneCommand}"
-                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
-                    <Separator/>
+                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"
+                              IsCheckable="False"/>
                     <MenuItem Header="Recent scenes..."
                               ItemsSource="{Binding Scene.LastScenes}"
                               DisplayMemberPath="Filename"
@@ -48,9 +49,16 @@
                                         Value="{Binding Path=Command}"/>
                                 <Setter Property="ToolTip"
                                         Value="{Binding Path=Path}"/>
+                                <Setter Property="IsCheckable"
+                                        Value="False"/>
                             </Style>
                         </MenuItem.ItemContainerStyle>
                     </MenuItem>
+                    <Separator/>
+                    <MenuItem Header="Auto-start on load"
+                              IsCheckable="True"
+                              IsChecked="{Binding Renderer.AutoStartOnLoad}"/>
+
                 </MenuItem>
                 <MenuItem Header="Help">
                     <MenuItem Header="About"/>
@@ -151,13 +159,29 @@
                     <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
 
-                <TreeView Grid.Column="0"
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <renderer:RendererParams x:Name="RendererPropertiesControl"/>
+
+                    <GridSplitter Grid.Row="1"
+                                  Height="5"
+                                  VerticalAlignment="Stretch"
+                                  HorizontalAlignment="Stretch"
+                                  Background="{StaticResource BorderBrush}"/>
+
+                    <TreeView Grid.Row="2"
                           Name="ProfilerTreeView">
-                    <TreeViewItem Header="Rendering"
+                        <TreeViewItem Header="Rendering"
                                   FontFamily="Courier New"/>
-                    <TreeViewItem Header="Loading"
+                        <TreeViewItem Header="Loading"
                                   FontFamily="Courier New"/>
-                </TreeView>
+                    </TreeView>
+                </Grid>
 
                 <GridSplitter
                     Grid.Column="1"
@@ -345,12 +369,13 @@
                     HorizontalAlignment="Left"
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch"
+                    ToolTip="Total/Used/Free"
                     Content="{Binding Statusbar.CpuMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-
                 <StatusBarItem
                     HorizontalAlignment="Left"
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch"
+                    ToolTip="Total/Used/Free"
                     Content="{Binding Statusbar.GpuMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
                 <StatusBarItem
                     Width="200"

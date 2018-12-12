@@ -75,33 +75,43 @@ namespace gui.Model
 
         public bool loadScene(string path)
         {
-            if(!File.Exists(path))
+            if (path != FullPath)
             {
-                if(MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
-                    "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
-                    MessageBoxImage.Error) == MessageBoxResult.Yes)
+                if (!File.Exists(path))
                 {
-                    int index = Settings.Default.LastScenes.IndexOf(m_fullPath);
-                    if(index >= 0)
+                    if (MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
+                        "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
+                        MessageBoxImage.Error) == MessageBoxResult.Yes)
                     {
-                        Settings.Default.LastScenes.RemoveAt(index);
-                        OnPropertyChanged(nameof(LastScenes));
+                        int index = Settings.Default.LastScenes.IndexOf(m_fullPath);
+                        if (index >= 0)
+                        {
+                            Settings.Default.LastScenes.RemoveAt(index);
+                            OnPropertyChanged(nameof(LastScenes));
+                        }
                     }
-                }
-                return false;
-            } else
-            {
-                if (!Loader.loader_load_json(path))
-                {
-                    MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
-                        MessageBoxImage.Error);
                     return false;
                 }
                 else
                 {
-                    FullPath = path;
-                    return true;
+                    if (!Loader.loader_load_json(path))
+                    {
+                        MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                        FullPath = null;
+                        return false;
+                    }
+                    else
+                    {
+                        FullPath = path;
+                        return true;
+                    }
                 }
+            } else
+            {
+                MessageBox.Show("Scene is already loaded", "", MessageBoxButton.OK,
+                    MessageBoxImage.Exclamation);
+                return true;
             }
         }
 

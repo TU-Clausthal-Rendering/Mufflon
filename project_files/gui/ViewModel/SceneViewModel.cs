@@ -39,9 +39,7 @@ namespace gui.ViewModel
 
             public void Execute(object parameter)
             {
-                if(!m_models.Scene.loadScene(Path))
-                {
-                }
+                m_models.Scene.loadScene(Path);
             }
 
             public event EventHandler CanExecuteChanged

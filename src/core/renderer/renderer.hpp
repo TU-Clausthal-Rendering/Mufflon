@@ -2,6 +2,7 @@
 
 #include "parameter.hpp"
 #include "core/scene/handles.hpp"
+#include <ei/vector.hpp>
 
 namespace mufflon { namespace renderer {
 
@@ -14,7 +15,7 @@ public:
 	virtual void reset() = 0;
 	virtual IParameterHandler& get_parameters() = 0;
 	virtual bool has_scene() const noexcept = 0;
-	virtual void load_scene(scene::SceneHandle scene) = 0;
+	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) = 0;
 };
 
 }} // namespace mufflon::renderer

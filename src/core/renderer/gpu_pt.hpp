@@ -30,7 +30,7 @@ public:
 	virtual void reset() override;
 	virtual IParameterHandler& get_parameters() final { return m_params; }
 	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
-	virtual void load_scene(scene::SceneHandle scene) override;
+	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) override;
 
 private:
 	// Used so that we don't need to include everything in CU files

@@ -69,5 +69,17 @@ namespace gui.Properties {
                 this["LastScenes"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool AutoStartOnLoad {
+            get {
+                return ((bool)(this["AutoStartOnLoad"]));
+            }
+            set {
+                this["AutoStartOnLoad"] = value;
+            }
+        }
     }
 }

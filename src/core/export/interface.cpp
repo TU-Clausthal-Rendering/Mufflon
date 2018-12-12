@@ -1386,8 +1386,8 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
 		return nullptr;
 	}
-	s_currentRenderer->load_scene(hdl);
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
+	s_currentRenderer->load_scene(hdl, res);
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);
 }

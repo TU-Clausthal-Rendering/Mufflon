@@ -122,10 +122,11 @@ void CpuPathTracer::init_rngs(int num) {
 		m_rngs[i] = math::Rng(i);
 }
 
-void CpuPathTracer::load_scene(scene::SceneHandle scene) {
+void CpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
 	m_currentScene = scene;
 	// Make sure the scene is loaded completely for the use on CPU side
 	m_currentScene->synchronize<Device::CPU>();
+	//m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
 	m_reset = true;
 }
 

@@ -178,7 +178,12 @@
       <DependentUpon>SelectRendererDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\Helper\ComboBoxItem.cs" />
+    <Compile Include="View\Helper\DecimalTextBox.cs" />
     <Compile Include="View\Helper\EnterTextBox.cs" />
+    <Compile Include="View\Helper\NumericUpDown.xaml.cs">
+      <DependentUpon>NumericUpDown.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Helper\RestrictedTextBox.cs" />
     <Compile Include="View\Light\DirectionalLightView.xaml.cs">
       <DependentUpon>DirectionalLightView.xaml</DependentUpon>
     </Compile>
@@ -224,6 +229,9 @@
     <Compile Include="View\Material\WalterMaterialView.xaml.cs">
       <DependentUpon>WalterMaterialView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Renderer\RendererParams.xaml.cs">
+      <DependentUpon>RendererParams.xaml</DependentUpon>
+    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -262,6 +270,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Dialog\SelectRendererDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Helper\NumericUpDown.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -322,6 +334,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Material\WalterMaterialView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Renderer\RendererParams.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

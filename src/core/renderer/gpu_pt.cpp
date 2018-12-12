@@ -32,11 +32,11 @@ void GpuPathTracer::reset() {
 	m_reset = true;
 }
 
-void GpuPathTracer::load_scene(scene::SceneHandle scene) {
+void GpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
 	m_currentScene = scene;
 	// Make sure the scene is loaded completely for the use on CPU side
 	m_currentScene->synchronize<Device::CPU>();
-	scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {});
+	scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {}, resolution);
 	if (m_scenePtr != nullptr)
 		cuda::check_error(cudaFree(m_scenePtr));
 	cuda::check_error(cudaMalloc(&m_scenePtr, sizeof(*m_scenePtr)));
