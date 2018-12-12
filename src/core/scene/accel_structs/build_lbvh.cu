@@ -12,7 +12,10 @@
 #include <thrust/device_ptr.h>
 
 
-namespace mufflon { namespace {
+//namespace mufflon { namespace {//TODO use anonym?
+namespace mufflon {
+namespace scene {
+namespace accel_struct {
 
 CUDA_FUNCTION void syncthreads() {
 #ifdef __CUDA_ARCH__
@@ -386,19 +389,6 @@ template <typename T> __global__ void build_lbvh_treeD(
 	build_lbvh_tree<T>(numPrimitives, sortedKeys, parents, idx);
 }
 
-
-CUDA_FUNCTION void extract_prim_counts(i32 primitiveCount, ei::IVec4& count) {
-	i32 sphCountMask = 0x000003FF;
-	i32 triCountMask = 0x3FF00000;
-	i32 quadCountMask = 0x000FFC00;
-	i32 triShift = 20;
-	i32 quadShift = 10;
-	count.x = (primitiveCount & triCountMask) >> triShift;
-	count.y = (primitiveCount & quadCountMask) >> quadShift;
-	count.z = (primitiveCount & sphCountMask);
-	count.w = count.x + count.y + count.z;
-}
-
 struct BBCache {
 	ei::Box bb;
 	float cost;
@@ -482,7 +472,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	const i32 numInternalNodes = numPrimitives - 1;
 	i32 leafIndex = idx + numInternalNodes;
 	i32 boxId = leafIndex << 1;
-	boundingBoxes[boxId] = { currentBb.min, int_as_float(primitiveCount) };
+	boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(primitiveCount) };
 	boundingBoxes[boxId + 1] = { currentBb.max, cost };
 
 	syncthreads(); // TODO check this.
@@ -536,7 +526,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 			ei::Vec4 childBbMax = boundingBoxes[boxId + 1];
 			childInfo = BBCache{
 				ei::Box{ei::Vec3{childBbMin}, ei::Vec3{childBbMax}},
-				childBbMax.w, __float_as_int(childBbMin.w)
+				childBbMax.w, float_bits_as_int(childBbMin.w)
 			};
 		}
 #else
@@ -545,7 +535,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 		ei::Vec4 childBbMax = boundingBoxes[boxId + 1];
 		childInfo = BBCache{
 			ei::Box{ei::Vec3{childBbMin}, ei::Vec3{childBbMax}},
-			childBbMax.w, float_as_int(childBbMin.w)
+			childBbMax.w, float_bits_as_int(childBbMin.w)
 		};
 #endif // __CUDA_ARCH__
 		syncthreads(); // @todo check.
@@ -641,7 +631,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 #endif // __CUDA_ARCH__
 
 		boxId = lastNode << 1;
-		boundingBoxes[boxId] = { currentBb.min, int_as_float(primitiveCount) };
+		boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(primitiveCount) };
 		boundingBoxes[boxId + 1] = { currentBb.max, cost };
 
 		syncthreads(); //@todo check.
@@ -739,7 +729,7 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 	const i32 numInternalNodes = numInstances - 1;
 	i32 leafIndex = idx + numInternalNodes;
 	i32 boxId = leafIndex << 1;
-	boundingBoxes[boxId] = { currentBb.min, int_as_float(instanceCount) };
+	boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(instanceCount) };
 	boundingBoxes[boxId + 1] = { currentBb.max, cost };
 
 	syncthreads(); // TODO check this.
@@ -793,7 +783,7 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 			ei::Vec4 childBbMax = boundingBoxes[boxId + 1];
 			childInfo = BBCache{
 				ei::Box{ei::Vec3{childBbMin}, ei::Vec3{childBbMax}},
-				childBbMax.w, float_as_int(childBbMin.w)
+				childBbMax.w, float_bits_as_int(childBbMin.w)
 			};
 		}
 #else
@@ -802,7 +792,7 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 		ei::Vec4 childBbMax = boundingBoxes[boxId + 1];
 		childInfo = BBCache{
 			ei::Box{ei::Vec3{childBbMin}, ei::Vec3{childBbMax}},
-			childBbMax.w, float_as_int(childBbMin.w)
+			childBbMax.w, float_bits_as_int(childBbMin.w)
 		};
 #endif // __CUDA_ARCH__
 		syncthreads(); // @todo check.
@@ -893,7 +883,7 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 #endif // __CUDA_ARCH__
 
 		boxId = lastNode << 1;
-		boundingBoxes[boxId] = { currentBb.min, int_as_float(instanceCount) };
+		boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(instanceCount) };
 		boundingBoxes[boxId + 1] = { currentBb.max, cost };
 
 		syncthreads(); //@todo check.
@@ -965,7 +955,7 @@ CUDA_FUNCTION void mark_nodes(
 	// This is better than using a stack, since less operations are needed
 	// and due to parallerism, performance is not affected.
 	const i32 boxId = idx << 1;
-	i32 primitiveCount = float_as_int(boundingBoxes[boxId].w);
+	i32 primitiveCount = float_bits_as_int(boundingBoxes[boxId].w);
 	if (primitiveCount >= 0) {
 		leafMarks[idx] = 0;
 		return;
@@ -1054,7 +1044,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		}
 
 		const i32 boxId = parent << 1;
-		i32 primitiveCount = float_as_int(boundingBoxes[boxId].w);
+		i32 primitiveCount = float_bits_as_int(boundingBoxes[boxId].w);
 		if (primitiveCount >= 0 && removedMarks[parent] != 0xFFFFFFFF) {
 
 			// Copy bounding boxes to parent.
@@ -1101,7 +1091,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		
 		// Copy data indices.
 		if (lo.w < 0) {
-			i32 primitiveCount = float_as_int(lo.w);
+			i32 primitiveCount = float_bits_as_int(lo.w);
 			ei::IVec4 counts;
 			extract_prim_counts(primitiveCount, counts);
 			i32 startId;
@@ -1124,8 +1114,8 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 			counts.y = endPos.x;
 			counts.z = endPos.y;
 			collapsedBVH[pointerId] = ei::Vec4(
-				lo.w, int_as_float(counts.x),
-				int_as_float(counts.y), int_as_float(counts.z));
+				lo.w, int_bits_as_float(counts.x),
+				int_bits_as_float(counts.y), int_bits_as_float(counts.z));
 			i32 primType; // 0: tri; 1: quad; 2: sph.
 			i32 tmpId;
 			// Use a loop to set data indices.
@@ -1244,7 +1234,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh_ins(
 		}
 
 		const i32 boxId = parent << 1;
-		i32 primitiveCount = float_as_int(boundingBoxes[boxId].w);
+		i32 primitiveCount = float_bits_as_int(boundingBoxes[boxId].w);
 		if (primitiveCount >= 0 && removedMarks[parent] != 0xFFFFFFFF) {
 
 			// Copy bounding boxes to parent.
@@ -1293,7 +1283,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh_ins(
 			// Set the pointer to instances.
 			// Copy data indices is no longer needed.
 			if (lo.w < 0) {
-				i32 instanceCount = float_as_int(lo.w) & 0x3FFFFFFF;
+				i32 instanceCount = float_bits_as_int(lo.w) & 0x3FFFFFFF;
 				i32 startId;
 				if (offset) { // The current node is right child.
 					startId = idx;
@@ -1302,7 +1292,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh_ins(
 					startId = idx - instanceCount + 1;
 				}
 				collapsedBVH[pointerId] = ei::Vec4(
-					instanceCount, int_as_float(startId), 0.f, 0.f);
+					instanceCount, int_bits_as_float(startId), 0.f, 0.f);
 			}
 		}
 }
@@ -1329,8 +1319,8 @@ __global__ void copy_to_collapsed_bvh_insD(
 		boundingBoxes, parents, removedMarks, sortIndices, preInternalLeaves, reduceOffsets, idx);
 }
 
-}} // namespace mufflon:: {
-
+//}} // namespace mufflon:: {
+}}}
 
 
 namespace mufflon { namespace scene { namespace accel_struct {
@@ -1586,7 +1576,7 @@ void build_lbvh64(ei::Vec3* meshVertices,
 
 // For the scene.
 template < Device dev >
-void build_lbvh64(ei::Mat3x4* matrixs,
+void build_lbvh32(ei::Mat3x4* matrixs,
 	i32* objIds,
 	ei::Box* aabbs,
 	ei::Vec3 lo, ei::Vec3 hi, ei::Vec2 traverseCosts, i32 numInstances,
@@ -1796,7 +1786,7 @@ void build_lbvh64(ei::Mat3x4* matrixs,
 	}
 	else {
 		collapsedBVH = (ei::Vec4*)malloc(numFloat4InCollapsedBVH * sizeof(ei::Vec4));
-		for (i32 i = 0; i < numNodes; i++)
+		for (i32 idx = 0; idx < (i32)numNodes; idx++)
 		{
 			copy_to_collapsed_bvh_ins(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes, 
 				collapsedBVH, boundingBoxes, parents, removedMarks, sortIndices, 
@@ -1813,6 +1803,72 @@ void build_lbvh64(ei::Mat3x4* matrixs,
 
 	(*instanceIds) = sortIndices;
 	(*bvh) = collapsedBVH;
+}
+
+void build_lbvh_obj(ObjectDescriptor<Device::CPU> obj) {
+	ei::Vec3* meshVertices = (ei::Vec3*)obj.polygon.vertices;
+	ei::Vec4* spheres = (ei::Vec4*)obj.spheres.spheres;
+	i32* triIndices = (i32*)obj.polygon.vertexIndices;
+	i32* quadIndices = (i32*)(obj.polygon.vertexIndices + obj.polygon.numTriangles);
+	ei::Vec3 lo = obj.aabb.min; // TODO maybe use another seperate aabbs.
+	ei::Vec3 hi = obj.aabb.max;
+	ei::Vec4 traverseCosts = { 1.0f, 1.2f, 2.4f, 1.f };
+	i32 offsetQuads = obj.polygon.numTriangles;
+	i32 offsetSpheres = offsetQuads + obj.polygon.numQuads;
+	i32 numPrimitives = offsetSpheres + obj.spheres.numSpheres;
+	obj.accelStruct = malloc(sizeof(LBVH));
+	LBVH* lbvh = (LBVH*)obj.accelStruct;
+	build_lbvh64(meshVertices, spheres, triIndices, quadIndices, lo, hi, traverseCosts,
+		numPrimitives, offsetQuads, offsetSpheres, &lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
+}
+
+void build_lbvh_obj(ObjectDescriptor<Device::CUDA> obj) {
+	ei::Vec3* meshVertices = (ei::Vec3*)obj.polygon.vertices;
+	ei::Vec4* spheres = (ei::Vec4*)obj.spheres.spheres;
+	i32* triIndices = (i32*)obj.polygon.vertexIndices;
+	i32* quadIndices = (i32*)(obj.polygon.vertexIndices + obj.polygon.numTriangles);
+	ei::Vec3 lo = obj.aabb.min; // TODO maybe use another seperate aabbs.
+	ei::Vec3 hi = obj.aabb.max;
+	ei::Vec4 traverseCosts = { 1.0f, 1.2f, 2.4f, 1.f };
+	i32 offsetQuads = obj.polygon.numTriangles;
+	i32 offsetSpheres = offsetQuads + obj.polygon.numQuads;
+	i32 numPrimitives = offsetSpheres + obj.spheres.numSpheres;
+	obj.accelStruct = malloc(sizeof(LBVH));
+	LBVH* lbvh = (LBVH*)obj.accelStruct;
+	build_lbvh64(meshVertices, spheres, triIndices, quadIndices, lo, hi, traverseCosts,
+		numPrimitives, offsetQuads, offsetSpheres, &lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
+}
+
+void build_lbvh_scene(
+	SceneDescriptor<Device::CPU> scene
+) {
+	ei::Mat3x4* matrixs = (ei::Mat3x4*)scene.transformations;
+	i32* objIds = (i32*)scene.objectIndices;
+	ei::Box* aabbs = (ei::Box*)scene.aabbs;
+	ei::Vec3 lo = scene.aabb.min;
+	ei::Vec3 hi = scene.aabb.max;
+	ei::Vec2 traverseCosts = { 1.f, 20.f };// TODO: find value for this.
+	i32 numInstances = scene.numInstances;
+	scene.accelStruct = malloc(sizeof(LBVH));
+	LBVH* lbvh = (LBVH*)scene.accelStruct;
+	build_lbvh32<Device::CPU>(matrixs, objIds, aabbs, lo, hi, traverseCosts, numInstances,
+		&lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
+}
+
+void build_lbvh_scene(
+	SceneDescriptor<Device::CUDA> scene
+) {
+	ei::Mat3x4* matrixs = (ei::Mat3x4*)scene.transformations;
+	i32* objIds = (i32*)scene.objectIndices;
+	ei::Box* aabbs = (ei::Box*)scene.aabbs;
+	ei::Vec3 lo = scene.aabb.min;
+	ei::Vec3 hi = scene.aabb.max;
+	ei::Vec2 traverseCosts = { 1.f, 20.f };// TODO: find value for this.
+	i32 numInstances = scene.numInstances;
+	scene.accelStruct = malloc(sizeof(LBVH));
+	LBVH* lbvh = (LBVH*)scene.accelStruct;
+	build_lbvh32<Device::CUDA>(matrixs, objIds, aabbs, lo, hi, traverseCosts, numInstances,
+		&lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
 }
 
 

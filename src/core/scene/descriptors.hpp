@@ -52,7 +52,7 @@ struct SpheresDescriptor {
 
 template < Device dev >
 struct ObjectDescriptor {
-	ei::Box aabb;
+	ei::Box aabb;//TODO remove this?
 	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
 	ArrayDevHandle_t<dev, void> accelStruct;

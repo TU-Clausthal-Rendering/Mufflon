@@ -27,13 +27,6 @@ __device__ __inline__ float fmax_fmax(float a, float b, float c) { return __int_
 __device__ __inline__ float spanBeginKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmax_fmax(fminf(a0, a1), fminf(b0, b1), fmin_fmax(c0, c1, d)); }
 __device__ __inline__ float spanEndKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmin_fmin(fmaxf(a0, a1), fmaxf(b0, b1), fmax_fmin(c0, c1, d)); }
 
-struct LBVH
-{
-	ei::Vec4* bvh;
-	i32 bvhSize;
-	i32* primIds;
-};
-
 }
 }
 

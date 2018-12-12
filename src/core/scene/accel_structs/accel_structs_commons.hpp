@@ -43,7 +43,7 @@ struct AccelStructInfo {
 	} outputs;
 };
 
-CUDA_FUNCTION float int_as_float(i32 v) {
+CUDA_FUNCTION float int_bits_as_float(i32 v) {
 #ifdef __CUDA_ARCH__
 	return __int_as_float(v);
 #else
@@ -51,13 +51,20 @@ CUDA_FUNCTION float int_as_float(i32 v) {
 #endif // __CUDA_ARCH__
 }
 
-CUDA_FUNCTION i32 float_as_int(float v) {
+CUDA_FUNCTION i32 float_bits_as_int(float v) {
 #ifdef __CUDA_ARCH__
 	return __float_as_int(v);
 #else
 	return reinterpret_cast<i32&>(v);
 #endif // __CUDA_ARCH__
 }
+
+struct LBVH
+{
+	ei::Vec4* bvh;
+	i32 bvhSize;
+	i32* primIds;
+};
 
 }
 }
