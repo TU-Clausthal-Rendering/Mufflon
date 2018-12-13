@@ -26,11 +26,6 @@ namespace gui.ViewModel
         public string Name { get; set; }
         public float Value { get; set; }
     }
-    public class RendererPropertyString
-    {
-        public string Name { get; set; }
-        public string Value { get; set; }
-    }
 
     public class RendererViewModel : INotifyPropertyChanged
     {
@@ -89,9 +84,6 @@ namespace gui.ViewModel
             m_models = models;
             m_propertiesGrid = (DataGrid)((UserControl)window.FindName("RendererPropertiesControl")).FindName("RendererPropertiesGrid");
             RendererProperties = new ObservableCollection<object>();
-            RendererProperties.Add(new RendererPropertyBool() { Name = "TestBool", Value = true });
-            RendererProperties.Add(new RendererPropertyInt() { Name = "TestInt", Value = 6 });
-            RendererProperties.Add(new RendererPropertyString() { Name = "TestString", Value = "Ha!" });
             AutoStartOnLoad = Settings.Default.AutoStartOnLoad;
 
             // Register the handlers
@@ -136,6 +128,28 @@ namespace gui.ViewModel
                     rendererTypeChanged();
                     break;
                 case nameof(Models.Renderer.IsRendering):
+                    // Update the parameters of the renderer
+                    if(m_models.Renderer.IsRendering)
+                    {
+                        foreach(object prop in RendererProperties) {
+                            if(prop is RendererPropertyBool)
+                            {
+                                if (!Core.renderer_set_parameter_bool((prop as RendererPropertyBool).Name,
+                                    Convert.ToUInt32((prop as RendererPropertyBool).Value)))
+                                    throw new Exception("Failed to set renderer parameter");
+                            } else if(prop is RendererPropertyInt)
+                            {
+                                if (!Core.renderer_set_parameter_int((prop as RendererPropertyInt).Name,
+                                    (prop as RendererPropertyInt).Value))
+                                    throw new Exception("Failed to set renderer parameter");
+                            } else if (prop is RendererPropertyFloat)
+                            {
+                                if (!Core.renderer_set_parameter_float((prop as RendererPropertyFloat).Name,
+                                    (prop as RendererPropertyFloat).Value))
+                                    throw new Exception("Failed to set renderer parameter");
+                            }
+                        }
+                    }
                     OnPropertyChanged(nameof(IsRendering));
                     break;
             }
@@ -205,13 +219,6 @@ namespace gui.ViewModel
                         }
                         break;
                     default:
-                        {
-                            RendererProperties.Add(new RendererPropertyString()
-                            {
-                                Name = name,
-                                Value = "## UNKNOWN TYPE ##"
-                            });
-                        }
                         break;
                 }
             }

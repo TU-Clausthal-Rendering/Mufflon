@@ -13,8 +13,38 @@
               ItemsSource="{Binding Renderer.RendererProperties, UpdateSourceTrigger=PropertyChanged}"
               AutoGenerateColumns="False"
               CanUserAddRows="False"
-              Width="200">
+              RowHeaderWidth="0"
+              Width="Auto">
         <DataGrid.Resources>
+            <Style x:Key="{x:Type DataGridCell}"
+                    TargetType="{x:Type DataGridCell}">
+                <Setter Property="Background" Value="{x:Null}"/>
+                <Setter Property="BorderBrush" Value="{x:Null}"/>
+                <Setter Property="Foreground"
+                                Value="{Binding RelativeSource={RelativeSource Self}, Path=Foreground}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{x:Null}"/>
+                        <Setter Property="BorderBrush" Value="{x:Null}"/>
+                        <Setter Property="Foreground"
+                                Value="{Binding RelativeSource={RelativeSource Self}, Path=Foreground}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="{x:Type DataGridRow}">
+                <Setter Property="Background" Value="{x:Null}"/>
+                <Setter Property="BorderBrush" Value="{x:Null}"/>
+                <Setter Property="Foreground"
+                                Value="{Binding RelativeSource={RelativeSource Self}, Path=Foreground}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{x:Null}"/>
+                        <Setter Property="BorderBrush" Value="{x:Null}"/>
+                        <Setter Property="Foreground"
+                                Value="{Binding RelativeSource={RelativeSource Self}, Path=Foreground}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
             <DataTemplate x:Key="BoolTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyBool}">
                 <CheckBox HorizontalAlignment="Center"
@@ -23,29 +53,33 @@
             </DataTemplate>
             <DataTemplate x:Key="IntTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyInt}">
-                <!-- <helper:NumericUpDown Text="{Binding Value}"/> -->
-                <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                     HorizontalContentAlignment="Right"/>
+                <helper:NumericUpDown Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
             </DataTemplate>
             <DataTemplate x:Key="FloatTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyFloat}">
                 <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                     HorizontalContentAlignment="Right"/>
-            </DataTemplate>
-            <DataTemplate x:Key="StringTemplate"
-                          DataType="{x:Type viewmodel:RendererPropertyString}">
-                <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                     HorizontalContentAlignment="Right"/>
+                                     HorizontalContentAlignment="Right"
+                                     VerticalContentAlignment="Center"/>
             </DataTemplate>
             <local:ColumnTemplateSelector x:Key="ColumnTemplateSelector"
                                           BoolTemplate="{StaticResource BoolTemplate}"
                                           IntTemplate="{StaticResource IntTemplate}"
-                                          StringTemplate="{StaticResource StringTemplate}"/>
+                                          FloatTemplate="{StaticResource FloatTemplate}"/>
         </DataGrid.Resources>
         <DataGrid.Columns>
             <DataGridTextColumn Header="Parameter"
                                 Binding="{Binding Name}"
-                                Width="*"/>
+                                Width="*"
+                                IsReadOnly="True">
+                <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="{x:Type TextBlock}"
+                           BasedOn="{StaticResource {x:Type TextBlock}}">
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                        <Setter Property="HorizontalAlignment" Value="Left"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                    </Style>
+                </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
             <DataGridTemplateColumn Header="Value"
                                     Width="*"
                                     CellTemplateSelector="{StaticResource ColumnTemplateSelector}"/>

@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using gui.Annotations;
 
@@ -26,7 +27,7 @@ namespace gui.View.Helper
         // TODO: doesn't update GUI
         public string Text
         {
-            get { return NUDTextBox.Text; }
+            get => NUDTextBox.Text;
             set {
                 if (NUDTextBox.Text == value) return;
                 NUDTextBox.Text = value;
@@ -38,6 +39,7 @@ namespace gui.View.Helper
         public NumericUpDown()
         {
             InitializeComponent();
+            NUDTextBox.SetBinding(TextBox.TextProperty, new Binding(nameof(Text)));
             NUDTextBox.DataContext = this;
             Text = DefaultValue.ToString();
         }

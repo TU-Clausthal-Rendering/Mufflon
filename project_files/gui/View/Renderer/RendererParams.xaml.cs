@@ -21,7 +21,6 @@ namespace gui.View.Renderer
         public DataTemplate BoolTemplate { get; set; }
         public DataTemplate IntTemplate { get; set; }
         public DataTemplate FloatTemplate { get; set; }
-        public DataTemplate StringTemplate { get; set; }
 
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
         {
@@ -31,8 +30,6 @@ namespace gui.View.Renderer
                 return IntTemplate;
             else if (item is RendererPropertyFloat)
                 return FloatTemplate;
-            else if (item is RendererPropertyString)
-                return StringTemplate;
             else
                 return base.SelectTemplate(item, container);
         }
