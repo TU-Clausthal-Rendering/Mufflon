@@ -1,5 +1,6 @@
 #include "intersection.hpp"
 #include "accel_structs_commons.hpp"
+#include "lbvh.hpp"
 #include "util/types.hpp"
 
 #include <cuda_runtime_api.h>

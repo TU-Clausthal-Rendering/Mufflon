@@ -3,7 +3,7 @@
 #include "util/int_types.hpp"
 #include "lights/light_tree.hpp"
 #include "core/memory/residency.hpp"
-#include "core/scene/accel_structs/accel_struct.hpp"
+#include "core/scene/accel_structs/accel_struct_info.hpp"
 #include "handles.hpp"
 #include <ei/vector.hpp>
 #include <ei/3dtypes.hpp>

@@ -63,6 +63,11 @@ public:
 	void mark_synced(Device synced) noexcept {
 		m_dirty.mark_synced(synced);
 	}
+
+	template < Device dev >
+	bool is_resident() const noexcept {
+		return m_mem.template get<unique_device_ptr<dev, char>>() != nullptr;
+	}
 private:
 	std::size_t m_size;
 	util::DirtyFlags<Device> m_dirty;

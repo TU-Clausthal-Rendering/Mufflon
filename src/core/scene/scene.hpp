@@ -8,11 +8,11 @@
 #include "core/cameras/camera.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/generic_resource.hpp"
-#include "core/scene/accel_structs/accel_struct.hpp"
+#include "core/scene/accel_structs/accel_struct_info.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/object.hpp"
-#include "core/scene/accel_structs/build_lbvh.hpp"
+#include "core/scene/accel_structs/lbvh.hpp"
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -85,9 +85,7 @@ public:
 	}*/
 	// Clears the BVH of this object.
 	void clear_accel_structure() {
-		m_accelStruct[get_device_index<Device::CPU>()].type = accel_struct::AccelType::NONE;
-		m_accelStruct[get_device_index<Device::CUDA>()].type = accel_struct::AccelType::NONE;
-		// TODO: memory management
+		m_accelStruct.mark_invalid();
 	}
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
@@ -180,7 +178,7 @@ public:
 			static_cast<u32>(m_instances.size()),
 			m_boundingBox,
 			objDevDesc.get(),
-			m_accelStruct[get_device_index<dev>()],
+			AccelDescriptor{},
 			instTransformsDesc.get(),
 			instObjIndicesDesc.get(),
 			objAabbsDesc.get(),
@@ -190,10 +188,11 @@ public:
 		};
 
 		// Rebuild Instance BVH?
-		if(sceneDesc.accelStruct.type == accel_struct::AccelType::NONE) {
-			accel_struct::build_lbvh_scene(sceneDesc);
-			m_accelStruct[get_device_index<dev>()] = sceneDesc.accelStruct;
+		
+		if(m_accelStruct.needs_rebuild<dev>()) {
+			m_accelStruct.build(sceneDesc);
 		}
+		sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
 
 		return sceneDesc;
 	}
@@ -211,7 +210,7 @@ private:
 	lights::LightTreeBuilder m_lightTree;
 
 	// Acceleration structure over all instances
-	AccelDescriptor m_accelStruct[NUM_DEVICES];
+	accel_struct::LBVHBuilder m_accelStruct;
 
 	// Resources for descriptors
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ObjectDescriptor<Device::CPU>>,

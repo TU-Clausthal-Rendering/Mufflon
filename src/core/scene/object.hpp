@@ -202,7 +202,8 @@ public:
 		};
 		// (Re)build acceleration structure if necessary
 		if(is_accel_dirty<dev>()) {
-			accel_struct::build_lbvh_obj(desc, m_boundingBox);
+			//accel_struct::build_lbvh_obj(desc, m_boundingBox);
+			// TODO call after LBVHBuilder.build refactoring
 			m_accelStruct[get_device_index<dev>()] = desc.accelStruct;
 		}
 		return desc;

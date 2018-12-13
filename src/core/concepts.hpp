@@ -32,7 +32,7 @@ private:
 	//template<class T> static constexpr bool has_acquire_const(...) { return false; }
 	template<class T, typename = decltype(std::declval<T>().acquire_const<Device::CPU>())> static constexpr bool has_acquire_const() { return true; }
 	template<class T> static constexpr bool has_acquire_const(...) { return false; }
-	template<class T, typename = std::enable_if_t<std::is_trivially_copyable<decltype(std::declval<T>().acquire_const<Device::CPU>())>::value>> static constexpr bool descriptor_is_copyable() { return true; }
+	template<class T, typename = std::enable_if_t<std::is_trivially_copyable< std::remove_cv_t<std::decay_t< decltype(std::declval<T>().acquire_const<Device::CPU>())>> >::value>> static constexpr bool descriptor_is_copyable() { return true; }
 	template<class T> static constexpr bool descriptor_is_copyable(...) { return false; }
 	template<class T, typename = decltype(std::declval<T>().unload<Device::CPU>())> static constexpr bool has_unload() { return true; }
 	template<class T> static constexpr bool has_unload(...) { return false; }

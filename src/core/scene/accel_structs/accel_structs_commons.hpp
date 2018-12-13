@@ -59,13 +59,6 @@ CUDA_FUNCTION i32 float_bits_as_int(float v) {
 #endif // __CUDA_ARCH__
 }
 
-struct LBVH
-{
-	ei::Vec4* bvh;
-	i32 bvhSize;
-	i32* primIds;
-};
-
 }
 }
 }

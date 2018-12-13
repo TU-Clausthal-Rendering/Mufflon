@@ -1,8 +1,9 @@
-#include "build_lbvh.hpp"
+#include "lbvh.hpp"
 #include "util/types.hpp"
 #include "core/cuda/cu_lib_wrapper.h"
 #include "core/math/sfcurves.hpp"
 #include "core/memory/residency.hpp"
+#include "core/memory/allocator.hpp"
 #include "accel_structs_commons.hpp"
 
 #include <cuda_runtime_api.h>
@@ -1563,101 +1564,84 @@ void build_lbvh64(ei::Vec3* meshVertices,
 
 // For the scene.
 template < Device dev >
-void build_lbvh32(ei::Mat3x4* matrixs,
+void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrixs,
 	i32* objIds,
 	ei::Box* aabbs,
-	ei::Vec3 lo, ei::Vec3 hi, ei::Vec2 traverseCosts, i32 numInstances,
-	i32** instanceIds, ei::Vec4** bvh, i32& bvhSize) {
+	const ei::Box& sceneBB,
+	ei::Vec2 traverseCosts, i32 numInstances) {
 	i32 numBlocks, numThreads;
 
+	// Allocate memory for a part of the BVH. We do not know the final size yet and
+	// cannot allocate the other parts in bvh.
+	m_primIds.resize(numInstances * sizeof(i32));
+	i32* primIds = as<i32>(m_primIds.acquire<dev>());
+
 	// Calculate Morton codes.
-	u32* mortonCodes;
-	i32* sortIndices;
-	if (dev == Device::CUDA) {
-		cudaMalloc((void**)&mortonCodes, numInstances * sizeof(i32));
-		cudaMalloc((void**)&sortIndices, numInstances * sizeof(i32));
-
-		get_maximum_occupancy(numBlocks, numThreads, numInstances, calculate_morton_codes32D);
-		calculate_morton_codes32D << < numBlocks, numThreads >> > (
-			matrixs, objIds, aabbs, lo, hi,
-			mortonCodes, sortIndices, numInstances);
-
-		// Sort based on Morton codes.
-		CuLib::DeviceSort(numInstances, &mortonCodes, &mortonCodes,
-			&sortIndices, &sortIndices);
-	}
-	else {
-		mortonCodes = (u32*)malloc(numInstances * sizeof(i32));
-		sortIndices = (i32*)malloc(numInstances * sizeof(i32));
-
-		for (i32 idx = 0; idx < numInstances; idx++)
-		{
-			calculate_morton_codes32(matrixs, objIds, aabbs, lo, hi,
-				mortonCodes, sortIndices, numInstances, idx);
-		}
-
-		// Sort based on Morton codes.
-		thrust::sort_by_key(mortonCodes, mortonCodes + numInstances, sortIndices);
-	}
-
-	// Create BVH.
-	// Layout: first internal nodes, then leves.
+	auto codesMem = make_udevptr_array<dev, u32>(numInstances);
 	const i32 numInternalNodes = numInstances - 1;
 	const u32 numNodes = numInternalNodes + numInstances;
-	i32 *parents; // size numNodes.
-	const u32 totalBytes = numNodes * sizeof(i32);
-	if (dev == Device::CUDA) {
-		cudaMalloc((void**)&parents, totalBytes);
+	auto parentsMem = make_udevptr_array<dev, i32>(numNodes);
+	i32 *parents = parentsMem.get(); // size numNodes.
 
-		cudaFuncSetCacheConfig(build_lbvh_treeD<u64>, cudaFuncCachePreferL1);
-		get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<u32>);
-		build_lbvh_treeD<u32> << <numBlocks, numThreads >> > (//TODO check <u64>
-			numInstances,
-			mortonCodes,
-			parents);
-	}
-	else {
-		parents = (i32*)malloc(totalBytes);
+	{
+		u32* mortonCodes = codesMem.get();
+		if (dev == Device::CUDA) {
+			get_maximum_occupancy(numBlocks, numThreads, numInstances, calculate_morton_codes32D);
+			calculate_morton_codes32D << < numBlocks, numThreads >> > (
+				matrixs, objIds, aabbs, sceneBB.min, sceneBB.max,
+				mortonCodes, primIds, numInstances);
 
-		for (i32 idx = 0; idx < numInternalNodes; idx++)
-		{
-			build_lbvh_tree<u32>(numInstances, mortonCodes, parents, idx);
+			// Sort based on Morton codes.
+			CuLib::DeviceSort(numInstances, &mortonCodes, &mortonCodes,
+				&primIds, &primIds);
+		}
+		else {
+			for (i32 idx = 0; idx < numInstances; idx++)
+			{
+				calculate_morton_codes32(matrixs, objIds, aabbs, sceneBB.min, sceneBB.max,
+					mortonCodes, primIds, numInstances, idx);
+			}
+
+			// Sort based on Morton codes.
+			thrust::sort_by_key(mortonCodes, mortonCodes + numInstances, primIds);
+		}
+
+		// Create BVH.
+		// Layout: first internal nodes, then leves.
+		if (dev == Device::CUDA) {
+			cudaFuncSetCacheConfig(build_lbvh_treeD<u64>, cudaFuncCachePreferL1);
+			get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<u32>);
+			build_lbvh_treeD<u32> << <numBlocks, numThreads >> > (//TODO check <u64>
+				numInstances,
+				mortonCodes,
+				parents);
+		}
+		else {
+			for (i32 idx = 0; idx < numInternalNodes; idx++)
+			{
+				build_lbvh_tree<u32>(numInstances, mortonCodes, parents, idx);
+			}
 		}
 	}
 
 
 	// Calcualte bounding boxes and SAH.
-	i32* deviceCounters;
-	ei::Vec4 *boundingBoxes;
-	i32* collapseOffsets;
-	if (dev == Device::CUDA) {
-		// Create atomic counters buffer.
-		cudaMalloc((void**)&deviceCounters, numInternalNodes * sizeof(i32));
-		cudaMemset(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
-		// Allocate bounding boxes.
-		cudaMalloc((void**)&boundingBoxes, numNodes * 2 * sizeof(ei::Vec4));
-		// Allocate collapseOffsets.
-		// The last position for collapseOffsets is to avoid access violations,
-		// since if the last internal node needs to be collapsed, it will write 
-		// to this positions with offset = 0, but this info will not be used further.
-		cudaMalloc((void**)& collapseOffsets, numInstances * sizeof(i32));
-		cudaMemset(collapseOffsets, 0, numInternalNodes * sizeof(i32));
-	}
-	else {
-		// Create atomic counters buffer.
-		deviceCounters = (i32*)malloc(numInternalNodes * sizeof(i32));
-		memset(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
-		// Allocate bounding boxes.
-		boundingBoxes = (ei::Vec4*)malloc(numNodes * 2 * sizeof(ei::Vec4));
-		// Allocate collapseOffsets.
-		// The last position for collapseOffsets is to avoid access violations,
-		// since if the last internal node needs to be collapsed, it will write 
-		// to this positions with offset = 0, but this info will not be used further.
-		collapseOffsets = (i32*)malloc(numInstances * sizeof(i32));
-		memset(collapseOffsets, 0, numInternalNodes * sizeof(i32));
-	}
-	i32* removedMarks = deviceCounters;
-	i32* leafMarks = (i32*)mortonCodes;
+	// Create atomic counters buffer.
+	auto deviceCountersMem = make_udevptr_array<dev, i32>(numInternalNodes);
+	i32* deviceCounters = deviceCountersMem.get();
+	mem_set<dev>(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
+	// Allocate bounding boxes.
+	auto boundingBoxesMem = make_udevptr_array<dev, ei::Vec4>(numNodes * 2);
+	ei::Vec4 *boundingBoxes = boundingBoxesMem.get();
+	// Allocate collapseOffsets.
+	// The last position for collapseOffsets is to avoid access violations,
+	// since if the last internal node needs to be collapsed, it will write 
+	// to this positions with offset = 0, but this info will not be used further.
+	auto collapseOffsetsMem = make_udevptr_array<dev, i32>(numInternalNodes);
+	i32* collapseOffsets = collapseOffsetsMem.get();
+	mem_set<dev>(collapseOffsets, 0, numInternalNodes * sizeof(i32));
+	i32* leafMarks = (i32*)codesMem.get();
+
 	if (dev == Device::CUDA) {
 		// Calculate BVH bounding boxes.
 		i32 bboxCacheSize = numThreads * sizeof(ei::Vec4) * 2;
@@ -1671,7 +1655,7 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 			objIds,
 			aabbs,
 			boundingBoxes,
-			sortIndices,
+			primIds,
 			parents,
 			collapseOffsets,
 			traverseCosts.x, traverseCosts.y,
@@ -1682,7 +1666,7 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 		mark_nodesD << <numBlocks, numThreads, bboxCacheSize >> > (
 			numInternalNodes,
 			boundingBoxes,
-			removedMarks,
+			deviceCounters,
 			collapseOffsets,
 			leafMarks);
 	}
@@ -1695,18 +1679,18 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 				objIds,
 				aabbs,
 				boundingBoxes,
-				sortIndices,
+				primIds,
 				parents,
 				collapseOffsets,
 				traverseCosts.x, traverseCosts.y,
-				deviceCounters, 
+				deviceCounters,
 				idx);
 		}
 
 		// Mark all children of collapsed nodes as removed and themselves as leaves (=1).
 		for (i32 idx = 0; idx < numInternalNodes; idx++)
 		{
-			mark_nodes(numInternalNodes, boundingBoxes, removedMarks, collapseOffsets, leafMarks, idx);
+			mark_nodes(numInternalNodes, boundingBoxes, deviceCounters, collapseOffsets, leafMarks, idx);
 		}
 	}
 
@@ -1728,8 +1712,6 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 		thrust::exclusive_scan(leafMarks, leafMarks + numInternalNodes + 1, leafMarks);
 	}
 
-	// Copy values for collapsed BVH.	
-	ei::Vec4* collapsedBVH;
 	// Here uses a compact memory layout so that each leaf only uses 16 bytes.
 	i32 numInternLeavesCollapsedBVH; //!= (numNodesCollapsedBVH + 1) >> 1; since there are simple leaves.
 	// and it includes the removed ones.
@@ -1743,11 +1725,11 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 	i32 numInternalNodesCollapsedBVH = numInternalNodes - numInternLeavesCollapsedBVH;
 	numInternLeavesCollapsedBVH -= numRemovedInternalNodes;
 	i32 numFloat4InCollapsedBVH = numInternLeavesCollapsedBVH + 4 * numInternalNodesCollapsedBVH;
-	bvhSize = numFloat4InCollapsedBVH;
 	//printf("bvhSize %d %d %d\n", bvhSize, 
 	//	numInternLeavesCollapsedBVH + numRemovedInternalNodes, numRemovedInternalNodes);
+	m_bvhNodes.resize(numFloat4InCollapsedBVH * sizeof(ei::Vec4));
+	ei::Vec4* collapsedBVH = as<ei::Vec4>(m_bvhNodes.acquire<dev>());
 	if (dev == Device::CUDA) {
-		cudaMalloc((void**)&collapsedBVH, numFloat4InCollapsedBVH * sizeof(ei::Vec4));
 		get_maximum_occupancy(numBlocks, numThreads, numNodes, copy_to_collapsed_bvh_insD);
 		copy_to_collapsed_bvh_insD << < numBlocks, numThreads >> > (
 			numNodes,
@@ -1756,44 +1738,26 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 			collapsedBVH,
 			boundingBoxes,
 			parents,
-			removedMarks,
-			sortIndices,
+			deviceCounters,
+			primIds,
 			leafMarks,
 			collapseOffsets
 			);
-
-
-		// Free device memory.
-		cudaFree(leafMarks);// aka mortonCodes.
-		//cudaFree(sortIndices);
-		cudaFree(parents);
-		cudaFree(removedMarks);// aka deviceCounters.
-		cudaFree(boundingBoxes);
-		cudaFree(collapseOffsets);
 	}
 	else {
-		collapsedBVH = (ei::Vec4*)malloc(numFloat4InCollapsedBVH * sizeof(ei::Vec4));
 		for (i32 idx = 0; idx < (i32)numNodes; idx++)
 		{
 			copy_to_collapsed_bvh_ins(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes, 
-				collapsedBVH, boundingBoxes, parents, removedMarks, sortIndices, 
+				collapsedBVH, boundingBoxes, parents, deviceCounters, primIds, 
 				leafMarks, collapseOffsets, idx);
 		}
-
-		// Free device memory.
-		free(leafMarks);// aka mortonCodes.
-		free(parents);
-		free(removedMarks);// aka deviceCounters.
-		free(boundingBoxes);
-		free(collapseOffsets);
 	}
-
-	(*instanceIds) = sortIndices;
-	(*bvh) = collapsedBVH;
 }
 
+
 template < Device dev >
-void build_lbvh_obj(ObjectDescriptor<dev>& obj, const ei::Box& aabb) {
+void LBVHBuilder::build(ObjectDescriptor<dev>& obj, const ei::Box& aabb) {
+	// TODO: refactor the same way as for the scene
 	ei::Vec3* meshVertices = (ei::Vec3*)obj.polygon.vertices;
 	ei::Vec4* spheres = (ei::Vec4*)obj.spheres.spheres;
 	i32* triIndices = (i32*)obj.polygon.vertexIndices;
@@ -1805,33 +1769,34 @@ void build_lbvh_obj(ObjectDescriptor<dev>& obj, const ei::Box& aabb) {
 	i32 offsetSpheres = offsetQuads + obj.polygon.numQuads;
 	i32 numPrimitives = offsetSpheres + obj.spheres.numSpheres;
 	obj.accelStruct.type = AccelType::LBVH;
-	LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
+	ei::Vec4* bvh;
+	i32* primIds;
+	i32 bvhSize;
 	build_lbvh64<dev>(meshVertices, spheres, triIndices, quadIndices, lo, hi, traverseCosts,
-		numPrimitives, offsetQuads, offsetSpheres, &lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
+		numPrimitives, offsetQuads, offsetSpheres, &primIds, &bvh, bvhSize);
 }
 
-template void build_lbvh_obj<Device::CPU>(ObjectDescriptor<Device::CPU>&, const ei::Box&);
-template void build_lbvh_obj<Device::CUDA>(ObjectDescriptor<Device::CUDA>&, const ei::Box&);
+template void LBVHBuilder::build<Device::CPU>(ObjectDescriptor<Device::CPU>&, const ei::Box&);
+template void LBVHBuilder::build<Device::CUDA>(ObjectDescriptor<Device::CUDA>&, const ei::Box&);
 
 template < Device dev >
-void build_lbvh_scene(
-	SceneDescriptor<dev>& scene
+void LBVHBuilder::build(
+	const SceneDescriptor<dev>& scene
 ) {
-	ei::Mat3x4* matrixs = (ei::Mat3x4*)scene.transformations;
-	i32* objIds = (i32*)scene.objectIndices;
-	ei::Box* aabbs = (ei::Box*)scene.aabbs;
-	ei::Vec3 lo = scene.aabb.min;
-	ei::Vec3 hi = scene.aabb.max;
 	ei::Vec2 traverseCosts = { 1.f, 20.f };// TODO: find value for this.
-	i32 numInstances = scene.numInstances;
-	scene.accelStruct.type = AccelType::LBVH;
-	LBVH* lbvh = (LBVH*)scene.accelStruct.accelParameters;
-	build_lbvh32<dev>(matrixs, objIds, aabbs, lo, hi, traverseCosts, numInstances,
-		&lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
+
+	build_lbvh32<dev>((ei::Mat3x4*)scene.transformations,
+		(i32*)scene.objectIndices,
+		(ei::Box*)scene.aabbs,
+		scene.aabb,
+		traverseCosts, scene.numInstances);
+
+	m_primIds.mark_changed(dev);
+	m_bvhNodes.mark_changed(dev);
 }
 
-template void build_lbvh_scene<Device::CPU>(SceneDescriptor<Device::CPU>&);
-template void build_lbvh_scene<Device::CUDA>(SceneDescriptor<Device::CUDA>&);
+template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&);
+template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&);
 
 }}} // namespace mufflon
 

@@ -1,9 +1,79 @@
 #pragma once
 
-#include "core/scene/accel_structs/accel_struct.hpp"
-#include "accel_structs_commons.hpp"
+#include "core/concepts.hpp"
+#include "core/scene/descriptors.hpp"
+#include "core/memory/generic_resource.hpp"
+#include "util/flag.hpp"
+#include "accel_struct_info.hpp"
 
 namespace mufflon { namespace scene { namespace accel_struct {
+
+// Structure specific descriptor
+struct LBVH {
+	const ei::Vec4* bvh;
+	const i32* primIds;
+	i32 bvhSize;
+};
+
+//
+class LBVHBuilder {
+public:
+	template < Device dev >
+	void build(ObjectDescriptor<dev>& obj, const ei::Box& aabb);
+
+	template < Device dev >
+	void build(const SceneDescriptor<dev>& scene);
+
+	template < Device dev >
+	AccelDescriptor acquire_const() {
+		if(needs_rebuild<dev>())
+			throw std::runtime_error("[LBVHBuilder::acquire_const] the BVH must be created with build() before a descriptor can be returned.");
+		synchronize<dev>();
+
+		AccelDescriptor desc;
+		desc.type = AccelType::LBVH;
+		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
+		lbvhDesc.bvh = as<ei::Vec4>( m_bvhNodes.acquire_const<dev>() );
+		lbvhDesc.primIds = as<i32>( m_bvhNodes.acquire_const<dev>() );
+		lbvhDesc.bvhSize = int(m_bvhNodes.size() / sizeof(ei::Vec4));
+		return desc;
+	}
+
+	template < Device dev >
+	void unload() {
+		m_primIds.unload<dev>();
+		m_bvhNodes.unload<dev>();
+	}
+
+	template < Device dev >
+	void synchronize() {
+		m_primIds.synchronize<dev>();
+		m_bvhNodes.synchronize<dev>();
+	}
+
+	template < Device dev >
+	bool needs_rebuild() const {
+		return (!m_primIds.is_resident<Device::CPU>() || !m_bvhNodes.is_resident<Device::CPU>())
+			&& (!m_primIds.is_resident<Device::CUDA>() || !m_bvhNodes.is_resident<Device::CUDA>());
+	}
+
+	void mark_invalid() noexcept {
+		unload<Device::CPU>();
+		unload<Device::CUDA>();
+	}
+private:
+	GenericResource m_primIds;
+	GenericResource m_bvhNodes;
+
+	template < Device dev >
+	void build_lbvh32(ei::Mat3x4* matrixs,//matrices
+		i32* objIds,
+		ei::Box* aabbs,
+		const ei::Box& sceneBB,
+		ei::Vec2 traverseCosts, i32 numInstances);
+};
+
+template DeviceManagerConcept<LBVHBuilder>;
 
 
 /**

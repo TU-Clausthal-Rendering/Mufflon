@@ -91,4 +91,13 @@ inline void copy(T* dst, const T* src, std::size_t size ) {
 // mAssertMsg(dstDev != Device::OPENGL && srcDev != Device::OPENGL, "Unimplemented copy specialization.");
 // TODO: OpenGL (glBufferSubData with offset and object handle as target/src types
 
+template < Device dev >
+inline void mem_set(void* mem, int value, std::size_t size) {
+	memset(mem, value, size);
+}
+template <>
+inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
+	cudaMemset(mem, value, size);
+}
+
 } // namespace mufflon
