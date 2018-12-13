@@ -96,6 +96,7 @@
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Dll\Loader.cs" />
+    <Compile Include="Dll\Logger.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
     <Compile Include="Model\Camera\FocusCameraModel.cs" />

@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using gui.Annotations;
+using gui.Dll;
 using gui.Model;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
@@ -42,10 +43,7 @@ namespace gui.ViewModel
         {
             m_models = models;
             m_models.App.Window.ConsoleInputBox.KeyDown += ConsoleInputBoxOnKeyDown;
-            m_models.App.GlHost.Log += GlHostOnLog;
-
-            //AddText("im white", Brushes.White);
-            //AddText("im red", Brushes.Red);
+            Logger.Log += GlHostOnLog;
         }
 
         private void GlHostOnLog(string message, Brush color)

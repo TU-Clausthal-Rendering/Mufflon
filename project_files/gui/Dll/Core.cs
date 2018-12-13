@@ -72,8 +72,17 @@ namespace gui.Dll
             PARAM_BOOL
         };
 
+        public enum Severity
+        {
+            PEDANTIC,
+            INFO,
+            WARNING,
+            ERROR,
+            FATAL_ERROR
+        };
 
-        public delegate void LogCallback(string message, int severity);
+
+        public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool display_screenshot();

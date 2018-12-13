@@ -98,6 +98,7 @@ namespace gui.Model
                     {
                         MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
                             MessageBoxImage.Error);
+                        //Logger.log(e.Message, Core.Severity.FATAL_ERROR);
                         FullPath = null;
                         return false;
                     }

@@ -21,9 +21,6 @@ namespace gui.Dll
         public delegate void ErrorEvent(string message);
         public event ErrorEvent Error;
 
-        public delegate void LogEvent(string message, Brush color);
-        public event LogEvent Log;
-
         // host of the HwndHost
         private readonly Border m_parent;
         // information about the viewport
@@ -105,6 +102,7 @@ namespace gui.Dll
             }
             catch (Exception e)
             {
+                Logger.log(e.Message, Core.Severity.FATAL_ERROR);
                 Dispatcher.BeginInvoke(Error, e.Message);
             }
             Core.mufflon_destroy();
@@ -137,16 +135,11 @@ namespace gui.Dll
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
             // dll call: initialize glad etc.
-            m_logCallbackPointer = new Core.LogCallback(LogCallback);
+            m_logCallbackPointer = new Core.LogCallback(Logger.log);
             if (!Core.mufflon_initialize(m_logCallbackPointer))
                 throw new Exception(Core.GetDllError());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.GetDllError());
-        }
-
-        private void LogCallback(string message, int severity)
-        {
-            Dispatcher.BeginInvoke(Log, message, Brushes.White);
         }
 
         /// <summary>
