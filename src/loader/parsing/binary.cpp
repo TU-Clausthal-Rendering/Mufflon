@@ -435,7 +435,7 @@ void BinaryLoader::read_compressed_normal_compressed_vertices() {
 													* (3u * sizeof(float) + sizeof(u32)));
 	
 	for(u32 vertex = 0u; vertex < m_currObjState.numVertices; ++vertex) {
-		Vec3 unpackedNormal = util::pun<Vec3>(ei::unpackOctahedral32(packedNormals[vertex]));
+		Vec3 unpackedNormal = util::pun<Vec3>(ei::normalize(ei::unpackOctahedral32(packedNormals[vertex])));
 
 		if(polygon_add_vertex(m_currObjState.objHdl, points[vertex], unpackedNormal, uvs[vertex]) == INVALID_INDEX)
 			throw std::runtime_error("Failed to add vertex " + std::to_string(vertex)
@@ -629,7 +629,6 @@ void BinaryLoader::read_lod() {
 		read_compressed_face_materials();
 		read_compressed_face_attributes();
 		read_compressed_spheres();
-		throw std::runtime_error("Compressed data is not supported yet");
 	} else {
 		// First comes vertex data
 		if(m_currObjState.globalFlags.is_set(GlobalFlag::COMPRESSED_NORMALS))

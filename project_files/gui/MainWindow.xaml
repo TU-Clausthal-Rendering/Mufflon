@@ -159,29 +159,30 @@
                     <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
 
-                <Grid Grid.Column="0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="5"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
 
-                    <renderer:RendererParams x:Name="RendererPropertiesControl"/>
-
-                    <GridSplitter Grid.Row="1"
-                                  Height="5"
-                                  VerticalAlignment="Stretch"
-                                  HorizontalAlignment="Stretch"
-                                  Background="{StaticResource BorderBrush}"/>
-
-                    <TreeView Grid.Row="2"
-                          Name="ProfilerTreeView">
-                        <TreeViewItem Header="Rendering"
-                                  FontFamily="Courier New"/>
-                        <TreeViewItem Header="Loading"
-                                  FontFamily="Courier New"/>
-                    </TreeView>
-                </Grid>
+                <TabControl
+                    Grid.Column="0"
+                    Background="{StaticResource BackgroundBrush}">
+                    <TabItem Header="Scenario"
+                             Width="Auto">
+                        
+                    </TabItem>
+                    <TabItem Header="Properties"
+                             Width="Auto">
+                        <renderer:RendererParams x:Name="RendererPropertiesControl"/>
+                    </TabItem>
+                    <TabItem Header="Profiler"
+                             Width="Auto">
+                        <TreeView Grid.Row="2"
+                                  Name="ProfilerTreeView">
+                            <TreeViewItem Header="Rendering"
+                                          FontFamily="Courier New"/>
+                            <TreeViewItem Header="Loading"
+                                          FontFamily="Courier New"/>
+                        </TreeView>
+                    </TabItem>
+                </TabControl>
+                
 
                 <GridSplitter
                     Grid.Column="1"

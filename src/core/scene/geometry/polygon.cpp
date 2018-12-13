@@ -125,10 +125,6 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
 
-	auto vAttribs = std::make_tuple(VAttrDesc<float>{"hi"});
-	auto fAttribs = std::make_tuple(FAttrDesc<int>{"test"});
-	auto desc = get_descriptor<Device::CUDA>(vAttribs, fAttribs);
-
 	return vh;
 }
 

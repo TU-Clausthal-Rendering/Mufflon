@@ -93,9 +93,11 @@ public:
 		// Initialize it
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		T prototype{ std::forward<Args>(args)... };
-		for(std::size_t i = 0; i < n; ++i)
-			cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyDefault));
+		if(!std::is_fundamental<T>::value) {
+			T prototype{ std::forward<Args>(args)... };
+			for (std::size_t i = 0; i < n; ++i)
+				cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyDefault));
+		}
 		return ptr;
 	}
 

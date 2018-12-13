@@ -22,7 +22,7 @@ struct RenderBuffer;
 
 class GpuPathTracer : public IRenderer {
 public:
-	GpuPathTracer() = default;
+	GpuPathTracer();
 	~GpuPathTracer();
 
 	// This is just a test method, don't use this as an actual interface
@@ -38,7 +38,7 @@ private:
 				 RenderBuffer<Device::CUDA> outputBuffer) const;
 
 	bool m_reset = true;
-	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params = {};
+	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params;
 	scene::SceneHandle m_currentScene = nullptr;
 	scene::SceneDescriptor<Device::CUDA>* m_scenePtr = nullptr;
 };

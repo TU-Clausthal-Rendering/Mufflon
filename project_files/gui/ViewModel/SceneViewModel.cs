@@ -85,6 +85,7 @@ namespace gui.ViewModel
                                 Path = path
                             });
                         }
+                        OnPropertyChanged(nameof(CanLoadLastScenes));
                         
                         break;
                     }

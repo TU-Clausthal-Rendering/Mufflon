@@ -83,7 +83,7 @@ namespace gui.Model
                         "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
                         MessageBoxImage.Error) == MessageBoxResult.Yes)
                     {
-                        int index = Settings.Default.LastScenes.IndexOf(m_fullPath);
+                        int index = Settings.Default.LastScenes.IndexOf(path);
                         if (index >= 0)
                         {
                             Settings.Default.LastScenes.RemoveAt(index);

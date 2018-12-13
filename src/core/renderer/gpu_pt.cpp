@@ -6,6 +6,8 @@
 
 namespace mufflon::renderer {
 
+GpuPathTracer::GpuPathTracer() : m_params{} {}
+
 GpuPathTracer::~GpuPathTracer() {
 	if(m_scenePtr != nullptr)
 		cuda::check_error(cudaFree(m_scenePtr));
