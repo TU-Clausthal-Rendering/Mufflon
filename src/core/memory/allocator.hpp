@@ -68,22 +68,6 @@ public:
 		}
 		return nullptr;
 	}
-
-	template < class T, Device dev = Device::CPU >
-	static void copy(T* dst, const T* src, std::size_t n) {
-		static_assert(std::is_trivially_copyable<T>::value,
-					  "Must be trivially copyable");
-		switch(dev) {
-			case Device::CPU:
-				std::memcpy(dst, src, sizeof(T) * n); 
-				break;
-			case Device::CUDA:
-				cuda::check_error(cudaMemcpy(dst, src, sizeof(T) * n, cudaMemcpyDefault));
-				break;
-			default:
-				mAssert(false);
-		}
-	}
 };
 
 // Allocator specialization for CUDA

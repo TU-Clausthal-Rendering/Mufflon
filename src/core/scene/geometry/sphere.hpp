@@ -161,8 +161,7 @@ public:
 
 			std::vector<void*> cpuAttribs(numAttribs);
 			push_back_attrib<0u, dev>(cpuAttribs, attribs);
-			Allocator<Device::CPU>::template copy<void*, dev>(attribBuffer.buffer, cpuAttribs.data(),
-															  numAttribs);
+			copy(attribBuffer.buffer, cpuAttribs.data(), numAttribs);
 		}
 
 		return SpheresDescriptor<dev>{

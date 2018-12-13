@@ -141,8 +141,8 @@ public:
 					for(std::size_t i = hdl.index() + 1u; i < m_attribs.size(); ++i) {
 						// Swap the attribute into the temporary buffer, then copy it to its new location
 						if(m_attribs[i].offset != std::numeric_limits<std::size_t>::max()) {
-							Allocator::copy(swapBlock, &m_memoryBlock[m_attribs[i].offset], m_attribs[i].length);
-							Allocator::copy(&m_memoryBlock[currOffset], swapBlock, m_attribs[i].length);
+							copy(swapBlock, &m_memoryBlock[m_attribs[i].offset], m_attribs[i].length);
+							copy(&m_memoryBlock[currOffset], swapBlock, m_attribs[i].length);
 							m_attribs[i].offset = currOffset;
 							currOffset += m_attribs[i].length;
 						}
@@ -593,8 +593,7 @@ public:
 				// Copy the current attribute into the buffer
 				auto[propPtr, currLength] = m_accessors[i](attrib, m_mesh);
 				if constexpr(dev == Device::CUDA)
-					Allocator<Device::CPU>::template copy<char, Device::CUDA>(&pool.get_pool_data()[currOffset],
-																			  propPtr, currLength);
+					copy(&pool.get_pool_data()[currOffset], propPtr, currLength);
 				else
 					throw std::runtime_error("Missing OpenGL copy");
 				currOffset += currLength;
