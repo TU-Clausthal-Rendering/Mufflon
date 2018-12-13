@@ -38,17 +38,6 @@ public:
 		return m_objRef;
 	}
 
-	template < Device dev >
-	InstanceDescriptor<dev> get_descriptor() {
-		// We need to leave the objectdescriptor empty and leave it
-		// up to the scene to properly fill it in, since we do not
-		// yet have an array of object descriptors
-		return InstanceDescriptor<dev>{
-			m_transMat,
-			0u
-		};
-	}
-
 private:
 	Object& m_objRef;
 	TransMatrixType m_transMat;

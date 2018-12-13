@@ -3,6 +3,7 @@
 #include "util/int_types.hpp"
 #include "lights/light_tree.hpp"
 #include "core/memory/residency.hpp"
+#include "core/scene/accel_structs/accel_struct.hpp"
 #include "handles.hpp"
 #include <ei/vector.hpp>
 #include <ei/3dtypes.hpp>
@@ -19,6 +20,12 @@ namespace scene {
  * valid on said device. They also may be outdated if a different scenario
  * gets created.
  */
+
+// Exchangable acceleration structure header
+struct AccelDescriptor {
+	accel_struct::AccelType type { accel_struct::AccelType::NONE };
+	u8 accelParameters[accel_struct::MAX_ACCEL_STRUCT_PARAMETER_SIZE];
+};
 
 // Geometric descriptors
 template < Device dev >
@@ -52,18 +59,9 @@ struct SpheresDescriptor {
 
 template < Device dev >
 struct ObjectDescriptor {
-	ei::Box aabb;//TODO remove this?
 	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
-	ArrayDevHandle_t<dev, void> accelStruct;
-};
-
-template < Device dev >
-struct InstanceDescriptor {
-	ei::Matrix<Real, 3, 4> transformation;
-	// Index into the object array of the scene descriptor
-	// TODO: replace with direct pointer? wouldn't work for OpenGL
-	u32 objectIndex;
+	AccelDescriptor accelStruct;
 };
 
 
@@ -94,11 +92,9 @@ struct SceneDescriptor {
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
 	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> objects;
-	ArrayDevHandle_t<dev, InstanceDescriptor<dev>> instances;
 
-	ArrayDevHandle_t<dev, void> accelStruct;
-	// TODO: use the following three or InstanceDescriptor?
-	ArrayDevHandle_t<dev, ei::Matrix<Real, 3, 4>> transformations;
+	AccelDescriptor accelStruct;
+	ArrayDevHandle_t<dev, ei::Mat3x4> transformations;
 	ArrayDevHandle_t<dev, u32> objectIndices;
 	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 

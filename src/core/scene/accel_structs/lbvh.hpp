@@ -10,7 +10,7 @@ namespace mufflon { namespace scene { namespace accel_struct {
  * LBVH class.
  * Linear Bounding Volume Hiearchie.
  */
-class LBVH:
+/*class LBVH:
 	public IAccelerationStructure {
 public:
 	LBVH();
@@ -53,7 +53,7 @@ private:
 	AccelStructInfo::InputArrays m_inputCPU{};
 	AccelStructInfo::OutputArrays m_outputCUDA{};
 	AccelStructInfo::OutputArrays m_outputCPU{};
-};
+};*/
 
 }}}
 

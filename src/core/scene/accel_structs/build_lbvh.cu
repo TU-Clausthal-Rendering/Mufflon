@@ -17,6 +17,10 @@ namespace mufflon {
 namespace scene {
 namespace accel_struct {
 
+
+static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH),
+	"Descriptor parameter block to small for this acceleration structure.");
+
 CUDA_FUNCTION void syncthreads() {
 #ifdef __CUDA_ARCH__
 	__syncthreads();
@@ -468,7 +472,9 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	cost *= ei::surface(currentBb);
 
 	// Update node bounding boxes of current node.
+#ifdef __CUDA_ARCH__
 	sharedBb[threadIdx.x] = { currentBb, cost, primitiveCount };
+#endif
 	const i32 numInternalNodes = numPrimitives - 1;
 	i32 leafIndex = idx + numInternalNodes;
 	i32 boxId = leafIndex << 1;
@@ -725,7 +731,9 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 	cost *= ei::surface(currentBb);
 
 	// Update node bounding boxes of current node.
+#ifdef __CUDA_ARCH__
 	sharedBb[threadIdx.x] = { currentBb, cost, instanceCount };
+#endif
 	const i32 numInternalNodes = numInstances - 1;
 	i32 leafIndex = idx + numInternalNodes;
 	i32 boxId = leafIndex << 1;
@@ -1325,27 +1333,6 @@ __global__ void copy_to_collapsed_bvh_insD(
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
-void build_lbvh64_info(AccelStructInfo::Size& sizes,
-	AccelStructInfo::InputArrays& inputs, AccelStructInfo::OutputArrays& ouputs,
-	ei::Box& bbox, ei::Vec4& traverseCost) {
-	
-	build_lbvh64(
-		inputs.meshVertices,
-		inputs.spheres,
-		inputs.triIndices,
-		inputs.quadIndices,
-		bbox.min,
-		bbox.max,
-		traverseCost,
-		sizes.numPrimives,
-		sizes.offsetQuads,
-		sizes.offsetSpheres,
-		&ouputs.primIds,
-		&ouputs.bvh,
-		sizes.bvhSize
-	);
-}
-
 // For the objects.
 template < Device dev >
 void build_lbvh64(ei::Vec3* meshVertices,
@@ -1409,7 +1396,7 @@ void build_lbvh64(ei::Vec3* meshVertices,
 
 		for (i32 idx = 0; idx < numInternalNodes; idx++)
 		{
-			build_lbvh_tree<u64>(numInstances, mortonCodes, parents, idx);
+			build_lbvh_tree<u64>(numPrimitives, mortonCodes, parents, idx);
 		}
 	}
 
@@ -1476,11 +1463,11 @@ void build_lbvh64(ei::Vec3* meshVertices,
 	}
 	else {
 		// Calculate BVH bounding boxes.
-		for (i32 idx = 0; idx < numInstances; idx++)
+		for (i32 idx = 0; idx < numPrimitives; idx++)
 		{
 			calculate_bounding_boxes(numPrimitives, meshVertices, spheres, triIndices, quadIndices,
-				boundingBoxes, sortedIndices, parents, collapseOffsets, offsetQuads, offsetSpheres,
-				ci, ct0, ct1, ct2, counters, idx);
+				boundingBoxes, sortIndices, parents, collapseOffsets, offsetQuads, offsetSpheres,
+				traverseCosts.x, traverseCosts.y, traverseCosts.z, traverseCosts.w, deviceCounters, idx);
 		}
 
 		// Mark all children of collapsed nodes as removed and themselves as leaves (=1).
@@ -1555,7 +1542,7 @@ void build_lbvh64(ei::Vec3* meshVertices,
 	}
 	else {
 		collapsedBVH = (ei::Vec4*)malloc(numFloat4InCollapsedBVH * sizeof(ei::Vec4));
-		for (i32 i = 0; i < numNodes; i++)
+		for (i32 idx = 0; idx < i32(numNodes); idx++)
 		{
 			copy_to_collapsed_bvh(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes,
 				collapsedBVH, boundingBoxes, parents, removedMarks, sortIndices, 
@@ -1805,42 +1792,30 @@ void build_lbvh32(ei::Mat3x4* matrixs,
 	(*bvh) = collapsedBVH;
 }
 
-void build_lbvh_obj(ObjectDescriptor<Device::CPU> obj) {
+template < Device dev >
+void build_lbvh_obj(ObjectDescriptor<dev>& obj, const ei::Box& aabb) {
 	ei::Vec3* meshVertices = (ei::Vec3*)obj.polygon.vertices;
 	ei::Vec4* spheres = (ei::Vec4*)obj.spheres.spheres;
 	i32* triIndices = (i32*)obj.polygon.vertexIndices;
 	i32* quadIndices = (i32*)(obj.polygon.vertexIndices + obj.polygon.numTriangles);
-	ei::Vec3 lo = obj.aabb.min; // TODO maybe use another seperate aabbs.
-	ei::Vec3 hi = obj.aabb.max;
+	ei::Vec3 lo = aabb.min; // TODO maybe use another seperate aabbs.
+	ei::Vec3 hi = aabb.max;
 	ei::Vec4 traverseCosts = { 1.0f, 1.2f, 2.4f, 1.f };
 	i32 offsetQuads = obj.polygon.numTriangles;
 	i32 offsetSpheres = offsetQuads + obj.polygon.numQuads;
 	i32 numPrimitives = offsetSpheres + obj.spheres.numSpheres;
-	obj.accelStruct = malloc(sizeof(LBVH));
-	LBVH* lbvh = (LBVH*)obj.accelStruct;
-	build_lbvh64(meshVertices, spheres, triIndices, quadIndices, lo, hi, traverseCosts,
+	obj.accelStruct.type = AccelType::LBVH;
+	LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
+	build_lbvh64<dev>(meshVertices, spheres, triIndices, quadIndices, lo, hi, traverseCosts,
 		numPrimitives, offsetQuads, offsetSpheres, &lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
 }
 
-void build_lbvh_obj(ObjectDescriptor<Device::CUDA> obj) {
-	ei::Vec3* meshVertices = (ei::Vec3*)obj.polygon.vertices;
-	ei::Vec4* spheres = (ei::Vec4*)obj.spheres.spheres;
-	i32* triIndices = (i32*)obj.polygon.vertexIndices;
-	i32* quadIndices = (i32*)(obj.polygon.vertexIndices + obj.polygon.numTriangles);
-	ei::Vec3 lo = obj.aabb.min; // TODO maybe use another seperate aabbs.
-	ei::Vec3 hi = obj.aabb.max;
-	ei::Vec4 traverseCosts = { 1.0f, 1.2f, 2.4f, 1.f };
-	i32 offsetQuads = obj.polygon.numTriangles;
-	i32 offsetSpheres = offsetQuads + obj.polygon.numQuads;
-	i32 numPrimitives = offsetSpheres + obj.spheres.numSpheres;
-	obj.accelStruct = malloc(sizeof(LBVH));
-	LBVH* lbvh = (LBVH*)obj.accelStruct;
-	build_lbvh64(meshVertices, spheres, triIndices, quadIndices, lo, hi, traverseCosts,
-		numPrimitives, offsetQuads, offsetSpheres, &lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
-}
+template void build_lbvh_obj<Device::CPU>(ObjectDescriptor<Device::CPU>&, const ei::Box&);
+template void build_lbvh_obj<Device::CUDA>(ObjectDescriptor<Device::CUDA>&, const ei::Box&);
 
+template < Device dev >
 void build_lbvh_scene(
-	SceneDescriptor<Device::CPU> scene
+	SceneDescriptor<dev>& scene
 ) {
 	ei::Mat3x4* matrixs = (ei::Mat3x4*)scene.transformations;
 	i32* objIds = (i32*)scene.objectIndices;
@@ -1849,28 +1824,14 @@ void build_lbvh_scene(
 	ei::Vec3 hi = scene.aabb.max;
 	ei::Vec2 traverseCosts = { 1.f, 20.f };// TODO: find value for this.
 	i32 numInstances = scene.numInstances;
-	scene.accelStruct = malloc(sizeof(LBVH));
-	LBVH* lbvh = (LBVH*)scene.accelStruct;
-	build_lbvh32<Device::CPU>(matrixs, objIds, aabbs, lo, hi, traverseCosts, numInstances,
+	scene.accelStruct.type = AccelType::LBVH;
+	LBVH* lbvh = (LBVH*)scene.accelStruct.accelParameters;
+	build_lbvh32<dev>(matrixs, objIds, aabbs, lo, hi, traverseCosts, numInstances,
 		&lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
 }
 
-void build_lbvh_scene(
-	SceneDescriptor<Device::CUDA> scene
-) {
-	ei::Mat3x4* matrixs = (ei::Mat3x4*)scene.transformations;
-	i32* objIds = (i32*)scene.objectIndices;
-	ei::Box* aabbs = (ei::Box*)scene.aabbs;
-	ei::Vec3 lo = scene.aabb.min;
-	ei::Vec3 hi = scene.aabb.max;
-	ei::Vec2 traverseCosts = { 1.f, 20.f };// TODO: find value for this.
-	i32 numInstances = scene.numInstances;
-	scene.accelStruct = malloc(sizeof(LBVH));
-	LBVH* lbvh = (LBVH*)scene.accelStruct;
-	build_lbvh32<Device::CUDA>(matrixs, objIds, aabbs, lo, hi, traverseCosts, numInstances,
-		&lbvh->primIds, &lbvh->bvh, lbvh->bvhSize);
-}
-
+template void build_lbvh_scene<Device::CPU>(SceneDescriptor<Device::CPU>&);
+template void build_lbvh_scene<Device::CUDA>(SceneDescriptor<Device::CUDA>&);
 
 }}} // namespace mufflon
 

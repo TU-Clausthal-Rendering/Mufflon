@@ -6,11 +6,13 @@
 #include "types.hpp"
 #include "lights/light_tree.hpp"
 #include "core/cameras/camera.hpp"
+#include "core/memory/residency.hpp"
 #include "core/memory/generic_resource.hpp"
 #include "core/scene/accel_structs/accel_struct.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/object.hpp"
+#include "core/scene/accel_structs/build_lbvh.hpp"
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -40,7 +42,7 @@ public:
 	void add_instance(InstanceHandle hdl) {
 		m_instances.push_back(hdl);
 		m_boundingBox = ei::Box(m_boundingBox, hdl->get_bounding_box());
-		m_accelDirty = true;
+		clear_accel_structure();
 	}
 
 	void load_media(const std::vector<materials::Medium>& media);
@@ -72,27 +74,21 @@ public:
 	}
 
 	// Checks if the acceleration structure on one of the system parts has been modified.
-	bool is_accel_dirty(Device res) const noexcept;
+	template < Device dev >
+	bool is_accel_dirty() const noexcept {
+		return m_accelStruct[get_device_index<dev>()].type == accel_struct::AccelType::NONE;
+	}
 
-	// Checks whether the object currently has a BVH.
-	bool has_accel_structure() const noexcept {
-		return m_accelStruct != nullptr;
-	}
-	// Returns the BVH of this object.
-	const accel_struct::IAccelerationStructure& get_accel_structure() const noexcept {
-		mAssert(this->has_accel_structure());
-		return *m_accelStruct;
-	}
+	// Checks whether the scene currently has a BVH.
+	/*bool has_accel_structure() const noexcept {
+		return m_accelStruct.type != accel_struct::Type::NONE;
+	}*/
 	// Clears the BVH of this object.
-	void clear_accel_structure();
-	// Initializes the acceleration structure to a given implementation.
-	template < class Accel, class... Args >
-	void set_accel_structure(Args&& ...args) {
-		m_accel_struct = std::make_unique<Accel>(std::forward<Args>(args)...);
+	void clear_accel_structure() {
+		m_accelStruct[get_device_index<Device::CPU>()].type = accel_struct::AccelType::NONE;
+		m_accelStruct[get_device_index<Device::CUDA>()].type = accel_struct::AccelType::NONE;
+		// TODO: memory management
 	}
-
-	// (Re-)builds the acceleration structure
-	void build_accel_structure();
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights,
@@ -136,31 +132,41 @@ public:
 										const ei::IVec2& resolution) {
 		synchronize<dev>();
 		std::vector<ObjectDescriptor<dev>> objectDescs;
-		std::vector<InstanceDescriptor<dev>> instanceDescs;
+		std::vector<ei::Mat3x4> instanceTransformations;
+		std::vector<u32> objectIndices;
+		std::vector<ei::Box> objectAabbs;
 		// We need this to ensure we only create one descriptor per object
 		std::unordered_map<Object*, u32> objectDescMap;
 
 		// Create the object and instance descriptors hand-in-hand
 		for(InstanceHandle inst : m_instances) {
-			instanceDescs.push_back(inst->get_descriptor<dev>());
 			// Create the object descriptor, if not already present, and its index
 			Object* objHdl = &inst->get_object();
 			auto entry = objectDescMap.find(objHdl);
 			if(entry == objectDescMap.end()) {
 				entry = objectDescMap.emplace(objHdl, static_cast<u32>(objectDescs.size())).first;
 				objectDescs.push_back(objHdl->get_descriptor<dev>(vertexAttribs, faceAttribs, sphereAttribs));
+				objectAabbs.push_back(objHdl->get_bounding_box());
 			}
-			instanceDescs.back().objectIndex = entry->second;
+			instanceTransformations.push_back(inst->get_transformation_matrix());
+			objectIndices.push_back(entry->second);
 		}
 		// Allocate the device memory and copy over the descriptors
 		auto& objDevDesc = m_objDevDesc.get<unique_device_ptr<dev, ObjectDescriptor<dev>>>();
-		auto& instDevDesc = m_instDevDesc.get<unique_device_ptr<dev, InstanceDescriptor<dev>>>();
 		objDevDesc = make_udevptr_array<dev, ObjectDescriptor<dev>>(objectDescs.size());
-		instDevDesc = make_udevptr_array<dev, InstanceDescriptor<dev>>(instanceDescs.size());
-		Allocator<Device::CPU>::template copy<ObjectDescriptor<dev>, dev>(objDevDesc.get(), objectDescs.data(),
-																		  objectDescs.size());
-		Allocator<Device::CPU>::template copy<InstanceDescriptor<dev>, dev>(instDevDesc.get(), instanceDescs.data(),
-																			instanceDescs.size());
+		copy(objDevDesc.get(), objectDescs.data(), objectDescs.size() * sizeof(ObjectDescriptor<dev>));
+
+		auto& instTransformsDesc = m_instTransformsDesc.get<unique_device_ptr<dev, ei::Mat3x4>>();
+		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
+		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
+
+		auto& instObjIndicesDesc = m_instObjIndicesDesc.get<unique_device_ptr<dev, u32>>();
+		instObjIndicesDesc = make_udevptr_array<dev,u32>(objectIndices.size());
+		copy(instObjIndicesDesc.get(), objectIndices.data(), sizeof(u32) * objectIndices.size());
+
+		auto& objAabbsDesc = m_objAabbsDesc.get<unique_device_ptr<dev, ei::Box>>();
+		objAabbsDesc = make_udevptr_array<dev, ei::Box>(objectAabbs.size());
+		copy(objAabbsDesc.get(), objectAabbs.data(), sizeof(ei::Box) * objectAabbs.size());
 
 		load_materials<dev>();
 
@@ -168,17 +174,28 @@ public:
 		CameraDescriptor camera;
 		m_camera->get_parameter_pack(&camera.get(), resolution);
 
-		return SceneDescriptor<dev>{
+		SceneDescriptor<dev> sceneDesc{
 			camera,
 			static_cast<u32>(objectDescs.size()),
-			static_cast<u32>(instanceDescs.size()),
+			static_cast<u32>(m_instances.size()),
 			m_boundingBox,
 			objDevDesc.get(),
-			instDevDesc.get(),
+			m_accelStruct[get_device_index<dev>()],
+			instTransformsDesc.get(),
+			instObjIndicesDesc.get(),
+			objAabbsDesc.get(),
 			m_lightTree.acquireConst<dev>(),
 			as<materials::Medium>(m_media.acquire_const<dev>()),
 			as<int>(m_materials.acquire_const<dev>())
 		};
+
+		// Rebuild Instance BVH?
+		if(sceneDesc.accelStruct.type == accel_struct::AccelType::NONE) {
+			accel_struct::build_lbvh_scene(sceneDesc);
+			m_accelStruct[get_device_index<dev>()] = sceneDesc.accelStruct;
+		}
+
+		return sceneDesc;
 	}
 
 
@@ -194,14 +211,17 @@ private:
 	lights::LightTreeBuilder m_lightTree;
 
 	// Acceleration structure over all instances
-	bool m_accelDirty = false;
-	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
+	AccelDescriptor m_accelStruct[NUM_DEVICES];
 
 	// Resources for descriptors
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ObjectDescriptor<Device::CPU>>,
 		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>>> m_objDevDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, InstanceDescriptor<Device::CPU>>,
-		unique_device_ptr<Device::CUDA, InstanceDescriptor<Device::CUDA>>> m_instDevDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4>,
+		unique_device_ptr<Device::CUDA, ei::Mat3x4>> m_instTransformsDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, u32>,
+		unique_device_ptr<Device::CUDA, u32>> m_instObjIndicesDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box>,
+		unique_device_ptr<Device::CUDA, ei::Box>> m_objAabbsDesc;
 
 	ei::Box m_boundingBox;
 

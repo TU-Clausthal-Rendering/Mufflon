@@ -12,22 +12,6 @@ void Scene::load_media(const std::vector<materials::Medium>& media) {
 	m_media.mark_changed(Device::CPU);
 }
 
-bool Scene::is_accel_dirty(Device res) const noexcept {
-	return m_accelDirty || m_accelStruct->is_dirty(res);
-}
-
-void Scene::clear_accel_structure() {
-	// Mark as dirty only if we change something
-	m_accelDirty |= m_accelStruct != nullptr;
-	m_accelStruct.reset();
-}
-
-void Scene::build_accel_structure() {
-	m_accelDirty = false;
-	m_accelStruct->build(m_instances);
-}
-
-
 template< Device dev >
 void Scene::load_materials() {
 	// 1. Pass get the sizes for the index -> material offset table

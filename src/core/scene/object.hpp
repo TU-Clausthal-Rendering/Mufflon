@@ -86,7 +86,7 @@ public:
 	template < class Geom, class... Args >
 	auto add(Args&& ...args) {
 		auto hdl = m_geometryData.template get<Geom>().add(std::forward<Args>(args)...);
-		m_accelDirty = true;
+		clear_accel_structure();
 		// Expand the object's bounding box
 		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.template get<Geom>().get_bounding_box().max);
 		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.template get<Geom>().get_bounding_box().min);
@@ -96,7 +96,7 @@ public:
 	template < class Geom, class... Args >
 	auto add_bulk(Args&& ...args) {
 		auto hdl = m_geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
-		m_accelDirty = true;
+		clear_accel_structure();
 		// Expand the object's bounding box
 		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.template get<Geom>().get_bounding_box().max);
 		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.template get<Geom>().get_bounding_box().min);
@@ -140,7 +140,7 @@ public:
 	template < class Geom, class Tessellater, class... Args >
 	void tessellate(Tessellater& tessellater, Args&& ...args) {
 		m_geometryData.template get<Geom>().tessellate(tessellater, std::forward<Args>(args)...);
-		m_accelDirty = true;
+		clear_accel_structure();
 	}
 	// Creates a new LoD by applying a decimater to the geomtry type.
 	template < class Geom, class Decimater, class... Args >
@@ -148,7 +148,7 @@ public:
 		// TODO: what do we want exactly?
 		Object temp(*this);
 		temp.m_geometryData.template get<Geom>().create_lod(decimater, std::forward<Args>(args)...);
-		temp.m_accelDirty = true;
+		temp.clear_accel_structure();
 		return temp;
 	}
 
@@ -196,36 +196,30 @@ public:
 										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
 										 const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
 		ObjectDescriptor<dev> desc{
-			m_boundingBox,
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
 			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
-			ArrayDevHandle_t<dev, void>{}
+			m_accelStruct[get_device_index<dev>()]
 		};
-		// TODO: build object BVH if necessary
+		// (Re)build acceleration structure if necessary
+		if(is_accel_dirty<dev>()) {
+			accel_struct::build_lbvh_obj(desc, m_boundingBox);
+			m_accelStruct[get_device_index<dev>()] = desc.accelStruct;
+		}
 		return desc;
 	}
 
 	// Checks if the acceleration structure on one of the system parts has been modified.
-	bool is_accel_dirty(Device res) const noexcept;
+	template < Device dev >
+	bool is_accel_dirty() const noexcept {
+		return m_accelStruct[get_device_index<dev>()].type == accel_struct::AccelType::NONE;
+	}
 
 	// Checks whether the object currently has a BVH.
-	bool has_accel_structure() const noexcept {
+	/*bool has_accel_structure() const noexcept {
 		return m_accelStruct != nullptr;
-	}
-	// Returns the BVH of this object.
-	const accel_struct::IAccelerationStructure& get_accel_structure() const noexcept {
-		mAssert(this->has_accel_structure());
-		return *m_accelStruct;
-	}
+	}*/
 	// Clears the BVH of this object.
 	void clear_accel_structure();
-	// Initializes the acceleration structure to a given implementation.
-	template < class Accel, class... Args >
-	void set_accel_structure(Args&& ...args) {
-		m_accelStruct = std::make_unique<Accel>(std::forward<Args>(args)...);
-	}
-	// (Re-)builds the acceleration structure.
-	void build_accel_structure();
 
 	// Makes the data of the geometric object resident in the memory system
 	// Eg. position, normal, uv, material index for poly, position, radius, mat index for sphere...
@@ -259,8 +253,7 @@ private:
 	GeometryTuple m_geometryData;
 	ei::Box m_boundingBox;
 
-	bool m_accelDirty = false;
-	std::unique_ptr<accel_struct::IAccelerationStructure> m_accelStruct = nullptr;
+	AccelDescriptor m_accelStruct[NUM_DEVICES];
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; // Current level-of-detail
 	ObjectFlags m_flags;

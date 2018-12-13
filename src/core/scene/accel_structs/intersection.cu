@@ -619,7 +619,7 @@ void first_intersection_scene_imp(
 				if (interset(box, invDir, ood, tmin, hitT)) {
 					// Intersect the ray against the obj primtive bvh.
 					ObjectDescriptor<dev> obj = objs[objId];
-					LBVH* lbvh = (LBVH*)obj.accelStruct;
+					LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 					const i32 numFaces = obj.polygon.numTriangles + obj.polygon.numQuads;
 					const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : 0x80000000;
 					i32 primId;
@@ -759,7 +759,7 @@ void first_intersection_scene(
 	const float tmin, const float tmax,
 	RayIntersectionResult<dev>* __restrict__ result
 ) {
-	const LBVH* lbvh = (const LBVH*)scene.accelStruct;
+	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec4* bvh = (const ei::Vec4*)lbvh->bvh;
 	const i32 bvhSize = lbvh->bvhSize;
 	const i32* instanceIds = (const i32*)lbvh->primIds;
@@ -891,7 +891,7 @@ bool any_intersection_scene_imp(
 				if (interset(box, invDir, ood, tmin, tmax)) {
 					// Intersect the ray against the obj primtive bvh.
 					ObjectDescriptor<dev> obj = objs[objId];
-					LBVH* lbvh = (LBVH*)obj.accelStruct;
+					LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 					const i32 numFaces = obj.polygon.numTriangles + obj.polygon.numQuads;
 					const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : 0x80000000;
 					// Do ray-obj test.
@@ -954,7 +954,7 @@ bool any_intersection_scene(
 	const ei::Ray ray, const u64 startInsPrimId,
 	const float tmin, const float tmax
 ) {
-	const LBVH* lbvh = (const LBVH*)scene.accelStruct;
+	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec4* bvh = (const ei::Vec4*)lbvh->bvh;
 	const i32 bvhSize = lbvh->bvhSize;
 	const i32* instanceIds = (const i32*)lbvh->primIds;

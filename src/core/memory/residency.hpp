@@ -12,6 +12,17 @@ enum class Device : unsigned char {
 
 //static constexpr Device DeviceIterator[3] = {Device::CPU, Device::CUDA, Device::OPENGL};
 
+// Convert to index access to be able to store things for different devices in arrays.
+constexpr int NUM_DEVICES = 3;
+template<Device dev>
+inline constexpr int get_device_index() { return -1; }
+template<>
+inline constexpr int get_device_index<Device::CPU>() { return 0; }
+template<>
+inline constexpr int get_device_index<Device::CUDA>() { return 1; }
+template<>
+inline constexpr int get_device_index<Device::OPENGL>() { return 2; }
+
 // Inline bits operators for Device.
 inline Device operator&(Device a, Device b) {
 	return Device(static_cast<int>(a) & static_cast<int>(b));

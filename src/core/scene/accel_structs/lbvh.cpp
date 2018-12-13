@@ -4,7 +4,7 @@
 
 namespace mufflon {	namespace scene {namespace accel_struct {
 
-LBVH::LBVH():
+/*LBVH::LBVH():
 	m_device(Device::NONE)
 {
 }
@@ -36,7 +36,7 @@ void LBVH::make_resident(Device res)
 			/*cudaMemcpy(m_sizes.bvh, m_inputCUDA.bvh, m_inputCUDA.bvhSize * sizeof(ei::Vec4), cudaMemcpyDefault);
 			m_sizes.primIds = (i32*)malloc(m_sizes.numPrimives * sizeof(i32));
 			cudaMemcpy(m_sizes.primIds, m_inputCUDA.primIds, m_sizes.numPrimives * sizeof(i32), cudaMemcpyDefault);*/
-
+	/*
 		}
 	}
 
@@ -183,5 +183,5 @@ bool LBVH::is_dirty(Device res) const
 {
 	return false;
 }
-
+*/
 }}}
