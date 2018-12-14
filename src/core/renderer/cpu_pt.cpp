@@ -6,6 +6,7 @@
 #include "core/cameras/camera.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/math/rng.hpp"
+#include "core/scene/accel_structs/intersection.hpp"
 #include <random>
 
 namespace mufflon::renderer {
@@ -68,7 +69,10 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
 				vertex->get_position(), m_currentScene->get_bounding_box(),
 				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
-			bool anyhit = false; // TODO use a real anyhit method
+			// TODO: set startInsPrimId with a proper value.
+			bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
+				scene, { vertex->get_position() , nee.direction }, 0xFFFFFFFF00000000ull, 
+				nee.dist); 
 			if(!anyhit) {
 				auto value = vertex->evaluate(nee.direction, scene.media);
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
