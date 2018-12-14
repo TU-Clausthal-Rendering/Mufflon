@@ -51,7 +51,7 @@ public:
 		virtual ~IBaseAttribute() {}
 
 	protected:
-		virtual void adjust_pool_pointers(AttributePools& pools) noexcept = 0;
+		virtual void adjust_pool_pointers(AttributePools& pools, util::DirtyFlags<Device>& flags) noexcept = 0;
 	};
 
 	template < class... Args >
@@ -67,7 +67,7 @@ public:
 		m_mapping(std::move(list.m_mapping)) {
 		// Update the pool pointers in the attributes
 		for(auto& attrib : m_attributes)
-			attrib->adjust_pool_pointers(m_attributePools);
+			attrib->adjust_pool_pointers(m_attributePools, m_flags);
 	}
 	AttributeListBase& operator=(const AttributeListBase&) = delete;
 	AttributeListBase& operator=(AttributeListBase&&) = default;
@@ -111,7 +111,7 @@ public:
 		// Hide the construction from public eye
 		BaseAttribute(AttributePools& pools, util::DirtyFlags<Device>& flags) :
 			m_pools(&pools),
-			m_dirty(flags) {
+			m_dirty(&flags) {
 			// In the inheriting attribute you MUST initialize the handles!
 		}
 
@@ -149,14 +149,14 @@ public:
 		}
 
 		void mark_changed(Device changed) {
-			m_dirty.mark_changed(changed);
+			m_dirty->mark_changed(changed);
 		}
 
 		// Synchronizes the attribute pool to the given device
 		template < Device dev >
 		void synchronize() {
 			mAssert(m_pools != nullptr);
-			mufflon::synchronize<dev>(*m_pools, m_dirty, ListType::template getPool<dev>(*m_pools));
+			mufflon::synchronize<dev>(*m_pools, *m_dirty, ListType::template getPool<dev>(*m_pools));
 		}
 
 		std::size_t get_size() const noexcept {
@@ -181,7 +181,7 @@ public:
 			const auto& handle = m_handles.template get<POOL_INDEX>();
 			std::size_t read = pool.restore<T>(handle, stream, start, count);
 			if(read > 0u)
-				m_dirty.mark_changed(Device::CPU);
+				m_dirty->mark_changed(Device::CPU);
 			return read;
 		}
 
@@ -196,13 +196,14 @@ public:
 
 	protected:
 		// We need this for move construction
-		virtual void adjust_pool_pointers(AttributePools& pools) noexcept override {
+		virtual void adjust_pool_pointers(AttributePools& pools, util::DirtyFlags<Device>& flags) noexcept override {
 			m_pools = &pools;
+			m_dirty = &flags;
 		}
 
 		AttributePools* m_pools;
 		AttributeHandles<T> m_handles;
-		util::DirtyFlags<Device>& m_dirty;
+		util::DirtyFlags<Device>* m_dirty;
 
 	private:
 		// Removes the attribute from all devices

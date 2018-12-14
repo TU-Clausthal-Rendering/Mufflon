@@ -36,7 +36,7 @@ std::string ParserState::get_parser_level() const {
 		if(objectNames.empty())
 			key = "\"Root\"";
 		else
-			key = "\"Root\":\"" + std::string(objectNames.front()) + ':';
+			key = "\"Root\":\"" + std::string(objectNames.front()) + "\":";
 	} else {
 		key = '\"' + std::string(map_level_to_string(current)) + "\":";
 		for(std::size_t i = 0u; i < objectNames.size(); ++i)

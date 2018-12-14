@@ -37,6 +37,7 @@
 // Undefine unnecessary windows macros
 #undef near
 #undef far
+#undef ERROR
 
 using namespace mufflon;
 using namespace mufflon::scene;
@@ -86,11 +87,12 @@ std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
 WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
-// TODO: remove these (leftover from Felix' prototype)
+// Holds the last error for the GUI to display
 std::string s_lastError;
 
 // Plugin container
 std::vector<TextureLoaderPlugin> s_plugins;
+
 
 constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX, INVALID_INDEX,
@@ -199,6 +201,9 @@ inline std::string get_attr_type_name(AttribDesc desc) {
 void delegateLog(LogSeverity severity, const std::string& message) {
 	if(s_logCallback != nullptr)
 		s_logCallback(message.c_str(), static_cast<int>(severity));
+	if (severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
+		s_lastError = message;
+	}
 }
 
 } // namespace
@@ -1812,17 +1817,19 @@ Boolean render_enable_renderer(RendererType type) {
 	switch(type) {
 		case RendererType::RENDERER_CPU_PT: {
 			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>();
-			return true;
-		}
+		}	break;
 		case RendererType::RENDERER_GPU_PT: {
 			s_currentRenderer = std::make_unique<renderer::GpuPathTracer>();
-			return true;
-		}
+		}	break;
 		default: {
 			logError("[", FUNCTION_NAME, "] Unknown renderer type");
 			return false;
 		}
 	}
+	if(WorldContainer::instance().get_current_scenario() != nullptr)
+		s_currentRenderer->load_scene(WorldContainer::instance().get_current_scene(),
+			WorldContainer::instance().get_current_scenario()->get_resolution());
+	return true;
 }
 
 Boolean render_iterate() {

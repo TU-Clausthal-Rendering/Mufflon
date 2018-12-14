@@ -118,12 +118,11 @@ void OutputHandler::set_targets(OutputValue targets) {
 		int i = 0;
 		for (u32 flag : OutputValue::iterator) {
 			// Is this atttribute recorded at all?
-			if ((!targets.is_set(flag) && m_targets.is_set(flag))
-				|| (!targets.is_set(flag << 8) && m_targets.is_set(flag << 8))) {
-				// Unload (TODO: what if there's more devices?)
-				m_cumulativeTex[i].unload<Device::CPU>();
-				m_cumulativeTex[i].unload<Device::CUDA>();
-				m_cumulativeTex[i].unload<Device::OPENGL>();
+			if (!targets.is_set(flag) && m_targets.is_set(flag))
+				m_cumulativeTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
+			if (!targets.is_set(flag << 8) && m_targets.is_set(flag << 8)) {
+				m_cumulativeVarTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
+				m_iterationTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
 			}
 			++i;
 		}

@@ -102,7 +102,6 @@ namespace gui.Dll
             }
             catch (Exception e)
             {
-                Logger.log(e.Message, Core.Severity.FATAL_ERROR);
                 Dispatcher.BeginInvoke(Error, e.Message);
             }
             Core.mufflon_destroy();

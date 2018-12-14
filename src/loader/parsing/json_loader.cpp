@@ -619,7 +619,7 @@ void JsonLoader::load_file() {
 		m_state.current = ParserState::Level::ROOT;
 		load_scenarios(binLoader.get_material_names());
 		// Load the default scenario
-		m_state.current = ParserState::Level::ROOT;
+		m_state.reset();
 		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
 		if(defScenHdl == nullptr)
 			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + '\'');
