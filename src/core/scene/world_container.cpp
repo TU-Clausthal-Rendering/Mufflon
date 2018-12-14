@@ -229,7 +229,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 				const scene::Point* positions = as<scene::Point>(polygons.get_points().aquireConst<Device::CPU>());
 				const scene::UvCoordinate* uvs = as<scene::UvCoordinate>(polygons.get_uvs().aquireConst<Device::CPU>());
 				for(const auto& face : polygons.faces()) {
-					if(m_materials[materials[primIdx]]->is_emissive()) {
+					if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
 						if(std::distance(face.begin(), face.end()) == 3) {
 							lights::AreaLightTriangleDesc al;
 							al.radianceTex = m_materials[materials[primIdx]]->get_emissive_texture();
@@ -260,7 +260,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 				materials = spheres.get_mat_indices().aquireConst<Device::CPU>();
 				const ei::Sphere* spheresData = spheres.get_spheres().aquireConst<Device::CPU>();
 				for(std::size_t i = 0; i < spheres.get_mat_indices().get_size(); ++i) {
-					if(m_materials[materials[i]]->is_emissive()) {
+					if(m_materials[materials[i]]->get_properties().is_emissive()) {
 						lights::AreaLightSphereDesc al{
 							spheresData[i].center,
 							spheresData[i].radius,

@@ -40,6 +40,30 @@ inline Device operator~(Device a) {
 	return Device(~static_cast<int>(a));
 }
 
+// Conversion of a runtime parameter 'device' into a constexpr 'dev'.
+// This is very useful to call templates via
+// device_switch(device, foo<dev>());
+// without rewriting the switch everytime.
+// WARNING: this is a switch -> need to return or to break; at the end
+// of 'expr'.
+#define device_switch(device, expr)						\
+	switch(device) {									\
+		case Device::CPU: {								\
+			constexpr Device dev = Device::CPU;			\
+			expr;										\
+		}												\
+		case Device::CUDA: {							\
+			constexpr Device dev = Device::CUDA;		\
+			expr;										\
+		}												\
+		case Device::OPENGL: {							\
+			constexpr Device dev = Device::OPENGL;		\
+			expr;										\
+		}												\
+		default:										\
+			mAssertMsg(false, "Unknown device type.");	\
+	};
+
 // Many code snippets are either CPU or CUDA. This can be detected at compile time.
 // => no template parameter Device for algorithms.
 #ifdef __CUDA_ARCH__

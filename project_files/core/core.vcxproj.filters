@@ -139,9 +139,6 @@
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp">
       <Filter>Source Files\core\scene\textures</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp">
-      <Filter>Source Files\core\scene\materials</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\scene.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>

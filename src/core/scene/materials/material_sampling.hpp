@@ -20,9 +20,14 @@ namespace mufflon { namespace scene { namespace materials {
  * outBuffer: pointer to a writeable buffer with at least get
  *		get_parameter_pack_size(device) memory.
  */
-CUDA_FUNCTION void fetch(const HandlePack& handles, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
-	switch(handles.type) {
-		case Materials::LAMBERT: as<LambertHandlePack<CURRENT_DEV>>(handles).fetch(uvCoordinate, outBuffer); break;
+CUDA_FUNCTION void fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
+	outBuffer->flags = desc.flags;
+	outBuffer->innerMedium = desc.innerMedium;
+	outBuffer->outerMedium = desc.outerMedium;
+	const char* subDesc = as<char>(&desc) + sizeof(MaterialDescriptorBase);
+	char* subParam = as<char>(outBuffer) + sizeof(ParameterPack);
+	switch(desc.type) {
+		case Materials::LAMBERT: as<LambertDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam); break;
 		default:
 			mAssertMsg(false, "Material not (fully) implemented!");
 	}
@@ -68,11 +73,12 @@ sample(const TangentSpace& tangentSpace,
 	mAssert(ei::approx(len(incidentTS), 1.0f));
 
 	// Use model specific subroutine
+	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	math::PathSample res;
 	switch(params.type)
 	{
 		case Materials::LAMBERT: {
-			res = lambert_sample(static_cast<const LambertParameterPack&>(params), incidentTS, rndSet);
+			res = lambert_sample(*as<LambertParameterPack>(subParams), incidentTS, rndSet);
 		} break;
 		default: ;
 #ifndef __CUDA_ARCH__
@@ -155,11 +161,12 @@ evaluate(const TangentSpace& tangentSpace,
 	}
 
 	// Call material implementation
+	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	math::EvalValue res;
 	switch(params.type)
 	{
 		case Materials::LAMBERT: {
-			res = lambert_evaluate(static_cast<const LambertParameterPack&>(params), incidentTS, excidentTS);
+			res = lambert_evaluate(*as<LambertParameterPack>(subParams), incidentTS, excidentTS);
 		} break;
 		default: ;
 #ifndef __CUDA_ARCH__
@@ -193,9 +200,10 @@ evaluate(const TangentSpace& tangentSpace,
  */
 CUDA_FUNCTION Spectrum
 albedo(const ParameterPack& params) {
+	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	switch(params.type)
 	{
-		case Materials::LAMBERT: return lambert_albedo(static_cast<const LambertParameterPack&>(params));
+		case Materials::LAMBERT: return lambert_albedo(*as<LambertParameterPack>(subParams));
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", params.type);

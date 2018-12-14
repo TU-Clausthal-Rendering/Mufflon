@@ -35,9 +35,19 @@ struct MaterialPropertyFlags : public util::Flags<u16> {
 	static constexpr u16 REFLECTIVE = 2u;	// BRDF = Is there any contribution from reflections? (contribution for incident and excident on the same side)
 	static constexpr u16 REFRACTIVE = 4u;	// BTDF = Is there any contribution from refractions? (contribution for incident and excident on opposite sides)
 	static constexpr u16 HALFVECTOR_BASED = 8u;	// Does this material need a half vector for evaluations?
+
+	MaterialPropertyFlags() = default;
+	MaterialPropertyFlags(u16 m) { mask = m; }
+
+	bool is_emissive() const noexcept { return is_set(EMISSIVE); }
+	bool is_reflective() const noexcept { return is_set(REFLECTIVE); }
+	bool is_refractive() const noexcept { return is_set(REFRACTIVE); }
+	bool is_halfv_based() const noexcept { return is_set(HALFVECTOR_BASED); }
 };
 
-struct HandlePack {
+// Base definition of material descriptors.
+// Each implementation of a material adds some additional information to this descriptor.
+struct MaterialDescriptorBase {
 	Materials type;
 	MaterialPropertyFlags flags;
 	MediumHandle innerMedium;
@@ -57,7 +67,9 @@ struct ParameterPack {
 	}
 };
 
+// TODO remove this and provide a scene based (detect which material needs the most at runtime) max size instead
 constexpr std::size_t MAX_MATERIAL_PARAMETER_SIZE = 256;
+
 
 /**
  * High level material abstraction. A material manages a set of texture handles for
@@ -69,11 +81,14 @@ constexpr std::size_t MAX_MATERIAL_PARAMETER_SIZE = 256;
  */
 class IMaterial {
 public:
+	IMaterial(Materials mat) : m_type(mat) {}
 	virtual ~IMaterial() = default;
 
 	// A name of the material for mental recognition (no program logic depends on this name)
 	const std::string& get_name() const noexcept { return m_name; }
 	void set_name(std::string name) { m_name = move(name); }
+
+	virtual MaterialPropertyFlags get_properties() const noexcept = 0;
 
 	/* 
 	 * Size of the material descriptor itself (mainly texture handles)
@@ -87,7 +102,7 @@ public:
 		mAssertMsg(false, "Material not (fully) implemented!");
 	}*/
 
-	virtual std::size_t get_handle_pack_size(Device device) const = 0;
+	virtual std::size_t get_descriptor_size(Device device) const = 0;
 
 	/*
 	 * Size of a fetched parameter instanciation from this material.
@@ -101,8 +116,10 @@ public:
 	 * device: structure the output for the target device
 	 * outBuffer: pointer to a writeable buffer with at least get
 	 *		get_handle_pack_size(device) memory.
+	 * returns: a pointer to the end of the written data. I.e. outBuffer - return
+	 *		is the size of the written descriptor.
 	 */
-	virtual void get_handle_pack(Device device, HandlePack* outBuffer) const = 0;
+	virtual char* get_descriptor(Device device, char* outBuffer) const;
 
 	// Get only the texture for emissive materials
 	virtual TextureHandle get_emissive_texture() const = 0;
@@ -123,17 +140,6 @@ public:
 	}
 
 	virtual Medium compute_medium() const = 0;
-
-	// Is any component of this material able to emit light?
-	virtual bool is_emissive() const = 0;
-	// Is there any contribution from reflections? (contribution for incident and excident on the same side)
-	virtual bool is_brdf() const = 0;
-	// Is there any contribution from refractions? (contribution for incident and excident on opposite sides)
-	virtual bool is_btdf() const = 0;
-	// Does this material need a half vector for evaluations?
-	virtual bool is_halfvector_based() const = 0;
-
-	MaterialPropertyFlags get_property_flags() const noexcept;
 
 protected:
 	MediumHandle m_innerMedium;

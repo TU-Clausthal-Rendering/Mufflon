@@ -20,7 +20,7 @@ void Scene::load_materials() {
 		mAssert(offset <= std::numeric_limits<i32>::max());
 		offsets.push_back(i32(offset));
 		//offset += materials::get_handle_pack_size();
-		offset += mat->get_handle_pack_size(dev);
+		offset += mat->get_descriptor_size(dev);
 	}
 	// Allocate the memory
 	m_materials.resize(offset);
@@ -30,9 +30,9 @@ void Scene::load_materials() {
 	char buffer[materials::MAX_MATERIAL_PARAMETER_SIZE];
 	int i = 0;
 	for(const auto& mat : m_materialsRef) {
-		mAssert(mat->get_handle_pack_size(dev) <= materials::MAX_MATERIAL_PARAMETER_SIZE);
-		mat->get_handle_pack(dev, as<materials::HandlePack>(buffer));
-		copy(mem + offsets[i], buffer, mat->get_handle_pack_size(dev));
+		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_PARAMETER_SIZE);
+		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
+		copy(mem + offsets[i], buffer, size);
 		++i;
 	}
 	m_materials.mark_synced(dev); // Avoid overwrites with data from different devices.

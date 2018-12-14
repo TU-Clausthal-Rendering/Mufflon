@@ -9,27 +9,16 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
-struct LambertParameterPack : public ParameterPack {
-	CUDA_FUNCTION LambertParameterPack(const ParameterPack& baseParameters, Spectrum albedo) :
-		ParameterPack(baseParameters),
-		albedo(albedo)
-	{}
-	Spectrum albedo; // TODO: alignment is bad
+struct LambertParameterPack {
+	Spectrum albedo;
 };
 
 template<Device dev>
-struct LambertHandlePack : public HandlePack {
-	LambertHandlePack(const HandlePack& baseProperties,
-					  textures::ConstTextureDevHandle_t<dev> albedoTex) :
-		HandlePack(baseProperties),
-		albedoTex(albedoTex)
-	{}
-
+struct LambertDesc {
 	textures::ConstTextureDevHandle_t<dev> albedoTex;
 
-	CUDA_FUNCTION void fetch(const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) const {
+	CUDA_FUNCTION void fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
 		*as<LambertParameterPack>(outBuffer) = LambertParameterPack{
-			ParameterPack{ Materials::LAMBERT, flags, innerMedium, outerMedium },
 			Spectrum{ sample(albedoTex, uvCoordinate) }
 		};
 	}
@@ -38,17 +27,41 @@ struct LambertHandlePack : public HandlePack {
 // Class for the handling of the Lambertian material.
 class Lambert : public IMaterial {
 public:
-	Lambert(TextureHandle albedo);
+	Lambert(TextureHandle albedo) :
+		IMaterial{Materials::LAMBERT},
+		m_albedo{albedo}
+	{}
 
-	std::size_t get_handle_pack_size(Device device) const final;
-	std::size_t get_parameter_pack_size() const final { return sizeof(LambertParameterPack); }
-	void get_handle_pack(Device device, HandlePack* outBuffer) const final;
+	MaterialPropertyFlags get_properties() const noexcept final {
+		return MaterialPropertyFlags::REFLECTIVE;
+	}
+
+	std::size_t get_descriptor_size(Device device) const final {
+		device_switch(device, return sizeof(LambertDesc<dev>));
+		return 0;
+	}
+
+	std::size_t get_parameter_pack_size() const final {
+		return sizeof(LambertParameterPack);
+	}
+
+	char* get_descriptor(Device device, char* outBuffer) const final {
+		// First write the general descriptor and then append the lambert specific one
+		outBuffer = IMaterial::get_descriptor(device, outBuffer);
+		device_switch(device,
+			*as<LambertDesc<dev>>(outBuffer) =
+				LambertDesc<dev>{ m_albedo->aquireConst<dev>() };
+			return outBuffer + sizeof(LambertDesc<dev>);
+		);
+		return nullptr;
+	}
+
 	TextureHandle get_emissive_texture() const final { return nullptr; }
-	Medium compute_medium() const final;
-	bool is_emissive() const final { return false; }
-	bool is_brdf() const final { return true; }
-	bool is_btdf() const final { return false; }
-	bool is_halfvector_based() const final { return false; }
+
+	Medium compute_medium() const final {
+		// Use some average dielectric refraction index and a maximum absorption
+		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
+	}
 private:
 	TextureHandle m_albedo;
 };

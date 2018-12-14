@@ -29,7 +29,6 @@
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
     <ClCompile Include="..\..\src\core\scene\lights\lights.cpp" />
     <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp" />
-    <ClCompile Include="..\..\src\core\scene\materials\lambert.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
     <ClCompile Include="..\..\src\core\scene\scenario.cpp" />

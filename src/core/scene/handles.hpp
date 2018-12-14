@@ -17,7 +17,7 @@ namespace materials {
 	class IMaterial;
 	class Medium;
 	using MediumHandle = uint16_t;
-	struct HandlePack;
+	struct MaterialDescriptorBase;
 }
 namespace lights {
 	struct PointLight;

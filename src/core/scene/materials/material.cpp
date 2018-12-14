@@ -1,4 +1,5 @@
 #include "material.hpp"
+#include "core/memory/dyntype_memory.hpp"
 #include <array>
 #include <string>
 
@@ -21,13 +22,14 @@ const std::string& to_string(Materials type)
 }
 
 
-MaterialPropertyFlags IMaterial::get_property_flags() const noexcept {
-	MaterialPropertyFlags flags;
-	if(is_emissive()) flags.set(MaterialPropertyFlags::EMISSIVE);
-	if(is_brdf()) flags.set(MaterialPropertyFlags::REFLECTIVE);
-	if(is_btdf()) flags.set(MaterialPropertyFlags::REFRACTIVE);
-	if(is_halfvector_based()) flags.set(MaterialPropertyFlags::HALFVECTOR_BASED);
-	return flags;
+char* IMaterial::get_descriptor(Device device, char* outBuffer) const {
+	*as<MaterialDescriptorBase>(outBuffer) = MaterialDescriptorBase{
+		m_type,
+		get_properties(),
+		m_innerMedium,
+		m_outerMedium
+	};
+	return outBuffer + sizeof(MaterialDescriptorBase);
 }
 
 

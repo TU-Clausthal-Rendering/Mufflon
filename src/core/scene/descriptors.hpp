@@ -96,8 +96,8 @@ struct SceneDescriptor {
 	ConstArrayDevHandle_t<dev, materials::Medium> media;
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
 
-	CUDA_FUNCTION const materials::HandlePack& get_material(MaterialIndex matIdx) const {
-		return *as<materials::HandlePack>(as<char>(materials) + materials[matIdx]);
+	CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(MaterialIndex matIdx) const {
+		return *as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[matIdx]);
 	}
 };
 
