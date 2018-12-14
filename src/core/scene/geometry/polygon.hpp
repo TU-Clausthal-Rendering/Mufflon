@@ -3,13 +3,15 @@
 #include "polygon_mesh.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
+#include "core/scene/attr.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
-#include "core/scene/attribute_list.hpp"
 #include "util/range.hpp"
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
-#include <tuple>
+#include <array>
 #include <optional>
+#include <string_view>
+#include <tuple>
 
 // Forward declarations
 namespace OpenMesh::Subdivider::Uniform {
@@ -44,16 +46,8 @@ public:
 	using Quad = std::array<Index, 4u>;
 	// OpenMesh types
 	// TODO: change attributelist
-	using VertexAttributeListType = OmAttributeList<false>;
-	using FaceAttributeListType = OmAttributeList<true>;
-	template < class Attr >
-	using VertexAttributeHdl = typename VertexAttributeListType::template AttributeHandle<Attr>;
-	template < class Attr >
-	using FaceAttributeHdl = typename FaceAttributeListType::template AttributeHandle<Attr>;
-	template < class T >
-	using VertexAttribute = typename VertexAttributeListType::template BaseAttribute<T>;
-	template < class T >
-	using FaceAttribute = typename FaceAttributeListType::template BaseAttribute<T>;
+	using VertexAttributePoolType = OpenMeshAttributePool<false>;
+	using FaceAttributePoolType = OpenMeshAttributePool<true>;
 	using VertexHandle = OpenMesh::VertexHandle;
 	using FaceHandle = OpenMesh::FaceHandle;
 	using TriangleHandle = OpenMesh::FaceHandle;
@@ -65,27 +59,6 @@ public:
 		std::size_t readPoints;
 		std::size_t readNormals;
 		std::size_t readUvs;
-	};
-
-	// Struct containing handles to both OpenMesh and custom attributes (vertex)
-	template < class T >
-	struct VertexAttributeHandle {
-		using Type = T;
-		using OmAttrHandle = OpenMesh::VPropHandleT<Type>;
-		using CustomAttrHandle = VertexAttributeHdl<Type>;
-
-		OmAttrHandle omHandle;
-		CustomAttrHandle customHandle;
-	};
-
-	// Struct containing handles to both OpenMesh and custom attributes (faces)
-	template < class T >
-	struct FaceAttributeHandle {
-		using Type = T;
-		using OmAttrHandle = OpenMesh::FPropHandleT<Type>;
-		using CustomAttrHandle = FaceAttributeHdl<Type>;
-		OmAttrHandle omHandle;
-		CustomAttrHandle customHandle;
 	};
 
 	// Associates an attribute name with a type (vertex- or faceattributehandle)
@@ -177,67 +150,58 @@ public:
 	void resize(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
 	void reserve(std::size_t vertices, std::size_t egdes, std::size_t tris, std::size_t quads);
 
-	// Requests a new attribute, either for face or vertex.
-	template < class AttrHandle >
-	AttrHandle request(const std::string& name) {
-		using Type = typename AttrHandle::Type;
+	template < class T, bool face >
+	typename OpenMeshAttributePool<face>::AttributeHandle add_attribute(std::string name) {
+		return get_attributes<face>().add_attribute<T>(std::move(name));
+	}
 
-		typename AttrHandle::OmAttrHandle attrHandle;
-		if(!m_meshData->get_property_handle(attrHandle, name)) {
-			// Add the attribute to OpenMesh...
-			m_meshData->add_property(attrHandle, name);
-			// ...as well as our attribute list
-			return { attrHandle, select_list<AttrHandle>().template add<Type>(name, attrHandle) };
-		} else {
-			// Found in OpenMesh already, now find it in our list
-			auto opt = select_list<AttrHandle>().template find<Type>(name);
-			mAssertMsg(opt.has_value(), "This should never ever happen that we have a "
-					   "property in OpenMesh but not in our custom list");
-			return { attrHandle, opt.value() };
+	void remove_attribute(std::string_view name) {
+		throw std::runtime_error("Operation not implemented yet");
+	}
+
+	// Synchronizes the default attributes position, normal, uv, matindex 
+	template < Device dev >
+	void synchronize() {
+		m_vertexAttributes.synchronize<dev>();
+		m_faceAttributes.synchronize<dev>();
+		// Synchronize the index buffer
+		if (m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
+			if (m_indexFlags.has_competing_changes()) {
+				logError("[Polygons::synchronize] Competing device changes; ignoring one");
+			}
+			m_indexBuffer.for_each([&](auto& buffer) {
+				using ChangedBuffer = std::decay_t<decltype(buffer)>;
+				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
+			});
 		}
 	}
 
-	template < class AttributeHandle >
-	void remove(AttributeHandle& attr) {
-		// Remove from both lists
-		m_meshData->remove_property(attr.omHandle);
-		select_list<AttributeHandle>().remove(attr.customHandle);
+	template < Device dev, bool face >
+	void synchronize(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
+		get_attributes<face>().synchronize<dev>(hdl);
+	}
+	template < Device dev, bool face >
+	void synchronize(std::string_view name) {
+		get_attributes<face>().synchronize<dev>(name);
 	}
 
-	template < class AttrHandle >
-	std::optional<AttrHandle> find(const std::string& name) {
-		using Type = typename AttrHandle::Type;
-
-		typename AttrHandle::OmAttrHandle attrHandle;
-		if(!m_meshData->get_property_handle(attrHandle, name))
-			return std::nullopt;
-		// Find attribute in custom list as 
-		auto opt = select_list<AttrHandle>().template find<Type>(name);
-		mAssert(opt.has_value());
-		return AttrHandle{
-			attrHandle,
-			opt.value()
-		};
+	template < Device dev >
+	void unload() {
+		m_vertexAttributes.unload<dev>();
+		m_faceAttributes.unload<dev>();
 	}
 
-	template < class T >
-	auto& aquire(const VertexAttributeHandle<T>& attrHandle) {
-		return m_vertexAttributes.aquire(attrHandle.customHandle);
+	template < bool face >
+	void mark_changed(Device dev) {
+		get_attributes<face>().mark_changed(dev);
 	}
-
-	template < class T >
-	const auto& aquire(const VertexAttributeHandle<T>& attrHandle) const {
-		return m_vertexAttributes.aquire(attrHandle.customHandle);
+	template < bool face >
+	void mark_changed(Device dev, typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
+		get_attributes<face>().mark_changed(dev, hdl);
 	}
-
-	template < class T >
-	auto& aquire(const FaceAttributeHandle<T>& attrHandle) {
-		return m_faceAttributes.aquire(attrHandle.customHandle);
-	}
-
-	template < class T >
-	const auto& aquire(const FaceAttributeHandle<T>& attrHandle) const {
-		return m_faceAttributes.aquire(attrHandle.customHandle);
+	template < bool face >
+	void mark_changed(Device dev, std::string_view name) {
+		get_attributes<face>().mark_changed(dev, name);
 	}
 
 	/**
@@ -247,14 +211,40 @@ public:
 	 * renderer's task to aquire it once more after that, since we cannot hand out
 	 * Accessors to the concrete device.
 	 */
-	template < Device dev, class... VArgs, class... FArgs >
-	PolygonsDescriptor<dev> get_descriptor(const std::tuple<VAttrDesc<VArgs>...>& vertexAttribs,
-										   const std::tuple<FAttrDesc<FArgs>...>& faceAttribs) {
+	template < Device dev, std::size_t N, std::size_t M >
+	PolygonsDescriptor<dev> get_descriptor(const std::array<const char*, N>& vertexAttribs,
+										   const std::array<const char*, M>& faceAttribs) {
 		this->synchronize<dev>();
-		PolygonsDescriptor<dev> desc = get_common_descriptor<dev>();
-		set_vertex_attrib_descriptor<dev>(desc, vertexAttribs);
-		set_face_attrib_descriptor<dev>(desc, faceAttribs);
-		return desc;
+
+		// Resize the attribute array if necessary
+		resizeAttribBuffer<dev>(vertexAttribs.size(), faceAttribs.size());
+		// Collect the attributes; for that, we iterate the given Attributes and
+		// gather them on CPU side (or rather, their device pointers); then
+		// we copy it to the actual device
+		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+		std::vector<void*> cpuVertexAttribs(vertexAttribs.size());
+		std::vector<void*> cpuFaceAttribs(faceAttribs.size());
+		for (const char* name : vertexAttribs)
+			cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
+		for (const char* name : faceAttribs)
+			cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
+		copy<void*>(attribBuffer.vertex, cpuVertexAttribs.data(), vertexAttribs.size());
+		copy<void*>(attribBuffer.face, cpuFaceAttribs.data(), faceAttribs.size());
+
+		return PolygonsDescriptor<dev>{
+			static_cast<u32>(this->get_vertex_count()),
+			static_cast<u32>(this->get_triangle_count()),
+			static_cast<u32>(this->get_quad_count()),
+			static_cast<u32>(vertexAttribs.size()),
+			static_cast<u32>(faceAttribs.size()),
+			this->acquire_const<dev, ei::Vec3, false>(this->get_points_hdl()),
+			this->acquire_const<dev, ei::Vec3, false>(this->get_normals_hdl()),
+			this->acquire_const<dev, ei::Vec2, false>(this->get_uvs_hdl()),
+			this->acquire_const<dev, u16, true>(this->get_material_indices_hdl()),
+			this->get_index_buffer<dev>(),
+			attribBuffer.vertex,
+			attribBuffer.face
+		};
 	}
 
 	// Adds a new vertex.
@@ -292,105 +282,18 @@ public:
 	VertexBulkReturn add_bulk(std::size_t count, util::IByteReader& pointStream,
 							  util::IByteReader& uvStream, const ei::Box& boundingBox);
 	/**
-	 * Bulk-loads the given attribute starting at the given vertex.
+	 * Bulk-loads the given attribute starting at the given vertex/face.
 	 * The number of read values will be capped by the number of vertice present
 	 * after the starting position.
 	 */
-	template < class Attribute >
-	std::size_t add_bulk(Attribute& attribute, const VertexHandle& startVertex,
-						 std::size_t count, util::IByteReader& attrStream) {
-		mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData->n_vertices());
-		// Cap the number of attributes
-		const std::size_t actualCount = std::min(m_meshData->n_vertices() - static_cast<std::size_t>(startVertex.idx()),
-												 count);
-		// Read the attribute from the stream
-		return attribute.restore(attrStream,
-								 static_cast<std::size_t>(startVertex.idx()), actualCount);
-	}
-	/**
-	 * Bulk-loads the given attribute starting at the given face.
-	 * The number of read values will be capped by the number of faces present
-	 * after the starting position.
-	 */
-	template < class Attribute >
-	std::size_t add_bulk(Attribute& attribute, const FaceHandle& startFace,
-						 std::size_t count, util::IByteReader& attrStream) {
-		mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData->n_faces());
-		// Cap the number of attributes
-		std::size_t actualCount = std::min(m_meshData->n_faces() - static_cast<std::size_t>(startFace.idx()),
-										   count);
-		// Read the attribute from the stream
-		return attribute.restore(attrStream,
-								 static_cast<std::size_t>(startFace.idx()), actualCount);
-	}
-	// Also performs bulk-load for an attribute, but aquires it first.
-	template < class T >
-	std::size_t add_bulk(const VertexAttributeHandle<T>& attrHandle,
-						 const VertexHandle& startVertex, std::size_t count,
-						 util::IByteReader& attrStream) {
-		mAssert(attrHandle.omHandle.is_valid());
-		VertexAttribute<T>& attribute = this->aquire(attrHandle);
-		return add_bulk(attribute, startVertex, count, attrStream);
-	}
-	// Also performs bulk-load for an attribute, but aquires it first.
-	template < class T >
-	std::size_t add_bulk(const FaceAttributeHandle<T>& attrHandle,
-						 const FaceHandle& startFace, std::size_t count,
-						 util::IByteReader& attrStream) {
-		mAssert(attrHandle.omHandle.is_valid());
-		FaceAttribute<T>& attribute = this->aquire(attrHandle);
-		return add_bulk(attribute, startFace, count, attrStream);
-	}
-
-	VertexAttribute<OpenMesh::Vec3f>& get_points() {
-		return this->aquire(m_pointsAttrHdl);
-	}
-	const VertexAttribute<OpenMesh::Vec3f>& get_points() const {
-		return this->aquire(m_pointsAttrHdl);
-	}
-
-	VertexAttribute<OpenMesh::Vec3f>& get_normals() {
-		return this->aquire(m_normalsAttrHdl);
-	}
-	const VertexAttribute<OpenMesh::Vec3f>& get_normals() const {
-		return this->aquire(m_normalsAttrHdl);
-	}
-
-	VertexAttribute<OpenMesh::Vec2f>& get_uvs() {
-		return this->aquire(m_uvsAttrHdl);
-	}
-	const VertexAttribute<OpenMesh::Vec2f>& get_uvs() const {
-		return this->aquire(m_uvsAttrHdl);
-	}
-
-	FaceAttribute<MaterialIndex>& get_mat_indices() {
-		return this->aquire(m_matIndexAttrHdl);
-	}
-	const FaceAttribute<MaterialIndex>& get_mat_indices() const {
-		return this->aquire(m_matIndexAttrHdl);
-	}
-
-	// Synchronizes the default attributes position, normal, uv, matindex 
-	template < Device dev >
-	void synchronize() {
-		m_vertexAttributes.synchronize<dev>();
-		m_faceAttributes.synchronize<dev>();
-		// Synchronize the index buffer
-		if(m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
-			if(m_indexFlags.has_competing_changes()) {
-				logError("[Polygons::synchronize] Competing device changes; ignoring one");
-			}
-			m_indexBuffer.for_each([&](auto& buffer) {
-				using ChangedBuffer = std::decay_t<decltype(buffer)>;
-				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
-			});
-		}
-	}
-
-	template < Device dev >
-	void unload() {
-		m_vertexAttributes.unload<dev>();
-	}
+	std::size_t add_bulk(std::string_view name, const VertexHandle& startVertex,
+						 std::size_t count, util::IByteReader& attrStream);
+	std::size_t add_bulk(std::string_view name, const FaceHandle& startVertex,
+						 std::size_t count, util::IByteReader& attrStream);
+	std::size_t add_bulk(OpenMeshAttributePool<false>::AttributeHandle hdl, const VertexHandle& startVertex,
+						 std::size_t count, util::IByteReader& attrStream);
+	std::size_t add_bulk(OpenMeshAttributePool<true>::AttributeHandle hdl, const FaceHandle& startVertex,
+						 std::size_t count, util::IByteReader& attrStream);
 
 	// Implements tessellation for uniform subdivision.
 	void tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMeshType, Real>& tessellater,
@@ -424,6 +327,36 @@ public:
 		};
 	}
 
+	template < Device dev, class T, bool face >
+	T* acquire(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
+		return get_attributes<face>().acquire<dev, T>(hdl);
+	}
+	template < Device dev, class T, bool face >
+	const T* acquire_const(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
+		return get_attributes<face>().acquire_const<dev, T>(hdl);
+	}
+	template < Device dev, class T, bool face >
+	T* acquire(std::string_view name) {
+		return get_attributes<face>().acquire<dev, T>(name);
+	}
+	template < Device dev, class T, bool face >
+	const T* acquire_const(std::string_view name) {
+		return get_attributes<face>().acquire_const<dev, T>(name);
+	}
+
+	OpenMeshAttributePool<false>::AttributeHandle get_points_hdl() const noexcept {
+		return m_pointsHdl;
+	}
+	OpenMeshAttributePool<false>::AttributeHandle get_normals_hdl() const noexcept {
+		return m_normalsHdl;
+	}
+	OpenMeshAttributePool<false>::AttributeHandle get_uvs_hdl() const noexcept {
+		return m_uvsHdl;
+	}
+	OpenMeshAttributePool<true>::AttributeHandle get_material_indices_hdl() const noexcept {
+		return m_matIndicesHdl;
+	}
+
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;
 	}
@@ -449,55 +382,15 @@ public:
 	}
 
 	std::size_t get_vertex_attribute_count() const noexcept {
-		return m_vertexAttributes.get_num_attributes();
+		return m_vertexAttributes.get_attribute_count();
 	}
 
 	std::size_t get_face_attribute_count() const noexcept {
-		return m_faceAttributes.get_num_attributes();
+		return m_faceAttributes.get_attribute_count();
 	}
 
 private:
-	// Helper structs for identifying handle type
-	template < class >
-	struct IsVertexHandleType : std::false_type {};
-	template < class T >
-	struct IsVertexHandleType<VertexAttributeHandle<T>> : std::true_type {};
-	template < class >
-	struct IsFaceHandleType : std::false_type {};
-	template < class T >
-	struct IsFaceHandleType<FaceAttributeHandle<T>> : std::true_type {};
-
-	// Helper function for adding attributes since functions cannot be partially specialized
-	template < class AttributeHandle >
-	auto& select_list() {
-		if constexpr(IsVertexHandleType<AttributeHandle>::value)
-			return m_vertexAttributes;
-		else
-			return m_faceAttributes;
-	}
-
-	// Helper for iterating a tuple
-	template < std::size_t I, Device dev, template < class > class AttribType, class... Args >
-	void push_back_attrib(std::vector<void*>& vec, const std::tuple<Args...>& attribs) {
-		if constexpr(I < sizeof...(Args)) {
-			// First extract the underlying attribute type...
-			using Type = std::tuple_element_t<I, std::tuple<Args...>>;
-			// ...then create the proper handle type...
-			using AttrHdl = AttribType<Type>;
-			// ...and mix it with the presumed name to find it
-			const std::string& name = std::get<I>(attribs).name;
-			std::optional<AttrHdl> attribHdl = this->find<AttrHdl>(name);
-
-			if(!attribHdl.has_value()) {
-				logWarning("[Polygons::push_back_attrib] Could not find attribute '",
-						 name, '\'');
-				vec.push_back(nullptr);
-			} else {
-				vec.push_back(this->aquire(attribHdl.value()).aquire<dev>());
-			}
-			push_back_attrib<I + 1u, dev, AttribType>(vec, attribs);
-		}
-	}
+	static constexpr const char MAT_INDICES_NAME[] = "material-indices";
 
 	// Helper class for distinct array handle types
 	template < Device dev >
@@ -519,6 +412,15 @@ private:
 		IndexBuffer<Device::CUDA>>;
 	using AttribBuffers = util::TaggedTuple<AttribBuffer<Device::CPU>,
 		AttribBuffer<Device::CUDA>>;
+
+	// Helper for deciding between vertex and face attributes
+	template < bool face >
+	auto& get_attributes() {
+		if constexpr(face)
+			return m_faceAttributes;
+		else
+			return m_vertexAttributes;
+	}
 
 	// Reserves more space for the index buffer
 	template < Device dev >
@@ -554,88 +456,35 @@ private:
 		}
 	}
 
-	// Helper functions to set the attribute descriptors properly
-	template < Device dev, class... FAttrs >
-	void set_face_attrib_descriptor(PolygonsDescriptor<dev>& desc, const std::tuple<FAttrs...>& faceAttribs) {
-		constexpr std::size_t numFaceAttribs = sizeof...(FAttrs);
-		// Collect the attributes; for that, we iterate the given Attributes and
-		// gather them on CPU side (or rather, their device pointers); then
-		// we copy it to the actual device
-		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
-			// Resize the attribute array if necessary
-		if(attribBuffer.faceSize < numFaceAttribs) {
-			if(attribBuffer.faceSize == 0)
-				attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(numFaceAttribs);
-			else
-				attribBuffer.face = Allocator<dev>::realloc(attribBuffer.face, attribBuffer.faceSize,
-															numFaceAttribs);
-			attribBuffer.faceSize = numFaceAttribs;
-		}
-
-		std::vector<void*> cpuFaceAttribs(numFaceAttribs);
-		push_back_attrib<0u, dev, FaceAttributeHandle>(cpuFaceAttribs, faceAttribs);
-		copy<void*>(attribBuffer.face, cpuFaceAttribs.data(), numFaceAttribs);
-		desc.numFaceAttributes = numFaceAttribs;
-		desc.faceAttributes = attribBuffer.face;
-	}
-	template < Device dev, class... VAttrs >
-	void set_vertex_attrib_descriptor(PolygonsDescriptor<dev>& desc, const std::tuple<VAttrs...>& vertexAttribs) {
-		constexpr std::size_t numVertexAttribs = sizeof...(VAttrs);
-		// Collect the attributes; for that, we iterate the given Attributes and
-		// gather them on CPU side (or rather, their device pointers); then
-		// we copy it to the actual device
-		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
-			// Resize the attribute array if necessary
-		if(attribBuffer.vertSize < numVertexAttribs) {
-			if(attribBuffer.vertSize == 0)
-				attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(numVertexAttribs);
-			else
-				attribBuffer.vertex = Allocator<dev>::realloc(attribBuffer.vertex, attribBuffer.vertSize,
-															numVertexAttribs);
-			attribBuffer.vertSize = numVertexAttribs;
-		}
-
-		std::vector<void*> cpuVertexAttribs(numVertexAttribs);
-		push_back_attrib<0u, dev, FaceAttributeHandle>(cpuVertexAttribs, vertexAttribs);
-		copy<void*>(attribBuffer.vertex, cpuVertexAttribs.data(), numVertexAttribs);
-		desc.numVertexAttributes = numVertexAttribs;
-		desc.vertexAttributes = attribBuffer.vertex;
-	}
 	template < Device dev >
-	PolygonsDescriptor<dev> get_common_descriptor() {
-		return PolygonsDescriptor<dev>{
-			static_cast<u32>(this->get_vertex_count()),
-			static_cast<u32>(this->get_triangle_count()),
-			static_cast<u32>(this->get_quad_count()),
-			0u,
-			0u,
-			reinterpret_cast<const ei::Vec3*>(this->get_points().aquireConst<dev>()),
-			reinterpret_cast<const ei::Vec3*>(this->get_normals().aquireConst<dev>()),
-			reinterpret_cast<const ei::Vec2*>(this->get_uvs().aquireConst<dev>()),
-			this->get_mat_indices().aquireConst<dev>(),
-			this->get_index_buffer<dev>(),
-			ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
-			ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
-		};
+	void resizeAttribBuffer(std::size_t v, std::size_t f) {
+		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+		// Resize the attribute array if necessary
+		if (attribBuffer.faceSize < f) {
+			if (attribBuffer.faceSize == 0)
+				attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(f);
+			else
+				attribBuffer.face = Allocator<dev>::realloc(attribBuffer.face, attribBuffer.faceSize, f);
+			attribBuffer.faceSize = f;
+		}
+		if (attribBuffer.vertSize < v) {
+			if (attribBuffer.vertSize == 0)
+				attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(v);
+			else
+				attribBuffer.vertex = Allocator<dev>::realloc(attribBuffer.vertex, attribBuffer.vertSize, v);
+			attribBuffer.vertSize = v;
+		}
 	}
-
-	// These methods simply create references to the attributes
-	// By holding references to them, if they ever get removed, we're in a bad spot
-	// So you BETTER not remove the standard attributes
-	VertexAttributeHandle<OpenMesh::Vec3f> create_points_handle();
-	VertexAttributeHandle<OpenMesh::Vec3f> create_normals_handle();
-	VertexAttributeHandle<OpenMesh::Vec2f> create_uvs_handle();
-	FaceAttributeHandle<MaterialIndex> create_mat_index_handle();
 
 	// It's a unique pointer so we have one fixed address we can reference in OmAttributePool
 	// TODO: does that degrade performance? probably not, since attributes aren't aquired often
 	std::unique_ptr<PolygonMeshType> m_meshData;
-	VertexAttributeListType m_vertexAttributes;
-	FaceAttributeListType m_faceAttributes;
-	VertexAttributeHandle<OpenMesh::Vec3f> m_pointsAttrHdl;
-	VertexAttributeHandle<OpenMesh::Vec3f> m_normalsAttrHdl;
-	VertexAttributeHandle<OpenMesh::Vec2f> m_uvsAttrHdl;
-	FaceAttributeHandle<MaterialIndex> m_matIndexAttrHdl;
+	VertexAttributePoolType m_vertexAttributes;
+	FaceAttributePoolType m_faceAttributes;
+	OpenMeshAttributePool<false>::AttributeHandle m_pointsHdl;
+	OpenMeshAttributePool<false>::AttributeHandle m_normalsHdl;
+	OpenMeshAttributePool<false>::AttributeHandle m_uvsHdl;
+	OpenMeshAttributePool<true>::AttributeHandle m_matIndicesHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
 	IndexBuffers m_indexBuffer;
 	util::DirtyFlags<Device> m_indexFlags;

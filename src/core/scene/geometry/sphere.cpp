@@ -5,8 +5,8 @@ namespace mufflon::scene::geometry {
 
 Spheres::Spheres() :
 	m_attributes(),
-	m_sphereData(m_attributes.add<ei::Sphere>("spheres")),
-	m_matIndex(m_attributes.add<MaterialIndex>("materialIdx")) {
+	m_spheresHdl(m_attributes.add_attribute<ei::Sphere>("spheres")),
+	m_matIndicesHdl(m_attributes.add_attribute<MaterialIndex>("materialIdx")) {
 	// Invalidate bounding box
 	m_boundingBox.min = {
 		std::numeric_limits<float>::max(),
@@ -22,8 +22,8 @@ Spheres::Spheres() :
 
 Spheres::Spheres(Spheres&& sphere) :
 	m_attributes(std::move(sphere.m_attributes)),
-	m_sphereData(std::move(sphere.m_sphereData)),
-	m_matIndex(std::move(sphere.m_matIndex)),
+	m_spheresHdl(std::move(sphere.m_spheresHdl)),
+	m_matIndicesHdl(std::move(sphere.m_matIndicesHdl)),
 	m_boundingBox(std::move(sphere.m_boundingBox)){
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -42,13 +42,13 @@ Spheres::~Spheres() {
 }
 
 Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
-	std::size_t newIndex = m_attributes.get_size();
+	std::size_t newIndex = m_attributes.get_attribute_elem_count();
 	SphereHandle hdl(newIndex);
 	m_attributes.resize(newIndex + 1u);
-	auto posRadAccessor = get_spheres().aquire<Device::CPU>();
-	get_spheres().mark_changed(Device::CPU);
-	posRadAccessor[newIndex].center = point;
-	posRadAccessor[newIndex].radius = radius;
+	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
+	spheres[newIndex].center = point;
+	spheres[newIndex].radius = radius;
+	m_attributes.mark_changed(Device::CPU, m_spheresHdl);
 	// Expand bounding box
 	m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ei::Sphere{ point, radius }} };
 	return hdl;
@@ -56,19 +56,18 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 
 Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
 	SphereHandle hdl = this->add(point, radius);
-	get_mat_indices().aquire<Device::CPU>()[hdl] = idx;
-	get_mat_indices().mark_changed(Device::CPU);
+	m_attributes.acquire<Device::CPU, u16>(m_spheresHdl)[hdl] = idx;
+	m_attributes.mark_changed(Device::CPU, m_matIndicesHdl);
 	return hdl;
 }
 
 Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radPosStream) {
-	std::size_t start = m_attributes.get_size();
+	std::size_t start = m_attributes.get_attribute_elem_count();
 	SphereHandle hdl(start);
 	m_attributes.resize(start + count);
-	auto& spheres = get_spheres();
-	std::size_t readRadPos = spheres.restore(radPosStream, start, count);
+	std::size_t readRadPos = m_attributes.restore(m_spheresHdl, radPosStream, start, count);
 	// Expand bounding box
-	const ei::Sphere* radPos = spheres.aquireConst<Device::CPU>();
+	const ei::Sphere* radPos = m_attributes.acquire_const<Device::CPU, ei::Sphere>(m_spheresHdl);
 	for(std::size_t i = start; i < start + readRadPos; ++i)
 		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{radPos[i]} };
 	return { hdl, readRadPos };
@@ -76,14 +75,30 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 
 Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radPosStream,
 									  const ei::Box& boundingBox) {
-	std::size_t start = m_attributes.get_size();
+	std::size_t start = m_attributes.get_attribute_elem_count();
 	SphereHandle hdl(start);
 	m_attributes.resize(start + count);
-	auto& spheres = get_spheres();
-	std::size_t readRadPos = spheres.restore(radPosStream, start, count);
+	std::size_t readRadPos = m_attributes.restore(m_spheresHdl, radPosStream, start, count);
 	// Expand bounding box
 	m_boundingBox = ei::Box(m_boundingBox, boundingBox);
 	return { hdl, readRadPos };
 }
 
+std::size_t Spheres::add_bulk(std::string_view name, const SphereHandle& startSphere,
+							  std::size_t count, util::IByteReader& attrStream) {
+	if(startSphere >= m_attributes.get_attribute_elem_count())
+		return 0u;
+	if(startSphere + count > m_attributes.get_attribute_elem_count())
+		m_attributes.resize(startSphere + count);
+	return m_attributes.restore(name, attrStream, startSphere, count);
+}
+
+std::size_t Spheres::add_bulk(AttributePool::AttributeHandle hdl, const SphereHandle& startSphere,
+							  std::size_t count, util::IByteReader& attrStream) {
+	if(startSphere >= m_attributes.get_attribute_elem_count())
+		return 0u;
+	if(startSphere + count > m_attributes.get_attribute_elem_count())
+		m_attributes.resize(startSphere + count);
+	return m_attributes.restore(hdl, attrStream, startSphere, count);
+}
 } // namespace mufflon::scene::geometry

@@ -150,8 +150,7 @@ typedef struct {
 } AttribDesc;
 
 typedef struct {
-	int32_t openMeshIndex;
-	int32_t customIndex;
+	int32_t index;
 	AttribDesc type;
 	Boolean face;
 } PolygonAttributeHandle;
@@ -256,16 +255,6 @@ CORE_API PolygonAttributeHandle CDECL polygon_request_vertex_attribute(ObjectHdl
 CORE_API PolygonAttributeHandle CDECL polygon_request_face_attribute(ObjectHdl obj,
 																  const char* name,
 																  AttribDesc type);
-CORE_API Boolean CDECL polygon_remove_vertex_attribute(ObjectHdl obj,
-												 const PolygonAttributeHandle* hdl);
-CORE_API Boolean CDECL polygon_remove_face_attribute(ObjectHdl obj,
-											   const PolygonAttributeHandle* hdl);
-CORE_API PolygonAttributeHandle CDECL polygon_find_vertex_attribute(ObjectHdl obj,
-																 const char* name,
-																 AttribDesc type);
-CORE_API PolygonAttributeHandle CDECL polygon_find_face_attribute(ObjectHdl obj,
-															   const char* name,
-															   AttribDesc type);
 CORE_API VertexHdl CDECL polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv);
 CORE_API FaceHdl CDECL polygon_add_triangle(ObjectHdl obj, UVec3 vertices);
 CORE_API FaceHdl CDECL polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
@@ -316,10 +305,6 @@ CORE_API Boolean CDECL spheres_resize(ObjectHdl obj, size_t count);
 CORE_API SphereAttributeHandle CDECL spheres_request_attribute(ObjectHdl obj,
 															const char* name,
 															AttribDesc type);
-CORE_API Boolean CDECL spheres_remove_attribute(ObjectHdl obj, const SphereAttributeHandle* hdl);
-CORE_API SphereAttributeHandle CDECL spheres_find_attribute(ObjectHdl obj,
-														 const char* name,
-														 AttribDesc type);
 CORE_API SphereHdl CDECL spheres_add_sphere(ObjectHdl obj, Vec3 point, float radius);
 CORE_API SphereHdl CDECL spheres_add_sphere_material(ObjectHdl obj, Vec3 point,
 													 float radius, MatIdx idx);

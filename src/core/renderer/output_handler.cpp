@@ -150,8 +150,8 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 
 	// Upload to CPU / synchronize if necessary
 	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
-		m_cumulativeVarTex[quantity].aquireConst<Device::CPU>() :
-		m_cumulativeTex[quantity].aquireConst<Device::CPU>();
+		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
+		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
 
 	// TODO: openmp
 	for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x) {

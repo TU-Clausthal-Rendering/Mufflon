@@ -1,11 +1,11 @@
 #pragma once
 
+#include "core/scene/attr.hpp"
 #include "core/scene/descriptors.hpp"
-#include "core/scene/types.hpp"
-#include "core/scene/attribute_list.hpp"
 #include "core/scene/types.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
+#include <array>
 #include <tuple>
 #include <vector>
 
@@ -27,10 +27,6 @@ public:
 	// Basic type definitions
 	using Index = u32;
 	using SphereHandle = std::size_t;
-	template < class T >
-	using AttributeHandle = typename AttributeList::template AttributeHandle<T>;
-	template < class T >
-	using Attribute = typename AttributeList::template BaseAttribute<T>;
 
 	// Struct communicating the number of bulk-read spheres
 	struct BulkReturn {
@@ -57,22 +53,59 @@ public:
 		m_attributes.resize(count);
 	}
 
-	// Requests a new per-sphere attribute.
 	template < class T >
-	AttributeHandle<T> request(const std::string& name) {
-		return m_attributes.add<T>(name);
+	AttributePool::AttributeHandle add_attribute(std::string name) {
+		return m_attributes.add_attribute<T>(std::move(name));
 	}
 
-	// Removes a per-sphere attribute.
-	template < class T >
-	void remove(const AttributeHandle<T> &attr) {
-		m_attributes.remove<T>(attr);
+	void remove_attribute(std::string_view name) {
+		throw std::runtime_error("Operation not implemented yet");
 	}
 
-	// Finds a per-sphere attribute by name.
-	template < class T >
-	std::optional<AttributeHandle<T>> find(const std::string& name) {
-		return m_attributes.find<T>(name);
+	// Synchronizes the default attributes position, normal, uv, matindex 
+	template < Device dev >
+	void synchronize() {
+		m_attributes.synchronize<dev>();
+	}
+	template < Device dev >
+	void synchronize(std::string_view name) {
+		m_attributes.synchronize<dev>(name);
+	}
+	template < Device dev >
+	void synchronize(AttributePool::AttributeHandle hdl) {
+		m_attributes.synchronize<dev>(hdl);
+	}
+
+	template < Device dev >
+	void unload() {
+		m_attributes.unload<dev>();
+	}
+
+	template < Device dev, class T >
+	T* acquire(typename AttributePool::AttributeHandle hdl) {
+		return m_attributes.acquire<dev, T>(hdl);
+	}
+	template < Device dev, class T >
+	const T* acquire_const(typename AttributePool::AttributeHandle hdl) {
+		return m_attributes.acquire_const<dev, T>(hdl);
+	}
+	template < Device dev, class T >
+	T* acquire(std::string_view name) {
+		return m_attributes.acquire<dev, T>(name);
+	}
+	template < Device dev, class T >
+	const T* acquire_const(std::string_view name) {
+		return m_attributes.acquire_const<dev, T>(name);
+	}
+
+	void mark_changed(Device dev) {
+		m_attributes.mark_changed(dev);
+	}
+	void mark_changed(Device dev, AttributePool::AttributeHandle hdl) {
+		m_attributes.mark_changed(dev, hdl);
+	}
+	void mark_changed(Device dev, std::string_view name) {
+		m_attributes.mark_changed(dev, name);
 	}
 
 	// Adds a sphere.
@@ -91,46 +124,16 @@ public:
 	 * The number of read values will be capped by the number of spheres present
 	 * after the starting position.
 	 */
-	template < class T >
-	std::size_t add_bulk(Attribute<T>& attribute, const SphereHandle& startSphere,
-						 std::size_t count, util::IByteReader& attrStream) {
-		std::size_t start = startSphere;
-		if(start >= m_attributes.get_size())
-			return 0u;
-		if(start + count > m_attributes.get_size())
-			m_attributes.resize(start + count);
-		return attribute.restore(attrStream, start, count);
-	}
-	// Also performs bulk-load for an attribute, but aquires it first.
-	template < class Type >
-	std::size_t add_bulk(const AttributeHandle<Type>& attrHandle,
-						 const SphereHandle& startSphere, std::size_t count,
-						 util::IByteReader& attrStream) {
-		return this->add_bulk(m_attributes.aquire(attrHandle), startSphere, count, attrStream);
-	}
+	std::size_t add_bulk(std::string_view name, const SphereHandle& startSphere,
+						 std::size_t count, util::IByteReader& attrStream);
+	std::size_t add_bulk(AttributePool::AttributeHandle hdl, const SphereHandle& startSphere,
+						 std::size_t count, util::IByteReader& attrStream);
 
-	template < class T >
-	Attribute<T>& aquire(const AttributeHandle<T>& attrHandle) {
-		return m_attributes.aquire(attrHandle);
+	AttributePool::AttributeHandle get_spheres_hdl() const noexcept {
+		return m_spheresHdl;
 	}
-
-	template < class T >
-	const Attribute<T>& aquire(const AttributeHandle<T>& attrHandle) const {
-		return m_attributes.aquire(attrHandle);
-	}
-
-	Attribute<ei::Sphere>& get_spheres() {
-		return this->aquire(m_sphereData);
-	}
-	const Attribute<ei::Sphere>& get_spheres() const {
-		return this->aquire(m_sphereData);
-	}
-
-	Attribute<MaterialIndex>& get_mat_indices() {
-		return this->aquire(m_matIndex);
-	}
-	const Attribute<MaterialIndex>& get_mat_indices() const {
-		return this->aquire(m_matIndex);
+	AttributePool::AttributeHandle get_material_indices_hdl() const noexcept {
+		return m_matIndicesHdl;
 	}
 
 	/**
@@ -140,48 +143,37 @@ public:
 	 * renderer's task to aquire it once more after that, since we cannot hand out
 	 * Accessors to the concrete device.
 	 */
-	template < Device dev, class... Args >
-	SpheresDescriptor<dev> get_descriptor(const std::tuple<AttrDesc<Args>...>& attribs) {
+	template < Device dev, std::size_t N >
+	SpheresDescriptor<dev> get_descriptor(const std::array<const char*, N>& attribs) {
 		this->synchronize<dev>();
-		constexpr std::size_t numAttribs = sizeof...(Args);
 		// Collect the attributes; for that, we iterate the given Attributes and
 		// gather them on CPU side (or rather, their device pointers); then
 		// we copy it to the actual device
 		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
-		if(numAttribs > 0) {
+		if(attribs.size() > 0) {
 			// Resize the attribute array if necessary
-			if(attribBuffer.size < numAttribs) {
+			if(attribBuffer.size < attribs.size()) {
 				if(attribBuffer.size == 0)
-					attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(numAttribs);
+					attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
 				else
 					attribBuffer.buffer = Allocator<dev>::template realloc(attribBuffer.buffer, attribBuffer.size,
-																		   numAttribs);
-				attribBuffer.size = numAttribs;
+																		   attribs.size());
+				attribBuffer.size = attribs.size();
 			}
 
-			std::vector<void*> cpuAttribs(numAttribs);
-			push_back_attrib<0u, dev>(cpuAttribs, attribs);
-			copy(attribBuffer.buffer, cpuAttribs.data(), numAttribs);
+			std::vector<void*> cpuAttribs(attribs.size());
+			for(const char* name : attribs)
+				cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
+			copy(attribBuffer.buffer, cpuAttribs.data(), attribs.size());
 		}
 
 		return SpheresDescriptor<dev>{
 			static_cast<u32>(this->get_sphere_count()),
-			static_cast<u32>(numAttribs),
-			this->get_spheres().aquireConst<dev>(),
-			this->get_mat_indices().aquireConst<dev>(),
+			static_cast<u32>(attribs.size()),
+			this->acquire_const<dev, ei::Sphere>(this->get_spheres_hdl()),
+			this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
 			attribBuffer.buffer
 		};
-	}
-	
-	// Synchronizes the default attributes position, normal, uv, matindex 
-	template < Device dev >
-	void synchronize() {
-		m_attributes.synchronize<dev>();
-	}
-
-	template < Device dev >
-	void unload() {
-		m_attributes.unload<dev>();
 	}
 
 	const ei::Box& get_bounding_box() const noexcept {
@@ -189,7 +181,11 @@ public:
 	}
 
 	std::size_t get_sphere_count() const noexcept {
-		return m_attributes.get_size();
+		return m_attributes.get_attribute_elem_count();
+	}
+
+	std::size_t get_attribute_count() const noexcept {
+		return m_attributes.get_attribute_count();
 	}
 
 private:
@@ -203,33 +199,12 @@ private:
 	using AttribBuffers = util::TaggedTuple<AttribBuffer<Device::CPU>,
 		AttribBuffer<Device::CUDA>>;
 
-	// Helper for iterating a tuple
-	template < std::size_t I, Device dev, class... Args >
-	void push_back_attrib(std::vector<void*>& vec, const std::tuple<Args...>& attribs) {
-		if constexpr(I < sizeof...(Args)) {
-			// First extract the underlying attribute type...
-			using Type = std::tuple_element_t<I, std::tuple<Args...>>;
-			// ...then mix it with the presumed name to find it
-			const std::string& name = std::get<I>(attribs).name;
-			std::optional<AttributeHandle<Type>> attribHdl = this->find<Type>(name);
-
-			if(!attribHdl.has_value()) {
-				logWarning("[Polygons::push_back_attrib] Could not find attribute '",
-						   name, '\'');
-				vec.push_back(nullptr);
-			} else {
-				vec.push_back(this->aquire(attribHdl.value()).aquire<dev>());
-			}
-			push_back_attrib<I + 1u, dev>(vec, attribs);
-		}
-	}
-
 	// Make sure that spheres are tightly packed
 	static_assert(sizeof(ei::Sphere) == 4u * sizeof(float));
 
-	AttributeList m_attributes;
-	AttributeHandle<ei::Sphere> m_sphereData;
-	AttributeHandle<MaterialIndex> m_matIndex;
+	AttributePool m_attributes;
+	AttributePool::AttributeHandle m_spheresHdl;
+	AttributePool::AttributeHandle m_matIndicesHdl;
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
 	ei::Box m_boundingBox;

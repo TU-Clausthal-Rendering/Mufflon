@@ -142,9 +142,6 @@
     <ClCompile Include="..\..\src\core\scene\scene.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\attribute.cpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\world_container.cpp">
       <Filter>Source Files\core\scene</Filter>
     </ClCompile>
@@ -729,12 +726,7 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\src\core\scene\attribute_list.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\attribute.hpp">
+    <ClInclude Include="..\..\src\core\scene\attr.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>

@@ -50,7 +50,7 @@ public:
 		outBuffer = IMaterial::get_descriptor(device, outBuffer);
 		device_switch(device,
 			*as<LambertDesc<dev>>(outBuffer) =
-				LambertDesc<dev>{ m_albedo->aquireConst<dev>() };
+				LambertDesc<dev>{ m_albedo->acquire_const<dev>() };
 			return outBuffer + sizeof(LambertDesc<dev>);
 		);
 		return nullptr;

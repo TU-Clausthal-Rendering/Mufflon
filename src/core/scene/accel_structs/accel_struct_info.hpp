@@ -13,9 +13,6 @@ struct Ray;
 
 namespace mufflon { namespace scene {
 
-// Forward declaration
-struct ObjectData;
-
 namespace accel_struct {
 
 // All supported types of acceleration structures

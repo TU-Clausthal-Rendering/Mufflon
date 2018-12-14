@@ -27,16 +27,6 @@ namespace accel_struct {
 	class IAccelerationStructure;
 }
 
-// Data packet handed out by an object (for e.g. BVH construction)
-struct ObjectData {
-	std::size_t triangleCount;
-	std::size_t quadCount;
-	ei::Box aabb;
-	util::Range<geometry::Polygons::FaceIterator> faces;
-	geometry::Polygons::VertexAttribute<OpenMesh::Vec3f>& faceVertices;
-	geometry::Spheres::Attribute<ei::Sphere>& spheres;
-};
-
 struct ObjectFlags : public util::Flags<u32> {
 	static constexpr u32 EMISSIVE = 1u;
 };
@@ -76,94 +66,6 @@ public:
 		m_flags = flags;
 	}
 
-	// Resizes storage of geometry type.
-	template < class Geom, class... Args >
-	void resize(Args&& ...args) {
-		m_geometryData.template get<Geom>().resize(std::forward<Args>(args)...);
-	}
-
-	// Adds a primitive (e.g. vertex, triangle, sphere...) to geometry.
-	template < class Geom, class... Args >
-	auto add(Args&& ...args) {
-		auto hdl = m_geometryData.template get<Geom>().add(std::forward<Args>(args)...);
-		clear_accel_structure();
-		// Expand the object's bounding box
-		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.template get<Geom>().get_bounding_box().max);
-		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.template get<Geom>().get_bounding_box().min);
-		return hdl;
-	}
-
-	template < class Geom, class... Args >
-	auto add_bulk(Args&& ...args) {
-		auto hdl = m_geometryData.get<Geom>().add_bulk(std::forward<Args>(args)...);
-		clear_accel_structure();
-		// Expand the object's bounding box
-		m_boundingBox.max = ei::max(m_boundingBox.max, m_geometryData.template get<Geom>().get_bounding_box().max);
-		m_boundingBox.min = ei::min(m_boundingBox.min, m_geometryData.template get<Geom>().get_bounding_box().min);
-		return hdl;
-	}
-
-	// Requests an attribute for the geometry type.
-	template < class Geom, class Type >
-	auto request(const std::string& name) {
-		return m_geometryData.template get<Geom>().template request<Type>(name);
-	}
-	// Removes an attribute for the geometry type.
-	template < class Geom, class AttributeHandle >
-	void remove(AttributeHandle& handle) {
-		m_geometryData.template get<Geom>().remove(handle);
-	}
-	// Attempts to find an attribute by name.
-	template < class Geom, class T >
-	auto find(const std::string& name) {
-		return m_geometryData.template get<Geom>().template find<T>(name);
-	}
-	/**
-	 * Aquires a reference to an attribute, valid until the attribute gets removed.
-	 * Since we cannot track what the user does with this attribute, the object must manually be marked as 'dirty'
-	 * before the next operation on a different residency.
-	 */
-	template <  class Geom, class AttributeHandle >
-	auto &aquire(const AttributeHandle& attrHandle) {
-		return m_geometryData.template get<Geom>().aquire(attrHandle);
-	}
-	/**
-	 * Aquires a reference to an attribute, valid until the attribute gets removed.
-	 * The read-only version of aquire does not need the dirty flag.
-	 */
-	template < class Geom, class AttributeHandle >
-	const auto &aquire(const AttributeHandle& attrHandle) const {
-		return m_geometryData.template get<Geom>().aquire(attrHandle);
-	}
-
-	// Applies tessellation to the geometry type.
-	template < class Geom, class Tessellater, class... Args >
-	void tessellate(Tessellater& tessellater, Args&& ...args) {
-		m_geometryData.template get<Geom>().tessellate(tessellater, std::forward<Args>(args)...);
-		clear_accel_structure();
-	}
-	// Creates a new LoD by applying a decimater to the geomtry type.
-	template < class Geom, class Decimater, class... Args >
-	Object create_lod(Decimater& decimater, Args&& ...args) {
-		// TODO: what do we want exactly?
-		Object temp(*this);
-		temp.m_geometryData.template get<Geom>().create_lod(decimater, std::forward<Args>(args)...);
-		temp.clear_accel_structure();
-		return temp;
-	}
-
-	// Grants access to the material-index attribute (required for ALL geometry types)
-	template < class Geom >
-	auto& get_mat_indices() {
-		return m_geometryData.template get<Geom>().get_mat_indices();
-	}
-
-	// Grants access to the material-index attribute (required for ALL geometry types)
-	template < class Geom >
-	const auto& get_mat_indices() const {
-		return m_geometryData.template get<Geom>().get_mat_indices();
-	}
-
 	// Grants direct access to the mesh data (const only).
 	// Valid types for Geom are geometry::Polygons, geometry::Spheres
 	template < class Geom >
@@ -191,10 +93,10 @@ public:
 
 	// Get the descriptor of the object (including all geometry)
 	// Synchronizes implicitly
-	template < Device dev, class... VAttrs, class... FAttrs, class... Attrs >
-	ObjectDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
-										 const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
-										 const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs) {
+	template < Device dev, std::size_t N, std::size_t M, std::size_t O >
+	ObjectDescriptor<dev> get_descriptor(const std::array<const char*, N> &vertexAttribs,
+										 const std::array<const char*, M> &faceAttribs,
+										 const std::array<const char*, O> &sphereAttribs) {
 		ObjectDescriptor<dev> desc{
 			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
 			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),

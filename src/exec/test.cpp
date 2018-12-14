@@ -138,11 +138,11 @@ void test_polygon() {
 	mAssert(obj != nullptr);
 	{
 		auto hdl0 = polygon_request_vertex_attribute(obj, "test0", AttribDesc{ AttributeType::ATTR_FLOAT, 1u });
-		mAssert(hdl0.customIndex != INVALID_INDEX);
+		mAssert(hdl0.index != INVALID_INDEX);
 		auto hdl1 = polygon_request_vertex_attribute(obj, "test1", AttribDesc{ AttributeType::ATTR_INT, 3u });
-		mAssert(hdl1.customIndex != INVALID_INDEX);
+		mAssert(hdl1.index != INVALID_INDEX);
 		auto hdl2 = polygon_request_face_attribute(obj, "test2", AttribDesc{ AttributeType::ATTR_UCHAR, 4u });
-		mAssert(hdl2.customIndex != INVALID_INDEX);
+		mAssert(hdl2.index != INVALID_INDEX);
 		float m0{ 25.f };
 		ei::Vec<int, 3u> m1{ 1, 2, 3 };
 		ei::Vec<unsigned char, 4u> m2{ 2, 4, 6, 8 };
@@ -168,12 +168,6 @@ void test_polygon() {
 
 		// TODO: read back attributes
 
-		success = polygon_remove_vertex_attribute(obj, &hdl0);
-		mAssert(success);
-		success = polygon_remove_vertex_attribute(obj, &hdl1);
-		mAssert(success);
-		success = polygon_remove_face_attribute(obj, &hdl2);
-		mAssert(success);
 
 		// TODO: test bulk functions as well
 		if(TEST_STREAM) {

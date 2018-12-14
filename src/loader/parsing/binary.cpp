@@ -265,7 +265,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes() {
 									 + std::to_string(m_currObjState.lodLevel) + ')');
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
-		if(attrHdl.openMeshIndex == INVALID_INDEX)
+		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 		if(polygon_set_vertex_attribute_bulk(m_currObjState.objHdl, &attrHdl, 0u,
@@ -290,7 +290,7 @@ void BinaryLoader::read_uncompressed_face_attributes() {
 									 + std::to_string(m_currObjState.lodLevel) + ')');
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
-		if(attrHdl.openMeshIndex == INVALID_INDEX)
+		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add face attribute to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 		if(polygon_set_face_attribute_bulk(m_currObjState.objHdl, &attrHdl, 0u,
@@ -530,7 +530,7 @@ void BinaryLoader::read_compressed_vertex_attributes() {
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(),
 														state.type);
-		if(attrHdl.customIndex == INVALID_INDEX)
+		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 		for(u32 v = 0u; v < m_currObjState.numVertices; ++v) {
@@ -559,7 +559,7 @@ void BinaryLoader::read_compressed_face_attributes() {
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(),
 													  state.type);
-		if(attrHdl.customIndex == INVALID_INDEX)
+		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add face attribute to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 		for(u32 f = 0u; f < m_currObjState.numTriangles + m_currObjState.numQuads; ++f) {

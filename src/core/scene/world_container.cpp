@@ -225,9 +225,9 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 				u32 primIdx = 0;
 				// First search in polygons (PrimitiveHandle expects poly before sphere)
 				auto& polygons = instance.get_object().get_geometry<geometry::Polygons>();
-				const MaterialIndex* materials = polygons.get_mat_indices().aquireConst<Device::CPU>();
-				const scene::Point* positions = as<scene::Point>(polygons.get_points().aquireConst<Device::CPU>());
-				const scene::UvCoordinate* uvs = as<scene::UvCoordinate>(polygons.get_uvs().aquireConst<Device::CPU>());
+				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex, true>(polygons.get_material_indices_hdl());
+				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point, false>(polygons.get_points_hdl());
+				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate, false>(polygons.get_uvs_hdl());
 				for(const auto& face : polygons.faces()) {
 					if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
 						if(std::distance(face.begin(), face.end()) == 3) {
@@ -257,9 +257,9 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 
 				// Then get the sphere lights
 				auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
-				materials = spheres.get_mat_indices().aquireConst<Device::CPU>();
-				const ei::Sphere* spheresData = spheres.get_spheres().aquireConst<Device::CPU>();
-				for(std::size_t i = 0; i < spheres.get_mat_indices().get_size(); ++i) {
+				materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
+				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					if(m_materials[materials[i]]->get_properties().is_emissive()) {
 						lights::AreaLightSphereDesc al{
 							spheresData[i].center,

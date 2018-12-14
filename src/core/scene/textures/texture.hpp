@@ -192,7 +192,7 @@ public:
 
 	// Aquire a read-only accessor
 	template < Device dev >
-	ConstTextureDevHandle_t<dev> aquireConst() {
+	ConstTextureDevHandle_t<dev> acquire_const() {
 		this->synchronize<dev>();
 		return m_constHandles.get<ConstTextureDevHandle_t<dev>>();
 	}

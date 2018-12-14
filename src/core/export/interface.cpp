@@ -68,12 +68,6 @@ using namespace mufflon::scene::geometry;
 	} while(0)
 
 // Shortcuts for long handle names
-template < class T >
-using PolyVAttr = Polygons::VertexAttributeHandle<T>;
-template < class T >
-using PolyFAttr = Polygons::FaceAttributeHandle<T>;
-template < class T >
-using SphereAttr = Spheres::AttributeHandle<T>;
 using PolyVHdl = Polygons::VertexHandle;
 using PolyFHdl = Polygons::FaceHandle;
 using SphereVHdl = Spheres::SphereHandle;
@@ -95,7 +89,7 @@ std::vector<TextureLoaderPlugin> s_plugins;
 
 
 constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
-	INVALID_INDEX, INVALID_INDEX,
+	INVALID_INDEX,
 	AttribDesc{
 		AttributeType::ATTR_COUNT,
 		0u
@@ -103,7 +97,7 @@ constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
 	false
 };
 constexpr PolygonAttributeHandle INVALID_POLY_FATTR_HANDLE{
-	INVALID_INDEX, INVALID_INDEX,
+	INVALID_INDEX,
 	AttribDesc{
 		AttributeType::ATTR_COUNT,
 		0u
@@ -368,7 +362,7 @@ void execute_command(const char* command) {
 
 Boolean polygon_resize(ObjectHdl obj, size_t vertices, size_t edges, size_t tris, size_t quads) {
 	CHECK_NULLPTR(obj, "object handle", false);
-	static_cast<Object*>(obj)->template resize<Polygons>(vertices, edges, tris, quads);
+	static_cast<Object*>(obj)->template get_geometry<Polygons>().resize(vertices, edges, tris, quads);
 	return true;
 }
 
@@ -380,10 +374,9 @@ PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj, const cha
 
 	return switchAttributeType(type, [name, &type, &object](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attr = object.template request<Polygons, PolyVAttr<Type>>(name);
+		auto attr = object.template get_geometry<Polygons>().template add_attribute<Type, false>(name);
 		return PolygonAttributeHandle{
-			attr.omHandle.idx(),
-			static_cast<int32_t>(attr.customHandle.index()),
+			static_cast<int32_t>(attr.index),
 			type, false
 		};
 	}, [&type, name = FUNCTION_NAME](){
@@ -401,10 +394,9 @@ PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 
 	return switchAttributeType(type, [name, type, &object](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attr = object.template request<Polygons, PolyFAttr<Type>>(name);
+		auto attr = object.template get_geometry<Polygons>().template add_attribute<Type, true>(name);
 		return PolygonAttributeHandle{
-			attr.omHandle.idx(),
-			static_cast<int32_t>(attr.customHandle.index()),
+			static_cast<int32_t>(attr.index),
 			type, true
 		};
 	}, [&type, name = FUNCTION_NAME]() {
@@ -413,96 +405,9 @@ PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 	});
 }
 
-Boolean polygon_remove_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* hdl) {
-	CHECK_NULLPTR(obj, "object handle", false);
-	CHECK_NULLPTR(hdl, "attribute", false);
-	CHECK_GEQ_ZERO(hdl->openMeshIndex, "attribute index (OpenMesh)", false);
-	CHECK_GEQ_ZERO(hdl->customIndex, "attribute index (custom)", false);
-	CHECK(!hdl->face, "face attribute in vertex function", false);
-	Object& object = *static_cast<Object*>(obj);
-
-	return switchAttributeType(hdl->type, [hdl, &object](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		PolyVAttr<Type> attr = convert_poly_to_attr<PolyVAttr<Type>>(*hdl);
-		object.template remove<Polygons>(attr);
-		return true;
-	}, [hdl, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(hdl->type));
-		return false;
-	});
-}
-
-Boolean polygon_remove_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* hdl) {
-	CHECK_NULLPTR(obj, "object handle", false);
-	CHECK_NULLPTR(hdl, "attribute", false);
-	CHECK_GEQ_ZERO(hdl->openMeshIndex, "attribute index (OpenMesh)", false);
-	CHECK_GEQ_ZERO(hdl->customIndex, "attribute index (custom)", false);
-	CHECK(hdl->face, "vertex attribute in face function", false);
-	Object& object = *static_cast<Object*>(obj);
-
-	return switchAttributeType(hdl->type, [hdl, &object](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		PolyFAttr<Type> attr = convert_poly_to_attr<PolyFAttr<Type>>(*hdl);
-		object.template remove<Polygons>(attr);
-		return true;
-	}, [hdl, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(hdl->type));
-		return false;
-	});
-}
-
-PolygonAttributeHandle polygon_find_vertex_attribute(ObjectHdl obj,
-													 const char* name,
-													 AttribDesc type) {
-	CHECK_NULLPTR(obj, "object handle", INVALID_POLY_VATTR_HANDLE);
-	CHECK_NULLPTR(name, "attribute name", INVALID_POLY_VATTR_HANDLE);
-	Object& object = *static_cast<Object*>(obj);
-
-	return switchAttributeType(type, [&object, type, name](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		std::optional<PolyVAttr<Type>> attr = object.template find<Polygons, PolyVAttr<Type>>(name);
-		if(attr.has_value()) {
-			return PolygonAttributeHandle{
-				attr.value().omHandle.idx(),
-				static_cast<int32_t>(attr.value().customHandle.index()),
-				type, false
-			};
-		}
-		return INVALID_POLY_VATTR_HANDLE;
-	}, [&type, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
-		return INVALID_POLY_VATTR_HANDLE;
-	});
-}
-
-PolygonAttributeHandle polygon_find_face_attribute(ObjectHdl obj, const char* name,
-												   AttribDesc type) {
-	CHECK_NULLPTR(obj, "object handle", INVALID_POLY_FATTR_HANDLE);
-	CHECK_NULLPTR(name, "attribute name", INVALID_POLY_FATTR_HANDLE);
-	Object& object = *static_cast<Object*>(obj);
-
-	return switchAttributeType(type, [&object, type, name](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		std::optional<PolyFAttr<Type>> attr = object.template find<Polygons, PolyFAttr<Type>>(name);
-		if(attr.has_value()) {
-			return PolygonAttributeHandle{
-				attr.value().omHandle.idx(),
-				static_cast<int32_t>(attr.value().customHandle.index()),
-				type, true
-			};
-		}
-		return INVALID_POLY_FATTR_HANDLE;
-	}, [&type, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
-		return INVALID_POLY_FATTR_HANDLE;
-	});
-}
-
 VertexHdl polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv) {
 	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
-	PolyVHdl hdl = static_cast<Object*>(obj)->template add<Polygons>(
+	PolyVHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		util::pun<ei::Vec3>(point), util::pun<ei::Vec3>(normal),
 		util::pun<ei::Vec2>(uv));
 	if(!hdl.is_valid()) {
@@ -515,7 +420,7 @@ VertexHdl polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv) {
 FaceHdl polygon_add_triangle(ObjectHdl obj, UVec3 vertices) {
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
 
-	PolyFHdl hdl = static_cast<Object*>(obj)->template add<Polygons>(
+	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) });
@@ -529,7 +434,7 @@ FaceHdl polygon_add_triangle(ObjectHdl obj, UVec3 vertices) {
 FaceHdl polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
 										 MatIdx idx) {
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Object*>(obj)->template add<Polygons>(
+	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
@@ -543,7 +448,7 @@ FaceHdl polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
 
 FaceHdl polygon_add_quad(ObjectHdl obj, UVec4 vertices) {
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Object*>(obj)->template add<Polygons>(
+	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
@@ -558,7 +463,7 @@ FaceHdl polygon_add_quad(ObjectHdl obj, UVec4 vertices) {
 FaceHdl polygon_add_quad_material(ObjectHdl obj, UVec4 vertices,
 									 MatIdx idx) {
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Object*>(obj)->template add<Polygons>(
+	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
@@ -584,8 +489,8 @@ VertexHdl polygon_add_vertex_bulk(ObjectHdl obj, size_t count, FILE* points,
 	mufflon::util::FileReader normalReader{ normals };
 	mufflon::util::FileReader uvReader{ uvs };
 
-	Polygons::VertexBulkReturn info = object.template add_bulk<Polygons>(count, pointReader,
-																normalReader, uvReader);
+	Polygons::VertexBulkReturn info = object.template get_geometry<Polygons>().add_bulk(
+		count, pointReader, normalReader, uvReader);
 	if(pointsRead != nullptr)
 		*pointsRead = info.readPoints;
 	if(pointsRead != nullptr)
@@ -606,8 +511,8 @@ VertexHdl polygon_add_vertex_bulk_no_normals(ObjectHdl obj, size_t count,
 	mufflon::util::FileReader pointReader{ points };
 	mufflon::util::FileReader uvReader{ uvs };
 
-	Polygons::VertexBulkReturn info = object.template add_bulk<Polygons>(count, pointReader,
-																		 uvReader);
+	Polygons::VertexBulkReturn info = object.template get_geometry<Polygons>().add_bulk(
+		count, pointReader, uvReader);
 	if(pointsRead != nullptr)
 		*pointsRead = info.readPoints;
 	if(pointsRead != nullptr)
@@ -629,9 +534,8 @@ VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points
 	mufflon::util::FileReader uvReader{ uvs };
 
 	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
-	Polygons::VertexBulkReturn info = object.template add_bulk<Polygons>(count, pointReader,
-																normalReader, uvReader,
-																aabb);
+	Polygons::VertexBulkReturn info = object.template get_geometry<Polygons>().add_bulk(
+		count, pointReader, normalReader, uvReader, aabb);
 	if(pointsRead != nullptr)
 		*pointsRead = info.readPoints;
 	if(pointsRead != nullptr)
@@ -654,8 +558,8 @@ VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
 	mufflon::util::FileReader uvReader{ uvs };
 
 	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
-	Polygons::VertexBulkReturn info = object.template add_bulk<Polygons>(count, pointReader,
-																		 uvReader, aabb);
+	Polygons::VertexBulkReturn info = object.template get_geometry<Polygons>().add_bulk(
+		count, pointReader, uvReader, aabb);
 	if(pointsRead != nullptr)
 		*pointsRead = info.readPoints;
 	if(pointsRead != nullptr)
@@ -669,9 +573,8 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
 	CHECK(!attr->face, "Face attribute in vertex function", false);
+	CHECK_GEQ_ZERO(attr->index, "attribute index", false);
 	CHECK_GEQ_ZERO(vertex, "vertex index", false);
-	CHECK_GEQ_ZERO(attr->openMeshIndex, "attribute index (OpenMesh)", false);
-	CHECK_GEQ_ZERO(attr->customIndex, "attribute index (custom)", false);
 	Object& object = *static_cast<Object*>(obj);
 	if(vertex >= static_cast<int>(object.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Vertex index out of bounds (",
@@ -682,9 +585,10 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 
 	return switchAttributeType(attr->type, [&object, attr, vertex, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr));
-		attribute.template aquire<Device::CPU>()[vertex] = *static_cast<const Type*>(value);
-		attribute.mark_changed(Device::CPU);
+		OpenMeshAttributePool<false>::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		object.template get_geometry<Polygons>().acquire<Device::CPU, Type, false>(
+			hdl)[vertex] = *static_cast<const Type*>(value);
+		object.template get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -704,7 +608,9 @@ Boolean polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal) 
 		return false;
 	}
 
-	object.get_geometry<geometry::Polygons>().get_normals().aquire<Device::CPU>()[vertex] = util::pun<OpenMesh::Vec3f>(normal);
+	auto hdl = object.get_geometry<Polygons>().get_normals_hdl();
+	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec3f, false>(hdl)[vertex] = util::pun<OpenMesh::Vec3f>(normal);
+	object.get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
 	return true;
 }
 
@@ -719,7 +625,9 @@ Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
 		return false;
 	}
 
-	object.get_geometry<geometry::Polygons>().get_uvs().aquire<Device::CPU>()[vertex] = util::pun<OpenMesh::Vec2f>(uv);
+	auto hdl = object.get_geometry<Polygons>().get_uvs_hdl();
+	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec2f, false>(hdl)[vertex] = util::pun<OpenMesh::Vec2f>(uv);
+	object.get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
 	return true;
 }
 
@@ -730,8 +638,7 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 	CHECK_NULLPTR(value, "attribute value", false);
 	CHECK(attr->face, "Vertex attribute in face function", false);
 	CHECK_GEQ_ZERO(face, "face index", false);
-	CHECK_GEQ_ZERO(attr->openMeshIndex, "attribute index (OpenMesh)", false);
-	CHECK_GEQ_ZERO(attr->customIndex, "attribute index (custom)", false);
+	CHECK_GEQ_ZERO(attr->index, "attribute index", false);
 	Object& object = *static_cast<Object*>(obj);
 	if(face >= static_cast<int>(object.template get_geometry<Polygons>().get_face_count())) {
 		logError("[", FUNCTION_NAME, "] Face index out of bounds (",
@@ -742,9 +649,10 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 
 	return switchAttributeType(attr->type, [&object, attr, face, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto& attribute = object.template aquire<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr));
-		attribute.template aquire<Device::CPU>()[face] = *static_cast<const Type*>(value);
-		attribute.mark_changed(Device::CPU);
+		OpenMeshAttributePool<true>::AttributeHandle hdl{ static_cast<size_t>(attr->index) };
+		object.template get_geometry<Polygons>().acquire<Device::CPU, Type, true>(
+			hdl)[face] = *static_cast<const Type*>(value);
+		object.template get_geometry<Polygons>().mark_changed<true>(Device::CPU, hdl);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -764,8 +672,9 @@ Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
 		return false;
 	}
 
-	object.template get_mat_indices<Polygons>().aquire<Device::CPU>()[face] = idx;
-	object.template get_mat_indices<Polygons>().mark_changed(Device::CPU);
+	auto hdl = object.get_geometry<Polygons>().get_material_indices_hdl();
+	object.get_geometry<Polygons>().acquire<Device::CPU, u16, true>(hdl)[face] = idx;
+	object.get_geometry<Polygons>().mark_changed<true>(Device::CPU, hdl);
 	return true;
 }
 
@@ -777,8 +686,7 @@ size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHa
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
 	CHECK(!attr->face, "Face attribute in vertex function", false);
 	CHECK_GEQ_ZERO(startVertex, "start vertex index", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->openMeshIndex, "attribute index (OpenMesh)", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->customIndex, "attribute index (custom)", INVALID_SIZE);
+	CHECK_GEQ_ZERO(attr->index, "attribute index (OpenMesh)", INVALID_SIZE);
 	Object& object = *static_cast<Object*>(obj);
 	if(startVertex >= static_cast<int>(object.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Vertex index out of bounds (",
@@ -790,7 +698,8 @@ size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHa
 
 	return switchAttributeType(attr->type, [&object, attr, startVertex, count, &attrStream](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		return object.template add_bulk<Polygons>(convert_poly_to_attr<PolyVAttr<Type>>(*attr),
+		OpenMeshAttributePool<false>::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		return object.template get_geometry<Polygons>().add_bulk(hdl,
 										 PolyVHdl{ static_cast<int>(startVertex) },
 										 count, attrStream);
 	}, [attr, name = FUNCTION_NAME]() {
@@ -808,8 +717,7 @@ size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHand
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
 	CHECK(attr->face, "Vertex attribute in face function", false);
 	CHECK_GEQ_ZERO(startFace, "start face index", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->openMeshIndex, "attribute index (OpenMesh)", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->customIndex, "attribute index (custom)", INVALID_SIZE);
+	CHECK_GEQ_ZERO(attr->index, "attribute index (OpenMesh)", INVALID_SIZE);
 	Object& object = *static_cast<Object*>(obj);
 	if(startFace >= static_cast<int>(object.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Face index out of bounds (",
@@ -821,9 +729,9 @@ size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHand
 
 	return switchAttributeType(attr->type, [&object, attr, startFace, count, &attrStream](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		return object.template add_bulk<Polygons>(convert_poly_to_attr<PolyFAttr<Type>>(*attr),
-										 PolyFHdl{ static_cast<int>(startFace) },
-										 count, attrStream);
+		OpenMeshAttributePool<true>::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		return object.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
+																 count, attrStream);
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
 				 get_attr_type_name(attr->type));
@@ -847,9 +755,9 @@ size_t polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t co
 	}
 	util::FileReader matStream{ stream };
 
-	return object.template add_bulk<Polygons>(object.template get_mat_indices<Polygons>(),
-									 PolyFHdl{ static_cast<int>(startFace) },
-									 count, matStream);
+	OpenMeshAttributePool<true>::AttributeHandle hdl = object.template get_geometry<Polygons>().get_material_indices_hdl();
+	return object.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
+															 count, matStream);
 }
 
 size_t polygon_get_vertex_count(ObjectHdl obj) {
@@ -895,7 +803,7 @@ Boolean polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 
 Boolean spheres_resize(ObjectHdl obj, size_t count) {
 	CHECK_NULLPTR(obj, "object handle", false);
-	static_cast<Object*>(obj)->template resize<Spheres>(count);
+	static_cast<Object*>(obj)->template get_geometry<Spheres>().resize(count);
 	return true;
 }
 
@@ -908,7 +816,7 @@ SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 	return switchAttributeType(type, [name, type, &object](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		return SphereAttributeHandle{
-			static_cast<int>(object.template request<Spheres, Type>(name).index()),
+			static_cast<int32_t>(object.template get_geometry<Spheres>().add_attribute<Type>(name).index),
 			type
 		};
 	}, [&type, name = FUNCTION_NAME]() {
@@ -917,49 +825,9 @@ SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 	});
 }
 
-Boolean spheres_remove_attribute(ObjectHdl obj, const SphereAttributeHandle* hdl) {
-	CHECK_NULLPTR(obj, "object handle", false);
-	CHECK_NULLPTR(hdl, "attribute", false);
-	CHECK_GEQ_ZERO(hdl->index, "attribute index", false);
-	Object& object = *static_cast<Object*>(obj);
-
-	return switchAttributeType(hdl->type, [hdl, &object](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		SphereAttr<Type> attr{ static_cast<size_t>(hdl->index) };
-		object.template remove<Spheres>(attr);
-		return true;
-	}, [hdl, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(hdl->type));
-		return false;
-	});
-}
-
-SphereAttributeHandle spheres_find_attribute(ObjectHdl obj, const char* name,
-											 AttribDesc type) {
-	CHECK_NULLPTR(obj, "object handle", INVALID_SPHERE_ATTR_HANDLE);
-	CHECK_NULLPTR(name, "attribute name", INVALID_SPHERE_ATTR_HANDLE);
-	Object& object = *static_cast<Object*>(obj);
-
-	return switchAttributeType(type, [&object, type, name](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		std::optional<SphereAttr<Type>> attr = object.template find<Spheres, Type>(name);
-		if(attr.has_value()) {
-			return SphereAttributeHandle{
-				static_cast<IndexType>(attr.value().index()),
-				type
-			};
-		}
-		return INVALID_SPHERE_ATTR_HANDLE;
-	}, [&type, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
-		return INVALID_SPHERE_ATTR_HANDLE;
-	});
-}
-
 SphereHdl spheres_add_sphere(ObjectHdl obj, Vec3 point, float radius) {
 	CHECK_NULLPTR(obj, "object handle", SphereHdl{ INVALID_INDEX });
-	SphereVHdl hdl = static_cast<Object*>(obj)->template add<Spheres>(
+	SphereVHdl hdl = static_cast<Object*>(obj)->template get_geometry<Spheres>().add(
 		util::pun<ei::Vec3>(point), radius);
 	return SphereHdl{ static_cast<IndexType>(hdl) };
 }
@@ -967,7 +835,7 @@ SphereHdl spheres_add_sphere(ObjectHdl obj, Vec3 point, float radius) {
 SphereHdl spheres_add_sphere_material(ObjectHdl obj, Vec3 point, float radius,
 								MatIdx idx) {
 	CHECK_NULLPTR(obj, "object handle", SphereHdl{ INVALID_INDEX });
-	SphereVHdl hdl = static_cast<Object*>(obj)->template add<Spheres>(
+	SphereVHdl hdl = static_cast<Object*>(obj)->template get_geometry<Spheres>().add(
 		util::pun<ei::Vec3>(point), radius, idx);
 	return SphereHdl{ static_cast<IndexType>(hdl) };
 }
@@ -979,7 +847,7 @@ SphereHdl spheres_add_sphere_bulk(ObjectHdl obj, size_t count,
 	Object& object = *static_cast<Object*>(obj);
 	mufflon::util::FileReader sphereReader{ stream };
 
-	Spheres::BulkReturn info = object.template add_bulk<Spheres>(count, sphereReader);
+	Spheres::BulkReturn info = object.template get_geometry<Spheres>().add_bulk(count, sphereReader);
 	if(readSpheres != nullptr)
 		*readSpheres = info.readSpheres;
 	return SphereHdl{ static_cast<IndexType>(info.handle) };
@@ -995,7 +863,7 @@ SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 	mufflon::util::FileReader sphereReader{ stream };
 
 	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
-	Spheres::BulkReturn info = object.template add_bulk<Spheres>(count, sphereReader,
+	Spheres::BulkReturn info = object.template get_geometry<Spheres>().add_bulk(count, sphereReader,
 														aabb);
 	if(readSpheres != nullptr)
 		*readSpheres = info.readSpheres;
@@ -1019,10 +887,9 @@ Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 
 	return switchAttributeType(attr->type, [&object, attr, sphere, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		SphereAttr<Type> sphereAttr{ static_cast<size_t>(attr->index) };
-		auto& attribute = object.template aquire<Spheres>(sphereAttr);
-		attribute.template aquire<Device::CPU>()[sphere] = *static_cast<const Type*>(value);
-		attribute.mark_changed(Device::CPU);
+		AttributePool::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		object.template get_geometry<Spheres>().acquire<Device::CPU, Type>(hdl)[sphere] = *static_cast<const Type*>(value);
+		object.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -1042,8 +909,9 @@ Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
 		return false;
 	}
 
-	object.template get_mat_indices<Spheres>().aquire<Device::CPU>()[sphere] = idx;
-	object.template get_mat_indices<Spheres>().mark_changed(Device::CPU);
+	AttributePool::AttributeHandle hdl = object.template get_geometry<Spheres>().get_material_indices_hdl();
+	object.template get_geometry<Spheres>().acquire<Device::CPU, u16>(hdl)[sphere] = idx;
+	object.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
 	return true;
 }
 
@@ -1066,10 +934,10 @@ size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* at
 
 	return switchAttributeType(attr->type, [&object, attr, startSphere, count, &attrStream](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		SphereAttr<Type> sphereAttr{ static_cast<size_t>(attr->index) };
-		return object.template add_bulk<Spheres>(sphereAttr,
-										SphereVHdl{ static_cast<size_t>(startSphere) },
-										count, attrStream);
+		AttributePool::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		return object.template get_geometry<Spheres>().add_bulk(hdl,
+																SphereVHdl{ static_cast<size_t>(startSphere) },
+																count, attrStream);
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
 				 get_attr_type_name(attr->type));
@@ -1091,9 +959,10 @@ size_t spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere, size_
 	}
 	util::FileReader matStream{ stream };
 
-	return object.template add_bulk<Spheres>(object.template get_mat_indices<Spheres>(),
-									SphereVHdl{ static_cast<size_t>(startSphere) },
-									count, matStream);
+	AttributePool::AttributeHandle hdl = object.template get_geometry<Spheres>().get_material_indices_hdl();
+	return object.template get_geometry<Spheres>().add_bulk(hdl,
+															SphereVHdl{ static_cast<size_t>(startSphere) },
+															count, matStream);
 	return INVALID_SIZE;
 }
 
@@ -1392,7 +1261,7 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		return nullptr;
 	}
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
-	if(s_currentRenderer)
+	if (s_currentRenderer != nullptr)
 		s_currentRenderer->load_scene(hdl, res);
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);

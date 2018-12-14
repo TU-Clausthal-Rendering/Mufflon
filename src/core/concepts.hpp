@@ -9,14 +9,14 @@ namespace mufflon {
 /* The manager concept is a host (cpu) class which provides access
  * and synchronization to some resource for rendering.
  * A manager should not implement any functions on the data. Rather,
- * the functional layer must work on the return values of acquireConst()
+ * the functional layer must work on the return values of acquire_const()
  * and acquire() which are also called Descriptors.
  *
  * Usage: put 'template DeviceManagerConcept<YourType>;'
  * after the closing }; of the class YourType.
  *
  * Enforced members:
- *		template<Device dev> acquireConst();
+ *		template<Device dev> acquire_const();
  *			- must call synchronize() implicitly (not enforceable)
  *		template<Device dev> unload();
  *		template<Device dev> synchronize();

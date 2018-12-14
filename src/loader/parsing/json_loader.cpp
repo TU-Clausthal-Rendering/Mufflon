@@ -222,8 +222,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else {
 				throw std::runtime_error("Invalid type for refraction index");
 			}
-			mat->inner.fresnel.a = load_material(get(m_state, material, "layerA"));
-			mat->inner.fresnel.b = load_material(get(m_state, material, "layerB"));
+			mat->inner.fresnel.a = load_material(get(m_state, material, "layerReflection"));
+			mat->inner.fresnel.b = load_material(get(m_state, material, "layerRefraction"));
 		} else if(type.compare("glass") == 0) {
 			// TODO: glass material
 		} else if(type.compare("opaque") == 0) {

@@ -123,10 +123,10 @@ public:
 	 *		std::make_tuple(scene::geometry::Spheres::AttrDesc<float>{"S1"})
 	 * );
 	 */
-	template < Device dev, class... VAttrs, class... FAttrs, class... Attrs >
-	SceneDescriptor<dev> get_descriptor(const std::tuple<geometry::Polygons::VAttrDesc<VAttrs>...>& vertexAttribs,
-										const std::tuple<geometry::Polygons::FAttrDesc<FAttrs>...>& faceAttribs,
-										const std::tuple<geometry::Spheres::AttrDesc<Attrs>...>& sphereAttribs,
+	template < Device dev, std::size_t N, std::size_t M, std::size_t O >
+	SceneDescriptor<dev> get_descriptor(const std::array<const char*, N> &vertexAttribs,
+										const std::array<const char*, M> &faceAttribs,
+										const std::array<const char*, O> &sphereAttribs,
 										const ei::IVec2& resolution) {
 		synchronize<dev>();
 		std::vector<ObjectDescriptor<dev>> objectDescs;
@@ -182,7 +182,7 @@ public:
 			instTransformsDesc.get(),
 			instObjIndicesDesc.get(),
 			objAabbsDesc.get(),
-			m_lightTree.acquireConst<dev>(),
+			m_lightTree.acquire_const<dev>(),
 			as<materials::Medium>(m_media.acquire_const<dev>()),
 			as<int>(m_materials.acquire_const<dev>())
 		};
@@ -190,9 +190,9 @@ public:
 		// Rebuild Instance BVH?
 		
 		if(m_accelStruct.needs_rebuild<dev>()) {
-			m_accelStruct.build(sceneDesc);
+			//m_accelStruct.build(sceneDesc);
 		}
-		sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
+		//sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
 
 		return sceneDesc;
 	}

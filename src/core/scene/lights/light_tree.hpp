@@ -134,7 +134,7 @@ public:
 			   TextureHandle envLight = nullptr);
 
 	template < Device dev >
-	const LightTree<dev>& acquireConst() noexcept {
+	const LightTree<dev>& acquire_const() noexcept {
 		this->synchronize<dev>();
 		if constexpr(dev == Device::CPU) return *m_treeCpu;
 		else return *m_treeCuda;

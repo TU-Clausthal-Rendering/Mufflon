@@ -30,7 +30,9 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_reset = false;
-	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, buffer.get_resolution());
+	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>(std::array<const char*, 0>{},
+																								std::array<const char*, 0>{},
+																								std::array<const char*, 0>{}, buffer.get_resolution());
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
