@@ -1460,6 +1460,7 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	switch(num) {
 		case 1: format = textures::Format::R32F; break;
 		case 2: format = textures::Format::RG32F; break;
+		case 3: format = textures::Format::RGBA32F; break;
 		case 4: format = textures::Format::RGBA32F; break;
 		default:
 			logError("[", FUNCTION_NAME, "] Invalid number of channels (", num, ')');
@@ -1467,8 +1468,10 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	}
 
 	// Create new
-	std::unique_ptr<u8[]> data = std::make_unique<u8[]>(sizeof(float) * num);
-	memcpy(data.get(), &value, sizeof(float) * num);
+	ei::Vec4 paddedVal{0.0f};
+	memcpy(&paddedVal, value, num * sizeof(float));
+	std::unique_ptr<u8[]> data = std::make_unique<u8[]>(textures::PIXEL_SIZE(format));
+	memcpy(data.get(), &paddedVal, textures::PIXEL_SIZE(format));
 	hdl = s_world.add_texture(name, 1, 1, 1, format,
 							  static_cast<textures::SamplingMode>(sampling),
 							  false, move(data));
