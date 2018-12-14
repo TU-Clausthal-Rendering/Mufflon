@@ -175,11 +175,9 @@ CUDA_FUNCTION void calculate_morton_codes32(
 ) {
 	const i32 objId = objIds[idx];
 	const ei::Box aabb = ei::transform(aabbs[objId], matrices[idx]);
-	const ei::Vec3 centroid = (aabb.max + aabb.max) * .5f;
 
-	const ei::Vec3 normalizedPos = normalize_position(centroid, lo, hi);
-	const u32 mortonCode = calculate_morton_code32(normalizedPos);
-	mortonCodes[idx] = mortonCode;
+	const ei::Vec3 normalizedPos = normalize_position(center(aabb), lo, hi);
+	mortonCodes[idx] = calculate_morton_code32(normalizedPos);
 	sortIndices[idx] = idx;
 }
 

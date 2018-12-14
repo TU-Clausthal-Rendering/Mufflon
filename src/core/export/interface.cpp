@@ -1392,7 +1392,8 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		return nullptr;
 	}
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
-	s_currentRenderer->load_scene(hdl, res);
+	if(s_currentRenderer)
+		s_currentRenderer->load_scene(hdl, res);
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);
 }
