@@ -199,5 +199,8 @@ evaluate_pdf(const PinholeParams& params, const ei::Vec2& resolution, const scen
 	return 1.0f / (pixelArea * cosAtCam * cosAtCam * cosAtCam);
 }*/
 
-}
-} // namespace mufflon::cameras
+
+static_assert(sizeof(FocusParams) <= MAX_CAMERA_PARAM_SIZE,
+	"MAX_CAMERA_PARAM_SIZE outdated please change the number in the header file.");
+
+}} // namespace mufflon::cameras

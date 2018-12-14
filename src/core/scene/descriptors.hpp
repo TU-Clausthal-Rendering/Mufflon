@@ -4,6 +4,7 @@
 #include "lights/light_tree.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/accel_structs/accel_struct_info.hpp"
+#include "core/cameras/camera.hpp"
 #include "handles.hpp"
 #include <ei/vector.hpp>
 #include <ei/3dtypes.hpp>
@@ -63,14 +64,6 @@ struct ObjectDescriptor {
 	SpheresDescriptor<dev> spheres;
 	AccelDescriptor accelStruct;
 };
-
-
-} namespace cameras {
-	// ei::max(sizeof(PinholeParams), sizeof(FocusParams));
-	// There is a static assert in camera.cpp checking if this number is correct.
-	// The max is not taken here to avoid the unessary include of the camera implementations.
-	constexpr std::size_t MAX_CAMERA_PARAM_SIZE = 68;
-} namespace scene {
 
 struct CameraDescriptor {
 	u8 cameraParameters[cameras::MAX_CAMERA_PARAM_SIZE];

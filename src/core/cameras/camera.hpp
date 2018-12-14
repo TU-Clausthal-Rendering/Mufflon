@@ -138,4 +138,9 @@ struct ProjectionResult {
 	float w {0.0f};						// The sensor response (equal to the PDF for some camera models)
 };
 
+// ei::max(sizeof(PinholeParams), sizeof(FocusParams));
+// There is a static assert in each camera header checking if this number is correct.
+// The max is not taken here to avoid the unessary include of the camera implementations.
+constexpr std::size_t MAX_CAMERA_PARAM_SIZE = 68;
+
 }} // namespace mufflon::cameras
