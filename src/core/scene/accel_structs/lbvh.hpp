@@ -66,11 +66,19 @@ private:
 	GenericResource m_bvhNodes;
 
 	template < Device dev >
-	void build_lbvh32(ei::Mat3x4* matrixs,//matrices
+	void build_lbvh32(ei::Mat3x4* matrices,
 		i32* objIds,
 		ei::Box* aabbs,
 		const ei::Box& sceneBB,
 		ei::Vec2 traverseCosts, i32 numInstances);
+
+	template < Device dev >
+	void build_lbvh64(ei::Vec3* meshVertices,
+		ei::Vec4* spheres,
+		i32* triIndices,
+		i32* quadIndices,
+		const ei::Box& aabb, ei::Vec4 traverseCosts, i32 numPrimitives,
+		i32 offsetQuads, i32 offsetSpheres);
 };
 
 template DeviceManagerConcept<LBVHBuilder>;

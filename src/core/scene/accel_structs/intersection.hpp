@@ -30,30 +30,19 @@ struct RayInfo {
 	float tmax;
 };
 
+template <Device dev>
 bool any_intersection_lbvh(
-	SceneDescriptor<Device::CUDA> scene,
+	SceneDescriptor<dev> scene,
 	const ei::Ray ray, const u64 startInsPrimId,
 	const float tmin, const float tmax
 );
 
-bool any_intersection_lbvh(
-	SceneDescriptor<Device::CPU> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax
-);
-
+template <Device dev>
 void first_intersection_lbvh(
-	SceneDescriptor<Device::CPU> scene,
+	SceneDescriptor<dev> scene,
 	const ei::Ray ray, const u64 startInsPrimId,
 	const float tmin, const float tmax,
-	RayIntersectionResult<Device::CPU>* result
-);
-
-void first_intersection_lbvh(
-	SceneDescriptor<Device::CUDA> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax,
-	RayIntersectionResult<Device::CUDA>* result
+	RayIntersectionResult<dev>* result
 );
 
 }
