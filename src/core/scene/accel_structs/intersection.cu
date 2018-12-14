@@ -122,7 +122,7 @@ CUDA_FUNCTION void interset_2box(const ei::Vec4 n0xy, const ei::Vec4 n1xy,
 #endif // __CUDA_ARCH__
 }
 
-CUDA_FUNCTION bool any_intersection_obj_imp(
+CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 	const ei::Vec4* __restrict__ bvh,
 	const i32 bvhSize,
 	const ei::Vec3* __restrict__ meshVertices,
@@ -299,7 +299,7 @@ CUDA_FUNCTION bool any_intersection_obj_imp(
 }
 
 
-CUDA_FUNCTION void first_intersection_obj_imp(
+CUDA_FUNCTION void first_intersection_obj_lbvh_imp(
 	const ei::Vec4* __restrict__ bvh,
 	const i32 bvhSize,
 	const ei::Vec3* __restrict__ meshVertices,
@@ -505,7 +505,7 @@ CUDA_FUNCTION ei::Mat4x4 expand_mat3x4(const ei::Mat3x4 v) {
 
 template < Device dev >
 CUDA_FUNCTION
-void first_intersection_scene_imp(
+void first_intersection_scene_lbvh_imp(
 	const ei::Vec4* __restrict__ bvh,
 	const i32 bvhSize,
 	const ei::Mat3x4* __restrict__ transforms,
@@ -515,8 +515,8 @@ void first_intersection_scene_imp(
 	const i32 numInstances,
 	const ObjectDescriptor<dev>* __restrict__ objs,
 	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax,
-	RayIntersectionResult<dev>* __restrict__ result
+	float tmaxValue,
+	RayIntersectionResult& result
 ) {
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
@@ -526,6 +526,9 @@ void first_intersection_scene_imp(
 	// Primitive index of the closest intersection, -1 if none.
 	const i32 startInstanceId = (i32)(startInsPrimId >> 32);
 	const i32 startPrimId = (i32)startInsPrimId;
+	const float tmin = 0.f;
+	// TODO adjust tmax with a small value based on scene size.
+	const float	tmax = tmaxValue + exp2f(-80.0f);
 	i32 hitPrimId = 0x80000000;						// No primitive intersected so far.
 	i32 hitInstanceId = -1;
 	ei::Vec3 hitBarycentric;
@@ -628,7 +631,7 @@ void first_intersection_scene_imp(
 					ei::Vec3 barycentric;
 					i32 secondTri;						// For ray-quad intersection.
 					// Do ray-obj test.
-					first_intersection_obj_imp(
+					first_intersection_obj_lbvh_imp(
 						lbvh->bvh,
 						lbvh->bvhSize,
 						obj.polygon.vertices,
@@ -671,7 +674,7 @@ void first_intersection_scene_imp(
 		}
 	}
 	if (hitInstanceId == -1) {
-		(*result) = { hitT, (u64)-1ll };
+		result = { hitT, (u64)-1ll };
 	}
 	else {
 		const i32 objId = objIds[hitInstanceId];
@@ -730,60 +733,13 @@ void first_intersection_scene_imp(
 		normal = transMatrix * normal;
 		tangent = transMatrix * tangent;
 
-		(*result) = { hitT, hitPrimId | (u64(hitInstanceId) << 32ull), normal, tangent, uv, hitBarycentric };
+		result = { hitT, hitPrimId | (u64(hitInstanceId) << 32ull), normal, tangent, uv, hitBarycentric };
 	}
-}
-
-__global__
-void first_intersection_sceneD(
-	const ei::Vec4* __restrict__ bvh,
-	const i32 bvhSize,
-	const ei::Mat3x4* __restrict__ transforms,
-	const i32* __restrict__ objIds,
-	const ei::Box* __restrict__ aabbs,
-	const i32* __restrict__ instanceIds,
-	const i32 numInstances,
-	const ObjectDescriptor<Device::CUDA>* __restrict__ objs,
-	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax,
-	RayIntersectionResult<Device::CUDA>* __restrict__ result
-) {
-	first_intersection_scene_imp<Device::CUDA>(
-		bvh, bvhSize, transforms, objIds, aabbs, instanceIds, numInstances, objs,
-		ray, startInsPrimId, tmin, tmax, result);
-}
-
-template <Device dev>
-void first_intersection_lbvh(
-	SceneDescriptor<dev> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax,
-	RayIntersectionResult<dev>* result
-) {
-	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
-	const ei::Vec4* bvh = (const ei::Vec4*)lbvh->bvh;
-	const i32 bvhSize = lbvh->bvhSize;
-	const i32* instanceIds = (const i32*)lbvh->primIds;
-	const ei::Mat3x4* transforms = (const ei::Mat3x4*)scene.transformations;
-	const i32* objIds = (const i32*)scene.objectIndices;
-	const ei::Box* aabbs = (const ei::Box*)scene.aabbs;
-	const i32 numInstances = scene.numInstances;
-
-	if (dev == Device::CUDA)
-		first_intersection_sceneD<<<1,1>>>(
-			bvh, bvhSize, transforms, objIds, aabbs, instanceIds, numInstances, 
-			(const ObjectDescriptor<Device::CUDA>*)scene.objects,
-			ray, startInsPrimId, tmin, tmax, (RayIntersectionResult<Device::CUDA>*)result);
-	else
-		first_intersection_scene_imp<Device::CPU>(
-			bvh, bvhSize, transforms, objIds, aabbs, instanceIds, numInstances, 
-			(const ObjectDescriptor<Device::CPU>*)scene.objects,
-			ray, startInsPrimId, tmin, tmax, (RayIntersectionResult<Device::CPU>*)result);
 }
 
 template < Device dev >
 CUDA_FUNCTION
-bool any_intersection_scene_imp(
+bool any_intersection_scene_lbvh_imp(
 	const ei::Vec4* __restrict__ bvh,
 	const i32 bvhSize,
 	const ei::Mat3x4* __restrict__ transforms,
@@ -793,13 +749,15 @@ bool any_intersection_scene_imp(
 	const i32 numInstances,
 	const ObjectDescriptor<dev>* __restrict__ objs,
 	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax
+	const float tmaxValue
 ) {
 	// Setup traversal.
 	// Traversal stack in CUDA thread-local memory.
 	i32 traversalStack[STACK_SIZE];
 	traversalStack[0] = EntrypointSentinel;	// Bottom-most entry.
-
+	const float tmin = 0.f;
+	// TODO adjust tmax with a small value based on scene size.
+	const float	tmax = tmaxValue + exp2f(-80.0f); 
 	// Primitive index of the closest intersection, -1 if none.
 	const i32 startInstanceId = (i32)(startInsPrimId >> 32);
 	const i32 startPrimId = (i32)startInsPrimId;
@@ -807,7 +765,7 @@ bool any_intersection_scene_imp(
 	// nodeAddr: Non-negative: current internal node; negative: leaf.
 	i32 nodeAddr = 0; // Start from the root.  
 	char* stackPtr = (char*)&traversalStack[0]; // Current position in traversal stack.
-	const float	ooeps = exp2f(-80.0f); // Avoid div by zero.
+	
 
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
@@ -896,7 +854,7 @@ bool any_intersection_scene_imp(
 					const i32 numFaces = obj.polygon.numTriangles + obj.polygon.numQuads;
 					const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : 0x80000000;
 					// Do ray-obj test.
-					if (any_intersection_obj_imp(
+					if (any_intersection_obj_lbvh_imp(
 						lbvh->bvh,
 						lbvh->bvhSize,
 						obj.polygon.vertices,
@@ -929,74 +887,71 @@ bool any_intersection_scene_imp(
 	return false;
 }
 
-
-__global__
-void any_intersection_sceneD(
-	const ei::Vec4* __restrict__ bvh,
-	const i32 bvhSize,
-	const ei::Mat3x4* __restrict__ transforms,
-	const i32* __restrict__ objIds,
-	const ei::Box* __restrict__ aabbs,
-	const i32* __restrict__ instanceIds,
-	const i32 numInstances,
-	const ObjectDescriptor<Device::CUDA>* __restrict__ objs,
+template < Device dev >
+CUDA_FUNCTION
+bool any_intersection_scene_lbvh(
+	const SceneDescriptor<dev> scene,
 	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax,
-	i32* result
-) {
-	*result = (i32)any_intersection_scene_imp<Device::CUDA>(
-		bvh, bvhSize, transforms, objIds, aabbs, instanceIds, numInstances, objs,
-		ray, startInsPrimId, tmin, tmax);
-}
-
-template <Device dev>
-bool any_intersection_lbvh(
-	SceneDescriptor<dev> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax
+	const float tmax
 ) {
 	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
-	const ei::Vec4* bvh = (const ei::Vec4*)lbvh->bvh;
-	const i32 bvhSize = lbvh->bvhSize;
-	const i32* instanceIds = (const i32*)lbvh->primIds;
-	const ei::Mat3x4* transforms = (const ei::Mat3x4*)scene.transformations;
-	const i32* objIds = (const i32*)scene.objectIndices;
-	const ei::Box* aabbs = (const ei::Box*)scene.aabbs;
-	const i32 numInstances = scene.numInstances;
-
-	if (dev == Device::CUDA) 
-	{
-		i32* resultD;
-		cudaMalloc((void**)&resultD, sizeof(i32));
-		any_intersection_sceneD << <1, 1 >> > (
-			bvh, bvhSize, transforms, objIds, aabbs, instanceIds, numInstances, 
-			(const ObjectDescriptor<Device::CUDA>*)scene.objects,
-			ray, startInsPrimId, tmin, tmax, resultD);
-		i32 result;
-		cudaMemcpy(&result, resultD, sizeof(i32), cudaMemcpyDeviceToHost);
-		return static_cast<bool>(result);
-
-	}
-	else
-		return any_intersection_scene_imp<Device::CPU>(
-			bvh, bvhSize, transforms, objIds, aabbs, instanceIds, numInstances, 
-			(const ObjectDescriptor<Device::CPU>*)scene.objects,
-			ray, startInsPrimId, tmin, tmax);
+	return any_intersection_scene_lbvh_imp<dev>(		
+		(const ei::Vec4*)lbvh->bvh,
+		lbvh->bvhSize,
+		(const ei::Mat3x4*)scene.transformations,
+		(const i32*)scene.objectIndices,
+		(const ei::Box*)scene.aabbs,
+		(const i32*)lbvh->primIds,
+		scene.numInstances,
+		scene.objects,
+		ray, startInsPrimId, tmax
+		);
 }
 
-template bool any_intersection_lbvh(SceneDescriptor<Device::CUDA> scene, 
-	const ei::Ray ray, const u64 startInsPrimId, const float tmin, const float tmax);
+template __host__ __device__ bool any_intersection_scene_lbvh(
+	SceneDescriptor<Device::CUDA> scene,
+	const ei::Ray ray, const u64 startInsPrimId,
+	const float tmax
+);
 
-template bool any_intersection_lbvh(SceneDescriptor<Device::CPU> scene,
-	const ei::Ray ray, const u64 startInsPrimId, const float tmin, const float tmax);
+template __host__ __device__ bool any_intersection_scene_lbvh(
+	SceneDescriptor<Device::CPU> scene,
+	const ei::Ray ray, const u64 startInsPrimId,
+	const float tmax
+);
 
-template void first_intersection_lbvh(SceneDescriptor<Device::CUDA> scene,
-	const ei::Ray ray, const u64 startInsPrimId, const float tmin, const float tmax,
-	RayIntersectionResult<Device::CUDA>* result);
+template < Device dev >
+CUDA_FUNCTION
+void first_intersection_scene_lbvh(
+	const SceneDescriptor<dev> scene,
+	const ei::Ray ray, const u64 startInsPrimId,
+	const float tmax, RayIntersectionResult& result
+) {
+	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
+	first_intersection_scene_lbvh_imp<dev>(
+		(const ei::Vec4*)lbvh->bvh,
+		lbvh->bvhSize,
+		(const ei::Mat3x4*)scene.transformations,
+		(const i32*)scene.objectIndices,
+		(const ei::Box*)scene.aabbs,
+		(const i32*)lbvh->primIds,
+		scene.numInstances,
+		scene.objects,
+		ray, startInsPrimId, tmax, result
+		);
+}
 
-template void first_intersection_lbvh(SceneDescriptor<Device::CPU> scene,
-	const ei::Ray ray, const u64 startInsPrimId, const float tmin, const float tmax,
-	RayIntersectionResult<Device::CPU>* result);
+template __host__ __device__ void first_intersection_scene_lbvh(
+	SceneDescriptor<Device::CUDA>,
+	const ei::Ray, const u64,
+	const float, RayIntersectionResult&
+);
+
+template __host__ __device__ void first_intersection_scene_lbvh(
+	SceneDescriptor<Device::CPU> ,
+	const ei::Ray , const u64 ,
+	const float , RayIntersectionResult&
+);
 
 }
 }

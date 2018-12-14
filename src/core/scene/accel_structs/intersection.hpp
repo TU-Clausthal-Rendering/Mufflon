@@ -13,7 +13,6 @@ namespace mufflon {
 namespace scene {
 namespace accel_struct {
 
-template < Device dev >
 struct RayIntersectionResult {
 	float hitT;
 	PrimitiveHandle hitPrimId;
@@ -30,19 +29,20 @@ struct RayInfo {
 	float tmax;
 };
 
-template <Device dev>
-bool any_intersection_lbvh(
-	SceneDescriptor<dev> scene,
+template < Device dev >
+__host__ __device__
+bool any_intersection_scene_lbvh(
+	const SceneDescriptor<dev> scene,
 	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax
+	const float tmax
 );
 
-template <Device dev>
-void first_intersection_lbvh(
-	SceneDescriptor<dev> scene,
+template < Device dev >
+CUDA_FUNCTION
+void first_intersection_scene_lbvh(
+	const SceneDescriptor<dev> scene,
 	const ei::Ray ray, const u64 startInsPrimId,
-	const float tmin, const float tmax,
-	RayIntersectionResult<dev>* result
+	const float tmax, RayIntersectionResult& result
 );
 
 }

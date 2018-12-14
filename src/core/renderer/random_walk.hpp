@@ -69,7 +69,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// TODO: optional energy clamping
 
 	// Go to the next intersection
-	scene::accel_struct::RayIntersectionResult<CURRENT_DEV> nextHit;
+	scene::accel_struct::RayIntersectionResult nextHit;
 	//ei::Ray ray {sample.origin, sample.excident};
 	//bool didHit = first_hit(, nextHit);
 
