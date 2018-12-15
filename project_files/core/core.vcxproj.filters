@@ -726,7 +726,7 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\attr.hpp">
+    <ClInclude Include="..\..\src\core\scene\attribute.hpp">
       <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>

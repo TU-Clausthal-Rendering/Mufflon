@@ -247,7 +247,7 @@ enum ParameterType {
 // TODO: how to handle errors
 
 // Polygon interface
-CORE_API Boolean CDECL CDECL polygon_resize(ObjectHdl obj, size_t vertices, size_t edges,
+CORE_API Boolean CDECL CDECL polygon_reserve(ObjectHdl obj, size_t vertices, size_t edges,
 											size_t tris, size_t quads);
 CORE_API PolygonAttributeHandle CDECL polygon_request_vertex_attribute(ObjectHdl obj,
 																	const char* name,
@@ -301,7 +301,7 @@ CORE_API size_t CDECL polygon_get_quad_count(ObjectHdl obj);
 CORE_API Boolean CDECL polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
 
 // Spheres interface
-CORE_API Boolean CDECL spheres_resize(ObjectHdl obj, size_t count);
+CORE_API Boolean CDECL spheres_reserve(ObjectHdl obj, size_t count);
 CORE_API SphereAttributeHandle CDECL spheres_request_attribute(ObjectHdl obj,
 															const char* name,
 															AttribDesc type);

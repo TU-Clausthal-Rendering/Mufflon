@@ -45,9 +45,9 @@ public:
 
 	Object();
 	Object(const Object&) = delete;
-	Object(Object&&) = default;
+	Object(Object&& obj);
 	Object& operator=(const Object&) = delete;
-	Object& operator=(Object&&) = default;
+	Object& operator=(Object&&) = delete;
 	~Object();
 
 	// Returns the name of the object (references the string in the object map
@@ -142,8 +142,11 @@ public:
 	}
 
 	// Gets the bounding box of the object
-	const ei::Box& get_bounding_box() const noexcept {
-		return m_boundingBox;
+	ei::Box get_bounding_box() const noexcept {
+		return ei::Box{
+			m_geometryData.template get<geometry::Polygons>().get_bounding_box(),
+			m_geometryData.template get<geometry::Spheres>().get_bounding_box()
+		};
 	}
 	// Gets the bounding box of the sub-mesh
 	template < class Geom >
@@ -154,7 +157,6 @@ public:
 private:
 	std::string_view m_name;
 	GeometryTuple m_geometryData;
-	ei::Box m_boundingBox;
 
 	AccelDescriptor m_accelStruct[NUM_DEVICES];
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation

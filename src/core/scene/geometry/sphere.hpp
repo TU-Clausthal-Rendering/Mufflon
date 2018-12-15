@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/scene/attr.hpp"
+#include "core/scene/attribute.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
 #include <ei/3dtypes.hpp>
@@ -49,8 +49,8 @@ public:
 	Spheres& operator=(Spheres&&) = delete;
 	~Spheres();
 
-	void resize(std::size_t count) {
-		m_attributes.resize(count);
+	void reserve(std::size_t count) {
+		m_attributes.reserve(count);
 	}
 
 	template < class T >

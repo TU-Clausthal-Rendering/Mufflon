@@ -388,7 +388,7 @@ public:
 			vert->m_incidentPdf = position.pdf;
 			return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
 		}
-		else if (camera.type == cameras::CameraModel::FOCUS) {
+		else if(camera.type == cameras::CameraModel::FOCUS) {
 			vert->m_type = Interaction::CAMERA_FOCUS;
 			cameras::FocusParams* desc = as<cameras::FocusParams>(vert->desc());
 			*desc = static_cast<const cameras::FocusParams&>(camera);

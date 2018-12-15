@@ -195,7 +195,7 @@ inline std::string get_attr_type_name(AttribDesc desc) {
 void delegateLog(LogSeverity severity, const std::string& message) {
 	if(s_logCallback != nullptr)
 		s_logCallback(message.c_str(), static_cast<int>(severity));
-	if (severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
+	if(severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
 		s_lastError = message;
 	}
 }
@@ -217,7 +217,7 @@ Boolean iterate() {
 	return true;
 }
 Boolean display_screenshot() {
-	if (!s_imageOutput) {
+	if(!s_imageOutput) {
 		logError("[", FUNCTION_NAME, "] No image to print is present");
 		return false;
 	}
@@ -262,18 +262,18 @@ Boolean display_screenshot() {
 		glBindTexture(GL_TEXTURE_2D, 0u);
 		glUseProgram(0);
 		glBindVertexArray(0);
-		if (tex != 0) glDeleteTextures(1u, &tex);
-		if (vertShader != 0) glDeleteShader(vertShader);
-		if (geomShader != 0) glDeleteShader(geomShader);
-		if (fragShader != 0) glDeleteShader(fragShader);
-		if (program != 0) glDeleteProgram(program);
-		if (vao != 0) glDeleteVertexArrays(1, &vao);
+		if(tex != 0) glDeleteTextures(1u, &tex);
+		if(vertShader != 0) glDeleteShader(vertShader);
+		if(geomShader != 0) glDeleteShader(geomShader);
+		if(fragShader != 0) glDeleteShader(fragShader);
+		if(program != 0) glDeleteProgram(program);
+		if(vao != 0) glDeleteVertexArrays(1, &vao);
 	};
 
 	// Creates an OpenGL texture, copies the screen data into it and
 	// renders it to the screen
 	glGenTextures(1u, &tex);
-	if (tex == 0) {
+	if(tex == 0) {
 		logError("[", FUNCTION_NAME, "] Failed to initialize screen texture");
 		cleanup();
 		return false;
@@ -288,7 +288,7 @@ Boolean display_screenshot() {
 	vertShader = glCreateShader(GL_VERTEX_SHADER);
 	geomShader = glCreateShader(GL_GEOMETRY_SHADER);
 	fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-	if (vertShader == 0 || fragShader == 0 || geomShader == 0) {
+	if(vertShader == 0 || fragShader == 0 || geomShader == 0) {
 		logError("[", FUNCTION_NAME, "] Failed to initialize screen shaders");
 		cleanup();
 		return false;
@@ -303,14 +303,14 @@ Boolean display_screenshot() {
 	glGetShaderiv(vertShader, GL_COMPILE_STATUS, &compiled[0]);
 	glGetShaderiv(geomShader, GL_COMPILE_STATUS, &compiled[1]);
 	glGetShaderiv(fragShader, GL_COMPILE_STATUS, &compiled[2]);
-	if (compiled[0] != GL_TRUE || compiled[1] != GL_TRUE || compiled[2] != GL_TRUE) {
+	if(compiled[0] != GL_TRUE || compiled[1] != GL_TRUE || compiled[2] != GL_TRUE) {
 		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders");
 		cleanup();
 		return false;
 	}
 
 	program = glCreateProgram();
-	if (program == 0u) {
+	if(program == 0u) {
 		logError("[", FUNCTION_NAME, "] Failed to initialize screen program");
 		cleanup();
 		return false;
@@ -321,7 +321,7 @@ Boolean display_screenshot() {
 	glLinkProgram(program);
 	GLint linkStatus;
 	glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
-	if (linkStatus != GL_TRUE) {
+	if(linkStatus != GL_TRUE) {
 		logError("[", FUNCTION_NAME, "] Failed to link screen program");
 		cleanup();
 		return false;
@@ -339,7 +339,7 @@ Boolean display_screenshot() {
 	glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
 
 	glGenVertexArrays(1, &vao);
-	if (vao == 0) {
+	if(vao == 0) {
 		logError("[", FUNCTION_NAME, "] Failed to link screen program");
 		cleanup();
 		return false;
@@ -360,9 +360,9 @@ void execute_command(const char* command) {
 	// TODO
 }
 
-Boolean polygon_resize(ObjectHdl obj, size_t vertices, size_t edges, size_t tris, size_t quads) {
+Boolean polygon_reserve(ObjectHdl obj, size_t vertices, size_t edges, size_t tris, size_t quads) {
 	CHECK_NULLPTR(obj, "object handle", false);
-	static_cast<Object*>(obj)->template get_geometry<Polygons>().resize(vertices, edges, tris, quads);
+	static_cast<Object*>(obj)->template get_geometry<Polygons>().reserve(vertices, edges, tris, quads);
 	return true;
 }
 
@@ -801,9 +801,9 @@ Boolean polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	return true;
 }
 
-Boolean spheres_resize(ObjectHdl obj, size_t count) {
+Boolean spheres_reserve(ObjectHdl obj, size_t count) {
 	CHECK_NULLPTR(obj, "object handle", false);
-	static_cast<Object*>(obj)->template get_geometry<Spheres>().resize(count);
+	static_cast<Object*>(obj)->template get_geometry<Spheres>().reserve(count);
 	return true;
 }
 
@@ -1123,7 +1123,7 @@ CameraHdl world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
 			util::pun<ei::Vec3>(up), focalLength, focusDistance,
 			lensRad, chipHeight, near, far
 		));
-	if (hdl == nullptr) {
+	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating focus camera");
 		return nullptr;
 	}
@@ -1261,7 +1261,7 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		return nullptr;
 	}
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
-	if (s_currentRenderer != nullptr)
+	if(s_currentRenderer != nullptr)
 		s_currentRenderer->load_scene(hdl, res);
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);
@@ -1715,7 +1715,7 @@ Boolean render_iterate() {
 			logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 			return false;
 		}
-		if (!s_currentRenderer->has_scene()) {
+		if(!s_currentRenderer->has_scene()) {
 			logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 			return false;
 		}
@@ -1728,7 +1728,7 @@ Boolean render_iterate() {
 }
 
 Boolean render_reset() {
-	if (s_currentRenderer != nullptr)
+	if(s_currentRenderer != nullptr)
 		s_currentRenderer->reset();
 	return true;
 }
@@ -1810,7 +1810,7 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 			logError("[", FUNCTION_NAME, "] Unknown render target");
 			return false;
 	}
-	if (s_imageOutput != nullptr)
+	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
@@ -1836,7 +1836,7 @@ Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 			logError("[", FUNCTION_NAME, "] Unknown render target");
 			return false;
 	}
-	if (s_imageOutput != nullptr)
+	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
@@ -1844,7 +1844,7 @@ Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 Boolean render_enable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target << 8u);
-	if (s_imageOutput != nullptr)
+	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
@@ -1852,7 +1852,7 @@ Boolean render_enable_variance_render_targets() {
 Boolean render_enable_non_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target);
-	if (s_imageOutput != nullptr)
+	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
@@ -1865,7 +1865,7 @@ Boolean render_enable_all_render_targets() {
 Boolean render_disable_variance_render_targets() {
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target << 8u);
-	if (s_imageOutput != nullptr)
+	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 }
@@ -1898,7 +1898,7 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 	}
 	renderer::ParamDesc rendererDesc = s_currentRenderer->get_parameters().get_param_desc(idx);
 
-	if (type != nullptr)
+	if(type != nullptr)
 		*type = static_cast<ParameterType>(rendererDesc.type);
 	std::size_t nameLength = std::strlen(rendererDesc.name) + 1u;
 #ifdef _WIN32
@@ -1907,7 +1907,7 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 #else // _WIN32
 	char* name = new char[str.size() + 1u];
 #endif // _WIN32
-	if (name == nullptr) {
+	if(name == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
 		return nullptr;
 	}
@@ -2096,7 +2096,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 	// Only once per process do we register/unregister the message handler
 	static bool initialized = false;
 	s_logCallback = logCallback;
-	if (!initialized) {
+	if(!initialized) {
 		registerMessageHandler(delegateLog);
 		disableStdHandler();
 
@@ -2147,7 +2147,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 			}
 		}
 
-		if (!gladLoadGL()) {
+		if(!gladLoadGL()) {
 			logError("[", FUNCTION_NAME, "] gladLoadGL failed");
 			return false;
 		}
@@ -2155,7 +2155,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		// Set the CUDA device to initialize the context
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
-		if (count > 0) {
+		if(count > 0) {
 			// We select the device with the highest compute capability
 			int devIndex = -1;
 			int major = -1;
@@ -2164,8 +2164,8 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 			cudaDeviceProp deviceProp;
 			for (int c = 0; c < count; ++c) {
 				cudaGetDeviceProperties(&deviceProp, c);
-				if (deviceProp.unifiedAddressing) {
-					if (deviceProp.major > major ||
+				if(deviceProp.unifiedAddressing) {
+					if(deviceProp.major > major ||
 						((deviceProp.major == major) && (deviceProp.minor > minor))) {
 						major = deviceProp.major;
 						minor = deviceProp.minor;
@@ -2173,7 +2173,7 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 					}
 				}
 			}
-			if (devIndex < 0) {
+			if(devIndex < 0) {
 				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none supports unified addressing; "
 						 "continuing without CUDA");
 			}

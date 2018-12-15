@@ -614,10 +614,12 @@ void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attrib
 void BinaryLoader::read_lod() {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_lod");
 	// Reserve memory for the current LOD
-	if(!polygon_resize(m_currObjState.objHdl, m_currObjState.numVertices,
+	if(!polygon_reserve(m_currObjState.objHdl, m_currObjState.numVertices,
 					   m_currObjState.numEdges, m_currObjState.numTriangles,
 					   m_currObjState.numQuads))
-		throw std::runtime_error("Failed to reserve LoD memory");
+		throw std::runtime_error("Failed to reserve LoD polygon memory");
+	if (!spheres_reserve(m_currObjState.objHdl, m_currObjState.numSpheres))
+		throw std::runtime_error("Failed to reserve LoD sphere memory");
 	if(m_currObjState.globalFlags.is_set(GlobalFlag::DEFLATE)) {
 		if(m_currObjState.globalFlags.is_set(GlobalFlag::COMPRESSED_NORMALS))
 			read_compressed_normal_compressed_vertices();

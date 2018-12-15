@@ -114,13 +114,13 @@ template void OutputHandler::end_iteration<Device::CUDA>();
 
 
 void OutputHandler::set_targets(OutputValue targets) {
-	if (targets != m_targets) {
+	if(targets != m_targets) {
 		int i = 0;
 		for (u32 flag : OutputValue::iterator) {
 			// Is this atttribute recorded at all?
-			if (!targets.is_set(flag) && m_targets.is_set(flag))
+			if(!targets.is_set(flag) && m_targets.is_set(flag))
 				m_cumulativeTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
-			if (!targets.is_set(flag << 8) && m_targets.is_set(flag << 8)) {
+			if(!targets.is_set(flag << 8) && m_targets.is_set(flag << 8)) {
 				m_cumulativeVarTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
 				m_iterationTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
 			}

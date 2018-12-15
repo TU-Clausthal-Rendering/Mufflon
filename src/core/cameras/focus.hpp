@@ -78,7 +78,7 @@ focuscam_sample_position(const FocusParams& params, const math::RndSet2& rndSet)
 	// Get a (randomized) position in [-1,1]²
 	const ei::Vec2 squarePoint{ 2.f * rndSet.u0 - 1.f, 2.f * rndSet.u1 - 1.f };
 	float theta, r;
-	if (ei::abs(squarePoint.x) > ei::abs(squarePoint.y)) {
+	if(ei::abs(squarePoint.x) > ei::abs(squarePoint.y)) {
 		r = squarePoint.x;
 		theta = ei::PI * squarePoint.x / (4.f * squarePoint.y);
 	}

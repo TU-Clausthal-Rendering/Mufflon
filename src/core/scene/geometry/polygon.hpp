@@ -1,12 +1,12 @@
 #pragma once
 
 #include "polygon_mesh.hpp"
-#include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
-#include "core/scene/attr.hpp"
+#include "core/scene/attribute.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
 #include "util/range.hpp"
+#include <ei/3dtypes.hpp>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <array>
 #include <optional>
@@ -147,8 +147,7 @@ public:
 	Polygons& operator=(Polygons&&) = delete;
 	~Polygons();
 
-	void resize(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
-	void reserve(std::size_t vertices, std::size_t egdes, std::size_t tris, std::size_t quads);
+	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
 
 	template < class T, bool face >
 	typename OpenMeshAttributePool<face>::AttributeHandle add_attribute(std::string name) {
@@ -165,8 +164,8 @@ public:
 		m_vertexAttributes.synchronize<dev>();
 		m_faceAttributes.synchronize<dev>();
 		// Synchronize the index buffer
-		if (m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
-			if (m_indexFlags.has_competing_changes()) {
+		if(m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
+			if(m_indexFlags.has_competing_changes()) {
 				logError("[Polygons::synchronize] Competing device changes; ignoring one");
 			}
 			m_indexBuffer.for_each([&](auto& buffer) {
@@ -460,15 +459,15 @@ private:
 	void resizeAttribBuffer(std::size_t v, std::size_t f) {
 		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
 		// Resize the attribute array if necessary
-		if (attribBuffer.faceSize < f) {
-			if (attribBuffer.faceSize == 0)
+		if(attribBuffer.faceSize < f) {
+			if(attribBuffer.faceSize == 0)
 				attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(f);
 			else
 				attribBuffer.face = Allocator<dev>::realloc(attribBuffer.face, attribBuffer.faceSize, f);
 			attribBuffer.faceSize = f;
 		}
-		if (attribBuffer.vertSize < v) {
-			if (attribBuffer.vertSize == 0)
+		if(attribBuffer.vertSize < v) {
+			if(attribBuffer.vertSize == 0)
 				attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(v);
 			else
 				attribBuffer.vertex = Allocator<dev>::realloc(attribBuffer.vertex, attribBuffer.vertSize, v);
