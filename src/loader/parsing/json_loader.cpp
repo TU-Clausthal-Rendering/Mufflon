@@ -574,25 +574,25 @@ void JsonLoader::load_file() {
 				 m_binaryFile.string(), "'");
 		return;
 	}
-	// Default scenario
-	m_defaultScenario = read_opt<const char*>(m_state, document, "defaultScenario", "");
-	// Choose first one in JSON - no guarantees
-	if(m_defaultScenario.empty())
-		m_defaultScenario = m_scenarios->value.MemberBegin()->name.GetString();
-	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, '\'');
 
 	m_scenarios = get(m_state, document, "scenarios");
 	m_cameras = get(m_state, document, "cameras");
 	m_lights = get(m_state, document, "lights");
 	m_materials = get(m_state, document, "materials");
 
-	// First parse binary file
-	binary::BinaryLoader binLoader{ m_binaryFile };
 	// Partially parse the default scenario
 	m_state.current = ParserState::Level::SCENARIOS;
+	m_defaultScenario = read_opt<const char*>(m_state, document, "defaultScenario", "");
+	// Choose first one in JSON - no guarantees
+	if(m_defaultScenario.empty())
+		m_defaultScenario = m_scenarios->value.MemberBegin()->name.GetString();
+	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, '\'');
 	const Value& defScen = get(m_state, m_scenarios->value, &m_defaultScenario[0u])->value;
 	const u64 defaultGlobalLod = read_opt<u64>(m_state, defScen, "lod", 0u);
 	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, '\'');
+
+	// First parse binary file
+	binary::BinaryLoader binLoader{ m_binaryFile };
 	std::unordered_map<std::string_view, u64> defaultLocalLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
