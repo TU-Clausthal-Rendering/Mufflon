@@ -20,6 +20,7 @@ namespace {
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
+	logPedantic("[read_file] Loading JSON file '", path, "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
 	fileString.resize(fileSize);
@@ -65,6 +66,7 @@ void JsonLoader::clear_state() {
 
 TextureHdl JsonLoader::load_texture(const char* name) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
+	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
 	fs::path path(name);
 	if (!path.is_absolute())
@@ -80,6 +82,7 @@ TextureHdl JsonLoader::load_texture(const char* name) {
 
 MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator matIter) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_material", ProfileLevel::HIGH);
+	logPedantic("[JsonLoader::load_material] Loading material '", matIter->name.GetString(), "'");
 	using namespace rapidjson;
 	MaterialParams* mat = new MaterialParams{};
 
@@ -275,6 +278,7 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 	m_state.current = ParserState::Level::CAMERAS;
 
 	for(auto cameraIter = cameras.MemberBegin(); cameraIter != cameras.MemberEnd(); ++cameraIter) {
+		logPedantic("[JsonLoader::load_cameras] Loading camera '", cameraIter->name.GetString(), "'");
 		const Value& camera = cameraIter->value;
 		assertObject(m_state, camera);
 		m_state.objectNames.push_back(cameraIter->name.GetString());
@@ -336,6 +340,7 @@ void JsonLoader::load_lights() {
 	m_state.current = ParserState::Level::LIGHTS;
 
 	for(auto lightIter = lights.MemberBegin(); lightIter != lights.MemberEnd(); ++lightIter) {
+		logPedantic("[JsonLoader::load_lights] Loading light '", lightIter->name.GetString(), "'");
 		const Value& light = lightIter->value;
 		assertObject(m_state, light);
 		m_state.objectNames.push_back(lightIter->name.GetString());
@@ -440,6 +445,7 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 	m_state.current = ParserState::Level::SCENARIOS;
 
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
+		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		const Value& scenario = scenarioIter->value;
 		assertObject(m_state, scenario);
 		m_state.objectNames.push_back(scenarioIter->name.GetString());
@@ -510,6 +516,8 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			// The binary names from the loader already wrap the name in the desired format
 			std::string_view matName = read<const char*>(m_state, get(m_state, materialsIter->value,
 																 binName.c_str()));
+			logPedantic("[JsonLoader::load_scenarios] Associating material '", matName,
+						"' with binary name '", binName, "'");
 			MatIdx slot = scenario_declare_material_slot(scenarioHdl, binName.c_str(), binName.length());
 			if(slot == INVALID_MATERIAL)
 				throw std::runtime_error("Failed to declare material slot");
@@ -549,6 +557,7 @@ void JsonLoader::load_file() {
 		if(m_version.compare(FILE_VERSION) != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
+		logInfo("[JsonLoader::load_file] Detected file version '", m_version, '\'');
 	}
 	// Binary file path
 	m_binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
@@ -556,6 +565,7 @@ void JsonLoader::load_file() {
 		logError("[JsonLoader::load_file] Scene file: has an empty binary file path");
 		return;
 	}
+	logInfo("[JsonLoader::load_file] Detected binary file path '", m_binaryFile.string(), '\'');
 	// Make the file path absolute
 	if(m_binaryFile.is_relative())
 		m_binaryFile = fs::canonical(m_filePath.parent_path() / m_binaryFile);
@@ -566,6 +576,10 @@ void JsonLoader::load_file() {
 	}
 	// Default scenario
 	m_defaultScenario = read_opt<const char*>(m_state, document, "defaultScenario", "");
+	// Choose first one in JSON - no guarantees
+	if(m_defaultScenario.empty())
+		m_defaultScenario = m_scenarios->value.MemberBegin()->name.GetString();
+	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, '\'');
 
 	m_scenarios = get(m_state, document, "scenarios");
 	m_cameras = get(m_state, document, "cameras");
@@ -574,30 +588,28 @@ void JsonLoader::load_file() {
 
 	// First parse binary file
 	binary::BinaryLoader binLoader{ m_binaryFile };
-	// Choose first one in JSON - no guarantees
-	if(m_defaultScenario.empty())
-		m_defaultScenario = m_scenarios->value.MemberBegin()->name.GetString();
 	// Partially parse the default scenario
 	m_state.current = ParserState::Level::SCENARIOS;
 	const Value& defScen = get(m_state, m_scenarios->value, &m_defaultScenario[0u])->value;
 	const u64 defaultGlobalLod = read_opt<u64>(m_state, defScen, "lod", 0u);
+	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, '\'');
 	std::unordered_map<std::string_view, u64> defaultLocalLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("objectProperties");
 		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
+			// Read the object name
 			std::string_view objectName = propIter->name.GetString();
 			m_state.objectNames.push_back(&objectName[0u]);
 			const Value& object = propIter->value;
 			assertObject(m_state, object);
-			// Check for object name meta-tag
-			if(std::strncmp(&objectName[0u], "[obj:", 5u) != 0)
-				continue;
-			std::string_view subName = objectName.substr(5u, objectName.length() - 6u);
 			auto lodIter = get(m_state, object, "lod", false);
-			if(lodIter != object.MemberEnd())
-				defaultLocalLods.insert({ subName, read<u64>(m_state, lodIter) });
+			if(lodIter != object.MemberEnd()) {
+				const u64 localLod = read<u64>(m_state, lodIter);
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, '\'');
+				defaultLocalLods.insert({ objectName, localLod });
+			}
 		}
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
