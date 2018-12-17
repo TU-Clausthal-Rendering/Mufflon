@@ -22,6 +22,7 @@ namespace mufflon { namespace scene { namespace materials {
  *		get_parameter_pack_size(device) memory.
  */
 CUDA_FUNCTION void fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
+	outBuffer->type = desc.type;
 	outBuffer->flags = desc.flags;
 	outBuffer->innerMedium = desc.innerMedium;
 	outBuffer->outerMedium = desc.outerMedium;
