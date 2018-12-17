@@ -132,6 +132,16 @@ namespace gui.Dll
         internal static extern IntPtr world_load_scenario(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_current_scene();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_get_current_scenario();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint world_get_scenario_count();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string world_get_scenario_name_by_index(uint index);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string world_get_scenario_name(IntPtr hdl);
 
         // Scenario API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

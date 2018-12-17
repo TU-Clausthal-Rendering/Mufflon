@@ -4,8 +4,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows.Controls;
 using System.Windows.Input;
 using gui.Annotations;
+using gui.Dll;
 using gui.Model;
 using gui.Properties;
 
@@ -50,36 +52,40 @@ namespace gui.ViewModel
         }
 
         private Models m_models;
-        private ObservableCollection<SceneMenuItem> m_lastScenes;
-        public ObservableCollection<SceneMenuItem> LastScenes { get => m_lastScenes; }
-        public bool CanLoadLastScenes { get => m_lastScenes.Count > 0 && !m_models.Renderer.IsRendering; }
+        private ListBox m_scenarioBox;
+        public ObservableCollection<SceneMenuItem> LastScenes { get; }
+        public ObservableCollection<string> Scenarios { get => m_models.Scene.Scenarios; }
+        public bool CanLoadLastScenes { get => LastScenes.Count > 0 && !m_models.Renderer.IsRendering; }
 
-        public SceneViewModel(Models models)
+        public SceneViewModel(MainWindow window, Models models)
         {
             m_models = models;
-            m_lastScenes = new ObservableCollection<SceneMenuItem>();
+            m_scenarioBox = (ListBox)window.FindName("ScenarioSelectionBox");
+            m_scenarioBox.SelectionChanged += scenarioChanged;
+            LastScenes = new ObservableCollection<SceneMenuItem>();
             foreach (string path in m_models.Scene.LastScenes)
             {
-                m_lastScenes.Add(new SceneMenuItem(m_models)
+                LastScenes.Add(new SceneMenuItem(m_models)
                 {
                     Filename = Path.GetFileName(path),
                     Path = path
                 });
             }
-            m_models.Scene.PropertyChanged += changeLastScenes;
+
+            m_models.Scene.PropertyChanged += changeScene;
             m_models.Renderer.PropertyChanged += renderStatusChanged;
         }
 
-        private void changeLastScenes(object sender, PropertyChangedEventArgs args)
+        private void changeScene(object sender, PropertyChangedEventArgs args)
         {
             switch(args.PropertyName)
             {
                 case nameof(SceneModel.LastScenes):
                     {
-                        m_lastScenes.Clear();
+                        LastScenes.Clear();
                         foreach(string path in m_models.Scene.LastScenes)
                         {
-                            m_lastScenes.Add(new SceneMenuItem(m_models)
+                            LastScenes.Add(new SceneMenuItem(m_models)
                             {
                                 Filename = Path.GetFileName(path),
                                 Path = path
@@ -87,11 +93,41 @@ namespace gui.ViewModel
                         }
                         OnPropertyChanged(nameof(CanLoadLastScenes));
                         
-                        break;
-                    }
-            }
-            
+                    }   break;
+                case nameof(SceneModel.Scenarios):
+                    {
+                        IntPtr currentScenario = Core.world_get_current_scenario();
+                        if (currentScenario == IntPtr.Zero)
+                            throw new Exception(Core.GetDllError());
+                        string currentScenarioName = Core.world_get_scenario_name(currentScenario);
+                        m_scenarioBox.SelectedItem = null;
 
+                        // Select the loaded scenario (unsubscribe the event since that scenario is already loaded)
+                        m_scenarioBox.SelectionChanged -= scenarioChanged;
+                        foreach (var item in m_scenarioBox.Items)
+                        {
+                            if ((item as string) == currentScenarioName)
+                            {
+                                m_scenarioBox.SelectedItem = item;
+                                break;
+                            }
+                        }
+                        m_scenarioBox.SelectionChanged += scenarioChanged;
+                    }   break;
+
+            }
+        }
+
+        private void scenarioChanged(object sender, SelectionChangedEventArgs args)
+        {
+            if(args.AddedItems.Count > 0)
+            {
+                IntPtr scenario = Core.world_find_scenario(args.AddedItems[0] as string);
+                if (scenario == IntPtr.Zero)
+                    throw new Exception(Core.GetDllError());
+                if(Core.world_load_scenario(scenario) == IntPtr.Zero)
+                    throw new Exception(Core.GetDllError());
+            }
         }
 
         private void renderStatusChanged(object sender, PropertyChangedEventArgs args)

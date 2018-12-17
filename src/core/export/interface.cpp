@@ -1049,6 +1049,56 @@ ScenarioHdl world_find_scenario(const char* name) {
 	return static_cast<ScenarioHdl>(hdl);
 }
 
+uint32_t world_get_scenario_count() {
+	return static_cast<uint32_t>(WorldContainer::instance().get_scenario_count());
+}
+
+const char* world_get_scenario_name(ConstScenarioHdl hdl) {
+	CHECK_NULLPTR(hdl, "scenario handle", nullptr);
+
+	std::string_view name = static_cast<ConstScenarioHandle>(hdl)->get_name();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(name.size() + 1u));
+#else // _WIN32
+	char* buffer = new char[name.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, &name[0u], name.size());
+	buffer[name.size()] = '\0';
+	return buffer;
+}
+
+const char* world_get_scenario_name_by_index(uint32_t index) {
+	const uint32_t MAX_INDEX = static_cast<uint32_t>(WorldContainer::instance().get_scenario_count());
+	if(index >= MAX_INDEX) {
+		logError("[", FUNCTION_NAME, "] Scenario index '", index, "' out of bounds (",
+				 MAX_INDEX, ')');
+		return nullptr;
+	}
+	const std::string& nameRef = WorldContainer::instance().get_scenario_name(index);
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(nameRef.size() + 1u));
+#else // _WIN32
+	char* buffer = new char[nameRef.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, nameRef.c_str(), nameRef.size());
+	buffer[nameRef.size()] = '\0';
+	return buffer;
+}
+
+ConstScenarioHdl world_get_current_scenario() {
+	return static_cast<ConstScenarioHdl>(WorldContainer::instance().get_current_scenario());
+}
+
 MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	CHECK_NULLPTR(name, "material name", nullptr);
 	CHECK_NULLPTR(mat, "material parameters", nullptr);

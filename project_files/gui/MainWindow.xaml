@@ -165,7 +165,9 @@
                     Background="{StaticResource BackgroundBrush}">
                     <TabItem Header="Scenario"
                              Width="Auto">
-                        
+                        <ListBox Name="ScenarioSelectionBox"
+                                 ItemsSource="{Binding Scene.Scenarios, UpdateSourceTrigger=PropertyChanged}">
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="Properties"
                              Width="Auto">

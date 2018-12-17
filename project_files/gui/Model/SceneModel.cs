@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
@@ -55,6 +57,7 @@ namespace gui.Model
         }
 
         public StringCollection LastScenes { get => Settings.Default.LastScenes; }
+        public ObservableCollection<string> Scenarios { get; }
 
         public bool IsLoaded
         {
@@ -71,6 +74,7 @@ namespace gui.Model
         {
             if (Settings.Default.LastScenes == null)
                 Settings.Default.LastScenes = new System.Collections.Specialized.StringCollection();
+            Scenarios = new ObservableCollection<string>();
         }
 
         public bool loadScene(string path)
@@ -104,7 +108,12 @@ namespace gui.Model
                     }
                     else
                     {
+                        // Set path and load scene properties
                         FullPath = path;
+                        uint count = Core.world_get_scenario_count();
+                        for(uint i = 0u; i < count; ++i)
+                            Scenarios.Add(Core.world_get_scenario_name_by_index(i));
+                        OnPropertyChanged(nameof(Scenarios));
                         return true;
                     }
                 }

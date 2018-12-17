@@ -171,6 +171,7 @@ typedef uint16_t MatIdx;
 typedef void* ObjectHdl;
 typedef void* InstanceHdl;
 typedef void* ScenarioHdl;
+typedef const void* ConstScenarioHdl;
 typedef void* SceneHdl;
 typedef void* MaterialHdl;
 typedef void* CameraHdl;
@@ -337,6 +338,10 @@ CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);
+CORE_API uint32_t CDECL world_get_scenario_count();
+CORE_API const char* CDECL world_get_scenario_name(ConstScenarioHdl index);
+CORE_API const char* CDECL world_get_scenario_name_by_index(uint32_t index);
+CORE_API ConstScenarioHdl CDECL world_get_current_scenario();
 CORE_API MaterialHdl CDECL world_add_material(const char* name, const MaterialParams* mat);
 // TODO: blended/fresnel materials
 // TODO: glass/opaque materials

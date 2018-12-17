@@ -52,6 +52,14 @@ ScenarioHandle WorldContainer::get_scenario(const std::string_view& name) {
 	return nullptr;
 }
 
+const std::string& WorldContainer::get_scenario_name(std::size_t index) {
+	mAssert(index < m_scenarios.size());
+	auto iter = m_scenarios.cbegin();
+	for(std::size_t i = 0; i < index; ++i)
+		++iter;
+	return iter->first;
+}
+
 MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial> material) {
 	m_materials.push_back(move(material));
 	return m_materials.back().get();

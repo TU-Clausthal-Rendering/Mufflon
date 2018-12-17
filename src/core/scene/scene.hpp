@@ -169,7 +169,7 @@ public:
 		load_materials<dev>();
 
 		// Camera
-		CameraDescriptor camera;
+		CameraDescriptor camera{};
 		m_camera->get_parameter_pack(&camera.get(), resolution);
 
 		SceneDescriptor<dev> sceneDesc{
