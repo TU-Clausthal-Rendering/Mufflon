@@ -33,6 +33,21 @@ CUDA_FUNCTION __forceinline__ float rescale_sample(float x, float pLeft, float p
 	return (x - pLeft) / (pRight - pLeft);
 }
 
+// Rescale a random number inside the interval [pLeft, pRight] to [0,u64::max]
+CUDA_FUNCTION __forceinline__ u64 rescale_sample(u64 x, u64 pLeft, u64 pRight) {
+	u64 interval = pRight - pLeft;
+	u64 xrel = x - pLeft;
+	// Problem: (xrel * u64::max) / interval leaves the 64 bit range
+	//			 xrel * (u64::max / interval) is imprecise (up to a factor of 2)
+	// Number 3: compensate parts of the lost precision
+	//return xrel * (std::numeric_limits<u64>::max() / interval)
+	//	 + u64(xrel * float(std::numeric_limits<u64>::max() % interval) / interval);
+	// Number 4: always round up - only reliable to guarantee a new independent
+	// random number.
+	return xrel * (std::numeric_limits<u64>::max() / interval
+		+ (std::numeric_limits<u64>::max() % interval) == 0 ? 0 : 1);
+}
+
 // Sample a cosine distributed direction from two random numbers in [0,1)
 CUDA_FUNCTION __forceinline__ DirectionSample sample_dir_cosine(float u0, float u1) {
 	float cosTheta = sqrt(u0);			// cos(acos(sqrt(x))) = sqrt(x)

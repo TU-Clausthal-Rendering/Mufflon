@@ -17,10 +17,11 @@ struct EmissiveDesc {
 	textures::ConstTextureDevHandle_t<dev> emission;
 	Spectrum scale;
 
-	CUDA_FUNCTION void fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
+	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
 		*as<EmissiveParameterPack>(outBuffer) = EmissiveParameterPack{
 			Spectrum{ sample(emission, uvCoordinate) } * scale
 		};
+		return sizeof(EmissiveParameterPack);
 	}
 };
 
@@ -40,12 +41,14 @@ public:
 	}
 
 	std::size_t get_descriptor_size(Device device) const final {
-		device_switch(device, return sizeof(EmissiveDesc<dev>));
+		std::size_t s = IMaterial::get_descriptor_size(device);
+		device_switch(device, return sizeof(EmissiveDesc<dev>) + s);
 		return 0;
 	}
 
 	std::size_t get_parameter_pack_size() const final {
-		return sizeof(EmissiveParameterPack);
+		return IMaterial::get_parameter_pack_size()
+			+ sizeof(EmissiveParameterPack);
 	}
 
 	char* get_descriptor(Device device, char* outBuffer) const final {

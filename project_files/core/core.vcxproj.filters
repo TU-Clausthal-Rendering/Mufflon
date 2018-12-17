@@ -744,6 +744,9 @@
     <ClInclude Include="..\..\src\core\scene\lights\light_medium.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\blend.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">

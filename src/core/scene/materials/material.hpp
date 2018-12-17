@@ -157,6 +157,7 @@ public:
 
 	virtual Medium compute_medium() const = 0;
 
+	Materials get_type() const { return m_type; }
 protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;

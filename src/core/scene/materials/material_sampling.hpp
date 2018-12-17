@@ -8,6 +8,7 @@
 #include "util/assert.hpp"
 #include "lambert.hpp"
 #include "emissive.hpp"
+#include "blend.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace materials {
@@ -20,7 +21,19 @@ namespace mufflon { namespace scene { namespace materials {
  * uvCoordinate: surface texture coordinate for fetching the textures.
  * outBuffer: pointer to a writeable buffer with at least get
  *		get_parameter_pack_size(device) memory.
+ * Returns the size of the fetched data.
  */
+CUDA_FUNCTION int fetch_subdesc(Materials type, const char* subDesc, const UvCoordinate& uvCoordinate, char* subParam) {
+	switch(type) {
+		case Materials::LAMBERT: return as<LambertDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
+		case Materials::EMISSIVE: return as<EmissiveDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
+		case Materials::BLEND: return as<BlendDesc>(subDesc)->fetch(uvCoordinate, subParam);
+		default:
+			mAssertMsg(false, "Material not (fully) implemented!");
+	}
+	return 0;
+}
+
 CUDA_FUNCTION void fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
 	outBuffer->type = desc.type;
 	outBuffer->flags = desc.flags;
@@ -28,12 +41,7 @@ CUDA_FUNCTION void fetch(const MaterialDescriptorBase& desc, const UvCoordinate&
 	outBuffer->outerMedium = desc.outerMedium;
 	const char* subDesc = as<char>(&desc) + sizeof(MaterialDescriptorBase);
 	char* subParam = as<char>(outBuffer) + sizeof(ParameterPack);
-	switch(desc.type) {
-		case Materials::LAMBERT: as<LambertDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam); break;
-		case Materials::EMISSIVE: as<EmissiveDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam); break;
-		default:
-			mAssertMsg(false, "Material not (fully) implemented!");
-	}
+	fetch_subdesc(desc.type, subDesc, uvCoordinate, subParam);
 }
 
 
@@ -48,12 +56,39 @@ CUDA_FUNCTION ei::Vec2 solve(const ei::Mat2x2 & _A, const ei::Vec2 & _b) {
 	return {detX / detM, detY / detM};
 }
 
+
+
 /*
  * Importance sampling of a generic material. This method switches to the specific
  * sampling routines internal.
  * incident: normalized incident direction. Points towards the surface.
  * adjoint: false if this is a view sub-path, true if it is a light sub-path.
  */
+// Kernel to split the sampling to specific implementations
+CUDA_FUNCTION math::PathSample
+sample_subdesc(Materials type,
+			   const char* subParams,
+			   const Direction& incidentTS,
+			   const Medium* media,
+			   const math::RndSet2_1& rndSet,
+			   bool adjoint)
+{
+	switch(type)
+	{
+		case Materials::LAMBERT:
+			return lambert_sample(*as<LambertParameterPack>(subParams), incidentTS, rndSet);
+		case Materials::EMISSIVE:	// Not sampleable - simply let 'res' be the default value
+			return math::PathSample{};
+		case Materials::BLEND:
+			return blend_sample(*as<BlendParameterPack>(subParams), incidentTS, media, rndSet, adjoint);
+		default: ;
+#ifndef __CUDA_ARCH__
+			logWarning("[materials::sample] Trying to evaluate unimplemented material type ", type);
+#endif
+			return math::PathSample{};
+	}
+}
+
 CUDA_FUNCTION math::PathSample
 sample(const TangentSpace& tangentSpace,
 		const ParameterPack& params,
@@ -77,18 +112,7 @@ sample(const TangentSpace& tangentSpace,
 
 	// Use model specific subroutine
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	math::PathSample res;
-	switch(params.type)
-	{
-		case Materials::LAMBERT: {
-			res = lambert_sample(*as<LambertParameterPack>(subParams), incidentTS, rndSet);
-		} break;
-		case Materials::EMISSIVE: break;	// Not sampleable - simply let 'res' be the default value
-		default: ;
-#ifndef __CUDA_ARCH__
-			logWarning("[materials::sample] Trying to evaluate unimplemented material type ", params.type);
-#endif
-	}
+	math::PathSample res = sample_subdesc(params.type, subParams, incidentTS, media, rndSet, adjoint);
 
 	// Early out if result is discarded anyway
 	if(res.throughput == 0.0f) return res;
@@ -114,6 +138,8 @@ sample(const TangentSpace& tangentSpace,
 	return res;
 }
 
+
+
 /*
  * Evaluate an BxDF and its associtated PDFs for two directions.
  * incident: normalized incident direction. Points towards the surface.
@@ -121,6 +147,33 @@ sample(const TangentSpace& tangentSpace,
  * adjoint: false if the incident is a view sub-path, true if it is a light sub-path.
  * merge: Used to apply a different shading normal correction.
  */
+
+// Kernel to call the specific evaluation routines
+CUDA_FUNCTION math::EvalValue
+evaluate_subdesc(Materials type,
+				 const char* subParams,
+				 const Direction& incidentTS,
+				 const Direction& excidentTS,
+				 const Medium* media,
+				 bool adjoint,
+				 bool merge) {
+	switch(type)
+	{
+		case Materials::LAMBERT:
+			return lambert_evaluate(*as<LambertParameterPack>(subParams), incidentTS, excidentTS);
+		case Materials::EMISSIVE:
+			mAssertMsg(false, "Emissive evaluation should never be called (0-contribution). Eearly out based on material check assumed.");
+			return math::EvalValue{};
+		case Materials::BLEND:
+			return blend_evaluate(*as<BlendParameterPack>(subParams), incidentTS, excidentTS, media, adjoint, merge);
+		default:
+#ifndef __CUDA_ARCH__
+			logWarning("[materials::evaluate] Trying to evaluate unimplemented material type ", type);
+#endif
+			return math::EvalValue{};
+	}
+}
+
 CUDA_FUNCTION math::EvalValue
 evaluate(const TangentSpace& tangentSpace,
 		 const ParameterPack& params,
@@ -166,21 +219,7 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Call material implementation
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	math::EvalValue res;
-	switch(params.type)
-	{
-		case Materials::LAMBERT: {
-			res = lambert_evaluate(*as<LambertParameterPack>(subParams), incidentTS, excidentTS);
-		} break;
-		case Materials::EMISSIVE: {
-			mAssertMsg(false, "Emissive evaluation should never be called (0-contribution). Eearly out based on material check assumed.");
-			break;
-		}
-		default: ;
-#ifndef __CUDA_ARCH__
-			logWarning("[materials::evaluate] Trying to evaluate unimplemented material type ", params.type);
-#endif
-	}
+	math::EvalValue res = evaluate_subdesc(params.type, subParams, incidentTS, excidentTS, media, adjoint, merge);
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return res;
@@ -207,18 +246,23 @@ evaluate(const TangentSpace& tangentSpace,
  * suffice.
  */
 CUDA_FUNCTION Spectrum
-albedo(const ParameterPack& params) {
-	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	switch(params.type)
+albedo(Materials type, const char* subParams) {
+	switch(type)
 	{
 		case Materials::LAMBERT: return lambert_albedo(*as<LambertParameterPack>(subParams));
 		case Materials::EMISSIVE: return emissive_albedo(*as<EmissiveParameterPack>(subParams));
+		case Materials::BLEND: return blend_albedo(*as<BlendParameterPack>(subParams));
 		default:
 #ifndef __CUDA_ARCH__
-			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", params.type);
+			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", type);
 #endif
 			return Spectrum{0.0f};
 	}
+}
+CUDA_FUNCTION Spectrum
+albedo(const ParameterPack& params) {
+	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
+	return albedo(params.type, subParams);
 }
 
 /*
@@ -226,19 +270,12 @@ albedo(const ParameterPack& params) {
  */
 CUDA_FUNCTION Spectrum
 emission(const ParameterPack& params, const scene::Direction& excident) {
-	switch(params.type)
-	{
-		case Materials::LAMBERT: return Spectrum{0.0f};
-		case Materials::EMISSIVE: {
-			const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-			return as<EmissiveParameterPack>(subParams)->radiance;
-		}
-		default:
-#ifndef __CUDA_ARCH__
-			logWarning("[materials::emission] Trying to evaluate unimplemented material type ", params.type);
-#endif
-			return Spectrum{0.0f};
+	if(params.type == Materials::EMISSIVE) {
+		const char* subParams = as<char>(&params) + sizeof(ParameterPack);
+		return as<EmissiveParameterPack>(subParams)->radiance;
 	}
+	// Emission is not implemented in the majority of materials -> no check/redundant implementation
+	return Spectrum{0.0f};
 }
 
 
@@ -248,9 +285,15 @@ emission(const ParameterPack& params, const scene::Direction& excident) {
 CUDA_FUNCTION int get_size(const ParameterPack& params) {
 	switch(params.type)
 	{
-		case Materials::LAMBERT: return sizeof(LambertParameterPack);
-		case Materials::EMISSIVE: return sizeof(EmissiveParameterPack);
-			// Others might be recursive: write get_size for the specific materials
+		case Materials::LAMBERT: return sizeof(LambertParameterPack) + sizeof(ParameterPack);
+		case Materials::EMISSIVE: return sizeof(EmissiveParameterPack) + sizeof(ParameterPack);
+		case Materials::BLEND: {
+			//const char* layerA = as<char>(&params + 1);
+			//const char* layerB = as<char>(&params) + params.offsetB;
+			return sizeof(BlendParameterPack) + sizeof(ParameterPack);
+				//+ get_size(
+			// TODO: recursion or remove this entire method
+		}
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::get_size] Trying to evaluate unimplemented material type ", params.type);
