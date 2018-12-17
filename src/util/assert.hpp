@@ -1,55 +1,40 @@
 #pragma once
 
-#include <cassert>
-#include <iostream>
-
+// Defines whether an assert should automatically trigger a breakpoint in a debugger or not
 //#define NO_BREAK_ON_ASSERT
 
-#ifdef _MSC_VER
-#include <intrin.h>
-#ifdef _DEBUG
-#define DEBUG_ENABLED
-#endif // _DEBUG
-#else // _MSC_VER
-#ifndef NDEBUG
-#define DEBUG_ENABLED
-#endif // NDEBUG
-#endif // _MSC_VER
+namespace mufflon {
+
+void debug_break();
+void check_assert(bool condition, const char* file, int line, const char* condStr);
+void check_assert(bool condition, const char* file, int line, const char* condStr, const char* msg);
+
+} // namespace mufflon
 
 #ifdef DEBUG_ENABLED
-#ifndef NO_BREAK_ON_ASSERT
-#define mDebugBreak __debugbreak
-#else // NO_BREAK_ON_ASSERT
-#define mDebugBreak ((void)0)
-#endif // NO_BREAK_ON_ASSERT
 #ifdef __CUDACC__
+#ifndef NO_BREAK_ON_ASSERT
+#define cudaDebugBreak asm("brkpt;");
+#else // NO_BREAK_ON_ASSERT
+#define cudaDebugBreak ((void)0)
+#endif // NO_BREAK_ON_ASSERT
 #define mAssert(cond)																													\
 	do {																																\
-		if(!(cond))																														\
+		if(!(cond))	{																													\
 			printf("Assertion '" #cond "' (%s, line %d) failed\n", __FILE__, __LINE__);													\
+			cudaDebugBreak();																											\
+		}																																\
 	} while(0)
 #define mAssertMsg(cond, msg)																											\
 	do {																																\
 		if(!(cond)) {																													\
 			printf("Assertion '" #cond "' (%s, line %d) failed: %s\n", __FILE__, __LINE__, msg);										\
-			mDebugBreak();																												\
+			cudaDebugBreak();																											\
 		}																																\
 	} while(0)
 #else // __CUDACC__
-#define mAssert(cond)																													\
-	do {																																\
-		if(!(cond)) {																													\
-			std::cerr << "Assertion '" << #cond << "' (" << __FILE__ << ", line " << __LINE__ << ") failed" << std::endl;				\
-			mDebugBreak();																												\
-		}																																\
-	} while(0)
-#define mAssertMsg(cond, msg)																											\
-	do {																																\
-		if(!(cond)) {																													\
-			std::cerr << "Assertion '" << #cond << "' (" << __FILE__ << ", line " << __LINE__ << ") failed: " << msg << std::endl;		\
-			mDebugBreak();																												\
-		}																																\
-	} while(0)
+#define mAssert(cond) check_assert((cond), __FILE__, __LINE__, #cond)
+#define mAssertMsg(cond, msg) check_assert((cond), __FILE__, __LINE__, #cond, msg)
 #endif // __CUDACC__
 #else // NDEBUG
 #define mAssert(cond) ((void)0)

@@ -6,6 +6,7 @@
 #include "core/scene/types.hpp"
 #include "core/scene/handles.hpp"
 #include "medium.hpp"
+#include <string>
 
 namespace mufflon { namespace scene { namespace materials {
 

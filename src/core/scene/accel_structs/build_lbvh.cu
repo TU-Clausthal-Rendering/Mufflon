@@ -12,6 +12,10 @@
 #include <thrust/sort.h>
 #include <thrust/device_ptr.h>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif // _MSC_VER
+
 
 //namespace mufflon { namespace {//TODO use anonym?
 namespace mufflon {
