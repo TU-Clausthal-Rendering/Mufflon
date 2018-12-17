@@ -202,6 +202,9 @@
     <ClCompile Include="..\..\src\core\cameras\focus.cpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\attribute.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
