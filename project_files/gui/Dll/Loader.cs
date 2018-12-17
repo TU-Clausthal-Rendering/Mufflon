@@ -44,5 +44,8 @@ namespace gui.Dll
         internal static extern string loader_profiling_get_total_and_snapshots();
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void loader_profiling_reset();
+        [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string loader_get_dll_error();
     }
 }

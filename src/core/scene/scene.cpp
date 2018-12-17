@@ -108,9 +108,9 @@ SceneDescriptor<dev> Scene::get_descriptor(const std::vector<const char*>& verte
 	// Rebuild Instance BVH?
 
 	if(m_accelStruct.needs_rebuild<dev>()) {
-		//m_accelStruct.build(sceneDesc);
+		m_accelStruct.build(sceneDesc);
 	}
-	//sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
+	sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
 
 	return sceneDesc;
 }

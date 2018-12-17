@@ -66,6 +66,13 @@ using namespace mufflon::scene::geometry;
 			return retval;														\
 		}																		\
 	} while(0)
+#define TRY try {
+#define CATCH_ALL(retval)														\
+	} catch(const std::exception& e) {											\
+		logError("[", FUNCTION_NAME, "] Exception caught: ", e.what());			\
+		s_lastError = e.what();													\
+		return retval;															\
+	}
 
 // Shortcuts for long handle names
 using PolyVHdl = Polygons::VertexHandle;
@@ -195,30 +202,48 @@ inline std::string get_attr_type_name(AttribDesc desc) {
 
 // Function delegating the logger output to the applications handle, if applicable
 void delegateLog(LogSeverity severity, const std::string& message) {
+	TRY
 	if(s_logCallback != nullptr)
 		s_logCallback(message.c_str(), static_cast<int>(severity));
 	if(severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
 		s_lastError = message;
 	}
+	CATCH_ALL(;)
 }
 
 } // namespace
 
 // TODO: remove, Felix prototype
-const char* get_error(int& length) {
-	length = static_cast<int>(s_lastError.length());
-	return s_lastError.data();
+const char* core_get_dll_error(int& length) {
+	TRY
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(s_lastError.size() + 1u));
+#else // _WIN32
+	char* buffer = new char[s_lastError.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, s_lastError.c_str(), s_lastError.size());
+	buffer[s_lastError.size()] = '\0';
+	return buffer;
+	CATCH_ALL(nullptr)
 }
+
 Boolean iterate() {
+	TRY
 	static float t = 0.0f;
 	glClearColor(0.0f, t, 0.0f, 1.0f);
 	t += 0.01f;
 	if(t > 1.0f) t -= 1.0f;
 	glClear(GL_COLOR_BUFFER_BIT);
-
 	return true;
+	CATCH_ALL(false)
 }
 Boolean display_screenshot() {
+	TRY
 	if(!s_imageOutput) {
 		logError("[", FUNCTION_NAME, "] No image to print is present");
 		return false;
@@ -351,45 +376,55 @@ Boolean display_screenshot() {
 
 	cleanup();
 	return true;
+	CATCH_ALL(false)
 }
 Boolean resize(int width, int height, int offsetX, int offsetY) {
+	TRY
 	// glViewport should not be called with width or height zero
 	if(width == 0 || height == 0) return true;
 	glViewport(0, 0, width, height);
 	return true;
+	CATCH_ALL(false)
 }
 void execute_command(const char* command) {
+	TRY
 	// TODO
+	CATCH_ALL(;)
 }
 
 Boolean polygon_reserve(ObjectHdl obj, size_t vertices, size_t edges, size_t tris, size_t quads) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Object*>(obj)->template get_geometry<Polygons>().reserve(vertices, edges, tris, quads);
 	return true;
+	CATCH_ALL(false)
 }
 
 PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj, const char* name,
 														AttribDesc type) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_POLY_VATTR_HANDLE);
 	CHECK_NULLPTR(name, "attribute name", INVALID_POLY_VATTR_HANDLE);
 	Object& object = *static_cast<Object*>(obj);
 
 	return switchAttributeType(type, [name, &type, &object](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
+			using Type = typename std::decay_t<decltype(val)>::Type;
 		auto attr = object.template get_geometry<Polygons>().template add_attribute<Type, false>(name);
 		return PolygonAttributeHandle{
 			static_cast<int32_t>(attr.index),
 			type, false
 		};
-	}, [&type, name = FUNCTION_NAME](){
+	}, [&type, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type ", get_attr_type_name(type));
 		return INVALID_POLY_VATTR_HANDLE;
 	});
+	CATCH_ALL(INVALID_POLY_VATTR_HANDLE)
 }
 
 PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 													  const char* name,
 													  AttribDesc type) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_POLY_FATTR_HANDLE);
 	CHECK_NULLPTR(name, "attribute name", INVALID_POLY_FATTR_HANDLE);
 	Object& object = *static_cast<Object*>(obj);
@@ -405,9 +440,12 @@ PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
 		return INVALID_POLY_FATTR_HANDLE;
 	});
+
+	CATCH_ALL(INVALID_POLY_FATTR_HANDLE)
 }
 
 VertexHdl polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
 	PolyVHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		util::pun<ei::Vec3>(point), util::pun<ei::Vec3>(normal),
@@ -417,9 +455,11 @@ VertexHdl polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv) {
 		return VertexHdl{ INVALID_INDEX };
 	}
 	return VertexHdl{ static_cast<IndexType>(hdl.idx()) };
+	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
 FaceHdl polygon_add_triangle(ObjectHdl obj, UVec3 vertices) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
 
 	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
@@ -431,10 +471,12 @@ FaceHdl polygon_add_triangle(ObjectHdl obj, UVec3 vertices) {
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
 FaceHdl polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
 										 MatIdx idx) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
 	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
@@ -446,9 +488,11 @@ FaceHdl polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
 FaceHdl polygon_add_quad(ObjectHdl obj, UVec4 vertices) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
 	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
@@ -460,10 +504,12 @@ FaceHdl polygon_add_quad(ObjectHdl obj, UVec4 vertices) {
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
 FaceHdl polygon_add_quad_material(ObjectHdl obj, UVec4 vertices,
 									 MatIdx idx) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", FaceHdl{ INVALID_INDEX });
 	PolyFHdl hdl = static_cast<Object*>(obj)->template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
@@ -476,12 +522,14 @@ FaceHdl polygon_add_quad_material(ObjectHdl obj, UVec4 vertices,
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
 VertexHdl polygon_add_vertex_bulk(ObjectHdl obj, size_t count, FILE* points,
 									 FILE* normals, FILE* uvs,
 									 size_t* pointsRead, size_t* normalsRead,
 									 size_t* uvsRead) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(normals, "normals stream descriptor", VertexHdl{ INVALID_INDEX });
@@ -500,12 +548,14 @@ VertexHdl polygon_add_vertex_bulk(ObjectHdl obj, size_t count, FILE* points,
 	if(pointsRead != nullptr)
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
 VertexHdl polygon_add_vertex_bulk_no_normals(ObjectHdl obj, size_t count,
 											 FILE* points, FILE* uvs,
 											 size_t* pointsRead,
 											 size_t* uvsRead) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
@@ -520,12 +570,14 @@ VertexHdl polygon_add_vertex_bulk_no_normals(ObjectHdl obj, size_t count,
 	if(pointsRead != nullptr)
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
 VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points,
 										  FILE* normals, FILE* uvs, Vec3 min,
 										  Vec3 max, size_t* pointsRead,
 										  size_t* normalsRead, size_t* uvsRead) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(normals, "normals stream descriptor", VertexHdl{ INVALID_INDEX });
@@ -545,6 +597,7 @@ VertexHdl polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points
 	if(pointsRead != nullptr)
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
 VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
@@ -552,6 +605,7 @@ VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
 												  Vec3 min, Vec3 max,
 												  size_t* pointsRead,
 												  size_t* uvsRead) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
@@ -567,10 +621,12 @@ VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
 	if(pointsRead != nullptr)
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
 Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
 								  VertexHdl vertex, const void* value) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
@@ -597,9 +653,11 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 				 get_attr_type_name(attr->type));
 		return false;
 	});
+	CATCH_ALL(false)
 }
 
 Boolean polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(vertex, "vertex index", false);
 	Object& object = *static_cast<Object*>(obj);
@@ -614,9 +672,11 @@ Boolean polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal) 
 	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec3f, false>(hdl)[vertex] = util::pun<OpenMesh::Vec3f>(normal);
 	object.get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(vertex, "vertex index", false);
 	Object& object = *static_cast<Object*>(obj);
@@ -631,10 +691,12 @@ Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
 	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec2f, false>(hdl)[vertex] = util::pun<OpenMesh::Vec2f>(uv);
 	object.get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
 								FaceHdl face, const void* value) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
@@ -661,9 +723,11 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 				 get_attr_type_name(attr->type));
 		return false;
 	});
+	CATCH_ALL(false)
 }
 
 Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(face, "face index", false);
 	Object& object = *static_cast<Object*>(obj);
@@ -678,11 +742,13 @@ Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
 	object.get_geometry<Polygons>().acquire<Device::CPU, u16, true>(hdl)[face] = idx;
 	object.get_geometry<Polygons>().mark_changed<true>(Device::CPU, hdl);
 	return true;
+	CATCH_ALL(false)
 }
 
 size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHandle* attr,
 										 VertexHdl startVertex, size_t count,
 										 FILE* stream) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
@@ -709,11 +775,13 @@ size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHa
 				 get_attr_type_name(attr->type));
 		return INVALID_SIZE;
 	});
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHandle* attr,
 									   FaceHdl startFace, size_t count,
 									   FILE* stream) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
@@ -739,10 +807,12 @@ size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHand
 				 get_attr_type_name(attr->type));
 		return INVALID_SIZE;
 	});
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t count,
 									 FILE* stream) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
 	CHECK_GEQ_ZERO(startFace, "start face index", INVALID_SIZE);
@@ -760,39 +830,51 @@ size_t polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t co
 	OpenMeshAttributePool<true>::AttributeHandle hdl = object.template get_geometry<Polygons>().get_material_indices_hdl();
 	return object.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
 															 count, matStream);
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_get_vertex_count(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	const Object& object = *static_cast<const Object*>(obj);
 	return object.template get_geometry<Polygons>().get_vertex_count();
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_get_edge_count(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	const Object& object = *static_cast<const Object*>(obj);
 	return object.template get_geometry<Polygons>().get_edge_count();
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_get_face_count(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	const Object& object = *static_cast<const Object*>(obj);
 	return object.template get_geometry<Polygons>().get_face_count();
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_get_triangle_count(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	const Object& object = *static_cast<const Object*>(obj);
 	return object.template get_geometry<Polygons>().get_triangle_count();
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t polygon_get_quad_count(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	const Object& object = *static_cast<const Object*>(obj);
 	return object.template get_geometry<Polygons>().get_quad_count();
+	CATCH_ALL(INVALID_SIZE)
 }
 
 Boolean polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	const Object& object = *static_cast<const Object*>(obj);
 	const ei::Box& aabb = object.template get_geometry<Polygons>().get_bounding_box();
@@ -801,16 +883,20 @@ Boolean polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	if(max != nullptr)
 		*max = util::pun<Vec3>(aabb.max);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean spheres_reserve(ObjectHdl obj, size_t count) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Object*>(obj)->template get_geometry<Spheres>().reserve(count);
 	return true;
+	CATCH_ALL(false)
 }
 
 SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 												AttribDesc type) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SPHERE_ATTR_HANDLE);
 	CHECK_NULLPTR(name, "attribute name", INVALID_SPHERE_ATTR_HANDLE);
 	Object& object = *static_cast<Object*>(obj);
@@ -825,25 +911,31 @@ SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
 		return INVALID_SPHERE_ATTR_HANDLE;
 	});
+	CATCH_ALL(INVALID_SPHERE_ATTR_HANDLE)
 }
 
 SphereHdl spheres_add_sphere(ObjectHdl obj, Vec3 point, float radius) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", SphereHdl{ INVALID_INDEX });
 	SphereVHdl hdl = static_cast<Object*>(obj)->template get_geometry<Spheres>().add(
 		util::pun<ei::Vec3>(point), radius);
 	return SphereHdl{ static_cast<IndexType>(hdl) };
+	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
 SphereHdl spheres_add_sphere_material(ObjectHdl obj, Vec3 point, float radius,
 								MatIdx idx) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", SphereHdl{ INVALID_INDEX });
 	SphereVHdl hdl = static_cast<Object*>(obj)->template get_geometry<Spheres>().add(
 		util::pun<ei::Vec3>(point), radius, idx);
 	return SphereHdl{ static_cast<IndexType>(hdl) };
+	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
 SphereHdl spheres_add_sphere_bulk(ObjectHdl obj, size_t count,
 									 FILE* stream, size_t* readSpheres) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", SphereHdl{ INVALID_INDEX } );
 	CHECK_NULLPTR(stream, "sphere stream descriptor", SphereHdl{ INVALID_INDEX });
 	Object& object = *static_cast<Object*>(obj);
@@ -853,12 +945,13 @@ SphereHdl spheres_add_sphere_bulk(ObjectHdl obj, size_t count,
 	if(readSpheres != nullptr)
 		*readSpheres = info.readSpheres;
 	return SphereHdl{ static_cast<IndexType>(info.handle) };
+	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
 SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 										  FILE* stream, Vec3 min, Vec3 max,
 										  size_t* readSpheres) {
-
+	TRY
 	CHECK_NULLPTR(obj, "object handle", SphereHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(stream, "sphere stream descriptor", SphereHdl{ INVALID_INDEX });
 	Object& object = *static_cast<Object*>(obj);
@@ -870,10 +963,12 @@ SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 	if(readSpheres != nullptr)
 		*readSpheres = info.readSpheres;
 	return SphereHdl{ static_cast<IndexType>(info.handle) };
+	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
 Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 						   SphereHdl sphere, const void* value) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_NULLPTR(attr, "attribute handle", false);
 	CHECK_NULLPTR(value, "attribute value", false);
@@ -898,9 +993,11 @@ Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 				 get_attr_type_name(attr->type));
 		return false;
 	});
+	CATCH_ALL(false)
 }
 
 Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(sphere, "sphere index", false);
 	Object& object = *static_cast<Object*>(obj);
@@ -915,11 +1012,13 @@ Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
 	object.template get_geometry<Spheres>().acquire<Device::CPU, u16>(hdl)[sphere] = idx;
 	object.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
 	return true;
+	CATCH_ALL(false)
 }
 
 size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* attr,
 								  SphereHdl startSphere, size_t count,
 								  FILE* stream) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
@@ -945,10 +1044,12 @@ size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* at
 				 get_attr_type_name(attr->type));
 		return INVALID_SIZE;
 	});
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere, size_t count,
 									 FILE* stream) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
 	CHECK_GEQ_ZERO(startSphere, "start sphere index", INVALID_SIZE);
@@ -966,15 +1067,19 @@ size_t spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere, size_
 															SphereVHdl{ static_cast<size_t>(startSphere) },
 															count, matStream);
 	return INVALID_SIZE;
+	CATCH_ALL(INVALID_SIZE)
 }
 
 size_t spheres_get_sphere_count(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SIZE);
 	const Object& object = *static_cast<const Object*>(obj);
 	return object.template get_geometry<Spheres>().get_sphere_count();
+	CATCH_ALL(INVALID_SIZE)
 }
 
 Boolean spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	const Object& object = *static_cast<const Object*>(obj);
 	const ei::Box& aabb = object.get_bounding_box<Spheres>();
@@ -983,25 +1088,31 @@ Boolean spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max) {
 	if(max != nullptr)
 		*max = util::pun<Vec3>(aabb.max);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat) {
+	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
 	Instance& instance = *static_cast<InstanceHandle>(inst);
 	instance.set_transformation_matrix(util::pun<ei::Mat3x4>(*mat));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat) {
+	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
 	if(mat != nullptr)
 		*mat = util::pun<Mat3x4>(instance.get_transformation_matrix());
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max) {
+	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
 	const ei::Box& aabb = instance.get_bounding_box();
@@ -1010,36 +1121,48 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max) {
 	if(max != nullptr)
 		*max = util::pun<Vec3>(aabb.max);
 	return true;
+	CATCH_ALL(false)
 }
 
 void world_clear_all() {
+	TRY
 	WorldContainer::clear_instance();
+	CATCH_ALL(;)
 }
 
 ObjectHdl world_create_object(const char* name, ::ObjectFlags flags) {
+	TRY
 	CHECK_NULLPTR(name, "object name", nullptr);
 	return static_cast<ObjectHdl>(WorldContainer::instance().create_object(name,
 			util::pun<scene::ObjectFlags>(flags)));
+	CATCH_ALL(nullptr)
 }
 
 ObjectHdl world_get_object(const char* name) {
+	TRY
 	CHECK_NULLPTR(name, "object name", nullptr);
 	return static_cast<ObjectHdl>(WorldContainer::instance().get_object(name));
+	CATCH_ALL(nullptr)
 }
 
 InstanceHdl world_create_instance(ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
 	return static_cast<InstanceHdl>(WorldContainer::instance().create_instance(hdl));
+	CATCH_ALL(nullptr)
 }
 
 ScenarioHdl world_create_scenario(const char* name) {
+	TRY
 	CHECK_NULLPTR(name, "scenario name", nullptr);
 	ScenarioHandle hdl = WorldContainer::instance().create_scenario(name);
 	return static_cast<ScenarioHdl>(hdl);
+	CATCH_ALL(nullptr)
 }
 
 ScenarioHdl world_find_scenario(const char* name) {
+	TRY
 	CHECK_NULLPTR(name, "scenario name", nullptr);
 	std::string_view nameView{ name };
 	ScenarioHandle hdl = WorldContainer::instance().get_scenario(nameView);
@@ -1049,13 +1172,17 @@ ScenarioHdl world_find_scenario(const char* name) {
 		return nullptr;
 	}
 	return static_cast<ScenarioHdl>(hdl);
+	CATCH_ALL(nullptr)
 }
 
 uint32_t world_get_scenario_count() {
+	TRY
 	return static_cast<uint32_t>(WorldContainer::instance().get_scenario_count());
+	CATCH_ALL(0u)
 }
 
 const char* world_get_scenario_name(ConstScenarioHdl hdl) {
+	TRY
 	CHECK_NULLPTR(hdl, "scenario handle", nullptr);
 
 	std::string_view name = static_cast<ConstScenarioHandle>(hdl)->get_name();
@@ -1072,9 +1199,11 @@ const char* world_get_scenario_name(ConstScenarioHdl hdl) {
 	std::memcpy(buffer, &name[0u], name.size());
 	buffer[name.size()] = '\0';
 	return buffer;
+	CATCH_ALL(nullptr)
 }
 
 const char* world_get_scenario_name_by_index(uint32_t index) {
+	TRY
 	const uint32_t MAX_INDEX = static_cast<uint32_t>(WorldContainer::instance().get_scenario_count());
 	if(index >= MAX_INDEX) {
 		logError("[", FUNCTION_NAME, "] Scenario index '", index, "' out of bounds (",
@@ -1095,13 +1224,17 @@ const char* world_get_scenario_name_by_index(uint32_t index) {
 	std::memcpy(buffer, nameRef.c_str(), nameRef.size());
 	buffer[nameRef.size()] = '\0';
 	return buffer;
+	CATCH_ALL(nullptr)
 }
 
 ConstScenarioHdl world_get_current_scenario() {
+	TRY
 	return static_cast<ConstScenarioHdl>(WorldContainer::instance().get_current_scenario());
+	CATCH_ALL(nullptr)
 }
 
 MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
+	TRY
 	CHECK_NULLPTR(name, "material name", nullptr);
 	CHECK_NULLPTR(mat, "material parameters", nullptr);
 
@@ -1152,10 +1285,12 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	}
 
 	return static_cast<MaterialHdl>(hdl);
+	CATCH_ALL(nullptr)
 }
 
 CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 								   Vec3 up, float near, float far, float vFov) {
+	TRY
 	CHECK_NULLPTR(name, "camera name", nullptr);
 	CameraHandle hdl = WorldContainer::instance().add_camera(name,
 		std::make_unique<cameras::Pinhole>(
@@ -1167,12 +1302,14 @@ CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 		return nullptr;
 	}
 	return static_cast<CameraHdl>(hdl);
+	CATCH_ALL(nullptr)
 }
 
 CameraHdl world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
 								 Vec3 up, float near, float far,
 								 float focalLength, float focusDistance,
 								 float lensRad, float chipHeight) {
+	TRY
 	CHECK_NULLPTR(name, "camera name", nullptr);
 	CameraHandle hdl = WorldContainer::instance().add_camera(name,
 		std::make_unique<cameras::Focus>(
@@ -1185,9 +1322,11 @@ CameraHdl world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
 		return nullptr;
 	}
 	return static_cast<CameraHdl>(hdl);
+	CATCH_ALL(nullptr)
 }
 
 LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) {
+	TRY
 	CHECK_NULLPTR(name, "pointlight name", nullptr);
 	auto hdl = WorldContainer::instance().add_light(name, lights::PointLight{
 													util::pun<ei::Vec3>(position),
@@ -1197,11 +1336,13 @@ LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) 
 		return nullptr;
 	}
 	return static_cast<LightHdl>(&hdl.value()->second);
+	CATCH_ALL(nullptr)
 }
 
 LightHdl world_add_spot_light(const char* name, Vec3 position, Vec3 direction,
 							  Vec3 intensity, float openingAngle,
 							  float falloffStart) {
+	TRY
 	CHECK_NULLPTR(name, "spotlight name", nullptr);
 	ei::Vec3 dir = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(dir), 1.0f)) {
@@ -1237,10 +1378,12 @@ LightHdl world_add_spot_light(const char* name, Vec3 position, Vec3 direction,
 		return nullptr;
 	}
 	return static_cast<LightHdl>(&hdl.value()->second);
+	CATCH_ALL(nullptr)
 }
 
 LightHdl world_add_directional_light(const char* name, Vec3 direction,
 									 Vec3 radiance) {
+	TRY
 	CHECK_NULLPTR(name, "directional light name", nullptr);
 	auto hdl = WorldContainer::instance().add_light(name, lights::DirectionalLight{
 													util::pun<ei::Vec3>(direction),
@@ -1250,9 +1393,11 @@ LightHdl world_add_directional_light(const char* name, Vec3 direction,
 		return nullptr;
 	}
 	return static_cast<LightHdl>(&hdl.value()->second);
+	CATCH_ALL(nullptr)
 }
 
 LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
+	TRY
 	CHECK_NULLPTR(name, "directional light name", nullptr);
 	CHECK_NULLPTR(envmap, "environment map", nullptr);
 	TextureHandle hdl = static_cast<TextureHandle>(envmap);
@@ -1262,13 +1407,17 @@ LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
 		return nullptr;
 	}
 	return envLight.value()->second;
+	CATCH_ALL(nullptr)
 }
 
 CameraHdl world_get_camera(const char* name) {
+	TRY
 	CHECK_NULLPTR(name, "camera name", nullptr);
 	return static_cast<CameraHdl>(WorldContainer::instance().get_camera(name));
+	CATCH_ALL(nullptr)
 }
 LightHdl world_get_light(const char* name, LightType type) {
+	TRY
 	CHECK_NULLPTR(name, "light name", nullptr);
 	switch(type) {
 		case LightType::LIGHT_POINT: {
@@ -1308,9 +1457,11 @@ LightHdl world_get_light(const char* name, LightType type) {
 			return nullptr;
 		}
 	}
+	CATCH_ALL(nullptr)
 }
 
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	SceneHandle hdl = WorldContainer::instance().load_scene(static_cast<ConstScenarioHandle>(scenario));
 	if(hdl == nullptr) {
@@ -1322,13 +1473,17 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		s_currentRenderer->load_scene(hdl, res);
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);
+	CATCH_ALL(nullptr)
 }
 
 SceneHdl world_get_current_scene() {
+	TRY
 	return static_cast<SceneHdl>(WorldContainer::instance().get_current_scene());
+	CATCH_ALL(nullptr)
 }
 
 TextureHdl world_get_texture(const char* path) {
+	TRY
 	CHECK_NULLPTR(path, "texture path", false);
 	auto hdl = WorldContainer::instance().find_texture(path);
 	if(!hdl.has_value()) {
@@ -1337,9 +1492,11 @@ TextureHdl world_get_texture(const char* path) {
 		return nullptr;
 	}
 	return static_cast<TextureHdl>(&hdl.value()->second);
+	CATCH_ALL(nullptr)
 }
 
 TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
+	TRY
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
 	// Check if the texture is already loaded
@@ -1369,9 +1526,11 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 												 static_cast<textures::SamplingMode>(sampling),
 												 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
 	return static_cast<TextureHdl>(&hdl.value()->second);
+	CATCH_ALL(nullptr)
 }
 
 TextureHdl world_add_texture_value(const float* value, int num, TextureSampling sampling) {
+	TRY
 	mAssert(num >= 1 && num <= 4);
 	// Create an artifical name for the value texture (for compatibilty with file-textures)
 	std::string name = std::to_string(value[0]);
@@ -1403,27 +1562,35 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 							  static_cast<textures::SamplingMode>(sampling),
 							  false, move(data));
 	return static_cast<TextureHdl>(&hdl.value()->second);
+	CATCH_ALL(nullptr)
 }
 
 const char* scenario_get_name(ScenarioHdl scenario) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	// This relies on the fact that the string_view in scenario points to
 	// an std::string object, which is null terminated
 	return &static_cast<const Scenario*>(scenario)->get_name()[0u];
+	CATCH_ALL(nullptr)
 }
 
 size_t scenario_get_global_lod_level(ScenarioHdl scenario) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", Scenario::NO_CUSTOM_LOD);
 	return static_cast<const Scenario*>(scenario)->get_global_lod_level();
+	CATCH_ALL(Scenario::NO_CUSTOM_LOD)
 }
 
 Boolean scenario_set_global_lod_level(ScenarioHdl scenario, LodLevel level) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_global_lod_level(level);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scenario_get_resolution(ScenarioHdl scenario, uint32_t* width, uint32_t* height) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	ei::IVec2 res = static_cast<const Scenario*>(scenario)->get_resolution();
 	if(width != nullptr)
@@ -1431,59 +1598,77 @@ Boolean scenario_get_resolution(ScenarioHdl scenario, uint32_t* width, uint32_t*
 	if(height != nullptr)
 		*height = res.y;
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scenario_set_resolution(ScenarioHdl scenario, uint32_t width, uint32_t height) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_resolution(ei::IVec2{ width, height });
 	return true;
+	CATCH_ALL(false)
 }
 
 CameraHdl scenario_get_camera(ScenarioHdl scenario) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	return static_cast<CameraHdl>(static_cast<const Scenario*>(scenario)->get_camera());
+	CATCH_ALL(nullptr)
 }
 
 Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_camera(static_cast<CameraHandle>(cam));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
 	return static_cast<const Scenario*>(scenario)->is_masked(static_cast<const Object*>(obj));
+	CATCH_ALL(false)
 }
 
 Boolean scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Scenario*>(scenario)->mask_object(static_cast<const Object*>(obj));
 	return true;
+	CATCH_ALL(false)
 }
 
 LodLevel scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", Scenario::NO_CUSTOM_LOD);
 	CHECK_NULLPTR(obj, "object handle", Scenario::NO_CUSTOM_LOD);
 	return static_cast<const Scenario*>(scenario)->get_custom_lod(static_cast<const Object*>(obj));
+	CATCH_ALL(Scenario::NO_CUSTOM_LOD)
 }
 
 Boolean scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 							 LodLevel level) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Scenario*>(scenario)->set_custom_lod(static_cast<const Object*>(obj),
 													 level);
 	return true;
+	CATCH_ALL(false)
 }
 
 IndexType scenario_get_light_count(ScenarioHdl scenario) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_INDEX);
 	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_light_names().size());
+	CATCH_ALL(INVALID_INDEX)
 }
 
 const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);
 	if(index >= scen.get_light_names().size()) {
@@ -1495,9 +1680,11 @@ const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
 	// references a std::string object in WorldContainer. Should that ever
 	// change we'll need to perform a copy here instead
 	return &scen.get_light_names()[index][0u];
+	CATCH_ALL(nullptr)
 }
 
 Boolean scenario_add_light(ScenarioHdl scenario, const char* name) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(name, "light name", false);
 	// Indirection via world container because we store string_views
@@ -1508,9 +1695,11 @@ Boolean scenario_add_light(ScenarioHdl scenario, const char* name) {
 	}
 	static_cast<Scenario*>(scenario)->add_light(resolvedName.value());
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scenario_remove_light_by_index(ScenarioHdl scenario, size_t index) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
 	if(index >= scen.get_light_names().size()) {
@@ -1520,49 +1709,61 @@ Boolean scenario_remove_light_by_index(ScenarioHdl scenario, size_t index) {
 	}
 	scen.remove_light(index);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scenario_remove_light_by_named(ScenarioHdl scenario, const char* name) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(name, "light name", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
 	scen.remove_light(name);
 	return true;
+	CATCH_ALL(false)
 }
 
 MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
 									  const char* name, std::size_t nameLength) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
 	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
 	return static_cast<Scenario*>(scenario)->declare_material_slot(nameView);
+	CATCH_ALL(INVALID_MATERIAL)
 }
 
 MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 								  const char* name, std::size_t nameLength) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
 	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
 	return static_cast<const Scenario*>(scenario)->get_material_slot_index(nameView);
+	CATCH_ALL(INVALID_MATERIAL)
 }
 
 MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 										   MatIdx index) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	CHECK((index < INVALID_MATERIAL), "Invalid material index", nullptr);
 	return static_cast<MaterialHdl>(static_cast<const Scenario*>(scenario)->get_assigned_material(index));
+	CATCH_ALL(nullptr)
 }
 
 Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 							  MaterialHdl handle) {
+	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(handle, "material handle", false);
 	CHECK((index < INVALID_MATERIAL), "Invalid material index", false);
 	static_cast<Scenario*>(scenario)->assign_material(index, static_cast<MaterialHandle>(handle));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
+	TRY
 	CHECK_NULLPTR(scene, "scene handle", false);
 	const Scene& scen = *static_cast<const Scene*>(scene);
 	if(min != nullptr)
@@ -1570,98 +1771,124 @@ Boolean scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
 	if(max != nullptr)
 		*max = util::pun<Vec3>(scen.get_bounding_box().max);
 	return true;
+	CATCH_ALL(false)
 }
 
 ConstCameraHdl scene_get_camera(SceneHdl scene) {
+	TRY
 	CHECK_NULLPTR(scene, "scene handle", nullptr);
 	return static_cast<ConstCameraHdl>(static_cast<const Scene*>(scene)->get_camera());
+	CATCH_ALL(nullptr)
 }
 
 Boolean world_get_point_light_position(LightHdl hdl, Vec3* pos) {
+	TRY
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
 	if(pos != nullptr)
 		*pos = util::pun<Vec3>(light.position);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_point_light_intensity(LightHdl hdl, Vec3* intensity) {
+	TRY
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
 	if(intensity != nullptr)
 		*intensity = util::pun<Vec3>(light.intensity);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos) {
+	TRY
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
 	light.position = util::pun<ei::Vec3>(pos);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
+	TRY
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
 	light.intensity = util::pun<ei::Vec3>(intensity);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(pos != nullptr)
 		*pos = util::pun<Vec3>(light.position);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(intensity != nullptr)
 		*intensity = util::pun<Vec3>(light.intensity);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(direction != nullptr)
 		*direction = util::pun<Vec3>(ei::unpackOctahedral32(light.direction));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_angle(LightHdl hdl, float* angle) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(angle != nullptr)
 		*angle = std::acos(__half2float(light.cosThetaMax));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_falloff(LightHdl hdl, float* falloff) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(falloff != nullptr)
 		*falloff = std::acos(__half2float(light.cosFalloffStart));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	light.position = util::pun<ei::Vec3>(pos);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	light.intensity = util::pun<ei::Vec3>(intensity);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
@@ -1672,9 +1899,11 @@ Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
 	// TODO: check direction
 	light.direction = ei::packOctahedral32(util::pun<ei::Vec3>(actualDirection));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 
@@ -1687,9 +1916,11 @@ Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
 	}
 	light.cosThetaMax = __float2half(std::cos(actualAngle));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
+	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
 	// Clamp it to the opening angle!
@@ -1706,25 +1937,31 @@ Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 		light.cosFalloffStart = compressedCosFalloff;
 	}
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
+	TRY
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
 	if(direction != nullptr)
 		*direction = util::pun<Vec3>(light.direction);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance) {
+	TRY
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
 	if(radiance != nullptr)
 		*radiance = util::pun<Vec3>(light.radiance);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
+	TRY
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
@@ -1734,16 +1971,20 @@ Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	}
 	light.direction = util::pun<ei::Vec3>(actualDirection);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
+	TRY
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
 	light.radiance = util::pun<ei::Vec3>(radiance);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_enable_renderer(RendererType type) {
+	TRY
 	switch(type) {
 		case RendererType::RENDERER_CPU_PT: {
 			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>();
@@ -1760,37 +2001,11 @@ Boolean render_enable_renderer(RendererType type) {
 		s_currentRenderer->load_scene(WorldContainer::instance().get_current_scene(),
 			WorldContainer::instance().get_current_scenario()->get_resolution());
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_iterate() {
-	try {
-		if(s_currentRenderer == nullptr) {
-			logError("[", FUNCTION_NAME, "] No renderer is currently set");
-			return false;
-		}
-		if(s_imageOutput == nullptr) {
-			logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
-			return false;
-		}
-		if(!s_currentRenderer->has_scene()) {
-			logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
-			return false;
-		}
-		s_currentRenderer->iterate(*s_imageOutput);
-	} catch(const std::exception& e) {
-		logError("[", FUNCTION_NAME, "] Exception occured:\n", e.what());
-		return false;
-	}
-	return true;
-}
-
-Boolean render_reset() {
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->reset();
-	return true;
-}
-
-Boolean render_get_screenshot() {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -1799,11 +2014,25 @@ Boolean render_get_screenshot() {
 		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 		return false;
 	}
-	// TODO: this is just for debugging!
-	return false;
+	if(!s_currentRenderer->has_scene()) {
+		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
+		return false;
+	}
+	s_currentRenderer->iterate(*s_imageOutput);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean render_reset() {
+	TRY
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_save_screenshot(const char* filename) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -1844,9 +2073,11 @@ Boolean render_save_screenshot(const char* filename) {
 	}
 
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
+	TRY
 	switch(target) {
 		case RenderTarget::TARGET_RADIANCE:
 			s_outputTargets.set(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
@@ -1870,9 +2101,11 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
+	TRY
 	switch(target) {
 		case RenderTarget::TARGET_RADIANCE:
 			s_outputTargets.clear(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
@@ -1896,59 +2129,75 @@ Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_enable_variance_render_targets() {
+	TRY
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target << 8u);
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_enable_non_variance_render_targets() {
+	TRY
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target);
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_enable_all_render_targets() {
+	TRY
 	return render_enable_variance_render_targets()
 		&& render_enable_non_variance_render_targets();
+	CATCH_ALL(false)
 }
 
 Boolean render_disable_variance_render_targets() {
+	TRY
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target << 8u);
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_disable_non_variance_render_targets() {
+	TRY
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target);
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_disable_all_render_targets() {
+	TRY
 	return render_disable_variance_render_targets()
 		&& render_disable_non_variance_render_targets();
+	CATCH_ALL(false)
 }
 
 uint32_t renderer_get_num_parameters() {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
-		return 0;
+		return 0u;
 	}
 	return s_currentRenderer->get_parameters().get_num_parameters();
+	CATCH_ALL(0u)
 }
 
 const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return nullptr;
@@ -1971,71 +2220,89 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 	std::memcpy(name, rendererDesc.name, nameLength);
 
 	return name;
+	CATCH_ALL(nullptr)
 }
 
 Boolean renderer_set_parameter_int(const char* name, int32_t value) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
 	s_currentRenderer->get_parameters().set_param(name, value);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean renderer_get_parameter_int(const char* name, int32_t* value) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
 	*value = s_currentRenderer->get_parameters().get_param_int(name);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean renderer_set_parameter_float(const char* name, float value) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
 	s_currentRenderer->get_parameters().set_param(name, value);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean renderer_get_parameter_float(const char* name, float* value) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
 	*value = s_currentRenderer->get_parameters().get_param_float(name);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean renderer_set_parameter_bool(const char* name, Boolean value) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
 	s_currentRenderer->get_parameters().set_param(name, bool(value));
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean renderer_get_parameter_bool(const char* name, Boolean* value) {
+	TRY
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
 	*value = s_currentRenderer->get_parameters().get_param_bool(name);
 	return true;
+	CATCH_ALL(false)
 }
 
 void profiling_enable() {
+	TRY
 	Profiler::instance().set_enabled(true);
+	CATCH_ALL(;)
 }
 
 void profiling_disable() {
+	TRY
 	Profiler::instance().set_enabled(false);
+	CATCH_ALL(;)
 }
 
 Boolean profiling_set_level(ProfilingLevel level) {
+	TRY
 	switch(level) {
 		case ProfilingLevel::PROFILING_LOW:
 			Profiler::instance().set_profile_level(ProfileLevel::LOW);
@@ -2050,27 +2317,35 @@ Boolean profiling_set_level(ProfilingLevel level) {
 			logError("[", FUNCTION_NAME, "] invalid profiling level");
 	}
 	return false;
+	CATCH_ALL(false)
 }
 
 Boolean profiling_save_current_state(const char* path) {
+	TRY
 	CHECK_NULLPTR(path, "file path", false);
 	Profiler::instance().save_current_state(path);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean profiling_save_snapshots(const char* path) {
+	TRY
 	CHECK_NULLPTR(path, "file path", false);
 	Profiler::instance().save_snapshots(path);
 	return true;
+	CATCH_ALL(false)
 }
 
 Boolean profiling_save_total_and_snapshots(const char* path) {
+	TRY
 	CHECK_NULLPTR(path, "file path", false);
 	Profiler::instance().save_total_and_snapshots(path);
 	return true;
+	CATCH_ALL(false)
 }
 
 const char* profiling_get_current_state() {
+	TRY
 	std::string str = Profiler::instance().save_current_state();
 #ifdef _WIN32
 	// For C# interop
@@ -2085,9 +2360,11 @@ const char* profiling_get_current_state() {
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
+	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_snapshots() {
+	TRY
 	std::string str = Profiler::instance().save_snapshots();
 #ifdef _WIN32
 	// For C# interop
@@ -2102,9 +2379,11 @@ const char* profiling_get_snapshots() {
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
+	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_total_and_snapshots() {
+	TRY
 	std::string str = Profiler::instance().save_total_and_snapshots();
 #ifdef _WIN32
 	// For C# interop
@@ -2119,37 +2398,53 @@ const char* profiling_get_total_and_snapshots() {
 	std::memcpy(buffer, str.c_str(), str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
+	CATCH_ALL(nullptr)
 }
 
 void profiling_reset() {
+	TRY
 	Profiler::instance().reset_all();
+	CATCH_ALL(;)
 }
 
 size_t profiling_get_total_cpu_memory() {
+	TRY
 	return CpuProfileState::get_total_memory();
+	CATCH_ALL(0u)
 }
 
 size_t profiling_get_free_cpu_memory() {
+	TRY
 	return CpuProfileState::get_free_memory();
+	CATCH_ALL(0u)
 }
 
 size_t profiling_get_used_cpu_memory() {
+	TRY
 	return CpuProfileState::get_used_memory();
+	CATCH_ALL(0u)
 }
 
 size_t profiling_get_total_gpu_memory() {
+	TRY
 	return GpuProfileState::get_total_memory();
+	CATCH_ALL(0u)
 }
 
 size_t profiling_get_free_gpu_memory() {
+	TRY
 	return GpuProfileState::get_free_memory();
+	CATCH_ALL(0u)
 }
 
 size_t profiling_get_used_gpu_memory() {
+	TRY
 	return GpuProfileState::get_used_memory();
+	CATCH_ALL(0u)
 }
 
 Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
+	TRY
 	// Only once per process do we register/unregister the message handler
 	static bool initialized = false;
 	s_logCallback = logCallback;
@@ -2246,18 +2541,25 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 		initialized = true;
 	}
 	return initialized;
+	CATCH_ALL(false)
 }
 
 int32_t mufflon_get_cuda_device_index() {
+	TRY
 	return s_cudaDevIndex;
+	CATCH_ALL(-1)
 }
 
 Boolean mufflon_is_cuda_initialized() {
+	TRY
 	return s_cudaDevIndex >= 0;
+	CATCH_ALL(false)
 }
 
 void mufflon_destroy() {
+	TRY
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_currentRenderer.reset();
+	CATCH_ALL(;)
 }

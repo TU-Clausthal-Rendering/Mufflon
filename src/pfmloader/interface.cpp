@@ -57,21 +57,31 @@ constexpr T swap_bytes(T val) {
 
 // Function delegating the logger output to the applications handle, if applicable
 void delegateLog(LogSeverity severity, const std::string& message) {
-	if(s_logCallback != nullptr)
-		s_logCallback(message.c_str(), static_cast<int>(severity));
+	try {
+		if(s_logCallback != nullptr)
+			s_logCallback(message.c_str(), static_cast<int>(severity));
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
+		return;
+	}
 }
 
 } // namespace
 
 Boolean set_logger(void(*logCallback)(const char*, int)) {
-	static bool initialized = false;
-	s_logCallback = logCallback;
-	if(!initialized) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
-		initialized = true;
+	try {
+		static bool initialized = false;
+		s_logCallback = logCallback;
+		if(!initialized) {
+			registerMessageHandler(delegateLog);
+			disableStdHandler();
+			initialized = true;
+		}
+		return true;
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
+		return false;
 	}
-	return true;
 }
 
 Boolean can_load_texture_format(const char* ext) {
@@ -79,19 +89,18 @@ Boolean can_load_texture_format(const char* ext) {
 }
 
 Boolean load_texture(const char* path, TextureData* texData) {
-	CHECK_NULLPTR(path, "texture path", false);
-	CHECK_NULLPTR(path, "texture return data", false);
-
-	// Code taken from ImageViewer
-	std::ifstream stream(path, std::ios::binary);
-	if(!stream.is_open()) {
-		logError("[", FUNCTION_NAME, "] Could not open texture file '",
-				 path, "'");
-		return false;
-	}
 	try {
-		stream.exceptions(std::ios::failbit);
+		CHECK_NULLPTR(path, "texture path", false);
+		CHECK_NULLPTR(path, "texture return data", false);
 
+		// Code taken from ImageViewer
+		std::ifstream stream(path, std::ios::binary);
+		if(!stream.is_open()) {
+			logError("[", FUNCTION_NAME, "] Could not open texture file '",
+					 path, "'");
+			return false;
+		}
+		stream.exceptions(std::ios::failbit);
 
 		char bands[2u];
 		stream.read(bands, 2u);
@@ -101,7 +110,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		   && std::strncmp(bands, "PF", 2u) != 0)
 			throw std::runtime_error("Unknown bands description '"
 									 + std::string(bands, 2u) + "'");
-		
+
 		const int width = read<int>(stream);
 		const int height = read<int>(stream);
 		const float scalef = read<float>(stream);
@@ -116,7 +125,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 			c = stream.get();	// ... except if there's a carriage return
 		if(c != '\n')
 			throw std::runtime_error("Expected newline in header");
-		
+
 		const bool grayscale = std::strncmp(bands, "Pf", 2u) == 0;
 		if(grayscale)
 			texData->format = TextureFormat::FORMAT_R32F;
@@ -158,10 +167,12 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		}
 
 		texData->data = reinterpret_cast<uint8_t*>(data);
+		return true;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] Texture load for '",
 				 path, "' caught exception: ", e.what());
+		if(texData->data)
+			delete[] texData->data;
 		return false;
 	}
-	return true;
 }

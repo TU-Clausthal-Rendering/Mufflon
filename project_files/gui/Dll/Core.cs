@@ -91,7 +91,7 @@ namespace gui.Dll
         internal static extern bool resize(int width, int height, int offsetX, int offsetY);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr get_error(out int length);
+        internal static extern string core_get_dll_error();
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void execute_command(string command);
@@ -278,15 +278,5 @@ namespace gui.Dll
         internal static extern bool mufflon_is_cuda_initialized();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void mufflon_destroy();
-
-        /// <summary>
-        /// wrapper for get_error()
-        /// </summary>
-        /// <returns>error string returned by get_error()</returns>
-        internal static string GetDllError()
-        {
-            var ptr = get_error(out var length);
-            return ptr.Equals(IntPtr.Zero) ? "" : Marshal.PtrToStringAnsi(ptr, length);
-        }
     }
 }

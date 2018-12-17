@@ -98,7 +98,7 @@ namespace gui.ViewModel
                     {
                         IntPtr currentScenario = Core.world_get_current_scenario();
                         if (currentScenario == IntPtr.Zero)
-                            throw new Exception(Core.GetDllError());
+                            throw new Exception(Core.core_get_dll_error());
                         string currentScenarioName = Core.world_get_scenario_name(currentScenario);
                         m_scenarioBox.SelectedItem = null;
 
@@ -124,9 +124,9 @@ namespace gui.ViewModel
             {
                 IntPtr scenario = Core.world_find_scenario(args.AddedItems[0] as string);
                 if (scenario == IntPtr.Zero)
-                    throw new Exception(Core.GetDllError());
+                    throw new Exception(Core.core_get_dll_error());
                 if(Core.world_load_scenario(scenario) == IntPtr.Zero)
-                    throw new Exception(Core.GetDllError());
+                    throw new Exception(Core.core_get_dll_error());
             }
         }
 

@@ -8,6 +8,7 @@ extern "C" {
 
 typedef uint32_t Boolean;
 
+LOADER_API const char* CDECL loader_get_dll_error();
 LOADER_API Boolean CDECL loader_set_logger(void(*logCallback)(const char*, int));
 LOADER_API Boolean CDECL loader_load_json(const char* path);
 LOADER_API void CDECL loader_profiling_enable();

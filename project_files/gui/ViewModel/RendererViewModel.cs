@@ -112,13 +112,13 @@ namespace gui.ViewModel
             {
                 case nameof(Models.Scene.FullPath):
                     if (!Core.render_disable_all_render_targets())
-                        throw new Exception(Core.GetDllError());
+                        throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
-                        throw new Exception(Core.GetDllError());
+                        throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_enable_renderer(m_models.Renderer.Type))
-                        throw new Exception(Core.GetDllError());
+                        throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
-                        throw new Exception(Core.GetDllError());
+                        throw new Exception(Core.core_get_dll_error());
                     if (m_models.Scene.IsLoaded && AutoStartOnLoad)
                         m_models.Renderer.IsRendering = true;
                     break;
@@ -164,13 +164,13 @@ namespace gui.ViewModel
         {
             // Perform the actual renderer changes in the DLL
             if (!Core.render_disable_all_render_targets())
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
             if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
             if (!Core.render_enable_renderer(m_models.Renderer.Type))
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
             if (!Core.render_reset())
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
 
             // Change the properties
             RendererProperties.Clear();

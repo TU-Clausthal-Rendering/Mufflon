@@ -46,21 +46,31 @@ TextureFormat get_float_format(int components) {
 
 // Function delegating the logger output to the applications handle, if applicable
 void delegateLog(LogSeverity severity, const std::string& message) {
-	if(s_logCallback != nullptr)
-		s_logCallback(message.c_str(), static_cast<int>(severity));
+	try {
+		if(s_logCallback != nullptr)
+			s_logCallback(message.c_str(), static_cast<int>(severity));
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
+		return;
+	}
 }
 
 } // namespace
 
 Boolean set_logger(void(*logCallback)(const char*, int)) {
-	static bool initialized = false;
-	s_logCallback = logCallback;
-	if(!initialized) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
-		initialized = true;
+	try {
+		static bool initialized = false;
+		s_logCallback = logCallback;
+		if(!initialized) {
+			registerMessageHandler(delegateLog);
+			disableStdHandler();
+			initialized = true;
+		}
+		return true;
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
+		return false;
 	}
-	return true;
 }
 
 Boolean can_load_texture_format(const char* ext) {
@@ -70,59 +80,67 @@ Boolean can_load_texture_format(const char* ext) {
 }
 
 Boolean load_texture(const char* path, TextureData* texData) {
-	CHECK_NULLPTR(path, "texture path", false);
-	CHECK_NULLPTR(path, "texture return data", false);
+	try {
+		CHECK_NULLPTR(path, "texture path", false);
+		CHECK_NULLPTR(path, "texture return data", false);
 
-	// Code taken from ImageViewer
-	stbi_set_flip_vertically_on_load(true);
-	int width = 0;
-	int height = 0;
-	int components = 0;
-	std::size_t perElemBytes = 0u;
-	char* data = nullptr;
-	// Load either LDR or HDR
-	if(stbi_is_hdr(path)) {
-		data = reinterpret_cast<char*>(stbi_loadf(path, &width, &height, &components, 0));
-		perElemBytes = sizeof(float);
-		texData->sRgb = 0u;
-	} else {
-		data = reinterpret_cast<char*>(stbi_load(path, &width, &height, &components, 0));
-		perElemBytes = sizeof(char);
-		texData->sRgb = 1u;
-	}
+		// Code taken from ImageViewer
+		stbi_set_flip_vertically_on_load(true);
+		int width = 0;
+		int height = 0;
+		int components = 0;
+		std::size_t perElemBytes = 0u;
+		char* data = nullptr;
+		// Load either LDR or HDR
+		if(stbi_is_hdr(path)) {
+			data = reinterpret_cast<char*>(stbi_loadf(path, &width, &height, &components, 0));
+			perElemBytes = sizeof(float);
+			texData->sRgb = 0u;
+		} else {
+			data = reinterpret_cast<char*>(stbi_load(path, &width, &height, &components, 0));
+			perElemBytes = sizeof(char);
+			texData->sRgb = 1u;
+		}
 
-	if(data == nullptr || width <= 0 || height <= 0 || components <= 0) {
-		// Fail silently since STB doesn't let us query supported extensions
+		if(data == nullptr || width <= 0 || height <= 0 || components <= 0) {
+			// Fail silently since STB doesn't let us query supported extensions
+			return false;
+		}
+
+		// Make sure that we have either 1, 2, or 4 channels
+		if(components == 3) {
+			components = 4;
+			// Copy over the image data one by one
+			std::size_t bytes = perElemBytes * width * height * components;
+			texData->data = new uint8_t[bytes];
+			for(std::size_t t = 0u; t < width * height; ++t) {
+				std::memcpy(&texData->data[components * perElemBytes * t],
+							&data[3u * perElemBytes * t],
+							3u * perElemBytes);
+				// Ignore alpha channel
+				std::memset(&texData->data[components * perElemBytes * t + 3u * perElemBytes],
+							0, perElemBytes);
+			}
+		} else {
+			// May use memcpy
+			std::size_t bytes = perElemBytes * width * height * components;
+			texData->data = new uint8_t[bytes];
+			std::memcpy(texData->data, data, bytes);
+		}
+
+		texData->format = perElemBytes == sizeof(float) ? get_float_format(components) : get_int_format(components);
+		stbi_image_free(data);
+
+		texData->width = static_cast<uint32_t>(width);
+		texData->height = static_cast<uint32_t>(height);
+		texData->components = static_cast<uint32_t>(components);
+		texData->layers = 1u;
+		return true;
+	}  catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Texture load for '",
+				 path, "' caught exception: ", e.what());
+		if(texData->data)
+			delete[] texData->data;
 		return false;
 	}
-
-	// Make sure that we have either 1, 2, or 4 channels
-	if(components == 3) {
-		components = 4;
-		// Copy over the image data one by one
-		std::size_t bytes = perElemBytes * width * height * components;
-		texData->data = new uint8_t[bytes];
-		for(std::size_t t = 0u; t < width * height; ++t) {
-			std::memcpy(&texData->data[components * perElemBytes * t],
-						&data[3u * perElemBytes * t],
-						3u * perElemBytes);
-			// Ignore alpha channel
-			std::memset(&texData->data[components * perElemBytes * t + 3u * perElemBytes],
-						0, perElemBytes);
-		}
-	} else {
-		// May use memcpy
-		std::size_t bytes = perElemBytes * width * height * components;
-		texData->data = new uint8_t[bytes];
-		std::memcpy(texData->data, data, bytes);
-	}
-
-	texData->format = perElemBytes == sizeof(float) ? get_float_format(components) : get_int_format(components);
-	stbi_image_free(data);
-
-	texData->width = static_cast<uint32_t>(width);
-	texData->height = static_cast<uint32_t>(height);
-	texData->components = static_cast<uint32_t>(components);
-	texData->layers = 1u;
-	return true;
 }

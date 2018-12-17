@@ -428,7 +428,6 @@ CORE_API Boolean CDECL render_enable_renderer(RendererType type);
 CORE_API Boolean CDECL render_iterate();
 CORE_API Boolean CDECL render_reset();
 // TODO: what do we pass to the GUI?
-CORE_API Boolean CDECL render_get_screenshot();
 CORE_API Boolean CDECL render_save_screenshot(const char* filename);
 CORE_API Boolean CDECL render_enable_render_target(RenderTarget target, Boolean variance);
 CORE_API Boolean CDECL render_disable_render_target(RenderTarget target, Boolean variance);
@@ -475,7 +474,7 @@ CORE_API void CDECL mufflon_destroy();
 CORE_API Boolean CDECL display_screenshot();
 CORE_API Boolean CDECL resize(int width, int height, int offsetX, int offsetY);
 CORE_API void CDECL execute_command(const char* command);
-CORE_API const char* CDECL get_error(int& length);
+CORE_API const char* CDECL core_get_dll_error();
 
 
 }

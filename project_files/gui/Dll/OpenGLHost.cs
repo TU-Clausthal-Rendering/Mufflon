@@ -79,9 +79,9 @@ namespace gui.Dll
                 Core.profiling_enable();
                 Loader.loader_profiling_enable();
                 if (!Core.profiling_set_level(Core.ProfilingLevel.ALL))
-                    throw new Exception(Core.GetDllError());
+                    throw new Exception(Core.core_get_dll_error());
                 if (!Loader.loader_profiling_set_level(Loader.ProfilingLevel.ALL))
-                    throw new Exception(Core.GetDllError());
+                    throw new Exception(Core.core_get_dll_error());
 
                 while (m_isRunning)
                 {
@@ -91,9 +91,9 @@ namespace gui.Dll
                     if (m_isRendering)
                     {
                         if (!Core.render_iterate())
-                            throw new Exception(Core.GetDllError());
+                            throw new Exception(Core.core_get_dll_error());
                         if (!Core.display_screenshot())
-                            throw new Exception(Core.GetDllError());
+                            throw new Exception(Core.core_get_dll_error());
                         if (!Gdi32.SwapBuffers(m_deviceContext))
                             throw new Win32Exception(Marshal.GetLastWin32Error());
                         m_rendererModel.performedIteration();
@@ -136,9 +136,9 @@ namespace gui.Dll
             // dll call: initialize glad etc.
             m_logCallbackPointer = new Core.LogCallback(Logger.log);
             if (!Core.mufflon_initialize(m_logCallbackPointer))
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
         }
 
         /// <summary>
@@ -160,7 +160,7 @@ namespace gui.Dll
                 m_renderOffsetX = newOffsetX;
                 m_renderOffsetY = newOffsetY;
                 if (!Core.resize(m_renderWidth, m_renderHeight, m_renderOffsetX, m_renderOffsetY))
-                    throw new Exception(Core.GetDllError());
+                    throw new Exception(Core.core_get_dll_error());
             }
         }
 

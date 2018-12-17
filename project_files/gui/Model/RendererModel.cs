@@ -53,7 +53,7 @@ namespace gui.Model
         {
             m_iteration = 0u;
             if (!Core.render_reset())
-                throw new Exception(Core.GetDllError());
+                throw new Exception(Core.core_get_dll_error());
         }
 
         #region PropertyChanged
