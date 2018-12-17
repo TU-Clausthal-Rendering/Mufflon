@@ -39,11 +39,6 @@ namespace gui.ViewModel
 
 
         private readonly Models m_models;
-        private readonly ObservableCollection<RendererItem> m_renderers = new ObservableCollection<RendererItem>()
-        {
-            new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
-            new RendererItem{ Id = 1, Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" },
-        };
         private RendererItem m_selectedRenderer;
         private DataGrid m_propertiesGrid;
         
@@ -76,7 +71,7 @@ namespace gui.ViewModel
             }
         }
 
-        public ObservableCollection<RendererItem> Renderers { get => m_renderers; }
+        public ObservableCollection<RendererItem> Renderers { get; }
         public ObservableCollection<object> RendererProperties { get; }
 
         public RendererViewModel(MainWindow window, Models models)
@@ -86,18 +81,28 @@ namespace gui.ViewModel
             RendererProperties = new ObservableCollection<object>();
             AutoStartOnLoad = Settings.Default.AutoStartOnLoad;
 
+            // Enable the renderers (TODO: automatically get them from somewhere?)
+            Renderers = new ObservableCollection<RendererItem>()
+            {
+                new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
+            };
+            if(Core.mufflon_is_cuda_initialized())
+            {
+                Renderers.Add(new RendererItem { Id = 1, Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" });
+            }
+
             // Register the handlers
             m_models.Scene.PropertyChanged += sceneChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;
 
             // Enable the last selected renderer
             int lastSelected = Settings.Default.LastSelectedRenderer;
-            if (lastSelected >= m_renderers.Count)
+            if (lastSelected >= Renderers.Count)
             {
                 lastSelected = 0;
                 Settings.Default.LastSelectedRenderer = 0;
             }
-            m_selectedRenderer = m_renderers[Settings.Default.LastSelectedRenderer];
+            m_selectedRenderer = Renderers[Settings.Default.LastSelectedRenderer];
             m_models.Renderer.Type = (Core.RendererType)m_selectedRenderer.Type;
         }
 

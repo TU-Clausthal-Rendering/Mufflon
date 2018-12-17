@@ -81,6 +81,8 @@ std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
 WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
+// Holds the CUDA device index
+int s_cudaDevIndex = -1;
 // Holds the last error for the GUI to display
 std::string s_lastError;
 
@@ -2231,11 +2233,12 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 			if(devIndex < 0) {
 				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none supports unified addressing; "
 						 "continuing without CUDA");
+			} else {
+				cuda::check_error(cudaSetDevice(devIndex));
+				s_cudaDevIndex = devIndex;
+				logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
+						"devices; initializing device ", devIndex, " (", deviceProp.name, ")");
 			}
-
-			cuda::check_error(cudaSetDevice(devIndex));
-			logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
-				"devices; initializing device ", devIndex, " (", deviceProp.name, ")");
 		} else {
 			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
 		}
@@ -2245,7 +2248,15 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 	return initialized;
 }
 
-CORE_API void mufflon_destroy() {
+int32_t mufflon_get_cuda_device_index() {
+	return s_cudaDevIndex;
+}
+
+Boolean mufflon_is_cuda_initialized() {
+	return s_cudaDevIndex >= 0;
+}
+
+void mufflon_destroy() {
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_currentRenderer.reset();
