@@ -57,8 +57,6 @@ public:
 		return nullptr;
 	}
 
-	TextureHandle get_emissive_texture() const final { return nullptr; }
-
 	Medium compute_medium() const final {
 		// Use some average dielectric refraction index and a maximum absorption
 		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};

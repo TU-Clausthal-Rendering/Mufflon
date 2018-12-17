@@ -15,10 +15,7 @@ struct EmissiveParameterPack {
 template<Device dev>
 struct EmissiveDesc {
 	textures::ConstTextureDevHandle_t<dev> emission;
-	float scale;
-
-	EmissiveDesc(textures::ConstTextureDevHandle_t<dev> emission,
-		float scale) : emission(emission), scale(scale) {}
+	Spectrum scale;
 
 	CUDA_FUNCTION void fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
 		*as<EmissiveParameterPack>(outBuffer) = EmissiveParameterPack{
@@ -27,15 +24,12 @@ struct EmissiveDesc {
 	}
 };
 
-// TODO: scale factor
-// TODO: apply scale in light-tree creation!
-
 // Lambertian self-emitting surface (uniform radiance in all view directions).
 // This class is a special case - it has an BSDF value of 0 and is not sampleable
 // instead it is the only class providing a non-zero output on get_emission().
 class Emissive : public IMaterial {
 public:
-	Emissive(TextureHandle emissiveTex, float scale) :
+	Emissive(TextureHandle emissiveTex, Spectrum scale) :
 		IMaterial{Materials::LAMBERT},
 		m_emission{emissiveTex},
 		m_scale(scale)
@@ -58,14 +52,14 @@ public:
 		// First write the general descriptor and then append the lambert specific one
 		outBuffer = IMaterial::get_descriptor(device, outBuffer);
 		device_switch(device,
-			*as<EmissiveDesc<dev>>(outBuffer) =
-				EmissiveDesc<dev>( m_emission->acquire_const<dev>(), m_scale );
+			(*as<EmissiveDesc<dev>>(outBuffer) =
+				 EmissiveDesc<dev>{ m_emission->acquire_const<dev>(), m_scale });
 			return outBuffer + sizeof(EmissiveDesc<dev>);
 		);
 		return nullptr;
 	}
 
-	TextureHandle get_emissive_texture() const final { return m_emission; }
+	Emission get_emission() const final { return {m_emission, m_scale}; }
 
 	Medium compute_medium() const final {
 		// Use some average dielectric refraction index and a maximum absorption
@@ -73,7 +67,7 @@ public:
 	}
 private:
 	TextureHandle m_emission;
-	float m_scale;
+	Spectrum m_scale;
 };
 
 // The albedo routine

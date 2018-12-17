@@ -1255,7 +1255,7 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 		case MATERIAL_EMISSIVE: {
 			auto tex = mat->inner.emissive.radiance;
 			auto newMaterial = std::make_unique<materials::Emissive>(static_cast<TextureHandle>(tex),
-								mat->inner.emissive.scale);
+								util::pun<Spectrum>(mat->inner.emissive.scale));
 		}	break;
 		case MATERIAL_ORENNAYAR:
 			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");

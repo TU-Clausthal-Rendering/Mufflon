@@ -119,9 +119,10 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightTriangle<CU
 	const ei::Vec2 bary = math::sample_barycentric(rnd.u0, rnd.u1);
 	const ei::Vec3 position = light.points[0u] + tangentX * bary.x + tangentY * bary.y;
 	const ei::Vec2 uv = light.uv[0u] + (light.uv[1u] - light.uv[0u]) * bary.x + (light.uv[2u] - light.uv[0u]) * bary.y;
+	const Spectrum scale = ei::unpackRGB9E5(light.scale);
 	return Photon{
 		{ position, AreaPdf{area2Inv * 2.0f} },
-		Spectrum{ sample(light.radianceTex, uv) }, // TODO: radiance to intensity?
+		Spectrum{ sample(light.radianceTex, uv) } * scale, // TODO: radiance to intensity?
 		LightType::AREA_LIGHT_TRIANGLE,
 		{normal, 0.5f / float(area2Inv)}
 	};
@@ -168,8 +169,10 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightQuad<CURREN
 		+ (light.uv[side?2u:1u] - light.uv[0u]) * bary.x
 		+ (light.uv[side?3u:2u] - light.uv[0u]) * bary.y;
 
+	const Spectrum scale = ei::unpackRGB9E5(light.scale);
+
 	return Photon{ { position, AreaPdf{ 1.0f / (area1 + area2) } },
-		Spectrum{sample(light.radianceTex, uv)}, // TODO: radiance to intensity?
+		Spectrum{sample(light.radianceTex, uv)} * scale, // TODO: radiance to intensity?
 		LightType::AREA_LIGHT_QUAD,
 		{side ? normal2 / (area2 * 2.0f) : normal1 / (area1 * 2.0f), area1 + area2} };
 }
@@ -179,10 +182,12 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightSphere<CURR
 													  const math::RndSet2& rnd) {
 	// We don't need to convert the "normal" due to sphere symmetry
 	const math::DirectionSample normal = math::sample_dir_sphere_uniform(rnd.u0, rnd.u1);
+	const Spectrum scale = ei::unpackRGB9E5(light.scale);
 	return Photon{
 		math::PositionSample{ light.position + normal.direction * light.radius,
 							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		Spectrum{sample(light.radianceTex, normal.direction)}, LightType::AREA_LIGHT_SPHERE,
+		Spectrum{sample(light.radianceTex, normal.direction)} * scale,
+		LightType::AREA_LIGHT_SPHERE,
 		{normal.direction, 4*ei::PI*ei::sq(light.radius)}
 	};
 }

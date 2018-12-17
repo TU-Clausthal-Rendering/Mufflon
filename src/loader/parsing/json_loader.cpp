@@ -184,7 +184,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		} else if(type.compare("emissive") == 0) {
 			// Emissive material
 			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
-			mat->inner.emissive.scale = read_opt<float>(m_state, material, "scale", 1.f);
+			mat->inner.emissive.scale = util::pun<Vec3>(read_opt<ei::Vec3>(m_state, material, "scale", ei::Vec3{1.0f, 1.0f, 1.0f}));
 			auto radianceIter = get(m_state, material, "radiance");
 			if(radianceIter->value.IsArray()) {
 				ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);

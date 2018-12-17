@@ -34,15 +34,15 @@ public:
 	 * The const version will break instead (assertion).
 	 */
 	template < Device dev >
-	char* acquire() {
-		synchronize<dev>();
+	char* acquire(bool sync = true) {
+		if(sync) synchronize<dev>();
 		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
 		return pMem;
 	}
 	template < Device dev >
-	const char* acquire_const() {
-		synchronize<dev>();
+	const char* acquire_const(bool sync = true) {
+		if(sync) synchronize<dev>();
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
 		return pMem;
 	}

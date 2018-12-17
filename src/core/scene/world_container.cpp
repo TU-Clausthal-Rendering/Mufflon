@@ -238,9 +238,11 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate, false>(polygons.get_uvs_hdl());
 				for(const auto& face : polygons.faces()) {
 					if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
+						auto emission = m_materials[materials[primIdx]]->get_emission();
 						if(std::distance(face.begin(), face.end()) == 3) {
 							lights::AreaLightTriangleDesc al;
-							al.radianceTex = m_materials[materials[primIdx]]->get_emissive_texture();
+							al.radianceTex = emission.texture;
+							al.scale = ei::packRGB9E5(emission.scale);
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = positions[vHdl.idx()];
@@ -250,7 +252,8 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 							posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
 						} else {
 							lights::AreaLightQuadDesc al;
-							al.radianceTex = m_materials[materials[primIdx]]->get_emissive_texture();
+							al.radianceTex = emission.texture;
+							al.scale = ei::packRGB9E5(emission.scale);
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = positions[vHdl.idx()];
@@ -269,10 +272,11 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					if(m_materials[materials[i]]->get_properties().is_emissive()) {
+						auto emission = m_materials[materials[primIdx]]->get_emission();
 						lights::AreaLightSphereDesc al{
 							spheresData[i].center,
 							spheresData[i].radius,
-							m_materials[materials[i]]->get_emissive_texture()
+							emission.texture, ei::packRGB9E5(emission.scale)
 						};
 						posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
 					}

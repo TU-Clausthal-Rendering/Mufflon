@@ -225,39 +225,7 @@ void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, 
 	}
 }
 
-void remap_textures_impl(const char*& cpuMem, char*& cudaMem, LightType type,
-						 std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle>& textureMap) {
-	switch(type) {
-		case LightType::AREA_LIGHT_TRIANGLE:
-		{
-			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem);
-			auto tex = textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			const std::ptrdiff_t offset = u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
-			cpuMem += sizeof(light);
-			cudaMem += sizeof(light);
-		} break;
-		case LightType::AREA_LIGHT_QUAD:
-		{
-			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem);
-			auto tex = textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			const std::ptrdiff_t offset = u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
-			cpuMem += sizeof(light);
-			cudaMem += sizeof(light);
-		} break;
-		case LightType::AREA_LIGHT_SPHERE:
-		{
-			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem);
-			auto tex = textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			const std::ptrdiff_t offset = u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
-			cpuMem += sizeof(light);
-			cudaMem += sizeof(light);
-		} break;
-		default:; // Other light type - nothing to do
-	}
-}
+
 
 } // namespace
 
@@ -384,17 +352,30 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	// Positional lights are more difficult since we don't know the concrete size
 	{
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
-		for(const auto& light : posLights) {
-			std::visit([&mem,this](const auto& posLight) {
-				using T = std::decay<decltype(posLight)>;
-				mem += sizeof(posLight);
-				if constexpr(std::is_same_v<T,AreaLightTriangleDesc>) {
+		for(const PositionalLights& light : posLights) {
+			std::visit(overloaded{
+				[&mem,this](const AreaLightTriangleDesc& desc) {
 					auto* dst = as<AreaLightTriangle<Device::CPU>>(mem);
-					*dst = posLight;
-					dst->radianceTex = *posLight.radianceTex->acquire_const<Device::CPU>();
+					mem += sizeof(desc);
+					*dst = desc;
 					// Remember texture for synchronization
-					m_textureMap.emplace(dst->radianceTex, posLight.radianceTex);
-				}
+					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
+				},
+				[&mem,this](const AreaLightQuadDesc& desc) {
+					auto* dst = as<AreaLightQuad<Device::CPU>>(mem);
+					mem += sizeof(desc);
+					*dst = desc;
+					// Remember texture for synchronization
+					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
+				},
+				[&mem,this](const AreaLightSphereDesc& desc) {
+					auto* dst = as<AreaLightSphere<Device::CPU>>(mem);
+					mem += sizeof(desc);
+					*dst = desc;
+					// Remember texture for synchronization
+					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
+				},
+				[&mem](const auto& desc) { mem += sizeof(desc); }
 			}, light.light);
 		}
 	}
@@ -406,35 +387,47 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	m_dirty.mark_changed(Device::CPU);
 }
 
-void LightTreeBuilder::remap_textures() {
-	mAssert(m_treeCpu->posLights.lightCount < std::numeric_limits<u32>::max());
-	if(m_treeCpu->posLights.lightCount == 0u)
-		return;
-
-	const char* cpuMem = m_treeCpu->posLights.memory;
-	char* cudaMem = m_treeCuda->posLights.memory;
-
-	if(m_treeCpu->posLights.lightCount == 1u) {
-		// Special case: no internal nodes at all
-		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(m_treeCpu->posLights.root.type), m_textureMap);
-		return;
-	}
-
-	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(m_treeCpu->posLights.lightCount));
-	// Walk backwards in the nodes to iterate over lights, but leave out the odd one (if it exists)
-	const u32 exclusiveLightNodes = static_cast<u32>(m_treeCpu->posLights.lightCount / 2u);
-	for(u32 i = 1u; i <= exclusiveLightNodes; ++i) {
-		const LightSubTree::Node& internal = *m_treeCpu->posLights.get_node((NODE_COUNT - i) * sizeof(LightSubTree::Node));
-		mAssert(internal.left.type < static_cast<u16>(LightType::NUM_LIGHTS));
-		mAssert(internal.right.type < static_cast<u16>(LightType::NUM_LIGHTS));
-		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(internal.left.type), m_textureMap);
-		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(internal.right.type), m_textureMap);
-	}
-	if(exclusiveLightNodes * 2u < m_treeCpu->posLights.lightCount) {
-		// One extra light
-		const LightSubTree::Node& internal = *m_treeCpu->posLights.get_node((NODE_COUNT - exclusiveLightNodes - 1u) * sizeof(LightSubTree::Node));
-		mAssert(internal.right.type < static_cast<u16>(LightType::NUM_LIGHTS));
-		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(internal.left.type), m_textureMap);
+void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {
+	switch(type) {
+		case LightSubTree::Node::INTERNAL_NODE_TYPE: {
+			cudaMemcpy(cudaMem + offset, cpuMem + offset, sizeof(LightSubTree::Node), cudaMemcpyDefault);
+			// Recursive implementation necessary, because the type is stored at the parents and not known to the node itself
+			const auto* node = as<LightSubTree::Node>(cpuMem + offset);
+			remap_textures(cpuMem, node->left.offset, node->left.type, cudaMem);
+			remap_textures(cpuMem, node->right.offset, node->right.type, cudaMem);
+		} break;
+		case u16(LightType::AREA_LIGHT_TRIANGLE): {
+			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
+			AreaLightTriangle<Device::CUDA> cudaLight;
+			for(int i = 0; i < 3; ++i) {
+				cudaLight.points[i] = light->points[i];
+				cudaLight.uv[i] = light->uv[i];
+			}
+			cudaLight.scale = light->scale;
+			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
+			cudaMemcpy(cudaMem + offset, &cudaLight, sizeof(cudaLight), cudaMemcpyDefault);
+		} break;
+		case u16(LightType::AREA_LIGHT_QUAD): {
+			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
+			AreaLightQuad<Device::CUDA> cudaLight;
+			for(int i = 0; i < 4; ++i) {
+				cudaLight.points[i] = light->points[i];
+				cudaLight.uv[i] = light->uv[i];
+			}
+			cudaLight.scale = light->scale;
+			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
+			cudaMemcpy(cudaMem + offset, &cudaLight, sizeof(cudaLight), cudaMemcpyDefault);
+		} break;
+		case u16(LightType::AREA_LIGHT_SPHERE): {
+			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem + offset);
+			AreaLightSphere<Device::CUDA> cudaLight;
+			cudaLight.position = light->position;
+			cudaLight.radius = light->radius;
+			cudaLight.scale = light->scale;
+			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
+			cudaMemcpy(cudaMem + offset, &cudaLight, sizeof(cudaLight), cudaMemcpyDefault);
+		} break;
+		default:; // Other light type - nothing to do
 	}
 }
 
@@ -450,7 +443,7 @@ void LightTreeBuilder::synchronize() {
 
 		// Equalize bookkeeping of subtrees
 		m_treeCuda->dirLights = m_treeCpu->dirLights;
-		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA>(); // Automatically sync
+		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA>(false);
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
@@ -461,9 +454,9 @@ void LightTreeBuilder::synchronize() {
 			envMapTex = envMapIter->second;
 		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(envMapTex, m_envmapSum.get());
 
-		// Replace all texture handles inside the tree's data
-		// It was synchronized by m_treeMemory.acquire<Device::CUDA>, but contains the wrong pointers.
-		remap_textures();
+		// Replace all texture handles inside the tree's data and
+		// synchronize all the remaining tree memory.
+		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
 
 		m_dirty.mark_synced(dev);
 	} else {

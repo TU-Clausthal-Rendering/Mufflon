@@ -74,6 +74,11 @@ struct ParameterPack {
 	}
 };
 
+struct Emission {
+	TextureHandle texture;
+	Spectrum scale;
+};
+
 // TODO remove this and provide a scene based (detect which material needs the most at runtime) max size instead
 constexpr std::size_t MAX_MATERIAL_PARAMETER_SIZE = 256;
 
@@ -133,7 +138,7 @@ public:
 	virtual char* get_descriptor(Device device, char* outBuffer) const;
 
 	// Get only the texture for emissive materials
-	virtual TextureHandle get_emissive_texture() const = 0;
+	virtual Emission get_emission() const { return {nullptr, Spectrum{0.0f}}; }
 
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {

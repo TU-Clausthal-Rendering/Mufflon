@@ -200,7 +200,7 @@ typedef struct {
 } WalterParams;
 typedef struct {
 	TextureHdl radiance;
-	float scale;
+	Vec3 scale;
 } EmissiveParams;
 typedef struct {
 	TextureHdl albedo;

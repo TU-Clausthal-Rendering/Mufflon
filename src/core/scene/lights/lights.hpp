@@ -62,39 +62,75 @@ struct alignas(16) SpotLight {
  *		The cost of the indirection will be a more expensive fetch.
  * TODO: also test uv-compression (shared exponent or fixed point?)
  */
+struct alignas(16) AreaLightTriangleDesc {
+	alignas(16) ei::Vec3 points[3u];		// 36 bytes
+	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
+	alignas(8) UvCoordinate uv[3u];			// 24 bytes
+	alignas(8) TextureHandle radianceTex;	// 8 bytes
+};
+struct alignas(16) AreaLightQuadDesc {
+	ei::Vec3 points[4u];					// 48 bytes
+	alignas(8) UvCoordinate uv[4u];			// 32 bytes
+	alignas(8) TextureHandle radianceTex;	// 8 byes
+	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
+};
+struct alignas(16) AreaLightSphereDesc {
+	ei::Vec3 position;						// 12 bytes
+	float radius;							// 4 bytes
+	alignas(8) TextureHandle radianceTex;	// 8 bytes
+	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
+};
+
 template < Device dev >
 struct alignas(16) AreaLightTriangle {
 	alignas(16) ei::Vec3 points[3u];
+	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
 	alignas(8) UvCoordinate uv[3u];
 	alignas(8) textures::ConstTextureDevHandle_t<dev> radianceTex;
+
+	AreaLightTriangle& operator=(const AreaLightTriangleDesc& rhs) {
+		for(int i = 0; i < 3; ++i) {
+			points[i] = rhs.points[i];
+			uv[i] = rhs.uv[i];
+		}
+		scale = rhs.scale;
+		radianceTex = rhs.radianceTex->acquire_const<dev>();
+		return *this;
+	}
 };
 template < Device dev >
 struct alignas(16) AreaLightQuad {
 	ei::Vec3 points[4u];
 	alignas(8) UvCoordinate uv[4u];
 	alignas(8) textures::ConstTextureDevHandle_t<dev> radianceTex;
+	// The forced alignment makes sure the two types CPU/GPU have the same size.
+	// Problem: radianceTex is 16 byte on GPU but only 8 on CPU.
+	alignas(16) u32 scale;			// A spectrum scale for the radiance texture in RGB9E5
+
+	AreaLightQuad& operator=(const AreaLightQuadDesc& rhs) {
+		for(int i = 0; i < 4; ++i) {
+			points[i] = rhs.points[i];
+			uv[i] = rhs.uv[i];
+		}
+		scale = rhs.scale;
+		radianceTex = rhs.radianceTex->acquire_const<dev>();
+		return *this;
+	}
 };
 template < Device dev >
 struct alignas(16) AreaLightSphere {
 	ei::Vec3 position;
 	float radius;
 	alignas(8) textures::ConstTextureDevHandle_t<dev> radianceTex;
-};
+	alignas(16) u32 scale;			// A spectrum scale for the radiance texture in RGB9E5
 
-struct alignas(16) AreaLightTriangleDesc {
-	alignas(16) ei::Vec3 points[3u];
-	alignas(8) UvCoordinate uv[3u];
-	alignas(8) TextureHandle radianceTex;
-};
-struct alignas(16) AreaLightQuadDesc {
-	ei::Vec3 points[4u];
-	alignas(8) UvCoordinate uv[4u];
-	alignas(8) TextureHandle radianceTex;
-};
-struct alignas(16) AreaLightSphereDesc {
-	ei::Vec3 position;
-	float radius;
-	alignas(8) TextureHandle radianceTex;
+	AreaLightSphere& operator=(const AreaLightSphereDesc& rhs) {
+		position = rhs.position;
+		radius = rhs.radius;
+		scale = rhs.scale;
+		radianceTex = rhs.radianceTex->acquire_const<dev>();
+		return *this;
+	}
 };
 
 /**
@@ -124,13 +160,13 @@ static_assert(sizeof(AreaLightTriangle<Device::CPU>) == 80 && alignof(AreaLightT
 			  "Wrong struct packing");
 static_assert(sizeof(AreaLightTriangle<Device::CUDA>) == 80 && alignof(AreaLightTriangle<Device::CUDA>) == 16,
 			  "Wrong struct packing");
-static_assert(sizeof(AreaLightQuad<Device::CPU>) == 96 && alignof(AreaLightQuad<Device::CPU>) == 16,
+static_assert(sizeof(AreaLightQuad<Device::CPU>) == 112 && alignof(AreaLightQuad<Device::CPU>) == 16,
 			  "Wrong struct packing");
-static_assert(sizeof(AreaLightQuad<Device::CUDA>) == 96 && alignof(AreaLightQuad<Device::CUDA>) == 16,
+static_assert(sizeof(AreaLightQuad<Device::CUDA>) == 112 && alignof(AreaLightQuad<Device::CUDA>) == 16,
 			  "Wrong struct packing");
-static_assert(sizeof(AreaLightSphere<Device::CPU>) == 32 && alignof(AreaLightSphere<Device::CPU>) == 16,
+static_assert(sizeof(AreaLightSphere<Device::CPU>) == 48 && alignof(AreaLightSphere<Device::CPU>) == 16,
 			  "Wrong struct packing");
-static_assert(sizeof(AreaLightSphere<Device::CUDA>) == 32 && alignof(AreaLightSphere<Device::CUDA>) == 16,
+static_assert(sizeof(AreaLightSphere<Device::CUDA>) == 48 && alignof(AreaLightSphere<Device::CUDA>) == 16,
 			  "Wrong struct packing");
 static_assert(sizeof(DirectionalLight) == 32 && alignof(DirectionalLight) == 16,
 			  "Wrong struct packing");
