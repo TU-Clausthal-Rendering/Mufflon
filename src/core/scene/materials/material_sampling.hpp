@@ -7,6 +7,7 @@
 #include "util/log.hpp"
 #include "util/assert.hpp"
 #include "lambert.hpp"
+#include "emissive.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace materials {
@@ -28,6 +29,7 @@ CUDA_FUNCTION void fetch(const MaterialDescriptorBase& desc, const UvCoordinate&
 	char* subParam = as<char>(outBuffer) + sizeof(ParameterPack);
 	switch(desc.type) {
 		case Materials::LAMBERT: as<LambertDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam); break;
+		case Materials::EMISSIVE: as<EmissiveDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam); break;
 		default:
 			mAssertMsg(false, "Material not (fully) implemented!");
 	}
@@ -80,6 +82,7 @@ sample(const TangentSpace& tangentSpace,
 		case Materials::LAMBERT: {
 			res = lambert_sample(*as<LambertParameterPack>(subParams), incidentTS, rndSet);
 		} break;
+		case Materials::EMISSIVE: break;	// Not sampleable - simply let 'res' be the default value
 		default: ;
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::sample] Trying to evaluate unimplemented material type ", params.type);
@@ -168,6 +171,10 @@ evaluate(const TangentSpace& tangentSpace,
 		case Materials::LAMBERT: {
 			res = lambert_evaluate(*as<LambertParameterPack>(subParams), incidentTS, excidentTS);
 		} break;
+		case Materials::EMISSIVE: {
+			mAssertMsg(false, "Emissive evaluation should never be called (0-contribution). Eearly out based on material check assumed.");
+			break;
+		}
 		default: ;
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::evaluate] Trying to evaluate unimplemented material type ", params.type);
@@ -204,6 +211,7 @@ albedo(const ParameterPack& params) {
 	switch(params.type)
 	{
 		case Materials::LAMBERT: return lambert_albedo(*as<LambertParameterPack>(subParams));
+		case Materials::EMISSIVE: return emissive_albedo(*as<EmissiveParameterPack>(subParams));
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", params.type);
@@ -220,6 +228,10 @@ emission(const ParameterPack& params, const scene::Direction& excident) {
 	switch(params.type)
 	{
 		case Materials::LAMBERT: return Spectrum{0.0f};
+		case Materials::EMISSIVE: {
+			const char* subParams = as<char>(&params) + sizeof(ParameterPack);
+			return as<EmissiveParameterPack>(subParams)->radiance;
+		}
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::emission] Trying to evaluate unimplemented material type ", params.type);
@@ -236,6 +248,7 @@ CUDA_FUNCTION int get_size(const ParameterPack& params) {
 	switch(params.type)
 	{
 		case Materials::LAMBERT: return sizeof(LambertParameterPack);
+		case Materials::EMISSIVE: return sizeof(EmissiveParameterPack);
 			// Others might be recursive: write get_size for the specific materials
 		default:
 #ifndef __CUDA_ARCH__

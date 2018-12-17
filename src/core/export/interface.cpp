@@ -1053,17 +1053,12 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	CHECK_NULLPTR(name, "material name", nullptr);
 	CHECK_NULLPTR(mat, "material parameters", nullptr);
 
+	std::unique_ptr<materials::IMaterial> newMaterial;
 	MaterialHandle hdl = nullptr;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
 			auto tex = mat->inner.lambert.albedo;
-			auto newMaterial = std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex));
-			newMaterial->set_name(name);
-			newMaterial->set_outer_medium( s_world.add_medium(
-				{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
-				 util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-			newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
-			hdl = s_world.add_material(move(newMaterial));
+			newMaterial = std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex));
 		}	break;
 		case MATERIAL_TORRANCE:
 			// TODO
@@ -1072,9 +1067,11 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 		case MATERIAL_WALTER:
 			logWarning("[", FUNCTION_NAME, "] Material type 'walter' not supported yet");
 			return nullptr;
-		case MATERIAL_EMISSIVE:
-			logWarning("[", FUNCTION_NAME, "] Material type 'emissive' not supported yet");
-			return nullptr;
+		case MATERIAL_EMISSIVE: {
+			auto tex = mat->inner.emissive.radiance;
+			auto newMaterial = std::make_unique<materials::Emissive>(static_cast<TextureHandle>(tex),
+								mat->inner.emissive.scale);
+		}	break;
 		case MATERIAL_ORENNAYAR:
 			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
 			return nullptr;
@@ -1087,6 +1084,14 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 		default:
 			logWarning("[", FUNCTION_NAME, "] Unknown material type");
 	}
+
+	// Set common properties and add to scene
+	newMaterial->set_name(name);
+	newMaterial->set_outer_medium( s_world.add_medium(
+		{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
+			util::pun<Spectrum>(mat->outerMedium.absorption)}) );
+	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
+	hdl = s_world.add_material(move(newMaterial));
 
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating material '",
