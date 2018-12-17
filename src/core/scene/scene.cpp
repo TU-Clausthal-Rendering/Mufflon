@@ -1,12 +1,15 @@
 #include "scene.hpp"
 #include "descriptors.hpp"
 #include "core/cameras/camera.hpp"
+#include "core/cameras/pinhole.hpp"
+#include "core/cameras/focus.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/materials/point_medium.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 
-namespace mufflon::scene {
+namespace mufflon { namespace scene {
 
 void Scene::load_media(const std::vector<materials::Medium>& media) {
 	m_media.resize(sizeof(materials::Medium) * media.size());
@@ -106,29 +109,60 @@ SceneDescriptor<dev> Scene::get_descriptor(const std::vector<const char*>& verte
 	};
 
 	// Rebuild Instance BVH?
-
 	if(m_accelStruct.needs_rebuild<dev>()) {
 		m_accelStruct.build(sceneDesc);
 	}
 	sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
 
+	// For each light determine the medium
+	m_lightTree.update_media(sceneDesc);
+
+	// For the camera as well
+	this->update_camera_medium(sceneDesc);
+
 	return sceneDesc;
+}
+
+template < Device dev >
+void Scene::update_camera_medium(SceneDescriptor<dev>& descriptor) {
+	if constexpr(dev == Device::CPU)
+		update_camera_medium_cpu(descriptor);
+	else if constexpr(dev == Device::CUDA)
+		scene_detail::update_camera_medium_cuda(descriptor);
+	else
+		mAssert(false);
+}
+
+void Scene::update_camera_medium_cpu(SceneDescriptor<Device::CPU>& scene) {
+	cameras::CameraParams& params = scene.camera.get();
+	switch(params.type) {
+		case cameras::CameraModel::PINHOLE:
+			params.mediumIndex = materials::get_point_medium(scene, reinterpret_cast<cameras::PinholeParams&>(params).position);
+			break;
+		case cameras::CameraModel::FOCUS:
+			params.mediumIndex = materials::get_point_medium(scene, reinterpret_cast<cameras::FocusParams&>(params).position);
+			break;
+		default: mAssert(false);
+	}
 }
 
 template void Scene::load_materials<Device::CPU>();
 template void Scene::load_materials<Device::CUDA>();
 //template void Scene::load_materials<Device::OPENGL>();
+template void Scene::update_camera_medium<Device::CPU>(SceneDescriptor<Device::CPU>& descriptor);
+template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::CUDA>& descriptor);
+//template void update_camera_medium< Device::OPENGL>(const SceneDescriptor<Device::OPENGL>& descriptor);
 template SceneDescriptor<Device::CPU> Scene::get_descriptor<Device::CPU>(const std::vector<const char*>&,
-																		 const std::vector<const char*>&,
-																		 const std::vector<const char*>&,
-																		 const ei::IVec2&);
+																			const std::vector<const char*>&,
+																			const std::vector<const char*>&,
+																			const ei::IVec2&);
 template SceneDescriptor<Device::CUDA> Scene::get_descriptor<Device::CUDA>(const std::vector<const char*>&,
-																		   const std::vector<const char*>&,
-																		   const std::vector<const char*>&,
-																		   const ei::IVec2&);
+																			const std::vector<const char*>&,
+																			const std::vector<const char*>&,
+																			const ei::IVec2&);
 /*template SceneDescriptor<Device::OPENGL> Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
 																			const std::vector<const char*>&,
 																			const std::vector<const char*>&,
 																			const ei::IVec2&);*/
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

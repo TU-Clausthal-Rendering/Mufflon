@@ -5,6 +5,7 @@
 #include "core/math/sample_types.hpp"
 #include "util/assert.hpp"
 #include <string>
+#include "core/scene/handles.hpp"
 
 namespace mufflon {
 
@@ -13,7 +14,7 @@ enum class Device : unsigned char;
 
 namespace cameras {
 
-enum class CameraModel: i32 {
+enum class CameraModel: i16 {
 	PINHOLE,			// Infinite sharp pinhole camera
 	FOCUS,				// Thin-lens physical related camera model
 	ORTHOGRAPHIC,		// Orthographic projection
@@ -27,6 +28,7 @@ const std::string& to_string(CameraModel type);
 // Basic header for camera parameter packs.
 struct CameraParams {
 	CameraModel type;
+	scene::materials::MediumHandle mediumIndex;
 };
 
 /*
@@ -141,6 +143,6 @@ struct ProjectionResult {
 // ei::max(sizeof(PinholeParams), sizeof(FocusParams));
 // There is a static assert in each camera header checking if this number is correct.
 // The max is not taken here to avoid the unessary include of the camera implementations.
-constexpr std::size_t MAX_CAMERA_PARAM_SIZE = 68;
+constexpr std::size_t MAX_CAMERA_PARAM_SIZE = 70;
 
 }} // namespace mufflon::cameras

@@ -275,7 +275,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int mufflon_get_cuda_device_index();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool mufflon_is_cuda_initialized();
+        internal static extern bool mufflon_is_cuda_available();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void mufflon_destroy();
     }

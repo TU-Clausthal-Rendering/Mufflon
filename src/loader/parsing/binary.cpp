@@ -752,7 +752,7 @@ void BinaryLoader::read_instances() {
 		const u32 animInstId = read<u32>();
 		const Mat3x4 transMat = read<Mat3x4>();
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
-					", animInstId ", animInstId, ") for object '", m_currObjState.name, '\'');
+					", animInstId ", animInstId, ") for object '", m_currObjState.name, "\'");
 		InstanceHdl instHdl = world_create_instance(m_objectHandles[objId]);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
@@ -773,7 +773,7 @@ void BinaryLoader::read_instances() {
 	for(std::size_t i = 0u; i < hasInstance.size(); ++i) {
 		if(!hasInstance[i]) {
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
-						m_currObjState.name, '\'');
+						m_currObjState.name, "\'");
 			// Add default instance
 			const Mat3x4 transMat = Mat3x4{
 				1.f, 0.f, 0.f, 0.f,
@@ -810,7 +810,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 		// Open the binary file and enable exception management
 		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
 		if(m_fileStream.bad() || m_fileStream.fail())
-			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + '\'');
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
 		const std::ifstream::pos_type fileStart = m_fileStream.tellg();

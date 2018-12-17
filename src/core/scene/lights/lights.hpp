@@ -36,7 +36,8 @@ enum class LightType : u16 {
  * TODO: for measured light sources, we'd need to add a texture handle.
  */
 struct alignas(16) PointLight {
-	alignas(16) ei::Vec3 position;
+	ei::Vec3 position;
+	materials::MediumHandle mediumIndex;
 	alignas(16) ei::Vec3 intensity;
 };
 
@@ -48,10 +49,11 @@ struct alignas(16) PointLight {
  */
 struct alignas(16) SpotLight {
 	ei::Vec3 position;
-	u32 direction;			// points away from the light source (direction of ligt flow), packed with ei::packOctahedral32
-	ei::Vec3 intensity;
 	half cosThetaMax;
 	half cosFalloffStart;
+	ei::Vec3 direction;
+	materials::MediumHandle mediumIndex;
+	alignas(16) ei::Vec3 intensity;
 };
 
 /**
@@ -116,7 +118,7 @@ struct alignas(16) EnvMapLight {
 // Asserts to make sure the compiler actually followed our orders
 static_assert(sizeof(PointLight) == 32 && alignof(PointLight) == 16,
 			  "Wrong struct packing");
-static_assert(sizeof(SpotLight) == 32 && alignof(SpotLight) == 16,
+static_assert(sizeof(SpotLight) == 48 && alignof(SpotLight) == 16,
 			  "Wrong struct packing");
 static_assert(sizeof(AreaLightTriangle<Device::CPU>) == 80 && alignof(AreaLightTriangle<Device::CPU>) == 16,
 			  "Wrong struct packing");

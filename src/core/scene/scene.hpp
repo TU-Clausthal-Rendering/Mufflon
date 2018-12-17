@@ -128,6 +128,9 @@ public:
 										const std::vector<const char*>& sphereAttribs,
 										const ei::IVec2& resolution);
 
+	template < Device dev >
+	void update_camera_medium(SceneDescriptor<dev>& scene);
+
 private:
 	// List of instances and thus objects to-be-rendered
 	std::vector<InstanceHandle> m_instances;
@@ -157,6 +160,14 @@ private:
 
 	template< Device dev >
 	void load_materials();
+	
+	void update_camera_medium_cpu(SceneDescriptor<Device::CPU>& scene);
 };
+
+namespace scene_detail {
+
+void update_camera_medium_cuda(SceneDescriptor<Device::CUDA>& scene);
+
+} // namespace scene_detail
 
 }} // namespace mufflon::scene

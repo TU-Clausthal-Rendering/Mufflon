@@ -43,6 +43,7 @@ void GpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolu
 		if(m_scenePtr != nullptr)
 			cuda::check_error(cudaFree(m_scenePtr));
 		cuda::check_error(cudaMalloc(&m_scenePtr, sizeof(*m_scenePtr)));
+		std::size_t m = sizeof(*m_scenePtr);
 		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
 		m_reset = true;
 	}

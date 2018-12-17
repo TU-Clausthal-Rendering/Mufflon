@@ -738,6 +738,12 @@
     <ClInclude Include="..\..\src\core\scene\materials\emissive.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\point_medium.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\light_medium.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">
@@ -757,6 +763,12 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
       <Filter>Source Files\core\renderer</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\scene\lights\light_tree.cu">
+      <Filter>Source Files\core\scene\lights</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\scene\scene.cu">
+      <Filter>Source Files\core\scene</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

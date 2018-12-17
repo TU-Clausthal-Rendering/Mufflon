@@ -21,7 +21,12 @@ namespace ei {
 struct Box;
 } // namespace ei
 
-namespace mufflon { namespace scene { namespace lights {
+namespace mufflon { namespace scene {
+
+template < Device dev >
+struct SceneDescriptor;
+
+namespace lights {
 
 #ifndef __CUDACC__
 // Kind of code duplication, but for type-safety use this when constructing a light tree
@@ -133,6 +138,10 @@ public:
 			   const ei::Box& boundingBox,
 			   TextureHandle envLight = nullptr);
 
+	// Determines for each point- and spotlight in what medium it is
+	template < Device dev >
+	void update_media(const SceneDescriptor<dev>& descriptor);
+
 	template < Device dev >
 	const LightTree<dev>& acquire_const() noexcept {
 		this->synchronize<dev>();
@@ -144,18 +153,12 @@ public:
 	void synchronize();
 
 	template < Device dev >
-	void unload() {
-		m_treeMemory.unload<dev>();
-		m_primToNodePath.unload<dev>();
-		if(dev == Device::CPU && m_treeCpu) {
-			m_treeCpu = nullptr;
-		} else if(m_treeCuda) {
-			m_treeCuda = nullptr;
-		}
-		// TODO: unload envmap handle
-	}
+	void unload();
 
 private:
+	void update_media_cpu(const SceneDescriptor<Device::CPU>& scene);
+	void remap_textures();
+
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;
 	std::unique_ptr<LightTree<Device::CUDA>> m_treeCuda;
@@ -166,13 +169,15 @@ private:
 	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;
 	// 'Local' summed area table, which the light tree holds ownership of
 	std::unique_ptr<textures::Texture> m_envmapSum;
-
-	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);
 };
 
 #endif // __CUDACC__
 
 namespace lighttree_detail {
+
+std::size_t get_num_internal_nodes(std::size_t elems);
+
+void update_media_cuda(const SceneDescriptor<Device::CUDA>& scene, const LightSubTree& posLights);
 
 // Helper to adjust PDF by the chance to pick light type
 CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {

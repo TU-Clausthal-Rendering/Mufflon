@@ -4,6 +4,10 @@
 #include "core/memory/allocator.hpp"
 #include "core/cuda/error.hpp"
 #include "core/math/sfcurves.hpp"
+#include "core/scene/descriptors.hpp"
+#include "core/scene/accel_structs/intersection.hpp"
+#include "core/scene/materials/material.hpp"
+#include "core/scene/lights/light_medium.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cmath>
@@ -11,20 +15,6 @@
 namespace mufflon { namespace scene { namespace lights {
 
 namespace {
-
-// Computes the number of nodes of a balanced tree with elems leaves
-std::size_t get_num_internal_nodes(std::size_t elems) {
-	if(elems <= 1u)
-		return 0u;
-	// Height of a balanced binary tree is log2(N) + 1
-	std::size_t height = static_cast<std::size_t>(std::log2(elems));
-	// Interior nodes are then 2^(height-1) - 1u
-	std::size_t nodes = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
-	// Check if our tree is "filled" or if we have extra nodes on the bottom level
-	return nodes + (elems - static_cast<std::size_t>(std::pow(2u, height)));
-}
-
-
 
 float get_flux(const void* light, u16 type, const ei::Vec3& aabbDiag) {
 	switch(type) {
@@ -235,10 +225,59 @@ void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, 
 	}
 }
 
-using namespace lighttree_detail;
+void remap_textures_impl(const char*& cpuMem, char*& cudaMem, LightType type,
+						 std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle>& textureMap) {
+	switch(type) {
+		case LightType::AREA_LIGHT_TRIANGLE:
+		{
+			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem);
+			auto tex = textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
+			const std::ptrdiff_t offset = u32((const char*)&light->radianceTex - (const char*)light);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
+			cpuMem += sizeof(light);
+			cudaMem += sizeof(light);
+		} break;
+		case LightType::AREA_LIGHT_QUAD:
+		{
+			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem);
+			auto tex = textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
+			const std::ptrdiff_t offset = u32((const char*)&light->radianceTex - (const char*)light);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
+			cpuMem += sizeof(light);
+			cudaMem += sizeof(light);
+		} break;
+		case LightType::AREA_LIGHT_SPHERE:
+		{
+			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem);
+			auto tex = textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
+			const std::ptrdiff_t offset = u32((const char*)&light->radianceTex - (const char*)light);
+			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
+			cpuMem += sizeof(light);
+			cudaMem += sizeof(light);
+		} break;
+		default:; // Other light type - nothing to do
+	}
+}
 
 } // namespace
 
+namespace lighttree_detail {
+
+// Computes the number of nodes of a balanced tree with elems leaves
+std::size_t get_num_internal_nodes(std::size_t elems) {
+	if(elems <= 1u)
+		return 0u;
+	// Height of a balanced binary tree is log2(N) + 1
+	std::size_t height = static_cast<std::size_t>(std::log2(elems));
+	// Interior nodes are then 2^(height-1) - 1u
+	std::size_t nodes = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
+	// Check if our tree is "filled" or if we have extra nodes on the bottom level
+	return nodes + (elems - static_cast<std::size_t>(std::pow(2u, height)));
+}
+
+} // namespace lighttree_detail
+
+using namespace lighttree_detail;
 
 // Node constructors
 LightSubTree::Node::Node(const char* base,
@@ -367,32 +406,35 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	m_dirty.mark_changed(Device::CPU);
 }
 
-void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {
-	switch(type) {
-		case LightSubTree::Node::INTERNAL_NODE_TYPE: {
-			// Recursive implementation necessary, because the type is stored at the parents and not known to the node itself
-			const auto* node = as<LightSubTree::Node>(cpuMem + offset);
-			remap_textures(cpuMem, node->left.offset, node->left.type, cudaMem);
-		} break;
-		case u16(LightType::AREA_LIGHT_TRIANGLE): {
-			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
-			auto tex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			offset += u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
-		} break;
-		case u16(LightType::AREA_LIGHT_QUAD): {
-			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
-			auto tex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			offset += u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
-		} break;
-		case u16(LightType::AREA_LIGHT_SPHERE): {
-			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem + offset);
-			auto tex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			offset += u32((const char*)&light->radianceTex - (const char*)light);
-			cudaMemcpy(cudaMem + offset, &tex, sizeof(tex), cudaMemcpyDefault);
-		} break;
-		default:; // Other light type - nothing to do
+void LightTreeBuilder::remap_textures() {
+	mAssert(m_treeCpu->posLights.lightCount < std::numeric_limits<u32>::max());
+	if(m_treeCpu->posLights.lightCount == 0u)
+		return;
+
+	const char* cpuMem = m_treeCpu->posLights.memory;
+	char* cudaMem = m_treeCuda->posLights.memory;
+
+	if(m_treeCpu->posLights.lightCount == 1u) {
+		// Special case: no internal nodes at all
+		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(m_treeCpu->posLights.root.type), m_textureMap);
+		return;
+	}
+
+	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(m_treeCpu->posLights.lightCount));
+	// Walk backwards in the nodes to iterate over lights, but leave out the odd one (if it exists)
+	const u32 exclusiveLightNodes = static_cast<u32>(m_treeCpu->posLights.lightCount / 2u);
+	for(u32 i = 1u; i <= exclusiveLightNodes; ++i) {
+		const LightSubTree::Node& internal = *m_treeCpu->posLights.get_node((NODE_COUNT - i) * sizeof(LightSubTree::Node));
+		mAssert(internal.left.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		mAssert(internal.right.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(internal.left.type), m_textureMap);
+		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(internal.right.type), m_textureMap);
+	}
+	if(exclusiveLightNodes * 2u < m_treeCpu->posLights.lightCount) {
+		// One extra light
+		const LightSubTree::Node& internal = *m_treeCpu->posLights.get_node((NODE_COUNT - exclusiveLightNodes - 1u) * sizeof(LightSubTree::Node));
+		mAssert(internal.right.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		remap_textures_impl(cpuMem, cudaMem, static_cast<LightType>(internal.left.type), m_textureMap);
 	}
 }
 
@@ -421,7 +463,7 @@ void LightTreeBuilder::synchronize() {
 
 		// Replace all texture handles inside the tree's data
 		// It was synchronized by m_treeMemory.acquire<Device::CUDA>, but contains the wrong pointers.
-		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
+		remap_textures();
 
 		m_dirty.mark_synced(dev);
 	} else {
@@ -429,7 +471,59 @@ void LightTreeBuilder::synchronize() {
 	}
 }
 
-template void LightTreeBuilder::synchronize<Device::CUDA>();
+void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scene) {
+	char* currLightMem = m_treeCpu->posLights.memory;
+	mAssert(m_treeCpu->posLights.lightCount == 0 || currLightMem != nullptr);
+	mAssert(m_treeCpu->posLights.lightCount < std::numeric_limits<u32>::max());
+	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(m_treeCpu->posLights.lightCount));
+	// Walk backwards in the nodes to iterate over lights, but leave out the odd one (if it exists)
+	const u32 exclusiveLightNodes = static_cast<u32>(m_treeCpu->posLights.lightCount / 2u);
+	for(u32 i = 1u; i <= exclusiveLightNodes; ++i) {
+		const LightSubTree::Node& node = *m_treeCpu->posLights.get_node((NODE_COUNT - i) * static_cast<u32>(sizeof(LightSubTree::Node)));
+		mAssert(node.left.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		mAssert(node.right.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		set_light_medium(&currLightMem[node.left.offset], static_cast<LightType>(node.left.type), scene);
+		set_light_medium(&currLightMem[node.right.offset], static_cast<LightType>(node.right.type), scene);
+	}
+	if(exclusiveLightNodes * 2u < m_treeCpu->posLights.lightCount) {
+		// One extra light
+		const LightSubTree::Node& node = *m_treeCpu->posLights.get_node((NODE_COUNT - exclusiveLightNodes - 1u) * sizeof(LightSubTree::Node));
+		mAssert(node.right.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		set_light_medium(&currLightMem[node.right.offset], static_cast<LightType>(node.right.type), scene);
+	}
+}
+
+template < Device dev >
+void LightTreeBuilder::update_media(const SceneDescriptor<dev>& scene) {
+	this->synchronize<dev>();
+	if constexpr(dev == Device::CPU)
+		this->update_media_cpu(scene);
+	else if constexpr(dev == Device::CUDA)
+		update_media_cuda(scene, m_treeCuda->posLights);
+	else
+		default: mAssert(false); return;
+}
+
+template < Device dev >
+void LightTreeBuilder::unload() {
+	m_treeMemory.unload<dev>();
+	m_primToNodePath.unload<dev>();
+	if(dev == Device::CPU && m_treeCpu) {
+		m_treeCpu = nullptr;
+	} else if(m_treeCuda) {
+		m_treeCuda = nullptr;
+	}
+	// TODO: unload envmap handle
+}
+
 template void LightTreeBuilder::synchronize<Device::CPU>();
+template void LightTreeBuilder::synchronize<Device::CUDA>();
+//template void LightTreeBuilder::synchronize<Device::OPENGL>();
+template void LightTreeBuilder::unload<Device::CPU>();
+template void LightTreeBuilder::unload<Device::CUDA>();
+//template void LightTreeBuilder::unload<Device::OPENGL>();
+template void LightTreeBuilder::update_media<Device::CPU>(const SceneDescriptor<Device::CPU>& descriptor);
+template void LightTreeBuilder::update_media<Device::CUDA>(const SceneDescriptor<Device::CUDA>& descriptor);
+//template void LightTreeBuilder::update_media<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>& descriptor);
 
 }}} // namespace mufflon::scene::lights

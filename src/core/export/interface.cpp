@@ -214,7 +214,7 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 } // namespace
 
 // TODO: remove, Felix prototype
-const char* core_get_dll_error(int& length) {
+const char* core_get_dll_error() {
 	TRY
 #ifdef _WIN32
 	// For C# interop
@@ -1330,6 +1330,7 @@ LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) 
 	CHECK_NULLPTR(name, "pointlight name", nullptr);
 	auto hdl = WorldContainer::instance().add_light(name, lights::PointLight{
 													util::pun<ei::Vec3>(position),
+													std::numeric_limits<MaterialIndex>::max(), // Placeholder
 													util::pun<ei::Vec3>(intensity) });
 	if(!hdl.has_value()) {
 		logError("[", FUNCTION_NAME, "] Error adding point light");
@@ -1369,10 +1370,12 @@ LightHdl world_add_spot_light(const char* name, Vec3 position, Vec3 direction,
 
 	auto hdl = WorldContainer::instance().add_light(name, lights::SpotLight{
 													util::pun<ei::Vec3>(position),
-													ei::packOctahedral32(dir),
-													util::pun<ei::Vec3>(intensity),
 													__float2half(cosAngle),
-													__float2half(cosFalloff) });
+													__float2half(cosFalloff),
+													dir,
+													std::numeric_limits<MaterialIndex>::max(), // Placeholder
+													util::pun<ei::Vec3>(intensity),
+													 });
 	if(!hdl.has_value()) {
 		logError("[", FUNCTION_NAME, "] Error adding point light");
 		return nullptr;
@@ -1844,7 +1847,7 @@ Boolean world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
 	if(direction != nullptr)
-		*direction = util::pun<Vec3>(ei::unpackOctahedral32(light.direction));
+		*direction = util::pun<Vec3>(light.direction);
 	return true;
 	CATCH_ALL(false)
 }
@@ -1897,7 +1900,7 @@ Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
 		return false;
 	}
 	// TODO: check direction
-	light.direction = ei::packOctahedral32(util::pun<ei::Vec3>(actualDirection));
+	light.direction = util::pun<ei::Vec3>(actualDirection);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2550,9 +2553,19 @@ int32_t mufflon_get_cuda_device_index() {
 	CATCH_ALL(-1)
 }
 
-Boolean mufflon_is_cuda_initialized() {
+Boolean mufflon_is_cuda_available() {
 	TRY
-	return s_cudaDevIndex >= 0;
+	int count = 0;
+	cuda::check_error(cudaGetDeviceCount(&count));
+	if(count > 0) {
+		cudaDeviceProp deviceProp;
+		for(int c = 0; c < count; ++c) {
+			cudaGetDeviceProperties(&deviceProp, c);
+			if(deviceProp.unifiedAddressing) 
+				return true;
+		}
+	}
+	return false;
 	CATCH_ALL(false)
 }
 

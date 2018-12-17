@@ -34,7 +34,7 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 	TRY
 	if(s_logCallback != nullptr)
 		s_logCallback(message.c_str(), static_cast<int>(severity));
-	CATCH_ALL()
+	CATCH_ALL(;)
 }
 
 } // namespace
@@ -103,13 +103,13 @@ Boolean loader_load_json(const char* path) {
 void loader_profiling_enable() {
 	TRY
 	Profiler::instance().set_enabled(true);
-	CATCH_ALL()
+	CATCH_ALL(;)
 }
 
 void loader_profiling_disable() {
 	TRY
 	Profiler::instance().set_enabled(false);
-	CATCH_ALL()
+	CATCH_ALL(;)
 }
 
 Boolean loader_profiling_set_level(ProfilingLevel level) {
@@ -224,5 +224,5 @@ const char* loader_profiling_get_total_and_snapshots() {
 void loader_profiling_reset() {
 	TRY
 	Profiler::instance().reset_all();
-	CATCH_ALL()
+	CATCH_ALL(;)
 }

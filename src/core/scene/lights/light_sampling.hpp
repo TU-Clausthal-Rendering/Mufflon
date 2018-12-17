@@ -87,7 +87,7 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const SpotLight& light,
 ) {
 	return Photon{ { light.position, AreaPdf::infinite() },
 				   light.intensity, LightType::SPOT_LIGHT,
-				   {ei::unpackOctahedral32(light.direction), light.cosThetaMax, light.cosFalloffStart} };
+				   { light.direction, light.cosThetaMax, light.cosFalloffStart } };
 }
 CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_spot(const Spectrum& intensity,
 															  const scene::Direction direction,
@@ -307,7 +307,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 	const float dist = sqrtf(distSqr);
 	const ei::Vec3 direction = (light.position - pos) / dist;
 	const math::EvalValue value = evaluate_spot(-direction, light.intensity,
-										ei::unpackOctahedral32(light.direction),
+										light.direction,
 										light.cosThetaMax, light.cosFalloffStart);
 	return NextEventEstimation{
 		direction, value.cosOut, value.value, dist, distSqr, AreaPdf::infinite()

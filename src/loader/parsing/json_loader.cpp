@@ -72,7 +72,7 @@ TextureHdl JsonLoader::load_texture(const char* name) {
 	if (!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if (!fs::exists(path))
-		throw std::runtime_error("Cannot find texture file '" + path.string() + '\'');
+		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
 	path = fs::canonical(path);
 	TextureHdl tex = world_add_texture(path.string().c_str(), TextureSampling::SAMPLING_LINEAR);
 	if(tex == nullptr)
@@ -557,7 +557,7 @@ void JsonLoader::load_file() {
 		if(m_version.compare(FILE_VERSION) != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
-		logInfo("[JsonLoader::load_file] Detected file version '", m_version, '\'');
+		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
 	// Binary file path
 	m_binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
@@ -565,7 +565,7 @@ void JsonLoader::load_file() {
 		logError("[JsonLoader::load_file] Scene file: has an empty binary file path");
 		return;
 	}
-	logInfo("[JsonLoader::load_file] Detected binary file path '", m_binaryFile.string(), '\'');
+	logInfo("[JsonLoader::load_file] Detected binary file path '", m_binaryFile.string(), "'");
 	// Make the file path absolute
 	if(m_binaryFile.is_relative())
 		m_binaryFile = fs::canonical(m_filePath.parent_path() / m_binaryFile);
@@ -586,10 +586,10 @@ void JsonLoader::load_file() {
 	// Choose first one in JSON - no guarantees
 	if(m_defaultScenario.empty())
 		m_defaultScenario = m_scenarios->value.MemberBegin()->name.GetString();
-	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, '\'');
+	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, "'");
 	const Value& defScen = get(m_state, m_scenarios->value, &m_defaultScenario[0u])->value;
 	const u64 defaultGlobalLod = read_opt<u64>(m_state, defScen, "lod", 0u);
-	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, '\'');
+	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, "'");
 
 	// First parse binary file
 	binary::BinaryLoader binLoader{ m_binaryFile };
@@ -607,7 +607,7 @@ void JsonLoader::load_file() {
 			auto lodIter = get(m_state, object, "lod", false);
 			if(lodIter != object.MemberEnd()) {
 				const u64 localLod = read<u64>(m_state, lodIter);
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, '\'');
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
 				defaultLocalLods.insert({ objectName, localLod });
 			}
 		}
@@ -634,11 +634,11 @@ void JsonLoader::load_file() {
 		m_state.reset();
 		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
 		if(defScenHdl == nullptr)
-			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + '\'');
+			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + "'");
 
 		auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
 		if(!world_load_scenario(defScenHdl))
-			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + '\'');
+			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
 	}

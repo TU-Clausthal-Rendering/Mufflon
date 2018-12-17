@@ -86,7 +86,7 @@ namespace gui.ViewModel
             {
                 new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
             };
-            if(Core.mufflon_is_cuda_initialized())
+            if(Core.mufflon_is_cuda_available())
             {
                 Renderers.Add(new RendererItem { Id = 1, Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" });
             }
