@@ -59,7 +59,7 @@ public:
 		outBuffer = IMaterial::get_descriptor(device, outBuffer);
 		device_switch(device,
 			*as<EmissiveDesc<dev>>(outBuffer) =
-				EmissiveDesc<dev>( m_emission->aquireConst<dev>(), m_scale );
+				EmissiveDesc<dev>( m_emission->acquire_const<dev>(), m_scale );
 			return outBuffer + sizeof(EmissiveDesc<dev>);
 		);
 		return nullptr;

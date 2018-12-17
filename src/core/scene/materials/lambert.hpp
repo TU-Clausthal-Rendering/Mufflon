@@ -36,12 +36,14 @@ public:
 	}
 
 	std::size_t get_descriptor_size(Device device) const final {
-		device_switch(device, return sizeof(LambertDesc<dev>));
+		std::size_t s = IMaterial::get_descriptor_size(device);
+		device_switch(device, return sizeof(LambertDesc<dev>) + s);
 		return 0;
 	}
 
 	std::size_t get_parameter_pack_size() const final {
-		return sizeof(LambertParameterPack);
+		return IMaterial::get_parameter_pack_size()
+			+ sizeof(LambertParameterPack);
 	}
 
 	char* get_descriptor(Device device, char* outBuffer) const final {

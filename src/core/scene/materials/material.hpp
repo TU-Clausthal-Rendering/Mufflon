@@ -102,12 +102,16 @@ public:
 		mAssertMsg(false, "Material not (fully) implemented!");
 	}*/
 
-	virtual std::size_t get_descriptor_size(Device device) const = 0;
+	virtual std::size_t get_descriptor_size(Device device) const {
+		return sizeof(MaterialDescriptorBase);
+	}
 
 	/*
 	 * Size of a fetched parameter instanciation from this material.
 	 */
-	virtual std::size_t get_parameter_pack_size() const = 0;
+	virtual std::size_t get_parameter_pack_size() const {
+		return sizeof(ParameterPack);
+	}
 
 	/*
 	 * Get the handles which are required to fetch the current material.
