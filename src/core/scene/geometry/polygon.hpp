@@ -160,20 +160,7 @@ public:
 
 	// Synchronizes the default attributes position, normal, uv, matindex 
 	template < Device dev >
-	void synchronize() {
-		m_vertexAttributes.synchronize<dev>();
-		m_faceAttributes.synchronize<dev>();
-		// Synchronize the index buffer
-		if(m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
-			if(m_indexFlags.has_competing_changes()) {
-				logError("[Polygons::synchronize] Competing device changes; ignoring one");
-			}
-			m_indexBuffer.for_each([&](auto& buffer) {
-				using ChangedBuffer = std::decay_t<decltype(buffer)>;
-				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
-			});
-		}
-	}
+	void synchronize();
 
 	template < Device dev, bool face >
 	void synchronize(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
@@ -423,57 +410,13 @@ private:
 
 	// Reserves more space for the index buffer
 	template < Device dev >
-	void reserve_index_buffer(std::size_t capacity) {
-		auto& buffer = m_indexBuffer.get<IndexBuffer<dev>>();
-		if(capacity > buffer.reserved) {
-			if(buffer.reserved == 0u)
-				buffer.indices = Allocator<dev>::template alloc_array<u32>(capacity);
-			else
-				buffer.indices = Allocator<Device::CPU>::realloc(buffer.indices, buffer.reserved,
-															 capacity);
-			buffer.reserved = capacity;
-			m_indexFlags.mark_changed(dev);
-		}
-	}
-
+	void reserve_index_buffer(std::size_t capacity);
 	// Synchronizes two device index buffers
 	template < Device changed, Device sync >
-	void synchronize_index_buffer() {
-		if constexpr(changed != sync) {
-			if(m_indexFlags.has_changes(changed)) {
-				auto& changedBuffer = m_indexBuffer.get<IndexBuffer<changed>>();
-				auto& syncBuffer = m_indexBuffer.get<IndexBuffer<sync>>();
-
-				// Check if we need to realloc
-				if(syncBuffer.reserved < m_triangles + m_quads)
-					this->reserve_index_buffer<sync>(m_triangles + m_quads);
-
-				if(changedBuffer.reserved != 0u)
-					copy(syncBuffer.indices, changedBuffer.indices, m_triangles + m_quads);
-				m_indexFlags.mark_synced(sync);
-			}
-		}
-	}
-
+	void synchronize_index_buffer();
+	// Resizes the attribute buffer to hold v vertex and f face attribute pointers
 	template < Device dev >
-	void resizeAttribBuffer(std::size_t v, std::size_t f) {
-		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
-		// Resize the attribute array if necessary
-		if(attribBuffer.faceSize < f) {
-			if(attribBuffer.faceSize == 0)
-				attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(f);
-			else
-				attribBuffer.face = Allocator<dev>::realloc(attribBuffer.face, attribBuffer.faceSize, f);
-			attribBuffer.faceSize = f;
-		}
-		if(attribBuffer.vertSize < v) {
-			if(attribBuffer.vertSize == 0)
-				attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(v);
-			else
-				attribBuffer.vertex = Allocator<dev>::realloc(attribBuffer.vertex, attribBuffer.vertSize, v);
-			attribBuffer.vertSize = v;
-		}
-	}
+	void resizeAttribBuffer(std::size_t v, std::size_t f);
 
 	// It's a unique pointer so we have one fixed address we can reference in OmAttributePool
 	// TODO: does that degrade performance? probably not, since attributes aren't aquired often
