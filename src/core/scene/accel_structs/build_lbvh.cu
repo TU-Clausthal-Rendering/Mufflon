@@ -207,7 +207,7 @@ void get_maximum_occupancy(i32 &gridSize, i32 &blockSize, i32 totalThreads, T fu
 	// maximum occupancy for a full device launch 
 	//gridSize;    // The actual grid size needed, based on input size 
 
-	cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, func, dynamicSMemSize, 0);
+	cuda::check_error(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, func, dynamicSMemSize, 0));
 
 	if (blockSize != 0)
 		// Round up according to array size 
@@ -230,7 +230,7 @@ void get_maximum_occupancy_variable_smem(i32 &gridSize, i32 &blockSize, i32 tota
 	// maximum occupancy for a full device launch 
 	//gridSize;    // The actual grid size needed, based on input size 
 
-	cudaOccupancyMaxPotentialBlockSizeVariableSMem(&minGridSize, &blockSize, func, blockSizeToDynamicSMemSize, 0);
+	cuda::check_error(cudaOccupancyMaxPotentialBlockSizeVariableSMem(&minGridSize, &blockSize, func, blockSizeToDynamicSMemSize, 0));
 
 	if (blockSize != 0)
 		// Round up according to array size 
@@ -1340,6 +1340,15 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 	i32* quadIndices,
 	const ei::Box& aabb, ei::Vec4 traverseCosts, i32 numPrimitives,
 	i32 offsetQuads, i32 offsetSpheres) {
+	if (numPrimitives == 1) {
+		// TODO remove this. 
+		m_primIds.resize(1);
+		m_primIds.synchronize<dev>();
+		m_bvhNodes.resize(1);
+		m_bvhNodes.synchronize<dev>();
+		return;
+	}
+
 	i32 numBlocks, numThreads;
 
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
@@ -1527,6 +1536,15 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 	ei::Box* aabbs,
 	const ei::Box& sceneBB,
 	ei::Vec2 traverseCosts, i32 numInstances) {
+	if (numInstances == 1) {
+		// TODO remove this. 
+		m_primIds.resize(1);
+		m_primIds.synchronize<dev>();
+		m_bvhNodes.resize(1);
+		m_bvhNodes.synchronize<dev>();
+		return;
+	}
+
 	i32 numBlocks, numThreads;
 
 	// Allocate memory for a part of the BVH. We do not know the final size yet and

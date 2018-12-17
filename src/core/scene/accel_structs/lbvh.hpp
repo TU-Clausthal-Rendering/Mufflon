@@ -65,6 +65,14 @@ private:
 	GenericResource m_primIds;
 	GenericResource m_bvhNodes;
 
+	/* Build 32-bits collapsed LBVH for the scene.
+	* At first, a normal LBVH is build, then the lower nodes are collapsed
+	* based on SAH values. 
+	* It ensures that there is at least one internal node after collasing if
+	* there are at least two instances.
+	* If there is only one instance, no BVH is built.
+	* Each instance is coded with 32 bits.
+	*/
 	template < Device dev >
 	void build_lbvh32(ei::Mat3x4* matrices,
 		i32* objIds,
@@ -72,6 +80,14 @@ private:
 		const ei::Box& sceneBB,
 		ei::Vec2 traverseCosts, i32 numInstances);
 
+	/* Build 64-bits collapsed LBVH for one object.
+	* At first, a normal LBVH is build, then the lower nodes are collapsed
+	* based on SAH values.
+	* It ensures that there is at least one internal node after collasing if
+	* there are at least two primitives.
+	* If there is only one primitive, no BVH is built.
+	* Each primitive is coded with 64 bits.
+	*/
 	template < Device dev >
 	void build_lbvh64(ei::Vec3* meshVertices,
 		ei::Vec4* spheres,
