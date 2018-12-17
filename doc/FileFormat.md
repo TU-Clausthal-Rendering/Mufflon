@@ -157,7 +157,7 @@ Materials
                 | <texture>,            // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
                                         // OR a texture with one or three channels (relative path)
                                         // DEFAULT: 0.5
-	"ndf": "{BS,GGX,Cos}",				// Name of the normal distribution function
+	"ndf": "{BS,GGX,Cos}",				// Name of the normal distribution function (default GGX)
     "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
                                         // DEFAULT: [0.5, 0.5, 0.5]
 
@@ -167,13 +167,13 @@ Materials
                  | <texture>,           // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
                                         // OR a texture with one or three channels (relative path)
                                         // DEFAULT: 0.5
-	"ndf": "{BS,GGX,Cos}",				// Name of the normal distribution function
+    "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
 
 `"type": "emissive"`
 
     "radiance": [r,g,b] | <texture>,    // Surface radiance in [W/m²sr]
-    "scale: float                       // Multiplier for radiance
+    "scale: [r,g,b]                     // Multiplier for radiance (HDR color, default 1,1,1)
 
 `"type": "orennayar"`
 
@@ -252,15 +252,16 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                                         // indies, material indices) and <ATTRIBUTES> are
                                         // deflate compressed. All optional compressed blocks are marked
                                         // with ' (each ' is one independent DEFLATE stream).
+                                        // See <DATA>' for details (applies to all data blocks with ')
             | COMPRESSED_NORMALS 2      // Normals can be compressed into 32bit with a custom compression
 
     <JUMP_TABLE> = u32          // Number of entries in the table N
                    N*u64        // Absolute start position of the object/LOD,
                                 // the index in the array is the <OBJID>/lod level (0-based)
 
-    <DATA>' = u32                       // Size in bytes of the compressed data block
-              u32                       // Size in bytes of the decompressed data block
-              <DATA>
+    DATA' = u32                       // Size in bytes of the compressed data block
+            u32                       // Size in bytes of the decompressed data block
+            <COMPRESSED_STREAM>
 
     <OBJECT> = u32 'Obj_'       // Type check for this section
                <STRING>         // The name, used as [obj:name] in the above JSON specification
