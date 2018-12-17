@@ -1,11 +1,9 @@
 #pragma once
 
 #include "core/scene/attribute.hpp"
-#include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
-#include <array>
 #include <tuple>
 #include <vector>
 
@@ -16,7 +14,12 @@ class IByteReader;
 } // namespace util
 } // namespace mufflon
 
-namespace mufflon::scene::geometry {
+namespace mufflon { namespace scene {
+
+template < Device dev >
+struct SpheresDescriptor;
+
+namespace geometry {
 
 /**
  * Instantiation of geometry class.
@@ -143,38 +146,8 @@ public:
 	 * renderer's task to aquire it once more after that, since we cannot hand out
 	 * Accessors to the concrete device.
 	 */
-	template < Device dev, std::size_t N >
-	SpheresDescriptor<dev> get_descriptor(const std::array<const char*, N>& attribs) {
-		this->synchronize<dev>();
-		// Collect the attributes; for that, we iterate the given Attributes and
-		// gather them on CPU side (or rather, their device pointers); then
-		// we copy it to the actual device
-		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
-		if(attribs.size() > 0) {
-			// Resize the attribute array if necessary
-			if(attribBuffer.size < attribs.size()) {
-				if(attribBuffer.size == 0)
-					attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
-				else
-					attribBuffer.buffer = Allocator<dev>::template realloc(attribBuffer.buffer, attribBuffer.size,
-																		   attribs.size());
-				attribBuffer.size = attribs.size();
-			}
-
-			std::vector<void*> cpuAttribs(attribs.size());
-			for(const char* name : attribs)
-				cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
-			copy(attribBuffer.buffer, cpuAttribs.data(), attribs.size());
-		}
-
-		return SpheresDescriptor<dev>{
-			static_cast<u32>(this->get_sphere_count()),
-			static_cast<u32>(attribs.size()),
-			this->acquire_const<dev, ei::Sphere>(this->get_spheres_hdl()),
-			this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
-			attribBuffer.buffer
-		};
-	}
+	template < Device dev >
+	SpheresDescriptor<dev> get_descriptor(const std::vector<const char*>& attribs);
 
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;
@@ -210,4 +183,4 @@ private:
 	ei::Box m_boundingBox;
 };
 
-} // namespace mufflon::scene::geometry
+}}} // namespace mufflon::scene::geometry

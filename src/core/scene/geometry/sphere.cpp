@@ -1,4 +1,5 @@
 #include "sphere.hpp"
+#include "core/scene/descriptors.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon::scene::geometry {
@@ -101,4 +102,42 @@ std::size_t Spheres::add_bulk(AttributePool::AttributeHandle hdl, const SphereHa
 		m_attributes.reserve(startSphere + count);
 	return m_attributes.restore(hdl, attrStream, startSphere, count);
 }
+
+template < Device dev >
+SpheresDescriptor<dev> Spheres::get_descriptor(const std::vector<const char*>& attribs) {
+	this->synchronize<dev>();
+	// Collect the attributes; for that, we iterate the given Attributes and
+	// gather them on CPU side (or rather, their device pointers); then
+	// we copy it to the actual device
+	AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+	if(attribs.size() > 0) {
+		// Resize the attribute array if necessary
+		if(attribBuffer.size < attribs.size()) {
+			if(attribBuffer.size == 0)
+				attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
+			else
+				attribBuffer.buffer = Allocator<dev>::template realloc(attribBuffer.buffer, attribBuffer.size,
+																	   attribs.size());
+			attribBuffer.size = attribs.size();
+		}
+
+		std::vector<void*> cpuAttribs(attribs.size());
+		for(const char* name : attribs)
+			cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
+		copy(attribBuffer.buffer, cpuAttribs.data(), attribs.size());
+	}
+
+	return SpheresDescriptor<dev>{
+		static_cast<u32>(this->get_sphere_count()),
+			static_cast<u32>(attribs.size()),
+			this->acquire_const<dev, ei::Sphere>(this->get_spheres_hdl()),
+			this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
+			attribBuffer.buffer
+	};
+}
+
+template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>(const std::vector<const char*>&);
+template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>(const std::vector<const char*>&);
+//template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>(const std::vector<const char*>&);
+
 } // namespace mufflon::scene::geometry

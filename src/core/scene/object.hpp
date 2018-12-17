@@ -1,5 +1,6 @@
 #pragma once
 
+#include "descriptors.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
 #include "ei/3dtypes.hpp"
@@ -9,11 +10,11 @@
 #include "util/range.hpp"
 #include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
-#include "core/scene/descriptors.hpp"
 #include <climits>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace mufflon {
 
@@ -27,9 +28,13 @@ namespace accel_struct {
 	class IAccelerationStructure;
 }
 
+template < Device dev >
+struct ObjectDescriptor;
+
 struct ObjectFlags : public util::Flags<u32> {
 	static constexpr u32 EMISSIVE = 1u;
 };
+
 
 /**
  * Representation of a scene object.
@@ -93,23 +98,10 @@ public:
 
 	// Get the descriptor of the object (including all geometry)
 	// Synchronizes implicitly
-	template < Device dev, std::size_t N, std::size_t M, std::size_t O >
-	ObjectDescriptor<dev> get_descriptor(const std::array<const char*, N> &vertexAttribs,
-										 const std::array<const char*, M> &faceAttribs,
-										 const std::array<const char*, O> &sphereAttribs) {
-		ObjectDescriptor<dev> desc{
-			m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
-			m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
-			m_accelStruct[get_device_index<dev>()]
-		};
-		// (Re)build acceleration structure if necessary
-		if(is_accel_dirty<dev>()) {
-			//accel_struct::build_lbvh_obj(desc, m_boundingBox);
-			// TODO call after LBVHBuilder.build refactoring
-			m_accelStruct[get_device_index<dev>()] = desc.accelStruct;
-		}
-		return desc;
-	}
+	template < Device dev >
+	ObjectDescriptor<dev> get_descriptor(const std::vector<const char*>& vertexAttribs,
+										 const std::vector<const char*>& faceAttribs,
+										 const std::vector<const char*>& sphereAttribs);
 
 	// Checks if the acceleration structure on one of the system parts has been modified.
 	template < Device dev >

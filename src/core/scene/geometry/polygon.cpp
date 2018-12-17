@@ -2,6 +2,7 @@
 #include "util/assert.hpp"
 #include "util/log.hpp"
 #include "util/punning.hpp"
+#include "core/scene/descriptors.hpp"
 #include <OpenMesh/Core/Mesh/Handles.hh>
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
@@ -385,6 +386,41 @@ void Polygons::synchronize() {
 		});
 	}
 }
+template < Device dev >
+PolygonsDescriptor<dev> Polygons::get_descriptor(const std::vector<const char*>& vertexAttribs,
+												 const std::vector<const char*>& faceAttribs) {
+	this->synchronize<dev>();
+
+	// Resize the attribute array if necessary
+	resizeAttribBuffer<dev>(vertexAttribs.size(), faceAttribs.size());
+	// Collect the attributes; for that, we iterate the given Attributes and
+	// gather them on CPU side (or rather, their device pointers); then
+	// we copy it to the actual device
+	AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+	std::vector<void*> cpuVertexAttribs(vertexAttribs.size());
+	std::vector<void*> cpuFaceAttribs(faceAttribs.size());
+	for(const char* name : vertexAttribs)
+		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
+	for(const char* name : faceAttribs)
+		cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
+	copy<void*>(attribBuffer.vertex, cpuVertexAttribs.data(), vertexAttribs.size());
+	copy<void*>(attribBuffer.face, cpuFaceAttribs.data(), faceAttribs.size());
+
+	return PolygonsDescriptor<dev>{
+		static_cast<u32>(this->get_vertex_count()),
+			static_cast<u32>(this->get_triangle_count()),
+			static_cast<u32>(this->get_quad_count()),
+			static_cast<u32>(vertexAttribs.size()),
+			static_cast<u32>(faceAttribs.size()),
+			this->acquire_const<dev, ei::Vec3, false>(this->get_points_hdl()),
+			this->acquire_const<dev, ei::Vec3, false>(this->get_normals_hdl()),
+			this->acquire_const<dev, ei::Vec2, false>(this->get_uvs_hdl()),
+			this->acquire_const<dev, u16, true>(this->get_material_indices_hdl()),
+			this->get_index_buffer<dev>(),
+			attribBuffer.vertex,
+			attribBuffer.face
+	};
+}
 
 // Reserves more space for the index buffer
 template < Device dev >
@@ -456,6 +492,12 @@ template void Polygons::resizeAttribBuffer<Device::CUDA>(std::size_t v, std::siz
 template void Polygons::synchronize<Device::CPU>();
 template void Polygons::synchronize<Device::CUDA>();
 //template void Polygons::synchronize<Device::OPENGL>();
+template PolygonsDescriptor<Device::CPU> Polygons::get_descriptor<Device::CPU>(const std::vector<const char*>& vertexAttribs,
+																			   const std::vector<const char*>& faceAttribs);
+template PolygonsDescriptor<Device::CUDA> Polygons::get_descriptor<Device::CUDA>(const std::vector<const char*>& vertexAttribs,
+																				 const std::vector<const char*>& faceAttribs);
+/*template PolygonsDescriptor<Device::OPENGL> Polygons::get_descriptor<Device::OPENGL>(const std::vector<const char*>& vertexAttribs,
+																					 const std::vector<const char*>& faceAttribs);*/
 
 
 } // namespace mufflon::scene::geometry

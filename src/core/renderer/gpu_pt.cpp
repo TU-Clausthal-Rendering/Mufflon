@@ -39,9 +39,7 @@ void GpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolu
 		m_currentScene = scene;
 		// Make sure the scene is loaded completely for the use on CPU side
 		m_currentScene->synchronize<Device::CUDA>();
-		scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(std::array<const char*, 0>{},
-																									  std::array<const char*, 0>{},
-																									  std::array<const char*, 0>{}, resolution);
+		scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {}, resolution);
 		if(m_scenePtr != nullptr)
 			cuda::check_error(cudaFree(m_scenePtr));
 		cuda::check_error(cudaMalloc(&m_scenePtr, sizeof(*m_scenePtr)));

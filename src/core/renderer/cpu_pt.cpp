@@ -25,14 +25,12 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	auto scope = Profiler::instance().start<CpuProfileState>("CPU PT iteration", ProfileLevel::LOW);
 	// (Re) create the random number generators
 	if(m_rngs.size() != outputBuffer.get_num_pixels()
-		|| m_reset)
+	   || m_reset)
 		init_rngs(outputBuffer.get_num_pixels());
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_reset = false;
-	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>(std::array<const char*, 0>{},
-																								std::array<const char*, 0>{},
-																								std::array<const char*, 0>{}, buffer.get_resolution());
+	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, buffer.get_resolution());
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?

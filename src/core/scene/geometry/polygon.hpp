@@ -3,15 +3,14 @@
 #include "polygon_mesh.hpp"
 #include "util/assert.hpp"
 #include "core/scene/attribute.hpp"
-#include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
 #include "util/range.hpp"
 #include <ei/3dtypes.hpp>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
-#include <array>
 #include <optional>
 #include <string_view>
 #include <tuple>
+#include <vector>
 
 // Forward declarations
 namespace OpenMesh::Subdivider::Uniform {
@@ -31,7 +30,12 @@ namespace mufflon::util {
 class IByteReader;
 } // namespace mufflon::util
 
-namespace mufflon::scene::geometry {
+namespace mufflon { namespace scene {
+
+template < Device dev >
+struct PolygonsDescriptor;
+
+namespace geometry {
 
 /**
  * Instantiation of geometry class.
@@ -72,7 +76,7 @@ public:
 		using Type = T;
 		std::string name;
 	};
-	
+
 	class FaceIterator {
 	public:
 		static FaceIterator cbegin(const PolygonMeshType& mesh) {
@@ -119,8 +123,7 @@ public:
 	private:
 		FaceIterator(const PolygonMeshType& mesh, OpenMesh::PolyConnectivity::ConstFaceIter iter) :
 			m_mesh(mesh),
-			m_faceIter(std::move(iter))
-		{}
+			m_faceIter(std::move(iter)) {}
 
 		const PolygonMeshType& m_mesh;
 		OpenMesh::PolyConnectivity::ConstFaceIter m_faceIter;
@@ -197,41 +200,9 @@ public:
 	 * renderer's task to aquire it once more after that, since we cannot hand out
 	 * Accessors to the concrete device.
 	 */
-	template < Device dev, std::size_t N, std::size_t M >
-	PolygonsDescriptor<dev> get_descriptor(const std::array<const char*, N>& vertexAttribs,
-										   const std::array<const char*, M>& faceAttribs) {
-		this->synchronize<dev>();
-
-		// Resize the attribute array if necessary
-		resizeAttribBuffer<dev>(vertexAttribs.size(), faceAttribs.size());
-		// Collect the attributes; for that, we iterate the given Attributes and
-		// gather them on CPU side (or rather, their device pointers); then
-		// we copy it to the actual device
-		AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
-		std::vector<void*> cpuVertexAttribs(vertexAttribs.size());
-		std::vector<void*> cpuFaceAttribs(faceAttribs.size());
-		for (const char* name : vertexAttribs)
-			cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
-		for (const char* name : faceAttribs)
-			cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
-		copy<void*>(attribBuffer.vertex, cpuVertexAttribs.data(), vertexAttribs.size());
-		copy<void*>(attribBuffer.face, cpuFaceAttribs.data(), faceAttribs.size());
-
-		return PolygonsDescriptor<dev>{
-			static_cast<u32>(this->get_vertex_count()),
-			static_cast<u32>(this->get_triangle_count()),
-			static_cast<u32>(this->get_quad_count()),
-			static_cast<u32>(vertexAttribs.size()),
-			static_cast<u32>(faceAttribs.size()),
-			this->acquire_const<dev, ei::Vec3, false>(this->get_points_hdl()),
-			this->acquire_const<dev, ei::Vec3, false>(this->get_normals_hdl()),
-			this->acquire_const<dev, ei::Vec2, false>(this->get_uvs_hdl()),
-			this->acquire_const<dev, u16, true>(this->get_material_indices_hdl()),
-			this->get_index_buffer<dev>(),
-			attribBuffer.vertex,
-			attribBuffer.face
-		};
-	}
+	template < Device dev >
+	PolygonsDescriptor<dev> get_descriptor(const std::vector<const char*>& vertexAttribs,
+										   const std::vector<const char*>& faceAttribs);
 
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
@@ -287,7 +258,7 @@ public:
 	// Implements tessellation for adaptive subdivision.
 	/*void tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<PolygonMeshType>& tessellater,
 					std::size_t divisions);*/
-	// Implements decimation.
+					// Implements decimation.
 	void create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 					std::size_t target_vertices);
 
@@ -302,7 +273,7 @@ public:
 		mAssert(m_meshData != nullptr);
 		return util::Range<FaceIterator>{
 			FaceIterator::cbegin(*m_meshData),
-			FaceIterator::cend(*m_meshData)
+				FaceIterator::cend(*m_meshData)
 		};
 	}
 
@@ -438,4 +409,4 @@ private:
 	std::size_t m_quads = 0u;
 };
 
-} // namespace mufflon::scene::geometry
+}}} // namespace mufflon::scene::geometry
