@@ -71,7 +71,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
 			// TODO: set startInsPrimId with a proper value.
 			bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-				scene, { vertex->get_position() , nee.direction }, 0xFFFFFFFF00000000ull, 
+				scene, { vertex->get_position() , ei::normalize(nee.direction) }, 0xFFFFFFFF00000000ull, 
 				nee.dist); 
 			if(!anyhit) {
 				auto value = vertex->evaluate(nee.direction, scene.media);

@@ -34,7 +34,7 @@ public:
 		desc.type = AccelType::LBVH;
 		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
 		lbvhDesc.bvh = as<ei::Vec4>( m_bvhNodes.acquire_const<dev>() );
-		lbvhDesc.primIds = as<i32>( m_bvhNodes.acquire_const<dev>() );
+		lbvhDesc.primIds = as<i32>(m_primIds.acquire_const<dev>() );
 		lbvhDesc.bvhSize = int(m_bvhNodes.size() / sizeof(ei::Vec4));
 		return desc;
 	}

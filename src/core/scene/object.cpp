@@ -21,8 +21,8 @@ Object::~Object() {
 }
 
 void Object::clear_accel_structure() {
-	m_accelStruct[get_device_index<Device::CPU>()].type = accel_struct::AccelType::NONE;
-	m_accelStruct[get_device_index<Device::CUDA>()].type = accel_struct::AccelType::NONE;
+	/*m_accelStruct[get_device_index<Device::CPU>()].type = accel_struct::AccelType::NONE;
+	m_accelStruct[get_device_index<Device::CUDA>()].type = accel_struct::AccelType::NONE;*/
 	// TODO memory
 }
 
@@ -33,14 +33,14 @@ ObjectDescriptor<dev> Object::get_descriptor(const std::vector<const char*>& ver
 	ObjectDescriptor<dev> desc{
 		m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
 		m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
-		m_accelStruct[get_device_index<dev>()]
+		AccelDescriptor{}
 	};
 	// (Re)build acceleration structure if necessary
-	if(is_accel_dirty<dev>()) {
-		//accel_struct::build_lbvh_obj(desc, m_boundingBox);
-		// TODO call after LBVHBuilder.build refactoring
-		m_accelStruct[get_device_index<dev>()] = desc.accelStruct;
+	if (m_accelStruct.needs_rebuild<dev>()) {
+		m_accelStruct.build(desc, get_bounding_box());
 	}
+	desc.accelStruct = m_accelStruct.acquire_const<dev>();
+
 	return desc;
 }
 

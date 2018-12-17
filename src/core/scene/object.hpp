@@ -10,6 +10,7 @@
 #include "util/range.hpp"
 #include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
+#include "core/scene/accel_structs/lbvh.hpp"
 #include <climits>
 #include <cstdint>
 #include <memory>
@@ -104,10 +105,10 @@ public:
 										 const std::vector<const char*>& sphereAttribs);
 
 	// Checks if the acceleration structure on one of the system parts has been modified.
-	template < Device dev >
-	bool is_accel_dirty() const noexcept {
-		return m_accelStruct[get_device_index<dev>()].type == accel_struct::AccelType::NONE;
-	}
+	//template < Device dev >
+	//bool is_accel_dirty() const noexcept {
+		//return m_accelStruct[get_device_index<dev>()].type == accel_struct::AccelType::NONE;
+	//}
 
 	// Checks whether the object currently has a BVH.
 	/*bool has_accel_structure() const noexcept {
@@ -150,7 +151,8 @@ private:
 	std::string_view m_name;
 	GeometryTuple m_geometryData;
 
-	AccelDescriptor m_accelStruct[NUM_DEVICES];
+	// Acceleration structure over all instances
+	accel_struct::LBVHBuilder m_accelStruct;
 	std::size_t m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	std::size_t m_lodLevel = DEFAULT_LOD_LEVEL; // Current level-of-detail
 	ObjectFlags m_flags;

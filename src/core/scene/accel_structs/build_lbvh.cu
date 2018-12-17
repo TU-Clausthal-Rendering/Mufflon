@@ -1524,7 +1524,7 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 			);
 	}
 	else {
-		for (i32 idx = 0; idx < i32(numNodes); idx++)
+		for (i32 idx = 1; idx < i32(numNodes); idx++)
 		{
 			copy_to_collapsed_bvh(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes,
 				collapsedBVH, boundingBoxes, parents, deviceCounters, primIds,
@@ -1726,7 +1726,7 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 			);
 	}
 	else {
-		for (i32 idx = 0; idx < (i32)numNodes; idx++)
+		for (i32 idx = 1; idx < (i32)numNodes; idx++)
 		{
 			copy_to_collapsed_bvh_ins(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes, 
 				collapsedBVH, boundingBoxes, parents, deviceCounters, primIds, 
