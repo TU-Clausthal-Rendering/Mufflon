@@ -309,14 +309,15 @@ namespace gui.ViewModel
             else if (microseconds < 6e7)
                 formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0.00}s", microseconds / 1e6f);
             else if (microseconds < 36e8)
-                formatted = String.Format(CultureInfo.InvariantCulture, "{0:00}m:{1:00.00}s",
-                    microseconds / 6e7f, microseconds / 1e6f);
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0}m:{1:00.00}s",
+                    microseconds / 6e7f, microseconds / 1e6f % 60f);
             else if (microseconds < 864e8)
-                formatted = String.Format(CultureInfo.InvariantCulture, "{0:00}h:{1:00}m:{2:00.00}s",
-                    microseconds / 36e8f, microseconds / 6e7f, microseconds / 1e6f);
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0}h:{1:00}m:{2:00.00}s",
+                    microseconds / 36e8f, microseconds / 6e7f % 60f, microseconds / 1e6f % 60f);
             else
-                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#}d:{1:00}h:{2:00}m:{3:00.00}s",
-                    microseconds / 864e8, microseconds / 36e8f, microseconds / 6e7f, microseconds / 1e6f);
+                formatted = String.Format(CultureInfo.InvariantCulture, "{0:#0}d:{1:00}h:{2:00}m:{3:00.00}s",
+                    microseconds / 864e8, microseconds / 36e8f % 24f,
+                    microseconds / 6e7f % 60f, microseconds / 1e6f % 60f);
             return formatted;
         }
 
