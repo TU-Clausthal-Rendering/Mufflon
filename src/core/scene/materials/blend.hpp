@@ -42,10 +42,10 @@ struct BlendDesc {
 // Class for the handling of the Lambertian material.
 class Blend : public IMaterial {
 public:
-	Blend(IMaterial* layerA, float factorA, IMaterial* layerB, float factorB) :
+	Blend(std::unique_ptr<IMaterial> layerA, float factorA, std::unique_ptr<IMaterial> layerB, float factorB) :
 		IMaterial{Materials::BLEND},
-		m_layerA{layerA},
-		m_layerB{layerB},
+		m_layerA{move(layerA)},
+		m_layerB{move(layerB)},
 		m_factorA{factorA},
 		m_factorB{factorB}
 	{}
@@ -87,8 +87,8 @@ public:
 		return m_layerA->compute_medium();
 	}
 private:
-	IMaterial* m_layerA;
-	IMaterial* m_layerB;
+	std::unique_ptr<IMaterial> m_layerA;
+	std::unique_ptr<IMaterial> m_layerB;
 	float m_factorA;
 	float m_factorB;
 };

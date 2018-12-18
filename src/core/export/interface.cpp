@@ -1233,13 +1233,12 @@ ConstScenarioHdl world_get_current_scenario() {
 	CATCH_ALL(nullptr)
 }
 
-MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
-	TRY
+namespace {
+std::unique_ptr<materials::IMaterial> convert_material(const char* name, const MaterialParams* mat) {
 	CHECK_NULLPTR(name, "material name", nullptr);
 	CHECK_NULLPTR(mat, "material parameters", nullptr);
 
 	std::unique_ptr<materials::IMaterial> newMaterial;
-	MaterialHandle hdl = nullptr;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
 			auto tex = mat->inner.lambert.albedo;
@@ -1254,15 +1253,19 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 			return nullptr;
 		case MATERIAL_EMISSIVE: {
 			auto tex = mat->inner.emissive.radiance;
-			auto newMaterial = std::make_unique<materials::Emissive>(static_cast<TextureHandle>(tex),
+			newMaterial = std::make_unique<materials::Emissive>(static_cast<TextureHandle>(tex),
 								util::pun<Spectrum>(mat->inner.emissive.scale));
 		}	break;
 		case MATERIAL_ORENNAYAR:
 			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
 			return nullptr;
-		case MATERIAL_BLEND:
-			logWarning("[", FUNCTION_NAME, "] Material type 'blend' not supported yet");
-			return nullptr;
+		case MATERIAL_BLEND: {
+			auto a = convert_material("LayerA", mat->inner.blend.a.mat);
+			auto b = convert_material("LayerB", mat->inner.blend.b.mat);
+			newMaterial = std::make_unique<materials::Blend>(
+				move(a), mat->inner.blend.a.factor,
+				move(b), mat->inner.blend.b.factor);
+		}	break;
 		case MATERIAL_FRESNEL:
 			logWarning("[", FUNCTION_NAME, "] Material type 'fresnel' not supported yet");
 			return nullptr;
@@ -1276,7 +1279,14 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 		{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 			util::pun<Spectrum>(mat->outerMedium.absorption)}) );
 	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
-	hdl = s_world.add_material(move(newMaterial));
+
+	return move(newMaterial);
+}
+} // namespace ::
+
+MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
+	TRY
+	MaterialHandle hdl = s_world.add_material(convert_material(name, mat));
 
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating material '",
@@ -1287,6 +1297,7 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	return static_cast<MaterialHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
+
 
 CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 								   Vec3 up, float near, float far, float vFov) {
