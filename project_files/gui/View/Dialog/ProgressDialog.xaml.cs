@@ -16,6 +16,10 @@ namespace gui.View.Dialog
 {
     /// <summary>
     /// Interaction logic for ProgressDialog.xaml
+    /// Properties:
+    /// WindowName - String
+    /// ConsoleOutput - ConsoleOutputViewModel
+    /// Progress - Value between 0 and 100
     /// </summary>
     public partial class ProgressDialog : Window
     {

@@ -4,9 +4,22 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui.View.Dialog"
+        xmlns:view="clr-namespace:gui.View"
         mc:Ignorable="d"
-        Title="ProgressDialog" Height="450" Width="800">
-    <Grid>
-        
-    </Grid>
+        Title="{Binding WindowName, FallbackValue=WindowName}" 
+        Height="300" 
+        Width="600"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="{StaticResource DialogStartupLocation}"
+        ResizeMode="NoResize">
+    <StackPanel Margin="{StaticResource DialogMargin}">
+        <view:ConsoleView
+            Height="200"
+            DataContext="{Binding ConsoleOutput}"
+            Margin="{StaticResource SinglePropertyMargin}"/>
+
+        <ProgressBar 
+            Height="30" 
+            Value="{Binding Progress, FallbackValue=20}"/>
+    </StackPanel>
 </Window>
