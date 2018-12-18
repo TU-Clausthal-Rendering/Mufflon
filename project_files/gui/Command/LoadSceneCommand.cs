@@ -45,7 +45,7 @@ namespace gui.Command
                     string file = dialog.FileName;
                     m_lastDirectory = Path.GetDirectoryName(file);
                     Settings.Default.lastScenePath = m_lastDirectory;
-                    m_models.Scene.loadScene(file);
+                    m_models.Scene.LoadScene(file);
                 }
             }
         }

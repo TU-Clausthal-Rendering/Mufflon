@@ -41,7 +41,7 @@ namespace gui.ViewModel
 
             public void Execute(object parameter)
             {
-                m_models.Scene.loadScene(Path);
+                m_models.Scene.LoadScene(Path);
             }
 
             public event EventHandler CanExecuteChanged

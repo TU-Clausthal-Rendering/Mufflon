@@ -5,6 +5,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using gui.Annotations;
 using gui.Dll;
@@ -56,7 +57,7 @@ namespace gui.Model
             }
         }
 
-        public StringCollection LastScenes { get => Settings.Default.LastScenes; }
+        public StringCollection LastScenes => Settings.Default.LastScenes;
         public ObservableCollection<string> Scenarios { get; }
 
         public bool IsLoaded
@@ -77,63 +78,75 @@ namespace gui.Model
             Scenarios = new ObservableCollection<string>();
         }
 
-        public bool loadScene(string path)
+        public void LoadScene(string path)
         {
-            if (path != FullPath)
-            {
-                if (!File.Exists(path))
-                {
-                    if (MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
-                        "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
-                        MessageBoxImage.Error) == MessageBoxResult.Yes)
-                    {
-                        int index = Settings.Default.LastScenes.IndexOf(path);
-                        if (index >= 0)
-                        {
-                            Settings.Default.LastScenes.RemoveAt(index);
-                            OnPropertyChanged(nameof(LastScenes));
-                        }
-                    }
-                    return false;
-                }
-                else
-                {
-                    if (!Loader.loader_load_json(path))
-                    {
-                        MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                        FullPath = null;
-                        return false;
-                    }
-                    else
-                    {
-                        // Set path and load scene properties
-                        FullPath = path;
-                        uint count = Core.world_get_scenario_count();
-                        for(uint i = 0u; i < count; ++i)
-                            Scenarios.Add(Core.world_get_scenario_name_by_index(i));
-                        OnPropertyChanged(nameof(Scenarios));
-                        return true;
-                    }
-                }
-            } else
+            if (path == FullPath)
             {
                 MessageBox.Show("Scene is already loaded", "", MessageBoxButton.OK,
                     MessageBoxImage.Exclamation);
-                return true;
+                return; // true;
             }
+
+            if (!File.Exists(path))
+            {
+                if (MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
+                    "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
+                    MessageBoxImage.Error) == MessageBoxResult.Yes)
+                {
+                    int index = Settings.Default.LastScenes.IndexOf(path);
+                    if (index >= 0)
+                    {
+                        Settings.Default.LastScenes.RemoveAt(index);
+                        OnPropertyChanged(nameof(LastScenes));
+                    }
+                }
+
+                return; //false;
+            }
+
+            LoadSceneAsynch(path);
         }
 
-        #region PropertyChanged
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        [NotifyPropertyChangedInvocator]
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        private async void LoadSceneAsynch(string path)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            var succeded = await Task.Run(() =>
+            {
+                var res = Loader.loader_load_json(path);
+                return res;
+            });
+
+            if (!succeded)
+            {
+                MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                //Logger.log(e.Message, Core.Severity.FATAL_ERROR);
+                FullPath = null;
+                return; // false;
+            }
+
+            MessageBox.Show("Scene was loaded successfully", "Information", MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            // Set path and load scene properties
+            FullPath = path;
+            uint count = Core.world_get_scenario_count();
+            Scenarios.Clear();
+            for (uint i = 0u; i < count; ++i)
+                Scenarios.Add(Core.world_get_scenario_name_by_index(i));
+            OnPropertyChanged(nameof(Scenarios));
+            //return true;
         }
 
-        #endregion
+    #region PropertyChanged
+
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    [NotifyPropertyChangedInvocator]
+    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    #endregion
     }
 }
