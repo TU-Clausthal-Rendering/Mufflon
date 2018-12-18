@@ -57,35 +57,80 @@ CUDA_FUNCTION u32 clz(u32 v) {
 }
 
 
-__host__ __device__ ei::Vec3 get_triangle_centroid(ei::Vec3 v0, ei::Vec3 v1, ei::Vec3 v2) {
-	ei::Vec3 lo = min(v0, v1, v2);
-	ei::Vec3 hi = max(v0, v1, v2);
-
-	return (lo + hi) * 0.5f;
+// Generic centroid overloads.
+// This helps in generalizing the code of a builder
+template < Device dev >
+__host__ __device__ ei::Vec3 get_centroid(const ObjectDescriptor<dev>& obj, i32 idx) {
+	// Primitve order: Trianges, Quads, Spheres -> idx determines the case
+	i32 spheresOffset = obj.polygon.numQuads + obj.polygon.numTriangles;
+	if(idx >= spheresOffset)
+		return obj.spheres.spheres[idx - spheresOffset].center;
+	if(idx >= i32(obj.polygon.numTriangles)) {
+		i32 quadId = (idx - obj.polygon.numTriangles) << 2;
+		return (obj.polygon.vertices[obj.polygon.vertexIndices[quadId  ]]
+			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+1]]
+			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+2]]
+			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+3]]) / 4.0f;
+	}
+	i32 triId = idx * 3;
+	return (obj.polygon.vertices[obj.polygon.vertexIndices[triId  ]]
+		  + obj.polygon.vertices[obj.polygon.vertexIndices[triId+1]]
+		  + obj.polygon.vertices[obj.polygon.vertexIndices[triId+2]]) / 3.0f;
 }
 
-__host__ __device__ ei::Vec3 get_quad_centroid(ei::Vec3 v0, ei::Vec3 v1,
-	ei::Vec3 v2, ei::Vec3 v3) {
-	ei::Vec3 lo = min(v0, v1, v2, v3);
-	ei::Vec3 hi = max(v0, v1, v2, v3);
-
-	return (lo + hi) * 0.5f;
+template < Device dev >
+__host__ __device__ ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 idx) {
+	i32 objIdx = scene.objectIndices[idx];
+	//const ei::Box aabb = ei::transform(prim.objAabbs[objIdx], prim.matrices[idx]);
+	// Extract the translation from the matrix only (no need to compute the
+	// full bounding box.
+	return center(scene.aabbs[objIdx]) + ei::Vec3{scene.transformations[idx][3],
+												  scene.transformations[idx][7],
+												  scene.transformations[idx][11]};
 }
+
+// Generic bounding box overloads.
+// This helps in generalizing the code of a builder
+template < Device dev >
+__host__ __device__ ei::Box get_bounding_box(const ObjectDescriptor<dev>& obj, i32 idx) {
+	// Primitve order: Trianges, Quads, Spheres -> idx determines the case
+	i32 spheresOffset = obj.polygon.numQuads + obj.polygon.numTriangles;
+	if(idx >= spheresOffset)
+		return ei::Box(obj.spheres.spheres[idx - spheresOffset]);
+	if(idx >= i32(obj.polygon.numTriangles)) {
+		i32 quadId = (idx - obj.polygon.numTriangles) << 2;
+		return ei::Box(obj.polygon.vertices[obj.polygon.vertexIndices[quadId  ]],
+					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+1]],
+					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+2]],
+					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+3]]);
+	}
+	i32 triId = idx * 3;
+	return ei::Box(obj.polygon.vertices[obj.polygon.vertexIndices[triId  ]],
+				   obj.polygon.vertices[obj.polygon.vertexIndices[triId+1]],
+				   obj.polygon.vertices[obj.polygon.vertexIndices[triId+2]]);
+}
+
+template < Device dev >
+__host__ __device__ ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
+	i32 objIdx = scene.objectIndices[idx];
+	return ei::transform(scene.aabbs[objIdx], scene.transformations[idx]);
+}
+
 
 // Calculates the point morton code using 63 bits.
-__forceinline__ __host__ __device__ u32 calculate_morton_code32(ei::Vec3 point)
-{
-	// Discretize the unit cube into a 21 bit integer
+template<typename Code>
+__forceinline__ __host__ __device__ Code calculate_morton_code(const ei::Vec3& point) {}
+template<>
+__forceinline__ __host__ __device__ u32 calculate_morton_code<u32>(const ei::Vec3& point) {
+	// Discretize the unit cube into a 10 bit integer
 	ei::UVec3 discretized{ ei::clamp(point * 1024.0f, 0.0f, 1023.0f) };
 
 	return math::part_by_two10(discretized[0]) * 4
 		+ math::part_by_two10(discretized[1]) * 2
 		+ math::part_by_two10(discretized[2]);
 }
-
-// Calculates the point morton code using 63 bits.
-__forceinline__ __host__ __device__ u64 calculate_morton_code64(ei::Vec3 point)
-{
+template<>
+__forceinline__ __host__ __device__ u64 calculate_morton_code<u64>(const ei::Vec3& point) {
 	// Discretize the unit cube into a 21 bit integer
 	ei::UVec3 discretized { ei::clamp(point * 2097152.0f, 0.0f, 2097151.0f) };
 
@@ -95,111 +140,46 @@ __forceinline__ __host__ __device__ u64 calculate_morton_code64(ei::Vec3 point)
 }
 
 __forceinline__ __host__ __device__
-ei::Vec3 normalize_position(ei::Vec3 pos, ei::Vec3 lo, ei::Vec3 hi) {
-	ei::Vec3 span = hi - lo;
-	return ei::Vec3((pos.x - lo.x) / span.x, (pos.y - lo.y) / span.y, (pos.z - lo.z) / span.z);
+ei::Vec3 normalize_position(ei::Vec3 pos, const ei::Box& box) {
+	ei::Vec3 span = box.max - box.min;
+	return (pos - box.min) / span;
 }
 
-CUDA_FUNCTION void calculate_morton_codes64(
-	ei::Vec3* meshVertices,
-	ei::Vec4* spheres,
-	i32* triIndices,
-	i32* quadIndices,
-	u64* mortonCodes,
-	i32* sortIndices, ei::Vec3 lo, ei::Vec3 hi,
-	const i32 offsetQuads, 
-	const i32 offsetSpheres, 
-	const i32 numPrimitives,
-	const i32 idx) {
-	ei::Vec3 centroid;
-	if (idx >= offsetSpheres) {
-		// Calculate Morton codes for spheres.
-		i32 sphId = idx - offsetSpheres;
-		ei::Vec4 sph = spheres[sphId];
-		centroid = ei::Vec3(sph);
-	}
-	else {
-		if (idx >= offsetQuads) {
-			// Calculate Morton codes for quads.
-			i32 quadId = (idx - offsetQuads) << 2;
-			ei::Vec3 v0 = meshVertices[quadIndices[quadId]];
-			ei::Vec3 v1 = meshVertices[quadIndices[quadId + 1]];
-			ei::Vec3 v2 = meshVertices[quadIndices[quadId + 2]];
-			ei::Vec3 v3 = meshVertices[quadIndices[quadId + 3]];
-			centroid = get_quad_centroid(v0, v1, v2, v3);
-		}
-		else {
-			// Calculate Morton codes for triangles.
-			i32 triId = idx * 3;
-			ei::Vec3 v0 = meshVertices[triIndices[triId]];
-			ei::Vec3 v1 = meshVertices[triIndices[triId + 1]];
-			ei::Vec3 v2 = meshVertices[triIndices[triId + 2]];
-			centroid = get_triangle_centroid(v0, v1, v2);
-		}
-	}
-	const ei::Vec3 normalizedPos = normalize_position(centroid, lo, hi);
-	const u64 mortonCode = calculate_morton_code64(normalizedPos);
-	mortonCodes[idx] = mortonCode;
-	sortIndices[idx] = idx;
+template<typename DescType, typename Code>
+CUDA_FUNCTION Code calculate_morton_code(const DescType& primitives, i32 idx,
+										 const ei::Box& sceneBB) {
+	const ei::Vec3 centroid = get_centroid(primitives, idx);
+	const ei::Vec3 normalizedPos = normalize_position(centroid, sceneBB);
+	return calculate_morton_code<Code>(normalizedPos);
 }
+
 
 __global__ void calculate_morton_codes64D(
-	ei::Vec3* meshVertices,
-	ei::Vec4* spheres,
-	i32* triIndices,
-	i32* quadIndices,
+	const ObjectDescriptor<Device::CUDA>& obj,
+	const ei::Box& sceneBB,
 	u64* mortonCodes,
-	i32* sortIndices, 
-	const ei::Vec3 lo,
-	const ei::Vec3 hi,
-	const i32 offsetQuads,
-	const i32 offsetSpheres,
-	const i32 numPrimitives) {
+	i32* sortIndices) {
 	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (idx >= numPrimitives)
+	if (idx >= obj.numPrimitives)
 		return;
 
-	calculate_morton_codes64(meshVertices,
-		spheres, triIndices, quadIndices,
-		mortonCodes, sortIndices, lo, hi,
-		offsetQuads, offsetSpheres, numPrimitives, idx);
-}
-
-CUDA_FUNCTION void calculate_morton_codes32(
-	ei::Mat3x4* matrices,
-	i32* objIds,
-	ei::Box* aabbs,
-	const ei::Vec3 lo, 
-	const ei::Vec3 hi,
-	u32* mortonCodes,
-	i32* sortIndices,
-	const i32 numInstances,
-	const i32 idx
-) {
-	const i32 objId = objIds[idx];
-	const ei::Box aabb = ei::transform(aabbs[objId], matrices[idx]);
-
-	const ei::Vec3 normalizedPos = normalize_position(center(aabb), lo, hi);
-	mortonCodes[idx] = calculate_morton_code32(normalizedPos);
+	mortonCodes[idx] = calculate_morton_code<ObjectDescriptor<Device::CUDA>, u64>(obj, idx, sceneBB);
 	sortIndices[idx] = idx;
 }
 
 __global__ void calculate_morton_codes32D(
-	ei::Mat3x4* matrices,
-	i32* objIds,
-	ei::Box* aabbs,
-	const ei::Vec3 lo, 
-	const ei::Vec3 hi,
+	const SceneDescriptor<Device::CUDA>& scene,
+	const ei::Box& sceneBB,
 	u32* mortonCodes,
-	i32* sortIndices,
-	const i32 numInstances) {
+	i32* sortIndices) {
 	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (idx >= numInstances)
+	if (idx >= scene.numInstances)
 		return;
 
-	calculate_morton_codes32(matrices, objIds, aabbs, lo, hi, mortonCodes, sortIndices, numInstances, idx);
+	mortonCodes[idx] = calculate_morton_code<SceneDescriptor<Device::CUDA>, u32>(scene, idx, sceneBB);
+	sortIndices[idx] = idx;
 }
 
 template<typename T> 
@@ -403,73 +383,47 @@ struct BBCache {
 };
 static_assert(sizeof(BBCache) == 8*sizeof(float), "Alignment of BBCache will be broken.");
 
+template < Device dev >
 CUDA_FUNCTION void calculate_bounding_boxes(
-	const u32 numPrimitives,
-	ei::Vec3* meshVertices,
-	ei::Vec4* spheres,
-	i32* triIndices,
-	i32* quadIndices,
+	const ObjectDescriptor<dev>& obj,
 	ei::Vec4 * __restrict__ boundingBoxes, //TODO remove __restricts?
 	i32 *sortedIndices,
 	i32 * __restrict__ parents,
 	i32 *collapseOffsets,
-	const i32 offsetQuads,
-	const i32 offsetSpheres,
-	const float ci, const float ct0, const float ct1, const float ct2,
+	const ei::Vec4& traversalCosts,
 	i32* counters,
 	const i32 idx,
 	const i32 firstThreadInBlock = 0,
 	const i32 lastThreadInBlock = 0,
 	BBCache* sharedBb = nullptr
-	)
-{
+) {
 	// If node is to be collapsed, offsets, dataIndices need to be updated.
 	bool checkCollapse = true;
 	i32 primId = sortedIndices[idx];
 
 	// Calculate leaves bounding box and set primitives count and intersection test cost.
 	ei::Box currentBb;
-	float cost(ci), costAsLeaf;
+	float cost(traversalCosts.x), costAsLeaf;
 	// Some auxilary variables for calculating primitiveCount.
 	ei::IVec4 counts = { 0,0,0,1 }; // x: tri; y: quad; z: sphere; w: total.
 	ei::IVec4 otherCounts; // x: tri; y: quad; z: sphere; w: total.
 	// primitiveCount stores the numbers of each primitives in form:
 	// 2 unused bits + 10 bits triangle + 10 bits quads + 10 bits spheres.
 	i32 primitiveCount;
-	if (primId >= offsetSpheres) {
-		// Calculate bounding box for spheres.
-		i32 sphId = primId - offsetSpheres;
-		ei::Sphere sph = *reinterpret_cast<ei::Sphere*>(spheres + sphId);
-		currentBb = ei::Box(sph);
+	if (primId >= i32(obj.polygon.numTriangles + obj.polygon.numQuads)) {
 		primitiveCount = 1;
-		cost += ct2;
+		cost += traversalCosts.w;
 		counts.z = 1;
+	} else if (primId >= i32(obj.polygon.numTriangles)) {
+		primitiveCount = 0x00000400;
+		cost += traversalCosts.z;
+		counts.y = 1;
+	} else {
+		primitiveCount = 0x00100000;
+		cost += traversalCosts.y;
+		counts.x = 1;
 	}
-	else {
-		if (primId >= offsetQuads) {
-			// Calculate bounding box for quads.
-			i32 quadId = (primId - offsetQuads) << 2;
-			ei::Vec3 v[4] = { meshVertices[quadIndices[quadId]],
-							  meshVertices[quadIndices[quadId + 1]],
-							  meshVertices[quadIndices[quadId + 2]],
-							  meshVertices[quadIndices[quadId + 3]] };
-			currentBb = ei::Box(v, 4);
-			primitiveCount = 0x00000400;
-			cost += ct1;
-			counts.y = 1;
-		}
-		else {
-			// Calculate bounding box for triangles.
-			i32 triId = primId * 3;
-			ei::Vec3 v[3] = { meshVertices[triIndices[triId]],
-							  meshVertices[triIndices[triId + 1]],
-							  meshVertices[triIndices[triId + 2]] };
-			currentBb = ei::Box(v, 3);
-			primitiveCount = 0x00100000;
-			cost += ct0;
-			counts.x = 1;
-		}
-	}
+	currentBb = get_bounding_box(obj, primId);
 
 	// Store cost and primitiveCount.
 	cost *= ei::surface(currentBb);
@@ -478,7 +432,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 #ifdef __CUDA_ARCH__
 	sharedBb[threadIdx.x] = { currentBb, cost, primitiveCount };
 #endif
-	const i32 numInternalNodes = numPrimitives - 1;
+	const i32 numInternalNodes = obj.numPrimitives - 1;
 	i32 leafIndex = idx + numInternalNodes;
 	i32 boxId = leafIndex << 1;
 	boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(primitiveCount) };
@@ -590,15 +544,14 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 				// even if the current node has checkCollapse = false but be killed in 
 				// the next round, however, primitiveCount will be read to disable checkCollapse.
 				primitiveCount = 0x00000FFF;
-			}
-			else {
+			} else {
 				// & 0x3FFFFFFF is used to avoid intervention of the leftChildMarkBit.
 				primitiveCount += (childInfo.primCount & 0x3FFFFFFF);
 				// Calculate costs.
 				float area = ei::surface(currentBb);
-				cost = ci * area + childInfo.cost + cost;
+				cost = traversalCosts.x * area + childInfo.cost + cost;
 				counts.w += otherCounts.w;// Determine offset.
-				costAsLeaf = area * (counts.x * ct0 + counts.y * ct1 + counts.z * ct2);
+				costAsLeaf = area * (counts.x * traversalCosts.y + counts.y * traversalCosts.z + counts.z * traversalCosts.w);
 				if (costAsLeaf < cost) {
 					// Collapse.
 					primitiveCount |= 0x80000000;
@@ -671,18 +624,12 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 }
 
 __global__ void calculate_bounding_boxesD(
-	const u32 numPrimitives,
-	ei::Vec3* meshVertices,
-	ei::Vec4* spheres,
-	i32* triIndices,
-	i32* quadIndices,
-	ei::Vec4 * __restrict__ boundingBoxes, //TODO remove __restricts?
-	i32 *sortedIndices,
-	i32 * __restrict__ parents,
-	i32 *collapseOffsets,
-	const i32 offsetQuads, 
-	const i32 offsetSpheres,
-	const float ci, const float ct0, const float ct1, const float ct2,
+	const ObjectDescriptor<Device::CUDA>& obj,
+	ei::Vec4* __restrict__ boundingBoxes, //TODO remove __restricts?
+	i32* sortedIndices,
+	i32* __restrict__ parents,
+	i32* collapseOffsets,
+	const ei::Vec4& traversalCosts,
 	i32* counters)
 {
 	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -693,21 +640,17 @@ __global__ void calculate_bounding_boxesD(
 	extern __shared__ BBCache sharedBb[]; 
 
 	// Check for valid threads.
-	if (idx >= numPrimitives)
-	{
+	if (idx >= obj.numPrimitives)
 		return;
-	}
 
-	calculate_bounding_boxes(numPrimitives, meshVertices, spheres, triIndices, quadIndices,
-		boundingBoxes, sortedIndices, parents, collapseOffsets, offsetQuads, offsetSpheres,
-		ci, ct0, ct1, ct2, counters, idx, firstThreadInBlock, lastThreadInBlock, sharedBb);
+	calculate_bounding_boxes(obj, boundingBoxes, sortedIndices, parents,
+		collapseOffsets, traversalCosts, counters, idx,
+		firstThreadInBlock, lastThreadInBlock, sharedBb);
 }
 
+template < Device dev >
 CUDA_FUNCTION void calculate_bounding_boxes_ins(
-	const u32 numInstances,
-	ei::Mat3x4* matrices,
-	i32* objIds,
-	ei::Box* aabbs,
+	const SceneDescriptor<dev>& scene,
 	ei::Vec4 * __restrict__ boundingBoxes, //TODO remove __restricts?
 	i32 *sortedIndices,
 	i32 * __restrict__ parents,
@@ -724,8 +667,8 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 
 	// Calculate leaves bounding box and set primitives count and intersection test cost.
 	float costAsLeaf;
-	const i32 objId = objIds[idx];
-	ei::Box currentBb = ei::transform(aabbs[objId], matrices[idx]);
+	const i32 objId = scene.objectIndices[idx];
+	ei::Box currentBb = ei::transform(scene.aabbs[objId], scene.transformations[idx]);
 	// Some auxilary variables for calculating primitiveCount.
 	i32 instanceCount = 1;
 	float cost = ci + ct;
@@ -737,7 +680,7 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 #ifdef __CUDA_ARCH__
 	sharedBb[threadIdx.x] = { currentBb, cost, instanceCount };
 #endif
-	const i32 numInternalNodes = numInstances - 1;
+	const i32 numInternalNodes = scene.numInstances - 1;
 	i32 leafIndex = idx + numInternalNodes;
 	i32 boxId = leafIndex << 1;
 	boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(instanceCount) };
@@ -926,10 +869,7 @@ CUDA_FUNCTION void calculate_bounding_boxes_ins(
 }
 
 __global__ void calculate_bounding_boxes_insD(
-	u32 numInstances,
-	ei::Mat3x4* matrices,
-	i32* objIds,
-	ei::Box* aabbs,
+	const SceneDescriptor<Device::CUDA>& scene,
 	ei::Vec4 * __restrict__ boundingBoxes, //TODO remove __restricts?
 	i32 *sortedIndices,
 	i32 * __restrict__ parents,
@@ -945,19 +885,17 @@ __global__ void calculate_bounding_boxes_insD(
 	extern __shared__ BBCache sharedBb[];
 
 	// Check for valid threads.
-	if (idx >= numInstances)
-	{
+	if (idx >= scene.numInstances)
 		return;
-	}
 
-	calculate_bounding_boxes_ins(numInstances, matrices, objIds, aabbs, boundingBoxes,
+	calculate_bounding_boxes_ins(scene, boundingBoxes,
 		sortedIndices, parents, collapseOffsets, ci, ct, counters, idx, 
 		firstThreadInBlock, lastThreadInBlock, sharedBb);
 }
 
 CUDA_FUNCTION void mark_nodes(
 	u32 numInternalNodes,
-	ei::Vec4* __restrict__ boundingBoxes,
+	const ei::Vec4* __restrict__ boundingBoxes,
 	i32* __restrict__ removedMarks,
 	i32* __restrict__ reduceOffsets,
 	i32* __restrict__ leafMarks,
@@ -998,7 +936,7 @@ CUDA_FUNCTION void mark_nodes(
 
 __global__ void mark_nodesD(
 	u32 numInternalNodes,
-	ei::Vec4* __restrict__ boundingBoxes,
+	const ei::Vec4* __restrict__ boundingBoxes,
 	i32* __restrict__ removedMarks,
 	i32* __restrict__ reduceOffsets,
 	i32* __restrict__ leafMarks
@@ -1012,7 +950,7 @@ __global__ void mark_nodesD(
 }
 
 
-CUDA_FUNCTION i32 insert_id(i32 id, i32* preLeaves, i32 removedLeaves) {
+CUDA_FUNCTION i32 insert_id(i32 id, const i32* preLeaves, i32 removedLeaves) {
 	i32 numPreLeaves = preLeaves[id];
 	return (id << 2) - numPreLeaves * 3 - removedLeaves;
 }
@@ -1037,12 +975,12 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 	const i32 numInternalNodes,
 	const i32 simpleLeafOffset,
 	ei::Vec4* collapsedBVH,
-	ei::Vec4 * __restrict__ boundingBoxes,
-	i32* __restrict__ parents,
-	i32* __restrict__ removedMarks,
+	const ei::Vec4 * __restrict__ boundingBoxes,
+	const i32* __restrict__ parents,
+	const i32* __restrict__ removedMarks,
 	i32* __restrict__ sortIndices,
-	i32* __restrict__ preInternalLeaves,
-	i32* __restrict__ reduceOffsets,
+	const i32* __restrict__ preInternalLeaves,
+	const i32* __restrict__ reduceOffsets,
 	const i32 offsetQuads, const i32 offsetSpheres,
 	const i32 idx
 ) {
@@ -1205,12 +1143,12 @@ __global__ void copy_to_collapsed_bvhD(
 	const i32 numInternalNodes,
 	const i32 simpleLeafOffset,
 	ei::Vec4* collapsedBVH,
-	ei::Vec4 * __restrict__ boundingBoxes,
-	i32* __restrict__ parents,
-	i32* __restrict__ removedMarks,
+	const ei::Vec4 * __restrict__ boundingBoxes,
+	const i32* __restrict__ parents,
+	const i32* __restrict__ removedMarks,
 	i32* __restrict__ sortIndices,
-	i32* __restrict__ preInternalLeaves,
-	i32* __restrict__ reduceOffsets,
+	const i32* __restrict__ preInternalLeaves,
+	const i32* __restrict__ reduceOffsets,
 	const i32 offsetQuads, const i32 offsetSpheres
 ) {
 	i32 idx = threadIdx.x + blockIdx.x * blockDim.x + 1;
@@ -1338,13 +1276,10 @@ namespace mufflon { namespace scene { namespace accel_struct {
 
 // For the objects.
 template < Device dev >
-void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
-	ei::Vec4* spheres,
-	i32* triIndices,
-	i32* quadIndices,
-	const ei::Box& aabb, ei::Vec4 traverseCosts, i32 numPrimitives,
-	i32 offsetQuads, i32 offsetSpheres) {
-	if (numPrimitives == 1) {
+void LBVHBuilder::build_lbvh(const ObjectDescriptor<dev>& obj,
+							 const ei::Box& sceneBB,
+							 const ei::Vec4& traverseCosts) {
+	if(obj.numPrimitives == 1) {
 		// TODO remove this. 
 		m_primIds.resize(1);
 		m_primIds.synchronize<dev>();
@@ -1357,39 +1292,39 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
 	// cannot allocate the other parts in bvh.
-	m_primIds.resize(numPrimitives * sizeof(i32));
+	m_primIds.resize(obj.numPrimitives * sizeof(i32));
 	i32* primIds = as<i32>(m_primIds.acquire<dev>());
 
 	// Calculate Morton codes.
-	auto codesMem = make_udevptr_array<dev, u64>(numPrimitives);
-	const i32 numInternalNodes = numPrimitives - 1;
-	const u32 numNodes = numInternalNodes + numPrimitives;
+	auto codesMem = make_udevptr_array<dev, u64>(obj.numPrimitives);
+	const i32 numInternalNodes = obj.numPrimitives - 1;
+	const u32 numNodes = numInternalNodes + obj.numPrimitives;
 	auto parentsMem = make_udevptr_array<dev, i32>(numNodes);
 	i32 *parents = parentsMem.get(); // size numNodes.
 	{
 		u64* mortonCodes = codesMem.get();
-		if (dev == Device::CUDA) {
-			get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codes64D);
-			calculate_morton_codes64D << < numBlocks, numThreads >> > (meshVertices,
-				spheres, triIndices, quadIndices,
-				mortonCodes, primIds, aabb.min, aabb.max,
-				offsetQuads, offsetSpheres, numPrimitives);
+		if(dev == Device::CUDA) {
+			// Satisfy the compiler (this brach is never reached without having the correct type,
+			// so the cast is effectless. However, the cleaner 'if constexpr' is not supported in cuda.
+			auto dobj = reinterpret_cast<const ObjectDescriptor<Device::CUDA>&>(obj);
+			get_maximum_occupancy(numBlocks, numThreads, obj.numPrimitives, calculate_morton_codes64D);
+			calculate_morton_codes64D << < numBlocks, numThreads >> > (
+				dobj, sceneBB, mortonCodes, primIds);
+			cuda::check_error(cudaGetLastError());
 
 			// Sort based on Morton codes.
-			CuLib::DeviceSort(numPrimitives, &mortonCodes, &mortonCodes,
+			CuLib::DeviceSort(obj.numPrimitives, &mortonCodes, &mortonCodes,
 				&primIds, &primIds);
-		}
-		else {
-			for (i32 idx = 0; idx < numPrimitives; idx++)
+			cuda::check_error(cudaGetLastError());
+		} else {
+			for (i32 idx = 0; idx < obj.numPrimitives; idx++)
 			{
-				calculate_morton_codes64(meshVertices,
-					spheres, triIndices, quadIndices,
-					mortonCodes, primIds, aabb.min, aabb.max,
-					offsetQuads, offsetSpheres, numPrimitives, idx);
+				mortonCodes[idx] = calculate_morton_code<ObjectDescriptor<dev>, u64>(obj, idx, sceneBB);
+				primIds[idx] = idx;
 			}
 
 			// Sort based on Morton codes.
-			thrust::sort_by_key(mortonCodes, mortonCodes + numPrimitives, primIds);
+			thrust::sort_by_key(mortonCodes, mortonCodes + obj.numPrimitives, primIds);
 		}
 
 		// Create BVH.
@@ -1398,14 +1333,15 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 			cudaFuncSetCacheConfig(build_lbvh_treeD<u64>, cudaFuncCachePreferL1);
 			get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<u64>);
 			build_lbvh_treeD<u64> << <numBlocks, numThreads >> > (//TODO check <u64>
-				numPrimitives,
+				obj.numPrimitives,
 				mortonCodes,
 				parents);
+			cuda::check_error(cudaGetLastError());
 		}
 		else {
 			for (i32 idx = 0; idx < numInternalNodes; idx++)
 			{
-				build_lbvh_tree<u64>(numPrimitives, mortonCodes, parents, idx);
+				build_lbvh_tree<u64>(obj.numPrimitives, mortonCodes, parents, idx);
 			}
 		}
 	}
@@ -1416,8 +1352,7 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 	i32* deviceCounters = deviceCountersMem.get();
 	mem_set<dev>(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
 	// Allocate bounding boxes.
-	auto boundingBoxesMem = make_udevptr_array<dev, ei::Vec4>(numNodes * 2);
-	ei::Vec4 *boundingBoxes = boundingBoxesMem.get();
+	auto boundingBoxes = make_udevptr_array<dev, ei::Vec4>(numNodes * 2);
 	// Allocate collapseOffsets.
 	// The last position for collapseOffsets is to avoid access violations,
 	// since if the last internal node needs to be collapsed, it will write 
@@ -1432,42 +1367,38 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 		i32 bboxCacheSize = numThreads * sizeof(ei::Vec4) * 2;
 		cudaFuncSetCacheConfig(calculate_bounding_boxesD, cudaFuncCachePreferShared);
 		BoundingBoxFunctor functor;
-		get_maximum_occupancy_variable_smem(numBlocks, numThreads, numPrimitives,
+		get_maximum_occupancy_variable_smem(numBlocks, numThreads, obj.numPrimitives,
 			calculate_bounding_boxesD, functor);
 		calculate_bounding_boxesD << <numBlocks, numThreads, bboxCacheSize >> > (
-			numPrimitives,
-			meshVertices,
-			spheres, triIndices, quadIndices,
-			boundingBoxes,
+			reinterpret_cast<const ObjectDescriptor<Device::CUDA>&>(obj), // See above
+			boundingBoxes.get(),
 			primIds,
 			parents,
 			collapseOffsets,
-			offsetQuads, offsetSpheres,
-			traverseCosts.x, traverseCosts.y, traverseCosts.z, traverseCosts.w,
+			traverseCosts,
 			deviceCounters);
 
 		// Mark all children of collapsed nodes as removed and themselves as leaves (=1).
 		get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, mark_nodesD);
 		mark_nodesD << <numBlocks, numThreads, bboxCacheSize >> > (
 			numInternalNodes,
-			boundingBoxes,
+			boundingBoxes.get(),
 			deviceCounters,
 			collapseOffsets,
 			leafMarks);
-	}
-	else {
+	} else {
 		// Calculate BVH bounding boxes.
-		for (i32 idx = 0; idx < numPrimitives; idx++)
+		for (i32 idx = 0; idx < obj.numPrimitives; idx++)
 		{
-			calculate_bounding_boxes(numPrimitives, meshVertices, spheres, triIndices, quadIndices,
-				boundingBoxes, primIds, parents, collapseOffsets, offsetQuads, offsetSpheres,
-				traverseCosts.x, traverseCosts.y, traverseCosts.z, traverseCosts.w, deviceCounters, idx);
+			calculate_bounding_boxes(obj,
+				boundingBoxes.get(), primIds, parents, collapseOffsets,
+				traverseCosts, deviceCounters, idx);
 		}
 
 		// Mark all children of collapsed nodes as removed and themselves as leaves (=1).
 		for (i32 idx = 0; idx < numInternalNodes; idx++)
 		{
-			mark_nodes(numInternalNodes, boundingBoxes, deviceCounters, collapseOffsets, leafMarks, idx);
+			mark_nodes(numInternalNodes, boundingBoxes.get(), deviceCounters, collapseOffsets, leafMarks, idx);
 		}
 	}
 
@@ -1513,35 +1444,30 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 			numInternalNodes,
 			numFloat4InCollapsedBVH - numInternalNodes,
 			collapsedBVH,
-			boundingBoxes,
+			boundingBoxes.get(),
 			parents,
 			deviceCounters,
 			primIds,
 			leafMarks,
 			collapseOffsets,
-			offsetQuads, offsetSpheres
-			);
-	}
-	else {
+			obj.polygon.numTriangles,
+			obj.polygon.numTriangles + obj.polygon.numQuads);
+	} else {
 		for (i32 idx = 1; idx < i32(numNodes); idx++)
 		{
 			copy_to_collapsed_bvh(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes,
-				collapsedBVH, boundingBoxes, parents, deviceCounters, primIds,
-				leafMarks, collapseOffsets, offsetQuads, offsetSpheres, idx);
+				collapsedBVH, boundingBoxes.get(), parents, deviceCounters, primIds,
+				leafMarks, collapseOffsets, obj.polygon.numTriangles,
+				obj.polygon.numTriangles + obj.polygon.numQuads, idx);
 		}
 	}
-
-	boundingBoxesMem = nullptr;
 }
 
 // For the scene.
 template < Device dev >
-void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
-	i32* objIds,
-	ei::Box* aabbs,
-	const ei::Box& sceneBB,
-	ei::Vec2 traverseCosts, i32 numInstances) {
-	if (numInstances == 1) {
+void LBVHBuilder::build_lbvh(const SceneDescriptor<dev>& scene,
+							 ei::Vec2 traverseCosts) {
+	if(scene.numInstances == 1) {
 		// TODO remove this. 
 		m_primIds.resize(1);
 		m_primIds.synchronize<dev>();
@@ -1554,37 +1480,36 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 
 	// Allocate memory for a part of the BVH. We do not know the final size yet and
 	// cannot allocate the other parts in bvh.
-	m_primIds.resize(numInstances * sizeof(i32));
+	m_primIds.resize(scene.numInstances * sizeof(i32));
 	i32* primIds = as<i32>(m_primIds.acquire<dev>());
 
 	// Calculate Morton codes.
-	auto codesMem = make_udevptr_array<dev, u32>(numInstances);
-	const i32 numInternalNodes = numInstances - 1;
-	const u32 numNodes = numInternalNodes + numInstances;
+	auto codesMem = make_udevptr_array<dev, u32>(scene.numInstances);
+	const i32 numInternalNodes = scene.numInstances - 1;
+	const u32 numNodes = numInternalNodes + scene.numInstances;
 	auto parentsMem = make_udevptr_array<dev, i32>(numNodes);
 	i32 *parents = parentsMem.get(); // size numNodes.
 
 	{
 		u32* mortonCodes = codesMem.get();
 		if (dev == Device::CUDA) {
-			get_maximum_occupancy(numBlocks, numThreads, numInstances, calculate_morton_codes32D);
+			get_maximum_occupancy(numBlocks, numThreads, scene.numInstances, calculate_morton_codes32D);
 			calculate_morton_codes32D << < numBlocks, numThreads >> > (
-				matrices, objIds, aabbs, sceneBB.min, sceneBB.max,
-				mortonCodes, primIds, numInstances);
+				reinterpret_cast<const SceneDescriptor<Device::CUDA>&>(scene),
+				scene.aabb, mortonCodes, primIds);
 
 			// Sort based on Morton codes.
-			CuLib::DeviceSort(numInstances, &mortonCodes, &mortonCodes,
+			CuLib::DeviceSort(scene.numInstances, &mortonCodes, &mortonCodes,
 				&primIds, &primIds);
-		}
-		else {
-			for (i32 idx = 0; idx < numInstances; idx++)
+		} else {
+			for (i32 idx = 0; idx < scene.numInstances; idx++)
 			{
-				calculate_morton_codes32(matrices, objIds, aabbs, sceneBB.min, sceneBB.max,
-					mortonCodes, primIds, numInstances, idx);
+				mortonCodes[idx] = calculate_morton_code<SceneDescriptor<dev>, u32>(scene, idx, scene.aabb);
+				primIds[idx] = idx;
 			}
 
 			// Sort based on Morton codes.
-			thrust::sort_by_key(mortonCodes, mortonCodes + numInstances, primIds);
+			thrust::sort_by_key(mortonCodes, mortonCodes + scene.numInstances, primIds);
 		}
 
 		// Create BVH.
@@ -1593,14 +1518,13 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 			cudaFuncSetCacheConfig(build_lbvh_treeD<u64>, cudaFuncCachePreferL1);
 			get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<u32>);
 			build_lbvh_treeD<u32> << <numBlocks, numThreads >> > (//TODO check <u64>
-				numInstances,
+				scene.numInstances,
 				mortonCodes,
 				parents);
-		}
-		else {
+		} else {
 			for (i32 idx = 0; idx < numInternalNodes; idx++)
 			{
-				build_lbvh_tree<u32>(numInstances, mortonCodes, parents, idx);
+				build_lbvh_tree<u32>(scene.numInstances, mortonCodes, parents, idx);
 			}
 		}
 	}
@@ -1612,8 +1536,7 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 	i32* deviceCounters = deviceCountersMem.get();
 	mem_set<dev>(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
 	// Allocate bounding boxes.
-	auto boundingBoxesMem = make_udevptr_array<dev, ei::Vec4>(numNodes * 2);
-	ei::Vec4 *boundingBoxes = boundingBoxesMem.get();
+	auto boundingBoxes = make_udevptr_array<dev, ei::Vec4>(numNodes * 2);
 	// Allocate collapseOffsets.
 	// The last position for collapseOffsets is to avoid access violations,
 	// since if the last internal node needs to be collapsed, it will write 
@@ -1628,14 +1551,11 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 		i32 bboxCacheSize = numThreads * sizeof(ei::Vec4) * 2;
 		cudaFuncSetCacheConfig(calculate_bounding_boxes_insD, cudaFuncCachePreferShared);
 		BoundingBoxFunctor functor;
-		get_maximum_occupancy_variable_smem(numBlocks, numThreads, numInstances,
+		get_maximum_occupancy_variable_smem(numBlocks, numThreads, scene.numInstances,
 			calculate_bounding_boxes_insD, functor);
 		calculate_bounding_boxes_insD << <numBlocks, numThreads, bboxCacheSize >> > (
-			numInstances,
-			matrices,
-			objIds,
-			aabbs,
-			boundingBoxes,
+			reinterpret_cast<const SceneDescriptor<Device::CUDA>&>(scene),
+			boundingBoxes.get(),
 			primIds,
 			parents,
 			collapseOffsets,
@@ -1646,20 +1566,16 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 		get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, mark_nodesD);
 		mark_nodesD << <numBlocks, numThreads, bboxCacheSize >> > (
 			numInternalNodes,
-			boundingBoxes,
+			boundingBoxes.get(),
 			deviceCounters,
 			collapseOffsets,
 			leafMarks);
-	}
-	else {
+	} else {
 		// Calculate BVH bounding boxes.
-		for (i32 idx = 0; idx < numInstances; idx++)
+		for (i32 idx = 0; idx < scene.numInstances; idx++)
 		{
-			calculate_bounding_boxes_ins(numInstances,
-				matrices,
-				objIds,
-				aabbs,
-				boundingBoxes,
+			calculate_bounding_boxes_ins(scene,
+				boundingBoxes.get(),
 				primIds,
 				parents,
 				collapseOffsets,
@@ -1671,7 +1587,7 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 		// Mark all children of collapsed nodes as removed and themselves as leaves (=1).
 		for (i32 idx = 0; idx < numInternalNodes; idx++)
 		{
-			mark_nodes(numInternalNodes, boundingBoxes, deviceCounters, collapseOffsets, leafMarks, idx);
+			mark_nodes(numInternalNodes, boundingBoxes.get(), deviceCounters, collapseOffsets, leafMarks, idx);
 		}
 	}
 
@@ -1717,7 +1633,7 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 			numInternalNodes,
 			numFloat4InCollapsedBVH - numInternalNodes,
 			collapsedBVH,
-			boundingBoxes,
+			boundingBoxes.get(),
 			parents,
 			deviceCounters,
 			primIds,
@@ -1729,7 +1645,7 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 		for (i32 idx = 1; idx < (i32)numNodes; idx++)
 		{
 			copy_to_collapsed_bvh_ins(numNodes, numInternalNodes, numFloat4InCollapsedBVH - numInternalNodes, 
-				collapsedBVH, boundingBoxes, parents, deviceCounters, primIds, 
+				collapsedBVH, boundingBoxes.get(), parents, deviceCounters, primIds, 
 				leafMarks, collapseOffsets, idx);
 		}
 	}
@@ -1739,16 +1655,7 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 template < Device dev >
 void LBVHBuilder::build(ObjectDescriptor<dev>& obj, const ei::Box& aabb) {
 	ei::Vec4 traverseCosts = { 1.0f, 1.2f, 2.4f, 1.f };
-	i32 offsetQuads = obj.polygon.numTriangles;
-	i32 offsetSpheres = offsetQuads + obj.polygon.numQuads;
-	i32 numPrimitives = offsetSpheres + obj.spheres.numSpheres;
-
-	build_lbvh64<dev>((ei::Vec3*)obj.polygon.vertices, 
-		(ei::Vec4*)obj.spheres.spheres, (i32*)obj.polygon.vertexIndices, 
-		(i32*)(obj.polygon.vertexIndices + obj.polygon.numTriangles), 
-		aabb, traverseCosts,
-		numPrimitives, offsetQuads, offsetSpheres);
-
+	build_lbvh<dev>(obj, aabb, traverseCosts);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }
@@ -1761,13 +1668,7 @@ void LBVHBuilder::build(
 	const SceneDescriptor<dev>& scene
 ) {
 	ei::Vec2 traverseCosts = { 1.f, 20.f };// TODO: find value for this.
-
-	build_lbvh32<dev>((ei::Mat3x4*)scene.transformations,
-		(i32*)scene.objectIndices,
-		(ei::Box*)scene.aabbs,
-		scene.aabb,
-		traverseCosts, scene.numInstances);
-	
+	build_lbvh<dev>(scene, traverseCosts);	
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }

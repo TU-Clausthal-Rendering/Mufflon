@@ -74,11 +74,8 @@ private:
 	* Each instance is coded with 32 bits.
 	*/
 	template < Device dev >
-	void build_lbvh32(ei::Mat3x4* matrices,
-		i32* objIds,
-		ei::Box* aabbs,
-		const ei::Box& sceneBB,
-		ei::Vec2 traverseCosts, i32 numInstances);
+	void build_lbvh(const SceneDescriptor<dev>& scene,
+					ei::Vec2 traverseCosts);
 
 	/* Build 64-bits collapsed LBVH for one object.
 	* At first, a normal LBVH is build, then the lower nodes are collapsed
@@ -89,12 +86,9 @@ private:
 	* Each primitive is coded with 64 bits.
 	*/
 	template < Device dev >
-	void build_lbvh64(ei::Vec3* meshVertices,
-		ei::Vec4* spheres,
-		i32* triIndices,
-		i32* quadIndices,
-		const ei::Box& aabb, ei::Vec4 traverseCosts, i32 numPrimitives,
-		i32 offsetQuads, i32 offsetSpheres);
+	void build_lbvh(const ObjectDescriptor<dev>& obj,
+					const ei::Box& sceneBB,
+					const ei::Vec4& traverseCosts);
 };
 
 template DeviceManagerConcept<LBVHBuilder>;

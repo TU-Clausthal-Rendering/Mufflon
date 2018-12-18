@@ -62,6 +62,7 @@ template < Device dev >
 struct ObjectDescriptor {
 	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
+	i32 numPrimitives;
 	AccelDescriptor accelStruct;
 };
 
@@ -81,7 +82,7 @@ template < Device dev >
 struct SceneDescriptor {
 	CameraDescriptor camera;
 	u32 numObjects;
-	u32 numInstances;
+	i32 numInstances;
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
 	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> objects;

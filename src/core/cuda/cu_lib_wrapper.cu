@@ -1,5 +1,6 @@
 #include "cu_lib_wrapper.h"
 #include "util/assert.hpp"
+#include "core/cuda/error.hpp"
 
 #include <cub\cub.cuh>
 //#include "Utilities\cudaHeaders.h"
@@ -20,7 +21,7 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 	KeyT* tmpKeysOut;
 	ValueT *tmpValuesOut;
 	if (keysIn == keysOut) {
-		cudaMalloc((void **)&tmpKeysOut, numElements * sizeof(KeyT));
+		cuda::check_error(cudaMalloc((void **)&tmpKeysOut, numElements * sizeof(KeyT)));
 	}
 	else {
 		tmpKeysOut = *keysOut;
@@ -41,9 +42,10 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 	size_t storageSize = 0;
 	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
 		numElements);
+	cuda::check_error(cudaGetLastError());
 
 	// Allocate temporary memory.
-	cudaMalloc(&tempStorage, storageSize);
+	cuda::check_error(cudaMalloc(&tempStorage, storageSize));
 
 	float elapsedTime = 0.0f;
 #ifdef MEASURE_EXECUTION_TIMES
@@ -56,6 +58,7 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 	// Sort
 	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
 		numElements);
+	cuda::check_error(cudaGetLastError());
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -64,7 +67,7 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 #endif
 
 	// Free temporary memory.
-	cudaFree(tempStorage);
+	cuda::check_error(cudaFree(tempStorage));
 
 	// Update in buffers.
 	KeyT* current = keysBuffer.d_buffers[1 - keysBuffer.selector];
@@ -72,14 +75,14 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 		*keysIn = current;
 	}
 	else {
-		cudaFree(current);
+		cuda::check_error(cudaFree(current));
 	}
 	ValueT* current2 = valuesBuffer.d_buffers[1 - valuesBuffer.selector];
 	if (valuesIn != valuesOut) {
 		*valuesIn = current2;
 	}
 	else {
-		cudaFree(current2);
+		cuda::check_error(cudaFree(current2));
 	}
 
 	// Update out buffers.
