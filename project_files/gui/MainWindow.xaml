@@ -159,15 +159,14 @@
                     <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
 
-
                 <TabControl
                     Grid.Column="0"
                     Background="{StaticResource BackgroundBrush}">
                     <TabItem Header="Scenario"
                              Width="Auto">
                         <ListBox Name="ScenarioSelectionBox"
-                                 ItemsSource="{Binding Scene.Scenarios, UpdateSourceTrigger=PropertyChanged}">
-                        </ListBox>
+                                 ItemsSource="{Binding Scene.Scenarios, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                     </TabItem>
                     <TabItem Header="Properties"
                              Width="Auto">
@@ -184,7 +183,6 @@
                         </TreeView>
                     </TabItem>
                 </TabControl>
-
 
                 <GridSplitter
                     Grid.Column="1"
