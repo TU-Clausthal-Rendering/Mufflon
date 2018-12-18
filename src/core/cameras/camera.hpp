@@ -58,8 +58,8 @@ public:
 
 		m_viewSpace = ei::Mat3x3{
 			right.x, right.y, right.z,
-			dir.x, dir.y, dir.z,
-			up.x, up.y, up.z
+			up.x, up.y, up.z,
+			dir.x, dir.y, dir.z
 		};
 	}
 	// Needs virtual destructor

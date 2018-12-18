@@ -46,7 +46,8 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
 						Throughput& throughput,
-						VertexType* outVertex
+						VertexType* outVertex,
+						scene::Direction& missedDir
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
@@ -58,9 +59,10 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 
 	// Russian roulette
 	float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
-	if(u0 >= continuationPropability)	// The smaller the contribution the more likely the kill
+	if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
+		throughput = Throughput{ Spectrum { 0.f }, 0.f };
 		return false;
-	else {
+	} else {
 		// Continue and compensate if rouletteWeight < 1.
 		throughput.weight /= continuationPropability;
 		throughput.guideWeight /= continuationPropability;
@@ -70,8 +72,8 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 
 	// Go to the next intersection
 	scene::accel_struct::RayIntersectionResult nextHit;
-	//ei::Ray ray {sample.origin, sample.excident};
-	//bool didHit = first_hit(, nextHit);
+	ei::Ray ray {sample.origin, sample.excident};
+	scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1, -1 }, scene::MAX_SCENE_SIZE, nextHit);
 
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[sample.medium];
@@ -79,19 +81,34 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
 
-	// if(!didHit) return false;
+	// If we missed the scene, terminate the ray and save the last direction for background sampling
+	if(nextHit.hitId.instanceId < 0) {
+		missedDir = ray.direction;
+		return false;
+	}
 
 	// Create the new surface vertex
 	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
-	float incidentCos = dot(nextHit.normal, sample.excident); // TODO: shading normal?
+	float incidentCos = dot(nextHit.normal, sample.excident);
+	scene::TangentSpace tangentSpace{
+		nextHit.normal, // TODO: shading normal?
+		nextHit.normal,
+		nextHit.tangent,
+		ei::cross(nextHit.normal, nextHit.tangent) // TODO: proper way around (left/right-handed)?
+	};
 	// TODO: get tangent space and parameter pack from nextHit
-	scene::MaterialIndex matIdx = 0; // TODO
+	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[nextHit.hitId.instanceId]];
+	scene::MaterialIndex matIdx;
+	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
+	if(nextHit.hitId.get_primitive_id() < FACE_COUNT)
+		matIdx = object.polygon.matIndices[nextHit.hitId.get_primitive_id()];
+	else
+		matIdx = object.spheres.matIndices[nextHit.hitId.get_primitive_id()];
 	char materialBuffer[scene::materials::MAX_MATERIAL_PARAMETER_SIZE];
-	scene::materials::fetch(scene.get_material(matIdx), scene::UvCoordinate{}, as<scene::materials::ParameterPack>(materialBuffer));
+	scene::materials::fetch(scene.get_material(matIdx), nextHit.uv, as<scene::materials::ParameterPack>(materialBuffer));
 	VertexType::create_surface(outVertex, &vertex, *as<scene::materials::ParameterPack>(materialBuffer),
 				{ position, sample.pdfF.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
-				scene::TangentSpace{}, sample.excident);
-
+				tangentSpace, sample.excident);
 	return true;
 }
 

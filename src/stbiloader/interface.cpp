@@ -85,7 +85,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		CHECK_NULLPTR(path, "texture return data", false);
 
 		// Code taken from ImageViewer
-		stbi_set_flip_vertically_on_load(true);
+		stbi_set_flip_vertically_on_load(false);
 		int width = 0;
 		int height = 0;
 		int components = 0;

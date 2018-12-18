@@ -84,8 +84,18 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		// Walk
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-		if(!walk(scene, *vertex, rnd, 0.0f, false, throughput, vertex))
+		scene::Direction lastDir;
+		if(!walk(scene, *vertex, rnd, 0.0f, false, throughput, vertex, lastDir)) {
+			if(throughput.weight != Spectrum{ 0.f }) {
+				// Missed scene - sample background
+				ei::Vec3 background = scene.lightTree.background.get_color(lastDir);
+				// TODO: where do we get the normal and stuff from?
+				outputBuffer.contribute(coord, throughput, background,
+										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
+										ei::Vec3{ 0, 0, 0 });
+			}
 			break;
+		}
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
@@ -100,22 +110,6 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			}
 		}
 	} while(pathLen < m_params.maxPathLength);
-
-	// Random walk ended because of missing the scene?
-	if(pathLen < m_params.maxPathLength) {
-		// TODO: fetch background
-		// TODO: normals, position???
-		const float phi = 2.f * ei::PI * coord.x  / static_cast<float>(outputBuffer.get_width());
-		const float theta = ei::PI * coord.y / static_cast<float>(outputBuffer.get_height());
-		ei::Vec3 testRadiance = scene.lightTree.background.get_color(ei::Vec3{
-			sinf(theta) * cosf(phi),
-			sinf(theta) * sinf(phi),
-			cosf(theta)
-		});
-		outputBuffer.contribute(coord, throughput, testRadiance,
-								ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-								ei::Vec3{ 0, 0, 0 });
-	}
 }
 
 void CpuPathTracer::init_rngs(int num) {

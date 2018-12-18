@@ -859,8 +859,8 @@ void first_intersection_scene_lbvh_imp(
 			indices[triId + 2] };
 
 			ei::Vec3 v[3] = { meshVertices[ids.x], meshVertices[ids.y], meshVertices[ids.z] };
-			tangent = ei::normalize(v[1] - v[0]);
-			normal = ei::cross(ei::normalize(v[0] - v[2]), tangent);
+			tangent = v[1] - v[0];
+			normal = ei::cross(v[0] - v[2], tangent);
 
 			ei::Vec2 uvV[3] = { meshUVs[ids.x], meshUVs[ids.y], meshUVs[ids.z] };
 			uv = uvV[0] * hitBarycentric.x + uvV[1] * hitBarycentric.y +
@@ -876,16 +876,20 @@ void first_intersection_scene_lbvh_imp(
 				tangent = ei::Vec3(1.f, 0.f, 0.f);
 			}
 			else {
-				tangent = ei::Vec3(ei::normalize(ei::Vec2(normal.y, -normal.x)), 0.f);
+				// TODO: does normal need to be normalized if we normalize later?
+				tangent = ei::Vec3(ei::Vec2(normal.y, -normal.x), 0.f);
 			}
 
 			uv.x = atan2f(normal.x, normal.y) / (2.f * ei::PI) + 0.5f;
 			uv.y = 0.5f * normal.z + 0.5f;
 		}
 
+		// TODO: enable this for (probably) better code?
+		//normal = ei::normalize(ei::transformDir(normal, transforms[hitInstanceId]));
+		//tangent = ei::normalize(ei::transformDir(tangent, transforms[hitInstanceId]));
 		const ei::Mat3x3 transMatrix = ei::Mat3x3{ transforms[hitInstanceId] };
-		normal = transMatrix * normal;
-		tangent = transMatrix * tangent;
+		normal = ei::normalize(transMatrix * normal);
+		tangent = ei::normalize(transMatrix * tangent);
 
 		result = { hitT, { hitInstanceId, hitPrimId }, normal, tangent, uv, hitBarycentric };
 	}
