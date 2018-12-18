@@ -124,8 +124,7 @@ namespace gui.Model
                 return; // false;
             }
 
-            MessageBox.Show("Scene was loaded successfully", "Information", MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            Logger.log("Scene was loaded successfully", Core.Severity.INFO);
 
             // Set path and load scene properties
             FullPath = path;

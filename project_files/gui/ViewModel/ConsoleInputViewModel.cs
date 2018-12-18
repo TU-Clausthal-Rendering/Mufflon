@@ -13,18 +13,15 @@ using System.Windows.Media;
 using gui.Annotations;
 using gui.Dll;
 using gui.Model;
-using Brush = System.Windows.Media.Brush;
-using Brushes = System.Windows.Media.Brushes;
+using gui.View;
 
 namespace gui.ViewModel
 {
     /// <summary>
-    /// View Model for the Console window
+    /// View Model for a console input box
     /// </summary>
-    public class ConsoleViewModel : INotifyPropertyChanged
+    public class ConsoleInputViewModel : INotifyPropertyChanged
     {
-        public ObservableCollection<TextBox> Output { get; } = new ObservableCollection<TextBox>();
-
         private string m_input = "";
         public string Input
         {
@@ -38,45 +35,27 @@ namespace gui.ViewModel
         }
 
         private readonly Models m_models;
+        private readonly TextBox m_inputBox;
+        private readonly ConsoleOutputViewModel m_output;
 
-        public ConsoleViewModel(Models models)
+        public ConsoleInputViewModel(Models models, TextBox inputBox, ConsoleOutputViewModel output)
         {
             m_models = models;
-            m_models.App.Window.ConsoleInputBox.KeyDown += ConsoleInputBoxOnKeyDown;
-            Logger.Log += GlHostOnLog;
-        }
-
-        private void GlHostOnLog(string message, Brush color)
-        {
-            AddText(message, color);
-            m_models.App.Window.ConsoleScrollViewer.ScrollToBottom();
-        }
-
-        private void AddText(string text, Brush color)
-        {
-            Output.Add(new TextBox
-            {
-                Background = Brushes.Transparent,
-                Foreground = color,
-                IsReadOnly = true,
-                TextWrapping = TextWrapping.Wrap,
-                Text = text,
-                BorderThickness = new Thickness(0.0),
-                FontFamily = new FontFamily("Consolas")
-            });
+            m_inputBox = inputBox;
+            m_output = output;
+            m_inputBox.KeyDown += ConsoleInputBoxOnKeyDown;
         }
 
         private void ConsoleInputBoxOnKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key != Key.Enter || Input.Length == 0) return;
-            
+
             // use input as command
-            AddText(Input, Brushes.White);
+            m_output.AddText(Input, Brushes.White);
             m_models.App.GlHost.QueueCommand(Input);
             Input = "";
 
-            m_models.App.Window.ConsoleInputBox.Focus();
-            m_models.App.Window.ConsoleScrollViewer.ScrollToBottom();
+            m_inputBox.Focus();
         }
 
         #region PropertyChanged

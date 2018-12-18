@@ -25,7 +25,9 @@ namespace gui.ViewModel
     /// </summary>
     public class ViewModels
     {
-        public ConsoleViewModel Console { get; }
+        public ConsoleOutputViewModel ConsoleOutput { get; }
+        public ConsoleInputViewModel ConsoleInput { get; }
+
         public ViewportViewModel Viewport { get; }
         public CamerasViewModel Cameras { get; }
         public LightsViewModel Lights { get; }
@@ -53,7 +55,8 @@ namespace gui.ViewModel
             m_models = new Models(window);
 
             // view model initialization
-            Console = new ConsoleViewModel(m_models);
+            ConsoleOutput = new ConsoleOutputViewModel(m_models);
+            ConsoleInput = new ConsoleInputViewModel(m_models, m_models.App.Window.ConsoleInputBox, ConsoleOutput);
             Viewport = new ViewportViewModel(m_models);
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);

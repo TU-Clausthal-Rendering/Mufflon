@@ -184,7 +184,7 @@
                         </TreeView>
                     </TabItem>
                 </TabControl>
-                
+
 
                 <GridSplitter
                     Grid.Column="1"
@@ -337,31 +337,24 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <!-- display box -->
-                <ScrollViewer
+
+                <view:ConsoleView 
                     Grid.Row="0"
-                    Margin="0"
-                    Background="{StaticResource ConsoleBrush}"
-                    x:Name="ConsoleScrollViewer">
-                    <!-- stack panel of messages -->
-                    <StackPanel>
-                        <ItemsControl ItemsSource="{Binding Console.Output, Mode=OneWay}"/>
-                    </StackPanel>
-                </ScrollViewer>
-                <!-- console input box -->
+                    DataContext="{Binding ConsoleOutput}"
+                    x:Name="ConsoleOutput"/>
+
                 <TextBox
                     Grid.Row="1"
                     HorizontalAlignment="Stretch"
                     Height="Auto"
                     Background="{StaticResource ConsoleBrush}"
                     Foreground="{StaticResource ConsoleFontBrush}"
-                    Text="{Binding Console.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    Text="{Binding ConsoleInput.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                     FontFamily="Consolas"
                     BorderBrush="{x:Null}"
                     SelectionBrush="{x:Null}"
                     x:Name="ConsoleInputBox"/>
             </Grid>
-
 
             <!-- status bar -->
             <StatusBar

@@ -18,5 +18,9 @@
         <!-- CenterOwner does not work if window is maximized -->
         <WindowStartupLocation x:Key="DialogStartupLocation">CenterScreen</WindowStartupLocation>
 
+        <!-- Console Styling -->
+        <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
+        <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
+
     </Application.Resources>
 </Application>

@@ -133,7 +133,8 @@
     <Compile Include="ViewModel\Camera\FocusCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
-    <Compile Include="ViewModel\ConsoleViewModel.cs" />
+    <Compile Include="ViewModel\ConsoleInputViewModel.cs" />
+    <Compile Include="ViewModel\ConsoleOutputViewModel.cs" />
     <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
     <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
     <Compile Include="ViewModel\Light\GoniometricLightViewModel.cs" />
@@ -172,8 +173,14 @@
     <Compile Include="View\Camera\PinholeCameraView.xaml.cs">
       <DependentUpon>PinholeCameraView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\ConsoleView.xaml.cs">
+      <DependentUpon>ConsoleView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Dialog\AddPropertyDialog.xaml.cs">
       <DependentUpon>AddPropertyDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Dialog\ProgressDialog.xaml.cs">
+      <DependentUpon>ProgressDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\Dialog\SelectRendererDialog.xaml.cs">
       <DependentUpon>SelectRendererDialog.xaml</DependentUpon>
@@ -266,7 +273,15 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="View\ConsoleView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="View\Dialog\AddPropertyDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Dialog\ProgressDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
