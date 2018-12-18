@@ -112,8 +112,7 @@ __host__ __device__ inline AngularPdf AreaPdf::to_angular_pdf(Real cos, Real dis
 template<typename T, typename D>
 __host__ __device__ inline decltype(std::declval<T>() / std::declval<D>())
 sdiv(const T& x, const D& d) {
-	if(d < 0.0f) return x / ei::min(d, static_cast<D>(-1e-20f));
-	else return x / ei::max(d, static_cast<D>(1e-20f));
+	return x / (d + T{ 1e-20f } * ei::sgn(x));
 }
 
 } // namespace mufflon

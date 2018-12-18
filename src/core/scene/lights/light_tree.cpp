@@ -468,6 +468,15 @@ void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scen
 	char* currLightMem = m_treeCpu->posLights.memory;
 	mAssert(m_treeCpu->posLights.lightCount == 0 || currLightMem != nullptr);
 	mAssert(m_treeCpu->posLights.lightCount < std::numeric_limits<u32>::max());
+	if(m_treeCpu->posLights.lightCount == 0)
+		return;
+	if(m_treeCpu->posLights.lightCount == 1) {
+		// Special case: root stores type
+		mAssert(m_treeCpu->posLights.root.type < static_cast<u16>(LightType::NUM_LIGHTS));
+		set_light_medium(currLightMem, static_cast<LightType>(m_treeCpu->posLights.root.type), scene);
+		return;
+	}
+
 	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(m_treeCpu->posLights.lightCount));
 	// Walk backwards in the nodes to iterate over lights, but leave out the odd one (if it exists)
 	const u32 exclusiveLightNodes = static_cast<u32>(m_treeCpu->posLights.lightCount / 2u);

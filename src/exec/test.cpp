@@ -17,6 +17,7 @@
 #include "util/assert.hpp"
 
 #define TEST_STREAM false
+using namespace mufflon;
 
 namespace {
 

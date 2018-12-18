@@ -23,7 +23,7 @@ CUDA_FUNCTION constexpr u64 part_by_two16(const u16 x) {
 }
 
 // Same partitioning as above but for 21 bits (maximum possible with 63 bit of 64 used in output).
-CUDA_FUNCTION constexpr u64 part_by_two21(const u32 x) {
+CUDA_FUNCTION u64 part_by_two21(const u32 x) {
 	mAssert((x & 0xffe00000) == 0);
 	u64 r = x;
 	r = (r | (r << 32)) & 0x001f00000000ffff;
@@ -34,7 +34,7 @@ CUDA_FUNCTION constexpr u64 part_by_two21(const u32 x) {
 	return r;
 }
 
-CUDA_FUNCTION constexpr u32 part_by_two10(const u32 x) {
+CUDA_FUNCTION u32 part_by_two10(const u32 x) {
 	mAssert((x & 0xfffffc00) == 0);
 	u32 r = x;
 	r = (r * 0x00010001u) & 0xFF0000FFu;

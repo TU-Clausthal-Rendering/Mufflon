@@ -12,9 +12,12 @@ namespace {
 
 #define STACK_SIZE              96 //64          // Size of the traversal stack in local memory.
 #define OBJ_STACK_SIZE              64 //64          // Size of the traversal stack in local memory.
-enum
+enum : i32
 {
-	EntrypointSentinel = 0x76543210,   // Bottom-most stack entry, indicating the end of traversal.
+	EntrypointSentinel = (i32)0x76543210,   // Bottom-most stack entry, indicating the end of traversal.
+	IGNORE_ID = (i32)0xFFFFFFFF,
+	SECOND_QUAD_TRIANGLE_BIT = (i32)0x80000000,
+	SECOND_QUAD_TRIANGLE_MASK = (i32)0x7FFFFFFF,
 };
 
 // Experimentally determined best mix of float/i32/video minmax instructions for Kepler.
@@ -154,10 +157,10 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 		}
 		else if (offsetQuads == 0) {
 			int check01 = 3;
-			if (startPrimId != 0x80000000) {
+			if (startPrimId != IGNORE_ID) {
 				if (startPrimId == 0)
 					check01 = 0x00000002;
-				else if (-startPrimId == 0)
+				else if ((startPrimId & SECOND_QUAD_TRIANGLE_MASK) == 0)
 					check01 = 0x00000001;
 			}
 			const ei::Vec3 v[4] = { meshVertices[quadIndices[0]],
@@ -300,10 +303,10 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 			for (i32 i = 0; i < counts.y; i++)
 			{
 				int check01 = 3;
-				if (startPrimId != 0x80000000) {
+				if (startPrimId != IGNORE_ID) {
 					if (startPrimId == primId) 
 						check01 = 0x00000002;
-					else if (-startPrimId == primId)
+					else if ((startPrimId & SECOND_QUAD_TRIANGLE_MASK) == primId)
 						check01 = 0x00000001;
 				}
 				const i32 quadId = (primId - offsetQuads) * 4;
@@ -391,10 +394,10 @@ CUDA_FUNCTION void first_intersection_obj_lbvh_imp(
 		}
 		else if (offsetQuads == 0) {
 			int check01 = 3;
-			if (startPrimId != 0x80000000) {
+			if (startPrimId != IGNORE_ID) {
 				if (startPrimId == 0)
 					check01 = 0x00000002;
-				else if ((~startPrimId) == 0)
+				else if ((startPrimId & SECOND_QUAD_TRIANGLE_MASK) == 0)
 					check01 = 0x00000001;
 			}
 			const ei::Vec3 v[4] = { meshVertices[quadIndices[0]],
@@ -419,7 +422,7 @@ CUDA_FUNCTION void first_intersection_obj_lbvh_imp(
 				if (ei::intersects(ray, tri1, t, barycentric)) {
 					if (t > tmin && t < hitT) {
 						hitT = t;
-						hitPrimId = ~0;
+						hitPrimId = SECOND_QUAD_TRIANGLE_BIT;
 						hitBarycentric = barycentric;
 					}
 				}
@@ -548,10 +551,10 @@ CUDA_FUNCTION void first_intersection_obj_lbvh_imp(
 			for (i32 i = 0; i < counts.y; i++)
 			{
 				int check01 = 3;
-				if (startPrimId != 0x80000000) {
+				if (startPrimId != IGNORE_ID) {
 					if (startPrimId == primId)
 						check01 = 0x00000002;
-					else if ((~startPrimId) == primId)
+					else if ((startPrimId & SECOND_QUAD_TRIANGLE_MASK) == primId)
 						check01 = 0x00000001;
 				}
 				const i32 quadId = (primId - offsetQuads) * 4;
@@ -577,7 +580,7 @@ CUDA_FUNCTION void first_intersection_obj_lbvh_imp(
 					if (ei::intersects(ray, tri1, t, barycentric)) {
 						if (t > tmin && t < hitT) {
 							hitT = t;
-							hitPrimId = ~primId;
+							hitPrimId = primId | SECOND_QUAD_TRIANGLE_BIT;
 							hitBarycentric = barycentric;
 						}
 					}
@@ -653,12 +656,12 @@ void first_intersection_scene_obj_lbvh(
 	// Intersect the ray against the obj bounding box.
 	if (interset(box, invDir, ood, tmin, hitT)) {
 		// Intersect the ray against the obj primtive bvh.
-		ObjectDescriptor<dev> obj = objs[objId];
+		const ObjectDescriptor<dev>& obj = objs[objId];
 		LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		const i32 numFaces = obj.polygon.numTriangles + obj.polygon.numQuads;
-		const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : 0x80000000;
-		i32 primId;
-		float t;
+		const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : IGNORE_ID;
+		i32 primId = IGNORE_ID;
+		float t = hitT;
 		ei::Vec3 barycentric;
 		const i32 offsetSphere = numFaces + obj.spheres.numSpheres;
 		// Do ray-obj test.
@@ -684,7 +687,7 @@ void first_intersection_scene_obj_lbvh(
 			(i32*)(traversalStack + 4)
 		);
 
-		if (primId != 0x80000000) {
+		if (primId != IGNORE_ID) {
 			// Set transformed t.
 			hitPrimId = primId;
 			hitInstanceId = instanceId;
@@ -706,17 +709,17 @@ void first_intersection_scene_lbvh_imp(
 	const i32* __restrict__ instanceIds,
 	const i32 numInstances,
 	const ObjectDescriptor<dev>* __restrict__ objs,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	float tmaxValue,
 	RayIntersectionResult& result
 ) {
 	// Primitive index of the closest intersection, -1 if none.
-	const i32 startInstanceId = (i32)(startInsPrimId >> 32);
-	const i32 startPrimId = (i32)startInsPrimId;
+	const i32 startInstanceId = startInsPrimId.instanceId;
+	const i32 startPrimId = startInsPrimId.primId;
 	const float tmin = 0.f;
 	// TODO adjust tmax with a small value based on scene size.
 	const float	tmax = tmaxValue + exp2f(-80.0f);
-	i32 hitPrimId = 0x80000000;						// No primitive intersected so far.
+	i32 hitPrimId = SECOND_QUAD_TRIANGLE_BIT;						// No primitive intersected so far.
 	i32 hitInstanceId = -1;
 	ei::Vec3 hitBarycentric;
 	float hitT = tmax;						// t-value of the closest intersection.
@@ -818,8 +821,8 @@ void first_intersection_scene_lbvh_imp(
 		}
 	}
 
-	if (hitInstanceId == -1) {
-		result = { hitT, (u64)-1ll };
+	if (hitInstanceId == IGNORE_ID) {
+		result = { hitT, { IGNORE_ID, IGNORE_ID } };
 	}
 	else {
 		const i32 objId = objIds[hitInstanceId];
@@ -834,8 +837,8 @@ void first_intersection_scene_lbvh_imp(
 		ei::Vec2 uv;
 		i32 hitSecondTri = 0;
 		i32 primId = hitPrimId;
-		if (hitPrimId < 0) {
-			primId = ~hitPrimId;
+		if (hitPrimId & SECOND_QUAD_TRIANGLE_BIT) {
+			primId = hitPrimId & SECOND_QUAD_TRIANGLE_MASK;
 			hitSecondTri = 1;
 		}
 
@@ -884,7 +887,7 @@ void first_intersection_scene_lbvh_imp(
 		normal = transMatrix * normal;
 		tangent = transMatrix * tangent;
 
-		result = { hitT, hitPrimId | (u64(hitInstanceId) << 32ull), normal, tangent, uv, hitBarycentric };
+		result = { hitT, { hitInstanceId, hitPrimId }, normal, tangent, uv, hitBarycentric };
 	}
 }
 
@@ -921,7 +924,7 @@ bool any_intersection_scene_obj_lbvh(
 		ObjectDescriptor<dev> obj = objs[objId];
 		LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		const i32 numFaces = obj.polygon.numTriangles + obj.polygon.numQuads;
-		const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : 0x80000000;
+		const i32 checkPrimId = (startInstanceId == instanceId) ? startPrimId : IGNORE_ID;
 		// Do ray-obj test.
 		if (any_intersection_obj_lbvh_imp(
 			lbvh->bvh,
@@ -957,15 +960,15 @@ bool any_intersection_scene_lbvh_imp(
 	const i32* __restrict__ instanceIds,
 	const i32 numInstances,
 	const ObjectDescriptor<dev>* __restrict__ objs,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmaxValue
 ) {
 	const float tmin = 0.f;
 	// TODO adjust tmax with a small value based on scene size.
 	const float	tmax = tmaxValue + exp2f(-80.0f); 
 	// Primitive index of the closest intersection, -1 if none.
-	const i32 startInstanceId = (i32)(startInsPrimId >> 32);
-	const i32 startPrimId = (i32)startInsPrimId;
+	const i32 startInstanceId = startInsPrimId.instanceId;
+	const i32 startPrimId = startInsPrimId.primId;
 
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
@@ -1069,8 +1072,8 @@ bool any_intersection_scene_lbvh_imp(
 template < Device dev >
 CUDA_FUNCTION
 bool any_intersection_scene_lbvh(
-	const SceneDescriptor<dev> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const SceneDescriptor<dev>& scene,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax
 ) {
 	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
@@ -1088,22 +1091,22 @@ bool any_intersection_scene_lbvh(
 }
 
 template __host__ __device__ bool any_intersection_scene_lbvh(
-	SceneDescriptor<Device::CUDA> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const SceneDescriptor<Device::CUDA>& scene,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax
 );
 
 template __host__ __device__ bool any_intersection_scene_lbvh(
-	SceneDescriptor<Device::CPU> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const SceneDescriptor<Device::CPU>& scene,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax
 );
 
 template < Device dev >
 CUDA_FUNCTION
 void first_intersection_scene_lbvh(
-	const SceneDescriptor<dev> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const SceneDescriptor<dev>& scene,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax, RayIntersectionResult& result
 ) {
 	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
@@ -1121,14 +1124,14 @@ void first_intersection_scene_lbvh(
 }
 
 template __host__ __device__ void first_intersection_scene_lbvh(
-	SceneDescriptor<Device::CUDA>,
-	const ei::Ray, const u64,
+	const SceneDescriptor<Device::CUDA>&,
+	const ei::Ray, const RayIntersectionResult::HitID&,
 	const float, RayIntersectionResult&
 );
 
 template __host__ __device__ void first_intersection_scene_lbvh(
-	SceneDescriptor<Device::CPU> ,
-	const ei::Ray , const u64 ,
+	const SceneDescriptor<Device::CPU>& ,
+	const ei::Ray , const RayIntersectionResult::HitID&,
 	const float , RayIntersectionResult&
 );
 

@@ -1,6 +1,7 @@
 #include "attribute.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
+#include <ei/vector.hpp>
 
 namespace mufflon { namespace scene {
 
@@ -188,7 +189,7 @@ void OpenMeshAttributePool<face>::mark_changed(Device dev) {
 
 template < bool face >
 std::size_t OpenMeshAttributePool<face>::restore(AttributeHandle hdl, util::IByteReader& attrStream,
-					std::size_t start, std::size_t count) {
+												 std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
 	this->synchronize<Device::CPU>(hdl);
 	if(start + count > m_attribElemCount)

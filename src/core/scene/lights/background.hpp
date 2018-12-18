@@ -29,6 +29,11 @@ public:
 	static constexpr Device DEVICE = dev;
 
 	Background() : m_type(BackgroundType::COLORED), m_color(ei::Vec3{ 0.f }) {}
+	Background(const Background&) = default;
+	Background(Background&&) = default;
+	Background& operator=(const Background&) = default;
+	Background& operator=(Background&&) = default;
+	~Background() = default;
 
 	// Constructors for creating the proper type of background
 	__host__ static Background black() {

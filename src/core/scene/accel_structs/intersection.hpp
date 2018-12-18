@@ -15,7 +15,14 @@ namespace accel_struct {
 
 struct RayIntersectionResult {
 	float hitT;
-	PrimitiveHandle hitPrimId;
+	struct HitID {
+		i32 instanceId;
+		i32 primId;
+
+		__host__ __device__ u32 get_primitive_id() const {
+			return static_cast<u32>(primId & 0x7FFFFFFF); // Remove the bit for identifying quad sides
+		}
+	} hitId;
 	ei::Vec3 normal;
 	ei::Vec3 tangent;
 	ei::Vec2 uv;
@@ -32,16 +39,16 @@ struct RayInfo {
 template < Device dev >
 __host__ __device__
 bool any_intersection_scene_lbvh(
-	const SceneDescriptor<dev> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const SceneDescriptor<dev>& scene,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax
 );
 
 template < Device dev >
-CUDA_FUNCTION
+__host__ __device__
 void first_intersection_scene_lbvh(
-	const SceneDescriptor<dev> scene,
-	const ei::Ray ray, const u64 startInsPrimId,
+	const SceneDescriptor<dev>& scene,
+	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax, RayIntersectionResult& result
 );
 

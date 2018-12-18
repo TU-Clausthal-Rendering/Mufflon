@@ -7,19 +7,11 @@
 
 namespace mufflon {
 
-void debug_break() {
-#ifdef _MSC_VER
-	__debugbreak();
-#else
-	__builtin_trap();
-#endif // _MSC_VER
-}
-
 void check_assert(bool condition, const char* file, int line, const char* condStr) {
 	if(!condition) {
 		std::cerr << "Assertion '" << condStr << "' (" << file << ", line " << line << ") failed" << std::endl;
 #ifndef NO_BREAK_ON_ASSERT
-		debug_break();
+		debugBreak;
 #endif // NO_BREAK_ON_ASSERT
 	}
 }
@@ -28,7 +20,7 @@ void check_assert(bool condition, const char* file, int line, const char* condSt
 	if(!condition) {
 		std::cerr << "Assertion '" << condStr << "' (" << file << ", line " << line << ") failed: " << msg << std::endl;
 #ifndef NO_BREAK_ON_ASSERT
-		debug_break();
+		debugBreak;
 #endif // NO_BREAK_ON_ASSERT
 	}
 }

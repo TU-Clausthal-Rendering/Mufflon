@@ -30,14 +30,13 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_reset = false;
-	scene::SceneDescriptor<Device::CPU> sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, buffer.get_resolution());
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 //#pragma omp parallel for
 	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, sceneDesc);
+		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
@@ -71,7 +70,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
 			// TODO: set startInsPrimId with a proper value.
 			bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-				scene, { vertex->get_position() , ei::normalize(nee.direction) }, 0xFFFFFFFF00000000ull, 
+				scene, { vertex->get_position() , ei::normalize(nee.direction) }, { -1, -1 },
 				nee.dist); 
 			if(!anyhit) {
 				auto value = vertex->evaluate(nee.direction, scene.media);
@@ -131,7 +130,7 @@ void CpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolu
 		m_currentScene = scene;
 		// Make sure the scene is loaded completely for the use on CPU side
 		m_currentScene->synchronize<Device::CPU>();
-		//m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
+		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
 		m_reset = true;
 	}
 }

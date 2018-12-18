@@ -18,14 +18,14 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 
 	ei::Vec3 dir = vertex - pos;
 	const float length = ei::len(dir);
-	dir *= 1.f / dir;
+	dir *= 1.f / length;
 	ei::Ray ray{ pos, dir };
 	scene::accel_struct::RayIntersectionResult res;
-	scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, 0xFFFFFFFF00000000ull, length + 1.f, res);
-	mAssert(res.hitPrimId != (u64)-1ll);
+	scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1l, -1l }, length + 1.f, res);
+	mAssert(res.hitId.primId != -1l);
 	// From the intersection we get the primitive, from which we can look up the material
-	const u32 INSTANCE_ID = res.hitPrimId >> 32u;
-	const u32 PRIMITIVE_ID = static_cast<u32>(res.hitPrimId & 0xFFFFFFFF);
+	const i32 INSTANCE_ID = res.hitId.instanceId;
+	const u32 PRIMITIVE_ID = res.hitId.get_primitive_id();
 
 	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[INSTANCE_ID]];
 	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;

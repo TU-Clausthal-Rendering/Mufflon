@@ -92,7 +92,7 @@ struct SceneDescriptor {
 	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 
 	// The receiver of this struct is responsible for deallocating this memory!
-	const lights::LightTree<dev> lightTree;
+	lights::LightTree<dev> lightTree;
 	ConstArrayDevHandle_t<dev, materials::Medium> media;
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
 
