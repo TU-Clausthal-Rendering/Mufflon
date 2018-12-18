@@ -1,4 +1,5 @@
 #include "cu_lib_wrapper.h"
+#include "util/assert.hpp"
 
 #include <cub\cub.cuh>
 //#include "Utilities\cudaHeaders.h"
@@ -364,20 +365,14 @@ int DeviceMax(u32 numElements, int* elements)
 }
 
 // ref. https://nvlabs.github.io/cub/structcub_1_1_device_scan.html#a83236fc272c0b573a2bb2c5b47e0867d
-template <typename T> float DeviceExclusiveSum(int numItems, T** valuesIn, T** valuesOut)
+template <typename T> float DeviceExclusiveSum(int numItems, const T* valuesIn, T* valuesOut)
 {
-	T* tmpValuesOut;
-	if (valuesIn == valuesOut) {
-		cudaMalloc((void **)&tmpValuesOut, numItems * sizeof(T));
-	}
-	else {
-		tmpValuesOut = *valuesOut;
-	}
+	//mAssert(valuesIn != valuesOut);
 
 	// Check how much temporary memory will be required
 	void* tempStorage = nullptr;
 	size_t storageSize = 0;
-	cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, *valuesIn, tmpValuesOut, numItems);
+	cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
 
 	// Allocate temporary memory
 	cudaMalloc(&tempStorage, storageSize);
@@ -391,7 +386,7 @@ template <typename T> float DeviceExclusiveSum(int numItems, T** valuesIn, T** v
 #endif
 
 	// Scan
-	cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, *valuesIn, tmpValuesOut, numItems);
+	cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -401,30 +396,19 @@ template <typename T> float DeviceExclusiveSum(int numItems, T** valuesIn, T** v
 
 	// Free temporary memory
 	cudaFree(tempStorage);
-
-	if (valuesIn == valuesOut) {
-		cudaFree(*valuesIn);
-		*valuesIn = tmpValuesOut;
-	}
 
 	return elapsedTime;
 }
 
 // ref. https://nvlabs.github.io/cub/structcub_1_1_device_scan.html#a83236fc272c0b573a2bb2c5b47e0867d
-template <typename T> float DeviceInclusiveSum(int numItems, T** valuesIn, T** valuesOut)
+template <typename T> float DeviceInclusiveSum(int numItems, const T* valuesIn, T* valuesOut)
 {
-	T* tmpValuesOut;
-	if (valuesIn == valuesOut) {
-		cudaMalloc((void **)&tmpValuesOut, numItems * sizeof(T));
-	}
-	else {
-		tmpValuesOut = *valuesOut;
-	}
+	//mAssert(valuesIn != valuesOut);
 
 	// Check how much temporary memory will be required
-	void* tempStorage = nullptr;
+	void* tempStorage = nullptr; // TODO: use a permanent temporary cache for this purpose (resize only if necessary)
 	size_t storageSize = 0;
-	cub::DeviceScan::InclusiveSum(tempStorage, storageSize, *valuesIn, tmpValuesOut, numItems);
+	cub::DeviceScan::InclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
 
 	// Allocate temporary memory
 	cudaMalloc(&tempStorage, storageSize);
@@ -438,7 +422,7 @@ template <typename T> float DeviceInclusiveSum(int numItems, T** valuesIn, T** v
 #endif
 
 	// Scan
-	cub::DeviceScan::InclusiveSum(tempStorage, storageSize, *valuesIn, tmpValuesOut, numItems);
+	cub::DeviceScan::InclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -449,21 +433,16 @@ template <typename T> float DeviceInclusiveSum(int numItems, T** valuesIn, T** v
 	// Free temporary memory
 	cudaFree(tempStorage);
 
-	if (valuesIn == valuesOut) {
-		cudaFree(*valuesIn);
-		*valuesIn = tmpValuesOut;
-	}
-
 	return elapsedTime;
 }
 
 
-float DeviceExclusiveSum(int numElements, int** valuesIn, int** valuesOut)
+float DeviceExclusiveSum(int numElements, const int* valuesIn, int* valuesOut)
 {
 	return DeviceExclusiveSum<int>(numElements, valuesIn, valuesOut);
 }
 
-float DeviceInclusiveSum(int numElements, int** valuesIn, int** valuesOut)
+float DeviceInclusiveSum(int numElements, const int* valuesIn, int* valuesOut)
 {
 	return DeviceInclusiveSum<int>(numElements, valuesIn, valuesOut);
 }

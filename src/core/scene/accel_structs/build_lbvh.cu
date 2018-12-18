@@ -1474,12 +1474,11 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 	i32 numRemovedInternalNodes;
 	if (dev == Device::CUDA) {
 		// Scan to get values for offsets.
-		CuLib::DeviceInclusiveSum(numInternalNodes, &collapseOffsets, &collapseOffsets);
-		//cudaDeviceSynchronize();//testing
-		cudaMemcpy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32),
-			cudaMemcpyDeviceToHost);
+		// TODO: is i32 enough??? It might overflow in the sum. I do not know what collapseOffsets should contain at this point, so I connot judge.
+		CuLib::DeviceInclusiveSum(numInternalNodes, collapseOffsets, collapseOffsets);
+		copy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32));
 		// Scan to get number of leaves arised from internal nodes before current node.
-		CuLib::DeviceExclusiveSum(numInternalNodes + 1, &leafMarks, &leafMarks);
+		CuLib::DeviceExclusiveSum(numInternalNodes + 1, leafMarks, leafMarks);
 	}
 	else {
 		// Scan to get values for offsets.
@@ -1531,6 +1530,8 @@ void LBVHBuilder::build_lbvh64(ei::Vec3* meshVertices,
 				leafMarks, collapseOffsets, offsetQuads, offsetSpheres, idx);
 		}
 	}
+
+	boundingBoxesMem = nullptr;
 }
 
 // For the scene.
@@ -1677,11 +1678,10 @@ void LBVHBuilder::build_lbvh32(ei::Mat3x4* matrices,
 	i32 numRemovedInternalNodes;
 	if (dev == Device::CUDA) {
 		// Scan to get values for offsets.
-		CuLib::DeviceInclusiveSum(numInternalNodes, &collapseOffsets, &collapseOffsets);
-		cudaMemcpy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32),
-			cudaMemcpyDeviceToHost);
+		CuLib::DeviceInclusiveSum(numInternalNodes, collapseOffsets, collapseOffsets);
+		copy(&numRemovedInternalNodes, collapseOffsets + numInternalNodes - 1, sizeof(i32));
 		// Scan to get number of leaves arised from internal nodes before current node.
-		CuLib::DeviceExclusiveSum(numInternalNodes + 1, &leafMarks, &leafMarks);
+		CuLib::DeviceExclusiveSum(numInternalNodes + 1, leafMarks, leafMarks);
 	}
 	else {
 		// Scan to get values for offsets.

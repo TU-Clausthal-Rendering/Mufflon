@@ -102,8 +102,9 @@ i32 DeviceSum(u32 numElements, u32* elements);
 float DeviceSum(u32 numElements, float* elements);
 
 // @feng
-float DeviceExclusiveSum(i32 numElements, i32** dataIn, i32** dataOut);
+// Can possibly be used inplace
+float DeviceExclusiveSum(i32 numElements, const i32* dataIn, i32* dataOut);
 
-float DeviceInclusiveSum(i32 numElements, i32** valuesIn, i32** valuesOut);
+float DeviceInclusiveSum(i32 numElements, const i32* valuesIn, i32* valuesOut);
 }
 }
