@@ -312,10 +312,10 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 										near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
 				throw std::runtime_error("Failed to add pinhole camera");
 		} else if(type.compare("focus") == 0) {
-			const float focalLength = read<float>(m_state, get(m_state, camera, "focalLength")) / 1000.f;
+			const float focalLength = read_opt<float>(m_state, camera, "focalLength", 35.f) / 1000.f;
 			const float focusDistance = read<float>(m_state, get(m_state, camera, "focusDistance"));
-			const float sensorHeight = read<float>(m_state, get(m_state, camera, "chipHeight")) / 1000.f;
-			const float lensRadius = read<float>(m_state, get(m_state, camera, "aperture")) / (2.f * focalLength);
+			const float sensorHeight = read_opt<float>(m_state, camera, "chipHeight", 24.f) / 1000.f;
+			const float lensRadius = read_opt<float>(m_state, camera, "aperture", 1.0) / (2.f * focalLength);
 			if(world_add_focus_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
 									   util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
 									   near, far, focalLength, focusDistance, lensRadius, sensorHeight) == nullptr)
