@@ -9,10 +9,13 @@ namespace mufflon { namespace scene { namespace materials {
 
 CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
 	mAssert(scene.objects[0u].polygon.numVertices > 0u || scene.objects[0u].spheres.numSpheres > 0u);
-	// Shoot a ray to a point in the scene (any vertex suffices)
+	// Shoot a ray to a point in the scene (middle of any primitive)
+	// TODO: replace with BVH common method (get_center)
 	ei::Vec3 vertex;
-	if(scene.objects[0u].polygon.numVertices > 0u)
-		vertex = scene.objects[0u].polygon.vertices[0u];
+	if(scene.objects[0u].polygon.numVertices >= 2u)
+		vertex = (scene.objects[0u].polygon.vertices[0u]
+				  + scene.objects[0u].polygon.vertices[1u]
+				  + scene.objects[0u].polygon.vertices[2u]) / 3.f;
 	else
 		vertex = scene.objects[0u].spheres.spheres[0u].center;
 
