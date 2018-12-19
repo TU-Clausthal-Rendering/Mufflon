@@ -87,6 +87,7 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
+    <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\SelectRendererCommand.cs" />
     <Compile Include="Command\LoadSceneCommand.cs" />
     <Compile Include="Command\PlayPauseCommand.cs" />
@@ -240,6 +241,9 @@
     <Compile Include="View\Renderer\RendererParams.xaml.cs">
       <DependentUpon>RendererParams.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\AppSettings.xaml.cs">
+      <DependentUpon>AppSettings.xaml</DependentUpon>
+    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -354,6 +358,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Renderer\RendererParams.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\AppSettings.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

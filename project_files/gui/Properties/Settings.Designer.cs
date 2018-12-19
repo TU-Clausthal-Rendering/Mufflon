@@ -81,5 +81,41 @@ namespace gui.Properties {
                 this["AutoStartOnLoad"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LogLevel {
+            get {
+                return ((int)(this["LogLevel"]));
+            }
+            set {
+                this["LogLevel"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int CoreProfileLevel {
+            get {
+                return ((int)(this["CoreProfileLevel"]));
+            }
+            set {
+                this["CoreProfileLevel"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LoaderProfileLevel {
+            get {
+                return ((int)(this["LoaderProfileLevel"]));
+            }
+            set {
+                this["LoaderProfileLevel"] = value;
+            }
+        }
     }
 }

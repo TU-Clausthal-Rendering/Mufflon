@@ -58,7 +58,8 @@
                     <MenuItem Header="Auto-start on load"
                               IsCheckable="True"
                               IsChecked="{Binding Renderer.AutoStartOnLoad}"/>
-
+                    <MenuItem Header="Settings"
+                              Command="{Binding OpenSettingsCommand}"/>
                 </MenuItem>
                 <MenuItem Header="Help">
                     <MenuItem Header="About"/>

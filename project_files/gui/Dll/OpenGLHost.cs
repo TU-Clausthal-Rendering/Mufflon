@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using gui.Model;
+using gui.Properties;
 using gui.ViewModel;
 
 namespace gui.Dll
@@ -78,10 +79,12 @@ namespace gui.Dll
                 InitializeOpenGl();
                 Core.profiling_enable();
                 Loader.loader_profiling_enable();
-                if (!Core.profiling_set_level(Core.ProfilingLevel.ALL))
+                if (!Core.profiling_set_level((Core.ProfilingLevel)Settings.Default.CoreProfileLevel))
                     throw new Exception(Core.core_get_dll_error());
-                if (!Loader.loader_profiling_set_level(Loader.ProfilingLevel.ALL))
-                    throw new Exception(Core.core_get_dll_error());
+                if (!Loader.loader_profiling_set_level((Loader.ProfilingLevel)Settings.Default.LoaderProfileLevel))
+                    throw new Exception(Loader.loader_get_dll_error());
+                Logger.LogLevel = (Core.Severity)Settings.Default.LogLevel;
+
 
                 while (m_isRunning)
                 {

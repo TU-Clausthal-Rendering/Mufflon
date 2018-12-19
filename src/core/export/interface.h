@@ -133,10 +133,10 @@ typedef enum {
 } OuterMediumType;
 
 typedef enum {
-	PROFILING_NONE,
-	PROFILING_LOW,
-	PROFILING_HIGH,
 	PROFILING_ALL,
+	PROFILING_HIGH,
+	PROFILING_LOW,
+	PROFILING_OFF
 } ProfilingLevel;
 
 typedef enum {

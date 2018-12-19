@@ -10,14 +10,14 @@ namespace gui.Dll
     /// <summary>
     /// DLL communication with loader.dll
     /// </summary>
-    static class Loader
+    public static class Loader
     {
-        internal enum ProfilingLevel
+        public enum ProfilingLevel
         {
-            OFF,
-            LOW,
+            ALL,
             HIGH,
-            ALL
+            LOW,
+            OFF
         };
 
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]

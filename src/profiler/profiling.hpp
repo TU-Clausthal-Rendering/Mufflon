@@ -10,9 +10,9 @@
 namespace mufflon {
 
 enum class ProfileLevel {
-	LOW,
+	ALL,
 	HIGH,
-	ALL
+	LOW
 };
 
 class ProfileState {
@@ -67,8 +67,7 @@ public:
 	template < class Prof >
 	[[nodiscard]]
 	std::optional<ProfileState::ProfileScope> start(std::string_view name, ProfileLevel level = ProfileLevel::HIGH) {
-		if(m_enabled && static_cast<std::underlying_type_t<ProfileLevel>>(level)
-		   <= static_cast<std::underlying_type_t<ProfileLevel>>(m_activation)) {
+		if(m_enabled && level >= m_activation) {
 			if(m_active != nullptr) {
 				// Use cascaded profiler
 				ProfileState* state = m_active->find_child(name);

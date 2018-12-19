@@ -59,10 +59,10 @@ namespace gui.Dll
 
         public enum ProfilingLevel
         {
-            OFF,
-            LOW,
+            ALL,
             HIGH,
-            ALL
+            LOW,
+            OFF
         };
 
         public enum ParameterType

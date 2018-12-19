@@ -14,6 +14,7 @@ using gui.Model.Camera;
 using gui.Model.Light;
 using gui.Model.Material;
 using gui.Utility;
+using gui.View;
 using gui.ViewModel.Camera;
 using gui.ViewModel.Light;
 using gui.ViewModel.Material;
@@ -44,8 +45,8 @@ namespace gui.ViewModel
         public ICommand AddMaterialCommand { get; }
         public ICommand AddCameraCommand { get; }
         public ICommand LoadSceneCommand { get; }
-
         public ICommand SelectRendererCommand { get; }
+        public ICommand OpenSettingsCommand { get; }
 
         private readonly Models m_models;
 
@@ -76,6 +77,7 @@ namespace gui.ViewModel
             AddMaterialCommand = new AddMaterialCommand(m_models);
             LoadSceneCommand = new LoadSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
+            OpenSettingsCommand = new OpenSettingsCommand();
         }
     }
 }

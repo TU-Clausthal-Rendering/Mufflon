@@ -1,0 +1,79 @@
+﻿<Window x:Class="gui.View.AppSettings"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:gui.View"
+        mc:Ignorable="d"
+        Title="Settings" Height="450" Width="400">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="25"/>
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0" Grid.Column="0"
+                    TabStripPlacement="Left">
+            <TabItem Header="General">
+                <StackPanel Margin="5">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Logger output level:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                  Width="100" ItemsSource="{Binding LogLevels}"
+                                  Name="LogLevelBox"
+                                  DisplayMemberPath="Name"
+                                  SelectedValuePath="Level"
+                                  SelectedItem="{Binding LogLevel}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                   Text="Core Profiler level:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1"
+                                  Width="100" ItemsSource="{Binding CoreProfilerLevels}"
+                                  Name="CoreProfilerLevelBox"
+                                  DisplayMemberPath="Name"
+                                  SelectedValuePath="Level"
+                                  SelectedItem="{Binding CoreProfilerLevel}"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="Loader Profiler level:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  Width="100" ItemsSource="{Binding LoaderProfilerLevels}"
+                                  Name="LoaderProfilerLevelBox"
+                                  DisplayMemberPath="Name"
+                                  SelectedValuePath="Level"
+                                  SelectedItem="{Binding LoaderProfilerLevel}"/>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Other">
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="1" Grid.Column="0"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Width="50" Click="OkButtonClick">Ok</Button>
+            <Button Width="50" Click="CancelButtonClick">Cancel</Button>
+        </StackPanel>
+    </Grid>
+</Window>
