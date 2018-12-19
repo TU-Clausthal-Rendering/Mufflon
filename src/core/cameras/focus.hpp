@@ -94,11 +94,11 @@ focuscam_sample_position(const FocusParams& params, const math::RndSet2& rndSet)
 	const ei::Vec3 xAxis = ei::cross(params.viewDir, params.up);
 	const ei::Vec3 yAxis = ei::cross(params.viewDir, xAxis);
 	const ei::Vec3 dirWorld = xAxis * nPos.x + yAxis * nPos.y + params.viewDir * nPos.z;
-	const ei::Vec3 pixelPos = params.position + dirWorld * __half2float(params.sensorDistance);
+	const ei::Vec3 lensPos = params.position + dirWorld * __half2float(params.sensorDistance);
 	// Compute the PDF for sampling the given position on the lens
 	const AreaPdf lensPosPdf = AreaPdf{ 1.f / ei::PI };
 
-	return math::PositionSample{ pixelPos, lensPosPdf };
+	return math::PositionSample{ lensPos, lensPosPdf };
 }
 
 CUDA_FUNCTION Importon
@@ -107,9 +107,7 @@ focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 	// First we sample the sensor position, then we use the sensor and the lens position to compute the direction
 	// Get a (randomized) position in [-1,1]²
 	const ei::Vec2 subPixel = pixel + ei::Vec2(rndSet.u0, rndSet.u1);
-	ei::Vec2 canonicalPos = subPixel / params.resolution * 2.0f - 1.0f;
-	// Transform it into a point on the near plane (camera space)
-	canonicalPos *= params.tanVFov;
+	const ei::Vec2 canonicalPos = 2.f * subPixel / params.resolution - 1.0f;
 	const float sensorHalfHeight = __half2float(params.sensorHalfHeight);
 	const float aspectRatio = params.resolution.x / float(params.resolution.y);
 	// Scale to fit the sensor
@@ -117,22 +115,21 @@ focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 	// Go to world space
 	const ei::Vec3 xAxis = ei::cross(params.viewDir, params.up);
 	const ei::Vec3 yAxis = ei::cross(params.viewDir, xAxis);
-	const ei::Vec3 pixelPos = nPos.x * xAxis + nPos.y * yAxis;
+	const ei::Vec3 pixelPos = params.position + nPos.x * xAxis + nPos.y * yAxis;
 
-	// Compute the focal point for the pixel
-	// The actual focal point for the direction has to be computed first
-	const ei::Vec3 pixelToLens = ei::normalize(exitPosWorld - pixelPos);
-	const float cosPixel = ei::dot(pixelToLens, params.viewDir);
-	const float sensorDistance = __half2float(params.sensorDistance);
-	float pixelSharpDist = sensorDistance;
-	if(cosPixel != 1.f)
-		pixelSharpDist = sensorDistance + canonicalPos.y / atan(acos(cosPixel));
-	// Compute the distance on the other side of the lens (where an object has to be to be sharp)
-	const float focusDistance = pixelSharpDist * params.focalLength / (pixelSharpDist - params.focalLength);
-	// Compute the focal point for this pixel (cam distance(nearplane) + focal distance along view direction)
-	const ei::Vec3 focalPoint = params.position + (sensorDistance + focusDistance) * params.viewDir;
-	// Now we can compute the ray direction
-	const ei::Vec3 direction = ei::normalize(focalPoint - exitPosWorld);
+	// Compute the point where the ray shoots towards
+	// For this, we use the lens formula G = (g/f - 1) * B,
+	// where G is the distance of the focus point from the lens axis,
+	// B is the distance of the image point from the lens axis (aka distance of
+	// pixel from sensor center), g is the focus distance, and
+	// f is the focal length
+	const float G = (params.focusDistance / params.focalLength - 1.f);
+	// The focus point now can be computed by scaling the sensor vector and moving it
+	const ei::Vec3 focusVector = nPos.x * G * xAxis + nPos.y * G * yAxis;
+	// Since we would need to scale the sensor vector anyway, we don't need to compute B
+	const ei::Vec3 focusPoint = params.position + params.viewDir * params.focusDistance
+		+ focusVector;
+	const ei::Vec3 direction = ei::normalize(focusPoint - exitPosWorld);
 
 	// Compute the directional PDF (see PBRT)
 	float pixelArea = ei::sq(2.f * params.tanVFov) * aspectRatio;

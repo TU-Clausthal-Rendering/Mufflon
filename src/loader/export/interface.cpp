@@ -117,7 +117,7 @@ Boolean loader_profiling_set_level(ProfilingLevel level) {
 	switch(level) {
 		case ProfilingLevel::PROFILING_OFF:
 			Profiler::instance().set_enabled(false);
-			break;
+			return true;
 		case ProfilingLevel::PROFILING_LOW:
 			Profiler::instance().set_profile_level(ProfileLevel::LOW);
 			return true;

@@ -96,7 +96,7 @@ SceneDescriptor<dev> Scene::get_descriptor(const std::vector<const char*>& verte
 	SceneDescriptor<dev> sceneDesc{
 		camera,
 		static_cast<u32>(objectDescs.size()),
-		static_cast<u32>(m_instances.size()),
+		static_cast<i32>(m_instances.size()),
 		m_boundingBox,
 		objDevDesc.get(),
 		AccelDescriptor{},

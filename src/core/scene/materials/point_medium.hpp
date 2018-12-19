@@ -22,7 +22,7 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	ei::Ray ray{ pos, dir };
 	scene::accel_struct::RayIntersectionResult res;
 	scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1l, -1l }, length + 1.f, res);
-	mAssert(res.hitId.primId != -1l);
+	mAssert(res.hitId.instanceId != -1l);
 	// From the intersection we get the primitive, from which we can look up the material
 	const i32 INSTANCE_ID = res.hitId.instanceId;
 	const u32 PRIMITIVE_ID = res.hitId.get_primitive_id();
