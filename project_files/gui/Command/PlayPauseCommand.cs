@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +16,12 @@ namespace gui.Command
         public PlayPauseCommand(Models models)
         {
             m_models = models;
+            CanExecuteChanged += OnCanExecuteChanged;
+        }
+
+        private void OnCanExecuteChanged(object sender, EventArgs args)
+        {
+            CommandManager.InvalidateRequerySuggested();
         }
 
         public bool CanExecute(object parameter)

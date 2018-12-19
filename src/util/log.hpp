@@ -19,6 +19,9 @@ enum class LogSeverity {
 	ERROR,
 	FATAL_ERROR,
 };
+
+/// Holds the currently set log level
+extern LogSeverity s_logLevel;
 	
 typedef void (*MessageHandlerFunc)(LogSeverity _severity, const std::string& _message);
 	
@@ -53,56 +56,50 @@ namespace details {
 	}
 }
 
-#if CA_LOG_LEVEL <= 0
 template<typename... ArgTs>
 void logPedantic(ArgTs&&... _args)
 {
-	std::string msg;
-	msg.reserve(500);
-	details::logMessage(LogSeverity::PEDANTIC, msg, std::forward<ArgTs>(_args)...);
+	if(s_logLevel <= LogSeverity::PEDANTIC) {
+		std::string msg;
+		msg.reserve(500);
+		details::logMessage(LogSeverity::PEDANTIC, msg, std::forward<ArgTs>(_args)...);
+	}
 }
-#else
-template<typename... ArgTs>
-void logPedantic(ArgTs&&... _args) {}
-#endif
 
-#if CA_LOG_LEVEL <= 1
 template<typename... ArgTs>
 void logInfo(ArgTs&&... _args)
 {
-	std::string msg;
-	msg.reserve(500);
-	details::logMessage(LogSeverity::INFO, msg, std::forward<ArgTs>(_args)...);
+	if(s_logLevel <= LogSeverity::INFO) {
+		std::string msg;
+		msg.reserve(500);
+		details::logMessage(LogSeverity::INFO, msg, std::forward<ArgTs>(_args)...);
+	}
 }
-#else
-template<typename... ArgTs>
-void logInfo(ArgTs&&... _args) {}
-#endif
 
-#if CA_LOG_LEVEL <= 2
 template<typename... ArgTs>
 void logWarning(ArgTs&&... _args)
 {
-	std::string msg;
-	msg.reserve(500);
-	details::logMessage(LogSeverity::WARNING, msg, std::forward<ArgTs>(_args)...);
+	if(s_logLevel <= LogSeverity::WARNING) {
+		std::string msg;
+		msg.reserve(500);
+		details::logMessage(LogSeverity::WARNING, msg, std::forward<ArgTs>(_args)...);
+	}
 }
-#else
-template<typename... ArgTs>
-void logWarning(ArgTs&&... _args) {}
-#endif
 
 template<typename... ArgTs>
 void logError(ArgTs&&... _args)
 {
-	std::string msg;
-	msg.reserve(500);
-	details::logMessage(LogSeverity::ERROR, msg, std::forward<ArgTs>(_args)...);
+	if(s_logLevel <= LogSeverity::ERROR) {
+		std::string msg;
+		msg.reserve(500);
+		details::logMessage(LogSeverity::ERROR, msg, std::forward<ArgTs>(_args)...);
+	}
 }
 	
 template<typename... ArgTs>
 void logFatal(ArgTs&&... _args)
 {
+	// No if, will always be logged
 	std::string msg;
 	msg.reserve(500);
 	details::logMessage(LogSeverity::FATAL_ERROR, msg, std::forward<ArgTs>(_args)...);

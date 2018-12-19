@@ -20,7 +20,7 @@ namespace {
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
-	logPedantic("[read_file] Loading JSON file '", path, "' into RAM");
+	logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
 	fileString.resize(fileSize);

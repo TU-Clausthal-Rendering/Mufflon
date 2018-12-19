@@ -140,6 +140,14 @@ typedef enum {
 } ProfilingLevel;
 
 typedef enum {
+	LOG_PEDANTIC,
+	LOG_INFO,
+	LOG_WARNING,
+	LOG_ERROR,
+	LOG_FATAL_ERROR
+} LogLevel;
+
+typedef enum {
 	NONE = 0,
 	OBJ_EMISSIVE = 1
 } ObjectFlags;
@@ -475,6 +483,7 @@ CORE_API Boolean CDECL display_screenshot();
 CORE_API Boolean CDECL resize(int width, int height, int offsetX, int offsetY);
 CORE_API void CDECL execute_command(const char* command);
 CORE_API const char* CDECL core_get_dll_error();
+CORE_API bool CDECL core_set_log_level(LogLevel level);
 
 
 }

@@ -10,6 +10,9 @@
 #include <combaseapi.h>
 #endif // _WIN32
 
+// Undefine windows API defines (bs...)
+#undef ERROR
+
 #define FUNCTION_NAME __func__
 
 #define TRY try {
@@ -55,6 +58,29 @@ const char* loader_get_dll_error() {
 	buffer[s_lastError.size()] = '\0';
 	return buffer;
 	CATCH_ALL(nullptr)
+}
+
+bool loader_set_log_level(LogLevel level) {
+	switch(level) {
+		case LogLevel::LOG_PEDANTIC:
+			mufflon::s_logLevel = LogSeverity::PEDANTIC;
+			return true;
+		case LogLevel::LOG_INFO:
+			mufflon::s_logLevel = LogSeverity::INFO;
+			return true;
+		case LogLevel::LOG_WARNING:
+			mufflon::s_logLevel = LogSeverity::WARNING;
+			return true;
+		case LogLevel::LOG_ERROR:
+			mufflon::s_logLevel = LogSeverity::ERROR;
+			return true;
+		case LogLevel::LOG_FATAL_ERROR:
+			mufflon::s_logLevel = LogSeverity::FATAL_ERROR;
+			return true;
+		default:
+			logError("[", FUNCTION_NAME, "] Invalid log level");
+			return false;
+	}
 }
 
 Boolean loader_set_logger(void(*logCallback)(const char*, int)) {

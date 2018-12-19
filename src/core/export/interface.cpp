@@ -232,16 +232,29 @@ const char* core_get_dll_error() {
 	CATCH_ALL(nullptr)
 }
 
-Boolean iterate() {
-	TRY
-	static float t = 0.0f;
-	glClearColor(0.0f, t, 0.0f, 1.0f);
-	t += 0.01f;
-	if(t > 1.0f) t -= 1.0f;
-	glClear(GL_COLOR_BUFFER_BIT);
-	return true;
-	CATCH_ALL(false)
+bool core_set_log_level(LogLevel level) {
+	switch(level) {
+		case LogLevel::LOG_PEDANTIC:
+			mufflon::s_logLevel = LogSeverity::PEDANTIC;
+			return true;
+		case LogLevel::LOG_INFO:
+			mufflon::s_logLevel = LogSeverity::INFO;
+			return true;
+		case LogLevel::LOG_WARNING:
+			mufflon::s_logLevel = LogSeverity::WARNING;
+			return true;
+		case LogLevel::LOG_ERROR:
+			mufflon::s_logLevel = LogSeverity::ERROR;
+			return true;
+		case LogLevel::LOG_FATAL_ERROR:
+			mufflon::s_logLevel = LogSeverity::FATAL_ERROR;
+			return true;
+		default:
+			logError("[", FUNCTION_NAME, "] Invalid log level");
+			return false;
+	}
 }
+
 Boolean display_screenshot() {
 	TRY
 	if(!s_imageOutput) {
@@ -2332,8 +2345,8 @@ Boolean profiling_set_level(ProfilingLevel level) {
 			return true;
 		default:
 			logError("[", FUNCTION_NAME, "] invalid profiling level");
+			return false;
 	}
-	return false;
 	CATCH_ALL(false)
 }
 

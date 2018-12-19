@@ -12,14 +12,6 @@ namespace gui.Dll
     /// </summary>
     public static class Loader
     {
-        public enum ProfilingLevel
-        {
-            ALL,
-            HIGH,
-            LOW,
-            OFF
-        };
-
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool loader_set_logger(Core.LogCallback callback);
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -29,7 +21,7 @@ namespace gui.Dll
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void loader_profiling_disable();
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern Boolean loader_profiling_set_level(ProfilingLevel level);
+        internal static extern Boolean loader_profiling_set_level(Core.ProfilingLevel level);
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern Boolean loader_profiling_save_current_state(string path);
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -47,5 +39,7 @@ namespace gui.Dll
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string loader_get_dll_error();
+        [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool loader_set_log_level(Core.Severity level);
     }
 }

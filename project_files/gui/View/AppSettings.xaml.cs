@@ -27,14 +27,9 @@ namespace gui.View
             public Core.Severity Level { get; set; }
             public string Name { get; set; }
         }
-        public class CoreProfilingLevel
+        public class ProfilingLevel
         {
             public Core.ProfilingLevel Level { get; set; }
-            public string Name { get; set; }
-        }
-        public class LoaderProfilingLevel
-        {
-            public Loader.ProfilingLevel Level { get; set; }
             public string Name { get; set; }
         }
 
@@ -46,24 +41,24 @@ namespace gui.View
             new Severity(){ Level = Core.Severity.ERROR, Name = "Error" },
             new Severity(){ Level = Core.Severity.FATAL_ERROR, Name = "Fatal error" }
         };
-        public ObservableCollection<CoreProfilingLevel> CoreProfilerLevels { get; } = new ObservableCollection<CoreProfilingLevel>()
+        public ObservableCollection<ProfilingLevel> CoreProfilerLevels { get; } = new ObservableCollection<ProfilingLevel>()
         {
-            new CoreProfilingLevel(){ Level = Core.ProfilingLevel.ALL, Name = "All" },
-            new CoreProfilingLevel(){ Level = Core.ProfilingLevel.HIGH, Name = "High" },
-            new CoreProfilingLevel(){ Level = Core.ProfilingLevel.LOW, Name = "Low" },
-            new CoreProfilingLevel(){ Level = Core.ProfilingLevel.OFF, Name = "Off" }
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.ALL, Name = "All" },
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.HIGH, Name = "High" },
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.LOW, Name = "Low" },
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.OFF, Name = "Off" }
         };
-        public ObservableCollection<LoaderProfilingLevel> LoaderProfilerLevels { get; } = new ObservableCollection<LoaderProfilingLevel>()
+        public ObservableCollection<ProfilingLevel> LoaderProfilerLevels { get; } = new ObservableCollection<ProfilingLevel>()
         {
-            new LoaderProfilingLevel(){ Level = Loader.ProfilingLevel.ALL, Name = "All" },
-            new LoaderProfilingLevel(){ Level = Loader.ProfilingLevel.HIGH, Name = "High" },
-            new LoaderProfilingLevel(){ Level = Loader.ProfilingLevel.LOW, Name = "Low" },
-            new LoaderProfilingLevel(){ Level = Loader.ProfilingLevel.OFF, Name = "Off" }
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.ALL, Name = "All" },
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.HIGH, Name = "High" },
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.LOW, Name = "Low" },
+            new ProfilingLevel(){ Level = Core.ProfilingLevel.OFF, Name = "Off" }
         };
 
         public Severity LogLevel { get; set; }
-        public CoreProfilingLevel CoreProfilerLevel { get; set; }
-        public LoaderProfilingLevel LoaderProfilerLevel { get; set; }
+        public ProfilingLevel CoreProfilerLevel { get; set; }
+        public ProfilingLevel LoaderProfilerLevel { get; set; }
 
         public AppSettings()
         {
@@ -82,13 +77,12 @@ namespace gui.View
             Settings.Default.CoreProfileLevel = (int)CoreProfilerLevel.Level;
             Settings.Default.LoaderProfileLevel = (int)LoaderProfilerLevel.Level;
 
-            Logger.LogLevel = LogLevel.Level;
+            Logger.LogLevel = LogLevel.Level; // Also sets the level in the DLLs
             if (CoreProfilerLevel.Level == Core.ProfilingLevel.OFF)
                 Core.profiling_disable();
             else if (!Core.profiling_set_level(CoreProfilerLevel.Level))
                 throw new Exception(Core.core_get_dll_error());
-
-            if (LoaderProfilerLevel.Level == Loader.ProfilingLevel.OFF)
+            if (LoaderProfilerLevel.Level == Core.ProfilingLevel.OFF)
                 Loader.loader_profiling_disable();
             else if (!Loader.loader_profiling_set_level(LoaderProfilerLevel.Level))
                 throw new Exception(Loader.loader_get_dll_error());

@@ -92,6 +92,8 @@ namespace gui.Dll
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern string core_get_dll_error();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool core_set_log_level(Severity level);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void execute_command(string command);

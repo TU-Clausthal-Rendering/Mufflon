@@ -186,8 +186,8 @@ void BinaryLoader::read_normal_compressed_vertices() {
 												&uvsRead) == INVALID_INDEX)
 		throw std::runtime_error("Failed to bulk-read vertices for object '" + m_currObjState.name + "', LoD "
 									+ std::to_string(m_currObjState.lodLevel));
-	logPedantic("[BinaryLoader::read_normal_compressed_vertices] Object '", m_currObjState.name, ": Read ",
-				pointsRead, '/', uvsRead, " point/UVs bulk");
+	logPedantic("[BinaryLoader::read_normal_compressed_vertices] Object '", m_currObjState.name, "': Read ",
+				pointsRead, "'", uvsRead, " point/UVs bulk");
 	if(pointsRead != m_currObjState.numVertices || uvsRead != m_currObjState.numVertices)
 		throw std::runtime_error("Not all vertices were fully read'" + m_currObjState.name
 								 + "', LoD " + std::to_string(m_currObjState.lodLevel));
@@ -227,8 +227,8 @@ void BinaryLoader::read_normal_uncompressed_vertices() {
 									&normalsRead, &uvsRead) == INVALID_INDEX)
 		throw std::runtime_error("Failed to bulk-read vertices for object '" + m_currObjState.name + "', LoD "
 								 + std::to_string(m_currObjState.lodLevel));
-	logPedantic("[BinaryLoader::read_normal_uncompressed_vertices] Object '", m_currObjState.name, ": Read ",
-				pointsRead, '/', normalsRead, '/', uvsRead, " point/normals/UVs bulk");
+	logPedantic("[BinaryLoader::read_normal_uncompressed_vertices] Object '", m_currObjState.name, "': Read ",
+				pointsRead, "'", normalsRead, "'", uvsRead, " point/normals/UVs bulk");
 	if(pointsRead != m_currObjState.numVertices || normalsRead != m_currObjState.numVertices
 	   || uvsRead != m_currObjState.numVertices)
 		throw std::runtime_error("Not all vertices were fully read for object '" + m_currObjState.name
@@ -266,7 +266,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes() {
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
 		if(read<u32>() != ATTRIBUTE_MAGIC)
 			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ')');
+									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -280,7 +280,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes() {
 		// Seek past the attribute
 		m_fileStream.seekg(state.bytes, std::ios_base::cur);
 	}
-	logPedantic("[BinaryLoader::read_uncompressed_vertex_attributes] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_vertex_attributes] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numVertAttribs, " vertex attributes");
 }
 
@@ -293,7 +293,7 @@ void BinaryLoader::read_uncompressed_face_attributes() {
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
 		if(read<u32>() != ATTRIBUTE_MAGIC)
 			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ')');
+									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -307,7 +307,7 @@ void BinaryLoader::read_uncompressed_face_attributes() {
 		// Seek past the attribute
 		m_fileStream.seekg(state.bytes, std::ios_base::cur);
 	}
-	logPedantic("[BinaryLoader::read_uncompressed_face_attributes] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_face_attributes] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numFaceAttribs, " face attributes");
 }
 
@@ -320,7 +320,7 @@ void BinaryLoader::read_uncompressed_sphere_attributes() {
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
 		if(read<u32>() != ATTRIBUTE_MAGIC)
 			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ')');
+									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -334,7 +334,7 @@ void BinaryLoader::read_uncompressed_sphere_attributes() {
 		// Seek past the attribute
 		m_fileStream.seekg(state.bytes, std::ios_base::cur);
 	}
-	logPedantic("[BinaryLoader::read_uncompressed_sphere_attributes] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_sphere_attributes] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numSphereAttribs, " sphere attributes");
 }
 
@@ -349,7 +349,7 @@ void BinaryLoader::read_uncompressed_face_materials() {
 		throw std::runtime_error("Failed to set face material for object '"
 								 + m_currObjState.name + "', LoD "
 								 + std::to_string(m_currObjState.lodLevel));
-	logPedantic("[BinaryLoader::read_uncompressed_face_materials] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_face_materials] Object '", m_currObjState.name, "': Read ",
 				faces, " face material indices");
 	// Seek to face attributes
 	m_fileStream.seekg(sizeof(u16) * faces, std::ios_base::cur);
@@ -365,7 +365,7 @@ void BinaryLoader::read_uncompressed_sphere_materials() {
 		throw std::runtime_error("Failed to set face material for object '"
 								 + m_currObjState.name + "', LoD "
 								 + std::to_string(m_currObjState.lodLevel));
-	logPedantic("[BinaryLoader::read_uncompressed_face_materials] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_face_materials] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numSpheres, " sphere material indices");
 	// Seek to face attributes
 	m_fileStream.seekg(sizeof(u16) * m_currObjState.numSpheres, std::ios_base::cur);
@@ -382,7 +382,7 @@ void BinaryLoader::read_uncompressed_triangles() {
 			throw std::runtime_error("Failed to add triangle to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_uncompressed_triangles] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_triangles] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numTriangles, " triangles");
 	// Seek to the quads
 	m_fileStream.seekg(3u * sizeof(u32) * m_currObjState.numTriangles, std::ios_base::cur);
@@ -399,7 +399,7 @@ void BinaryLoader::read_uncompressed_quads() {
 			throw std::runtime_error("Failed to add quad to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_uncompressed_quads] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_quads] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numQuads, " quads");
 	// Seek to the material indices
 	m_fileStream.seekg(4u * sizeof(u32) * m_currObjState.numQuads, std::ios_base::cur);
@@ -415,7 +415,7 @@ void BinaryLoader::read_uncompressed_spheres() {
 							   spheres.get(), &spheresRead) == INVALID_INDEX)
 		throw std::runtime_error("Failed to add quad to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
-	logPedantic("[BinaryLoader::read_uncompressed_spheres] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_uncompressed_spheres] Object '", m_currObjState.name, "': Read ",
 				spheresRead, " spheres bulk");
 	if(spheresRead != m_currObjState.numSpheres)
 		throw std::runtime_error("Not all spheres were fully read for object '" + m_currObjState.name
@@ -462,7 +462,7 @@ void BinaryLoader::read_compressed_normal_compressed_vertices() {
 									 + " to object '" + m_currObjState.name + "', LoD "
 									 + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_compressed_normal_compressed_vertices] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_normal_compressed_vertices] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numVertices, " deflated and normal-compressed vertices");
 }
 
@@ -482,7 +482,7 @@ void BinaryLoader::read_compressed_normal_uncompressed_vertices() {
 									 + " to object '" + m_currObjState.name + "', LoD "
 									 + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_compressed_normal_uncompressed_vertices] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_normal_uncompressed_vertices] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numVertices, " deflated vertices");
 }
 
@@ -498,7 +498,7 @@ void BinaryLoader::read_compressed_triangles() {
 			throw std::runtime_error("Failed to add triangle to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_compressed_triangles] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_triangles] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numTriangles, " deflated triangles");
 }
 
@@ -514,7 +514,7 @@ void BinaryLoader::read_compressed_quads() {
 			throw std::runtime_error("Failed to add quad to object '" + m_currObjState.name
 									 + "', LoD " + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_compressed_quads] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_quads] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numQuads, " deflated quads");
 }
 
@@ -538,7 +538,7 @@ void BinaryLoader::read_compressed_spheres() {
 									 + m_currObjState.name + "', LoD "
 									 + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_compressed_spheres] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_spheres] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numSpheres, " deflated spheres");
 
 	const unsigned char* attributes = sphereData.data() + m_currObjState.numSpheres
@@ -556,7 +556,7 @@ void BinaryLoader::read_compressed_vertex_attributes() {
 		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
 			throw std::runtime_error("Invalid attribute magic constant (object '"
 									 + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ')');
+									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(),
 														state.type);
@@ -571,7 +571,7 @@ void BinaryLoader::read_compressed_vertex_attributes() {
 			attributes += get_attribute_size(state.type);
 		}
 	}
-	logPedantic("[BinaryLoader::read_compressed_vertex_attributes] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_vertex_attributes] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numVertAttribs, " deflated vertex attributes");
 }
 
@@ -587,7 +587,7 @@ void BinaryLoader::read_compressed_face_attributes() {
 		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
 			throw std::runtime_error("Invalid attribute magic constant (object '"
 									 + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ')');
+									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(),
 													  state.type);
@@ -602,7 +602,7 @@ void BinaryLoader::read_compressed_face_attributes() {
 			attributes += get_attribute_size(state.type);
 		}
 	}
-	logPedantic("[BinaryLoader::read_compressed_face_attributes] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_face_attributes] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numFaceAttribs, " deflated face attributes");
 }
 
@@ -619,7 +619,7 @@ void BinaryLoader::read_compressed_face_materials() {
 									 + m_currObjState.name + "', LoD "
 									 + std::to_string(m_currObjState.lodLevel));
 	}
-	logPedantic("[BinaryLoader::read_compressed_face_materials] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_face_materials] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numTriangles + m_currObjState.numQuads, " deflated face material indices");
 }
 
@@ -631,7 +631,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attrib
 		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
 			throw std::runtime_error("Invalid attribute magic constant (object '"
 									 + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ')');
+									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -645,7 +645,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attrib
 			attributes += get_attribute_size(state.type);
 		}
 	}
-	logPedantic("[BinaryLoader::read_compressed_sphere_attributes] Object '", m_currObjState.name, ": Read ",
+	logPedantic("[BinaryLoader::read_compressed_sphere_attributes] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numSpheres, " deflated sphere material indices");
 }
 
@@ -682,7 +682,7 @@ void BinaryLoader::read_lod() {
 		read_uncompressed_face_attributes();
 		read_uncompressed_spheres();
 
-		logInfo("[BinaryLoader::read_lod] Loaded LoD ", m_currObjState.lodLevel, " of object object'",
+		logInfo("[BinaryLoader::read_lod] Loaded LoD ", m_currObjState.lodLevel, " of object object '",
 				m_currObjState.name, "' with ", m_currObjState.numVertices, " vertices, ",
 				m_currObjState.numTriangles, " triangles, ", m_currObjState.numQuads, " quads, ",
 				m_currObjState.numSpheres, " spheres");
@@ -692,8 +692,8 @@ void BinaryLoader::read_lod() {
 void BinaryLoader::read_object(const u64 globalLod,
 							   const std::unordered_map<std::string_view, u64>& localLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_object");
-	logInfo("[BinaryLoader::read_object] Loading object '", m_currObjState.name, ')');
 	m_currObjState.name = read<std::string>();
+	logInfo("[BinaryLoader::read_object] Loading object '", m_currObjState.name, "')");
 	m_currObjState.flags = static_cast<ObjectFlags>( read<u32>() );
 	m_currObjState.keyframe = read<u32>();
 	m_currObjState.animObjId = read<u32>();
@@ -708,13 +708,13 @@ void BinaryLoader::read_object(const u64 globalLod,
 			return globalLod;
 	}(m_currObjState.name);
 	logPedantic("[BinaryLoader::read_object] Using LoD '", m_currObjState.lodLevel,
-				"' for object '", m_currObjState.name, ')');
+				"' for object '", m_currObjState.name, "')");
 	// Jump table
 	const u32 numLods = read<u32>();
 	if(m_currObjState.lodLevel >= numLods)
 		throw std::runtime_error("Not enough LoDs specified for object '" + m_currObjState.name
 								 + "' (found " + std::to_string(numLods) + ", need "
-								 + std::to_string(m_currObjState.lodLevel) + ')');
+								 + std::to_string(m_currObjState.lodLevel) + ")");
 	// Jump to proper LoD
 	m_fileStream.seekg(m_currObjState.lodLevel * sizeof(u64), std::ifstream::cur);
 	m_fileStream.seekg(read<u64>(), std::ifstream::beg);
@@ -722,7 +722,7 @@ void BinaryLoader::read_object(const u64 globalLod,
 	// Load the LoD data
 	if(read<u32>() != LOD_MAGIC)
 		throw std::runtime_error("Invalid LoD magic constant (object '" + m_currObjState.name + "', LoD "
-								 + std::to_string(m_currObjState.lodLevel) + ')');
+								 + std::to_string(m_currObjState.lodLevel) + ")");
 	m_currObjState.numTriangles = read<u32>();
 	m_currObjState.numQuads = read<u32>();
 	m_currObjState.numSpheres = read<u32>();
@@ -847,7 +847,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 
 			// Read object
 			if(read<u32>() != OBJECT_MAGIC)
-				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ')');
+				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ")");
 			read_object(globalLod, localLods);
 		}
 

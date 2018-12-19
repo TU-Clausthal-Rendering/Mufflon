@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Media;
 
 namespace gui.Dll
@@ -8,7 +9,20 @@ namespace gui.Dll
         public delegate void LogEvent(string message, Brush color);
         public static event LogEvent Log;
 
-        public static Core.Severity LogLevel { get; set; }
+        private static Core.Severity s_logLevel = Core.Severity.INFO;
+        public static Core.Severity LogLevel
+        {
+            get => s_logLevel;
+            set
+            {
+                if (s_logLevel == value) return;
+                s_logLevel = value;
+                if (!Core.core_set_log_level(s_logLevel))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Loader.loader_set_log_level(s_logLevel))
+                    throw new Exception(Loader.loader_get_dll_error());
+            }
+        }
 
         public static void log(string message, Core.Severity severity)
         {

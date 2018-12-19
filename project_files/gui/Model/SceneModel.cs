@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
@@ -31,6 +29,7 @@ namespace gui.Model
                 if (m_fullPath == value) return;
                 m_fullPath = value;
                 OnPropertyChanged(nameof(FullPath));
+                OnPropertyChanged(nameof(IsLoaded));
 
                 // Check if we had this scene in the last X
                 // Check if the scene is already present in the list
@@ -66,15 +65,15 @@ namespace gui.Model
         }
 
         // scene root directory
-        public string Directory => System.IO.Path.GetDirectoryName(FullPath);
+        public string Directory => Path.GetDirectoryName(FullPath);
 
         // filename with extension
-        public string Filename => System.IO.Path.GetFileName(FullPath);
+        public string Filename => Path.GetFileName(FullPath);
 
         public SceneModel()
         {
             if (Settings.Default.LastScenes == null)
-                Settings.Default.LastScenes = new System.Collections.Specialized.StringCollection();
+                Settings.Default.LastScenes = new StringCollection();
             Scenarios = new ObservableCollection<string>();
         }
 
@@ -124,7 +123,7 @@ namespace gui.Model
                 return; // false;
             }
 
-            Logger.log("Scene was loaded successfully", Core.Severity.INFO);
+            Logger.log("Scene '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
 
             // Set path and load scene properties
             FullPath = path;

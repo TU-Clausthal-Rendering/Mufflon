@@ -81,18 +81,18 @@
                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.PlayPauseCommand}">
+                    <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}">
                         <StackPanel>
                             <Image 
                                 Source="Icons/play.png"
                                 Width="16"
                                 Height="16"
-                                Visibility="{Binding Toolbar.PlayIconVisibility}"/>
+                                Visibility="{Binding Toolbar.PlayIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
                             <Image 
                                 Source="Icons/pause.png"
                                 Width="16"
                                 Height="16"
-                                Visibility="{Binding Toolbar.PauseIconVisibility, FallbackValue=Collapsed}"/>
+                                Visibility="{Binding Toolbar.PauseIconVisibility, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                     </Button>
                 </StatusBarItem>
