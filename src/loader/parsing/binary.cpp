@@ -742,11 +742,13 @@ void BinaryLoader::read_object(const u64 globalLod,
 	read_lod();
 }
 
-void BinaryLoader::read_instances() {
+bool BinaryLoader::read_instances() {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
 	std::vector<uint8_t> hasInstance(m_objectHandles.size(), false);
 	const u32 numInstances = read<u32>();
 	for(u32 i = 0u; i < numInstances; ++i) {
+		if(m_abort)
+			return false;
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
 		const u32 animInstId = read<u32>();
@@ -771,6 +773,8 @@ void BinaryLoader::read_instances() {
 	}
 
 	for(std::size_t i = 0u; i < hasInstance.size(); ++i) {
+		if(m_abort)
+			return false;
 		if(!hasInstance[i]) {
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
 						m_currObjState.name, "\'");
@@ -796,12 +800,18 @@ void BinaryLoader::read_instances() {
 		}
 	}
 
+	return true;
 	// Create identity instances for objects not having one yet
 }
 
-void BinaryLoader::load_file(const u64 globalLod,
+bool BinaryLoader::load_file(fs::path file, const u64 globalLod,
 							 const std::unordered_map<std::string_view, u64>& localLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
+	m_filePath = std::move(file);
+	if(!fs::exists(m_filePath))
+		throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
+	m_aabb.min = ei::Vec3{ 1e30f };
+	m_aabb.max = ei::Vec3{ -1e30f };
 	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.string(), "'");
 	try {
 		if(!fs::exists(m_filePath))
@@ -815,6 +825,9 @@ void BinaryLoader::load_file(const u64 globalLod,
 		// Needed to get a C file descriptor offset
 		const std::ifstream::pos_type fileStart = m_fileStream.tellg();
 
+		if(m_abort)
+			return false;
+
 		// Read the materials header
 		if(read<u32>() != MATERIALS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid materials header magic constant");
@@ -825,6 +838,8 @@ void BinaryLoader::load_file(const u64 globalLod,
 		for(u32 i = 0u; i < numMaterials; ++i) {
 			m_materialNames.push_back(move(read<std::string>()));
 		}
+		if(m_abort)
+			return false;
 
 		// Jump to the location of objects
 		m_fileStream.seekg(objectStart, std::ifstream::beg);
@@ -841,6 +856,8 @@ void BinaryLoader::load_file(const u64 globalLod,
 
 		// Next come the objects
 		for(std::size_t i = 0u; i < objJumpTable.size(); ++i) {
+			if(m_abort)
+				return false;
 			// Jump to the right position in file
 			m_fileStream.seekg(objJumpTable[i], std::ifstream::beg);
 			m_currObjState.globalFlags = compressionFlags;
@@ -855,7 +872,8 @@ void BinaryLoader::load_file(const u64 globalLod,
 		m_fileStream.seekg(instanceStart, std::ios_base::beg);
 		if(read<u32>() != INSTANCE_MAGIC)
 			throw std::runtime_error("Invalid instance magic constant");
-		read_instances();
+		if(!read_instances())
+			return false;
 
 		this->clear_state();
 	} catch(const std::exception&) {
@@ -863,6 +881,7 @@ void BinaryLoader::load_file(const u64 globalLod,
 		this->clear_state();
 		throw;
 	}
+	return true;
 }
 
 } // namespace loader::binary

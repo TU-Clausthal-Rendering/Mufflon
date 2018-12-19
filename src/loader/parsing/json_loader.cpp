@@ -270,7 +270,7 @@ void JsonLoader::free_material(MaterialParams* mat) {
 	}
 }
 
-void JsonLoader::load_cameras(const ei::Box& aabb) {
+bool JsonLoader::load_cameras(const ei::Box& aabb) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& cameras = m_cameras->value;
@@ -279,6 +279,8 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 
 	for(auto cameraIter = cameras.MemberBegin(); cameraIter != cameras.MemberEnd(); ++cameraIter) {
 		logPedantic("[JsonLoader::load_cameras] Loading camera '", cameraIter->name.GetString(), "'");
+		if(m_abort)
+			return false;
 		const Value& camera = cameraIter->value;
 		assertObject(m_state, camera);
 		m_state.objectNames.push_back(cameraIter->name.GetString());
@@ -330,9 +332,10 @@ void JsonLoader::load_cameras(const ei::Box& aabb) {
 
 		m_state.objectNames.pop_back();
 	}
+	return true;
 }
 
-void JsonLoader::load_lights() {
+bool JsonLoader::load_lights() {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& lights = m_lights->value;
@@ -341,6 +344,8 @@ void JsonLoader::load_lights() {
 
 	for(auto lightIter = lights.MemberBegin(); lightIter != lights.MemberEnd(); ++lightIter) {
 		logPedantic("[JsonLoader::load_lights] Loading light '", lightIter->name.GetString(), "'");
+		if(m_abort)
+			return false;
 		const Value& light = lightIter->value;
 		assertObject(m_state, light);
 		m_state.objectNames.push_back(lightIter->name.GetString());
@@ -414,9 +419,10 @@ void JsonLoader::load_lights() {
 
 		m_state.objectNames.pop_back();
 	}
+	return true;
 }
 
-void JsonLoader::load_materials() {
+bool JsonLoader::load_materials() {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& materials = m_materials->value;
@@ -424,6 +430,8 @@ void JsonLoader::load_materials() {
 	m_state.current = ParserState::Level::MATERIALS;
 
 	for(auto matIter = materials.MemberBegin(); matIter != materials.MemberEnd(); ++matIter) {
+		if(m_abort)
+			return false;
 		MaterialParams* mat = load_material(matIter);
 		if(mat != nullptr) {
 			auto hdl = world_add_material(matIter->name.GetString(), mat);
@@ -435,9 +443,10 @@ void JsonLoader::load_materials() {
 			throw std::runtime_error("Failed to load material '" + std::string(matIter->name.GetString()) + "'");
 		}
 	}
+	return true;
 }
 
-void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
+bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
 	using namespace rapidjson;
 	const Value& scenarios = m_scenarios->value;
@@ -446,6 +455,8 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
+		if(m_abort)
+			return false;
 		const Value& scenario = scenarioIter->value;
 		assertObject(m_state, scenario);
 		m_state.objectNames.push_back(scenarioIter->name.GetString());
@@ -471,6 +482,9 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(!scenario_set_global_lod_level(scenarioHdl, lod))
 			throw std::runtime_error("Failed to set LoD " + std::to_string(lod));
 
+		if(m_abort)
+			return false;
+
 		// Add lights
 		if(lightIter != scenario.MemberEnd()) {
 			assertArray(m_state, lightIter);
@@ -485,6 +499,8 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		// Add objects
 		auto objectsIter = get(m_state, scenario, "objectProperties", false);
 		if(objectsIter != scenario.MemberEnd()) {
+			if(m_abort)
+				return false;
 			m_state.objectNames.push_back(objectsIter->name.GetString());
 			assertObject(m_state, objectsIter->value);
 			for(auto objIter = objectsIter->value.MemberBegin(); objIter != objectsIter->value.MemberEnd(); ++objIter) {
@@ -513,6 +529,8 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		m_state.objectNames.push_back(materialsIter->name.GetString());
 		assertObject(m_state, materialsIter->value);
 		for(const std::string& binName : binMatNames) {
+			if(m_abort)
+				return false;
 			// The binary names from the loader already wrap the name in the desired format
 			std::string_view matName = read<const char*>(m_state, get(m_state, materialsIter->value,
 																 binName.c_str()));
@@ -528,9 +546,10 @@ void JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				throw std::runtime_error("Failed to associate material '" + matHdl->first + "'");
 		}
 	}
+	return true;
 }
 
-void JsonLoader::load_file() {
+bool JsonLoader::load_file() {
 	using namespace rapidjson;
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file");
 
@@ -561,10 +580,8 @@ void JsonLoader::load_file() {
 	}
 	// Binary file path
 	m_binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
-	if(m_binaryFile.empty()) {
-		logError("[JsonLoader::load_file] Scene file: has an empty binary file path");
-		return;
-	}
+	if(m_binaryFile.empty())
+		throw std::runtime_error("Scene file has an empty binary file path");
 	logInfo("[JsonLoader::load_file] Detected binary file path '", m_binaryFile.string(), "'");
 	// Make the file path absolute
 	if(m_binaryFile.is_relative())
@@ -572,8 +589,11 @@ void JsonLoader::load_file() {
 	if(!fs::exists(m_binaryFile)) {
 		logError("[JsonLoader::load_file] Scene file: specifies a binary file that doesn't exist ('",
 				 m_binaryFile.string(), "'");
-		return;
+		throw std::runtime_error("Binary file '" + m_binaryFile.string() + "' does not exist");
 	}
+
+	if(m_abort)
+		return false;
 
 	m_scenarios = get(m_state, document, "scenarios");
 	m_cameras = get(m_state, document, "cameras");
@@ -592,7 +612,6 @@ void JsonLoader::load_file() {
 	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, "'");
 
 	// First parse binary file
-	binary::BinaryLoader binLoader{ m_binaryFile };
 	std::unordered_map<std::string_view, u64> defaultLocalLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
@@ -614,22 +633,28 @@ void JsonLoader::load_file() {
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
 	}
+
 	// Load the binary file before we load the rest of the JSON
-	binLoader.load_file(defaultGlobalLod, defaultLocalLods);
+	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultLocalLods))
+		return false;
 
 	try {
 		// Cameras
 		m_state.current = ParserState::Level::ROOT;
-		load_cameras(binLoader.get_bounding_box());
+		if(!load_cameras(m_binLoader.get_bounding_box()))
+			return false;
 		// Lights
 		m_state.current = ParserState::Level::ROOT;
-		load_lights();
+		if(!load_lights())
+			return false;
 		// Materials
 		m_state.current = ParserState::Level::ROOT;
-		load_materials();
+		if(!load_materials())
+			return false;
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
-		load_scenarios(binLoader.get_material_names());
+		if(!load_scenarios(m_binLoader.get_material_names()))
+			return false;
 		// Load the default scenario
 		m_state.reset();
 		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
@@ -642,6 +667,7 @@ void JsonLoader::load_file() {
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
 	}
+	return true;
 }
 
 

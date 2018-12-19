@@ -8,6 +8,7 @@ using System.Windows;
 using gui.Annotations;
 using gui.Dll;
 using gui.Properties;
+using gui.View;
 
 namespace gui.Model
 {
@@ -19,6 +20,7 @@ namespace gui.Model
         private static readonly int MAX_LAST_SCENES = 10;
 
         private string m_fullPath = null;
+        private SceneLoadStatus m_cancelDialog;
 
         // path with filename and extension
         public string FullPath
@@ -100,39 +102,58 @@ namespace gui.Model
                     }
                 }
 
-                return; //false;
+                return;
             }
 
+            m_cancelDialog = new SceneLoadStatus(Path.GetFileName(path));
+            m_cancelDialog.PropertyChanged += cancelSceneLoad;
             LoadSceneAsynch(path);
         }
 
         private async void LoadSceneAsynch(string path)
         {
-            var succeded = await Task.Run(() =>
+            var status = await Task.Run(() =>
             {
                 var res = Loader.loader_load_json(path);
                 return res;
             });
+            m_cancelDialog.Close();
 
-            if (!succeded)
+            if (status == Loader.LoaderStatus.ERROR)
             {
                 MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 //Logger.log(e.Message, Core.Severity.FATAL_ERROR);
                 FullPath = null;
-                return; // false;
+                return;
+            } else if(status == Loader.LoaderStatus.SUCCESS)
+            {
+                Logger.log("Scene '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
+
+                // Set path and load scene properties
+                FullPath = path;
+                uint count = Core.world_get_scenario_count();
+                Scenarios.Clear();
+                for (uint i = 0u; i < count; ++i)
+                    Scenarios.Add(Core.world_get_scenario_name_by_index(i));
+                OnPropertyChanged(nameof(Scenarios));
+            } else
+            {
+                Logger.log("Scene load was cancelled", Core.Severity.INFO);
             }
+        }
 
-            Logger.log("Scene '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
-
-            // Set path and load scene properties
-            FullPath = path;
-            uint count = Core.world_get_scenario_count();
-            Scenarios.Clear();
-            for (uint i = 0u; i < count; ++i)
-                Scenarios.Add(Core.world_get_scenario_name_by_index(i));
-            OnPropertyChanged(nameof(Scenarios));
-            //return true;
+        private void cancelSceneLoad(object sender, PropertyChangedEventArgs args)
+        {
+            switch(args.PropertyName)
+            {
+                case nameof(SceneLoadStatus.Canceled):
+                    // Cancel the loading
+                    // Ignore the return value, since cancelling isn't something really failable
+                    if(m_cancelDialog.Canceled)
+                        Loader.loader_abort();
+                    break;
+            }
         }
 
     #region PropertyChanged

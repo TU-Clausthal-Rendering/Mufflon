@@ -3,9 +3,10 @@
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "loader/parsing/json_loader.hpp"
-#include <stdexcept>
-#include <mutex>
+#include <atomic>
 #include <iostream>
+#include <mutex>
+#include <stdexcept>
 #ifdef _WIN32
 #include <combaseapi.h>
 #endif // _WIN32
@@ -29,6 +30,7 @@ using namespace loader;
 namespace {
 
 std::string s_lastError;
+std::atomic<json::JsonLoader*> s_jsonLoader = nullptr;
 
 void(*s_logCallback)(const char*, int);
 
@@ -96,18 +98,18 @@ Boolean loader_set_logger(void(*logCallback)(const char*, int)) {
 	CATCH_ALL(false)
 }
 
-Boolean loader_load_json(const char* path) {
+LoaderStatus loader_load_json(const char* path) {
 	TRY
 	fs::path filePath(path);
 
 	// Perform some error checking
 	if (!fs::exists(filePath)) {
 		logError("[", FUNCTION_NAME, "] File '", fs::canonical(filePath).string(), "' does not exist");
-		return false;
+		return LoaderStatus::LOADER_ERROR;
 	}
 	if (fs::is_directory(filePath)) {
 		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(filePath).string(), "' is a directory, not a file");
-		return false;
+		return LoaderStatus::LOADER_ERROR;
 	}
 	if (filePath.extension() != ".json")
 		logWarning("[", FUNCTION_NAME, "] Scene file does not end with '.json'; attempting to parse it anyway");
@@ -116,14 +118,25 @@ Boolean loader_load_json(const char* path) {
 		// Clear the world
 		world_clear_all();
 		json::JsonLoader loader{ filePath };
-		loader.load_file();
+		s_jsonLoader.store(&loader);
+		if(!loader.load_file())
+			return LoaderStatus::LOADER_ABORT;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
-		return false;
+		return LoaderStatus::LOADER_ERROR;
 	}
 
-	return true;
-	CATCH_ALL(false)
+	return LoaderStatus::LOADER_SUCCESS;
+	CATCH_ALL(LoaderStatus::LOADER_ERROR)
+}
+
+Boolean loader_abort() {
+	if(json::JsonLoader* loader = s_jsonLoader.load(); loader != nullptr) {
+		loader->abort_load();
+		return true;
+	}
+	logError("[", FUNCTION_NAME, "] No loader running that could be aborted");
+	return false;
 }
 
 void loader_profiling_enable() {

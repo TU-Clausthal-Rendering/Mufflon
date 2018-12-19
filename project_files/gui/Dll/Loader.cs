@@ -7,15 +7,25 @@ using System.Runtime.InteropServices;
 
 namespace gui.Dll
 {
+
     /// <summary>
     /// DLL communication with loader.dll
     /// </summary>
     public static class Loader
     {
+        public enum LoaderStatus
+        {
+            SUCCESS,
+            ERROR,
+            ABORT
+        };
+
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool loader_set_logger(Core.LogCallback callback);
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool loader_load_json(string path);
+        internal static extern LoaderStatus loader_load_json(string path);
+        [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool loader_abort();
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void loader_profiling_enable();
         [DllImport("loader.dll", CallingConvention = CallingConvention.Cdecl)]

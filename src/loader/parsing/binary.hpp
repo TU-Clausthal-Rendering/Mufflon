@@ -5,6 +5,7 @@
 #include "util/int_types.hpp"
 #include "core/export/interface.h"
 #include <ei/3dtypes.hpp>
+#include <atomic>
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -15,16 +16,9 @@ namespace loader::binary {
 
 class BinaryLoader {
 public:
-	BinaryLoader(fs::path filePath) :
-		m_filePath(std::move(filePath))
-	{
-		if(!fs::exists(m_filePath))
-			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
-		m_aabb.min = ei::Vec3{ 1e30f};
-		m_aabb.max = ei::Vec3{-1e30f};
-	}
+	BinaryLoader() = default;
 
-	void load_file(const mufflon::u64 globalLod,
+	bool load_file(fs::path file, const mufflon::u64 globalLod,
 				   const std::unordered_map<std::string_view, mufflon::u64>& localLods);
 
 	const std::vector<std::string>& get_material_names() const noexcept {
@@ -34,6 +28,10 @@ public:
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_aabb;
 	}
+
+	// This may be called from a different thread and leads to the current load being cancelled
+	void abort_load() { m_abort = true; }
+	bool was_aborted() { return m_abort; }
 
 private:
 	static constexpr mufflon::u32 MATERIALS_HEADER_MAGIC = 'M' | ('a' << 8u) | ('t' << 16u) | ('s' << 24u);
@@ -148,12 +146,12 @@ private:
 	void read_compressed_face_materials();
 	void read_compressed_sphere_attributes(const unsigned char* data);
 
-	void read_instances();
+	bool read_instances();
 	void read_object(const mufflon::u64 globalLod,
 					 const std::unordered_map<std::string_view, mufflon::u64>& localLods);
 	void read_lod();
 
-	const fs::path m_filePath;
+	fs::path m_filePath;
 	// Parser state
 	std::ifstream m_fileStream;
 	std::ifstream::pos_type m_fileStart;
@@ -163,6 +161,9 @@ private:
 	std::vector<std::string> m_materialNames;
 	std::vector<ObjectHdl> m_objectHandles;
 	ei::Box m_aabb;
+
+	// These are for aborting a load and keeping track of progress
+	std::atomic_bool m_abort = false;
 };
 
 } // namespace loader::binary

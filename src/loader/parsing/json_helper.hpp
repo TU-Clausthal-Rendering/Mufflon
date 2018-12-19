@@ -64,11 +64,11 @@ rapidjson::Value::ConstMemberIterator get(ParserState& state,
 
 // Reads a value without modifying the state
 template < class T >
-T read(ParserState& state, const rapidjson::Value& val);
+inline T read(ParserState& state, const rapidjson::Value& val);
 
 // Reads a value and pushes/pops the key name onto the state's object stack
 template < class T >
-T read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
+inline T read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
 	state.objectNames.push_back(val->name.GetString());
 	T res = read<T>(state, val->value);
 	state.objectNames.pop_back();
@@ -77,7 +77,7 @@ T read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val) {
 
 // Reads a value if present without modifying the state
 template < class T >
-T read_opt(ParserState& state, const rapidjson::Value& parent,
+inline T read_opt(ParserState& state, const rapidjson::Value& parent,
 		   const char* name, const T& defVal) {
 	auto obj = get(state, parent, name, false);
 	if(obj != parent.MemberEnd())
@@ -87,7 +87,7 @@ T read_opt(ParserState& state, const rapidjson::Value& parent,
 
 // Reads an array of any size
 template < class T >
-void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
+inline void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
 		  std::vector<T>& vals) {
 	if(!val->value.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
@@ -102,7 +102,7 @@ void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
 
 // Reads an array of the expected size
 template < class T >
-void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
+inline void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
 		  std::vector<T>& vals, std::size_t expectedSize) {
 	if(!val->value.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
