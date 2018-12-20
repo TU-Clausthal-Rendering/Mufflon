@@ -7,7 +7,7 @@
 
 namespace mufflon { namespace scene {
 
-__global__ void set_medium(SceneDescriptor<Device::CUDA> scene) {
+__global__ void set_camera_medium(SceneDescriptor<Device::CUDA> scene) {
 	// Single-thread kernel ;_;
 #ifdef __CUDA_ARCH__
 	if(threadIdx.x == 0) {
@@ -28,7 +28,7 @@ __global__ void set_medium(SceneDescriptor<Device::CUDA> scene) {
 namespace scene_detail {
 
 void update_camera_medium_cuda(SceneDescriptor<Device::CUDA>& scene) {
-	set_medium<<<1, 1>>>(scene);
+	set_camera_medium <<<1, 1>>>(scene);
 	cuda::check_error(cudaGetLastError());
 }
 

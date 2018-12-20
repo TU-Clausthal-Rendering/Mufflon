@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui.View"
         mc:Ignorable="d"
-        Title="Loading Scene" Height="90" Width="200">
+        Title="Loading Scene" Height="120" Width="250"
+        WindowStartupLocation="CenterOwner">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
