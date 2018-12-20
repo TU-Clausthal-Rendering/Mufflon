@@ -434,11 +434,13 @@ std::vector<unsigned char> BinaryLoader::decompress() {
 	std::vector<unsigned char> out(decompressedBytes);
 	// First read the bytes from the stream
 	m_fileStream.read(reinterpret_cast<char*>(in.data()), compressedBytes);
-	unsigned long outBytes;
-	uncompress(out.data(), &outBytes,
-			   in.data(), static_cast<unsigned long>(in.size()));
+	unsigned long outBytes = decompressedBytes;
+	int success = uncompress(out.data(), &outBytes,
+							 in.data(), static_cast<unsigned long>(in.size()));
+	if(success != MZ_OK)
+		throw std::runtime_error("Failed to deflate stream (error code " + std::to_string(success) + ")");
 	if(outBytes != static_cast<unsigned long>(decompressedBytes))
-		throw std::runtime_error("Corrupt deflate stream");
+		throw std::runtime_error("Mismatch between expected and actual decompressed byte count");
 	out.resize(outBytes);
 	return out;
 }
