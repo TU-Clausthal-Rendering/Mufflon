@@ -81,6 +81,7 @@ CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<camera
 	if(!iter.second)
 		return nullptr;
 	iter.first->second->set_name(iter.first->first);
+	m_cameraHandles.push_back(iter.first);
 	return iter.first->second.get();
 }
 
@@ -93,6 +94,13 @@ CameraHandle WorldContainer::get_camera(std::string_view name) {
 	return it->second.get();
 }
 
+CameraHandle WorldContainer::get_camera(std::size_t index) {
+	if(index >= m_cameras.size())
+		throw std::runtime_error("Camera index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_cameras.size()));
+	return m_cameraHandles[index]->second.get();
+}
+
 std::optional<WorldContainer::PointLightHandle> WorldContainer::add_light(std::string name,
 																		  lights::PointLight&& light) {
 	// TODO: switch to pointers
@@ -100,8 +108,8 @@ std::optional<WorldContainer::PointLightHandle> WorldContainer::add_light(std::s
 		logError("[WorldContainer::add_light] Point light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_pointLights.insert({ std::move(name), std::move(light) }).first;
-
+	m_pointLightHandles.push_back(m_pointLights.insert({ std::move(name), std::move(light) }).first);
+	return m_pointLightHandles.back();
 }
 
 std::optional<WorldContainer::SpotLightHandle> WorldContainer::add_light(std::string name,
@@ -111,7 +119,8 @@ std::optional<WorldContainer::SpotLightHandle> WorldContainer::add_light(std::st
 		logError("[WorldContainer::add_light] Spot light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_spotLights.insert({ std::move(name), std::move(light) }).first;
+	m_spotLightHandles.push_back(m_spotLights.insert({ std::move(name), std::move(light) }).first);
+	return m_spotLightHandles.back();
 
 }
 
@@ -122,7 +131,8 @@ std::optional<WorldContainer::DirLightHandle> WorldContainer::add_light(std::str
 		logError("[WorldContainer::add_light] Directional light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_dirLights.insert({ std::move(name), std::move(light) }).first;
+	m_dirLightHandles.push_back(m_dirLights.insert({ std::move(name), std::move(light) }).first);
+	return m_dirLightHandles.back();
 }
 std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::string name,
 																		TextureHandle env) {
@@ -131,7 +141,8 @@ std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::str
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_envLights.insert({ std::move(name), env }).first;
+	m_envLightHandles.push_back(m_envLights.insert({ std::move(name), std::move(env) }).first);
+	return m_envLightHandles.back();
 }
 
 std::optional<WorldContainer::PointLightHandle> WorldContainer::get_point_light(const std::string_view& name) {
@@ -160,6 +171,32 @@ std::optional<WorldContainer::EnvLightHandle> WorldContainer::get_env_light(cons
 	if(light == m_envLights.end())
 		return std::nullopt;
 	return light;
+}
+
+WorldContainer::PointLightHandle WorldContainer::get_point_light(std::size_t index) {
+	if(index >= m_pointLights.size())
+		throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_pointLights.size()));
+	return m_pointLightHandles[index];
+}
+WorldContainer::SpotLightHandle WorldContainer::get_spot_light(std::size_t index) {
+	if(index >= m_spotLights.size())
+		throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_spotLightHandles.size()));
+	return m_spotLightHandles[index];
+}
+WorldContainer::DirLightHandle WorldContainer::get_dir_light(std::size_t index) {
+	if(index >= m_dirLights.size())
+		throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_dirLightHandles.size()));
+	return m_dirLightHandles[index];
+}
+
+WorldContainer::EnvLightHandle WorldContainer::get_env_light(std::size_t index) {
+	if(index >= m_envLights.size())
+		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_envLightHandles.size()));
+	return m_envLightHandles[index];
 }
 
 bool WorldContainer::is_point_light(const std::string_view& name) const {

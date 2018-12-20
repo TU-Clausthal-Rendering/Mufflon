@@ -67,7 +67,14 @@ public:
 	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
 
 	// Find a camera dependent on its name.
+	std::size_t get_camera_count() const noexcept { return m_cameras.size(); }
 	CameraHandle get_camera(std::string_view name);
+	CameraHandle get_camera(std::size_t index);
+
+	std::size_t get_point_light_count() const noexcept { return m_pointLights.size(); }
+	std::size_t get_spot_light_count() const noexcept { return m_spotLights.size(); }
+	std::size_t get_dir_light_count() const noexcept { return m_dirLights.size(); }
+	std::size_t get_env_light_count() const noexcept { return m_envLights.size(); }
 
 	// Adds a new light to the scene
 	std::optional<PointLightHandle> add_light(std::string name, lights::PointLight&& light);
@@ -79,6 +86,10 @@ public:
 	std::optional<SpotLightHandle> get_spot_light(const std::string_view& name);
 	std::optional<DirLightHandle> get_dir_light(const std::string_view& name);
 	std::optional<EnvLightHandle> get_env_light(const std::string_view& name);
+	PointLightHandle get_point_light(std::size_t index);
+	SpotLightHandle get_spot_light(std::size_t index);
+	DirLightHandle get_dir_light(std::size_t index);
+	EnvLightHandle get_env_light(std::size_t index);
 	// Checks the type of a light by name
 	bool is_point_light(const std::string_view& name) const;
 	bool is_spot_light(const std::string_view& name) const;
@@ -139,11 +150,16 @@ private:
 	std::vector<materials::Medium> m_media;
 	// All available cameras mapped to their name.
 	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
+	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
 	// All light sources of the scene
 	std::map<std::string, lights::PointLight, std::less<>> m_pointLights;
 	std::map<std::string, lights::SpotLight, std::less<>> m_spotLights;
 	std::map<std::string, lights::DirectionalLight, std::less<>> m_dirLights;
 	std::map<std::string, TextureHandle, std::less<>> m_envLights;
+	std::vector<PointLightHandle> m_pointLightHandles;
+	std::vector<SpotLightHandle> m_spotLightHandles;
+	std::vector<DirLightHandle> m_dirLightHandles;
+	std::vector<EnvLightHandle> m_envLightHandles;
 	// Texture cache
 	std::map<std::string, textures::Texture, std::less<>> m_textures;
 

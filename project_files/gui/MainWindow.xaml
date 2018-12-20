@@ -171,7 +171,8 @@
                     </TabItem>
                     <TabItem Header="Properties"
                              Width="Auto">
-                        <renderer:RendererParams x:Name="RendererPropertiesControl"/>
+                        <renderer:RendererParams x:Name="RendererPropertiesControl"
+                                                 IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                     </TabItem>
                     <TabItem Header="Profiler"
                              Width="Auto">
@@ -248,8 +249,10 @@
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
-                                <ItemsControl ItemsSource="{Binding Materials.Views}"/>
-                                <Button Command="{Binding AddMaterialCommand}">
+                                <ItemsControl ItemsSource="{Binding Materials.Views}"
+                                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                                <Button Command="{Binding AddMaterialCommand}"
+                                        IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -273,8 +276,10 @@
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
-                                <ItemsControl ItemsSource="{Binding Lights.Views}"/>
-                                <Button Command="{Binding AddLightCommand}">
+                                <ItemsControl ItemsSource="{Binding Lights.Views}"
+                                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                                <Button Command="{Binding AddLightCommand}"
+                                        IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -298,21 +303,24 @@
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
-                                <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
-                                <Button Command="{Binding AddCameraCommand}">
+                                <ItemsControl ItemsSource="{Binding Cameras.Views}"
+                                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                                <Button Command="{Binding AddCameraCommand}"
+                                        IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition/>
+                                            <ColumnDefinition Width="7"/>
                                         </Grid.ColumnDefinitions>
                                         <Image 
                                             Grid.Column="0"
                                             Source="Icons/add.png"
                                             Width="16"
-                                            Height="16"/>
+                                            Height="16" Margin="0,5"/>
                                         <Label 
                                             Grid.Column="1"
-                                            Content="Add Camera"/>
+                                            Content="Add Camera" Grid.ColumnSpan="2"/>
                                     </Grid>
                                 </Button>
                             </StackPanel>

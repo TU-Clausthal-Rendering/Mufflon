@@ -21,7 +21,7 @@ public:
 			float focalLength, float focusDist, float lensRad,
 			float sensorHeight, float near = 1e-4f,
 			float far = 1e10f) :
-		Camera(std::move(position), std::move(dir),
+		Camera(CameraModel::FOCUS, std::move(position), std::move(dir),
 			   std::move(up), near, far),
 		// TODO
 		m_vFov(2.f * std::atan(sensorHeight / (2.f * focalLength))),

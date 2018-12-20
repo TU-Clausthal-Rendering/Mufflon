@@ -40,11 +40,12 @@ struct CameraParams {
 class Camera {
 public:
 	Camera() = default;
-	Camera(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
+	Camera(CameraModel model, ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
 		   float near = 1e-4f, float far = 1e10f) :
 		m_position(std::move(position)),
 		m_near(near),
-		m_far(far)
+		m_far(far),
+		m_model(model)
 	{
 		mAssert(near > 0.0f);
 		mAssert(far > near);
@@ -67,7 +68,7 @@ public:
 
 	// The name of the camera as used by the scenario setup.
 #ifndef __CUDACC__
-	const std::string_view& get_name() const noexcept { return m_name; }
+	std::string_view get_name() const noexcept { return m_name; }
 	void set_name(std::string_view name) { m_name = name; }
 #endif
 
@@ -109,6 +110,8 @@ public:
 		m_viewSpace = ei::rotationZ(a) * m_viewSpace;
 	}
 
+	CameraModel get_model() const noexcept { return m_model; }
+
 	/*
 	 * Interface to obtain the architecture independent parameters required for sampling
 	 * and evaluation. The outBuffer must have a size of at least get_parameter_pack_size().
@@ -127,6 +130,7 @@ protected:
 	float m_far {1e10f};		// Optional far clipping distance
 private:
 	std::string m_name;
+	CameraModel m_model;
 };
 
 struct Importon {

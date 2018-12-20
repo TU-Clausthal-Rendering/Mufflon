@@ -30,17 +30,17 @@ namespace gui.Model.Camera
             }
         }
 
-        private float m_chipHeight = 24.0f;
+        private float m_sensorHeight = 24.0f;
 
-        public float ChipHeight
+        public float SensorHeight
         {
-            get => m_chipHeight;
+            get => m_sensorHeight;
             set
             {
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_chipHeight) return;
-                m_chipHeight = value;
-                OnPropertyChanged(nameof(ChipHeight));
+                if (value == m_sensorHeight) return;
+                m_sensorHeight = value;
+                OnPropertyChanged(nameof(SensorHeight));
             }
         }
 

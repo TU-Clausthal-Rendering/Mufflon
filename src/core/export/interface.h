@@ -78,6 +78,7 @@ typedef enum {
 
 typedef enum {
 	CAM_PINHOLE,
+	CAM_FOCUS,
 	CAM_COUNT
 } CameraType;
 
@@ -372,9 +373,19 @@ CORE_API LightHdl CDECL world_add_directional_light(const char* name,
 												 Vec3 direction,
 												 Vec3 radiance);
 CORE_API LightHdl CDECL world_add_envmap_light(const char* name, TextureHdl envmap);
+CORE_API size_t CDECL world_get_camera_count();
 CORE_API CameraHdl CDECL world_get_camera(const char* name);
+CORE_API CameraHdl CDECL world_get_camera_by_index(size_t);
+CORE_API size_t CDECL world_get_point_light_count();
+CORE_API size_t CDECL world_get_spot_light_count();
+CORE_API size_t CDECL world_get_dir_light_count();
+CORE_API size_t CDECL world_get_env_light_count();
 CORE_API LightType CDECL world_get_light_type(const char* name);
 CORE_API LightHdl CDECL world_get_light(const char* name, LightType type);
+CORE_API const char* CDECL world_get_point_light_by_index(size_t index, LightHdl* hdl);
+CORE_API const char* CDECL world_get_spot_light_by_index(size_t index, LightHdl* hdl);
+CORE_API const char* CDECL world_get_dir_light_by_index(size_t index, LightHdl* hdl);
+CORE_API const char* CDECL world_get_env_light_by_index(size_t index, LightHdl* hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
 
@@ -432,7 +443,30 @@ CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
-// TODO: interface for envmap light
+
+// Camera interface
+CORE_API CameraType CDECL world_get_camera_type(ConstCameraHdl cam);
+CORE_API const char* CDECL world_get_camera_name(ConstCameraHdl cam);
+CORE_API Boolean CDECL world_get_camera_position(ConstCameraHdl cam, Vec3* pos);
+CORE_API Boolean CDECL world_get_camera_direction(ConstCameraHdl cam, Vec3* dir);
+CORE_API Boolean CDECL world_get_camera_up(ConstCameraHdl cam, Vec3* up);
+CORE_API Boolean CDECL world_get_camera_near(ConstCameraHdl cam, float* near);
+CORE_API Boolean CDECL world_get_camera_far(ConstCameraHdl cam, float* far);
+CORE_API Boolean CDECL world_set_camera_position(CameraHdl cam, Vec3 pos);
+CORE_API Boolean CDECL world_set_camera_direction(CameraHdl cam, Vec3 dir);
+CORE_API Boolean CDECL world_set_camera_up(CameraHdl cam, Vec3 up);
+CORE_API Boolean CDECL world_set_camera_near(CameraHdl cam, float near);
+CORE_API Boolean CDECL world_set_camera_far(CameraHdl cam, float far);
+CORE_API Boolean CDECL world_get_pinhole_camera_fov(ConstCameraHdl cam, float* vFov);
+CORE_API Boolean CDECL world_set_pinhole_camera_fov(CameraHdl cam, float vFov);
+CORE_API Boolean CDECL world_get_focus_camera_focal_length(ConstCameraHdl cam, float* focalLength);
+CORE_API Boolean CDECL world_get_focus_camera_focus_distance(ConstCameraHdl cam, float* focusDistance);
+CORE_API Boolean CDECL world_get_focus_camera_sensor_height(ConstCameraHdl cam, float* sensorHeight);
+CORE_API Boolean CDECL world_get_focus_camera_aperture(ConstCameraHdl cam, float* aperture);
+CORE_API Boolean CDECL world_set_focus_camera_focal_length(CameraHdl cam, float focalLength);
+CORE_API Boolean CDECL world_set_focus_camera_focus_distance(CameraHdl cam, float focusDistance);
+CORE_API Boolean CDECL world_set_focus_camera_sensor_height(CameraHdl cam, float sensorHeight);
+CORE_API Boolean CDECL world_set_focus_camera_aperture(CameraHdl cam, float aperture);
 
 // Interface for rendering
 CORE_API Boolean CDECL render_enable_renderer(RendererType type);

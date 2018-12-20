@@ -29,8 +29,8 @@ namespace gui.ViewModel.Camera
                 case nameof(FocusCameraModel.FocalLength):
                     OnPropertyChanged(nameof(FocalLength));
                     break;
-                case nameof(FocusCameraModel.ChipHeight):
-                    OnPropertyChanged(nameof(ChipHeight));
+                case nameof(FocusCameraModel.SensorHeight):
+                    OnPropertyChanged(nameof(SensorHeight));
                     break;
                 case nameof(FocusCameraModel.FocusDistance):
                     OnPropertyChanged(nameof(FocusDistance));
@@ -47,10 +47,10 @@ namespace gui.ViewModel.Camera
             set => m_parent.FocalLength = value;
         }
 
-        public float ChipHeight
+        public float SensorHeight
         {
-            get => m_parent.ChipHeight;
-            set => m_parent.ChipHeight = value;
+            get => m_parent.SensorHeight;
+            set => m_parent.SensorHeight = value;
         }
 
         public float FocusDistance

@@ -47,21 +47,22 @@ using namespace mufflon::scene::geometry;
 #define FUNCTION_NAME __func__
 #define CHECK(x, name, retval)													\
 	do {																		\
-		if(!x) {																\
-			logError("[", FUNCTION_NAME, "] Violated condition (" #name ")");	\
+		if(!(x)) {																\
+			logError("[", FUNCTION_NAME, "] Violated condition " #name " ("		\
+			#x ")");															\
 			return retval;														\
 		}																		\
 	} while(0)
 #define CHECK_NULLPTR(x, name, retval)											\
 	do {																		\
-		if(x == nullptr) {														\
+		if((x) == nullptr) {													\
 			logError("[", FUNCTION_NAME, "] Invalid " #name " (nullptr)");		\
 			return retval;														\
 		}																		\
 	} while(0)
 #define CHECK_GEQ_ZERO(x, name, retval)											\
 	do {																		\
-		if(x < 0) {																\
+		if((x) < 0) {															\
 			logError("[", FUNCTION_NAME, "] Invalid " #name " (< 0)");			\
 			return retval;														\
 		}																		\
@@ -211,24 +212,28 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 	CATCH_ALL(;)
 }
 
+char* copy_for_csharp(std::string_view str) {
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1));
+#else // _WIN32
+	char* buffer = new char[str.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate string buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, &str[0u], str.size());
+	buffer[str.size()] = '\0';
+	return buffer;
+}
+
 } // namespace
 
 // TODO: remove, Felix prototype
 const char* core_get_dll_error() {
 	TRY
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(s_lastError.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[s_lastError.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, s_lastError.c_str(), s_lastError.size());
-	buffer[s_lastError.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(s_lastError);
 	CATCH_ALL(nullptr)
 }
 
@@ -1197,21 +1202,8 @@ uint32_t world_get_scenario_count() {
 const char* world_get_scenario_name(ConstScenarioHdl hdl) {
 	TRY
 	CHECK_NULLPTR(hdl, "scenario handle", nullptr);
-
 	std::string_view name = static_cast<ConstScenarioHandle>(hdl)->get_name();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(name.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[name.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, &name[0u], name.size());
-	buffer[name.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(name);
 	CATCH_ALL(nullptr)
 }
 
@@ -1224,19 +1216,7 @@ const char* world_get_scenario_name_by_index(uint32_t index) {
 		return nullptr;
 	}
 	const std::string& nameRef = WorldContainer::instance().get_scenario_name(index);
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(nameRef.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[nameRef.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, nameRef.c_str(), nameRef.size());
-	buffer[nameRef.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(nameRef);
 	CATCH_ALL(nullptr)
 }
 
@@ -1437,11 +1417,47 @@ LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
 	CATCH_ALL(nullptr)
 }
 
+size_t world_get_camera_count() {
+	TRY
+	return WorldContainer::instance().get_camera_count();
+	CATCH_ALL(0u)
+}
+
 CameraHdl world_get_camera(const char* name) {
 	TRY
 	CHECK_NULLPTR(name, "camera name", nullptr);
 	return static_cast<CameraHdl>(WorldContainer::instance().get_camera(name));
 	CATCH_ALL(nullptr)
+}
+
+CORE_API CameraHdl CDECL world_get_camera_by_index(size_t index) {
+	TRY
+	return static_cast<CameraHdl>(WorldContainer::instance().get_camera(index));
+	CATCH_ALL(0u)
+}
+
+size_t world_get_point_light_count() {
+	TRY
+	return WorldContainer::instance().get_point_light_count();
+	CATCH_ALL(0u)
+}
+
+size_t world_get_spot_light_count() {
+	TRY
+	return WorldContainer::instance().get_spot_light_count();
+	CATCH_ALL(0u)
+}
+
+size_t world_get_dir_light_count() {
+	TRY
+	return WorldContainer::instance().get_dir_light_count();
+	CATCH_ALL(0u)
+}
+
+size_t world_get_env_light_count() {
+	TRY
+	return WorldContainer::instance().get_env_light_count();
+	CATCH_ALL(0u)
 }
 
 LightType world_get_light_type(const char* name) {
@@ -1502,6 +1518,42 @@ LightHdl world_get_light(const char* name, LightType type) {
 			return nullptr;
 		}
 	}
+	CATCH_ALL(nullptr)
+}
+
+const char* world_get_point_light_by_index(size_t index, LightHdl* hdl) {
+	TRY
+	auto iter = WorldContainer::instance().get_point_light(index);
+	if(hdl != nullptr)
+		*hdl = static_cast<LightHdl>(&iter->second);
+	return copy_for_csharp(iter->first);
+	CATCH_ALL(nullptr)
+}
+
+const char* world_get_spot_light_by_index(size_t index, LightHdl* hdl) {
+	TRY
+	auto iter = WorldContainer::instance().get_spot_light(index);
+	if(hdl != nullptr)
+		*hdl = static_cast<LightHdl>(&iter->second);
+	return copy_for_csharp(iter->first);
+	CATCH_ALL(nullptr)
+}
+
+const char* world_get_dir_light_by_index(size_t index, LightHdl* hdl) {
+	TRY
+	auto iter = WorldContainer::instance().get_dir_light(index);
+	if(hdl != nullptr)
+		*hdl = static_cast<LightHdl>(&iter->second);
+	return copy_for_csharp(iter->first);
+	CATCH_ALL(nullptr)
+}
+
+const char* world_get_env_light_by_index(size_t index, LightHdl* hdl) {
+	TRY
+	auto iter = WorldContainer::instance().get_env_light(index);
+	if(hdl != nullptr)
+		*hdl = static_cast<LightHdl>(&iter->second);
+	return copy_for_csharp(iter->first);
 	CATCH_ALL(nullptr)
 }
 
@@ -1609,6 +1661,210 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	return static_cast<TextureHdl>(&hdl.value()->second);
 	CATCH_ALL(nullptr)
 }
+
+CameraType world_get_camera_type(ConstCameraHdl cam) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", CameraType::CAM_COUNT);
+	cameras::CameraModel type = static_cast<const cameras::Camera*>(cam)->get_model();
+	switch(type) {
+		case cameras::CameraModel::PINHOLE: return CameraType::CAM_PINHOLE;
+		case cameras::CameraModel::FOCUS: return CameraType::CAM_FOCUS;
+		default: return CameraType::CAM_COUNT;
+	}
+	CATCH_ALL(CameraType::CAM_COUNT)
+}
+
+const char* world_get_camera_name(ConstCameraHdl cam) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", nullptr);
+	std::string_view name = static_cast<const cameras::Camera*>(cam)->get_name();
+	return copy_for_csharp(name);
+	CATCH_ALL(nullptr)
+}
+
+Boolean world_get_camera_position(ConstCameraHdl cam, Vec3* pos) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(pos != nullptr)
+		*pos = util::pun<Vec3>(static_cast<const cameras::Camera*>(cam)->get_position());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_direction(ConstCameraHdl cam, Vec3* dir) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(dir != nullptr)
+		*dir = util::pun<Vec3>(static_cast<const cameras::Camera*>(cam)->get_view_dir());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_up(ConstCameraHdl cam, Vec3* up) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(up != nullptr)
+		*up = util::pun<Vec3>(static_cast<const cameras::Camera*>(cam)->get_up_dir());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_near(ConstCameraHdl cam, float* near) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(near != nullptr)
+		*near = static_cast<const cameras::Camera*>(cam)->get_near();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_far(ConstCameraHdl cam, float* far) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(far != nullptr)
+		*far = static_cast<const cameras::Camera*>(cam)->get_far();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_position(CameraHdl cam, Vec3 pos) {
+	TRY
+		CHECK_NULLPTR(cam, "camera handle", false);
+	auto& camera = *static_cast<cameras::Camera*>(cam);
+	scene::Point newPos = camera.get_position() - util::pun<scene::Point>(pos);
+	camera.move(newPos.x, newPos.y, newPos.z);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_direction(CameraHdl cam, Vec3 dir) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	auto& camera = *static_cast<cameras::Camera*>(cam);
+	// TODO: compute proper rotation
+	return false;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_up(CameraHdl cam, Vec3 up) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	auto& camera = *static_cast<cameras::Camera*>(cam);
+	// TODO: ???
+	return false;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_near(CameraHdl cam, float near) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(near > 0.f, "near-plane", false);
+	static_cast<cameras::Camera*>(cam)->set_near(near);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_far(CameraHdl cam, float far) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(far > 0.f, "far-plane", false);
+	static_cast<cameras::Camera*>(cam)->set_far(far);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_pinhole_camera_fov(ConstCameraHdl cam, float* vFov) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(vFov != nullptr)
+		*vFov = static_cast<const cameras::Pinhole*>(cam)->get_vertical_fov();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_pinhole_camera_fov(CameraHdl cam, float vFov) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(vFov > 0.f && vFov < 180.f, "vertical field-of-view", false);
+	static_cast<cameras::Pinhole*>(cam)->set_vertical_fov(vFov);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_focus_camera_focal_length(ConstCameraHdl cam, float* focalLength) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(focalLength != nullptr)
+		*focalLength = static_cast<const cameras::Focus*>(cam)->get_focal_length();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_focus_camera_focus_distance(ConstCameraHdl cam, float* focusDistance) {
+	TRY
+		CHECK_NULLPTR(cam, "camera handle", false);
+	if(focusDistance != nullptr)
+		*focusDistance = static_cast<const cameras::Focus*>(cam)->get_focus_distance();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_focus_camera_sensor_height(ConstCameraHdl cam, float* sensorHeight) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(sensorHeight != nullptr)
+		*sensorHeight = static_cast<const cameras::Focus*>(cam)->get_sensor_height();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_focus_camera_aperture(ConstCameraHdl cam, float* aperture) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	const auto& camera = *static_cast<const cameras::Focus*>(cam);
+	if(aperture != nullptr)
+		*aperture =  camera.get_focal_length() / (2.f * camera.get_lens_radius());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_focus_camera_focal_length(CameraHdl cam, float focalLength) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(focalLength > 0.f, "focalLength", false);
+	static_cast<cameras::Focus*>(cam)->set_focal_length(focalLength);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_focus_camera_focus_distance(CameraHdl cam, float focusDistance) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(focusDistance > 0.f, "focus distance", false);
+	static_cast<cameras::Focus*>(cam)->set_focus_distance(focusDistance);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_focus_camera_sensor_height(CameraHdl cam, float sensorHeight) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(sensorHeight > 0.f, "sensor height", false);
+	static_cast<cameras::Focus*>(cam)->set_sensor_height(sensorHeight);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_focus_camera_aperture(CameraHdl cam, float aperture) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK(aperture > 0.f, "aperture", false);
+	auto& camera = *static_cast<cameras::Focus*>(cam);
+	camera.set_lens_radius(camera.get_focal_length() / aperture);
+	return true;
+	CATCH_ALL(false)
+}
+
 
 const char* scenario_get_name(ScenarioHdl scenario) {
 	TRY
@@ -1722,19 +1978,7 @@ const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
 		return nullptr;
 	}
 	std::string_view name = scen.get_light_names()[index];
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(name.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[name.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, &name[0u], name.size());
-	buffer[name.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(name);
 	CATCH_ALL(nullptr)
 }
 
@@ -2049,20 +2293,7 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	}
 
 	std::string_view path = nameOpt.value();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(path.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[path.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, &path[0u], path.size());
-	buffer[path.size()] = '\0';
-	return buffer;
-
+	return copy_for_csharp(path);
 	CATCH_ALL(nullptr)
 }
 
@@ -2289,20 +2520,7 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 
 	if(type != nullptr)
 		*type = static_cast<ParameterType>(rendererDesc.type);
-	std::size_t nameLength = std::strlen(rendererDesc.name) + 1u;
-#ifdef _WIN32
-	// For C# interop
-	char* name = reinterpret_cast<char*>(::CoTaskMemAlloc(nameLength));
-#else // _WIN32
-	char* name = new char[str.size() + 1u];
-#endif // _WIN32
-	if(name == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(name, rendererDesc.name, nameLength);
-
-	return name;
+	return copy_for_csharp(rendererDesc.name);
 	CATCH_ALL(nullptr)
 }
 
@@ -2433,57 +2651,21 @@ Boolean profiling_save_total_and_snapshots(const char* path) {
 const char* profiling_get_current_state() {
 	TRY
 	std::string str = Profiler::instance().save_current_state();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, str.c_str(), str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(str);
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_snapshots() {
 	TRY
 	std::string str = Profiler::instance().save_snapshots();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, str.c_str(), str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(str);
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_total_and_snapshots() {
 	TRY
 	std::string str = Profiler::instance().save_total_and_snapshots();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, str.c_str(), str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
+	return copy_for_csharp(str);
 	CATCH_ALL(nullptr)
 }
 
