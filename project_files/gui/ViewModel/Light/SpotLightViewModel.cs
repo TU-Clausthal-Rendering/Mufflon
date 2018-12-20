@@ -40,9 +40,6 @@ namespace gui.ViewModel.Light
                     OnPropertyChanged(nameof(IntensityY));
                     OnPropertyChanged(nameof(IntensityZ));
                     break;
-                case nameof(SpotLightModel.Exponent):
-                    OnPropertyChanged(nameof(Exponent));
-                    break;
                 case nameof(SpotLightModel.Width):
                     OnPropertyChanged(nameof(Width));
                     break;
@@ -109,12 +106,6 @@ namespace gui.ViewModel.Light
         {
             get => m_parent.Intensity.Z;
             set => m_parent.Intensity = new Vec3<float>(m_parent.Intensity.X, m_parent.Intensity.Y, value);
-        }
-
-        public float Exponent
-        {
-            get => m_parent.Exponent;
-            set => m_parent.Exponent = value;
         }
 
         public float Width

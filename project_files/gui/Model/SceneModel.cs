@@ -33,28 +33,30 @@ namespace gui.Model
                 OnPropertyChanged(nameof(FullPath));
                 OnPropertyChanged(nameof(IsLoaded));
 
-                // Check if we had this scene in the last X
-                // Check if the scene is already present in the list
-                int index = Settings.Default.LastScenes.IndexOf(m_fullPath);
-                if (index > 0)
+                if (m_fullPath != null)
                 {
-                    // Present, but not first
-                    string first = Settings.Default.LastScenes[0];
-                    Settings.Default.LastScenes[0] = m_fullPath;
-                    Settings.Default.LastScenes[index] = first;
-                    OnPropertyChanged(nameof(LastScenes));
-                }
-                else if (index < 0)
-                {
-                    // Not present
-                    if (Settings.Default.LastScenes.Count >= MAX_LAST_SCENES)
+                    // Check if we had this scene in the last X
+                    // Check if the scene is already present in the list
+                    int index = Settings.Default.LastScenes.IndexOf(m_fullPath);
+                    if (index > 0)
                     {
-                        Settings.Default.LastScenes.RemoveAt(Settings.Default.LastScenes.Count - 1);
+                        // Present, but not first
+                        string first = Settings.Default.LastScenes[0];
+                        Settings.Default.LastScenes[0] = m_fullPath;
+                        Settings.Default.LastScenes[index] = first;
+                        OnPropertyChanged(nameof(LastScenes));
                     }
-                    Settings.Default.LastScenes.Insert(0, m_fullPath);
-                    OnPropertyChanged(nameof(LastScenes));
+                    else if (index < 0)
+                    {
+                        // Not present
+                        if (Settings.Default.LastScenes.Count >= MAX_LAST_SCENES)
+                        {
+                            Settings.Default.LastScenes.RemoveAt(Settings.Default.LastScenes.Count - 1);
+                        }
+                        Settings.Default.LastScenes.Insert(0, m_fullPath);
+                        OnPropertyChanged(nameof(LastScenes));
+                    }
                 }
-
             }
         }
 

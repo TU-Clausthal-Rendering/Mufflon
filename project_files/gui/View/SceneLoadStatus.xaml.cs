@@ -37,6 +37,7 @@ namespace gui.View
             m_loadingText = (TextBlock)FindName("LoadingTextBlock");
             m_loadingText.Text = "Loading '" + sceneName + "'...";
             Show();
+            Owner.IsEnabled = false;
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -46,10 +47,10 @@ namespace gui.View
             OnPropertyChanged(nameof(Canceled));
         }
 
-        protected override void OnDeactivated(EventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
-            base.OnDeactivated(e);
-            this.Activate();
+            base.OnClosed(e);
+            Owner.IsEnabled = true;
         }
 
         #region PropertyChanged

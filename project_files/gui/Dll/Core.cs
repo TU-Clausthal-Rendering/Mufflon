@@ -13,7 +13,7 @@ namespace gui.Dll
     static public class Core
     {
         [StructLayout(LayoutKind.Sequential)]
-        internal struct Vec3
+        public struct Vec3
         {
             public float x, y, z;
             public Vec3(float a, float b, float c)
@@ -49,7 +49,7 @@ namespace gui.Dll
             LIGHTNESS
         };
 
-        internal enum LightType
+        public enum LightType
         {
             POINT,
             SPOT,
@@ -91,6 +91,7 @@ namespace gui.Dll
         internal static extern bool resize(int width, int height, int offsetX, int offsetY);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string core_get_dll_error();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_set_log_level(Severity level);
@@ -127,6 +128,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_add_envmap_light(string name, IntPtr envmap);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern LightType world_get_light_type(string name);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_camera(string name);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_light(string name, LightType type);
@@ -147,6 +150,7 @@ namespace gui.Dll
 
         // Scenario API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string scenario_get_name(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong scenario_get_global_lod_level(IntPtr scenario);
@@ -172,6 +176,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint scenario_get_light_count(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string scenario_get_light_name(IntPtr scenario, ulong index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_add_light(IntPtr scenario, string name);
@@ -188,6 +193,47 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_assign_material(IntPtr scenario, ushort index,
             IntPtr handle);
+
+        // Light API
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_point_light_position(IntPtr hdl, ref Vec3 pos);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_point_light_intensity(IntPtr hdl, ref Vec3 intensity);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_point_light_position(IntPtr hdl, Vec3 pos);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_point_light_intensity(IntPtr hdl, Vec3 intensity);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_spot_light_position(IntPtr hdl, ref Vec3 pos);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_spot_light_intensity(IntPtr hdl, ref Vec3 intensity);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_spot_light_direction(IntPtr hdl, ref Vec3 direction);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_spot_light_angle(IntPtr hdl, ref float angle);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_spot_light_falloff(IntPtr hdl, ref float falloff);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_spot_light_position(IntPtr hdl, Vec3 pos);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_spot_light_intensity(IntPtr hdl, Vec3 intensity);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_spot_light_direction(IntPtr hdl, Vec3 direction);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_spot_light_angle(IntPtr hdl, float angle);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_spot_light_falloff(IntPtr hdl, float fallof);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_dir_light_direction(IntPtr hdl, ref Vec3 direction);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_dir_light_radiance(IntPtr hdl, ref Vec3 radiance);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_dir_light_direction(IntPtr hdl, Vec3 direction);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_dir_light_radiance(IntPtr hdl, Vec3 radiance);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.LPStr)]
+        internal static extern string world_get_env_light_map(IntPtr hdl);
 
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

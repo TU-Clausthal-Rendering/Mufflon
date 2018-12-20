@@ -184,6 +184,7 @@ typedef void* SceneHdl;
 typedef void* MaterialHdl;
 typedef void* CameraHdl;
 typedef void* LightHdl;
+typedef const void* ConstLightHdl;
 typedef void* TextureHdl;
 typedef const void* ConstCameraHdl;
 
@@ -372,6 +373,7 @@ CORE_API LightHdl CDECL world_add_directional_light(const char* name,
 												 Vec3 radiance);
 CORE_API LightHdl CDECL world_add_envmap_light(const char* name, TextureHdl envmap);
 CORE_API CameraHdl CDECL world_get_camera(const char* name);
+CORE_API LightType CDECL world_get_light_type(const char* name);
 CORE_API LightHdl CDECL world_get_light(const char* name, LightType type);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
@@ -401,31 +403,32 @@ CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,
 CORE_API MaterialHdl CDECL scenario_get_assigned_material(ScenarioHdl scenario,
 														  MatIdx index);
 CORE_API Boolean CDECL scenario_assign_material(ScenarioHdl scenario, MatIdx index,
-										  MaterialHdl handle);
+												MaterialHdl handle);
 
 // Scene interface
 CORE_API Boolean CDECL scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max);
 CORE_API ConstCameraHdl CDECL scene_get_camera(SceneHdl scene);
 
 // Light interface
-CORE_API Boolean CDECL world_get_point_light_position(LightHdl hdl, Vec3* pos);
-CORE_API Boolean CDECL world_get_point_light_intensity(LightHdl hdl, Vec3* intensity);
+CORE_API Boolean CDECL world_get_point_light_position(ConstLightHdl hdl, Vec3* pos);
+CORE_API Boolean CDECL world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity);
 CORE_API Boolean CDECL world_set_point_light_position(LightHdl hdl, Vec3 pos);
 CORE_API Boolean CDECL world_set_point_light_intensity(LightHdl hdl, Vec3 intensity);
-CORE_API Boolean CDECL world_get_spot_light_position(LightHdl hdl, Vec3* pos);
-CORE_API Boolean CDECL world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity);
-CORE_API Boolean CDECL world_get_spot_light_direction(LightHdl hdl, Vec3* direction);
-CORE_API Boolean CDECL world_get_spot_light_angle(LightHdl hdl, float* angle);
-CORE_API Boolean CDECL world_get_spot_light_falloff(LightHdl hdl, float* falloff);
+CORE_API Boolean CDECL world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos);
+CORE_API Boolean CDECL world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity);
+CORE_API Boolean CDECL world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction);
+CORE_API Boolean CDECL world_get_spot_light_angle(ConstLightHdl hdl, float* angle);
+CORE_API Boolean CDECL world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff);
 CORE_API Boolean CDECL world_set_spot_light_position(LightHdl hdl, Vec3 pos);
 CORE_API Boolean CDECL world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity);
 CORE_API Boolean CDECL world_set_spot_light_direction(LightHdl hdl, Vec3 direction);
 CORE_API Boolean CDECL world_set_spot_light_angle(LightHdl hdl, float angle);
 CORE_API Boolean CDECL world_set_spot_light_falloff(LightHdl hdl, float fallof);
-CORE_API Boolean CDECL world_get_dir_light_direction(LightHdl hdl, Vec3* direction);
-CORE_API Boolean CDECL world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance);
+CORE_API Boolean CDECL world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction);
+CORE_API Boolean CDECL world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* radiance);
 CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
 CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
+CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);

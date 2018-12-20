@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Dll;
 using gui.Utility;
 using gui.ViewModel.Light;
 

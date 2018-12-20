@@ -88,6 +88,7 @@ public:
 	// Add new textures to the scene
 	bool has_texture(std::string_view name) const;
 	std::optional<TexCacheHandle> find_texture(std::string_view name);
+	std::optional<std::string_view> get_texture_name(TextureHandle hdl) const;
 	TexCacheHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
 							   textures::Format format, textures::SamplingMode mode,
 							   bool sRgb, std::unique_ptr<u8[]> data);

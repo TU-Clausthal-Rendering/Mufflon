@@ -1443,6 +1443,24 @@ CameraHdl world_get_camera(const char* name) {
 	return static_cast<CameraHdl>(WorldContainer::instance().get_camera(name));
 	CATCH_ALL(nullptr)
 }
+
+LightType world_get_light_type(const char* name) {
+	TRY
+	CHECK_NULLPTR(name, "light name", LightType::LIGHT_COUNT);
+	std::string_view nameView = name;
+	if(WorldContainer::instance().is_point_light(nameView))
+		return LightType::LIGHT_POINT;
+	else if(WorldContainer::instance().is_spot_light(nameView))
+		return LightType::LIGHT_SPOT;
+	else if(WorldContainer::instance().is_dir_light(nameView))
+		return LightType::LIGHT_DIRECTIONAL;
+	else if(WorldContainer::instance().is_env_light(nameView))
+		return LightType::LIGHT_ENVMAP;
+	else
+		return LightType::LIGHT_COUNT;
+	CATCH_ALL(LightType::LIGHT_COUNT)
+}
+
 LightHdl world_get_light(const char* name, LightType type) {
 	TRY
 	CHECK_NULLPTR(name, "light name", nullptr);
@@ -1703,10 +1721,20 @@ const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
 				 index, " >= ", scen.get_light_names().size(), ")");
 		return nullptr;
 	}
-	// The underlying string_view is guaranteed to be null-terminated since it
-	// references a std::string object in WorldContainer. Should that ever
-	// change we'll need to perform a copy here instead
-	return &scen.get_light_names()[index][0u];
+	std::string_view name = scen.get_light_names()[index];
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(name.size() + 1u));
+#else // _WIN32
+	char* buffer = new char[name.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, &name[0u], name.size());
+	buffer[name.size()] = '\0';
+	return buffer;
 	CATCH_ALL(nullptr)
 }
 
@@ -1808,7 +1836,7 @@ ConstCameraHdl scene_get_camera(SceneHdl scene) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_get_point_light_position(LightHdl hdl, Vec3* pos) {
+Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos) {
 	TRY
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
@@ -1818,7 +1846,7 @@ Boolean world_get_point_light_position(LightHdl hdl, Vec3* pos) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_point_light_intensity(LightHdl hdl, Vec3* intensity) {
+Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
 	TRY
 	CHECK_NULLPTR(hdl, "pointlight handle", false);
 	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
@@ -1846,7 +1874,7 @@ Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
+Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos) {
 	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
@@ -1856,7 +1884,7 @@ Boolean world_get_spot_light_position(LightHdl hdl, Vec3* pos) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
+Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
 	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
@@ -1866,7 +1894,7 @@ Boolean world_get_spot_light_intensity(LightHdl hdl, Vec3* intensity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
+Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
@@ -1876,7 +1904,7 @@ Boolean world_get_spot_light_direction(LightHdl hdl, Vec3* direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_angle(LightHdl hdl, float* angle) {
+Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle) {
 	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
@@ -1886,7 +1914,7 @@ Boolean world_get_spot_light_angle(LightHdl hdl, float* angle) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_falloff(LightHdl hdl, float* falloff) {
+Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff) {
 	TRY
 	CHECK_NULLPTR(hdl, "spotlight handle", false);
 	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
@@ -1967,7 +1995,7 @@ Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
+Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	TRY
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
@@ -1977,7 +2005,7 @@ Boolean world_get_dir_light_direction(LightHdl hdl, Vec3* direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_radiance(LightHdl hdl, Vec3* radiance) {
+Boolean world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* radiance) {
 	TRY
 	CHECK_NULLPTR(hdl, "directional light handle", false);
 	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
@@ -2008,6 +2036,34 @@ Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
 	light.radiance = util::pun<ei::Vec3>(radiance);
 	return true;
 	CATCH_ALL(false)
+}
+
+const char* world_get_env_light_map(ConstLightHdl hdl) {
+	TRY
+	CHECK_NULLPTR(hdl, "environment-mapped light handle", nullptr);
+	const TextureHandle& envmap = *static_cast<const TextureHandle*>(hdl);
+	auto nameOpt = WorldContainer::instance().get_texture_name(envmap);
+	if(!nameOpt.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not find envmap path!");
+		return nullptr;
+	}
+
+	std::string_view path = nameOpt.value();
+#ifdef _WIN32
+	// For C# interop
+	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(path.size() + 1u));
+#else // _WIN32
+	char* buffer = new char[path.size() + 1u];
+#endif // _WIN32
+	if(buffer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
+		return nullptr;
+	}
+	std::memcpy(buffer, &path[0u], path.size());
+	buffer[path.size()] = '\0';
+	return buffer;
+
+	CATCH_ALL(nullptr)
 }
 
 Boolean render_enable_renderer(RendererType type) {

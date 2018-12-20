@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Dll;
 using gui.Utility;
 using gui.ViewModel.Light;
 
@@ -54,19 +55,6 @@ namespace gui.Model.Light
                 if (Equals(value, m_intensity)) return;
                 m_intensity = value;
                 OnPropertyChanged(nameof(Intensity));
-            }
-        }
-
-        private float m_exponent;
-
-        public float Exponent
-        {
-            get => m_exponent;
-            set
-            {
-                if (Equals(value, m_exponent)) return;
-                m_exponent = value;
-                OnPropertyChanged(nameof(Exponent));
             }
         }
 

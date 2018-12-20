@@ -16,7 +16,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -113,33 +112,22 @@
         <TextBlock 
                 Grid.Column="0"
                 Grid.Row="4"
-                Text="Exponent:"
-                Margin="{StaticResource LeftPropertyMargin}"/>
-        <helper:EnterTextBox
-                Grid.Column="1"
-                Grid.Row="4"
-                Text="{Binding Exponent}"
-                Margin="{StaticResource RightPropertyMargin}"/>
-
-        <TextBlock 
-                Grid.Column="0"
-                Grid.Row="5"
                 Text="Width:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
         <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="5"
+                Grid.Row="4"
                 Text="{Binding Width}"
                 Margin="{StaticResource RightPropertyMargin}"/>
 
         <TextBlock 
                 Grid.Column="0"
-                Grid.Row="6"
+                Grid.Row="5"
                 Text="Falloff Start:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
         <helper:EnterTextBox
                 Grid.Column="1"
-                Grid.Row="6"
+                Grid.Row="5"
                 Text="{Binding FalloffStart}"
                 Margin="{StaticResource RightPropertyMargin}"/>
     </Grid>

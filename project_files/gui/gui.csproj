@@ -244,6 +244,9 @@
     <Compile Include="View\AppSettings.xaml.cs">
       <DependentUpon>AppSettings.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\ScenarioLoadStatus.xaml.cs">
+      <DependentUpon>ScenarioLoadStatus.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\SceneLoadStatus.xaml.cs">
       <DependentUpon>SceneLoadStatus.xaml</DependentUpon>
     </Compile>
@@ -365,6 +368,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\AppSettings.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\ScenarioLoadStatus.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

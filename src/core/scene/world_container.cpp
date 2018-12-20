@@ -206,6 +206,16 @@ std::optional<WorldContainer::TexCacheHandle> WorldContainer::find_texture(std::
 	return std::nullopt;
 }
 
+std::optional<std::string_view> WorldContainer::get_texture_name(TextureHandle hdl) const {
+	// Gotta iterate entire map... very expensive operation
+	// TODO: use bimap?
+	for(auto iter = m_textures.cbegin(); iter != m_textures.cend(); ++iter) {
+		if(&iter->second == hdl)
+			return iter->first;
+	}
+	return std::nullopt;
+}
+
 WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path, u16 width,
 											  u16 height, u16 numLayers,
 											  textures::Format format, textures::SamplingMode mode,

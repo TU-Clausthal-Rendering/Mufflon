@@ -4,12 +4,17 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using gui.Annotations;
 using gui.Dll;
 using gui.Model;
+using gui.Model.Light;
 using gui.Properties;
+using gui.Utility;
+using gui.View;
 
 namespace gui.ViewModel
 {
@@ -53,6 +58,7 @@ namespace gui.ViewModel
 
         private Models m_models;
         private ListBox m_scenarioBox;
+        private ScenarioLoadStatus m_scenarioLoadDialog;
         public ObservableCollection<SceneMenuItem> LastScenes { get; }
         public ObservableCollection<string> Scenarios { get => m_models.Scene.Scenarios; }
         public bool CanLoadLastScenes { get => LastScenes.Count > 0 && !m_models.Renderer.IsRendering; }
@@ -112,6 +118,7 @@ namespace gui.ViewModel
                                 break;
                             }
                         }
+                        loadScenarioLights(currentScenario);
                         m_scenarioBox.SelectionChanged += scenarioChanged;
                     }   break;
 
@@ -125,9 +132,141 @@ namespace gui.ViewModel
                 IntPtr scenario = Core.world_find_scenario(args.AddedItems[0] as string);
                 if (scenario == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
-                if(Core.world_load_scenario(scenario) == IntPtr.Zero)
-                    throw new Exception(Core.core_get_dll_error());
+                // The dialog will be closed when all scenario work is done (at the end of loadScenarioViews)
+                m_scenarioLoadDialog = new ScenarioLoadStatus(args.AddedItems[0] as string);
+                m_models.Lights.Models.Clear();
+                m_models.Materials.Models.Clear();
+                loadScenarioAsync(scenario);
             }
+        }
+
+        private async void loadScenarioAsync(IntPtr scenario)
+        {
+            await Task.Run(() =>
+            {
+                if (Core.world_load_scenario(scenario) == IntPtr.Zero)
+                    throw new Exception(Core.core_get_dll_error());
+                Application.Current.Dispatcher.BeginInvoke(new Action(() => loadScenarioViews(scenario)));
+            });
+        }
+
+        private void loadScenarioViews(IntPtr scenarioHdl)
+        {
+            loadScenarioLights(scenarioHdl);
+            loadScenarioMaterials(scenarioHdl);
+            m_scenarioLoadDialog.Close();
+        }
+
+        private void loadScenarioLights(IntPtr scenarioHdl)
+        {
+            uint count = Core.scenario_get_light_count(scenarioHdl);
+            for(uint i = 0u; i < count; ++i)
+            {
+                string name = Core.scenario_get_light_name(scenarioHdl, i);
+                if (name == null || name.Length == 0)
+                    throw new Exception(Core.core_get_dll_error());
+                Core.LightType type = Core.world_get_light_type(name);
+                LightModel lm = null;
+                switch (type)
+                {
+                    case Core.LightType.POINT:
+                        {
+                            IntPtr hdl = Core.world_get_light(name, type);
+                            if (hdl == IntPtr.Zero)
+                                throw new Exception(Core.core_get_dll_error());
+                            Core.Vec3 pos = new Core.Vec3();
+                            Core.Vec3 intensity = new Core.Vec3();
+                            if (!Core.world_get_point_light_position(hdl, ref pos))
+                                throw new Exception(Core.core_get_dll_error());
+                            if(!Core.world_get_point_light_intensity(hdl, ref intensity))
+                                throw new Exception(Core.core_get_dll_error());
+
+                            lm = new PointLightModel()
+                            {
+                                Position = new Vec3<float>(pos.x, pos.y, pos.z),
+                                Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z),
+                            };
+                        }   break;
+                    case Core.LightType.SPOT:
+                        {
+                            IntPtr hdl = Core.world_get_light(name, type);
+                            if (hdl == IntPtr.Zero)
+                                throw new Exception(Core.core_get_dll_error());
+                            Core.Vec3 pos = new Core.Vec3();
+                            Core.Vec3 dir = new Core.Vec3();
+                            Core.Vec3 intensity = new Core.Vec3();
+                            float angle = 0f;
+                            float falloff = 0f;
+                            if (!Core.world_get_spot_light_position(hdl, ref pos))
+                                throw new Exception(Core.core_get_dll_error());
+                            if (!Core.world_get_spot_light_direction(hdl, ref dir))
+                                throw new Exception(Core.core_get_dll_error());
+                            if (!Core.world_get_spot_light_intensity(hdl, ref intensity))
+                                throw new Exception(Core.core_get_dll_error());
+                            if (!Core.world_get_spot_light_angle(hdl, ref angle))
+                                throw new Exception(Core.core_get_dll_error());
+                            if (!Core.world_get_spot_light_falloff(hdl, ref falloff))
+                                throw new Exception(Core.core_get_dll_error());
+
+                            lm = new SpotLightModel() {
+                                Position = new Vec3<float>(pos.x, pos.y, pos.z),
+                                Direction = new Vec3<float>(dir.x, dir.y, dir.z),
+                                Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z),
+                                Width = angle,
+                                FalloffStart = falloff
+
+                            };
+                        }   break;
+                    case Core.LightType.DIRECTIONAL:
+                        {
+                            IntPtr hdl = Core.world_get_light(name, type);
+                            if (hdl == IntPtr.Zero)
+                                throw new Exception(Core.core_get_dll_error());
+                            Core.Vec3 dir = new Core.Vec3();
+                            Core.Vec3 radiance = new Core.Vec3();
+                            if(!Core.world_get_dir_light_direction(hdl, ref dir))
+                                throw new Exception(Core.core_get_dll_error());
+                            if (!Core.world_get_dir_light_radiance(hdl, ref radiance))
+                                throw new Exception(Core.core_get_dll_error());
+
+                            lm = new DirectionalLightModel()
+                            {
+                                Direction = new Vec3<float>(dir.x, dir.y, dir.z),
+                                Radiance = new Vec3<float>(radiance.x, radiance.y, radiance.z)
+
+                            };
+                        }
+                        break;
+                    case Core.LightType.ENVMAP:
+                        {
+                            IntPtr hdl = Core.world_get_light(name, type);
+                            if (hdl == IntPtr.Zero)
+                                throw new Exception(Core.core_get_dll_error());
+
+                            string map = Core.world_get_env_light_map(hdl);
+                            if(map == null || map.Length == 0)
+                                throw new Exception(Core.core_get_dll_error());
+                            lm = new EnvmapLightModel()
+                            {
+                                Map = map
+                            };
+                        }
+                        break;
+                    default:
+                        Logger.log("Unknown light type encountered (light '" + name + "')", Core.Severity.WARNING);
+                        break;
+                }
+                if(lm != null)
+                {
+                    lm.Name = name;
+                    m_models.Lights.Models.Add(lm);
+                }
+            }
+        }
+
+        private void loadScenarioMaterials(IntPtr scenarioHdl)
+        {
+            // TODO
         }
 
         private void renderStatusChanged(object sender, PropertyChangedEventArgs args)
