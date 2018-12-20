@@ -71,19 +71,19 @@ SceneDescriptor<dev> Scene::get_descriptor(const std::vector<const char*>& verte
 		objectIndices.push_back(entry->second);
 	}
 	// Allocate the device memory and copy over the descriptors
-	auto& objDevDesc = m_objDevDesc.get<unique_device_ptr<dev, ObjectDescriptor<dev>>>();
+	auto& objDevDesc = m_objDevDesc.get<unique_device_ptr<dev, ObjectDescriptor<dev>[]>>();
 	objDevDesc = make_udevptr_array<dev, ObjectDescriptor<dev>>(objectDescs.size());
 	copy(objDevDesc.get(), objectDescs.data(), objectDescs.size() * sizeof(ObjectDescriptor<dev>));
 
-	auto& instTransformsDesc = m_instTransformsDesc.get<unique_device_ptr<dev, ei::Mat3x4>>();
+	auto& instTransformsDesc = m_instTransformsDesc.get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 	instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
 	copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
-	auto& instObjIndicesDesc = m_instObjIndicesDesc.get<unique_device_ptr<dev, u32>>();
+	auto& instObjIndicesDesc = m_instObjIndicesDesc.get<unique_device_ptr<dev, u32[]>>();
 	instObjIndicesDesc = make_udevptr_array<dev, u32>(objectIndices.size());
 	copy(instObjIndicesDesc.get(), objectIndices.data(), sizeof(u32) * objectIndices.size());
 
-	auto& objAabbsDesc = m_objAabbsDesc.get<unique_device_ptr<dev, ei::Box>>();
+	auto& objAabbsDesc = m_objAabbsDesc.get<unique_device_ptr<dev, ei::Box[]>>();
 	objAabbsDesc = make_udevptr_array<dev, ei::Box>(objectAabbs.size());
 	copy(objAabbsDesc.get(), objectAabbs.data(), sizeof(ei::Box) * objectAabbs.size());
 

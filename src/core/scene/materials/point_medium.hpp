@@ -20,20 +20,19 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	const float length = ei::len(dir);
 	dir *= 1.f / length;
 	ei::Ray ray{ pos, dir };
-	scene::accel_struct::RayIntersectionResult res;
-	scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1l, -1l }, length + 1.f, res);
+	auto res = accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1l, -1l }, length + 1.f);
 	mAssert(res.hitId.primId != -1l);
 	// From the intersection we get the primitive, from which we can look up the material
-	const i32 INSTANCE_ID = res.hitId.instanceId;
-	const u32 PRIMITIVE_ID = res.hitId.get_primitive_id();
+	const i32 instanceId = res.hitId.instanceId;
+	const u32 primitiveId = res.hitId.get_primitive_id();
 
-	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[INSTANCE_ID]];
-	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
+	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[instanceId]];
+	const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;
 	scene::MaterialIndex matIdx;
-	if(PRIMITIVE_ID < FACE_COUNT)
-		matIdx = object.polygon.matIndices[PRIMITIVE_ID];
+	if(primitiveId < faceCount)
+		matIdx = object.polygon.matIndices[primitiveId];
 	else
-		matIdx = object.spheres.matIndices[PRIMITIVE_ID - FACE_COUNT];
+		matIdx = object.spheres.matIndices[primitiveId - faceCount];
 
 	return scene.get_material(matIdx).get_medium(ei::dot(dir, res.normal));
 }

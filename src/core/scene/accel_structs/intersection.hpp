@@ -26,7 +26,7 @@ struct RayIntersectionResult {
 	ei::Vec3 normal;
 	ei::Vec3 tangent;
 	ei::Vec2 uv;
-	ei::Vec3 barycentric;
+	ei::Vec3 barycentric; // TODO: storing 2 is sufficient, TODO: different coordinates for spheres/quads
 };
 
 struct RayInfo {
@@ -40,16 +40,18 @@ template < Device dev >
 __host__ __device__
 bool any_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
+	const ei::Ray& ray,
+	const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax
 );
 
 template < Device dev >
 __host__ __device__
-void first_intersection_scene_lbvh(
+RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray ray, const RayIntersectionResult::HitID& startInsPrimId,
-	const float tmax, RayIntersectionResult& result
+	const ei::Ray& ray,
+	const RayIntersectionResult::HitID& startInsPrimId,
+	const float tmax
 );
 
 }

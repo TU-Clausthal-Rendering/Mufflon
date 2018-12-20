@@ -25,6 +25,9 @@ static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH),
 	"Descriptor parameter block to small for this acceleration structure.");
 
 
+// Sentinel to detect end of parents[] pointer hierarchy
+constexpr i32 TreeHead = 0x10000000;
+
 
 // Type trait to derive some dependent types from a descriptor.
 template<typename Desc> struct desc_info {};
@@ -40,7 +43,7 @@ template<Device dev> struct desc_info<SceneDescriptor<dev>> {
 	using PrimCount = ei::Vec<i32, 1>;
 	using CostFactor = ei::Vec2;
 	static constexpr float NODE_TRAVERSAL_COST = 1.0f;
-	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST { 20.0f };// TODO: find value for this.
+	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST { 200000.0f };// TODO: find value for this.
 };
 template<typename Desc>
 using MortonCode_t = typename desc_info<Desc>::MortonCode;
@@ -168,7 +171,7 @@ CUDA_FUNCTION i32 longestCommonPrefix(Key* sortedKeys,
 }
 
 template <typename T> CUDA_FUNCTION void build_lbvh_tree(
-	u32 numPrimitives,
+	i32 numPrimitives,
 	T* sortedKeys,
 	i32 *parents,
 	const i32 idx
@@ -184,20 +187,17 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 	const i32 minLcp = longestCommonPrefix(sortedKeys, numPrimitives, idx, idx - direction, key1);
 	i32 lMax = 128;
 	while (longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + lMax * direction, key1) >
-		minLcp)
-	{
+		minLcp) {
 		lMax *= 4;
 	}
 
 	// Find other end using binary search.
 	i32 l = 0;
 	i32 t = lMax;
-	while (t > 1)
-	{
+	while (t > 1) {
 		t = t / 2;
-		if (longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (l + t) * direction, key1) >
-			minLcp)
-		{
+		if(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (l + t) * direction, key1) >
+			minLcp) {
 			l += t;
 		}
 	}
@@ -209,52 +209,33 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 	i32 divisor = 2;
 	t = l;
 	const i32 maxDivisor = 1 << (32 - cuda::clz(u32(l)));
-	while (divisor <= maxDivisor)
-	{
+	while (divisor <= maxDivisor) {
 		t = (l + divisor - 1) / divisor;
-		if (longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (s + t) * direction, key1) >
-			nodeLcp)
-		{
+		if(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (s + t) * direction, key1)
+			> nodeLcp) {
 			s += t;
 		}
 		divisor *= 2;
 	}
 	const i32 splitPosition = idx + s * direction + min(direction, 0);
 
-	i32 leftIndex;
-	i32 rightIndex;
+	i32 leftIndex = (min(idx, j) == splitPosition) ?
+		  splitPosition + numPrimitives - 1
+		: splitPosition;
+	i32 rightIndex = (max(idx, j) == (splitPosition + 1)) ?
+		  splitPosition + numPrimitives
+		: splitPosition + 1;
 
-	// Update left child pointer to a leaf.
-	if (min(idx, j) == splitPosition)
-	{
-		// Children is a leaf, add the number of internal nodes to the index.
-		leftIndex = splitPosition + numPrimitives - 1;
-	}
-	else
-	{
-		leftIndex = splitPosition;
-	}
-
-	// Update right child pointer to a leaf.
-	if (max(idx, j) == (splitPosition + 1))
-	{
-		// Children is a leaf, add the number of internal nodes to the index.
-		rightIndex = splitPosition + numPrimitives;
-	}
-	else
-	{
-		rightIndex = splitPosition + 1;
-	}
+	mAssert(leftIndex < 2*numPrimitives-1);
+	mAssert(rightIndex < 2*numPrimitives-1);
 
 	// Set parent nodes.
 	parents[leftIndex] = ~idx;
 	parents[rightIndex] = idx;
 
 	// Set the parent of the root node to -1.
-	if (idx == 0)
-	{
-		parents[0] = 0xEFFFFFFF;
-	}
+	if(idx == 0)
+		parents[0] = TreeHead;
 }
 
 // Note: dataIndices is of length numPrimitives.
@@ -385,7 +366,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	// The first thread to reach a node will just die.
 	// This circumvents the global sync problem. The second thread
 	// can be sure that the data of the first one is present.
-	while(otherChildThreadIdx != 0xFFFFFFFF) { // TODO: do while?
+	while(otherChildThreadIdx != 0xFFFFFFFF) {
 		cuda::globalMemoryBarrier();		// For reads on boundingBoxes[]
 
 		i32 otherChildNode = lastIsLeftChild ? lastNode + 1 : lastNode - 1;
@@ -430,6 +411,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 		currentNode = parents[currentNode];
 		lastIsLeftChild = currentNode < 0;
 		if(currentNode < 0) currentNode = ~currentNode;
+		if(currentNode == TreeHead) break;
 #ifdef __CUDA_ARCH__
 		otherChildThreadIdx = atomicExch(&counters[currentNode], idx);
 #else
@@ -459,7 +441,7 @@ CUDA_FUNCTION void mark_collapsed_nodes(
 	i32 collapseNode = -1;
 	i32 currentNode = parents[leafIndex];
 	if(currentNode < 0) currentNode = ~currentNode;
-	while(true) {
+	while(currentNode != TreeHead) {
 		ei::Vec4 boxMin_primCount = boundingBoxes[currentNode * 2];
 		ei::Vec4 boxMax_primCost = boundingBoxes[currentNode * 2 + 1];
 		ei::Box currentBb {ei::Vec3{boxMin_primCount}, ei::Vec3{boxMax_primCost}};
@@ -569,7 +551,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		if(parent < 0) { // Left child?
 			offset = 0;
 			parent = ~parent;
-		} else offset = 1;
+		} else offset = 2;
 
 		// The parent could be collapsed if the current node is a leaf.
 		// Search the first non-collapsed parent.
@@ -581,16 +563,15 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 				if(parent < 0) { // Left child?
 					offset = 0;
 					parent = ~parent;
-				} else offset = 1;
+				} else offset = 2;
 			}
 			countCode = float_bits_as_int(boundingBoxes[last * 2].w);
 		}
 
-		i32 outIdx = offsets[parent] * 4;
-		collapsedBVH[outIdx+offset] = ei::Vec4{boxMin_primCount.x,  boxMax_primCost.x,  boxMin_primCount.y,  boxMax_primCost.y};
-		((ei::Vec2*)(&collapsedBVH[outIdx+2]))[offset] = ei::Vec2{boxMin_primCount.z, boxMax_primCost.z};
-		((i32*)(&collapsedBVH[outIdx+3]))[offset] = node;
-		((i32*)(&collapsedBVH[outIdx+3]))[offset+2] = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
+		i32 outIdx = (offsets[parent] - 1) * 4;
+		const i32 primCount = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
+		collapsedBVH[outIdx+offset  ] = ei::Vec4{boxMin_primCount.x, boxMin_primCount.y, boxMin_primCount.z, int_bits_as_float(node)};
+		collapsedBVH[outIdx+offset+1] = ei::Vec4{boxMax_primCost.x,  boxMax_primCost.y,  boxMax_primCost.z,  int_bits_as_float(primCount)};
 	}
 }
 
@@ -605,7 +586,7 @@ __global__ void copy_to_collapsed_bvhD(
 ) {
 	i32 idx = threadIdx.x + blockIdx.x * blockDim.x + 1;
 
-	if (idx >= numNodes)
+	if(idx >= numNodes || idx == 0)
 		return;
 
 	copy_to_collapsed_bvh<DescType>(boundingBoxes, parents, offsets, idx, numInternalNodes, collapsedBVH);
@@ -617,14 +598,13 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 							 const ei::Box& sceneBB,
 							 const i32 numPrimitives
 ) {
-	/*if(numPrimitives == 1) {
-		// TODO remove this. 
-		m_primIds.resize(1);
-		m_primIds.synchronize<dev>();
+	if(numPrimitives == 1) { // Not necessary to build anything - trace code will skip the BVH
+		m_primIds.resize(1); // Make sure there is some memory (needs_rebuild depends on that) TODO: store simple bool instead?
 		m_bvhNodes.resize(1);
-		m_bvhNodes.synchronize<dev>();
+		m_primIds.acquire<DescType::DEVICE>();
+		m_bvhNodes.acquire<DescType::DEVICE>();
 		return;
-	}*/
+	}
 
 	const i32 numInternalNodes = numPrimitives - 1;
 	const i32 numNodes = numInternalNodes + numPrimitives;
@@ -664,14 +644,14 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 				primIdsUnsorted, primIds);
 			cuda::check_error(cudaGetLastError());
 		} else {
-			for (i32 idx = 0; idx < numPrimitives; idx++)
+			for(i32 idx = 0; idx < numPrimitives; idx++)
 			{
 				sortedMortonCodes[idx] = calculate_morton_code<DescType>(desc, idx, sceneBB);
 				primIds[idx] = idx;
 			}
 
 			// Sort based on Morton codes.
-			thrust::sort_by_key(sortedMortonCodes.get(), mortonCodes + numPrimitives, primIds);
+			thrust::sort_by_key(sortedMortonCodes.get(), sortedMortonCodes.get() + numPrimitives, primIds);
 		}
 
 		// Create BVH.
@@ -753,8 +733,8 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	logInfo("[LBVHBuilder::build_lbvh] collapsing removed ", numRemovedInternalNodes, " nodes.");
 
 	// Write the final compacted BVH
-	i32 numFloat4InCollapsedBVH = numInternalNodes - numRemovedInternalNodes;
-	m_bvhNodes.resize(numFloat4InCollapsedBVH * sizeof(ei::Vec4));
+	i32 numNodesInCollapsedBVH = (numInternalNodes - numRemovedInternalNodes);
+	m_bvhNodes.resize(numNodesInCollapsedBVH * sizeof(ei::Vec4) * 4);
 	ei::Vec4* collapsedBVH = as<ei::Vec4>(m_bvhNodes.acquire<DescType::DEVICE>());
 	if(DescType::DEVICE == Device::CUDA) {
 		get_maximum_occupancy(numBlocks, numThreads, numNodes, copy_to_collapsed_bvhD<DescType>);
@@ -762,7 +742,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			numNodes, numInternalNodes, boundingBoxes.get(), parents.get(),
 			collapseOffsets.get(), collapsedBVH);
 	} else {
-		for(i32 idx = 0; idx < numNodes; ++idx)
+		for(i32 idx = 1; idx < numNodes; ++idx)
 			copy_to_collapsed_bvh<DescType>(
 				boundingBoxes.get(), parents.get(), collapseOffsets.get(),
 				idx, numInternalNodes, collapsedBVH);

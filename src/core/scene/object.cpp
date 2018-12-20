@@ -38,7 +38,7 @@ ObjectDescriptor<dev> Object::get_descriptor(const std::vector<const char*>& ver
 	};
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
 	// (Re)build acceleration structure if necessary
-	if (m_accelStruct.needs_rebuild<dev>()) {
+	if(m_accelStruct.needs_rebuild<dev>()) {
 		m_accelStruct.build(desc, get_bounding_box());
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();

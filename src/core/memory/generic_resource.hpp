@@ -37,13 +37,13 @@ public:
 	char* acquire(bool sync = true) {
 		if(sync) synchronize<dev>();
 		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
-		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
+		auto* pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
 		return pMem;
 	}
 	template < Device dev >
 	const char* acquire_const(bool sync = true) {
 		if(sync) synchronize<dev>();
-		auto* pMem = m_mem.template get<unique_device_ptr<dev, char>>().get();
+		auto* pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
 		return pMem;
 	}
 
@@ -53,7 +53,7 @@ public:
 
 	template < Device dev >
 	void unload() {
-		m_mem.template get<unique_device_ptr<dev, char>>() = nullptr;
+		m_mem.template get<unique_device_ptr<dev, char[]>>() = nullptr;
 	}
 
 	void mark_changed(Device changed) noexcept {
@@ -66,14 +66,14 @@ public:
 
 	template < Device dev >
 	bool is_resident() const noexcept {
-		return m_mem.template get<unique_device_ptr<dev, char>>() != nullptr;
+		return m_mem.template get<unique_device_ptr<dev, char[]>>() != nullptr;
 	}
 private:
 	std::size_t m_size;
 	util::DirtyFlags<Device> m_dirty;
 	util::TaggedTuple<
-		unique_device_ptr<Device::CPU, char>,
-		unique_device_ptr<Device::CUDA, char>> m_mem;
+		unique_device_ptr<Device::CPU, char[]>,
+		unique_device_ptr<Device::CUDA, char[]>> m_mem;
 	//unique_device_ptr<Device::OPENGL, char> m_openglMem;
 };
 template DeviceManagerConcept<GenericResource>;

@@ -12,7 +12,8 @@ namespace mufflon { namespace scene { namespace accel_struct {
 struct LBVH {
 	const ei::Vec4* bvh;
 	const i32* primIds;
-	i32 bvhSize;
+	i32 bvhSize; // TODO: still required?
+	i32 numInternalNodes;
 };
 
 /*
@@ -24,13 +25,12 @@ struct LBVH {
  *
  * Layout of collapsedBVH:
  * Internal node (64 bytes)
- *  1. Vec4: L.bbmin.x, L.bbmax.x, L.bbmin.y, L.bbmax.y
- *  2. Vec4: R.bbmin.x, R.bbmax.x, R.bbmin.y, R.bbmax.y
- *  3. Vec4: L.bbmin.z, L.bbmax.z, R.bbmin.z, R.bbmax.z
- *  4. Vec4: cL, cR, primCountL, primCountR
- * TODO: if cX > numInternalNodes??
- * If cX < 0 it points to a 'leaf', otherwise index of internal node
- *  'leaf' means that -cX is the index in the primIds array with
+ *  1. Vec4: L.bbmin.x, L.bbmin.y, L.bbmin.z, cL
+ *  2. Vec4: L.bbmax.x, L.bbmax.y, L.bbmax.z, primCountL
+ *  3. Vec4: R.bbmin.x, R.bbmin.y, R.bbmin.z, cR
+ *  4. Vec4: R.bbmax.x, R.bbmax.y, R.bbmax.z, primCountR
+ * If cX > numInternalNodes it points to a 'leaf', otherwise index of internal node
+ *  'leaf' means that cX-numInternalNodes is the index in the primIds array with
  *  primCountX consecutive elements. (given by the last two values
  *  in the internal node.
  */
@@ -52,8 +52,9 @@ public:
 		desc.type = AccelType::LBVH;
 		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
 		lbvhDesc.bvh = as<ei::Vec4>( m_bvhNodes.acquire_const<dev>() );
-		lbvhDesc.primIds = as<i32>(m_primIds.acquire_const<dev>() );
+		lbvhDesc.primIds = as<i32>( m_primIds.acquire_const<dev>() );
 		lbvhDesc.bvhSize = int(m_bvhNodes.size() / sizeof(ei::Vec4));
+		lbvhDesc.numInternalNodes = int(m_bvhNodes.size() / (4 * sizeof(ei::Vec4)));
 		return desc;
 	}
 
