@@ -3,22 +3,12 @@
 #include "util/types.hpp"
 #include "util/assert.hpp"
 #include "core/export/api.h"
+#include "core/memory/residency.hpp"
+#include "core/scene/descriptors.hpp"
 
 namespace mufflon {
 namespace scene {
 namespace accel_struct {
-
-CUDA_FUNCTION constexpr void extract_prim_counts(i32 primitiveCount, ei::IVec4& count) {
-	i32 sphCountMask = 0x000003FF;
-	i32 triCountMask = 0x3FF00000;
-	i32 quadCountMask = 0x000FFC00;
-	i32 triShift = 20;
-	i32 quadShift = 10;
-	count.x = (primitiveCount & triCountMask) >> triShift;
-	count.y = (primitiveCount & quadCountMask) >> quadShift;
-	count.z = (primitiveCount & sphCountMask);
-	count.w = count.x + count.y + count.z;
-}
 
 struct AccelStructInfo {
 	struct Size
@@ -59,6 +49,63 @@ CUDA_FUNCTION i32 float_bits_as_int(float v) {
 #endif // __CUDA_ARCH__
 }
 
+// Generic centroid overloads.
+// This helps in generalizing the code of a builder
+template < Device dev >
+CUDA_FUNCTION ei::Vec3 get_centroid(const ObjectDescriptor<dev>& obj, i32 primIdx) {
+	// Primitve order: Trianges, Quads, Spheres -> idx determines the case
+	i32 spheresOffset = obj.polygon.numQuads + obj.polygon.numTriangles;
+	if(primIdx >= spheresOffset)
+		return obj.spheres.spheres[primIdx - spheresOffset].center;
+	if(primIdx >= i32(obj.polygon.numTriangles)) {
+		i32 quadId = (primIdx - obj.polygon.numTriangles) << 2;
+		return (obj.polygon.vertices[obj.polygon.vertexIndices[quadId  ]]
+			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+1]]
+			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+2]]
+			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+3]]) / 4.0f;
+	}
+	i32 triId = primIdx * 3;
+	return (obj.polygon.vertices[obj.polygon.vertexIndices[triId  ]]
+		  + obj.polygon.vertices[obj.polygon.vertexIndices[triId+1]]
+		  + obj.polygon.vertices[obj.polygon.vertexIndices[triId+2]]) / 3.0f;
 }
+
+template < Device dev >
+CUDA_FUNCTION ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 primIdx) {
+	i32 objIdx = scene.objectIndices[primIdx];
+	//const ei::Box aabb = ei::transform(prim.objAabbs[objIdx], prim.matrices[idx]);
+	// Extract the translation from the matrix only (no need to compute the
+	// full bounding box.
+	return center(scene.aabbs[objIdx]) + ei::Vec3{scene.transformations[primIdx][3],
+												  scene.transformations[primIdx][7],
+												  scene.transformations[primIdx][11]};
 }
+
+// Generic bounding box overloads.
+// This helps in generalizing the code of a builder
+template < Device dev >
+CUDA_FUNCTION ei::Box get_bounding_box(const ObjectDescriptor<dev>& obj, i32 idx) {
+	// Primitve order: Trianges, Quads, Spheres -> idx determines the case
+	i32 spheresOffset = obj.polygon.numQuads + obj.polygon.numTriangles;
+	if(idx >= spheresOffset)
+		return ei::Box(obj.spheres.spheres[idx - spheresOffset]);
+	if(idx >= i32(obj.polygon.numTriangles)) {
+		i32 quadId = (idx - obj.polygon.numTriangles) << 2;
+		return ei::Box(obj.polygon.vertices[obj.polygon.vertexIndices[quadId  ]],
+					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+1]],
+					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+2]],
+					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+3]]);
+	}
+	i32 triId = idx * 3;
+	return ei::Box(obj.polygon.vertices[obj.polygon.vertexIndices[triId  ]],
+				   obj.polygon.vertices[obj.polygon.vertexIndices[triId+1]],
+				   obj.polygon.vertices[obj.polygon.vertexIndices[triId+2]]);
 }
+
+template < Device dev >
+CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
+	i32 objIdx = scene.objectIndices[idx];
+	return ei::transform(scene.aabbs[objIdx], scene.transformations[idx]);
+}
+
+}}} // namespace mufflon::scene::accel_struct
