@@ -144,7 +144,7 @@ private:
 	void read_compressed_vertex_attributes();
 	void read_compressed_face_attributes();
 	void read_compressed_face_materials();
-	void read_compressed_sphere_attributes(const unsigned char* data);
+	void read_compressed_sphere_attributes();
 
 	bool read_instances();
 	void read_object(const mufflon::u64 globalLod,

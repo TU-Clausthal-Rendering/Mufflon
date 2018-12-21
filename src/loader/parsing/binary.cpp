@@ -263,10 +263,10 @@ void BinaryLoader::read_uncompressed_vertex_attributes() {
 		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	if(read<u32>() != ATTRIBUTE_MAGIC)
+		throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
+								 + std::to_string(m_currObjState.lodLevel) + ")");
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
-		if(read<u32>() != ATTRIBUTE_MAGIC)
-			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -290,10 +290,10 @@ void BinaryLoader::read_uncompressed_face_attributes() {
 		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	if(read<u32>() != ATTRIBUTE_MAGIC)
+		throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
+								 + std::to_string(m_currObjState.lodLevel) + ")");
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
-		if(read<u32>() != ATTRIBUTE_MAGIC)
-			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -317,10 +317,10 @@ void BinaryLoader::read_uncompressed_sphere_attributes() {
 		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	if(read<u32>() != ATTRIBUTE_MAGIC)
+		throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
+								 + std::to_string(m_currObjState.lodLevel) + ")");
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
-		if(read<u32>() != ATTRIBUTE_MAGIC)
-			throw std::runtime_error("Invalid attribute magic constant (object '" + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ")");
 		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -542,24 +542,21 @@ void BinaryLoader::read_compressed_spheres() {
 	}
 	logPedantic("[BinaryLoader::read_compressed_spheres] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numSpheres, " deflated spheres");
-
-	const unsigned char* attributes = sphereData.data() + m_currObjState.numSpheres
-										* (4u * sizeof(float) + sizeof(u16));
-	read_compressed_sphere_attributes(attributes);
+	read_compressed_sphere_attributes();
 }
 void BinaryLoader::read_compressed_vertex_attributes() {
 	if(m_currObjState.numVertices == 0 || m_currObjState.numVertAttribs == 0)
 		return;
 
+	if(read<u32>() != ATTRIBUTE_MAGIC)
+		throw std::runtime_error("Invalid attribute magic constant (object '"
+								 + m_currObjState.name + "', LoD "
+								 + std::to_string(m_currObjState.lodLevel) + ")");
+
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-
 	for(u32 i = 0u; i < m_currObjState.numVertAttribs; ++i) {
-		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
-			throw std::runtime_error("Invalid attribute magic constant (object '"
-									 + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ")");
-		AttribState state = read_uncompressed_attribute();
+		AttribState state = read_compressed_attribute(attributes);
 		auto attrHdl = polygon_request_vertex_attribute(m_currObjState.objHdl, state.name.c_str(),
 														state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -582,15 +579,15 @@ void BinaryLoader::read_compressed_face_attributes() {
 	   || m_currObjState.numFaceAttribs == 0)
 		return;
 
+	if(read<u32>() != ATTRIBUTE_MAGIC)
+		throw std::runtime_error("Invalid attribute magic constant (object '"
+								 + m_currObjState.name + "', LoD "
+								 + std::to_string(m_currObjState.lodLevel) + ")");
+
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-
 	for(u32 i = 0u; i < m_currObjState.numFaceAttribs; ++i) {
-		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
-			throw std::runtime_error("Invalid attribute magic constant (object '"
-									 + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ")");
-		AttribState state = read_uncompressed_attribute();
+		AttribState state = read_compressed_attribute(attributes);
 		auto attrHdl = polygon_request_face_attribute(m_currObjState.objHdl, state.name.c_str(),
 													  state.type);
 		if(attrHdl.index == INVALID_INDEX)
@@ -625,16 +622,18 @@ void BinaryLoader::read_compressed_face_materials() {
 				m_currObjState.numTriangles + m_currObjState.numQuads, " deflated face material indices");
 }
 
-void BinaryLoader::read_compressed_sphere_attributes(const unsigned char* attributes) {
+void BinaryLoader::read_compressed_sphere_attributes() {
 	if(m_currObjState.numSpheres == 0 || m_currObjState.numSphereAttribs == 0)
 		return;
 
+	if(read<u32>() != ATTRIBUTE_MAGIC)
+		throw std::runtime_error("Invalid attribute magic constant (object '"
+								 + m_currObjState.name + "', LoD "
+								 + std::to_string(m_currObjState.lodLevel) + ")");
+	std::vector<unsigned char> attributeData = decompress();
+	const unsigned char* attributes = attributeData.data();
 	for(u32 i = 0u; i < m_currObjState.numSphereAttribs; ++i) {
-		if(read<u32>(attributes) != ATTRIBUTE_MAGIC)
-			throw std::runtime_error("Invalid attribute magic constant (object '"
-									 + m_currObjState.name + "', LoD "
-									 + std::to_string(m_currObjState.lodLevel) + ")");
-		AttribState state = read_uncompressed_attribute();
+		AttribState state = read_compressed_attribute(attributes);
 		auto attrHdl = spheres_request_attribute(m_currObjState.objHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add sphere attribute to object '" + m_currObjState.name
