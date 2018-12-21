@@ -40,7 +40,7 @@
                 Grid.Column="1"
                 Grid.Row="1"
                 Margin="{StaticResource RightPropertyMargin}"
-                Text="{Binding ChipHeight}"/>
+                Text="{Binding SensorHeight}"/>
 
         <TextBlock
                 Grid.Column="0"

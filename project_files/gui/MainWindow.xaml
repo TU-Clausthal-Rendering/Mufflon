@@ -276,10 +276,8 @@
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
-                                <ItemsControl ItemsSource="{Binding Lights.Views}"
-                                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
-                                <Button Command="{Binding AddLightCommand}"
-                                        IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}">
+                                <ItemsControl ItemsSource="{Binding Lights.Views}"/>
+                                <Button Command="{Binding AddLightCommand}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -303,10 +301,8 @@
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
-                                <ItemsControl ItemsSource="{Binding Cameras.Views}"
-                                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
-                                <Button Command="{Binding AddCameraCommand}"
-                                        IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}">
+                                <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
+                                <Button Command="{Binding AddCameraCommand}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>

@@ -29,6 +29,11 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 		init_rngs(outputBuffer.get_num_pixels());
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
+	if(m_reset) {
+		// TODO: reset output buffer
+		// Reacquire scene descriptor (partially?)
+		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
+	}
 	m_reset = false;
 
 	// TODO: call sample in a parallel way for each output pixel

@@ -223,7 +223,8 @@ char* copy_for_csharp(std::string_view str) {
 		logError("[", FUNCTION_NAME, "] Failed to allocate string buffer");
 		return nullptr;
 	}
-	std::memcpy(buffer, &str[0u], str.size());
+	if(str.size() > 0u)
+		std::memcpy(buffer, &str[0u], str.size());
 	buffer[str.size()] = '\0';
 	return buffer;
 }
@@ -1329,6 +1330,14 @@ CameraHdl world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
 	CATCH_ALL(nullptr)
 }
 
+Boolean world_remove_camera(CameraHdl hdl) {
+	TRY
+	CHECK_NULLPTR(hdl, "camera handle", false);
+	WorldContainer::instance().remove_camera(static_cast<CameraHandle>(hdl));
+	return true;
+	CATCH_ALL(false)
+}
+
 LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) {
 	TRY
 	CHECK_NULLPTR(name, "pointlight name", nullptr);
@@ -1416,6 +1425,39 @@ LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
 	return envLight.value()->second;
 	CATCH_ALL(nullptr)
 }
+
+Boolean world_remove_point_light(LightHdl hdl) {
+	TRY
+	CHECK_NULLPTR(hdl, "point light handle", false);
+	WorldContainer::instance().remove_light(static_cast<lights::PointLight*>(hdl));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_remove_spot_light(LightHdl hdl) {
+	TRY
+		CHECK_NULLPTR(hdl, "spot light handle", false);
+	WorldContainer::instance().remove_light(static_cast<lights::SpotLight*>(hdl));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_remove_dir_light(LightHdl hdl) {
+	TRY
+		CHECK_NULLPTR(hdl, "directional light handle", false);
+	WorldContainer::instance().remove_light(static_cast<lights::DirectionalLight*>(hdl));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_remove_envmap_light(LightHdl hdl) {
+	TRY
+		CHECK_NULLPTR(hdl, "envmap light handle", false);
+	WorldContainer::instance().remove_light(static_cast<TextureHandle*>(hdl));
+	return true;
+	CATCH_ALL(false)
+}
+
 
 size_t world_get_camera_count() {
 	TRY
@@ -1921,6 +1963,8 @@ Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_camera(static_cast<CameraHandle>(cam));
+	if(scenario == world_get_current_scenario())
+		WorldContainer::instance().get_current_scene()->set_camera(static_cast<CameraHandle>(cam));
 	return true;
 	CATCH_ALL(false)
 }
@@ -2295,6 +2339,16 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	std::string_view path = nameOpt.value();
 	return copy_for_csharp(path);
 	CATCH_ALL(nullptr)
+}
+
+Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {
+	TRY
+	CHECK_NULLPTR(hdl, "environment-mapped light handle", false);
+	CHECK_NULLPTR(tex, "texture handle", false);
+	// TODO
+	logWarning("[", FUNCTION_NAME, "] Changing the envmap of an environment-map light is not supported yet");
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean render_enable_renderer(RendererType type) {

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using gui.Utility;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -21,6 +22,12 @@ namespace gui.Dll
                 x = a;
                 y = b;
                 z = c;
+            }
+            public Vec3(Vec3<float> vec)
+            {
+                x = vec.X;
+                y = vec.Y;
+                z = vec.Z;
             }
         };
 
@@ -82,6 +89,11 @@ namespace gui.Dll
             FATAL_ERROR
         };
 
+        public enum TextureSampling
+        {
+            NEAREST,
+            LINEAR
+        };
 
         public delegate void LogCallback(string message, Severity severity);
 
@@ -117,6 +129,12 @@ namespace gui.Dll
         internal static extern IntPtr world_add_pinhole_camera(string name, Vec3 position,
             Vec3 dir, Vec3 up, float near, float far, float vFov);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_add_focus_camera(string name, Vec3 position, Vec3 dir,
+            Vec3 up, float near, float far, float focalLength, float focusDistance,
+            float lensRad, float chipHeight);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_remove_camera(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_add_point_light(string name, Vec3 position,
 										   Vec3 intensity);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -128,6 +146,14 @@ namespace gui.Dll
             Vec3 radiance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_add_envmap_light(string name, IntPtr envmap);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_remove_point_light(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_remove_spot_light(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_remove_dir_light(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_remove_envmap_light(IntPtr hdl);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong world_get_camera_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -144,6 +170,11 @@ namespace gui.Dll
         internal static extern ulong world_get_env_light_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern LightType world_get_light_type(string name);
+
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_add_texture(string path, TextureSampling sampling);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_add_texture_value(out float[] value, int num, TextureSampling sampling);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.LPStr)]
@@ -261,6 +292,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string world_get_env_light_map(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_env_light_map(IntPtr hdl, IntPtr tex);
 
         // Camera API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

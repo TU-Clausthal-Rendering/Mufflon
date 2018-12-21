@@ -26,7 +26,6 @@ namespace gui.Model
 
         public ToolbarModel Toolbar { get; }
 
-
         public Models(MainWindow window)
         {
             Viewport = new ViewportModel();

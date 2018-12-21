@@ -62,6 +62,18 @@ namespace gui.Model.Light
             }
         }
 
+        private IntPtr m_handle = IntPtr.Zero;
+        public IntPtr Handle
+        {
+            get => m_handle;
+            set
+            {
+                if (m_handle == value) return;
+                m_handle = value;
+                OnPropertyChanged(nameof(Handle));
+            }
+        }
+
         /// <summary>
         /// creates a new view model based on this model
         /// </summary>

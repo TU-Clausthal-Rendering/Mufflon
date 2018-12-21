@@ -81,7 +81,8 @@ public:
 	// key in worldcontainer
 
 	void add_light(std::string_view name) {
-		m_lightNames.push_back(name);
+		if(std::find(m_lightNames.begin(), m_lightNames.end(), name) == m_lightNames.end())
+			m_lightNames.push_back(name);
 	}
 
 	void remove_light(std::size_t index);

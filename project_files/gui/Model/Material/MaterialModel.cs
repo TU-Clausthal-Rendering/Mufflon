@@ -62,6 +62,18 @@ namespace gui.Model.Material
             }
         }
 
+        private IntPtr m_handle = IntPtr.Zero;
+        public IntPtr Handle
+        {
+            get => m_handle;
+            set
+            {
+                if (m_handle == value) return;
+                m_handle = value;
+                OnPropertyChanged(nameof(Handle));
+            }
+        }
+
         // indicates if this material is included in another material (i.e. blend or fresnel)
         public bool IsRecursive { get; }
 

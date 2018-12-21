@@ -65,6 +65,7 @@ public:
 
 	// Add a fully specfied camera to the pool of all cameras.
 	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
+	void remove_camera(CameraHandle hdl);
 
 	// Find a camera dependent on its name.
 	std::size_t get_camera_count() const noexcept { return m_cameras.size(); }
@@ -90,6 +91,10 @@ public:
 	SpotLightHandle get_spot_light(std::size_t index);
 	DirLightHandle get_dir_light(std::size_t index);
 	EnvLightHandle get_env_light(std::size_t index);
+	void remove_light(lights::PointLight* hdl);
+	void remove_light(lights::SpotLight* hdl);
+	void remove_light(lights::DirectionalLight* hdl);
+	void remove_light(TextureHandle* hdl);
 	// Checks the type of a light by name
 	bool is_point_light(const std::string_view& name) const;
 	bool is_spot_light(const std::string_view& name) const;

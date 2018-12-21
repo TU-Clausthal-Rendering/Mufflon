@@ -85,6 +85,20 @@ CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<camera
 	return iter.first->second.get();
 }
 
+void WorldContainer::remove_camera(CameraHandle hdl) {
+	if(hdl == nullptr)
+		return;
+	auto iter = m_cameras.begin();
+	for(std::size_t i = 0u; i < m_cameras.size(); ++i) {
+		if(hdl == iter->second.get()) {
+			m_cameras.erase(iter);
+			m_cameraHandles.erase(m_cameraHandles.begin() + i);
+			break;
+		}
+		++iter;
+	}
+}
+
 CameraHandle WorldContainer::get_camera(std::string_view name) {
 	auto it = m_cameras.find(name);
 	if(it == m_cameras.end()) {
@@ -198,6 +212,63 @@ WorldContainer::EnvLightHandle WorldContainer::get_env_light(std::size_t index) 
 								 + " >= " + std::to_string(m_envLightHandles.size()));
 	return m_envLightHandles[index];
 }
+
+void WorldContainer::remove_light(lights::PointLight* hdl) {
+	if(hdl == nullptr)
+		return;
+	auto iter = m_pointLights.begin();
+	for(std::size_t i = 0u; i < m_pointLights.size(); ++i) {
+		if(hdl == &iter->second) {
+			m_pointLights.erase(iter);
+			m_pointLightHandles.erase(m_pointLightHandles.begin() + i);
+			break;
+		}
+		++iter;
+	}
+}
+
+void WorldContainer::remove_light(lights::SpotLight* hdl) {
+	if(hdl == nullptr)
+		return;
+	auto iter = m_spotLights.begin();
+	for(std::size_t i = 0u; i < m_spotLights.size(); ++i) {
+		if(hdl == &iter->second) {
+			m_spotLights.erase(iter);
+			m_spotLightHandles.erase(m_spotLightHandles.begin() + i);
+			break;
+		}
+		++iter;
+	}
+}
+
+void WorldContainer::remove_light(lights::DirectionalLight* hdl) {
+	if(hdl == nullptr)
+		return;
+	auto iter = m_dirLights.begin();
+	for(std::size_t i = 0u; i < m_dirLights.size(); ++i) {
+		if(hdl == &iter->second) {
+			m_dirLights.erase(iter);
+			m_dirLightHandles.erase(m_dirLightHandles.begin() + i);
+			break;
+		}
+		++iter;
+	}
+}
+
+void WorldContainer::remove_light(TextureHandle* hdl) {
+	if(hdl == nullptr)
+		return;
+	auto iter = m_envLights.begin();
+	for(std::size_t i = 0u; i < m_envLights.size(); ++i) {
+		if(hdl == &iter->second) {
+			m_envLights.erase(iter);
+			m_envLightHandles.erase(m_envLightHandles.begin() + i);
+			break;
+		}
+		++iter;
+	}
+}
+
 
 bool WorldContainer::is_point_light(const std::string_view& name) const {
 	return m_pointLights.find(name) != m_pointLights.cend();

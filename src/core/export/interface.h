@@ -363,6 +363,7 @@ CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, Vec3 position,
 												Vec3 up, float near, float far,
 												float focalLength, float focusDistance,
 												float lensRad, float chipHeight);
+CORE_API Boolean CDECL world_remove_camera(CameraHdl hdl);
 CORE_API LightHdl CDECL world_add_point_light(const char* name, Vec3 position,
 										   Vec3 intensity);
 CORE_API LightHdl CDECL world_add_spot_light(const char* name, Vec3 position,
@@ -373,6 +374,10 @@ CORE_API LightHdl CDECL world_add_directional_light(const char* name,
 												 Vec3 direction,
 												 Vec3 radiance);
 CORE_API LightHdl CDECL world_add_envmap_light(const char* name, TextureHdl envmap);
+CORE_API Boolean CDECL world_remove_point_light(LightHdl hdl);
+CORE_API Boolean CDECL world_remove_spot_light(LightHdl hdl);
+CORE_API Boolean CDECL world_remove_dir_light(LightHdl hdl);
+CORE_API Boolean CDECL world_remove_envmap_light(LightHdl hdl);
 CORE_API size_t CDECL world_get_camera_count();
 CORE_API CameraHdl CDECL world_get_camera(const char* name);
 CORE_API CameraHdl CDECL world_get_camera_by_index(size_t);
@@ -440,6 +445,7 @@ CORE_API Boolean CDECL world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* rad
 CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
 CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
 CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
+CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);

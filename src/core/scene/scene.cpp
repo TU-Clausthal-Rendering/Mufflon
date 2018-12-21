@@ -8,6 +8,7 @@
 #include "core/scene/materials/point_medium.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
+#include "profiler/cpu_profiler.hpp"
 
 namespace mufflon { namespace scene {
 
@@ -110,6 +111,7 @@ SceneDescriptor<dev> Scene::get_descriptor(const std::vector<const char*>& verte
 
 	// Rebuild Instance BVH?
 	if(m_accelStruct.needs_rebuild<dev>()) {
+		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 		m_accelStruct.build(sceneDesc);
 	}
 	sceneDesc.accelStruct = m_accelStruct.acquire_const<dev>();
