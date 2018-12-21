@@ -12,7 +12,6 @@ namespace mufflon { namespace scene { namespace accel_struct {
 struct LBVH {
 	const ei::Vec4* bvh;
 	const i32* primIds;
-	i32 bvhSize; // TODO: still required?
 	i32 numInternalNodes;
 };
 
@@ -53,7 +52,6 @@ public:
 		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
 		lbvhDesc.bvh = as<ei::Vec4>( m_bvhNodes.acquire_const<dev>() );
 		lbvhDesc.primIds = as<i32>( m_primIds.acquire_const<dev>() );
-		lbvhDesc.bvhSize = int(m_bvhNodes.size() / sizeof(ei::Vec4));
 		lbvhDesc.numInternalNodes = int(m_bvhNodes.size() / (4 * sizeof(ei::Vec4)));
 		return desc;
 	}

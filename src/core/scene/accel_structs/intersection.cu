@@ -235,7 +235,7 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 		}
 
 		if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-			const i32 primId = nodeAddr - bvh.numInternalNodes;
+			const i32 primId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
 
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
@@ -338,7 +338,7 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 		}
 
 		if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-			const i32 primId = nodeAddr - bvh.numInternalNodes;
+			const i32 primId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
 
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
@@ -381,11 +381,12 @@ void first_intersection_scene_obj_lbvh(
 	const ei::Vec3 ood = transRay.origin * invDir;
 
 	const i32 objId = scene.objectIndices[instanceId];
-	const ei::Box box = scene.aabbs[objId];
+	const ei::Box& box = scene.aabbs[objId];
 	const float tmin = 1e-6f * len(box.max - box.min);
 
 	// Intersect the ray against the obj bounding box.
-	if(intersect(box.min, box.max, invDir, ood, tmin, hitT, hitT)) {
+	float t;
+	if(intersect(box.min, box.max, invDir, ood, tmin, hitT, t)) {
 		// Intersect the ray against the obj primitive bvh.
 		const ObjectDescriptor<dev>& obj = scene.objects[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
@@ -405,8 +406,7 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 	const RayIntersectionResult::HitID& startInsPrimId,
 	const float tmax
 ) {
-	// Primitive index of the closest intersection, -1 if none.
-	const float tmin = 0.f; // TODO: add epsilon?
+	const float tmin = 1e-7f * len(scene.aabb.max - scene.aabb.min);
 	i32 hitPrimId = SECOND_QUAD_TRIANGLE_BIT;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	ei::Vec3 hitBarycentric;

@@ -257,8 +257,8 @@ template <typename T> __global__ void build_lbvh_treeD(
 struct BBCache {
 	BBCache() = default;
 	CUDA_FUNCTION __forceinline__ BBCache(const ei::Vec4& a, const ei::Vec4& b) :
-		boxMin{a}, cost{a.w},
-		boxMax{b}, primCount{float_bits_as_int(b.w)}
+		boxMin{a}, primCount{float_bits_as_int(a.w)},
+		boxMax{b}, cost{b.w}
 	{}
 	CUDA_FUNCTION __forceinline__ BBCache(const ei::Vec3& boxMin,
 							float cost,
@@ -267,9 +267,9 @@ struct BBCache {
 		boxMin(boxMin), cost(cost), boxMax(boxMax), primCount(primCount)
 	{}
 	ei::Vec3 boxMin;
-	float cost;
-	ei::Vec3 boxMax;
 	i32 primCount;
+	ei::Vec3 boxMax;
+	float cost;
 };
 static_assert(sizeof(BBCache) == 8*sizeof(float), "Alignment of BBCache is broken.");
 
@@ -399,7 +399,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 
 		// Compute data for this node
 		currentBb.min = ei::min(currentBb.min, childInfo.boxMin);
-		currentBb.max = ei::min(currentBb.max, childInfo.boxMax);
+		currentBb.max = ei::max(currentBb.max, childInfo.boxMax);
 		primitiveCount += extract_prim_counts<PrimCount_t<DescType>>(childInfo.primCount);
 		cost = desc_info<DescType>::NODE_TRAVERSAL_COST * ei::surface(currentBb) + cost + childInfo.cost;
 		i32 boxId = currentNode << 1;
@@ -570,8 +570,12 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 
 		i32 outIdx = (offsets[parent] - 1) * 4;
 		const i32 primCount = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
-		collapsedBVH[outIdx+offset  ] = ei::Vec4{boxMin_primCount.x, boxMin_primCount.y, boxMin_primCount.z, int_bits_as_float(node)};
-		collapsedBVH[outIdx+offset+1] = ei::Vec4{boxMax_primCost.x,  boxMax_primCost.y,  boxMax_primCost.z,  int_bits_as_float(primCount)};
+		// Enlarge the bounding box to avoid numerical issues in the tracing
+		const ei::Vec3 center = (ei::Vec3{boxMin_primCount} + ei::Vec3{boxMax_primCost}) * 0.5f;
+		const ei::Vec3 bbMin = (ei::Vec3{boxMin_primCount} - center) * 1.0001f + center;
+		const ei::Vec3 bbMax = (ei::Vec3{boxMax_primCost} - center) * 1.0001f + center;
+		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(node)};
+		collapsedBVH[outIdx+offset+1] = ei::Vec4{bbMax,  int_bits_as_float(primCount)};
 	}
 }
 
