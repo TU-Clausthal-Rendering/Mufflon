@@ -58,7 +58,7 @@ CUDA_FUNCTION ei::Vec3 get_centroid(const ObjectDescriptor<dev>& obj, i32 primId
 	if(primIdx >= spheresOffset)
 		return obj.spheres.spheres[primIdx - spheresOffset].center;
 	if(primIdx >= i32(obj.polygon.numTriangles)) {
-		i32 quadId = (primIdx - obj.polygon.numTriangles) << 2;
+		i32 quadId = (primIdx - obj.polygon.numTriangles) * 4 + obj.polygon.numTriangles * 3;
 		return (obj.polygon.vertices[obj.polygon.vertexIndices[quadId  ]]
 			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+1]]
 			  + obj.polygon.vertices[obj.polygon.vertexIndices[quadId+2]]
@@ -90,7 +90,7 @@ CUDA_FUNCTION ei::Box get_bounding_box(const ObjectDescriptor<dev>& obj, i32 idx
 	if(idx >= spheresOffset)
 		return ei::Box(obj.spheres.spheres[idx - spheresOffset]);
 	if(idx >= i32(obj.polygon.numTriangles)) {
-		i32 quadId = (idx - obj.polygon.numTriangles) << 2;
+		i32 quadId = (idx - obj.polygon.numTriangles) * 4 + obj.polygon.numTriangles * 3;
 		return ei::Box(obj.polygon.vertices[obj.polygon.vertexIndices[quadId  ]],
 					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+1]],
 					   obj.polygon.vertices[obj.polygon.vertexIndices[quadId+2]],

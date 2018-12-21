@@ -349,6 +349,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	// Proceed upwards in the hierarchy
 	i32 currentNode = parents[leafIndex];
 	i32 lastNode = idx; // Only for the first iteration is is the thread index, later it is realy a node
+//	i32 lastNode = leafIndex;
 	bool lastIsLeftChild = currentNode < 0;
 	if(currentNode < 0) currentNode = ~currentNode;
 
@@ -360,6 +361,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	i32 otherChildThreadIdx = atomicExch(&counters[currentNode], leafIndex);
 #else
 	i32 otherChildThreadIdx = counters[currentNode]; 
+	//i32 otherChildNode = counters[currentNode]; 
 	counters[currentNode] = leafIndex;
 #endif // __CUDA_ARCH__
 
@@ -367,6 +369,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	// This circumvents the global sync problem. The second thread
 	// can be sure that the data of the first one is present.
 	while(otherChildThreadIdx != 0xFFFFFFFF) {
+	//while(otherChildNode != 0xFFFFFFFF) {
 		cuda::globalMemoryBarrier();		// For reads on boundingBoxes[]
 
 		i32 otherChildNode = lastIsLeftChild ? lastNode + 1 : lastNode - 1;
@@ -417,6 +420,8 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 #else
 		otherChildThreadIdx = counters[currentNode]; 
 		counters[currentNode] = idx;
+		//otherChildNode = counters[currentNode]; 
+		//counters[currentNode] = lastNode;
 #endif // __CUDA_ARCH__
 	}
 
@@ -540,12 +545,9 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 	// Collapsed nodes do not exist anymore and do not write anything in the
 	// hierarchy
 	if(!is_collapsed(offsets, numInternalNodes, node)) {
-		// Read information of the current node and determine if it is a left or right
-		// child. A child will fill half of the data of the parent. To determine which
+		// Determine if it is a left or right child. A child will
+		// fill half of the data of the parent. To determine which
 		// half is written we use 'offset'.
-		ei::Vec4 boxMin_primCount = boundingBoxes[node * 2];
-		ei::Vec4 boxMax_primCost = boundingBoxes[node * 2 + 1];
-		i32 countCode = float_bits_as_int(boxMin_primCount.w);
 		i32 parent = parents[node];
 		i32 offset;
 		if(parent < 0) { // Left child?
@@ -555,25 +557,33 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 
 		// The parent could be collapsed if the current node is a leaf.
 		// Search the first non-collapsed parent.
-		if(node >= numInternalNodes) {
-			i32 last = node;
+		i32 finalNode = node;
+		if(finalNode >= numInternalNodes) {
 			while(is_collapsed(offsets, numInternalNodes, parent)) {
-				last = parent;
+				finalNode = parent;
 				parent = parents[parent];
 				if(parent < 0) { // Left child?
 					offset = 0;
 					parent = ~parent;
 				} else offset = 2;
 			}
-			countCode = float_bits_as_int(boundingBoxes[last * 2].w);
 		}
+		// TODO: break if not leftest or rightest child?
+		// If nodes are collapsed only two should do a write.!
 
-		i32 outIdx = (offsets[parent] - 1) * 4;
+		// Read the date of the current node (the highest collapsed or the leaf)
+		const ei::Vec4 boxMin_primCount = boundingBoxes[finalNode * 2];
+		const ei::Vec4 boxMax_primCost = boundingBoxes[finalNode * 2 + 1];
+		const i32 countCode = float_bits_as_int(boxMin_primCount.w);
 		const i32 primCount = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
+
+		const i32 outIdx = (offsets[parent] - 1) * 4;
 		// Enlarge the bounding box to avoid numerical issues in the tracing
 		const ei::Vec3 center = (ei::Vec3{boxMin_primCount} + ei::Vec3{boxMax_primCost}) * 0.5f;
 		const ei::Vec3 bbMin = (ei::Vec3{boxMin_primCount} - center) * 1.0001f + center;
 		const ei::Vec3 bbMax = (ei::Vec3{boxMax_primCost} - center) * 1.0001f + center;
+		//const ei::Vec3 bbMin = ei::Vec3(-5.1f);
+		//const ei::Vec3 bbMax = ei::Vec3(5.1f);
 		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(node)};
 		collapsedBVH[outIdx+offset+1] = ei::Vec4{bbMax,  int_bits_as_float(primCount)};
 	}
@@ -705,7 +715,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	}
 
 	// Find out which nodes can be collapsed according to SAH.
-	if(DescType::DEVICE == Device::CUDA) {
+	/*if(DescType::DEVICE == Device::CUDA) {
 		get_maximum_occupancy(numBlocks, numThreads, numPrimitives, mark_nodesD<DescType>);
 		mark_nodesD<DescType> <<< numBlocks, numThreads >>>(numInternalNodes,
 			boundingBoxes.get(), parents.get(),
@@ -716,7 +726,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
 				idx + numInternalNodes, collapseOffsets.get());
 		}
-	}
+	}*/
 
 	// Scan to get values for offsets.
 	i32 numRemovedInternalNodes;
@@ -724,14 +734,10 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		CuLib::DeviceInclusiveSum(numInternalNodes, collapseOffsets.get(), collapseOffsets.get());
 		copy(&numRemovedInternalNodes, collapseOffsets.get() + numInternalNodes - 1, sizeof(i32));
 		numRemovedInternalNodes = numInternalNodes - numRemovedInternalNodes;
-		// Scan to get number of leaves arised from internal nodes before current node.
-//		CuLib::DeviceExclusiveSum(numInternalNodes + 1, leafMarks, leafMarks);
 	} else {
 		// Scan to get values for offsets.
 		thrust::inclusive_scan(collapseOffsets.get(), collapseOffsets.get()+numInternalNodes, collapseOffsets.get());
 		numRemovedInternalNodes = numInternalNodes - collapseOffsets[numInternalNodes - 1];
-		// Scan to get number of leaves arised from internal nodes before current node.
-		//thrust::exclusive_scan(leafMarks, leafMarks + numInternalNodes + 1, leafMarks);
 	}
 
 	logInfo("[LBVHBuilder::build_lbvh] collapsing removed ", numRemovedInternalNodes, " nodes.");

@@ -481,7 +481,7 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 			}
 			
 			if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-				const i32 instanceId = nodeAddr - bvh.numInternalNodes;
+				const i32 instanceId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
 
 				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 				for(i32 i = 0; i < primCount; i++) {
@@ -501,7 +501,10 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 		}
 	}
 
-	if (hitInstanceId == IGNORE_ID) {
+	// Nobody should update hitT if no primitive is hit
+	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || hitT == tmax);
+
+	if(hitInstanceId == IGNORE_ID) {
 		return { hitT, { IGNORE_ID, IGNORE_ID } };
 	} else {
 		// To be determined
@@ -682,7 +685,7 @@ bool any_intersection_scene_lbvh_imp(
 			}
 
 			if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-				const i32 instanceId = nodeAddr - bvh.numInternalNodes;
+				const i32 instanceId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
 
 				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 				for(i32 i = 0; i < primCount; i++) {
