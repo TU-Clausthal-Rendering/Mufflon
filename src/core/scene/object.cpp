@@ -1,4 +1,6 @@
 #include "object.hpp"
+#include "profiler/cpu_profiler.hpp"
+
 
 namespace mufflon::scene {
 
@@ -39,6 +41,7 @@ ObjectDescriptor<dev> Object::get_descriptor(const std::vector<const char*>& ver
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
 	// (Re)build acceleration structure if necessary
 	if(m_accelStruct.needs_rebuild<dev>()) {
+		auto timer = Profiler::instance().start<CpuProfileState>("[Object::get_descriptor] build object BVH.");
 		m_accelStruct.build(desc, get_bounding_box());
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();

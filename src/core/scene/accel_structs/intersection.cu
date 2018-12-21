@@ -504,6 +504,21 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 	// Nobody should update hitT if no primitive is hit
 	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || hitT == tmax);
 
+	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
+	for(int i = 0; i < scene.numInstances; ++i) {
+		auto& obj = scene.objects[ scene.objectIndices[i] ];
+		const ei::Mat3x3 invRotScale = ei::invert(ei::Mat3x3{scene.transformations[i]});
+		const ei::Vec3 invTranslation { -scene.transformations[i][3],
+										-scene.transformations[i][7],
+										-scene.transformations[i][11] };
+		ei::Ray transRay = { invRotScale * (ray.origin + invTranslation),
+							 normalize(invRotScale * ray.direction) };
+		for(int p = 0; p < obj.numPrimitives; ++p) {
+			if(intersects_primitve(obj, transRay, p, -1, hitPrimId, hitT, hitBarycentric))
+				hitInstanceId = i;
+		}
+	}*/
+
 	if(hitInstanceId == IGNORE_ID) {
 		return { hitT, { IGNORE_ID, IGNORE_ID } };
 	} else {

@@ -540,6 +540,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 	const i32* __restrict__ offsets,
 	const i32 node,
 	const i32 numInternalNodes,
+	const i32 numInternalNodesAfterCollapse,
 	ei::Vec4* __restrict__ collapsedBVH
 ) {
 	// Collapsed nodes do not exist anymore and do not write anything in the
@@ -560,6 +561,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		i32 finalNode = node;
 		if(finalNode >= numInternalNodes) {
 			while(is_collapsed(offsets, numInternalNodes, parent)) {
+				if(offset == 2) return; // Only the left-most child of the subtree may write the parent node.
 				finalNode = parent;
 				parent = parents[parent];
 				if(parent < 0) { // Left child?
@@ -568,8 +570,6 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 				} else offset = 2;
 			}
 		}
-		// TODO: break if not leftest or rightest child?
-		// If nodes are collapsed only two should do a write.!
 
 		// Read the date of the current node (the highest collapsed or the leaf)
 		const ei::Vec4 boxMin_primCount = boundingBoxes[finalNode * 2];
@@ -578,14 +578,15 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		const i32 primCount = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
 
 		const i32 outIdx = (offsets[parent] - 1) * 4;
+		const i32 outNodeIdx = (node >= numInternalNodes) ?
+			  node - numInternalNodes + numInternalNodesAfterCollapse // Leaf. Offset address by number of collapsed nodes.
+			: offsets[node]-1;	// Internal node. Get the new position from offset array.
 		// Enlarge the bounding box to avoid numerical issues in the tracing
 		const ei::Vec3 center = (ei::Vec3{boxMin_primCount} + ei::Vec3{boxMax_primCost}) * 0.5f;
 		const ei::Vec3 bbMin = (ei::Vec3{boxMin_primCount} - center) * 1.0001f + center;
 		const ei::Vec3 bbMax = (ei::Vec3{boxMax_primCost} - center) * 1.0001f + center;
-		//const ei::Vec3 bbMin = ei::Vec3(-5.1f);
-		//const ei::Vec3 bbMax = ei::Vec3(5.1f);
-		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(node)};
-		collapsedBVH[outIdx+offset+1] = ei::Vec4{bbMax,  int_bits_as_float(primCount)};
+		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(outNodeIdx)};
+		collapsedBVH[outIdx+offset+1] = ei::Vec4{bbMax, int_bits_as_float(primCount)};
 	}
 }
 
@@ -593,6 +594,7 @@ template < typename DescType >
 __global__ void copy_to_collapsed_bvhD(
 	const i32 numNodes,
 	const i32 numInternalNodes,
+	const i32 numInternalNodesAfterCollapse,
 	const ei::Vec4 * __restrict__ boundingBoxes,
 	const i32* __restrict__ parents,
 	const i32* __restrict__ offsets,
@@ -603,7 +605,7 @@ __global__ void copy_to_collapsed_bvhD(
 	if(idx >= numNodes || idx == 0)
 		return;
 
-	copy_to_collapsed_bvh<DescType>(boundingBoxes, parents, offsets, idx, numInternalNodes, collapsedBVH);
+	copy_to_collapsed_bvh<DescType>(boundingBoxes, parents, offsets, idx, numInternalNodes, numInternalNodesAfterCollapse, collapsedBVH);
 }
 
 
@@ -715,7 +717,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	}
 
 	// Find out which nodes can be collapsed according to SAH.
-	/*if(DescType::DEVICE == Device::CUDA) {
+	if(DescType::DEVICE == Device::CUDA) {
 		get_maximum_occupancy(numBlocks, numThreads, numPrimitives, mark_nodesD<DescType>);
 		mark_nodesD<DescType> <<< numBlocks, numThreads >>>(numInternalNodes,
 			boundingBoxes.get(), parents.get(),
@@ -726,7 +728,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
 				idx + numInternalNodes, collapseOffsets.get());
 		}
-	}*/
+	}
 
 	// Scan to get values for offsets.
 	i32 numRemovedInternalNodes;
@@ -749,13 +751,13 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	if(DescType::DEVICE == Device::CUDA) {
 		get_maximum_occupancy(numBlocks, numThreads, numNodes, copy_to_collapsed_bvhD<DescType>);
 		copy_to_collapsed_bvhD<DescType> <<< numBlocks, numThreads >>>(
-			numNodes, numInternalNodes, boundingBoxes.get(), parents.get(),
+			numNodes, numInternalNodes, numNodesInCollapsedBVH, boundingBoxes.get(), parents.get(),
 			collapseOffsets.get(), collapsedBVH);
 	} else {
 		for(i32 idx = 1; idx < numNodes; ++idx)
 			copy_to_collapsed_bvh<DescType>(
 				boundingBoxes.get(), parents.get(), collapseOffsets.get(),
-				idx, numInternalNodes, collapsedBVH);
+				idx, numInternalNodes, numNodesInCollapsedBVH, collapsedBVH);
 	}
 }
 
