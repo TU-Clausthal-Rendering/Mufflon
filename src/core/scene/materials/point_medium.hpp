@@ -3,18 +3,15 @@
 #include "core/scene/descriptors.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
+#include "core/scene/accel_structs/accel_structs_commons.hpp"
 #include "core/scene/materials/material.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
 CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
 	mAssert(scene.objects[0u].polygon.numVertices > 0u || scene.objects[0u].spheres.numSpheres > 0u);
-	// Shoot a ray to a point in the scene (any vertex suffices)
-	ei::Vec3 vertex;
-	if(scene.objects[0u].polygon.numVertices > 0u)
-		vertex = scene.objects[0u].polygon.vertices[0u];
-	else
-		vertex = scene.objects[0u].spheres.spheres[0u].center;
+	// Shoot a ray to a point in the scene (any surface suffices)
+	ei::Vec3 vertex = accel_struct::get_centroid(scene.objects[0u], 0);
 
 	ei::Vec3 dir = vertex - pos;
 	const float length = ei::len(dir);
