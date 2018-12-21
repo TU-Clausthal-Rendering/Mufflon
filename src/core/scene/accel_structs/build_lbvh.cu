@@ -35,7 +35,7 @@ template<Device dev> struct desc_info<ObjectDescriptor<dev>> {
 	using MortonCode = u64;
 	using PrimCount = ei::IVec3;
 	using CostFactor = ei::Vec4;
-	static constexpr float NODE_TRAVERSAL_COST = 1.0f;
+	static constexpr float NODE_TRAVERSAL_COST = 3.0f;
 	static constexpr ei::Vec3 PRIM_TRAVERSAL_COST = { 1.2f, 2.4f, 1.0f };
 };
 template<Device dev> struct desc_info<SceneDescriptor<dev>> {
@@ -329,10 +329,11 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	BBCache* sharedBb = nullptr
 ) {
 	ei::Box currentBb = get_bounding_box(desc, primIdx);
+	float currentSA = ei::surface(currentBb);
 
 	// Get primitive count of the node and its cost
 	auto primitiveCount = get_count(desc, primIdx);
-	float cost = get_cost<DescType>(primitiveCount) * ei::surface(currentBb);
+	float cost = get_cost<DescType>(primitiveCount);
 
 	// Store in cache and global array
 #ifdef __CUDA_ARCH__
@@ -403,8 +404,14 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 		// Compute data for this node
 		currentBb.min = ei::min(currentBb.min, childInfo.boxMin);
 		currentBb.max = ei::max(currentBb.max, childInfo.boxMax);
-		primitiveCount += extract_prim_counts<PrimCount_t<DescType>>(childInfo.primCount);
-		cost = desc_info<DescType>::NODE_TRAVERSAL_COST * ei::surface(currentBb) + cost + childInfo.cost;
+		float newSA = ei::surface(currentBb);
+		float otherSA = ei::surface(ei::Box{childInfo.boxMin, childInfo.boxMax});
+		auto primitiveCountOther = extract_prim_counts<PrimCount_t<DescType>>(childInfo.primCount);
+		cost = desc_info<DescType>::NODE_TRAVERSAL_COST
+			+ currentSA / newSA * get_cost<DescType>(primitiveCount)
+			+ otherSA / newSA * get_cost<DescType>(primitiveCountOther);
+		primitiveCount += primitiveCountOther;
+		currentSA = newSA;
 		i32 boxId = currentNode << 1;
 		boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(encode_prim_counts(primitiveCount)) };
 		boundingBoxes[boxId + 1] = { currentBb.max, cost };
@@ -446,10 +453,9 @@ CUDA_FUNCTION void mark_collapsed_nodes(
 	i32 collapseNode = -1;
 	i32 currentNode = parents[leafIndex];
 	if(currentNode < 0) currentNode = ~currentNode;
-	while(currentNode != TreeHead) {
+	while(currentNode != 0) {
 		ei::Vec4 boxMin_primCount = boundingBoxes[currentNode * 2];
 		ei::Vec4 boxMax_primCost = boundingBoxes[currentNode * 2 + 1];
-		ei::Box currentBb {ei::Vec3{boxMin_primCount}, ei::Vec3{boxMax_primCost}};
 		auto primitiveCount = extract_prim_counts<PrimCount_t<DescType>>(float_bits_as_int(boxMin_primCount.w));
 
 		// Termination condition: more than 1023 primitves of a single type.
@@ -458,13 +464,15 @@ CUDA_FUNCTION void mark_collapsed_nodes(
 			break;
 
 		float cost = boxMax_primCost.w;		// Cost without collapse
-		float costAsLeaf = ei::surface(currentBb) * get_cost<DescType>(primitiveCount);
+		float costAsLeaf = get_cost<DescType>(primitiveCount);
 		if(costAsLeaf < cost)
 			collapseNode = currentNode;
 
 		currentNode = parents[currentNode];
 		if(currentNode < 0) currentNode = ~currentNode;
 	}
+
+	// TODO: can we set marks imediatelly? Does SAH guarentee monotony?
 
 	// Is there any ancestor, which is collapsed?
 	if(collapseNode != -1) {
@@ -578,14 +586,14 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		const i32 primCount = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
 
 		const i32 outIdx = (offsets[parent] - 1) * 4;
-		const i32 outNodeIdx = (node >= numInternalNodes) ?
+		const i32 outNode = (node >= numInternalNodes) ?
 			  node - numInternalNodes + numInternalNodesAfterCollapse // Leaf. Offset address by number of collapsed nodes.
 			: offsets[node]-1;	// Internal node. Get the new position from offset array.
 		// Enlarge the bounding box to avoid numerical issues in the tracing
 		const ei::Vec3 center = (ei::Vec3{boxMin_primCount} + ei::Vec3{boxMax_primCost}) * 0.5f;
 		const ei::Vec3 bbMin = (ei::Vec3{boxMin_primCount} - center) * 1.0001f + center;
 		const ei::Vec3 bbMax = (ei::Vec3{boxMax_primCost} - center) * 1.0001f + center;
-		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(outNodeIdx)};
+		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(outNode)};
 		collapsedBVH[outIdx+offset+1] = ei::Vec4{bbMax, int_bits_as_float(primCount)};
 	}
 }
