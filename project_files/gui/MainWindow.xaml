@@ -19,6 +19,10 @@
         <Thickness x:Key="ThinBorder" Bottom="1"/>
         <local:NegateBooleanConverter x:Key="inverter"/>
     </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Command="{Binding Toolbar.SaveScreenShotCommand}"
+                    Key="F2"/>
+    </Window.InputBindings>
     <DockPanel Background="{StaticResource BackgroundBrush}">
         <!-- Menu Bar and Status bar grid -->
         <Grid

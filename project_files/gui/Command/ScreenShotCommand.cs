@@ -11,6 +11,11 @@ namespace gui.Command
     {
         private Models m_models;
 
+        public string Gesture
+        {
+            get => "F2";
+        }
+
         public ScreenShotCommand(Models models)
         {
             m_models = models;
