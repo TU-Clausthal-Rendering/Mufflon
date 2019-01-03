@@ -199,9 +199,6 @@ void BinaryLoader::read_normal_compressed_vertices() {
 			throw std::runtime_error("Failed to set normal for object '" + m_currObjState.name + "', LoD "
 										+ std::to_string(m_currObjState.lodLevel));
 	}
-
-	// Seek to the attributes
-	m_fileStream.seekg(2u * sizeof(float) * m_currObjState.numVertices, std::ios_base::cur);
 }
 
 // Read vertices without deflation and without normal compression
@@ -384,8 +381,6 @@ void BinaryLoader::read_uncompressed_triangles() {
 	}
 	logPedantic("[BinaryLoader::read_uncompressed_triangles] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numTriangles, " triangles");
-	// Seek to the quads
-	m_fileStream.seekg(3u * sizeof(u32) * m_currObjState.numTriangles, std::ios_base::cur);
 }
 
 void BinaryLoader::read_uncompressed_quads() {
@@ -401,8 +396,6 @@ void BinaryLoader::read_uncompressed_quads() {
 	}
 	logPedantic("[BinaryLoader::read_uncompressed_quads] Object '", m_currObjState.name, "': Read ",
 				m_currObjState.numQuads, " quads");
-	// Seek to the material indices
-	m_fileStream.seekg(4u * sizeof(u32) * m_currObjState.numQuads, std::ios_base::cur);
 }
 
 void BinaryLoader::read_uncompressed_spheres() {
