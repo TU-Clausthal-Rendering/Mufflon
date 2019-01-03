@@ -171,9 +171,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		m_accelStruct.build(sceneDescriptor);
 		sceneDescriptor.accelStruct = m_accelStruct.acquire_const<dev>();
 		// For each light determine the medium
-		//m_lightTree.update_media(sceneDescriptor);
+		m_lightTree.update_media(sceneDescriptor);
 		// For the camera as well
-		//this->update_camera_medium(sceneDescriptor);
+		this->update_camera_medium(sceneDescriptor);
 	}
 
 

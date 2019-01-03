@@ -98,8 +98,8 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	scene::TangentSpace tangentSpace{
 		nextHit.normal, // TODO: shading normal?
 		nextHit.normal,
-		nextHit.tangent,
-		ei::cross(nextHit.normal, nextHit.tangent) // TODO: proper way around (left/right-handed)?
+		nextHit.tangentX,
+		nextHit.tangentY
 	};
 	// TODO: get tangent space and parameter pack from nextHit
 	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[nextHit.hitId.instanceId]];

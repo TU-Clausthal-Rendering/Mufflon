@@ -24,7 +24,8 @@ struct RayIntersectionResult {
 		}
 	} hitId;
 	ei::Vec3 normal;
-	ei::Vec3 tangent;
+	ei::Vec3 tangentX;
+	ei::Vec3 tangentY;
 	ei::Vec2 uv;
 	ei::Vec3 barycentric; // TODO: storing 2 is sufficient, TODO: different coordinates for spheres/quads
 };
