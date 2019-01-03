@@ -70,17 +70,20 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
+			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
 				vertex->get_position(), m_currentScene->get_bounding_box(),
-				math::RndSet2{ m_rngs[pixel].next() }, scene::lights::guide_flux);
+				neeRnd, scene::lights::guide_flux);
 			// TODO: set startInsPrimId with a proper value.
 			bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
 				scene, { vertex->get_position() , ei::normalize(nee.direction) }, { -1, -1 },
 				nee.dist); 
 			if(!anyhit) {
 				auto value = vertex->evaluate(nee.direction, scene.media);
+				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
+				mAssert(!isnan(mis));
 				outputBuffer.contribute(coord, throughput, { Spectrum{nee.intensity}, 1.0f },
 					value.cosOut, value.value * mis);
 			}

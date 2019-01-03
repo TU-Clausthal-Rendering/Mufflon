@@ -52,11 +52,13 @@ struct RenderBuffer {
 		if(is_valid(m_radiance)) {
 			ei::Vec4 prev = read(m_radiance, pixel);
 			ei::Vec3 newVal = viewThroughput.weight * lightThroughput.weight * value * cosines;
+			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
 			write(m_radiance, pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_lightness)) {
 			ei::Vec4 prev = read(m_lightness, pixel);
 			float newVal = viewThroughput.guideWeight * lightThroughput.guideWeight * cosines;
+			mAssert(!isnan(newVal));
 			write(m_lightness, pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 		// Position, Normal and Albedo are handled by the random hit contribution.
@@ -74,26 +76,31 @@ struct RenderBuffer {
 		if(is_valid(m_radiance)) {
 			ei::Vec4 prev = read(m_radiance, pixel);
 			ei::Vec3 newVal = viewThroughput.weight * radiance;
+			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
 			write(m_radiance, pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_position)) {
 			ei::Vec4 prev = read(m_position, pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * position;
+			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
 			write(m_position, pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_normal)) {
 			ei::Vec4 prev = read(m_normal, pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * normal;
+			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
 			write(m_normal, pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_albedo)) {
 			ei::Vec4 prev = read(m_albedo, pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * albedo;
+			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
 			write(m_albedo, pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_lightness)) {
 			ei::Vec4 prev = read(m_lightness, pixel);
 			float newVal = viewThroughput.guideWeight * avg(radiance);
+			mAssert(!isnan(newVal));
 			write(m_lightness, pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 	}

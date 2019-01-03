@@ -52,6 +52,10 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
 	if(sample.type == math::PathEventType::INVALID) return false;
+	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
+		&& !isnan(sample.origin.x) && !isnan(sample.origin.y) && !isnan(sample.origin.z)
+		&& !isnan(float(sample.pdfF)) && !isnan(float(sample.pdfB)));
+
 
 	// Update throughputs
 	throughput.weight *= sample.throughput;
@@ -80,6 +84,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	Spectrum transmission = currentMedium.get_transmission( nextHit.hitT );
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
+	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
 
 	// If we missed the scene, terminate the ray and save the last direction for background sampling
 	if(nextHit.hitId.instanceId < 0) {
