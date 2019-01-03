@@ -43,7 +43,10 @@ CUDA_FUNCTION u32 clz(u32 v) {
 	return __clz(v);
 #else
 #ifdef _MSC_VER
-	return __lzcnt(v);
+	//return __lzcnt(v); //This instruction is carbage: on some machines it is a different opcode -> wrong values
+	unsigned long out;
+	_BitScanReverse(&out, v);
+	return (v == 0) ? 32 : 31 - out;
 #else
 	return (v == 0) ? 32 : 31 - (u32)log2f((float)v);
 #endif // _MSC_VER
