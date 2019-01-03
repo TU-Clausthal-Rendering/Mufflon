@@ -12,14 +12,31 @@ namespace mufflon { namespace scene { namespace accel_struct {
 struct LBVH {
 	const ei::Vec4* bvh;
 	const i32* primIds;
-	i32 bvhSize;
+	i32 numInternalNodes;
 };
 
-//
+/*
+ * At first, a normal LBVH is build. See Karras "TODO"
+ * Then the lower nodes are collapsed based on SAH values. 
+ * It ensures that there is at least one internal node after collapsing if
+ * there are at least two instances.
+ * If there is only one instance, no BVH is built.
+ *
+ * Layout of collapsedBVH:
+ * Internal node (64 bytes)
+ *  1. Vec4: L.bbmin.x, L.bbmin.y, L.bbmin.z, cL
+ *  2. Vec4: L.bbmax.x, L.bbmax.y, L.bbmax.z, primCountL
+ *  3. Vec4: R.bbmin.x, R.bbmin.y, R.bbmin.z, cR
+ *  4. Vec4: R.bbmax.x, R.bbmax.y, R.bbmax.z, primCountR
+ * If cX > numInternalNodes it points to a 'leaf', otherwise index of internal node
+ *  'leaf' means that cX-numInternalNodes is the index in the primIds array with
+ *  primCountX consecutive elements. (given by the last two values
+ *  in the internal node.
+ */
 class LBVHBuilder {
 public:
 	template < Device dev >
-	void build(ObjectDescriptor<dev>& obj, const ei::Box& aabb);
+	void build(ObjectDescriptor<dev>& obj, const ei::Box& sceneBB);
 
 	template < Device dev >
 	void build(const SceneDescriptor<dev>& scene);
@@ -34,8 +51,8 @@ public:
 		desc.type = AccelType::LBVH;
 		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
 		lbvhDesc.bvh = as<ei::Vec4>( m_bvhNodes.acquire_const<dev>() );
-		lbvhDesc.primIds = as<i32>(m_primIds.acquire_const<dev>() );
-		lbvhDesc.bvhSize = int(m_bvhNodes.size() / sizeof(ei::Vec4));
+		lbvhDesc.primIds = as<i32>( m_primIds.acquire_const<dev>() );
+		lbvhDesc.numInternalNodes = int(m_bvhNodes.size() / (4 * sizeof(ei::Vec4)));
 		return desc;
 	}
 
@@ -65,83 +82,13 @@ private:
 	GenericResource m_primIds;
 	GenericResource m_bvhNodes;
 
-	/* Build 32-bits collapsed LBVH for the scene.
-	* At first, a normal LBVH is build, then the lower nodes are collapsed
-	* based on SAH values. 
-	* It ensures that there is at least one internal node after collasing if
-	* there are at least two instances.
-	* If there is only one instance, no BVH is built.
-	* Each instance is coded with 32 bits.
-	*/
-	template < Device dev >
-	void build_lbvh(const SceneDescriptor<dev>& scene,
-					ei::Vec2 traverseCosts);
-
-	/* Build 64-bits collapsed LBVH for one object.
-	* At first, a normal LBVH is build, then the lower nodes are collapsed
-	* based on SAH values.
-	* It ensures that there is at least one internal node after collasing if
-	* there are at least two primitives.
-	* If there is only one primitive, no BVH is built.
-	* Each primitive is coded with 64 bits.
-	*/
-	template < Device dev >
-	void build_lbvh(const ObjectDescriptor<dev>& obj,
+	// The internal build kernel for both kinds of hierarchies
+	template < typename DescType >
+	void build_lbvh(const DescType& desc,
 					const ei::Box& sceneBB,
-					const ei::Vec4& traverseCosts);
+					const i32 numPrimitives);
 };
 
 template DeviceManagerConcept<LBVHBuilder>;
 
-
-/**
- * LBVH class.
- * Linear Bounding Volume Hiearchie.
- */
-/*class LBVH:
-	public IAccelerationStructure {
-public:
-	LBVH();
-	~LBVH();
-
-	// Checks whether the structure is currently available on the given system.
-	bool is_resident(Device res) const final;
-	// TODO: Makes the structure's data available on the desired system.
-	// TODO: hybrid Device allowed?
-	void make_resident(Device res) final;
-	// Removes the structure from the given system, if present.
-	void unload_resident(Device res) final;
-	// TODO: Builds or rebuilds the structure.
-	void build(const std::vector<InstanceHandle>&) final;
-	// TODO: should this be put into a different class?
-	void build(ObjectData data) final;
-	// TODO: Checks whether the data on a given system has been modified and is out of sync.
-	virtual bool is_dirty(Device res) const final;
-private:
-
-	// Indicator for the location of the structure.
-	Device m_device;
-
-	// Layout of collapsedBVH:
-	// - Notation: c0: left child; c1: right child.
-	// Internal node (64 bytes):
-	// 1. ei::Vec4: c0.lo.x, c0.hi.x, c0.lo.y, c0.hi.y
-	// 2. ei::Vec4: c1.lo.x, c1.hi.x, c1.lo.y, c1.hi.y
-	// 3. ei::Vec4: c0.lo.z, c0.hi.z, c1.lo.z, c1.hi.z
-	// 4. ei::Vec4: c0, c1
-	// If cx < 0, then it points to a leaf.
-	// - Leaf with more than 1 primitives (16 bytes):
-	// 1. 32 bits: 2bits + 10bits (numTriangles) + 10bits (numQuads) + 10bits (numSpheres).
-	// 2. 32 bits: offset for triangles.
-	// 3. 32 bits: offset for quads.
-	// 4. 32 bits: offset for spheres.
-	// - Leaf with only one primitive will not be stored. cx takes primId as its value.
-	AccelStructInfo::Size m_sizes{};
-	AccelStructInfo::InputArrays m_inputCUDA{};
-	AccelStructInfo::InputArrays m_inputCPU{};
-	AccelStructInfo::OutputArrays m_outputCUDA{};
-	AccelStructInfo::OutputArrays m_outputCPU{};
-};*/
-
-}}}
-
+}}} // namespace mufflon::scene::accel_struct

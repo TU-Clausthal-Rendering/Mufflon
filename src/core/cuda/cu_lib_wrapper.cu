@@ -1,50 +1,31 @@
-#include "cu_lib_wrapper.h"
-#include "util/assert.hpp"
+#include "cu_lib_wrapper.hpp"
 #include "core/cuda/error.hpp"
 
-#include <cub\cub.cuh>
-//#include "Utilities\cudaHeaders.h"
-
+#include <cub/cub.cuh>
 #include <iostream>
 #include <fstream>
 #include <string>
 
-namespace mufflon {namespace CuLib {
+namespace mufflon { namespace CuLib {
 
 
 // In and out buffers may be swaped.
 // Original data is not kept.
-template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements, 
-	KeyT** keysIn, KeyT** keysOut,
-	ValueT** valuesIn, ValueT** valuesOut)
-{
-	KeyT* tmpKeysOut;
-	ValueT *tmpValuesOut;
-	if (keysIn == keysOut) {
-		cuda::check_error(cudaMalloc((void **)&tmpKeysOut, numElements * sizeof(KeyT)));
-	}
-	else {
-		tmpKeysOut = *keysOut;
-	}
-
-	if (valuesIn == valuesOut) {
-		cudaMalloc((void **)&tmpValuesOut, numElements * sizeof(ValueT));
-	}
-	else {
-		tmpValuesOut = *valuesOut;
-	}
-
-	cub::DoubleBuffer<KeyT> keysBuffer(*keysIn, tmpKeysOut);
-	cub::DoubleBuffer<ValueT> valuesBuffer(*valuesIn, tmpValuesOut);
+template < typename KeyT, typename ValueT >
+float DeviceSort(u32 numElements, 
+				 const KeyT* keysIn, KeyT* keysOut,
+				 const ValueT* valuesIn, ValueT* valuesOut) {
+	mAssert(keysIn != keysOut);
+	mAssert(valuesIn != valuesOut);
 
 	// Check how much temporary memory will be required.
-	void* tempStorage = nullptr;
 	size_t storageSize = 0;
-	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
-		numElements);
+	cub::DeviceRadixSort::SortPairs(nullptr, storageSize,
+		keysIn, keysOut, valuesIn, valuesOut, numElements);
 	cuda::check_error(cudaGetLastError());
 
 	// Allocate temporary memory.
+	void* tempStorage = nullptr;
 	cuda::check_error(cudaMalloc(&tempStorage, storageSize));
 
 	float elapsedTime = 0.0f;
@@ -56,8 +37,8 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 #endif
 
 	// Sort
-	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
-		numElements);
+	cub::DeviceRadixSort::SortPairs(nullptr, storageSize,
+		keysIn, keysOut, valuesIn, valuesOut, numElements);
 	cuda::check_error(cudaGetLastError());
 
 #ifdef MEASURE_EXECUTION_TIMES
@@ -69,30 +50,13 @@ template <typename KeyT, typename ValueT> float DeviceSort(u32 numElements,
 	// Free temporary memory.
 	cuda::check_error(cudaFree(tempStorage));
 
-	// Update in buffers.
-	KeyT* current = keysBuffer.d_buffers[1 - keysBuffer.selector];
-	if (keysIn != keysOut) {
-		*keysIn = current;
-	}
-	else {
-		cuda::check_error(cudaFree(current));
-	}
-	ValueT* current2 = valuesBuffer.d_buffers[1 - valuesBuffer.selector];
-	if (valuesIn != valuesOut) {
-		*valuesIn = current2;
-	}
-	else {
-		cuda::check_error(cudaFree(current2));
-	}
-
-	// Update out buffers.
-	current = keysBuffer.Current();
-	*keysOut = current;
-	current2 = valuesBuffer.Current();
-	*valuesOut = current2;
-
 	return elapsedTime;
 }
+
+template float DeviceSort<u32, i32>(u32, const u32* keysIn, u32* keysOut,
+									const i32* valuesIn, i32* valuesOut);
+template float DeviceSort<u64, i32>(u32, const u64* keysIn, u64* keysOut,
+									const i32* valuesIn, i32* valuesOut);
 
 #if 0
 // In and out buffers may be swaped.
@@ -178,7 +142,7 @@ template <typename T> float DeviceSort(u32 numElements, T** keysIn, T** keysOut,
 
 // In and out buffers may be swaped.
 // Original data is not kept.
-template <typename T> float DeviceSortDescending(u32 numElements, T** keysIn, T** keysOut,
+/*template <typename T> float DeviceSortDescending(u32 numElements, T** keysIn, T** keysOut,
 	u32** valuesIn, u32** valuesOut)
 {
 	T* tmpKeysOut;
@@ -365,7 +329,7 @@ float DeviceSum(u32 numElements, float* elements)
 int DeviceMax(u32 numElements, int* elements)
 {
 	return DeviceMax<int>(numElements, elements);
-}
+}*/
 
 // ref. https://nvlabs.github.io/cub/structcub_1_1_device_scan.html#a83236fc272c0b573a2bb2c5b47e0867d
 template <typename T> float DeviceExclusiveSum(int numItems, const T* valuesIn, T* valuesOut)

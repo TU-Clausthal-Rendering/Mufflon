@@ -146,14 +146,14 @@ private:
 	accel_struct::LBVHBuilder m_accelStruct;
 
 	// Resources for descriptors
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ObjectDescriptor<Device::CPU>>,
-		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>>> m_objDevDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4>,
-		unique_device_ptr<Device::CUDA, ei::Mat3x4>> m_instTransformsDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, u32>,
-		unique_device_ptr<Device::CUDA, u32>> m_instObjIndicesDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box>,
-		unique_device_ptr<Device::CUDA, ei::Box>> m_objAabbsDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ObjectDescriptor<Device::CPU>[]>,
+		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>[]>> m_objDevDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
+		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_instTransformsDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, u32[]>,
+		unique_device_ptr<Device::CUDA, u32[]>> m_instObjIndicesDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,
+		unique_device_ptr<Device::CUDA, ei::Box[]>> m_objAabbsDesc;
 
 	ei::Box m_boundingBox;
 

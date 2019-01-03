@@ -396,9 +396,6 @@
     <ClInclude Include="..\..\src\core\math\rng.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.h">
-      <Filter>Source Files\core\cuda</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
@@ -743,6 +740,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\blend.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.hpp">
+      <Filter>Source Files\core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\cuda\cuda_utils.hpp">
+      <Filter>Source Files\core\cuda</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

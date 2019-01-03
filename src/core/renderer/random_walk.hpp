@@ -71,9 +71,9 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// TODO: optional energy clamping
 
 	// Go to the next intersection
-	scene::accel_struct::RayIntersectionResult nextHit;
 	ei::Ray ray {sample.origin, sample.excident};
-	scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1, -1 }, scene::MAX_SCENE_SIZE, nextHit);
+	scene::accel_struct::RayIntersectionResult nextHit =
+		scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1, -1 }, scene::MAX_SCENE_SIZE);
 
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[sample.medium];

@@ -60,6 +60,7 @@ struct SpheresDescriptor {
 
 template < Device dev >
 struct ObjectDescriptor {
+	static constexpr Device DEVICE = dev;
 	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
 	i32 numPrimitives;
@@ -80,6 +81,7 @@ struct CameraDescriptor {
 // Light, camera etc.
 template < Device dev >
 struct SceneDescriptor {
+	static constexpr Device DEVICE = dev;
 	CameraDescriptor camera;
 	u32 numObjects;
 	i32 numInstances;
