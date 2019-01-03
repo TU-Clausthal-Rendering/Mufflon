@@ -767,6 +767,9 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 				boundingBoxes.get(), parents.get(), collapseOffsets.get(),
 				idx, numInternalNodes, numNodesInCollapsedBVH, collapsedBVH);
 	}
+
+//	for(int i = 0; i < numNodesInCollapsedBVH; ++i) {
+	//}
 }
 
 template < Device dev >

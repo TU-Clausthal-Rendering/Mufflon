@@ -235,14 +235,14 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 		}
 
 		if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-			const i32 primId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
+			const i32 primId = nodeAddr - bvh.numInternalNodes;
 
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
 				float hitT = tmax;
 				ei::Vec3 hitBarycentric;
 				i32 hitPrimitiveId;
-				if(intersects_primitve(obj, ray, primId, startPrimId, hitPrimitiveId, hitT, hitBarycentric))
+				if(intersects_primitve(obj, ray, bvh.primIds[primId + i], startPrimId, hitPrimitiveId, hitT, hitBarycentric))
 					return true;
 			}
 
@@ -338,11 +338,11 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 		}
 
 		if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-			const i32 primId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
+			const i32 primId = nodeAddr - bvh.numInternalNodes;
 
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
-				if(intersects_primitve(obj, ray, primId, startPrimId, hitPrimId, hitT, hitBarycentric))
+				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], startPrimId, hitPrimId, hitT, hitBarycentric))
 					hasHit = true;
 			}
 
@@ -481,13 +481,13 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 			}
 			
 			if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-				const i32 instanceId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
+				const i32 instanceId = nodeAddr - bvh.numInternalNodes;
 
 				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 				for(i32 i = 0; i < primCount; i++) {
 					first_intersection_scene_obj_lbvh(scene, ray, startInsPrimId,
-						instanceId, stackPtr+1, hitT, hitInstanceId, hitPrimId,
-						hitBarycentric);
+						bvh.primIds[ instanceId + i], stackPtr+1,
+						hitT, hitInstanceId, hitPrimId, hitBarycentric);
 				}
 
 				// Pop next node.
@@ -700,12 +700,12 @@ bool any_intersection_scene_lbvh_imp(
 			}
 
 			if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-				const i32 instanceId = bvh.primIds[ nodeAddr - bvh.numInternalNodes ];
+				const i32 instanceId = nodeAddr - bvh.numInternalNodes;
 
 				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 				for(i32 i = 0; i < primCount; i++) {
 					if(any_intersection_scene_obj_lbvh(scene, ray, startInsPrimId,
-						instanceId, tmax, stackPtr+1))
+						bvh.primIds[ instanceId + i ], tmax, stackPtr+1))
 						return true;
 				}
 
