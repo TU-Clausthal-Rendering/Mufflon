@@ -31,7 +31,10 @@ CUDA_FUNCTION u64 clz(u64 v) {
 	return __clzll(v);
 #else
 #ifdef _MSC_VER
-	return __lzcnt64(v);
+	// return __lzcnt64(v); //This instruction is carbage: on some machines it is a different opcode -> wrong values
+	unsigned long out;
+	_BitScanReverse64(&out, v);
+	return (v == 0) ? 64 : 63 - out;
 #else
 	return (v == 0) ? 64 : 63 - (u64)log2f((float)v);
 #endif // _MSC_VER
