@@ -117,5 +117,40 @@ namespace gui.Properties {
                 this["LoaderProfileLevel"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("#scene-#scenario-#renderer-#iteration")]
+        public string ScreenshotNamePattern {
+            get {
+                return ((string)(this["ScreenshotNamePattern"]));
+            }
+            set {
+                this["ScreenshotNamePattern"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ScreenshotFolder {
+            get {
+                return ((string)(this["ScreenshotFolder"]));
+            }
+            set {
+                this["ScreenshotFolder"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        public global::System.Collections.Specialized.StringCollection ScreenShotNamePatternHistory {
+            get {
+                return ((global::System.Collections.Specialized.StringCollection)(this["ScreenShotNamePatternHistory"]));
+            }
+            set {
+                this["ScreenShotNamePatternHistory"] = value;
+            }
+        }
     }
 }

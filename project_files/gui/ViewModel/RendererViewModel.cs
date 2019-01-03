@@ -32,9 +32,20 @@ namespace gui.ViewModel
         // Describes an item in the renderer selection combobox
         public class RendererItem
         {
+            private Core.RendererType m_type;
+            private string m_name = RendererModel.getRendererName(0);
             public int Id { get; set; }
-            public Core.RendererType Type { get; set; }
-            public string Name { get; set; }
+            public Core.RendererType Type
+            {
+                get => m_type;
+                set
+                {
+                    if (m_type == value) return;
+                    m_type = value;
+                    m_name = RendererModel.getRendererName(m_type);
+                }
+            }
+            public string Name { get => m_name; }
         }
 
 
@@ -84,11 +95,11 @@ namespace gui.ViewModel
             // Enable the renderers (TODO: automatically get them from somewhere?)
             Renderers = new ObservableCollection<RendererItem>()
             {
-                new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT, Name = "Pathtracer (CPU)" },
+                new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT },
             };
             if(Core.mufflon_is_cuda_available())
             {
-                Renderers.Add(new RendererItem { Id = 1, Type = Core.RendererType.GPU_PT, Name = "Pathtracer (GPU)" });
+                Renderers.Add(new RendererItem { Id = 1, Type = Core.RendererType.GPU_PT });
             }
 
             // Register the handlers

@@ -467,6 +467,7 @@ namespace gui.ViewModel
                 // The dialog will be closed when all scenario work is done (at the end of loadScenarioViews)
                 m_scenarioLoadDialog = new ScenarioLoadStatus(args.AddedItems[0] as string);
                 loadScenarioAsync(scenario);
+                m_models.Scene.CurrentScenario = args.AddedItems[0] as string;
             }
         }
 

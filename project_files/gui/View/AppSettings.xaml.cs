@@ -1,27 +1,30 @@
-﻿using gui.Dll;
+﻿using gui.Annotations;
+using gui.Dll;
 using gui.Properties;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using System.Windows.Forms;
 
 namespace gui.View
 {
     /// <summary>
     /// Interaction logic for Settings.xaml
     /// </summary>
-    public partial class AppSettings : Window
+    public partial class AppSettings : Window, INotifyPropertyChanged
     {
+        private static readonly int MAX_SCREENSHOT_PATTERN_HISTORY = 10;
+        public static readonly string ScreenshotNamePatternTooltip = "Specifies the pattern by which screenshots taken will be named\n" +
+            "Valid tags are:\n" +
+            "\t#scene - the name of the scene\n" +
+            "\t#renderer - the name of the active renderer" +
+            "\t#scenario - the name of the active scenario" +
+            "\t#iteration - the iteration at which the screenshot was taken";
+
         public class Severity
         {
             public Core.Severity Level { get; set; }
@@ -56,13 +59,27 @@ namespace gui.View
             new ProfilingLevel(){ Level = Core.ProfilingLevel.OFF, Name = "Off" }
         };
 
+        private string m_screenshotFolder;
         public Severity LogLevel { get; set; }
         public ProfilingLevel CoreProfilerLevel { get; set; }
         public ProfilingLevel LoaderProfilerLevel { get; set; }
+        // TODO: pattern file type checking?
+        public string ScreenshotNamePattern { get; set; } = Settings.Default.ScreenshotNamePattern;
+        public string ScreenshotFolder { get => m_screenshotFolder; }
+        public StringCollection ScreenshotNamePatternHistory { get => Settings.Default.ScreenShotNamePatternHistory; }
 
         public AppSettings()
         {
             InitializeComponent();
+            if (Settings.Default.ScreenshotFolder == null || Settings.Default.ScreenshotFolder.Length == 0)
+                Settings.Default.ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            m_screenshotFolder = Settings.Default.ScreenshotFolder;
+            if (Settings.Default.ScreenShotNamePatternHistory == null)
+                Settings.Default.ScreenShotNamePatternHistory = new StringCollection();
+            if (Settings.Default.ScreenShotNamePatternHistory.Count == 0)
+                Settings.Default.ScreenShotNamePatternHistory.Add(ScreenshotNamePattern);
+            OnPropertyChanged(nameof(ScreenshotFolder));
+            OnPropertyChanged(nameof(ScreenshotNamePatternHistory));
             LogLevel = LogLevels[Settings.Default.LogLevel];
             CoreProfilerLevel = CoreProfilerLevels[Settings.Default.CoreProfileLevel];
             LoaderProfilerLevel = LoaderProfilerLevels[Settings.Default.LoaderProfileLevel];
@@ -76,6 +93,13 @@ namespace gui.View
             Settings.Default.LogLevel = (int)LogLevel.Level;
             Settings.Default.CoreProfileLevel = (int)CoreProfilerLevel.Level;
             Settings.Default.LoaderProfileLevel = (int)LoaderProfilerLevel.Level;
+            if(Settings.Default.ScreenshotNamePattern != ScreenshotNamePattern)
+            {
+                Settings.Default.ScreenshotNamePattern = ScreenshotNamePattern;
+                Settings.Default.ScreenShotNamePatternHistory.Insert(0, ScreenshotNamePattern);
+                if (Settings.Default.ScreenShotNamePatternHistory.Count > MAX_SCREENSHOT_PATTERN_HISTORY)
+                    Settings.Default.ScreenshotNamePattern.Remove(Settings.Default.ScreenShotNamePatternHistory.Count - 1);
+            }
 
             Logger.LogLevel = LogLevel.Level; // Also sets the level in the DLLs
             if (CoreProfilerLevel.Level == Core.ProfilingLevel.OFF)
@@ -92,6 +116,26 @@ namespace gui.View
         {
             Close();
             // Do not save settings
+        }
+
+        private void ScreenshotFolder_Click(object sender, RoutedEventArgs e)
+        {
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            {
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                {
+                    m_screenshotFolder = dialog.SelectedPath;
+                    OnPropertyChanged(nameof(ScreenshotFolder));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        [NotifyPropertyChangedInvocator]
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

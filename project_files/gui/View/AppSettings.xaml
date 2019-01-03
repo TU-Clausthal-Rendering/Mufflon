@@ -28,6 +28,8 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         
                         <TextBlock Grid.Row="0" Grid.Column="0"
@@ -62,6 +64,36 @@
                                   DisplayMemberPath="Name"
                                   SelectedValuePath="Level"
                                   SelectedItem="{Binding LoaderProfilerLevel}"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0"
+                                   Text="Screenshot name pattern:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"
+                                   ToolTip="{x:Static local:AppSettings.ScreenshotNamePatternTooltip}"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1"
+                                  IsEditable="True"
+                                  ItemsSource="{Binding ScreenshotNamePatternHistory}"
+                                  Text="{Binding ScreenshotNamePattern}">
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0"
+                                   Text="Screenshot folder:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <Grid Grid.Row="4" Grid.Column="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding ScreenshotFolder}"
+                                       TextTrimming="CharacterEllipsis"
+                                       HorizontalAlignment="Stretch"/>
+                            <Button Grid.Column="1"
+                                    Click="ScreenshotFolder_Click"
+                                    HorizontalAlignment="Right">...</Button>
+                        </Grid>
                     </Grid>
                 </StackPanel>
             </TabItem>

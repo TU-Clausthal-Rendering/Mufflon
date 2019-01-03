@@ -47,6 +47,16 @@ namespace gui.Model
             }
         }
 
+        public static string getRendererName(Core.RendererType type)
+        {
+            switch(type)
+            {
+                case Core.RendererType.CPU_PT: return "Pathtracer (CPU)";
+                case Core.RendererType.GPU_PT: return "Pathtracer (GPU)";
+            }
+            return "Unknown";
+        }
+
         public void performedIteration()
         {
             ++m_iteration;

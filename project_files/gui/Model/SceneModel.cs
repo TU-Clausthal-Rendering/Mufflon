@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
@@ -60,6 +61,7 @@ namespace gui.Model
             }
         }
 
+        public string CurrentScenario { get; set; }
         public StringCollection LastScenes => Settings.Default.LastScenes;
         public ObservableCollection<string> Scenarios { get; }
 
@@ -138,7 +140,12 @@ namespace gui.Model
                 Scenarios.Clear();
                 for (uint i = 0u; i < count; ++i)
                     Scenarios.Add(Core.world_get_scenario_name_by_index(i));
+                string currName = Core.world_get_scenario_name(Core.world_get_current_scenario());
+                if (currName == null || currName.Length == 0)
+                    throw new Exception(Core.core_get_dll_error());
                 OnPropertyChanged(nameof(Scenarios));
+                CurrentScenario = currName;
+                OnPropertyChanged(CurrentScenario);
             } else
             {
                 Logger.log("Scene load was cancelled", Core.Severity.INFO);

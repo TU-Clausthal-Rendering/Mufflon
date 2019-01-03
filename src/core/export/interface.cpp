@@ -2478,6 +2478,7 @@ Boolean render_save_screenshot(const char* filename) {
 			dumpPfm(name + "_" + std::to_string(target) + "_var.pfm", data.data());
 		}
 	}
+	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", filename, "'");
 
 	return true;
 	CATCH_ALL(false)

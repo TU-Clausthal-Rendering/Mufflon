@@ -1,16 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using gui.Annotations;
 using gui.Command;
 using gui.Model;
-using gui.Dll;
 
 namespace gui.ViewModel
 {
@@ -23,6 +17,7 @@ namespace gui.ViewModel
             m_models = models;
             PlayPauseCommand = new PlayPauseCommand(models);
             ResetCommand = new ResetCommand(models);
+            SaveScreenShotCommand = new ScreenShotCommand(m_models);
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
         }
 
@@ -47,6 +42,7 @@ namespace gui.ViewModel
 
         public ICommand PlayPauseCommand { get; }
         public ICommand ResetCommand { get; }
+        public ICommand SaveScreenShotCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
