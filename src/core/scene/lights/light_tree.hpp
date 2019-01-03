@@ -132,11 +132,13 @@ public:
 	LightTreeBuilder& operator=(LightTreeBuilder&&) = default;
 
 	// Builds the light tree from lists of positional and directional lights and
-	// optionally an envmap light
+	// resets the envmap light to black
 	void build(std::vector<PositionalLights>&& posLights,
 			   std::vector<DirectionalLight>&& dirLights,
-			   const ei::Box& boundingBox,
-			   TextureHandle envLight = nullptr);
+			   const ei::Box& boundingBox);
+	// Updates (read replaces) the envmap light only
+	void set_envmap(TextureHandle envLight);
+	void set_envmap(ei::Vec3 color);
 
 	// Determines for each point- and spotlight in what medium it is
 	template < Device dev >

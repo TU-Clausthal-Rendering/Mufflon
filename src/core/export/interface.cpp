@@ -1602,7 +1602,7 @@ const char* world_get_env_light_by_index(size_t index, LightHdl* hdl) {
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	SceneHandle hdl = WorldContainer::instance().load_scene(static_cast<ConstScenarioHandle>(scenario));
+	SceneHandle hdl = WorldContainer::instance().load_scene(static_cast<ScenarioHandle>(scenario));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
 		return nullptr;
@@ -1610,6 +1610,21 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->load_scene(hdl, res);
+	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
+	return static_cast<SceneHdl>(hdl);
+	CATCH_ALL(nullptr)
+}
+
+SceneHdl world_reload_current_scenario() {
+	TRY
+	SceneHandle hdl = WorldContainer::instance().reload_scene();
+	if(hdl == nullptr) {
+		logError("[", FUNCTION_NAME, "] Failed to reload scenario");
+		return nullptr;
+	}
+	ei::IVec2 res = WorldContainer::instance().get_current_scenario()->get_resolution();
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	return static_cast<SceneHdl>(hdl);
 	CATCH_ALL(nullptr)
@@ -2122,6 +2137,30 @@ ConstCameraHdl scene_get_camera(SceneHdl scene) {
 	CHECK_NULLPTR(scene, "scene handle", nullptr);
 	return static_cast<ConstCameraHdl>(static_cast<const Scene*>(scene)->get_camera());
 	CATCH_ALL(nullptr)
+}
+
+void scene_mark_lighttree_dirty() {
+	TRY
+	SceneHandle scene = WorldContainer::instance().get_current_scene();
+	if(scene != nullptr)
+		scene->mark_light_tree_dirty();
+	CATCH_ALL(;)
+}
+
+void scene_mark_envmap_dirty() {
+	TRY
+	SceneHandle scene = WorldContainer::instance().get_current_scene();
+	if(scene != nullptr)
+		scene->mark_envmap_dirty();
+	CATCH_ALL(;)
+}
+
+void scene_mark_materials_dirty() {
+	TRY
+	SceneHandle scene = WorldContainer::instance().get_current_scene();
+	if(scene != nullptr)
+		scene->mark_materials_dirty();
+	CATCH_ALL(;)
 }
 
 Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos) {

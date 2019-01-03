@@ -386,40 +386,64 @@ void Polygons::synchronize() {
 		});
 	}
 }
-template < Device dev >
-PolygonsDescriptor<dev> Polygons::get_descriptor(const std::vector<const char*>& vertexAttribs,
-												 const std::vector<const char*>& faceAttribs) {
-	this->synchronize<dev>();
 
-	// Resize the attribute array if necessary
-	resizeAttribBuffer<dev>(vertexAttribs.size(), faceAttribs.size());
-	// Collect the attributes; for that, we iterate the given Attributes and
-	// gather them on CPU side (or rather, their device pointers); then
-	// we copy it to the actual device
-	AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
+template < Device dev >
+PolygonsDescriptor<dev> Polygons::get_descriptor() {
+	this->synchronize<dev>();
+	return PolygonsDescriptor<dev>{
+		static_cast<u32>(this->get_vertex_count()),
+		static_cast<u32>(this->get_triangle_count()),
+		static_cast<u32>(this->get_quad_count()),
+		0u,
+		0u,
+		this->acquire_const<dev, ei::Vec3, false>(this->get_points_hdl()),
+		this->acquire_const<dev, ei::Vec3, false>(this->get_normals_hdl()),
+		this->acquire_const<dev, ei::Vec2, false>(this->get_uvs_hdl()),
+		this->acquire_const<dev, u16, true>(this->get_material_indices_hdl()),
+		this->get_index_buffer<dev>(),
+		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
+		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
+	};
+}
+
+template < Device dev >
+void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
+										   const std::vector<const char*>& vertexAttribs,
+										   const std::vector<const char*>& faceAttribs) {
+	this->synchronize<dev>();
+	// Free the previous attribute array if no attributes are wanted
+	auto& buffer = m_attribBuffer.template get<AttribBuffer<dev>>();
+
+	if(vertexAttribs.size() == 0 && buffer.vertSize != 0) {
+		buffer.vertex = Allocator<dev>::free(buffer.vertex, buffer.vertSize);
+	} else {
+		if(buffer.vertSize == 0)
+			buffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(vertexAttribs.size());
+		else
+			buffer.vertex = Allocator<dev>::realloc(buffer.vertex, buffer.vertSize, vertexAttribs.size());
+	}
+	if(faceAttribs.size() == 0 && buffer.faceSize != 0) {
+		buffer.face = Allocator<dev>::free(buffer.face, buffer.faceSize);
+	} else {
+		if(buffer.faceSize == 0)
+			buffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(faceAttribs.size());
+		else
+			buffer.face = Allocator<dev>::realloc(buffer.face, buffer.faceSize, faceAttribs.size());
+	}
+
 	std::vector<void*> cpuVertexAttribs(vertexAttribs.size());
 	std::vector<void*> cpuFaceAttribs(faceAttribs.size());
 	for(const char* name : vertexAttribs)
 		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
 	for(const char* name : faceAttribs)
 		cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
-	copy<void*>(attribBuffer.vertex, cpuVertexAttribs.data(), vertexAttribs.size());
-	copy<void*>(attribBuffer.face, cpuFaceAttribs.data(), faceAttribs.size());
+	copy<void*>(buffer.vertex, cpuVertexAttribs.data(), vertexAttribs.size());
+	copy<void*>(buffer.face, cpuFaceAttribs.data(), faceAttribs.size());
 
-	return PolygonsDescriptor<dev>{
-		static_cast<u32>(this->get_vertex_count()),
-			static_cast<u32>(this->get_triangle_count()),
-			static_cast<u32>(this->get_quad_count()),
-			static_cast<u32>(vertexAttribs.size()),
-			static_cast<u32>(faceAttribs.size()),
-			this->acquire_const<dev, ei::Vec3, false>(this->get_points_hdl()),
-			this->acquire_const<dev, ei::Vec3, false>(this->get_normals_hdl()),
-			this->acquire_const<dev, ei::Vec2, false>(this->get_uvs_hdl()),
-			this->acquire_const<dev, u16, true>(this->get_material_indices_hdl()),
-			this->get_index_buffer<dev>(),
-			attribBuffer.vertex,
-			attribBuffer.face
-	};
+	descriptor.numVertexAttributes = static_cast<u32>(vertexAttribs.size());
+	descriptor.numFaceAttributes = static_cast<u32>(faceAttribs.size());
+	descriptor.vertexAttributes = buffer.vertex;
+	descriptor.faceAttributes = buffer.face;
 }
 
 // Reserves more space for the index buffer
@@ -492,10 +516,14 @@ template void Polygons::resizeAttribBuffer<Device::CUDA>(std::size_t v, std::siz
 template void Polygons::synchronize<Device::CPU>();
 template void Polygons::synchronize<Device::CUDA>();
 //template void Polygons::synchronize<Device::OPENGL>();
-template PolygonsDescriptor<Device::CPU> Polygons::get_descriptor<Device::CPU>(const std::vector<const char*>& vertexAttribs,
-																			   const std::vector<const char*>& faceAttribs);
-template PolygonsDescriptor<Device::CUDA> Polygons::get_descriptor<Device::CUDA>(const std::vector<const char*>& vertexAttribs,
-																				 const std::vector<const char*>& faceAttribs);
+template PolygonsDescriptor<Device::CPU> Polygons::get_descriptor<Device::CPU>();
+template PolygonsDescriptor<Device::CUDA> Polygons::get_descriptor<Device::CUDA>();
+template void Polygons::update_attribute_descriptor<Device::CPU>(PolygonsDescriptor<Device::CPU>& descriptor,
+																  const std::vector<const char*>& vertexAttribs,
+																  const std::vector<const char*>& faceAttribs);
+template void Polygons::update_attribute_descriptor<Device::CUDA>(PolygonsDescriptor<Device::CUDA>& descriptor,
+																  const std::vector<const char*>& vertexAttribs,
+																  const std::vector<const char*>& faceAttribs);
 /*template PolygonsDescriptor<Device::OPENGL> Polygons::get_descriptor<Device::OPENGL>(const std::vector<const char*>& vertexAttribs,
 																					 const std::vector<const char*>& faceAttribs);*/
 

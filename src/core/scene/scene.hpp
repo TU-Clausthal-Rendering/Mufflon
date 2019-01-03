@@ -39,7 +39,12 @@ public:
 
 	// Add an instance to be rendered
 	void add_instance(InstanceHandle hdl) {
-		m_instances.push_back(hdl);
+		auto iter = m_objects.find(&hdl->get_object());
+		if(iter == m_objects.end())
+			m_objects.emplace(&hdl->get_object(), std::vector<InstanceHandle>{hdl}).first;
+		else
+			iter->second.push_back(hdl);
+		// Check if we already have the object somewhere
 		m_boundingBox = ei::Box(m_boundingBox, hdl->get_bounding_box());
 		clear_accel_structure();
 	}
@@ -49,9 +54,11 @@ public:
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
-		for(InstanceHandle instance : m_instances) {
-			(void)instance;
-			// TODO
+		for(auto& obj : m_objects) {
+			for(InstanceHandle instance : obj.second) {
+				(void)instance;
+				// TODO
+			}
 		}
 		m_lightTree.synchronize<dev>();
 		m_media.synchronize<dev>();
@@ -89,10 +96,7 @@ public:
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights,
-					TextureHandle envLightTexture = nullptr) {
-		m_lightTree.build(std::move(posLights), std::move(dirLights),
-						  m_boundingBox, envLightTexture);
-	}
+					TextureHandle envLightTexture = nullptr);
 
 
 	// Overwrite which camera is used of the scene
@@ -104,8 +108,16 @@ public:
 	ConstCameraHandle get_camera() const noexcept {
 		return m_camera;
 	}
-
-
+	void mark_light_tree_dirty() noexcept {
+		m_lightTreeDirty = true;
+	}
+	void mark_envmap_dirty() noexcept {
+		m_envmapDirty = true;
+	}
+	void mark_materials_dirty() noexcept {
+		m_materialsDirty = true;
+	}
+	
 	/**
 	 * Creates a single structure which grants access to all scene data
 	 * needed on the specified device.
@@ -123,17 +135,18 @@ public:
 	 * );
 	 */
 	template < Device dev >
-	SceneDescriptor<dev> get_descriptor(const std::vector<const char*>& vertexAttribs,
-										const std::vector<const char*>& faceAttribs,
-										const std::vector<const char*>& sphereAttribs,
-										const ei::IVec2& resolution);
+	const SceneDescriptor<dev>& get_descriptor(const std::vector<const char*>& vertexAttribs,
+											   const std::vector<const char*>& faceAttribs,
+											   const std::vector<const char*>& sphereAttribs,
+											   const ei::IVec2& resolution);
 
 	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
 private:
 	// List of instances and thus objects to-be-rendered
-	std::vector<InstanceHandle> m_instances;
+	// We need this to ensure we only create one descriptor per object
+	std::map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
 	GenericResource m_media;		// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 	const std::vector<std::unique_ptr<materials::IMaterial>>& m_materialsRef;	// Refer the world's materials. There is no scenario dependent filtering because of global indexing.
@@ -155,8 +168,20 @@ private:
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,
 		unique_device_ptr<Device::CUDA, ei::Box[]>> m_objAabbsDesc;
 
-	ei::Box m_boundingBox;
+	// Descriptor storage
+	util::TaggedTuple<SceneDescriptor<Device::CPU>, SceneDescriptor<Device::CUDA>> m_descStore;
+	// Remember what attributes are part of the descriptor
+	std::vector<const char*> m_lastVertexAttribs;
+	std::vector<const char*> m_lastFaceAttribs;
+	std::vector<const char*> m_lastSphereAttribs;
 
+	// Dirty flags for scene contents
+	bool m_lightTreeDirty = true;
+	bool m_envmapDirty = true;
+	bool m_materialsDirty = true;
+	bool m_lightTreeDescChanged = true;
+
+	ei::Box m_boundingBox;
 
 	template< Device dev >
 	void load_materials();

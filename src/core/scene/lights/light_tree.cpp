@@ -269,32 +269,15 @@ LightTreeBuilder::~LightTreeBuilder() {
 
 void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
-					  const ei::Box& boundingBox,
-					  TextureHandle envLight) {
+					  const ei::Box& boundingBox) {
 	// Make sure the hashmap memory is allocated
 	m_primToNodePath.resize(int(posLights.size()));
 
 	unload<Device::CPU>();
 	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
 	m_treeCpu->primToNodePath = m_primToNodePath.acquire<Device::CPU>();
-
-	// Construct the environment light
-	if(envLight) {
-		// First create an appropriate summed area table; this depends on if we have a cube or a spherical map
-		if(envLight->get_num_layers() == 6)
-			m_envmapSum = std::make_unique<textures::Texture>(6u * envLight->get_width(), envLight->get_height(), 1u,
-															  envLight->get_format(), textures::SamplingMode::LINEAR,
-															  false);
-		else
-			m_envmapSum = std::make_unique<textures::Texture>(envLight->get_width(), envLight->get_height(), 1u,
-															  envLight->get_format(), textures::SamplingMode::LINEAR,
-															  false);
-		m_treeCpu->background = Background<Device::CPU>::envmap(envLight, m_envmapSum.get());
-		m_textureMap.emplace(envLight->acquire_const<Device::CPU>(), envLight);
-	} else {
-		// TODO: make more generic (different colors, analytic model...)
-		m_treeCpu->background = Background<Device::CPU>::black();
-	}
+	// Default envmap is black
+	m_treeCpu->background = Background<Device::CPU>::black();
 
 	if(posLights.size() == 0u && dirLights.size() == 0u) {
 		// Shortcut if no lights are specified
@@ -375,7 +358,10 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					// Remember texture for synchronization
 					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
 				},
-				[&mem](const auto& desc) { mem += sizeof(desc); }
+				[&mem](const auto& desc) {
+					std::memcpy(mem, &desc, sizeof(desc));
+					mem += sizeof(desc);
+				}
 			}, light.light);
 		}
 	}
@@ -385,6 +371,44 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale);
 	fill_map(posLights, m_treeCpu->primToNodePath);
 	m_dirty.mark_changed(Device::CPU);
+}
+
+void LightTreeBuilder::set_envmap(TextureHandle envLight) {
+	// We cannot check for texture identity here to avoid work - it might be that a texture gets
+	// deleted and another one is created in its place, resulting in the same pointer
+	// TODO: is that actually true?
+
+	this->synchronize<Device::CPU>();
+	// First remove the old mapping from the texture map
+	if(m_treeCpu->background.get_type() == BackgroundType::ENVMAP) {
+		auto iter = m_textureMap.find(m_treeCpu->background.get_envmap_light().texHandle);
+		if(iter != m_textureMap.end())
+			m_textureMap.erase(iter);
+	}
+
+	// Then create an appropriate summed area table; this depends on if we have a cube or a spherical map
+	if(envLight->get_num_layers() == 6)
+		m_envmapSum = std::make_unique<textures::Texture>(6u * envLight->get_width(), envLight->get_height(), 1u,
+														  envLight->get_format(), textures::SamplingMode::LINEAR,
+														  false);
+	else
+		m_envmapSum = std::make_unique<textures::Texture>(envLight->get_width(), envLight->get_height(), 1u,
+														  envLight->get_format(), textures::SamplingMode::LINEAR,
+														  false);
+	m_treeCpu->background = Background<Device::CPU>::envmap(envLight, m_envmapSum.get());
+	m_textureMap.emplace(envLight->acquire_const<Device::CPU>(), envLight);
+}
+
+void LightTreeBuilder::set_envmap(ei::Vec3 color) {
+	this->synchronize<Device::CPU>();
+	// First remove the old mapping from the texture map
+	if(m_treeCpu->background.get_type() == BackgroundType::ENVMAP) {
+		auto iter = m_textureMap.find(m_treeCpu->background.get_envmap_light().texHandle);
+		if(iter != m_textureMap.end())
+			m_textureMap.erase(iter);
+	}
+
+	m_treeCpu->background = Background<Device::CPU>::colored(color);
 }
 
 void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {

@@ -100,6 +100,9 @@ public:
 	bool is_spot_light(const std::string_view& name) const;
 	bool is_dir_light(const std::string_view& name) const;
 	bool is_env_light(const std::string_view& name) const;
+	// Functions for dirtying cameras and lights
+	void mark_camera_dirty(ConstCameraHandle cam);
+	void mark_envmap_light_dirty(TextureHandle* hdl);
 
 	// Add new textures to the scene
 	bool has_texture(std::string_view name) const;
@@ -122,7 +125,9 @@ public:
 	 * This destroys the currently loaded scene and overwrites it with a new one.
 	 * Returns nullptr if something goes wrong.
 	 */
-	SceneHandle load_scene(ConstScenarioHandle hdl);
+	SceneHandle load_scene(ScenarioHandle hdl);
+	// Reloads the scene from the current scenario
+	SceneHandle reload_scene();
 
 	// Returns the currently loaded scene, if present
 	SceneHandle get_current_scene() {
@@ -138,7 +143,8 @@ private:
 	WorldContainer& operator=(WorldContainer&&) = default;
 	~WorldContainer() = default;
 
-	SceneHandle load_scene(const Scenario& scenario);
+	SceneHandle load_scene(Scenario& scenario);
+	void load_scene_lights();
 
 	// Global container object for everything
 	static WorldContainer s_container;
@@ -156,11 +162,13 @@ private:
 	// All available cameras mapped to their name.
 	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
 	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
+	std::vector<u8> m_camerasDirty;
 	// All light sources of the scene
 	std::map<std::string, lights::PointLight, std::less<>> m_pointLights;
 	std::map<std::string, lights::SpotLight, std::less<>> m_spotLights;
 	std::map<std::string, lights::DirectionalLight, std::less<>> m_dirLights;
 	std::map<std::string, TextureHandle, std::less<>> m_envLights;
+	std::vector<u8> m_envLightsDirty;
 	std::vector<PointLightHandle> m_pointLightHandles;
 	std::vector<SpotLightHandle> m_spotLightHandles;
 	std::vector<DirLightHandle> m_dirLightHandles;
@@ -171,7 +179,7 @@ private:
 	// TODO: cameras, lights, materials
 
 	// Current scene
-	ConstScenarioHandle m_scenario = nullptr;
+	ScenarioHandle m_scenario = nullptr;
 	std::unique_ptr<Scene> m_scene = nullptr;
 };
 

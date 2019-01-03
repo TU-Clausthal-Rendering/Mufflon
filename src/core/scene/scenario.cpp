@@ -71,14 +71,20 @@ void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
 }
 
 void Scenario::remove_light(std::size_t index) {
-	if(index < m_lightNames.size())
+	if(index < m_lightNames.size()) {
 		m_lightNames.erase(m_lightNames.begin() + index);
+		m_lightsChanged = true;
+	}
 }
 
 void Scenario::remove_light(const std::string_view& name) {
 	m_lightNames.erase(std::remove_if(m_lightNames.begin(), m_lightNames.end(),
-		[&name](const std::string_view& n) {
-			return n == name;
+		[&name, this](const std::string_view& n) {
+			if(n == name) {
+				m_lightsChanged = true;
+				return true;
+			}
+			return false;
 		}), m_lightNames.end());
 }
 

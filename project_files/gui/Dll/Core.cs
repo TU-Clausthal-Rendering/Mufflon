@@ -194,6 +194,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_load_scenario(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_reload_current_scenario();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_current_scene();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_current_scenario();
@@ -341,6 +343,10 @@ namespace gui.Dll
         internal static extern bool world_set_focus_camera_sensor_height(IntPtr cam, float sensorHeight);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_focus_camera_aperture(IntPtr cam, float aperture);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void scene_mark_lighttree_dirty();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void scene_mark_envmap_dirty();
 
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

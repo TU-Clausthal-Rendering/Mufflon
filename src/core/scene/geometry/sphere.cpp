@@ -103,8 +103,23 @@ std::size_t Spheres::add_bulk(AttributePool::AttributeHandle hdl, const SphereHa
 	return m_attributes.restore(hdl, attrStream, startSphere, count);
 }
 
+
+// Gets the descriptor with only default attributes (position etc)
 template < Device dev >
-SpheresDescriptor<dev> Spheres::get_descriptor(const std::vector<const char*>& attribs) {
+SpheresDescriptor<dev> Spheres::get_descriptor() {
+	this->synchronize<dev>();
+	return SpheresDescriptor<dev>{
+		static_cast<u32>(this->get_sphere_count()),
+		0u,
+		this->acquire_const<dev, ei::Sphere>(this->get_spheres_hdl()),
+		this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
+		ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
+	};
+}
+// Updates the descriptor with the given set of attributes
+template < Device dev >
+void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
+										  const std::vector<const char*>& attribs) {
 	this->synchronize<dev>();
 	// Collect the attributes; for that, we iterate the given Attributes and
 	// gather them on CPU side (or rather, their device pointers); then
@@ -125,19 +140,19 @@ SpheresDescriptor<dev> Spheres::get_descriptor(const std::vector<const char*>& a
 		for(const char* name : attribs)
 			cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
 		copy(attribBuffer.buffer, cpuAttribs.data(), attribs.size());
+	} else if(attribBuffer.size != 0) {
+		attribBuffer.buffer = Allocator<dev>::free(attribBuffer.buffer, attribBuffer.size);
 	}
-
-	return SpheresDescriptor<dev>{
-		static_cast<u32>(this->get_sphere_count()),
-			static_cast<u32>(attribs.size()),
-			this->acquire_const<dev, ei::Sphere>(this->get_spheres_hdl()),
-			this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
-			attribBuffer.buffer
-	};
+	descriptor.numAttributes = static_cast<u32>(attribs.size());
+	descriptor.attributes = attribBuffer.buffer;
 }
 
-template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>(const std::vector<const char*>&);
-template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>(const std::vector<const char*>&);
+template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
+template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
+template void Spheres::update_attribute_descriptor<Device::CPU>(SpheresDescriptor<Device::CPU>& descriptor,
+																 const std::vector<const char*>&);
+template void Spheres::update_attribute_descriptor<Device::CUDA>(SpheresDescriptor<Device::CUDA>& descriptor,
+																 const std::vector<const char*>&);
 //template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>(const std::vector<const char*>&);
 
 } // namespace mufflon::scene::geometry

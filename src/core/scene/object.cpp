@@ -29,12 +29,10 @@ void Object::clear_accel_structure() {
 }
 
 template < Device dev >
-ObjectDescriptor<dev> Object::get_descriptor(const std::vector<const char*>& vertexAttribs,
-											 const std::vector<const char*>& faceAttribs,
-											 const std::vector<const char*>& sphereAttribs) {
+ObjectDescriptor<dev> Object::get_descriptor() {
 	ObjectDescriptor<dev> desc{
-		m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(vertexAttribs, faceAttribs),
-		m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(sphereAttribs),
+		m_geometryData.get<geometry::Polygons>().get_descriptor<dev>(),
+		m_geometryData.get<geometry::Spheres>().get_descriptor<dev>(),
 		0, // Below (very lengthy otherwise)
 		AccelDescriptor{}
 	};
@@ -42,20 +40,31 @@ ObjectDescriptor<dev> Object::get_descriptor(const std::vector<const char*>& ver
 	// (Re)build acceleration structure if necessary
 	if(m_accelStruct.needs_rebuild<dev>()) {
 		auto timer = Profiler::instance().start<CpuProfileState>("[Object::get_descriptor] build object BVH.");
-		auto scope = Profiler::instance().start<CpuProfileState>("build_obj_bvh");
 		m_accelStruct.build(desc, get_bounding_box());
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();
-
 	return desc;
 }
 
-template ObjectDescriptor<Device::CPU> Object::get_descriptor<Device::CPU>(const std::vector<const char*>&,
-																		   const std::vector<const char*>&,
-																		   const std::vector<const char*>&);
-template ObjectDescriptor<Device::CUDA> Object::get_descriptor<Device::CUDA>(const std::vector<const char*>&,
-																			 const std::vector<const char*>&,
-																			 const std::vector<const char*>&);
+template < Device dev >
+void Object::update_attribute_descriptor(ObjectDescriptor<dev>& descriptor,
+										 const std::vector<const char*>& vertexAttribs,
+										 const std::vector<const char*>& faceAttribs,
+										 const std::vector<const char*>& sphereAttribs) {
+	m_geometryData.get<geometry::Polygons>().update_attribute_descriptor<dev>(descriptor.polygon, vertexAttribs, faceAttribs);
+	m_geometryData.get<geometry::Spheres>().update_attribute_descriptor<dev>(descriptor.spheres, sphereAttribs);
+}
+
+template ObjectDescriptor<Device::CPU> Object::get_descriptor<Device::CPU>();
+template ObjectDescriptor<Device::CUDA> Object::get_descriptor<Device::CUDA>();
+template void Object::update_attribute_descriptor<Device::CPU>(ObjectDescriptor<Device::CPU>&,
+												  const std::vector<const char*>&,
+												  const std::vector<const char*>&,
+												  const std::vector<const char*>&);
+template void Object::update_attribute_descriptor<Device::CUDA>(ObjectDescriptor<Device::CUDA>&,
+												  const std::vector<const char*>&,
+												  const std::vector<const char*>&,
+												  const std::vector<const char*>&);
 /*template ObjectDescriptor<Device::OPENGL> Object::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
 																				 const std::vector<const char*>&,
 																				 const std::vector<const char*>&);*/

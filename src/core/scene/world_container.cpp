@@ -269,7 +269,6 @@ void WorldContainer::remove_light(TextureHandle* hdl) {
 	}
 }
 
-
 bool WorldContainer::is_point_light(const std::string_view& name) const {
 	return m_pointLights.find(name) != m_pointLights.cend();
 }
@@ -284,6 +283,24 @@ bool WorldContainer::is_dir_light(const std::string_view& name) const {
 
 bool WorldContainer::is_env_light(const std::string_view& name) const {
 	return m_envLights.find(name) != m_envLights.cend();
+}
+
+void WorldContainer::mark_camera_dirty(ConstCameraHandle hdl) {
+	// TODO: put the mark-dirty on scenario/scene level (one for add/remove, one for touched)?
+	// We need one for the env-map for sure, because that operation takes long
+	if(hdl == nullptr)
+		return;
+	auto iter = m_cameras.begin();
+	for(std::size_t i = 0u; i < m_cameras.size(); ++i) {
+		if(hdl == iter->second.get()) {
+			m_camerasDirty[i] = true;
+			break;
+		}
+	}
+}
+
+void WorldContainer::mark_envmap_light_dirty(TextureHandle* hdl) {
+
 }
 
 std::optional<std::string_view> WorldContainer::get_light_name_ref(const std::string_view& name) const noexcept {
@@ -333,7 +350,7 @@ WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path
 							  format, mode, sRgb, move(data) }).first;
 }
 
-SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
+SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	std::vector<lights::PositionalLights> posLights;
 	std::vector<lights::DirectionalLight> dirLights;
 	std::optional<EnvLightHandle> envLightTex;
@@ -344,8 +361,62 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	m_scene = std::make_unique<Scene>(scenario.get_camera(), m_materials);
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
-		if(!scenario.is_masked(&instance.get_object())) {
+		if(!scenario.is_masked(&instance.get_object()))
 			m_scene->add_instance(&instance);
+	}
+
+	// Check if the resulting scene has issues with size
+	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
+	   || ei::len(m_scene->get_bounding_box().max) >= SUGGESTED_MAX_SCENE_SIZE)
+		logWarning("[WorldContainer::load_scene] Scene size is larger than recommended "
+				   "(Furthest point of the bounding box should not be further than "
+				   "2^20m away)");
+
+	// Load the lights
+	this->load_scene_lights();
+
+	// Make media available / resident
+	m_scene->load_media(m_media);
+
+	m_scenario->camera_dirty_reset();
+
+	// Assign the newly created scene and destroy the old one?
+	return m_scene.get();
+}
+
+SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
+	mAssert(hdl != nullptr);
+	return load_scene(*hdl);
+}
+
+SceneHandle WorldContainer::reload_scene() {
+	// There is always a scenario set
+	mAssert(m_scenario != nullptr);
+
+	if(m_scene == nullptr)
+		return load_scene(*m_scenario);
+
+	if(m_scenario->lights_dirty_reset()) {
+		this->load_scene_lights();
+	}
+
+	// TODO: dirty flag for media?
+	// TODO: dirty flag for materials?
+
+	if(m_scenario->camera_dirty_reset())
+		m_scene->set_camera(m_scenario->get_camera());
+	return m_scene.get();
+}
+
+void WorldContainer::load_scene_lights() {
+	std::vector<lights::PositionalLights> posLights;
+	std::vector<lights::DirectionalLight> dirLights;
+	std::optional<EnvLightHandle> envLightTex;
+	posLights.reserve(m_pointLights.size() + m_spotLights.size());
+	dirLights.reserve(m_dirLights.size());
+	u32 instIdx = 0;
+	for(auto& instance : m_instances) {
+		if(!m_scenario->is_masked(&instance.get_object())) {
 			// Find all area lights, if the object contains some
 			if(instance.get_object().is_emissive()) {
 				u32 primIdx = 0;
@@ -367,7 +438,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
 							}
-							posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
+							posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
 						} else {
 							lights::AreaLightQuadDesc al;
 							al.radianceTex = emission.texture;
@@ -378,7 +449,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
 							}
-							posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
+							posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
 						}
 					}
 					++primIdx;
@@ -396,7 +467,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 							spheresData[i].radius,
 							emission.texture, ei::packRGB9E5(emission.scale)
 						};
-						posLights.push_back({al, u64(instIdx) << 32ull | primIdx});
+						posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
 					}
 					++primIdx;
 				}
@@ -405,19 +476,12 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 		++instIdx;
 	}
 
-	// Check if the resulting scene has issues with size
-	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
-	   || ei::len(m_scene->get_bounding_box().max) >= SUGGESTED_MAX_SCENE_SIZE)
-		logWarning("[WorldContainer::load_scene] Scene size is larger than recommended "
-				   "(Furthest point of the bounding box should not be further than "
-				   "2^20m away)");
-
 	// Add regular lights
-	for(const std::string_view& name : scenario.get_light_names()) {
+	for(const std::string_view& name : m_scenario->get_light_names()) {
 		if(auto pointLight = get_point_light(name); pointLight.has_value()) {
-			posLights.push_back({pointLight.value()->second, ~0u});
+			posLights.push_back({ pointLight.value()->second, ~0u });
 		} else if(auto spotLight = get_spot_light(name); spotLight.has_value()) {
-			posLights.push_back({spotLight.value()->second, ~0u});
+			posLights.push_back({ spotLight.value()->second, ~0u });
 		} else if(auto dirLight = get_dir_light(name); dirLight.has_value()) {
 			dirLights.push_back(dirLight.value()->second);
 		} else if(auto envLight = get_env_light(name); envLight.has_value()) {
@@ -428,7 +492,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 			envLightTex = envLight;
 		} else {
 			logWarning("[WorldContainer::load_scene] Unknown light source '", name, "' in scenario '",
-					   scenario.get_name(), "'");
+					   m_scenario->get_name(), "'");
 		}
 	}
 
@@ -438,16 +502,7 @@ SceneHandle WorldContainer::load_scene(const Scenario& scenario) {
 	else
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));
 
-	// Make media available / resident
-	m_scene->load_media(m_media);
-
-	// Assign the newly created scene and destroy the old one?
-	return m_scene.get();
-}
-
-SceneHandle WorldContainer::load_scene(ConstScenarioHandle hdl) {
-	mAssert(hdl != nullptr);
-	return load_scene(*hdl);
+	m_scenario->lights_dirty_reset();
 }
 
 } // namespace mufflon::scene

@@ -139,15 +139,13 @@ public:
 		return m_matIndicesHdl;
 	}
 
-	/**
-	 * Returns a descriptor (on CPU side) with pointers to resources (on Device side).
-	 * Takes two tuples: they must each contain the name and type of attributes which the
-	 * renderer wants to have access to. If an attribute gets written to, it is the
-	 * renderer's task to aquire it once more after that, since we cannot hand out
-	 * Accessors to the concrete device.
-	 */
+	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
-	SpheresDescriptor<dev> get_descriptor(const std::vector<const char*>& attribs);
+	SpheresDescriptor<dev> get_descriptor();
+	// Updates the descriptor with the given set of attributes
+	template < Device dev >
+	void update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
+									 const std::vector<const char*>& attribs);
 
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;

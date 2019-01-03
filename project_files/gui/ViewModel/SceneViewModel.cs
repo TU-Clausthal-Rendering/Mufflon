@@ -127,11 +127,17 @@ namespace gui.ViewModel
                 }
             } else if(args.Action == NotifyCollectionChangedAction.Remove)
             {
+                bool wasRendering = m_models.Renderer.IsRendering;
                 bool needsRebuild = false;
                 IntPtr currScenario = Core.world_get_current_scenario();
                 for (int i = 0; i < args.NewItems.Count; ++i)
                 {
                     LightModel light = (args.OldItems[i] as LightModel);
+                    if(light.IsSelected)
+                    {
+                        m_models.Renderer.IsRendering = false;
+                        needsRebuild = true;
+                    }
                     light.PropertyChanged -= OnLightChanged;
                     // remove light source
                     if (light.GetType() == typeof(PointLightModel))
@@ -161,15 +167,20 @@ namespace gui.ViewModel
                             throw new Exception(Core.core_get_dll_error());
                         if (!Core.scenario_remove_light_by_named(currScenario, (light as LightModel).Name))
                             throw new Exception(Core.core_get_dll_error());
+                        if (light.GetType() == typeof(EnvmapLightModel))
+                            Core.scene_mark_envmap_dirty();
+                        else
+                            Core.scene_mark_lighttree_dirty();
                         needsRebuild = true;
                     }
                 }
 
                 if(needsRebuild)
                 {
-                    if(Core.world_load_scenario(currScenario) == IntPtr.Zero)
+                    if (Core.world_reload_current_scenario() == IntPtr.Zero)
                         throw new Exception(Core.core_get_dll_error());
                     m_models.Renderer.reset();
+                    m_models.Renderer.IsRendering = wasRendering;
                 }
             }
         }
@@ -218,12 +229,17 @@ namespace gui.ViewModel
 
                     if (camera.IsSelected)
                     {
+                        bool wasRendering = m_models.Renderer.IsRendering;
+                        m_models.Renderer.IsRendering = false;
                         // Change the scenario's camera to the next lower
-                        if(args.OldStartingIndex == 0)
+                        if (args.OldStartingIndex == 0)
                             m_models.Cameras.Models[args.OldStartingIndex].IsSelected = true;
                         else
                             m_models.Cameras.Models[args.OldStartingIndex - 1].IsSelected = true;
+                        if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                            throw new Exception(Core.core_get_dll_error());
                         m_models.Renderer.reset();
+                        m_models.Renderer.IsRendering = wasRendering;
                     }
                 }
             }
@@ -247,6 +263,7 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 if (args.PropertyName == nameof(PointLightModel.Intensity) && !Core.world_set_point_light_intensity(light.Handle, new Core.Vec3((light as PointLightModel).Intensity)))
                     throw new Exception(Core.core_get_dll_error());
+                Core.scene_mark_lighttree_dirty();
             }
             else if (light.GetType() == typeof(SpotLightModel))
             {
@@ -260,6 +277,7 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 if (args.PropertyName == nameof(SpotLightModel.FalloffStart) && !Core.world_set_spot_light_falloff(light.Handle, (light as SpotLightModel).FalloffStart))
                     throw new Exception(Core.core_get_dll_error());
+                Core.scene_mark_lighttree_dirty();
             }
             else if (light.GetType() == typeof(DirectionalLightModel))
             {
@@ -267,6 +285,7 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 if (args.PropertyName == nameof(DirectionalLightModel.Radiance) && !Core.world_set_dir_light_radiance(light.Handle, new Core.Vec3((light as DirectionalLightModel).Radiance)))
                     throw new Exception(Core.core_get_dll_error());
+                Core.scene_mark_lighttree_dirty();
             }
             else if (light.GetType() == typeof(EnvmapLightModel))
             {
@@ -278,25 +297,30 @@ namespace gui.ViewModel
                     if (!Core.world_set_env_light_map(light.Handle, envMapHandle))
                         throw new Exception(Core.core_get_dll_error());
                 }
+                Core.scene_mark_envmap_dirty();
             }
 
             IntPtr currScenario = Core.world_get_current_scenario();
             if (currScenario == IntPtr.Zero)
                 throw new Exception(Core.core_get_dll_error());
 
-            if (light.IsSelected)
+            if (args.PropertyName == nameof(LightModel.IsSelected))
             {
-                if (!Core.scenario_add_light(currScenario, light.Name))
-                    throw new Exception(Core.core_get_dll_error());
-            } else
-            {
-                if (!Core.scenario_remove_light_by_named(currScenario, light.Name))
-                    throw new Exception(Core.core_get_dll_error());
+                if (light.IsSelected)
+                {
+                    if (!Core.scenario_add_light(currScenario, light.Name))
+                        throw new Exception(Core.core_get_dll_error());
+                }
+                else
+                {
+                    if (!Core.scenario_remove_light_by_named(currScenario, light.Name))
+                        throw new Exception(Core.core_get_dll_error());
+                }
             }
 
             if (needReload)
             {
-                if (Core.world_load_scenario(currScenario) == IntPtr.Zero)
+                if (Core.world_reload_current_scenario() == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
                 m_models.Renderer.IsRendering = wasRendering;
             }
@@ -322,7 +346,10 @@ namespace gui.ViewModel
             // TODO: we can find out what was changed easily
             CameraModel camera = (sender as CameraModel);
             bool wasRendering = m_models.Renderer.IsRendering;
-            bool needReload = camera.IsSelected || args.PropertyName == nameof(CameraModel.IsSelected);
+            // We only reload the renderer if the changed camera is selected or becomes selected;
+            // since the handler will be called twice (once for the selection and once for the deselection),
+            // we shouldn't reset both times
+            bool needReload = camera.IsSelected;
             if (needReload)
             {
                 m_models.Renderer.IsRendering = false;
@@ -361,8 +388,12 @@ namespace gui.ViewModel
                 if (!Core.scenario_set_camera(currScenario, camera.Handle))
                     throw new Exception(Core.core_get_dll_error());
 
-            if(needReload)
+            if (needReload)
+            {
+                if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                    throw new Exception(Core.core_get_dll_error());
                 m_models.Renderer.IsRendering = wasRendering;
+            }
         }
 
         private void changeScene(object sender, PropertyChangedEventArgs args)
@@ -622,7 +653,6 @@ namespace gui.ViewModel
                     Handle = hdl,
                     Map = map
                 });
-                m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
         }
 
@@ -710,7 +740,6 @@ namespace gui.ViewModel
                     model.Name = name;
                     model.Handle = cam;
                     m_models.Cameras.Models.Add(model);
-                    m_models.Cameras.Models.Last().PropertyChanged += OnCameraChanged;
                 }
             }
         }

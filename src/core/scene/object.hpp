@@ -97,12 +97,16 @@ public:
 		return m_flags.is_set(ObjectFlags::EMISSIVE);
 	}
 
-	// Get the descriptor of the object (including all geometry)
+	// Get the descriptor of the object (including all geometry, but without attributes)
 	// Synchronizes implicitly
 	template < Device dev >
-	ObjectDescriptor<dev> get_descriptor(const std::vector<const char*>& vertexAttribs,
-										 const std::vector<const char*>& faceAttribs,
-										 const std::vector<const char*>& sphereAttribs);
+	ObjectDescriptor<dev> get_descriptor();
+	// Updates the given descriptor's attribute fields
+	template < Device dev >
+	void update_attribute_descriptor(ObjectDescriptor<dev>& descriptor,
+									 const std::vector<const char*>& vertexAttribs,
+									 const std::vector<const char*>& faceAttribs,
+									 const std::vector<const char*>& sphereAttribs);
 
 	// Checks if the acceleration structure on one of the system parts has been modified.
 	//template < Device dev >

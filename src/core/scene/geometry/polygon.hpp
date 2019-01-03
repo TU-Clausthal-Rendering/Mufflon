@@ -193,16 +193,14 @@ public:
 		get_attributes<face>().mark_changed(dev, name);
 	}
 
-	/**
-	 * Returns a descriptor (on CPU side) with pointers to resources (on Device side).
-	 * Takes two tuples: they must each contain the name and type of attributes which the
-	 * renderer wants to have access to. If an attribute gets written to, it is the
-	 * renderer's task to aquire it once more after that, since we cannot hand out
-	 * Accessors to the concrete device.
-	 */
+	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
-	PolygonsDescriptor<dev> get_descriptor(const std::vector<const char*>& vertexAttribs,
-										   const std::vector<const char*>& faceAttribs);
+	PolygonsDescriptor<dev> get_descriptor();
+	// Updates the descriptor with the given set of attributes
+	template < Device dev >
+	void update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
+									 const std::vector<const char*>& vertexAttribs,
+									 const std::vector<const char*>& faceAttribs);
 
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
@@ -349,6 +347,11 @@ public:
 private:
 	static constexpr const char MAT_INDICES_NAME[] = "material-indices";
 
+	template < Device dev >
+	struct DescFlags {
+		bool geometryChanged;
+	};
+
 	// Helper class for distinct array handle types
 	template < Device dev >
 	struct IndexBuffer {
@@ -403,6 +406,9 @@ private:
 	util::DirtyFlags<Device> m_indexFlags;
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
+
+	// Dirty flags for descriptor rebuilding
+	util::TaggedTuple<DescFlags<Device::CPU>, DescFlags<Device::CUDA>> m_descFlags;
 
 	ei::Box m_boundingBox;
 	std::size_t m_triangles = 0u;

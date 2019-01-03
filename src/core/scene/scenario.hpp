@@ -62,6 +62,7 @@ public:
 	}
 	void set_camera(CameraHandle camera) noexcept {
 		m_camera = camera;
+		m_cameraChanged = true;
 	}
 
 	// Getter/setter for per-object properties
@@ -81,12 +82,27 @@ public:
 	// key in worldcontainer
 
 	void add_light(std::string_view name) {
-		if(std::find(m_lightNames.begin(), m_lightNames.end(), name) == m_lightNames.end())
+		if(std::find(m_lightNames.begin(), m_lightNames.end(), name) == m_lightNames.end()) {
 			m_lightNames.push_back(name);
+			m_lightsChanged = true;
+		}
 	}
 
 	void remove_light(std::size_t index);
 	void remove_light(const std::string_view& name);
+
+	// Queries whether lights have been added/removed and resets the flag
+	bool lights_dirty_reset() {
+		bool dirty = m_lightsChanged;
+		m_lightsChanged = false;
+		return dirty;
+	}
+	// Queries whether the camera has been changed and resets the flag
+	bool camera_dirty_reset() {
+		bool dirty = m_cameraChanged;
+		m_cameraChanged = false;
+		return dirty;
+	}
 
 	const std::vector<std::string_view>& get_light_names() const noexcept {
 		return m_lightNames;
@@ -102,6 +118,10 @@ private:
 		bool masked = false;
 		std::size_t lod = NO_CUSTOM_LOD;
 	};
+
+	// "Dirty" flags for rebuilding the scene
+	bool m_lightsChanged = false;
+	bool m_cameraChanged = true;
 
 	std::string_view m_name;
 	// Map from binaryName to a material index (may use string_views as keys
