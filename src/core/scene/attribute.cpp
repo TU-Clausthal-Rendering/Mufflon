@@ -317,6 +317,12 @@ void AttributePool::mark_changed(Device dev) {
 
 template < Device dev >
 void AttributePool::synchronize() {
+	// Always allocate memory (copies can and will only be done if there is a dirty memory)
+	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
+	bool hadNoMemory = !syncPool;
+	if(hadNoMemory)
+		syncPool = Allocator<dev>::alloc_array<char>(m_poolSize);
+
 	if(!m_dirty.has_changes())
 		return;
 	if(m_dirty.has_competing_changes())
@@ -326,7 +332,6 @@ void AttributePool::synchronize() {
 	if(m_attribElemCount == 0)
 		return;
 
-	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
 	char** changedPool = nullptr;
 
 	switch(dev) {
@@ -341,9 +346,8 @@ void AttributePool::synchronize() {
 	}
 
 	if(changedPool) {
-		if(!syncPool) {
+		if(hadNoMemory) {
 			// If there was no pool allocated we need to copy everything anyway
-			*changedPool = Allocator<dev>::alloc_array<char>(m_poolSize);
 			copy(syncPool, *changedPool, m_poolSize);
 		} else {
 			// Selective update is enough
@@ -356,7 +360,6 @@ void AttributePool::synchronize() {
 				}
 			}
 		}
-
 	}
 	m_dirty.mark_synced(dev);
 }
@@ -365,8 +368,9 @@ template < Device dev >
 void AttributePool::synchronize(AttributeHandle hdl) {
 	mAssert(hdl.index < m_attributes.size());
 	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
-	if(!syncPool)
+	if(!syncPool) { // If memory is missing all attributes need to be synced
 		this->synchronize<dev>();
+	}
 
 	if(!m_attributes[hdl.index].dirty.needs_sync(dev))
 		return;
