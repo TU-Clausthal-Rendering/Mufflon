@@ -5,9 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\loader">
-      <UniqueIdentifier>{87db4711-2986-4032-b8f1-8e6bd2d6041b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\core">
       <UniqueIdentifier>{cb799c0c-f3d0-4f32-9d0d-5d81003d2b7c}</UniqueIdentifier>
     </Filter>
@@ -19,9 +16,6 @@
     </Filter>
     <Filter Include="Source Files\deps\chinoise">
       <UniqueIdentifier>{9de4c341-434c-4c95-bd7b-c29a852ca17e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\loader\parsing">
-      <UniqueIdentifier>{5742c584-79b4-439d-9665-2ea0c1d89a10}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\util">
       <UniqueIdentifier>{4a959210-53dc-4e57-826d-966bfbedf809}</UniqueIdentifier>
@@ -35,10 +29,16 @@
     <Filter Include="Source Files\core\export">
       <UniqueIdentifier>{7875ae35-a123-434f-b195-f62080099bc7}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\loader\interface">
+    <Filter Include="Source Files\mffloader">
+      <UniqueIdentifier>{87db4711-2986-4032-b8f1-8e6bd2d6041b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mffloader\parsing">
+      <UniqueIdentifier>{5742c584-79b4-439d-9665-2ea0c1d89a10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mffloader\interface">
       <UniqueIdentifier>{8ac1c7a9-9155-46d2-a6d5-a35f57cdb04b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\loader\export">
+    <Filter Include="Source Files\mffloader\export">
       <UniqueIdentifier>{d17f245f-393e-457e-b68a-76aa4fd9286e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -68,16 +68,19 @@
       <Filter>Source Files\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\mffloader\interface\interface.cpp">
-      <Filter>Source Files\loader\interface</Filter>
+      <Filter>Source Files\mffloader\interface</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\mffloader\parsing\binary.cpp">
-      <Filter>Source Files\loader\parsing</Filter>
+      <Filter>Source Files\mffloader\parsing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\mffloader\parsing\json_helper.cpp">
-      <Filter>Source Files\loader\parsing</Filter>
+      <Filter>Source Files\mffloader\parsing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\mffloader\parsing\json_loader.cpp">
-      <Filter>Source Files\loader\parsing</Filter>
+      <Filter>Source Files\mffloader\parsing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mffloader\export\scene_exporter.cpp">
+      <Filter>Source Files\mffloader\export</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -142,19 +145,22 @@
       <Filter>Source Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\mffloader\interface\api.h">
-      <Filter>Source Files\loader\interface</Filter>
+      <Filter>Source Files\mffloader\interface</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\mffloader\interface\interface.h">
-      <Filter>Source Files\loader\interface</Filter>
+      <Filter>Source Files\mffloader\interface</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\mffloader\parsing\json_loader.hpp">
-      <Filter>Source Files\loader\parsing</Filter>
+      <Filter>Source Files\mffloader\parsing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\mffloader\parsing\binary.hpp">
-      <Filter>Source Files\loader\parsing</Filter>
+      <Filter>Source Files\mffloader\parsing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\mffloader\parsing\json_helper.hpp">
-      <Filter>Source Files\loader\parsing</Filter>
+      <Filter>Source Files\mffloader\parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\export\scene_exporter.hpp">
+      <Filter>Source Files\mffloader\export</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

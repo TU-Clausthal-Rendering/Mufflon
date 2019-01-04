@@ -91,6 +91,7 @@
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp" />
     <ClCompile Include="..\..\deps\chinoise\src\rnd.cpp" />
     <ClCompile Include="..\..\deps\miniz\miniz\miniz.c" />
+    <ClCompile Include="..\..\src\mffloader\export\scene_exporter.cpp" />
     <ClCompile Include="..\..\src\mffloader\interface\interface.cpp" />
     <ClCompile Include="..\..\src\mffloader\parsing\binary.cpp" />
     <ClCompile Include="..\..\src\mffloader\parsing\json_helper.cpp" />
@@ -116,6 +117,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\deps\miniz\miniz\miniz.h" />
+    <ClInclude Include="..\..\src\mffloader\export\scene_exporter.hpp" />
     <ClInclude Include="..\..\src\mffloader\interface\api.h" />
     <ClInclude Include="..\..\src\mffloader\interface\interface.h" />
     <ClInclude Include="..\..\src\mffloader\parsing\binary.hpp" />
