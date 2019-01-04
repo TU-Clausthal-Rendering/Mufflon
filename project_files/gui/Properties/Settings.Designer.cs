@@ -152,5 +152,38 @@ namespace gui.Properties {
                 this["ScreenShotNamePatternHistory"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("F2")]
+        public string ScreenshotGesture {
+            get {
+                return ((string)(this["ScreenshotGesture"]));
+            }
+            set {
+                this["ScreenshotGesture"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("ALT+P")]
+        public string PlayPauseGesture {
+            get {
+                return ((string)(this["PlayPauseGesture"]));
+            }
+            set {
+                this["PlayPauseGesture"] = value;
+            }
+        }
+        
+        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("ALT+R")]
+        public string ResetGesture {
+            get {
+                return ((string)(this["ResetGesture"]));
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Windows;
 using System.Windows.Input;
 using gui.Dll;
 using gui.Model;
@@ -7,27 +8,22 @@ using gui.Properties;
 
 namespace gui.Command
 {
-    public class ScreenShotCommand : ICommand
+    public class ScreenShotCommand : IGesturedCommand
     {
         private Models m_models;
 
-        public string Gesture
-        {
-            get => "F2";
-        }
-
-        public ScreenShotCommand(Models models)
+        public ScreenShotCommand(Models models) : base("ScreenshotGesture")
         {
             m_models = models;
         }
 
-        public bool CanExecute(object parameter)
+        public override bool CanExecute(object parameter)
         {
             // TODO: only screenshot when something was rendered?
             return true;
         }
 
-        public void Execute(object parameter)
+        public override void Execute(object parameter)
         {
             // First parse the current screenshot string and emplace the information
             string filename = Settings.Default.ScreenshotNamePattern;
@@ -42,7 +38,7 @@ namespace gui.Command
             m_models.Renderer.IsRendering = wasRunning;
         }
 
-        public event EventHandler CanExecuteChanged
+        public override event EventHandler CanExecuteChanged
         {
             add { }
             remove { }

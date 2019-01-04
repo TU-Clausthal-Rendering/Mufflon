@@ -12,11 +12,11 @@ using gui.Model.Light;
 
 namespace gui.Command
 {
-    public class PlayPauseCommand : ICommand
+    public class PlayPauseCommand : IGesturedCommand
     {
         private Models m_models;
 
-        public PlayPauseCommand(Models models)
+        public PlayPauseCommand(Models models) : base("PlayPauseGesture")
         {
             m_models = models;
             CanExecuteChanged += OnCanExecuteChanged;
@@ -27,17 +27,17 @@ namespace gui.Command
             CommandManager.InvalidateRequerySuggested();
         }
 
-        public bool CanExecute(object parameter)
+        public override bool CanExecute(object parameter)
         {
             return m_models.Scene.IsLoaded;
         }
 
-        public void Execute(object parameter)
+        public override void Execute(object parameter)
         {
             m_models.Renderer.IsRendering = !m_models.Renderer.IsRendering;
         }
 
-        public event EventHandler CanExecuteChanged
+        public override event EventHandler CanExecuteChanged
         {
             add
             {

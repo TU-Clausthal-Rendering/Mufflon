@@ -9,11 +9,11 @@ using gui.Dll;
 
 namespace gui.Command
 {
-    public class ResetCommand : ICommand
+    public class ResetCommand : IGesturedCommand
     {
         private Models m_models;
 
-        public ResetCommand(Models models)
+        public ResetCommand(Models models) : base("ResetGesture")
         {
             m_models = models;
             m_models.Renderer.PropertyChanged += RendererPropertyChanged;
@@ -26,17 +26,17 @@ namespace gui.Command
             }
         }
 
-        public bool CanExecute(object parameter)
+        public override bool CanExecute(object parameter)
         {
             return m_models.Renderer.IsRendering;
         }
 
-        public void Execute(object parameter)
+        public override void Execute(object parameter)
         {
             m_models.Renderer.reset();
         }
 
-        public event EventHandler CanExecuteChanged;
+        public override event EventHandler CanExecuteChanged;
 
         protected void OnCanExecuteChanged()
         {

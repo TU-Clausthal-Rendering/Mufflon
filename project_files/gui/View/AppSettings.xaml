@@ -97,6 +97,45 @@
                     </Grid>
                 </StackPanel>
             </TabItem>
+            <TabItem Header="Keybindings">
+                <StackPanel Margin="5">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Toggle render play/pause:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Width="50"
+                                 Text="{Binding PlayPauseGesture}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                   Text="Reset renderer:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Width="50"
+                                 Text="{Binding ResetGesture}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="Save screenshot:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Width="50"
+                                 Text="{Binding ScreenshotGesture}"/>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
             <TabItem Header="Other">
             </TabItem>
         </TabControl>

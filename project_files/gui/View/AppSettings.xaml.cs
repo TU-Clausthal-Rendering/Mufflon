@@ -1,6 +1,8 @@
 ﻿using gui.Annotations;
 using gui.Dll;
+using gui.Model;
 using gui.Properties;
+using gui.ViewModel;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -59,6 +61,9 @@ namespace gui.View
             new ProfilingLevel(){ Level = Core.ProfilingLevel.OFF, Name = "Off" }
         };
 
+        private ViewModels m_viewModels;
+
+        // General settings
         private string m_screenshotFolder;
         public Severity LogLevel { get; set; }
         public ProfilingLevel CoreProfilerLevel { get; set; }
@@ -68,9 +73,15 @@ namespace gui.View
         public string ScreenshotFolder { get => m_screenshotFolder; }
         public StringCollection ScreenshotNamePatternHistory { get => Settings.Default.ScreenShotNamePatternHistory; }
 
-        public AppSettings()
+        // Key bindings/gestures
+        public string PlayPauseGesture { get; set; }
+        public string ResetGesture { get; set; }
+        public string ScreenshotGesture { get; set; }
+
+        public AppSettings(ViewModels viewModels)
         {
             InitializeComponent();
+            m_viewModels = viewModels;
             if (Settings.Default.ScreenshotFolder == null || Settings.Default.ScreenshotFolder.Length == 0)
                 Settings.Default.ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             m_screenshotFolder = Settings.Default.ScreenshotFolder;
@@ -78,11 +89,15 @@ namespace gui.View
                 Settings.Default.ScreenShotNamePatternHistory = new StringCollection();
             if (Settings.Default.ScreenShotNamePatternHistory.Count == 0)
                 Settings.Default.ScreenShotNamePatternHistory.Add(ScreenshotNamePattern);
-            OnPropertyChanged(nameof(ScreenshotFolder));
-            OnPropertyChanged(nameof(ScreenshotNamePatternHistory));
             LogLevel = LogLevels[Settings.Default.LogLevel];
             CoreProfilerLevel = CoreProfilerLevels[Settings.Default.CoreProfileLevel];
             LoaderProfilerLevel = LoaderProfilerLevels[Settings.Default.LoaderProfileLevel];
+            PlayPauseGesture = viewModels.Toolbar.PlayPauseCommand.getCurrentGesture();
+            ResetGesture = viewModels.Toolbar.ResetCommand.getCurrentGesture();
+            ScreenshotGesture = viewModels.Toolbar.SaveScreenShotCommand.getCurrentGesture();
+
+            OnPropertyChanged(nameof(ScreenshotFolder));
+            OnPropertyChanged(nameof(ScreenshotNamePatternHistory));
             DataContext = this;
         }
 
@@ -100,7 +115,6 @@ namespace gui.View
                 if (Settings.Default.ScreenShotNamePatternHistory.Count > MAX_SCREENSHOT_PATTERN_HISTORY)
                     Settings.Default.ScreenshotNamePattern.Remove(Settings.Default.ScreenShotNamePatternHistory.Count - 1);
             }
-
             Logger.LogLevel = LogLevel.Level; // Also sets the level in the DLLs
             if (CoreProfilerLevel.Level == Core.ProfilingLevel.OFF)
                 Core.profiling_disable();
@@ -110,6 +124,11 @@ namespace gui.View
                 Loader.loader_profiling_disable();
             else if (!Loader.loader_profiling_set_level(LoaderProfilerLevel.Level))
                 throw new Exception(Loader.loader_get_dll_error());
+
+            // Keybinds
+            m_viewModels.Toolbar.PlayPauseCommand.updateGesture(PlayPauseGesture);
+            m_viewModels.Toolbar.ResetCommand.updateGesture(ResetGesture);
+            m_viewModels.Toolbar.SaveScreenShotCommand.updateGesture(ScreenshotGesture);
         }
 
         private void CancelButtonClick(object sender, RoutedEventArgs args)

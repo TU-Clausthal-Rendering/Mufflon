@@ -515,7 +515,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd())
 					if(!scenario_set_object_lod(scenarioHdl, objHdl, read<std::size_t>(m_state, lodIter)))
 						throw std::runtime_error("Failed to set LoD level of object '" + std::string(objectName) + "'");
-				if(object.HasMember("masked"))
+				if(object.HasMember("mask"))
 					if(!scenario_mask_object(scenarioHdl, objHdl))
 						throw std::runtime_error("Failed to set mask for object '" + std::string(objectName) + "'");
 

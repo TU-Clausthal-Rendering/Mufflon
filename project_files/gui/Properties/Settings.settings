@@ -35,5 +35,14 @@
     <Setting Name="ScreenShotNamePatternHistory" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="ScreenshotGesture" Type="System.String" Scope="User">
+      <Value Profile="(Default)">F2</Value>
+    </Setting>
+    <Setting Name="PlayPauseGesture" Type="System.String" Scope="User">
+      <Value Profile="(Default)">ALT+P</Value>
+    </Setting>
+    <Setting Name="ResetGesture" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">ALT+R</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

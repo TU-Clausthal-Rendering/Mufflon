@@ -15,9 +15,11 @@ namespace gui.ViewModel
         public ToolbarViewModel(Models models)
         {
             m_models = models;
+
             PlayPauseCommand = new PlayPauseCommand(models);
             ResetCommand = new ResetCommand(models);
             SaveScreenShotCommand = new ScreenShotCommand(m_models);
+
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
         }
 
@@ -40,9 +42,9 @@ namespace gui.ViewModel
         public Visibility PauseIconVisibility =>
             m_models.Renderer.IsRendering ? Visibility.Visible : Visibility.Collapsed;
 
-        public ICommand PlayPauseCommand { get; }
-        public ICommand ResetCommand { get; }
-        public ICommand SaveScreenShotCommand { get; }
+        public IGesturedCommand PlayPauseCommand { get; }
+        public IGesturedCommand ResetCommand { get; }
+        public IGesturedCommand SaveScreenShotCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

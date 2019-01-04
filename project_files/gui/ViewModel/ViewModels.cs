@@ -77,7 +77,7 @@ namespace gui.ViewModel
             AddMaterialCommand = new AddMaterialCommand(m_models);
             LoadSceneCommand = new LoadSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
-            OpenSettingsCommand = new OpenSettingsCommand();
+            OpenSettingsCommand = new OpenSettingsCommand(this);
         }
     }
 }

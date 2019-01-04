@@ -1,16 +1,20 @@
 ﻿using gui.View;
+using gui.ViewModel;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace gui.Command
 {
     class OpenSettingsCommand : ICommand
     {
+        private ViewModels m_viewModels;
         private AppSettings m_settings;
+
+        public OpenSettingsCommand(ViewModels viewModels)
+        {
+            m_viewModels = viewModels;
+        }
+
         event EventHandler ICommand.CanExecuteChanged
         {
             add
@@ -29,7 +33,7 @@ namespace gui.Command
 
         void ICommand.Execute(object parameter)
         {
-            m_settings = new AppSettings();
+            m_settings = new AppSettings(m_viewModels);
             m_settings.Show();
         }
     }
