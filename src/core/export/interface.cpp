@@ -1,4 +1,4 @@
-#include "interface.h"
+﻿#include "interface.h"
 #include "plugin/texture_plugin.hpp"
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
@@ -212,29 +212,12 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 	CATCH_ALL(;)
 }
 
-char* copy_for_csharp(std::string_view str) {
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate string buffer");
-		return nullptr;
-	}
-	if(str.size() > 0u)
-		std::memcpy(buffer, &str[0u], str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
-}
 
 } // namespace
 
-// TODO: remove, Felix prototype
 const char* core_get_dll_error() {
 	TRY
-	return copy_for_csharp(s_lastError);
+	return s_lastError.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -1164,6 +1147,13 @@ ObjectHdl world_get_object(const char* name) {
 	CATCH_ALL(nullptr)
 }
 
+CORE_API const char* CDECL world_get_object_name(ObjectHdl obj) {
+	TRY
+	CHECK_NULLPTR(obj, "object handle", nullptr);
+	return &reinterpret_cast<mufflon::scene::ConstObjectHandle>(obj)->get_name()[0];
+	CATCH_ALL(nullptr)
+}
+
 InstanceHdl world_create_instance(ObjectHdl obj) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
@@ -1204,7 +1194,7 @@ const char* world_get_scenario_name(ConstScenarioHdl hdl) {
 	TRY
 	CHECK_NULLPTR(hdl, "scenario handle", nullptr);
 	std::string_view name = static_cast<ConstScenarioHandle>(hdl)->get_name();
-	return copy_for_csharp(name);
+	return &name[0];
 	CATCH_ALL(nullptr)
 }
 
@@ -1217,7 +1207,7 @@ const char* world_get_scenario_name_by_index(uint32_t index) {
 		return nullptr;
 	}
 	const std::string& nameRef = WorldContainer::instance().get_scenario_name(index);
-	return copy_for_csharp(nameRef);
+	return nameRef.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -1502,7 +1492,7 @@ size_t world_get_env_light_count() {
 	CATCH_ALL(0u)
 }
 
-LightType world_get_light_type(const char* name) {
+/*LightType world_get_light_type(const char* name) {
 	TRY
 	CHECK_NULLPTR(name, "light name", LightType::LIGHT_COUNT);
 	std::string_view nameView = name;
@@ -1561,14 +1551,14 @@ LightHdl world_get_light(const char* name, LightType type) {
 		}
 	}
 	CATCH_ALL(nullptr)
-}
+}*/
 
 const char* world_get_point_light_by_index(size_t index, LightHdl* hdl) {
 	TRY
 	auto iter = WorldContainer::instance().get_point_light(index);
 	if(hdl != nullptr)
 		*hdl = static_cast<LightHdl>(&iter->second);
-	return copy_for_csharp(iter->first);
+	return iter->first.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -1577,7 +1567,7 @@ const char* world_get_spot_light_by_index(size_t index, LightHdl* hdl) {
 	auto iter = WorldContainer::instance().get_spot_light(index);
 	if(hdl != nullptr)
 		*hdl = static_cast<LightHdl>(&iter->second);
-	return copy_for_csharp(iter->first);
+	return iter->first.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -1586,7 +1576,7 @@ const char* world_get_dir_light_by_index(size_t index, LightHdl* hdl) {
 	auto iter = WorldContainer::instance().get_dir_light(index);
 	if(hdl != nullptr)
 		*hdl = static_cast<LightHdl>(&iter->second);
-	return copy_for_csharp(iter->first);
+	return iter->first.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -1595,7 +1585,7 @@ const char* world_get_env_light_by_index(size_t index, LightHdl* hdl) {
 	auto iter = WorldContainer::instance().get_env_light(index);
 	if(hdl != nullptr)
 		*hdl = static_cast<LightHdl>(&iter->second);
-	return copy_for_csharp(iter->first);
+	return iter->first.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -1735,7 +1725,7 @@ const char* world_get_camera_name(ConstCameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", nullptr);
 	std::string_view name = static_cast<const cameras::Camera*>(cam)->get_name();
-	return copy_for_csharp(name);
+	return &name[0];
 	CATCH_ALL(nullptr)
 }
 
@@ -2037,7 +2027,7 @@ const char* scenario_get_light_name(ScenarioHdl scenario, size_t index) {
 		return nullptr;
 	}
 	std::string_view name = scen.get_light_names()[index];
-	return copy_for_csharp(name);
+	return &name[0];
 	CATCH_ALL(nullptr)
 }
 
@@ -2400,7 +2390,7 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	}
 
 	std::string_view path = nameOpt.value();
-	return copy_for_csharp(path);
+	return &path[0];
 	CATCH_ALL(nullptr)
 }
 
@@ -2638,7 +2628,7 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 
 	if(type != nullptr)
 		*type = static_cast<ParameterType>(rendererDesc.type);
-	return copy_for_csharp(rendererDesc.name);
+	return rendererDesc.name;
 	CATCH_ALL(nullptr)
 }
 
@@ -2768,22 +2758,22 @@ Boolean profiling_save_total_and_snapshots(const char* path) {
 
 const char* profiling_get_current_state() {
 	TRY
-	std::string str = Profiler::instance().save_current_state();
-	return copy_for_csharp(str);
+	static std::string str = Profiler::instance().save_current_state();
+	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_snapshots() {
 	TRY
-	std::string str = Profiler::instance().save_snapshots();
-	return copy_for_csharp(str);
+	static std::string str = Profiler::instance().save_snapshots();
+	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_total_and_snapshots() {
 	TRY
-	std::string str = Profiler::instance().save_total_and_snapshots();
-	return copy_for_csharp(str);
+	static std::string str = Profiler::instance().save_total_and_snapshots();
+	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -2959,3 +2949,8 @@ void mufflon_destroy() {
 	s_currentRenderer.reset();
 	CATCH_ALL(;)
 }
+
+/*const char* get_teststring() {
+	static const char* test = u8"müfflon ηρα Φ∞∡∧";
+	return test;
+}*/

@@ -258,7 +258,8 @@ namespace gui.Dll
         {
             while (m_commandQueue.TryDequeue(out var command))
             {
-                Core.execute_command(command);
+                //Core.execute_command(command);
+                // TODO: reintroduce?
             }
         }
 

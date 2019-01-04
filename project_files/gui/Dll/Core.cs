@@ -103,49 +103,60 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool resize(int width, int height, int offsetX, int offsetY);
 
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string core_get_dll_error();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_dll_error")]
+        private static extern IntPtr core_get_dll_error_();
+        internal static string core_get_dll_error() { return StringUtil.FromNativeUTF8(core_get_dll_error_()); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_set_log_level(Severity level);
-
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void execute_command(string command);
 
         // World API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_create_object();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_object_name")]
+        private static extern IntPtr world_get_object_name_(IntPtr obj);
+        internal static string world_get_object_name(IntPtr obj) { return StringUtil.FromNativeUTF8(world_get_object_name_(obj)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_create_instance(IntPtr obj);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_create_scenario(string name);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_find_scenario(string name);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_lambert_material(string name, Vec3 rgb);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_lambert_material_textured(string name, IntPtr texture);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_pinhole_camera(string name, Vec3 position,
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_create_scenario")]
+        private static extern IntPtr world_create_scenario_(IntPtr name);
+        internal static IntPtr world_create_scenario(string name) { return world_create_scenario_(StringUtil.ToNativeUtf8(name)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_find_scenario")]
+        private static extern IntPtr world_find_scenario_(IntPtr name);
+        internal static IntPtr world_find_scenario(string name) { return world_find_scenario_(StringUtil.ToNativeUtf8(name)); }
+        // TODO: material interface
+        //internal static IntPtr world_add_material(string name, ...);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_pinhole_camera")]
+        private static extern IntPtr world_add_pinhole_camera_(IntPtr name, Vec3 position,
             Vec3 dir, Vec3 up, float near, float far, float vFov);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_focus_camera(string name, Vec3 position, Vec3 dir,
+        internal static IntPtr world_add_pinhole_camera(string name, Vec3 position,
+            Vec3 dir, Vec3 up, float near, float far, float vFov) { return world_add_pinhole_camera_(StringUtil.ToNativeUtf8(name), position, dir, up, near, far, vFov); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_focus_camera")]
+        private static extern IntPtr world_add_focus_camera_(IntPtr name, Vec3 position, Vec3 dir,
             Vec3 up, float near, float far, float focalLength, float focusDistance,
             float lensRad, float chipHeight);
+        internal static IntPtr world_add_focus_camera(string name, Vec3 position, Vec3 dir,
+            Vec3 up, float near, float far, float focalLength, float focusDistance,
+            float lensRad, float chipHeight) { return world_add_focus_camera_(StringUtil.ToNativeUtf8(name), position, dir, up, near, far, focalLength, focusDistance, lensRad, chipHeight); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_remove_camera(IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_point_light(string name, Vec3 position,
-										   Vec3 intensity);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_spot_light(string name, Vec3 position,
-            Vec3 direction, Vec3 intensity, float openingAngleRad,
-            float falloffStartRad);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_directional_light(string name, Vec3 direction,
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_point_light")]
+        private static extern IntPtr world_add_point_light_(IntPtr name, Vec3 position,
+            Vec3 intensity);
+        internal static IntPtr world_add_point_light(string name, Vec3 position,
+            Vec3 intensity) { return world_add_point_light_(StringUtil.ToNativeUtf8(name), position, intensity); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_spot_light")]
+        private static extern IntPtr world_add_spot_light_(IntPtr name, Vec3 position,
+            Vec3 direction, Vec3 intensity, float openingAngleRad, float falloffStartRad);
+        internal static IntPtr world_add_spot_light(string name, Vec3 position,
+            Vec3 direction, Vec3 intensity, float openingAngleRad, float falloffStartRad) { return world_add_spot_light_(StringUtil.ToNativeUtf8(name), position, direction, intensity, openingAngleRad, falloffStartRad); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_directional_light")]
+        private static extern IntPtr world_add_directional_light_(IntPtr name, Vec3 direction,
             Vec3 radiance);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_envmap_light(string name, IntPtr envmap);
+        internal static IntPtr world_add_directional_light(string name, Vec3 direction,
+            Vec3 radiance) { return world_add_directional_light_(StringUtil.ToNativeUtf8(name), direction, radiance); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_envmap_light")]
+        private static extern IntPtr world_add_envmap_light_(IntPtr name, IntPtr envmap);
+        internal static IntPtr world_add_envmap_light(string name, IntPtr envmap) { return world_add_envmap_light_(StringUtil.ToNativeUtf8(name), envmap); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_remove_point_light(IntPtr hdl);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -156,8 +167,9 @@ namespace gui.Dll
         internal static extern bool world_remove_envmap_light(IntPtr hdl);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong world_get_camera_count();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_get_camera(string name);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_camera")]
+        private static extern IntPtr world_get_camera_(IntPtr name);
+        internal static IntPtr world_get_camera(string name) { return world_get_camera_(StringUtil.ToNativeUtf8(name)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_camera_by_index(ulong index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -168,29 +180,31 @@ namespace gui.Dll
         internal static extern ulong world_get_dir_light_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong world_get_env_light_count();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LightType world_get_light_type(string name);
+        //[DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_light_type")]
+        //private static extern LightType world_get_light_type_(IntPtr name);
+        //internal static LightType world_get_light_type(string name) { return world_get_light_type_(StringUtil.ToNativeUtf8(name)); }
 
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_add_texture(string path, TextureSampling sampling);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_texture")]
+        private static extern IntPtr world_add_texture_(IntPtr path, TextureSampling sampling);
+        internal static IntPtr world_add_texture(string path, TextureSampling sampling) { return world_add_texture_(StringUtil.ToNativeUtf8(path), sampling); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_add_texture_value(out float[] value, int num, TextureSampling sampling);
 
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_point_light_by_index(ulong index, ref IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_spot_light_by_index(ulong index, ref IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_dir_light_by_index(ulong index, ref IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_env_light_by_index(ulong index, ref IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_point_light_by_index")]
+        private static extern IntPtr world_get_point_light_by_index_(ulong index, ref IntPtr hdl);
+        internal static string world_get_point_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_point_light_by_index_(index, ref hdl)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_spot_light_by_index")]
+        private static extern IntPtr world_get_spot_light_by_index_(ulong index, ref IntPtr hdl);
+        internal static string world_get_spot_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_spot_light_by_index_(index, ref hdl)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_dir_light_by_index")]
+        private static extern IntPtr world_get_dir_light_by_index_(ulong index, ref IntPtr hdl);
+        internal static string world_get_dir_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_dir_light_by_index_(index, ref hdl)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_env_light_by_index")]
+        private static extern IntPtr world_get_env_light_by_index_(ulong index, ref IntPtr hdl);
+        internal static string world_get_env_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_by_index_(index, ref hdl)); }
 
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_get_light(string name, LightType type);
+        //[DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        //internal static extern IntPtr world_get_light(string name, LightType type);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_load_scenario(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -201,17 +215,17 @@ namespace gui.Dll
         internal static extern IntPtr world_get_current_scenario();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint world_get_scenario_count();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_scenario_name_by_index(uint index);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_scenario_name(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_scenario_name_by_index")]
+        private static extern IntPtr world_get_scenario_name_by_index_(uint index);
+        internal static string world_get_scenario_name_by_index(uint index) { return StringUtil.FromNativeUTF8(world_get_scenario_name_by_index_(index)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_scenario_name")]
+        private static extern IntPtr world_get_scenario_name_(IntPtr hdl);
+        internal static string world_get_scenario_name(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_scenario_name_(hdl)); }
 
         // Scenario API
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string scenario_get_name(IntPtr scenario);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_name")]
+        private static extern IntPtr scenario_get_name_(IntPtr scenario);
+        internal static string scenario_get_name(IntPtr scenario) { return StringUtil.FromNativeUTF8(scenario_get_name_(scenario)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong scenario_get_global_lod_level(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -235,19 +249,23 @@ namespace gui.Dll
             ulong level);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint scenario_get_light_count(IntPtr scenario);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string scenario_get_light_name(IntPtr scenario, ulong index);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool scenario_add_light(IntPtr scenario, string name);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_light_name")]
+        private static extern IntPtr scenario_get_light_name_(IntPtr scenario, ulong index);
+        internal static string scenario_get_light_name(IntPtr scenario, ulong index) { return StringUtil.FromNativeUTF8(scenario_get_light_name_(scenario, index)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_add_light")]
+        private static extern bool scenario_add_light_(IntPtr scenario, IntPtr name);
+        internal static bool scenario_add_light(IntPtr scenario, string name) { return scenario_add_light_(scenario, StringUtil.ToNativeUtf8(name)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_remove_light_by_index(IntPtr scenario, ulong index);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool scenario_remove_light_by_named(IntPtr scenario, string name);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern ushort scenario_declare_material_slot(IntPtr scenario, string name);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern ushort scenario_get_material_slot(IntPtr scenario, string name);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_remove_light_by_named")]
+        private static extern bool scenario_remove_light_by_named_(IntPtr scenario, IntPtr name);
+        internal static bool scenario_remove_light_by_named(IntPtr scenario, string name) { return scenario_remove_light_by_named_(scenario, StringUtil.ToNativeUtf8(name)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_declare_material_slot")]
+        private static extern ushort scenario_declare_material_slot_(IntPtr scenario, IntPtr name);
+        internal static ushort scenario_declare_material_slot(IntPtr scenario, string name) { return scenario_declare_material_slot_(scenario, StringUtil.ToNativeUtf8(name)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_material_slot")]
+        private static extern ushort scenario_get_material_slot_(IntPtr scenario, IntPtr name);
+        internal static ushort scenario_get_material_slot(IntPtr scenario, string name) { return scenario_get_material_slot_(scenario, StringUtil.ToNativeUtf8(name)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr scenario_get_assigned_material(IntPtr scenario, ushort index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -291,18 +309,18 @@ namespace gui.Dll
         internal static extern bool world_set_dir_light_direction(IntPtr hdl, Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_dir_light_radiance(IntPtr hdl, Vec3 radiance);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_env_light_map(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_env_light_map")]
+        private static extern IntPtr world_get_env_light_map_(IntPtr hdl);
+        internal static string world_get_env_light_map(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_map_(hdl)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_env_light_map(IntPtr hdl, IntPtr tex);
 
         // Camera API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern CameraType world_get_camera_type(IntPtr cam);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string world_get_camera_name(IntPtr cam);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_camera_name")]
+        private static extern IntPtr world_get_camera_name_(IntPtr cam);
+        internal static string world_get_camera_name(IntPtr cam) { return StringUtil.FromNativeUTF8(world_get_camera_name_(cam)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_camera_position(IntPtr cam, ref Vec3 pos);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -361,8 +379,9 @@ namespace gui.Dll
         internal static extern bool render_reset();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_get_screenshot();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_save_screenshot(string filename);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_screenshot")]
+        private static extern bool render_save_screenshot_(IntPtr filename);
+        internal static bool render_save_screenshot(string filename) { return render_save_screenshot_(StringUtil.ToNativeUtf8(filename)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_render_target(RenderTarget target, uint variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -381,21 +400,27 @@ namespace gui.Dll
         internal static extern bool render_disable_all_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint renderer_get_num_parameters();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string renderer_get_parameter_desc(uint idx, ref ParameterType type);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool renderer_set_parameter_int(string name, int value);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool renderer_get_parameter_int(string name, ref int value);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool renderer_set_parameter_float(string name, float value);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool renderer_get_parameter_float(string name, ref float value);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool renderer_set_parameter_bool(string name, uint value);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool renderer_get_parameter_bool(string name, ref uint value);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_desc")]
+        private static extern IntPtr renderer_get_parameter_desc_(uint idx, ref ParameterType type);
+        internal static string renderer_get_parameter_desc(uint idx, ref ParameterType type) { return StringUtil.FromNativeUTF8(renderer_get_parameter_desc_(idx, ref type)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_int")]
+        private static extern bool renderer_set_parameter_int_(IntPtr name, int value);
+        internal static bool renderer_set_parameter_int(string name, int value) { return renderer_set_parameter_int_(StringUtil.ToNativeUtf8(name), value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_int")]
+        private static extern bool renderer_get_parameter_int_(IntPtr name, ref int value);
+        internal static bool renderer_get_parameter_int(string name, ref int value) { return renderer_get_parameter_int_(StringUtil.ToNativeUtf8(name), ref value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_float")]
+        private static extern bool renderer_set_parameter_float_(IntPtr name, float value);
+        internal static bool renderer_set_parameter_float(string name, float value) { return renderer_set_parameter_float_(StringUtil.ToNativeUtf8(name), value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_float")]
+        private static extern bool renderer_get_parameter_float_(IntPtr name, ref float value);
+        internal static bool renderer_get_parameter_float(string name, ref float value) { return renderer_get_parameter_float_(StringUtil.ToNativeUtf8(name), ref value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_bool")]
+        private static extern bool renderer_set_parameter_bool_(IntPtr name, uint value);
+        internal static bool renderer_set_parameter_bool(string name, uint value) { return renderer_set_parameter_bool_(StringUtil.ToNativeUtf8(name), value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_bool")]
+        private static extern bool renderer_get_parameter_bool_(IntPtr name, ref uint value);
+        internal static bool renderer_get_parameter_bool(string name, ref uint value) { return renderer_get_parameter_bool_(StringUtil.ToNativeUtf8(name), ref value); }
 
         // Interface for profiling
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -404,21 +429,24 @@ namespace gui.Dll
         internal static extern void profiling_disable();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool profiling_set_level(ProfilingLevel level);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool profiling_save_current_state(string path);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool profiling_save_snapshots(string path);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool profiling_save_total_and_snapshots(string path);
-        [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string profiling_get_current_state();
-        [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string profiling_get_snapshots();
-        [DllImport("core.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string profiling_get_total_and_snapshots();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_save_current_state")]
+        private static extern bool profiling_save_current_state_(IntPtr path);
+        internal static bool profiling_save_current_state(string path) { return profiling_save_current_state_(StringUtil.ToNativeUtf8(path)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_save_snapshots")]
+        private static extern bool profiling_save_snapshots_(IntPtr path);
+        internal static bool profiling_save_snapshots(string path) { return profiling_save_snapshots_(StringUtil.ToNativeUtf8(path)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_save_total_and_snapshots")]
+        private static extern bool profiling_save_total_and_snapshots_(IntPtr path);
+        internal static bool profiling_save_total_and_snapshots(string path) { return profiling_save_total_and_snapshots_(StringUtil.ToNativeUtf8(path)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_current_state")]
+        private static extern IntPtr profiling_get_current_state_();
+        internal static string profiling_get_current_state() { return StringUtil.FromNativeUTF8(profiling_get_current_state_()); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_snapshots")]
+        private static extern IntPtr profiling_get_snapshots_();
+        internal static string profiling_get_snapshots() { return StringUtil.FromNativeUTF8(profiling_get_snapshots_()); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_total_and_snapshots")]
+        private static extern IntPtr profiling_get_total_and_snapshots_();
+        internal static string profiling_get_total_and_snapshots() { return StringUtil.FromNativeUTF8(profiling_get_total_and_snapshots_()); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void profiling_reset();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -443,5 +471,9 @@ namespace gui.Dll
         internal static extern bool mufflon_is_cuda_available();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void mufflon_destroy();
+
+        //[DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "get_teststring")]
+        //private static extern IntPtr get_teststring_();
+        //internal static string get_teststring() { return StringUtil.FromNativeUTF8(get_teststring_()); }
     }
 }

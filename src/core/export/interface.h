@@ -345,6 +345,7 @@ CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Ve
 CORE_API void CDECL world_clear_all();
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
+CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);
@@ -385,8 +386,8 @@ CORE_API size_t CDECL world_get_point_light_count();
 CORE_API size_t CDECL world_get_spot_light_count();
 CORE_API size_t CDECL world_get_dir_light_count();
 CORE_API size_t CDECL world_get_env_light_count();
-CORE_API LightType CDECL world_get_light_type(const char* name);
-CORE_API LightHdl CDECL world_get_light(const char* name, LightType type);
+//CORE_API LightType CDECL world_get_light_type(const char* name);
+//CORE_API LightHdl CDECL world_get_light(const char* name, LightType type);
 CORE_API const char* CDECL world_get_point_light_by_index(size_t index, LightHdl* hdl);
 CORE_API const char* CDECL world_get_spot_light_by_index(size_t index, LightHdl* hdl);
 CORE_API const char* CDECL world_get_dir_light_by_index(size_t index, LightHdl* hdl);
@@ -530,9 +531,11 @@ CORE_API void CDECL mufflon_destroy();
 // TODO
 CORE_API Boolean CDECL display_screenshot();
 CORE_API Boolean CDECL resize(int width, int height, int offsetX, int offsetY);
-CORE_API void CDECL execute_command(const char* command);
 CORE_API const char* CDECL core_get_dll_error();
 CORE_API bool CDECL core_set_log_level(LogLevel level);
+
+
+//CORE_API const char* CDECL get_teststring();
 
 
 }
