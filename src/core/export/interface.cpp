@@ -18,7 +18,7 @@
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/lambert.hpp"
-#include "loader/export/interface.h"
+#include "mffloader/interface/interface.h"
 #include <cuda_runtime.h>
 #include <type_traits>
 #include <mutex>

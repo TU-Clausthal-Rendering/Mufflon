@@ -2,7 +2,7 @@
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"
-#include "loader/parsing/json_loader.hpp"
+#include "mffloader/parsing/json_loader.hpp"
 #include <atomic>
 #include <iostream>
 #include <mutex>

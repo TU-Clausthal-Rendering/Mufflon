@@ -20,9 +20,6 @@
     <Filter Include="Source Files\deps\chinoise">
       <UniqueIdentifier>{9de4c341-434c-4c95-bd7b-c29a852ca17e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\loader\export">
-      <UniqueIdentifier>{8ac1c7a9-9155-46d2-a6d5-a35f57cdb04b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\loader\parsing">
       <UniqueIdentifier>{5742c584-79b4-439d-9665-2ea0c1d89a10}</UniqueIdentifier>
     </Filter>
@@ -38,6 +35,12 @@
     <Filter Include="Source Files\core\export">
       <UniqueIdentifier>{7875ae35-a123-434f-b195-f62080099bc7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\loader\interface">
+      <UniqueIdentifier>{8ac1c7a9-9155-46d2-a6d5-a35f57cdb04b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader\export">
+      <UniqueIdentifier>{d17f245f-393e-457e-b68a-76aa4fd9286e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -48,18 +51,6 @@
     </ClCompile>
     <ClCompile Include="..\..\deps\chinoise\src\chinoise.cpp">
       <Filter>Source Files\deps\chinoise</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\loader\export\interface.cpp">
-      <Filter>Source Files\loader\export</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\loader\parsing\binary.cpp">
-      <Filter>Source Files\loader\parsing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\loader\parsing\json_helper.cpp">
-      <Filter>Source Files\loader\parsing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\loader\parsing\json_loader.cpp">
-      <Filter>Source Files\loader\parsing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\deps\miniz\miniz\miniz.c">
       <Filter>Source Files\deps\miniz</Filter>
@@ -75,6 +66,18 @@
     </ClCompile>
     <ClCompile Include="..\..\src\util\assert.cpp">
       <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mffloader\interface\interface.cpp">
+      <Filter>Source Files\loader\interface</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mffloader\parsing\binary.cpp">
+      <Filter>Source Files\loader\parsing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mffloader\parsing\json_helper.cpp">
+      <Filter>Source Files\loader\parsing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mffloader\parsing\json_loader.cpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -120,18 +123,6 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\3dintersection.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\loader\export\interface.h">
-      <Filter>Source Files\loader\export</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\loader\parsing\binary.hpp">
-      <Filter>Source Files\loader\parsing</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\loader\parsing\json_helper.hpp">
-      <Filter>Source Files\loader\parsing</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\loader\parsing\json_loader.hpp">
-      <Filter>Source Files\loader\parsing</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -147,11 +138,23 @@
     <ClInclude Include="..\..\src\profiler\profiling.hpp">
       <Filter>Source Files\profiler</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\loader\export\api.h">
-      <Filter>Source Files\loader\export</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\assert.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\interface\api.h">
+      <Filter>Source Files\loader\interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\interface\interface.h">
+      <Filter>Source Files\loader\interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\parsing\json_loader.hpp">
+      <Filter>Source Files\loader\parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\parsing\binary.hpp">
+      <Filter>Source Files\loader\parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\parsing\json_helper.hpp">
+      <Filter>Source Files\loader\parsing</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
