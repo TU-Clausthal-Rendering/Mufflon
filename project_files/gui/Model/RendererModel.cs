@@ -76,6 +76,15 @@ namespace gui.Model
             m_iterationComplete.WaitOne(Convert.ToInt32(timeout.TotalMilliseconds));
         }
 
+        // Only ever call this when you're sure that the renderer is currently not running
+        public void resetFromRenderLoop()
+        {
+            m_iteration = 0u;
+            if (!Core.render_reset())
+                throw new Exception(Core.core_get_dll_error());
+        }
+
+        // Pauses the renderer and waits for the iteration to complete if necessary
         public void reset()
         {
             if (IsRendering)

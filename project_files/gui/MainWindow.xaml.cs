@@ -22,6 +22,24 @@ namespace gui
     /// </summary>
     public partial class MainWindow : Window
     {
+        // Keeps track of the pressed status of keys
+        private bool m_pressedW = false;
+        private bool m_pressedS = false;
+        private bool m_pressedD = false;
+        private bool m_pressedA = false;
+        private bool m_pressedSpace = false;
+        private bool m_pressedLCtrl = false;
+        // Stickies pressed keys until the next question
+        private bool m_stickyW = false;
+        private bool m_stickyS = false;
+        private bool m_stickyD = false;
+        private bool m_stickyA = false;
+        private bool m_stickySpace = false;
+        private bool m_stickyLCtrl = false;
+        // To keep track of mouse dragging
+        Point m_lastMousePos;
+        Vector m_lastMouseDiff;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -33,6 +51,69 @@ namespace gui
         {
             MessageBox.Show(this, message, "OpenGL Thread Error");
             //Close();
+        }
+
+        private void OnKeyDownHandler(object sender, KeyEventArgs e)
+        {
+            switch(e.Key)
+            {
+                case Key.W: m_pressedW = true; m_stickyW = true; break;
+                case Key.S: m_pressedS = true; m_stickyS = true; break;
+                case Key.D: m_pressedD = true; m_stickyD = true; break;
+                case Key.A: m_pressedA = true; m_stickyA = true; break;
+                case Key.Space: m_pressedSpace = true; m_stickySpace = true; break;
+                case Key.LeftCtrl: m_pressedLCtrl = true; m_stickyLCtrl = true; break;
+            }
+        }
+
+        private void OnKeyUpHandler(object sender, KeyEventArgs e)
+        {
+            switch (e.Key)
+            {
+                case Key.W: m_pressedW = false; break;
+                case Key.S: m_pressedS = false; break;
+                case Key.D: m_pressedD = false; break;
+                case Key.A: m_pressedA = false; break;
+                case Key.Space: m_pressedSpace = false; break;
+                case Key.LeftCtrl: m_pressedLCtrl = false; break;
+            }
+        }
+
+        public bool wasPressedAndClear(Key key)
+        {
+            switch (key)
+            {
+                case Key.W: { bool retval = m_pressedW || m_stickyW; m_stickyW = false; return retval; }
+                case Key.S: { bool retval = m_pressedS || m_stickyS; m_stickyS = false; return retval; }
+                case Key.D: { bool retval = m_pressedD || m_stickyD; m_stickyD = false; return retval; }
+                case Key.A: { bool retval = m_pressedA || m_stickyA; m_stickyA = false; return retval; }
+                case Key.Space: { bool retval = m_pressedSpace || m_stickySpace; m_stickySpace = false; return retval; }
+                case Key.LeftCtrl: { bool retval = m_pressedLCtrl || m_stickyLCtrl; m_stickyLCtrl = false; return retval; }
+            }
+            return false;
+        }
+
+        private void OnMouseDownHandler(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                m_lastMousePos = e.MouseDevice.GetPosition(this);
+            }
+        }
+
+        private void OnMouseUpHandler(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Released)
+            {
+                m_lastMouseDiff += e.MouseDevice.GetPosition(this) - m_lastMousePos;
+            }
+        }
+
+        public Vector getMouseDiffAndClear()
+        {
+            Vector last = m_lastMouseDiff;
+            m_lastMouseDiff = new Vector();
+            return last;
         }
     }
 }

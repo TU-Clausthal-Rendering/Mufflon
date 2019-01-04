@@ -425,6 +425,8 @@ CORE_API Boolean CDECL scenario_assign_material(ScenarioHdl scenario, MatIdx ind
 // Scene interface
 CORE_API Boolean CDECL scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max);
 CORE_API ConstCameraHdl CDECL scene_get_camera(SceneHdl scene);
+CORE_API Boolean CDECL scene_move_active_camera(float x, float y, float z);
+CORE_API Boolean CDECL scene_rotate_active_camera(float x, float y, float z);
 CORE_API void CDECL scene_mark_lighttree_dirty();
 CORE_API void CDECL scene_mark_envmap_dirty();
 CORE_API void CDECL scene_mark_material_dirty();

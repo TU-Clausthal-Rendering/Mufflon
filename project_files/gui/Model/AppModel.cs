@@ -16,7 +16,7 @@ namespace gui.Model
             Window = window;
 
             // init gl host
-            GlHost = new OpenGLHost(window.BorderHost, viewport, rendererModel);
+            GlHost = new OpenGLHost(window, viewport, rendererModel);
             GlHost.Error += window.GlHostOnError;
             window.Loaded += (sender, args) => window.BorderHost.Child = GlHost;
         }

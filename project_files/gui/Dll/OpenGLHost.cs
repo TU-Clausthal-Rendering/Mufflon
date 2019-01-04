@@ -7,11 +7,14 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using gui.Model;
 using gui.Properties;
+using gui.Utility;
 using gui.ViewModel;
 
 namespace gui.Dll
@@ -23,6 +26,7 @@ namespace gui.Dll
         public event ErrorEvent Error;
 
         // host of the HwndHost
+        private readonly MainWindow m_window;
         private readonly Border m_parent;
         // information about the viewport
         private readonly ViewportModel m_viewport;
@@ -36,7 +40,29 @@ namespace gui.Dll
         private Thread m_renderThread;
         private bool m_isRunning = true;
         private bool m_isRendering = false;
-        public bool IsRendering { set => m_isRendering = value; }
+
+        // Blocker for when nothing is rendering to avoid busy-loop
+        private ManualResetEvent m_startedRender = new ManualResetEvent(false);
+
+        public bool IsRendering {
+            set
+            {
+                if (m_isRendering == value) return;
+                m_isRendering = value;
+                if (m_isRendering)
+                {
+                    // Clear the sticky input once
+                    m_window.wasPressedAndClear(Key.W);
+                    m_window.wasPressedAndClear(Key.S);
+                    m_window.wasPressedAndClear(Key.D);
+                    m_window.wasPressedAndClear(Key.A);
+                    m_window.wasPressedAndClear(Key.Space);
+                    m_window.wasPressedAndClear(Key.LeftCtrl);
+                    // Signal the render loop that it may continue
+                    m_startedRender.Set();
+                }
+            }
+        }
         private readonly ConcurrentQueue<string> m_commandQueue = new ConcurrentQueue<string>();
 
         // helper to detect resize in render thread
@@ -51,9 +77,10 @@ namespace gui.Dll
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
-        public OpenGLHost(Border parent, ViewportModel viewport, RendererModel rendererModel)
+        public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel)
         {
-            m_parent = parent;
+            m_window = window;
+            m_parent = window.BorderHost;
             m_viewport = viewport;
             m_rendererModel = rendererModel;
         }
@@ -74,6 +101,10 @@ namespace gui.Dll
         /// <param name="data"></param>
         private void Render(object data)
         {
+            // TODO: make these settings
+            float keySpeed = 0.125f;
+            float mouseSpeed = 0.0025f;
+
             try
             {
                 InitializeOpenGl();
@@ -85,14 +116,60 @@ namespace gui.Dll
                 if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)Settings.Default.LoaderProfileLevel))
                     throw new Exception(Loader.loader_get_dll_error());
 
+                m_viewport.PropertyChanged += HandleResize;
 
                 while (m_isRunning)
                 {
-                    HandleCommands();
-                    HandleResize();
+                    //HandleCommands();
+                    m_startedRender.WaitOne();
+                    m_startedRender.Reset();
 
                     if (m_isRendering)
                     {
+                        bool needsReload = false;
+
+                        // Check for keyboard input
+                        float x = 0f;
+                        float y = 0f;
+                        float z = 0f;
+                        // TODO: why does it need to be mirrored?
+                        if(m_window.wasPressedAndClear(Key.W))
+                            z += keySpeed;
+                        if (m_window.wasPressedAndClear(Key.S))
+                            z -= keySpeed;
+                        if (m_window.wasPressedAndClear(Key.D))
+                            x -= keySpeed;
+                        if (m_window.wasPressedAndClear(Key.A))
+                            x += keySpeed;
+                        if (m_window.wasPressedAndClear(Key.Space))
+                            y += keySpeed;
+                        if (m_window.wasPressedAndClear(Key.LeftCtrl))
+                            y -= keySpeed;
+
+                        if(x != 0f || y != 0f || z != 0f) {
+                            // TODO: mark camera dirty
+                            if (!Core.scene_move_active_camera(x, y, z))
+                                throw new Exception(Core.core_get_dll_error());
+                            needsReload = true;
+                        }
+
+                        // Check for mouse dragging
+                        Vector drag = m_window.getMouseDiffAndClear();
+                        if(drag.X != 0 || drag.Y != 0)
+                        {
+                            if(!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
+                                throw new Exception(Core.core_get_dll_error());
+                            needsReload = true;
+                        }
+
+                        // Reload the scene if necessary
+                        if(needsReload)
+                        {
+                            if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                                throw new Exception(Core.core_get_dll_error());
+                            m_rendererModel.resetFromRenderLoop();
+                        }
+
                         if (!Core.render_iterate())
                             throw new Exception(Core.core_get_dll_error());
                         if (!Core.display_screenshot())
@@ -100,6 +177,7 @@ namespace gui.Dll
                         if (!Gdi32.SwapBuffers(m_deviceContext))
                             throw new Win32Exception(Marshal.GetLastWin32Error());
                         m_rendererModel.performedIteration();
+                        m_startedRender.Set();
                     }
                 }
             }
@@ -147,7 +225,7 @@ namespace gui.Dll
         /// <summary>
         /// asynch thread: calls the dll resize() function if the client area was resized
         /// </summary>
-        private void HandleResize()
+        private void HandleResize(object sender, PropertyChangedEventArgs args)
         {
             // viewport resize?
             int newWidth = m_viewport.Width;
@@ -158,12 +236,19 @@ namespace gui.Dll
             if (m_renderWidth != newWidth || m_renderHeight != newHeight ||
                 m_renderOffsetX != newOffsetX || m_renderOffsetY != newOffsetY)
             {
+                // Pause the renderer if necessary
+                bool wasRunning = m_rendererModel.IsRendering;
+                m_rendererModel.IsRendering = false;
+                m_rendererModel.reset();
+
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
                 m_renderOffsetX = newOffsetX;
                 m_renderOffsetY = newOffsetY;
                 if (!Core.resize(m_renderWidth, m_renderHeight, m_renderOffsetX, m_renderOffsetY))
                     throw new Exception(Core.core_get_dll_error());
+
+                m_rendererModel.IsRendering = wasRunning;
             }
         }
 
@@ -214,6 +299,7 @@ namespace gui.Dll
         {
             // stop render thread
             m_isRunning = false;
+            m_startedRender.Set();
             m_renderThread.Join();
 
             // destroy resources

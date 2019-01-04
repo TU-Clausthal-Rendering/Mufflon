@@ -2139,6 +2139,28 @@ ConstCameraHdl scene_get_camera(SceneHdl scene) {
 	CATCH_ALL(nullptr)
 }
 
+Boolean scene_move_active_camera(float x, float y, float z) {
+	TRY
+	if(WorldContainer::instance().get_current_scene() == nullptr) {
+		logError("[", FUNCTION_NAME, "] No scene loaded yet");
+		return false;
+	}
+	WorldContainer::instance().get_current_scenario()->get_camera()->move(x, y, z);
+	CATCH_ALL(false)
+}
+
+Boolean scene_rotate_active_camera(float x, float y, float z) {
+	TRY
+		if(WorldContainer::instance().get_current_scene() == nullptr) {
+			logError("[", FUNCTION_NAME, "] No scene loaded yet");
+			return false;
+		}
+	WorldContainer::instance().get_current_scenario()->get_camera()->rotate_up_down(x);
+	WorldContainer::instance().get_current_scenario()->get_camera()->rotate_left_right(y);
+	WorldContainer::instance().get_current_scenario()->get_camera()->roll(z);
+	CATCH_ALL(false)
+}
+
 void scene_mark_lighttree_dirty() {
 	TRY
 	SceneHandle scene = WorldContainer::instance().get_current_scene();
