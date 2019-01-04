@@ -61,8 +61,12 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
+	if(coord.x == 395 && coord.y == 300) {
+		const float f = 1.f;
+	}
 	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
+
 
 	int pathLen = 0;
 	do {
@@ -103,6 +107,9 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 										ei::Vec3{ 0, 0, 0 });
 			}
 			break;
+		}
+		if(pathLen >= 1) {
+			const float t5 = 5.f;
 		}
 		++pathLen;
 

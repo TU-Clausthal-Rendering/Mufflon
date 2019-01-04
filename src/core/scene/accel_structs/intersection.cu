@@ -110,21 +110,21 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 	float t = -1.f;
 	float v0, v1;
 	if(ei::solveSquarePoly(A2*C1 - A1*C2, A2*D1 - A1*D2 + B2*C1 - B1*C2, B2*D1 - B1*D2, v0, v1)) {
-		// For the sake of divergence ignore the fact we might only have a single intersection
+		// For the sake of divergence ignore the fact we might only have a single solution
 		float u0, u1;
 		float t0 = -1.f;
 		float t1 = -1.f;
 		if(v0 >= 0.f && v0 <= 1.f) {
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
-				ei::Vec3 p0 = ei::bilerp(p00, p01, p10, p11, u0, v0);
+				ei::Vec3 p0 = ei::bilerp(p00, p10, p01, p11, u0, v0);
 				t0 = computeT(ray, p0);
 			}
 		}
 		if(v1 >= 0.f && v1 <= 1.f) {
 			u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u1 >= 0.f && u1 <= 1.f) {
-				ei::Vec3 p1 = ei::bilerp(p00, p01, p10, p11, u1, v1);
+				ei::Vec3 p1 = ei::bilerp(p00, p10, p01, p11, u1, v1);
 				t1 = computeT(ray, p1);
 			}
 		}
