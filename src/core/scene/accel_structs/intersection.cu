@@ -659,27 +659,25 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 				const ei::Vec2 uvV[4] = { meshUVs[ids.x], meshUVs[ids.y], meshUVs[ids.z], meshUVs[ids.w] };
 				// Compute tangent space by using surrogate coordinate system to get interpolated UVs
 				// TODO: fetch the instance instead (issue #44)
-				const ei::Vec3 dxds = hitBarycentric.y * (v[0u] + v[2u] - v[1u] - v[3u]) - v[0u] + v[1u];
-				const ei::Vec3 dxdt = hitBarycentric.x * (v[0u] + v[2u] - v[1u] - v[3u]) - v[0u] + v[3u];
+				const ei::Vec3 dxds = (1.f - hitBarycentric.y) * (v[3u] - v[0u]) + hitBarycentric.y * (v[2u] - v[1u]);
+				const ei::Vec3 dxdt = (1.f - hitBarycentric.x) * (v[1u] - v[0u]) + hitBarycentric.x * (v[2u] - v[3u]);
 				const ei::Matrix<float, 3, 2> dxdst{
 					dxds.x, dxdt.x,
 					dxds.y, dxdt.y,
 					dxds.z, dxdt.z
 				};
-				const ei::Vec2 duds = hitBarycentric.y * (uvV[0u] + uvV[2u] - uvV[1u] - uvV[3u]) - uvV[0u] + uvV[1u];
-				const ei::Vec2 dudt = hitBarycentric.x * (uvV[0u] + uvV[2u] - uvV[1u] - uvV[3u]) - uvV[0u] + uvV[3u];
+				const ei::Vec2 duds = (1.f - hitBarycentric.y) * (uvV[3u] - uvV[0u]) + hitBarycentric.y * (uvV[2u] - uvV[1u]);
+				const ei::Vec2 dudt = (1.f - hitBarycentric.x) * (uvV[1u] - uvV[0u]) + hitBarycentric.x * (uvV[2u] - uvV[3u]);
 				const ei::Matrix<float, 2, 2> dudst{
 					duds.x, dudt.x,
 					duds.y, dudt.y,
 				};
-				// TODO: compute inverse ourselves?
-				const ei::Matrix<float, 2, 2> dsduv = ei::invert(dsduv);
+				const ei::Mat2x2 dsduv = ei::invert(dudst);
 				const ei::Matrix<float, 3, 2> tangents = dxdst * dsduv;
 				tangentX = ei::Vec3{ tangents(0, 0), tangents(1, 0), tangents(2, 0) };
 				tangentY = ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) };
 
-
-				normal = ei::cross(tangentY, tangentX);
+				normal = ei::cross(tangentX, tangentY);
 				uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], hitBarycentric.x, hitBarycentric.y);
 			}
 		}
