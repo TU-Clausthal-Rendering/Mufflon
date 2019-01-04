@@ -13,6 +13,15 @@ namespace mufflon {
 namespace scene {
 namespace accel_struct {
 
+// The surface coordinates of the hitpoint, depending on primitive type
+union SurfaceParametrization {
+	ei::Vec2 barycentric;	// Triangle
+	ei::Vec2 bilinear;		// Quad
+	ei::Vec2 st;			// Sphere
+
+	__host__ __device__ SurfaceParametrization() {}
+};
+
 struct RayIntersectionResult {
 	float hitT;
 	struct HitID {
@@ -27,7 +36,7 @@ struct RayIntersectionResult {
 	ei::Vec3 tangentX;
 	ei::Vec3 tangentY;
 	ei::Vec2 uv;
-	ei::Vec3 barycentric; // TODO: storing 2 is sufficient, TODO: different coordinates for spheres/quads
+	SurfaceParametrization surfaceParams;
 };
 
 struct RayInfo {
