@@ -12,11 +12,8 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	mAssert(scene.objects[0u].polygon.numVertices > 0u || scene.objects[0u].spheres.numSpheres > 0u);
 	// Shoot a ray to a point in the scene (any surface suffices)
 	// We need to transform the vertex from object to world space
-	const ei::Mat3x3 rotation{ scene.transformations[0u] };
-	const ei::Vec3 translation{ scene.transformations[0u][3],
-								scene.transformations[0u][7],
-								scene.transformations[0u][11] };
-	const ei::Vec3 vertex = rotation * (accel_struct::get_centroid(scene.objects[scene.objectIndices[0u]], 0) + translation);
+	const ei::Vec3 vertex = scene.transformations[0u] 
+		* ei::Vec4{accel_struct::get_centroid(scene.objects[scene.objectIndices[0u]], 0), 1.0f};
 
 	ei::Vec3 dir = vertex - pos;
 	const float length = ei::len(dir);
