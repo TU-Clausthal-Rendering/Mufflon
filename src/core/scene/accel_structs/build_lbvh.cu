@@ -472,7 +472,8 @@ CUDA_FUNCTION void mark_collapsed_nodes(
 		if(currentNode < 0) currentNode = ~currentNode;
 	}
 
-	// TODO: can we set marks imediatelly? Does SAH guarentee monotony?
+	// We cannot set marks imediatelly, since there is counter-example for that
+	// SAH guarentees to be monotony.
 
 	// Is there any ancestor, which is collapsed?
 	if(collapseNode != -1) {
