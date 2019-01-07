@@ -101,65 +101,41 @@ namespace gui.ViewModel
                     // Add new light source
                     if (light.GetType() == typeof(PointLightModel))
                     {
-                        light.Handle = Core.world_add_point_light(light.Name, new Core.Vec3((light as PointLightModel).Position),
-                            new Core.Vec3((light as PointLightModel).Intensity));
+                        light.Handle = Core.world_add_light(light.Name, Core.LightType.POINT);
+                        loadSceneLightData(light.Handle, light as PointLightModel);
                     }
                     else if (light.GetType() == typeof(SpotLightModel))
                     {
-                        light.Handle = Core.world_add_spot_light(light.Name, new Core.Vec3((light as SpotLightModel).Position),
-                            new Core.Vec3((light as SpotLightModel).Direction), new Core.Vec3((light as SpotLightModel).Intensity),
-                            (light as SpotLightModel).Width, (light as SpotLightModel).FalloffStart);
+                        light.Handle = Core.world_add_light(light.Name, Core.LightType.SPOT);
+                        loadSceneLightData(light.Handle, light as SpotLightModel);
                     }
                     else if (light.GetType() == typeof(DirectionalLightModel))
                     {
-                        light.Handle = Core.world_add_directional_light(light.Name, new Core.Vec3((light as DirectionalLightModel).Direction),
-                            new Core.Vec3((light as DirectionalLightModel).Radiance));
+                        light.Handle = Core.world_add_light(light.Name, Core.LightType.DIRECTIONAL);
+                        loadSceneLightData(light.Handle, light as DirectionalLightModel);
                     }
                     else if (light.GetType() == typeof(EnvmapLightModel))
                     {
-                        IntPtr envMapHandle = Core.world_add_texture((light as EnvmapLightModel).Map, Core.TextureSampling.LINEAR);
-                        if (envMapHandle == IntPtr.Zero)
-                            throw new Exception(Core.core_get_dll_error());
-                        light.Handle = Core.world_add_envmap_light(light.Name, envMapHandle);
+                        light.Handle = Core.world_add_light(light.Name, Core.LightType.ENVMAP);
                     }
-                    if (light.Handle == IntPtr.Zero)
-                        throw new Exception(Core.core_get_dll_error());
                 }
             } else if(args.Action == NotifyCollectionChangedAction.Remove)
             {
                 bool wasRendering = m_models.Renderer.IsRendering;
                 bool needsRebuild = false;
                 IntPtr currScenario = Core.world_get_current_scenario();
-                for (int i = 0; i < args.NewItems.Count; ++i)
+                for (int i = 0; i < args.OldItems.Count; ++i)
                 {
                     LightModel light = (args.OldItems[i] as LightModel);
-                    if(light.IsSelected)
+                    if (light.IsSelected)
                     {
                         m_models.Renderer.IsRendering = false;
                         needsRebuild = true;
                     }
                     light.PropertyChanged -= OnLightChanged;
                     // remove light source
-                    if (light.GetType() == typeof(PointLightModel))
-                    {
-                        if (!Core.world_remove_point_light((light as PointLightModel).Handle))
-                            throw new Exception(Core.core_get_dll_error());
-                    }
-                    else if (light.GetType() == typeof(SpotLightModel))
-                    {
-                        if (!Core.world_remove_spot_light((light as SpotLightModel).Handle))
-                            throw new Exception(Core.core_get_dll_error());
-                    }
-                    else if (light.GetType() == typeof(DirectionalLightModel))
-                    {
-                        if (!Core.world_remove_dir_light((light as DirectionalLightModel).Handle))
-                            throw new Exception(Core.core_get_dll_error());
-                    }
-                    else if (light.GetType() == typeof(EnvmapLightModel))
-                    {
-                        if (!Core.world_remove_envmap_light((light as EnvmapLightModel).Handle))
-                            throw new Exception(Core.core_get_dll_error());
-                    }
+                    if (!Core.world_remove_light(light.Handle))
+                        throw new Exception(Core.core_get_dll_error());
                     // Also remove it from the scenario, if it was selected, and update the scene
                     if ((light as LightModel).IsSelected)
                     {
@@ -547,6 +523,57 @@ namespace gui.ViewModel
             }
         }
 
+        private void loadSceneLightData(IntPtr lightHdl, PointLightModel lightModel)
+        {
+            Core.Vec3 pos = new Core.Vec3();
+            Core.Vec3 intensity = new Core.Vec3();
+            if (!Core.world_get_point_light_position(lightHdl, ref pos))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.world_get_point_light_intensity(lightHdl, ref intensity))
+                throw new Exception(Core.core_get_dll_error());
+
+            lightModel.Position = new Vec3<float>(pos.x, pos.y, pos.z);
+            lightModel.Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z);
+        }
+
+        private void loadSceneLightData(IntPtr lightHdl, SpotLightModel lightModel)
+        {
+            Core.Vec3 pos = new Core.Vec3();
+            Core.Vec3 dir = new Core.Vec3();
+            Core.Vec3 intensity = new Core.Vec3();
+            float angle = 0f;
+            float falloff = 0f;
+            if (!Core.world_get_spot_light_position(lightHdl, ref pos))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.world_get_spot_light_direction(lightHdl, ref dir))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.world_get_spot_light_intensity(lightHdl, ref intensity))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.world_get_spot_light_angle(lightHdl, ref angle))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.world_get_spot_light_falloff(lightHdl, ref falloff))
+                throw new Exception(Core.core_get_dll_error());
+
+            lightModel.Position = new Vec3<float>(pos.x, pos.y, pos.z);
+            lightModel.Direction = new Vec3<float>(dir.x, dir.y, dir.z);
+            lightModel.Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z);
+            lightModel.Width = angle;
+            lightModel.FalloffStart = falloff;
+        }
+
+        private void loadSceneLightData(IntPtr lightHdl, DirectionalLightModel lightModel)
+        {
+            Core.Vec3 dir = new Core.Vec3();
+            Core.Vec3 radiance = new Core.Vec3();
+            if (!Core.world_get_dir_light_direction(lightHdl, ref dir))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.world_get_dir_light_radiance(lightHdl, ref radiance))
+                throw new Exception(Core.core_get_dll_error());
+
+            lightModel.Direction = new Vec3<float>(dir.x, dir.y, dir.z);
+            lightModel.Radiance = new Vec3<float>(radiance.x, radiance.y, radiance.z);
+        }
+
         private void loadSceneLights()
         {
             m_models.Lights.Models.Clear();
@@ -554,24 +581,17 @@ namespace gui.ViewModel
             ulong pointLightCount = Core.world_get_point_light_count();
             for(ulong i = 0u; i < pointLightCount; ++i)
             {
-                IntPtr hdl = IntPtr.Zero;
-                string name = Core.world_get_point_light_by_index(i, ref hdl);
-                if (hdl == IntPtr.Zero || name == null || name.Length == 0)
-                    throw new Exception(Core.core_get_dll_error());
-                Core.Vec3 pos = new Core.Vec3();
-                Core.Vec3 intensity = new Core.Vec3();
-                if (!Core.world_get_point_light_position(hdl, ref pos))
-                    throw new Exception(Core.core_get_dll_error());
-                if (!Core.world_get_point_light_intensity(hdl, ref intensity))
+                IntPtr hdl = Core.world_get_light_handle(i, Core.LightType.POINT);
+                string name = Core.world_get_light_name(hdl);
+                if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
 
                 m_models.Lights.Models.Add(new PointLightModel()
                 {
                     Name = name,
                     Handle = hdl,
-                    Position = new Vec3<float>(pos.x, pos.y, pos.z),
-                    Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z)
                 });
+                loadSceneLightData(hdl, m_models.Lights.Models.Last() as PointLightModel);
                 m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
@@ -579,36 +599,17 @@ namespace gui.ViewModel
             ulong spotLightCount = Core.world_get_spot_light_count();
             for (ulong i = 0u; i < spotLightCount; ++i)
             {
-                IntPtr hdl = IntPtr.Zero;
-                string name = Core.world_get_spot_light_by_index(i, ref hdl);
-                if (hdl == IntPtr.Zero || name == null || name.Length == 0)
-                    throw new Exception(Core.core_get_dll_error());
-                Core.Vec3 pos = new Core.Vec3();
-                Core.Vec3 dir = new Core.Vec3();
-                Core.Vec3 intensity = new Core.Vec3();
-                float angle = 0f;
-                float falloff = 0f;
-                if (!Core.world_get_spot_light_position(hdl, ref pos))
-                    throw new Exception(Core.core_get_dll_error());
-                if (!Core.world_get_spot_light_direction(hdl, ref dir))
-                    throw new Exception(Core.core_get_dll_error());
-                if (!Core.world_get_spot_light_intensity(hdl, ref intensity))
-                    throw new Exception(Core.core_get_dll_error());
-                if (!Core.world_get_spot_light_angle(hdl, ref angle))
-                    throw new Exception(Core.core_get_dll_error());
-                if (!Core.world_get_spot_light_falloff(hdl, ref falloff))
+                IntPtr hdl = Core.world_get_light_handle(i, Core.LightType.SPOT);
+                string name = Core.world_get_light_name(hdl);
+                if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
 
                 m_models.Lights.Models.Add(new SpotLightModel()
                 {
                     Name = name,
                     Handle = hdl,
-                    Position = new Vec3<float>(pos.x, pos.y, pos.z),
-                    Direction = new Vec3<float>(dir.x, dir.y, dir.z),
-                    Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z),
-                    Width = angle,
-                    FalloffStart = falloff
                 });
+                loadSceneLightData(hdl, m_models.Lights.Models.Last() as SpotLightModel);
                 m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
@@ -616,24 +617,17 @@ namespace gui.ViewModel
             ulong dirLightCount = Core.world_get_dir_light_count();
             for (ulong i = 0u; i < dirLightCount; ++i)
             {
-                IntPtr hdl = IntPtr.Zero;
-                string name = Core.world_get_dir_light_by_index(i, ref hdl);
-                if (hdl == IntPtr.Zero || name == null || name.Length == 0)
-                    throw new Exception(Core.core_get_dll_error());
-                Core.Vec3 dir = new Core.Vec3();
-                Core.Vec3 radiance = new Core.Vec3();
-                if (!Core.world_get_dir_light_direction(hdl, ref dir))
-                    throw new Exception(Core.core_get_dll_error());
-                if (!Core.world_get_dir_light_radiance(hdl, ref radiance))
+                IntPtr hdl = Core.world_get_light_handle(i, Core.LightType.DIRECTIONAL);
+                string name = Core.world_get_light_name(hdl);
+                if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
 
                 m_models.Lights.Models.Add(new DirectionalLightModel()
                 {
                     Name = name,
                     Handle = hdl,
-                    Direction = new Vec3<float>(dir.x, dir.y, dir.z),
-                    Radiance = new Vec3<float>(radiance.x, radiance.y, radiance.z)
                 });
+                loadSceneLightData(hdl, m_models.Lights.Models.Last() as DirectionalLightModel);
                 m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
@@ -641,9 +635,9 @@ namespace gui.ViewModel
             ulong envLightCount = Core.world_get_env_light_count();
             for (ulong i = 0u; i < envLightCount; ++i)
             {
-                IntPtr hdl = IntPtr.Zero;
-                string name = Core.world_get_env_light_by_index(i, ref hdl);
-                if (hdl == IntPtr.Zero || name == null || name.Length == 0)
+                IntPtr hdl = Core.world_get_light_handle(i, Core.LightType.ENVMAP);
+                string name = Core.world_get_light_name(hdl);
+                if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
                 string map = Core.world_get_env_light_map(hdl);
                 if (map == null || map.Length == 0)

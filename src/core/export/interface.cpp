@@ -1328,126 +1328,38 @@ Boolean world_remove_camera(CameraHdl hdl) {
 	CATCH_ALL(false)
 }
 
-LightHdl world_add_point_light(const char* name, Vec3 position, Vec3 intensity) {
+LightHdl world_add_light(const char* name, LightType type) {
 	TRY
-	CHECK_NULLPTR(name, "pointlight name", nullptr);
-	auto hdl = WorldContainer::instance().add_light(name, lights::PointLight{
-													util::pun<ei::Vec3>(position),
-													std::numeric_limits<MaterialIndex>::max(), // Placeholder
-													util::pun<ei::Vec3>(intensity) });
+	CHECK_NULLPTR(name, "pointlight name", (LightHdl{7, 0}));
+	std::optional<u32> hdl;
+	switch(type) {
+		case LIGHT_POINT: {
+			hdl = WorldContainer::instance().add_light(name, lights::PointLight{});
+		} break;
+		case LIGHT_SPOT: {
+			hdl = WorldContainer::instance().add_light(name, lights::SpotLight{});
+		} break;
+		case LIGHT_DIRECTIONAL: {
+			hdl = WorldContainer::instance().add_light(name, lights::DirectionalLight{});
+		} break;
+		case LIGHT_ENVMAP: {
+			hdl = WorldContainer::instance().add_light(name, TextureHandle{});
+		} break;
+	}
 	if(!hdl.has_value()) {
-		logError("[", FUNCTION_NAME, "] Error adding point light");
-		return nullptr;
+		logError("[", FUNCTION_NAME, "] Error adding a light");
+		return LightHdl{7, 0};
 	}
-	return static_cast<LightHdl>(&hdl.value()->second);
-	CATCH_ALL(nullptr)
+	return LightHdl{u32(type), hdl.value()};
+	CATCH_ALL((LightHdl{7, 0}))
 }
 
-LightHdl world_add_spot_light(const char* name, Vec3 position, Vec3 direction,
-							  Vec3 intensity, float openingAngle,
-							  float falloffStart) {
+Boolean world_remove_light(LightHdl hdl) {
 	TRY
-	CHECK_NULLPTR(name, "spotlight name", nullptr);
-	ei::Vec3 dir = ei::normalize(util::pun<ei::Vec3>(direction));
-	if(!ei::approx(ei::len(dir), 1.0f)) {
-		logError("[", FUNCTION_NAME, "] Spotlight direction cannot be a null vector");
-		return nullptr;
-	}
-	float actualAngle = std::fmod(openingAngle, 2.f * ei::PI);
-	float actualFalloff = std::fmod(falloffStart, 2.f * ei::PI);
-	if(actualAngle < 0.f)
-		actualAngle += 2.f*ei::PI;
-	if(actualFalloff < 0.f)
-		actualFalloff += 2.f*ei::PI;
-	if(actualAngle > ei::PI / 2.f) {
-		logWarning("[", FUNCTION_NAME, "] Spotlight angle will be clamped between 0-180 degrees");
-		actualAngle = ei::PI / 2.f;
-	}
-	float cosAngle = std::cos(actualAngle);
-	float cosFalloff = std::cos(actualFalloff);
-	if(cosAngle > cosFalloff) {
-		logWarning("[", FUNCTION_NAME, "] Spotlight falloff angle cannot be larger than"
-				   " its opening angle");
-		cosFalloff = cosAngle;
-	}
-
-	auto hdl = WorldContainer::instance().add_light(name, lights::SpotLight{
-													util::pun<ei::Vec3>(position),
-													__float2half(cosAngle),
-													__float2half(cosFalloff),
-													dir,
-													std::numeric_limits<MaterialIndex>::max(), // Placeholder
-													util::pun<ei::Vec3>(intensity),
-													 });
-	if(!hdl.has_value()) {
-		logError("[", FUNCTION_NAME, "] Error adding point light");
-		return nullptr;
-	}
-	return static_cast<LightHdl>(&hdl.value()->second);
-	CATCH_ALL(nullptr)
-}
-
-LightHdl world_add_directional_light(const char* name, Vec3 direction,
-									 Vec3 radiance) {
-	TRY
-	CHECK_NULLPTR(name, "directional light name", nullptr);
-	auto hdl = WorldContainer::instance().add_light(name, lights::DirectionalLight{
-													util::pun<ei::Vec3>(direction),
-													util::pun<ei::Vec3>(radiance) });
-	if(!hdl.has_value()) {
-		logError("[", FUNCTION_NAME, "] Error adding directional light");
-		return nullptr;
-	}
-	return static_cast<LightHdl>(&hdl.value()->second);
-	CATCH_ALL(nullptr)
-}
-
-LightHdl world_add_envmap_light(const char* name, TextureHdl envmap) {
-	TRY
-	CHECK_NULLPTR(name, "directional light name", nullptr);
-	CHECK_NULLPTR(envmap, "environment map", nullptr);
-	TextureHandle hdl = static_cast<TextureHandle>(envmap);
-	auto envLight = WorldContainer::instance().add_light(name, hdl);
-	if(!envLight.has_value()) {
-		logError("[", FUNCTION_NAME, "] Error adding environment-map light");
-		return nullptr;
-	}
-	return envLight.value()->second;
-	CATCH_ALL(nullptr)
-}
-
-Boolean world_remove_point_light(LightHdl hdl) {
-	TRY
-	CHECK_NULLPTR(hdl, "point light handle", false);
-	WorldContainer::instance().remove_light(static_cast<lights::PointLight*>(hdl));
+	WorldContainer::instance().remove_light(hdl.index, lights::LightType(hdl.type));
 	return true;
 	CATCH_ALL(false)
 }
-
-Boolean world_remove_spot_light(LightHdl hdl) {
-	TRY
-		CHECK_NULLPTR(hdl, "spot light handle", false);
-	WorldContainer::instance().remove_light(static_cast<lights::SpotLight*>(hdl));
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean world_remove_dir_light(LightHdl hdl) {
-	TRY
-		CHECK_NULLPTR(hdl, "directional light handle", false);
-	WorldContainer::instance().remove_light(static_cast<lights::DirectionalLight*>(hdl));
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean world_remove_envmap_light(LightHdl hdl) {
-	TRY
-		CHECK_NULLPTR(hdl, "envmap light handle", false);
-	WorldContainer::instance().remove_light(static_cast<TextureHandle*>(hdl));
-	return true;
-	CATCH_ALL(false)
-}
-
 
 size_t world_get_camera_count() {
 	TRY
@@ -1492,101 +1404,18 @@ size_t world_get_env_light_count() {
 	CATCH_ALL(0u)
 }
 
-/*LightType world_get_light_type(const char* name) {
-	TRY
-	CHECK_NULLPTR(name, "light name", LightType::LIGHT_COUNT);
-	std::string_view nameView = name;
-	if(WorldContainer::instance().is_point_light(nameView))
-		return LightType::LIGHT_POINT;
-	else if(WorldContainer::instance().is_spot_light(nameView))
-		return LightType::LIGHT_SPOT;
-	else if(WorldContainer::instance().is_dir_light(nameView))
-		return LightType::LIGHT_DIRECTIONAL;
-	else if(WorldContainer::instance().is_env_light(nameView))
-		return LightType::LIGHT_ENVMAP;
-	else
-		return LightType::LIGHT_COUNT;
-	CATCH_ALL(LightType::LIGHT_COUNT)
+CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type) {
+	return LightHdl{u32(type), u32(index)};
 }
 
-LightHdl world_get_light(const char* name, LightType type) {
-	TRY
-	CHECK_NULLPTR(name, "light name", nullptr);
-	switch(type) {
-		case LightType::LIGHT_POINT: {
-			auto hdl = WorldContainer::instance().get_point_light(name);
-			if(!hdl.has_value()) {
-				logError("[", FUNCTION_NAME, "] Error getting point light");
-				return nullptr;
-			}
-			return static_cast<LightHdl>(&hdl.value()->second);
-		}
-		case LightType::LIGHT_SPOT: {
-			auto hdl = WorldContainer::instance().get_spot_light(name);
-			if(!hdl.has_value()) {
-				logError("[", FUNCTION_NAME, "] Error getting spot light");
-				return nullptr;
-			}
-			return static_cast<LightHdl>(&hdl.value()->second);
-		}
-		case LightType::LIGHT_DIRECTIONAL: {
-			auto hdl = WorldContainer::instance().get_dir_light(name);
-			if(!hdl.has_value()) {
-				logError("[", FUNCTION_NAME, "] Error getting directional light");
-				return nullptr;
-			}
-			return static_cast<LightHdl>(&hdl.value()->second);
-		}
-		case LightType::LIGHT_ENVMAP: {
-			auto hdl = WorldContainer::instance().get_env_light(name);
-			if(!hdl.has_value()) {
-				logError("[", FUNCTION_NAME, "] Error geting envmap light");
-				return nullptr;
-			}
-			return static_cast<LightHdl>(&hdl.value()->second);
-		}
-		default: {
-			logError("[", FUNCTION_NAME, "] Unknown light type");
-			return nullptr;
-		}
-	}
-	CATCH_ALL(nullptr)
-}*/
-
-const char* world_get_point_light_by_index(size_t index, LightHdl* hdl) {
-	TRY
-	auto iter = WorldContainer::instance().get_point_light(index);
-	if(hdl != nullptr)
-		*hdl = static_cast<LightHdl>(&iter->second);
-	return iter->first.c_str();
-	CATCH_ALL(nullptr)
-}
-
-const char* world_get_spot_light_by_index(size_t index, LightHdl* hdl) {
-	TRY
-	auto iter = WorldContainer::instance().get_spot_light(index);
-	if(hdl != nullptr)
-		*hdl = static_cast<LightHdl>(&iter->second);
-	return iter->first.c_str();
-	CATCH_ALL(nullptr)
-}
-
-const char* world_get_dir_light_by_index(size_t index, LightHdl* hdl) {
-	TRY
-	auto iter = WorldContainer::instance().get_dir_light(index);
-	if(hdl != nullptr)
-		*hdl = static_cast<LightHdl>(&iter->second);
-	return iter->first.c_str();
-	CATCH_ALL(nullptr)
-}
-
-const char* world_get_env_light_by_index(size_t index, LightHdl* hdl) {
-	TRY
-	auto iter = WorldContainer::instance().get_env_light(index);
-	if(hdl != nullptr)
-		*hdl = static_cast<LightHdl>(&iter->second);
-	return iter->first.c_str();
-	CATCH_ALL(nullptr)
+CORE_API const char* CDECL world_get_light_name(LightHdl hdl) {
+	constexpr lights::LightType TYPES[] = {
+		lights::LightType::POINT_LIGHT,
+		lights::LightType::SPOT_LIGHT,
+		lights::LightType::DIRECTIONAL_LIGHT,
+		lights::LightType::ENVMAP_LIGHT
+	};
+	return s_world.get_light_name(hdl.index, TYPES[hdl.type]).data();
 }
 
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
@@ -2036,12 +1865,13 @@ Boolean scenario_add_light(ScenarioHdl scenario, const char* name) {
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(name, "light name", false);
 	// Indirection via world container because we store string_views
-	std::optional<std::string_view> resolvedName = WorldContainer::instance().get_light_name_ref(name);
-	if(!resolvedName.has_value()) {
+	auto light = s_world.find_light(name);
+	if(!light.has_value()) {
 		logError("[", FUNCTION_NAME, "] Light source '", name, "' does not exist");
 		return false;
 	}
-	static_cast<Scenario*>(scenario)->add_light(resolvedName.value());
+	std::string_view resolvedName = s_world.get_light_name(light.value().first, light.value().second);
+	static_cast<Scenario*>(scenario)->add_light(resolvedName);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2179,129 +2009,128 @@ void scene_mark_materials_dirty() {
 
 Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos) {
 	TRY
-	CHECK_NULLPTR(hdl, "pointlight handle", false);
-	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
+	const lights::PointLight* light = s_world.get_point_light(hdl.index);
+	CHECK_NULLPTR(light, "point light handle", false);
 	if(pos != nullptr)
-		*pos = util::pun<Vec3>(light.position);
+		*pos = util::pun<Vec3>(light->position);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
 	TRY
-	CHECK_NULLPTR(hdl, "pointlight handle", false);
-	const lights::PointLight& light = *static_cast<const lights::PointLight*>(hdl);
+	const lights::PointLight* light = s_world.get_point_light(hdl.index);
+	CHECK_NULLPTR(light, "point light handle", false);
 	if(intensity != nullptr)
-		*intensity = util::pun<Vec3>(light.intensity);
+		*intensity = util::pun<Vec3>(light->intensity);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos) {
 	TRY
-	CHECK_NULLPTR(hdl, "pointlight handle", false);
-	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
-	light.position = util::pun<ei::Vec3>(pos);
+	lights::PointLight* light = s_world.get_point_light(hdl.index);
+	CHECK_NULLPTR(light, "point light handle", false);
+	light->position = util::pun<ei::Vec3>(pos);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
 	TRY
-	CHECK_NULLPTR(hdl, "pointlight handle", false);
-	lights::PointLight& light = *static_cast<lights::PointLight*>(hdl);
-	light.intensity = util::pun<ei::Vec3>(intensity);
+	lights::PointLight* light = s_world.get_point_light(hdl.index);
+	CHECK_NULLPTR(light, "point light handle", false);
+	light->intensity = util::pun<ei::Vec3>(intensity);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	if(pos != nullptr)
-		*pos = util::pun<Vec3>(light.position);
+		*pos = util::pun<Vec3>(light->position);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	if(intensity != nullptr)
-		*intensity = util::pun<Vec3>(light.intensity);
+		*intensity = util::pun<Vec3>(light->intensity);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	if(direction != nullptr)
-		*direction = util::pun<Vec3>(light.direction);
+		*direction = util::pun<Vec3>(light->direction);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	if(angle != nullptr)
-		*angle = std::acos(__half2float(light.cosThetaMax));
+		*angle = std::acos(__half2float(light->cosThetaMax));
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	const lights::SpotLight& light = *static_cast<const lights::SpotLight*>(hdl);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	if(falloff != nullptr)
-		*falloff = std::acos(__half2float(light.cosFalloffStart));
+		*falloff = std::acos(__half2float(light->cosFalloffStart));
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
-	light.position = util::pun<ei::Vec3>(pos);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
+	light->position = util::pun<ei::Vec3>(pos);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
-	light.intensity = util::pun<ei::Vec3>(intensity);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
+	light->intensity = util::pun<ei::Vec3>(intensity);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
 		logError("[", FUNCTION_NAME, "] Spotlight direction cannot be a null vector");
 		return false;
 	}
-	// TODO: check direction
-	light.direction = util::pun<ei::Vec3>(actualDirection);
+	light->direction = util::pun<ei::Vec3>(actualDirection);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 
 	float actualAngle = std::fmod(angle, 2.f * ei::PI);
 	if(actualAngle < 0.f)
@@ -2310,27 +2139,27 @@ Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
 		logWarning("[", FUNCTION_NAME, "] Spotlight angle will be clamped between 0-180 degrees");
 		actualAngle = ei::PI / 2.f;
 	}
-	light.cosThetaMax = __float2half(std::cos(actualAngle));
+	light->cosThetaMax = __float2half(std::cos(actualAngle));
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 	TRY
-	CHECK_NULLPTR(hdl, "spotlight handle", false);
-	lights::SpotLight& light = *static_cast<lights::SpotLight*>(hdl);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	CHECK_NULLPTR(light, "spot light handle", false);
 	// Clamp it to the opening angle!
 	float actualFalloff = std::fmod(falloff, 2.f * ei::PI);
 	if(actualFalloff < 0.f)
 		actualFalloff += 2.f*ei::PI;
 	const float cosFalloff = std::cos(actualFalloff);
 	const __half compressedCosFalloff = __float2half(cosFalloff);
-	if(__half2float(light.cosThetaMax) > __half2float(compressedCosFalloff)) {
+	if(__half2float(light->cosThetaMax) > __half2float(compressedCosFalloff)) {
 		logWarning("[", FUNCTION_NAME, "] Spotlight falloff angle cannot be larger than"
 				   " its opening angle");
-		light.cosFalloffStart = light.cosThetaMax;
+		light->cosFalloffStart = light->cosThetaMax;
 	} else {
-		light.cosFalloffStart = compressedCosFalloff;
+		light->cosFalloffStart = compressedCosFalloff;
 	}
 	return true;
 	CATCH_ALL(false)
@@ -2338,51 +2167,51 @@ Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 
 Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	TRY
-	CHECK_NULLPTR(hdl, "directional light handle", false);
-	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
+	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	CHECK_NULLPTR(light, "directional light handle", false);
 	if(direction != nullptr)
-		*direction = util::pun<Vec3>(light.direction);
+		*direction = util::pun<Vec3>(light->direction);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* radiance) {
 	TRY
-	CHECK_NULLPTR(hdl, "directional light handle", false);
-	const lights::DirectionalLight& light = *static_cast<const lights::DirectionalLight*>(hdl);
+	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	CHECK_NULLPTR(light, "directional light handle", false);
 	if(radiance != nullptr)
-		*radiance = util::pun<Vec3>(light.radiance);
+		*radiance = util::pun<Vec3>(light->radiance);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	TRY
-	CHECK_NULLPTR(hdl, "directional light handle", false);
-	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
+	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	CHECK_NULLPTR(light, "directional light handle", false);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
 		logError("[", FUNCTION_NAME, "] Directional light direction cannot be a null vector");
 		return false;
 	}
-	light.direction = util::pun<ei::Vec3>(actualDirection);
+	light->direction = util::pun<ei::Vec3>(actualDirection);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
 	TRY
-	CHECK_NULLPTR(hdl, "directional light handle", false);
-	lights::DirectionalLight& light = *static_cast<lights::DirectionalLight*>(hdl);
-	light.radiance = util::pun<ei::Vec3>(radiance);
+	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	CHECK_NULLPTR(light, "directional light handle", false);
+	light->radiance = util::pun<ei::Vec3>(radiance);
 	return true;
 	CATCH_ALL(false)
 }
 
 const char* world_get_env_light_map(ConstLightHdl hdl) {
 	TRY
-	CHECK_NULLPTR(hdl, "environment-mapped light handle", nullptr);
-	const TextureHandle& envmap = *static_cast<const TextureHandle*>(hdl);
+	const TextureHandle& envmap = s_world.get_env_light(hdl.index);
+	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
 	auto nameOpt = WorldContainer::instance().get_texture_name(envmap);
 	if(!nameOpt.has_value()) {
 		logError("[", FUNCTION_NAME, "] Could not find envmap path!");
@@ -2396,10 +2225,11 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 
 Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {
 	TRY
-	CHECK_NULLPTR(hdl, "environment-mapped light handle", false);
 	CHECK_NULLPTR(tex, "texture handle", false);
-	// TODO
-	logWarning("[", FUNCTION_NAME, "] Changing the envmap of an environment-map light is not supported yet");
+	TextureHandle& envmap = s_world.get_env_light(hdl.index);
+	envmap = reinterpret_cast<TextureHandle>(tex);
+	// TODO: mark something as dirty?
+	// TODO: remove old texture?
 	return true;
 	CATCH_ALL(false)
 }

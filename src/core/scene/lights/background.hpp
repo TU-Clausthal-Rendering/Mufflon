@@ -76,7 +76,7 @@ public:
 		return newBck;
 	}
 
-	CUDA_FUNCTION Spectrum get_color(const ei::Vec3& direction) const {
+	CUDA_FUNCTION Spectrum get_radiance(const ei::Vec3& direction) const {
 		switch(m_type) {
 			case BackgroundType::COLORED: return m_color;
 			case BackgroundType::ENVMAP: {

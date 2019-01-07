@@ -70,6 +70,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 	int pathLen = 0;
 	do {
+		if(false)
 		if(pathLen+1 >= m_params.maxPathLength) {
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
@@ -100,7 +101,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		if(!walk(scene, *vertex, rnd, 0.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				ei::Vec3 background = scene.lightTree.background.get_color(lastDir);
+				ei::Vec3 background = scene.lightTree.background.get_radiance(lastDir);
 				// TODO: where do we get the normal and stuff from?
 				outputBuffer.contribute(coord, throughput, background,
 										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -119,7 +120,8 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(scene.lightTree, 0,
 												  lastPosition, scene::lights::guide_flux);
-				float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+				//float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+				float mis = 1.0f;
 				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 					vertex->get_normal(), vertex->get_albedo());
 			}

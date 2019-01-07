@@ -115,174 +115,126 @@ CameraHandle WorldContainer::get_camera(std::size_t index) {
 	return m_cameraHandles[index]->second.get();
 }
 
-std::optional<WorldContainer::PointLightHandle> WorldContainer::add_light(std::string name,
-																		  lights::PointLight&& light) {
-	// TODO: switch to pointers
-	if(m_pointLights.find(name) != m_pointLights.cend()) {
+std::optional<u32> WorldContainer::add_light(std::string name,
+											 lights::PointLight&& light) {
+	if(m_pointLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Point light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	m_pointLightHandles.push_back(m_pointLights.insert({ std::move(name), std::move(light) }).first);
-	return m_pointLightHandles.back();
+	return m_pointLights.insert(std::move(name), std::move(light));
 }
 
-std::optional<WorldContainer::SpotLightHandle> WorldContainer::add_light(std::string name,
-																		 lights::SpotLight&& light) {
-	// TODO: switch to pointers
-	if(m_spotLights.find(name) != m_spotLights.cend()) {
+std::optional<u32> WorldContainer::add_light(std::string name,
+											 lights::SpotLight&& light) {
+	if(m_spotLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Spot light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	m_spotLightHandles.push_back(m_spotLights.insert({ std::move(name), std::move(light) }).first);
-	return m_spotLightHandles.back();
+	return m_spotLights.insert(std::move(name), std::move(light));
 
 }
 
-std::optional<WorldContainer::DirLightHandle> WorldContainer::add_light(std::string name,
-																		lights::DirectionalLight&& light) {
-	// TODO: switch to pointers
-	if(m_dirLights.find(name) != m_dirLights.cend()) {
+std::optional<u32> WorldContainer::add_light(std::string name,
+											 lights::DirectionalLight&& light) {
+	if(m_dirLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Directional light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	m_dirLightHandles.push_back(m_dirLights.insert({ std::move(name), std::move(light) }).first);
-	return m_dirLightHandles.back();
+	return m_dirLights.insert(std::move(name), std::move(light));
 }
-std::optional<WorldContainer::EnvLightHandle> WorldContainer::add_light(std::string name,
-																		TextureHandle env) {
-	// TODO: switch to pointers
-	if(m_envLights.find(name) != m_envLights.cend()) {
+
+std::optional<u32> WorldContainer::add_light(std::string name,
+											 TextureHandle env) {
+	if(m_envLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	m_envLightHandles.push_back(m_envLights.insert({ std::move(name), std::move(env) }).first);
-	return m_envLightHandles.back();
+	return m_envLights.insert(std::move(name), std::move(env));
 }
 
-std::optional<WorldContainer::PointLightHandle> WorldContainer::get_point_light(const std::string_view& name) {
-	auto light = m_pointLights.find(name);
-	if(light == m_pointLights.end())
-		return std::nullopt;
-	return light;
+std::optional<std::pair<u32, lights::LightType>> WorldContainer::find_light(const std::string_view& name) {
+	if(m_pointLights.find(name) != nullptr)
+		return std::make_pair(u32(m_pointLights.get_index(name)), lights::LightType::POINT_LIGHT);
+	if(m_spotLights.find(name) != nullptr)
+		return std::make_pair(u32(m_spotLights.get_index(name)), lights::LightType::SPOT_LIGHT);
+	if(m_dirLights.find(name) != nullptr)
+		return std::make_pair(u32(m_dirLights.get_index(name)), lights::LightType::DIRECTIONAL_LIGHT);
+	if(m_envLights.find(name) != nullptr)
+		return std::make_pair(u32(m_envLights.get_index(name)), lights::LightType::ENVMAP_LIGHT);
+	return std::nullopt;
 }
 
-std::optional<WorldContainer::SpotLightHandle> WorldContainer::get_spot_light(const std::string_view& name) {
-	auto light = m_spotLights.find(name);
-	if(light == m_spotLights.end()) 
-		return std::nullopt;
-	return light;
-}
-
-std::optional<WorldContainer::DirLightHandle> WorldContainer::get_dir_light(const std::string_view& name) {
-	auto light = m_dirLights.find(name);
-	if(light == m_dirLights.end())
-		return std::nullopt;
-	return light;
-}
-
-std::optional<WorldContainer::EnvLightHandle> WorldContainer::get_env_light(const std::string_view& name) {
-	auto light = m_envLights.find(name);
-	if(light == m_envLights.end())
-		return std::nullopt;
-	return light;
-}
-
-WorldContainer::PointLightHandle WorldContainer::get_point_light(std::size_t index) {
+lights::PointLight* WorldContainer::get_point_light(u32 index) {
 	if(index >= m_pointLights.size())
 		throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
-								 + " >= " + std::to_string(m_pointLights.size()));
-	return m_pointLightHandles[index];
+									+ " >= " + std::to_string(m_pointLights.size()));
+	return &m_pointLights.get(index);
 }
-WorldContainer::SpotLightHandle WorldContainer::get_spot_light(std::size_t index) {
+
+lights::SpotLight* WorldContainer::get_spot_light(u32 index) {
 	if(index >= m_spotLights.size())
 		throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
-								 + " >= " + std::to_string(m_spotLightHandles.size()));
-	return m_spotLightHandles[index];
+									+ " >= " + std::to_string(m_spotLights.size()));
+	return &m_spotLights.get(index);
 }
-WorldContainer::DirLightHandle WorldContainer::get_dir_light(std::size_t index) {
+
+lights::DirectionalLight* WorldContainer::get_dir_light(u32 index) {
 	if(index >= m_dirLights.size())
 		throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
-								 + " >= " + std::to_string(m_dirLightHandles.size()));
-	return m_dirLightHandles[index];
+									+ " >= " + std::to_string(m_dirLights.size()));
+	return &m_dirLights.get(index);
 }
 
-WorldContainer::EnvLightHandle WorldContainer::get_env_light(std::size_t index) {
+TextureHandle& WorldContainer::get_env_light(u32 index) {
 	if(index >= m_envLights.size())
 		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
-								 + " >= " + std::to_string(m_envLightHandles.size()));
-	return m_envLightHandles[index];
+									+ " >= " + std::to_string(m_envLights.size()));
+	return m_envLights.get(index);
 }
 
-void WorldContainer::remove_light(lights::PointLight* hdl) {
-	if(hdl == nullptr)
-		return;
-	auto iter = m_pointLights.begin();
-	for(std::size_t i = 0u; i < m_pointLights.size(); ++i) {
-		if(hdl == &iter->second) {
-			m_pointLights.erase(iter);
-			m_pointLightHandles.erase(m_pointLightHandles.begin() + i);
-			break;
-		}
-		++iter;
+
+void WorldContainer::remove_light(u32 index, lights::LightType type) {
+	switch(type) {
+		case lights::LightType::POINT_LIGHT: {
+			if(index >= m_pointLights.size())
+				throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
+										 + " >= " + std::to_string(m_pointLights.size()));
+			m_pointLights.erase(index);
+		} break;
+		case lights::LightType::SPOT_LIGHT: {
+			if(index >= m_spotLights.size())
+				throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
+										 + " >= " + std::to_string(m_spotLights.size()));
+			m_spotLights.erase(index);
+		} break;
+		case lights::LightType::DIRECTIONAL_LIGHT: {
+			if(index >= m_dirLights.size())
+				throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
+											+ " >= " + std::to_string(m_dirLights.size()));
+			m_dirLights.erase(index);
+		} break;
+		case lights::LightType::ENVMAP_LIGHT: {
+			if(index >= m_envLights.size())
+				throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
+										 + " >= " + std::to_string(m_envLights.size()));
+			m_envLights.erase(index);
+			// TODO: delete texture?
+		} break;
+		default:
+			throw std::runtime_error("[WorldContainer::remove_light] Invalid light type.");
 	}
 }
 
-void WorldContainer::remove_light(lights::SpotLight* hdl) {
-	if(hdl == nullptr)
-		return;
-	auto iter = m_spotLights.begin();
-	for(std::size_t i = 0u; i < m_spotLights.size(); ++i) {
-		if(hdl == &iter->second) {
-			m_spotLights.erase(iter);
-			m_spotLightHandles.erase(m_spotLightHandles.begin() + i);
-			break;
-		}
-		++iter;
+std::string_view WorldContainer::get_light_name(u32 index, lights::LightType type) const {
+	switch(type) {
+		case lights::LightType::POINT_LIGHT: return m_pointLights.get_key(index);
+		case lights::LightType::SPOT_LIGHT: return m_spotLights.get_key(index);
+		case lights::LightType::DIRECTIONAL_LIGHT: return m_dirLights.get_key(index);
+		case lights::LightType::ENVMAP_LIGHT: return m_envLights.get_key(index);
+		default:
+			throw std::runtime_error("[WorldContainer::get_light_name] Invalid light type.");
 	}
-}
-
-void WorldContainer::remove_light(lights::DirectionalLight* hdl) {
-	if(hdl == nullptr)
-		return;
-	auto iter = m_dirLights.begin();
-	for(std::size_t i = 0u; i < m_dirLights.size(); ++i) {
-		if(hdl == &iter->second) {
-			m_dirLights.erase(iter);
-			m_dirLightHandles.erase(m_dirLightHandles.begin() + i);
-			break;
-		}
-		++iter;
-	}
-}
-
-void WorldContainer::remove_light(TextureHandle* hdl) {
-	if(hdl == nullptr)
-		return;
-	auto iter = m_envLights.begin();
-	for(std::size_t i = 0u; i < m_envLights.size(); ++i) {
-		if(hdl == &iter->second) {
-			m_envLights.erase(iter);
-			m_envLightHandles.erase(m_envLightHandles.begin() + i);
-			break;
-		}
-		++iter;
-	}
-}
-
-bool WorldContainer::is_point_light(const std::string_view& name) const {
-	return m_pointLights.find(name) != m_pointLights.cend();
-}
-
-bool WorldContainer::is_spot_light(const std::string_view& name) const {
-	return m_spotLights.find(name) != m_spotLights.cend();
-}
-
-bool WorldContainer::is_dir_light(const std::string_view& name) const {
-	return m_dirLights.find(name) != m_dirLights.cend();
-}
-
-bool WorldContainer::is_env_light(const std::string_view& name) const {
-	return m_envLights.find(name) != m_envLights.cend();
+	return "";
 }
 
 void WorldContainer::mark_camera_dirty(ConstCameraHandle hdl) {
@@ -301,23 +253,6 @@ void WorldContainer::mark_camera_dirty(ConstCameraHandle hdl) {
 
 void WorldContainer::mark_envmap_light_dirty(TextureHandle* hdl) {
 
-}
-
-std::optional<std::string_view> WorldContainer::get_light_name_ref(const std::string_view& name) const noexcept {
-	auto pointLight = m_pointLights.find(name);
-	if(pointLight != m_pointLights.cend())
-		return pointLight->first;
-	auto spotLight = m_spotLights.find(name);
-	if(spotLight != m_spotLights.cend())
-		return spotLight->first;
-	auto dirLight = m_dirLights.find(name);
-	if(dirLight != m_dirLights.cend())
-		return dirLight->first;
-	auto envLight = m_envLights.find(name);
-	if(envLight != m_envLights.cend())
-		return envLight->first;
-	logError("[WorldContainer::get_light_name_ref] Unknown light '", name, "'");
-	return std::nullopt;
 }
 
 bool WorldContainer::has_texture(std::string_view name) const {
@@ -411,7 +346,7 @@ SceneHandle WorldContainer::reload_scene() {
 void WorldContainer::load_scene_lights() {
 	std::vector<lights::PositionalLights> posLights;
 	std::vector<lights::DirectionalLight> dirLights;
-	std::optional<EnvLightHandle> envLightTex;
+	TextureHandle envLightTex = nullptr;
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
 		if(!m_scenario->is_masked(&instance.get_object())) {
@@ -480,28 +415,29 @@ void WorldContainer::load_scene_lights() {
 	dirLights.reserve(dirLights.size() + m_dirLights.size());
 
 	// Add regular lights
+	std::string_view prevEnvName;
 	for(const std::string_view& name : m_scenario->get_light_names()) {
-		if(auto pointLight = get_point_light(name); pointLight.has_value()) {
-			posLights.push_back({ pointLight.value()->second, ~0u });
-		} else if(auto spotLight = get_spot_light(name); spotLight.has_value()) {
-			posLights.push_back({ spotLight.value()->second, ~0u });
-		} else if(auto dirLight = get_dir_light(name); dirLight.has_value()) {
-			dirLights.push_back(dirLight.value()->second);
-		} else if(auto envLight = get_env_light(name); envLight.has_value()) {
-			if(envLightTex.has_value())
+		if(auto pointLight = m_pointLights.find(name); pointLight) {
+			posLights.push_back({ *pointLight, ~0u });
+		} else if(auto spotLight = m_spotLights.find(name); spotLight) {
+			posLights.push_back({ *spotLight, ~0u });
+		} else if(auto dirLight = m_dirLights.find(name); dirLight) {
+			dirLights.push_back(*dirLight);
+		} else if(auto envLight = m_envLights.find(name); envLight) {
+			if(envLightTex)
 				logWarning("[WorldContainer::load_scene] Multiple envmap lights are not supported; replacing '",
-						   envLightTex.value()->first, "' with '",
-						   envLight.value()->first);
-			envLightTex = envLight;
+						   prevEnvName, "' with '", name);
+			envLightTex = *envLight;
+			prevEnvName = name;
 		} else {
 			logWarning("[WorldContainer::load_scene] Unknown light source '", name, "' in scenario '",
 					   m_scenario->get_name(), "'");
 		}
 	}
 
-	if(envLightTex.has_value())
+	if(envLightTex)
 		m_scene->set_lights(std::move(posLights), std::move(dirLights),
-							envLightTex.value()->second);
+							envLightTex);
 	else
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));
 

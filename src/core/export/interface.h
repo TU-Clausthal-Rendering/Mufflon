@@ -169,6 +169,11 @@ typedef struct {
 	AttribDesc type;
 } SphereAttributeHandle;
 
+typedef struct {
+	uint32_t type: 3;
+	uint32_t index: 29;
+} LightHdl;
+
 // Typedefs for return values
 // Not to be accessed directly!
 typedef int32_t IndexType;
@@ -184,10 +189,9 @@ typedef const void* ConstScenarioHdl;
 typedef void* SceneHdl;
 typedef void* MaterialHdl;
 typedef void* CameraHdl;
-typedef void* LightHdl;
-typedef const void* ConstLightHdl;
 typedef void* TextureHdl;
 typedef const void* ConstCameraHdl;
+typedef const LightHdl ConstLightHdl;
 
 // Material types
 typedef struct {
@@ -365,20 +369,8 @@ CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, Vec3 position,
 												float focalLength, float focusDistance,
 												float lensRad, float chipHeight);
 CORE_API Boolean CDECL world_remove_camera(CameraHdl hdl);
-CORE_API LightHdl CDECL world_add_point_light(const char* name, Vec3 position,
-										   Vec3 intensity);
-CORE_API LightHdl CDECL world_add_spot_light(const char* name, Vec3 position,
-										  Vec3 direction, Vec3 intensity,
-										  float openingAngleRad,
-										  float falloffStartRad);
-CORE_API LightHdl CDECL world_add_directional_light(const char* name,
-												 Vec3 direction,
-												 Vec3 radiance);
-CORE_API LightHdl CDECL world_add_envmap_light(const char* name, TextureHdl envmap);
-CORE_API Boolean CDECL world_remove_point_light(LightHdl hdl);
-CORE_API Boolean CDECL world_remove_spot_light(LightHdl hdl);
-CORE_API Boolean CDECL world_remove_dir_light(LightHdl hdl);
-CORE_API Boolean CDECL world_remove_envmap_light(LightHdl hdl);
+CORE_API LightHdl CDECL world_add_light(const char* name, LightType type);
+CORE_API Boolean CDECL world_remove_light(LightHdl hdl);
 CORE_API size_t CDECL world_get_camera_count();
 CORE_API CameraHdl CDECL world_get_camera(const char* name);
 CORE_API CameraHdl CDECL world_get_camera_by_index(size_t);
@@ -386,12 +378,8 @@ CORE_API size_t CDECL world_get_point_light_count();
 CORE_API size_t CDECL world_get_spot_light_count();
 CORE_API size_t CDECL world_get_dir_light_count();
 CORE_API size_t CDECL world_get_env_light_count();
-//CORE_API LightType CDECL world_get_light_type(const char* name);
-//CORE_API LightHdl CDECL world_get_light(const char* name, LightType type);
-CORE_API const char* CDECL world_get_point_light_by_index(size_t index, LightHdl* hdl);
-CORE_API const char* CDECL world_get_spot_light_by_index(size_t index, LightHdl* hdl);
-CORE_API const char* CDECL world_get_dir_light_by_index(size_t index, LightHdl* hdl);
-CORE_API const char* CDECL world_get_env_light_by_index(size_t index, LightHdl* hdl);
+CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type);
+CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_reload_current_scenario();
 CORE_API SceneHdl CDECL world_get_current_scene();

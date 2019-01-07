@@ -36,9 +36,9 @@ enum class LightType : u16 {
  * TODO: for measured light sources, we'd need to add a texture handle.
  */
 struct alignas(16) PointLight {
-	ei::Vec3 position;
-	materials::MediumHandle mediumIndex;
-	alignas(16) ei::Vec3 intensity;
+	ei::Vec3 position {0.0f};
+	materials::MediumHandle mediumIndex {u16(~0u)};
+	alignas(16) Spectrum intensity {1.0f};
 };
 
 /**
@@ -48,12 +48,12 @@ struct alignas(16) PointLight {
  * are encoded 
  */
 struct alignas(16) SpotLight {
-	ei::Vec3 position;
-	half cosThetaMax;
-	half cosFalloffStart;
-	ei::Vec3 direction;
-	materials::MediumHandle mediumIndex;
-	alignas(16) ei::Vec3 intensity;
+    ei::Vec3 position {0.0f};
+    half cosThetaMax {0.5f};
+    half cosFalloffStart {0.7f};
+    ei::Vec3 direction {0.0f, -1.0f, 0.0f};
+	materials::MediumHandle mediumIndex {u16(~0u)};
+    alignas(16) ei::Vec3 intensity {1.0f};
 };
 
 /**
@@ -137,8 +137,8 @@ struct alignas(16) AreaLightSphere {
  * Directional light. Doesn't have a position.
  */
 struct alignas(16) DirectionalLight {
-	alignas(16) ei::Vec3 direction;
-	alignas(16) ei::Vec3 radiance;
+    alignas(16) ei::Vec3 direction {0.0f, -1.0f, 0.0f};
+    alignas(16) ei::Vec3 radiance {1.0f};
 };
 
 /**

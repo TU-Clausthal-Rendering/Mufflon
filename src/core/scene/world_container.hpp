@@ -7,6 +7,7 @@
 #include "lights/lights.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
+#include "util/indexed_string_map.hpp"
 #include <map>
 #include <memory>
 #include <vector>
@@ -78,28 +79,21 @@ public:
 	std::size_t get_env_light_count() const noexcept { return m_envLights.size(); }
 
 	// Adds a new light to the scene
-	std::optional<PointLightHandle> add_light(std::string name, lights::PointLight&& light);
-	std::optional<SpotLightHandle> add_light(std::string name, lights::SpotLight&& light);
-	std::optional<DirLightHandle> add_light(std::string name, lights::DirectionalLight&& light);
-	std::optional<EnvLightHandle> add_light(std::string name, TextureHandle env);
+	std::optional<u32> add_light(std::string name, lights::PointLight&& light);
+	std::optional<u32> add_light(std::string name, lights::SpotLight&& light);
+	std::optional<u32> add_light(std::string name, lights::DirectionalLight&& light);
+	std::optional<u32> add_light(std::string name, TextureHandle env);
 	// Finds a light by name
-	std::optional<PointLightHandle> get_point_light(const std::string_view& name);
-	std::optional<SpotLightHandle> get_spot_light(const std::string_view& name);
-	std::optional<DirLightHandle> get_dir_light(const std::string_view& name);
-	std::optional<EnvLightHandle> get_env_light(const std::string_view& name);
-	PointLightHandle get_point_light(std::size_t index);
-	SpotLightHandle get_spot_light(std::size_t index);
-	DirLightHandle get_dir_light(std::size_t index);
-	EnvLightHandle get_env_light(std::size_t index);
-	void remove_light(lights::PointLight* hdl);
-	void remove_light(lights::SpotLight* hdl);
-	void remove_light(lights::DirectionalLight* hdl);
-	void remove_light(TextureHandle* hdl);
-	// Checks the type of a light by name
-	bool is_point_light(const std::string_view& name) const;
-	bool is_spot_light(const std::string_view& name) const;
-	bool is_dir_light(const std::string_view& name) const;
-	bool is_env_light(const std::string_view& name) const;
+	std::optional<std::pair<u32, lights::LightType>> find_light(const std::string_view& name);
+	// Access the lights properties
+	lights::PointLight* get_point_light(u32 index);
+	lights::SpotLight* get_spot_light(u32 index);
+	lights::DirectionalLight* get_dir_light(u32 index);
+	TextureHandle& get_env_light(u32 index);
+	// Delete a light using its handle
+	void remove_light(u32 index, lights::LightType type);
+	// Get the name of a light
+	std::string_view get_light_name(u32 index, lights::LightType type) const;
 	// Functions for dirtying cameras and lights
 	void mark_camera_dirty(ConstCameraHandle cam);
 	void mark_envmap_light_dirty(TextureHandle* hdl);
@@ -111,9 +105,6 @@ public:
 	TexCacheHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
 							   textures::Format format, textures::SamplingMode mode,
 							   bool sRgb, std::unique_ptr<u8[]> data);
-
-	// Useful only when storing light names
-	std::optional<std::string_view> get_light_name_ref(const std::string_view& name) const noexcept;
 
 	// Singleton, creating our global world object
 	static WorldContainer& instance() {
@@ -164,15 +155,11 @@ private:
 	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
 	std::vector<u8> m_camerasDirty;
 	// All light sources of the scene
-	std::map<std::string, lights::PointLight, std::less<>> m_pointLights;
-	std::map<std::string, lights::SpotLight, std::less<>> m_spotLights;
-	std::map<std::string, lights::DirectionalLight, std::less<>> m_dirLights;
-	std::map<std::string, TextureHandle, std::less<>> m_envLights;
+	util::IndexedStringMap<lights::PointLight> m_pointLights;
+	util::IndexedStringMap<lights::SpotLight> m_spotLights;
+	util::IndexedStringMap<lights::DirectionalLight> m_dirLights;
+	util::IndexedStringMap<TextureHandle> m_envLights;
 	std::vector<u8> m_envLightsDirty;
-	std::vector<PointLightHandle> m_pointLightHandles;
-	std::vector<SpotLightHandle> m_spotLightHandles;
-	std::vector<DirLightHandle> m_dirLightHandles;
-	std::vector<EnvLightHandle> m_envLightHandles;
 	// Texture cache
 	std::map<std::string, textures::Texture, std::less<>> m_textures;
 

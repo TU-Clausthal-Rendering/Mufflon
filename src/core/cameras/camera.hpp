@@ -55,7 +55,7 @@ public:
 		if(ei::dot(dir, up) > 0.999f)
 			throw std::runtime_error("View direction and up-vector are too close to each other");
 		// Create orthonormal basis to determine view matrix
-		const ei::Vec3 right = ei::normalize(ei::cross(up, dir));
+		const ei::Vec3 right = ei::normalize(ei::cross(dir, up));
 
 		m_viewSpace = ei::Mat3x3{
 			right.x, right.y, right.z,

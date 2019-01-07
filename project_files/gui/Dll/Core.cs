@@ -139,32 +139,11 @@ namespace gui.Dll
             float lensRad, float chipHeight) { return world_add_focus_camera_(StringUtil.ToNativeUtf8(name), position, dir, up, near, far, focalLength, focusDistance, lensRad, chipHeight); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_remove_camera(IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_point_light")]
-        private static extern IntPtr world_add_point_light_(IntPtr name, Vec3 position,
-            Vec3 intensity);
-        internal static IntPtr world_add_point_light(string name, Vec3 position,
-            Vec3 intensity) { return world_add_point_light_(StringUtil.ToNativeUtf8(name), position, intensity); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_spot_light")]
-        private static extern IntPtr world_add_spot_light_(IntPtr name, Vec3 position,
-            Vec3 direction, Vec3 intensity, float openingAngleRad, float falloffStartRad);
-        internal static IntPtr world_add_spot_light(string name, Vec3 position,
-            Vec3 direction, Vec3 intensity, float openingAngleRad, float falloffStartRad) { return world_add_spot_light_(StringUtil.ToNativeUtf8(name), position, direction, intensity, openingAngleRad, falloffStartRad); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_directional_light")]
-        private static extern IntPtr world_add_directional_light_(IntPtr name, Vec3 direction,
-            Vec3 radiance);
-        internal static IntPtr world_add_directional_light(string name, Vec3 direction,
-            Vec3 radiance) { return world_add_directional_light_(StringUtil.ToNativeUtf8(name), direction, radiance); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_envmap_light")]
-        private static extern IntPtr world_add_envmap_light_(IntPtr name, IntPtr envmap);
-        internal static IntPtr world_add_envmap_light(string name, IntPtr envmap) { return world_add_envmap_light_(StringUtil.ToNativeUtf8(name), envmap); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_light")]
+        private static extern IntPtr world_add_light_(IntPtr name, LightType type);
+        internal static IntPtr world_add_light(string name, LightType type) { return world_add_light_(StringUtil.ToNativeUtf8(name), type); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_remove_point_light(IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_remove_spot_light(IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_remove_dir_light(IntPtr hdl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_remove_envmap_light(IntPtr hdl);
+        internal static extern bool world_remove_light(IntPtr hdl);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong world_get_camera_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_camera")]
@@ -180,9 +159,11 @@ namespace gui.Dll
         internal static extern ulong world_get_dir_light_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong world_get_env_light_count();
-        //[DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_light_type")]
-        //private static extern LightType world_get_light_type_(IntPtr name);
-        //internal static LightType world_get_light_type(string name) { return world_get_light_type_(StringUtil.ToNativeUtf8(name)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_get_light_handle(ulong index, LightType type);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_light_name")]
+        private static extern IntPtr world_get_light_name_(IntPtr hdl);
+        internal static string world_get_light_name(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_light_name_(hdl)); }
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_texture")]
         private static extern IntPtr world_add_texture_(IntPtr path, TextureSampling sampling);
@@ -190,21 +171,6 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_add_texture_value(out float[] value, int num, TextureSampling sampling);
 
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_point_light_by_index")]
-        private static extern IntPtr world_get_point_light_by_index_(ulong index, ref IntPtr hdl);
-        internal static string world_get_point_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_point_light_by_index_(index, ref hdl)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_spot_light_by_index")]
-        private static extern IntPtr world_get_spot_light_by_index_(ulong index, ref IntPtr hdl);
-        internal static string world_get_spot_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_spot_light_by_index_(index, ref hdl)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_dir_light_by_index")]
-        private static extern IntPtr world_get_dir_light_by_index_(ulong index, ref IntPtr hdl);
-        internal static string world_get_dir_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_dir_light_by_index_(index, ref hdl)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_env_light_by_index")]
-        private static extern IntPtr world_get_env_light_by_index_(ulong index, ref IntPtr hdl);
-        internal static string world_get_env_light_by_index(ulong index, ref IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_by_index_(index, ref hdl)); }
-
-        //[DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        //internal static extern IntPtr world_get_light(string name, LightType type);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_load_scenario(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

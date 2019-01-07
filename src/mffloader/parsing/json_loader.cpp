@@ -362,9 +362,10 @@ bool JsonLoader::load_lights() {
 				intensity = read<ei::Vec3>(m_state, get(m_state, light, "flux")) * 4.f * ei::PI;
 			intensity *= read_opt<float>(m_state, light, "scale", 1.f);
 
-			if(world_add_point_light(lightIter->name.GetString(), util::pun<Vec3>(position),
-									 util::pun<Vec3>(intensity)) == nullptr)
-				throw std::runtime_error("Failed to add point light");
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT); hdl.type == LIGHT_POINT) {
+				world_set_point_light_position(hdl, util::pun<Vec3>(position));
+				world_set_point_light_intensity(hdl, util::pun<Vec3>(intensity));
+			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
 			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
@@ -383,27 +384,32 @@ bool JsonLoader::load_lights() {
 				falloffStart = static_cast<Radians>(Degrees(read_opt<float>(m_state, light, "falloffWidth",
 																			static_cast<Radians>(Degrees(angle)))));
 
-			if(world_add_spot_light(lightIter->name.GetString(), util::pun<Vec3>(position),
-									util::pun<Vec3>(direction), util::pun<Vec3>(intensity),
-									angle, falloffStart) == nullptr)
-				throw std::runtime_error("Failed to add spot light");
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT); hdl.type == LIGHT_SPOT) {
+				world_set_spot_light_position(hdl, util::pun<Vec3>(position));
+				world_set_spot_light_intensity(hdl, util::pun<Vec3>(intensity));
+				world_set_spot_light_direction(hdl, util::pun<Vec3>(direction));
+				world_set_spot_light_angle(hdl, angle);
+				world_set_spot_light_falloff(hdl, falloffStart);
+			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
 			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
 			const ei::Vec3 radiance = read<ei::Vec3>(m_state, get(m_state, light, "radiance"))
 				* read_opt<float>(m_state, light, "scale", 1.f);
 
-			if(world_add_directional_light(lightIter->name.GetString(), util::pun<Vec3>(direction),
-										   util::pun<Vec3>(radiance)) == nullptr)
-				throw std::runtime_error("Failed to add directional light");
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL); hdl.type == LIGHT_DIRECTIONAL) {
+				world_set_dir_light_direction(hdl, util::pun<Vec3>(direction));
+				world_set_dir_light_radiance(hdl, util::pun<Vec3>(radiance));
+			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
 			// TODO: incorporate scale
 
-			if(world_add_envmap_light(lightIter->name.GetString(), texture) == nullptr)
-				throw std::runtime_error("Failed to add directional light");
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP); hdl.type == LIGHT_ENVMAP) {
+				world_set_env_light_map(hdl, texture);
+			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
 			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));

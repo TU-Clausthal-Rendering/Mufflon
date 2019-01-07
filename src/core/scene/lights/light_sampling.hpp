@@ -218,9 +218,8 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const DirectionalLight& li
 
 // *** ENVMAP ***
 // Samples a direction and evaluates the envmap's radiance in that direction
-CUDA_FUNCTION __forceinline__ math::DirectionSample sample_light_dir(const EnvMapLight<CURRENT_DEV>& light,
-																	 const float u0, const float u1,
-																	 Spectrum& radiance) {
+CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir(const EnvMapLight<CURRENT_DEV>& light,
+																	 const float u0, const float u1) {
 	// First we sample the envmap texel
 	EnvmapSampleResult sample = importance_sample_envmap(light, u0, u1);
 	// Depending on the type of envmap we will sample a different layer of the texture
@@ -270,24 +269,23 @@ CUDA_FUNCTION __forceinline__ math::DirectionSample sample_light_dir(const EnvMa
 		dir.pdf = AngularPdf{ sample.pdf / (2.f * ei::PI * ei::PI * sinTheta) };
 	}
 
-	radiance = ei::Vec3(textures::read(light.texHandle, sample.texel, layer));
-	return dir;
+	ei::Vec3 radiance { textures::sample(light.texHandle, sample.uv, layer) };
+	return { dir, radiance };
 }
 
 CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const EnvMapLight<CURRENT_DEV>& light,
 													  const ei::Box& bounds,
 													  const math::RndSet2_1& rnd) {
-	Spectrum radiance;
-	math::DirectionSample dir = sample_light_dir(light, rnd.u0, rnd.u1, radiance);
+	PhotonDir dir = sample_light_dir(light, rnd.u0, rnd.u1);
 
 	// Sample a start position on the bounding box
 	math::RndSet2 rnd2{ rnd.i0 };
 
 	return Photon{
-		math::sample_position(dir.direction, bounds, rnd2.u0, rnd2.u1),
-		radiance,
+		math::sample_position(dir.dir.direction, bounds, rnd2.u0, rnd2.u1),
+		dir.flux,
 		LightType::ENVMAP_LIGHT,
-		Photon::SourceParam{dir.direction, dir.pdf}
+		Photon::SourceParam{dir.dir.direction, dir.dir.pdf}
 	};
 }
 
@@ -393,16 +391,15 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLigh
 																const ei::Vec3& pos,
 																const ei::Box& bounds,
 																const math::RndSet2& rnd) {
-	Spectrum radiance;
-	math::DirectionSample dir = sample_light_dir(light, rnd.u0, rnd.u1, radiance);
+	PhotonDir dir = sample_light_dir(light, rnd.u0, rnd.u1);
 
 	// See connect_light(DirectionalLight) for pdf argumentation.
-	AreaPdf posPdf { 1.0f / math::projected_area(dir.direction, bounds) };
-	const math::EvalValue value = evaluate_dir(radiance, true,
+	AreaPdf posPdf { 1.0f / math::projected_area(dir.dir.direction, bounds) };
+	const math::EvalValue value = evaluate_dir(dir.flux, true,
 							posPdf.to_angular_pdf(1.0f, ei::sq(MAX_SCENE_SIZE)));
 	return NextEventEstimation{
-		dir.direction, value.cosOut, value.value, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
-		dir.pdf.to_area_pdf(1.0f, ei::sq(MAX_SCENE_SIZE))
+		dir.dir.direction, value.cosOut, value.value, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
+		dir.dir.pdf.to_area_pdf(1.0f, ei::sq(MAX_SCENE_SIZE))
 	};
 }
 
