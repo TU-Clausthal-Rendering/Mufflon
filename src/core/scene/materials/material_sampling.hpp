@@ -34,14 +34,14 @@ CUDA_FUNCTION int fetch_subdesc(Materials type, const char* subDesc, const UvCoo
 	return 0;
 }
 
-CUDA_FUNCTION void fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
+CUDA_FUNCTION int fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
 	outBuffer->type = desc.type;
 	outBuffer->flags = desc.flags;
 	outBuffer->innerMedium = desc.innerMedium;
 	outBuffer->outerMedium = desc.outerMedium;
 	const char* subDesc = as<char>(&desc) + sizeof(MaterialDescriptorBase);
 	char* subParam = as<char>(outBuffer) + sizeof(ParameterPack);
-	fetch_subdesc(desc.type, subDesc, uvCoordinate, subParam);
+	return fetch_subdesc(desc.type, subDesc, uvCoordinate, subParam) + sizeof(ParameterPack);
 }
 
 

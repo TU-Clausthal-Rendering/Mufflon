@@ -9,6 +9,7 @@
 #include "core/scene/lights/light_sampling.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
+#include "core/scene/accel_structs/intersection.hpp"
 #include <ei/conversions.hpp>
 
 namespace mufflon { namespace renderer {
@@ -52,7 +53,6 @@ struct VertexSample : public math::PathSample {
  * VERTEX_ALIGNMENT Number of bytes to which the vertices should be aligned (different
  *		for CPU and GPU).
  */
-// TODO: creation factory
 template < typename ExtensionT, int VERTEX_ALIGNMENT >
 class PathVertex {
 public:
@@ -345,6 +345,15 @@ public:
 		return Spectrum{0.0f};
 	}
 
+	scene::accel_struct::RayIntersectionResult::HitID get_primitive_id() const {
+		if(m_type == Interaction::SURFACE) {
+			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
+			return desc->primitiveId;
+		}
+		// TODO id for area lights too
+		return {-1, -1};
+	}
+
 	/* *************************************************************************
 	 * Creation methods (factory)											   *
 	 * Memory management of vertices is quite challenging, because its size	   *
@@ -456,7 +465,8 @@ public:
 	}
 
 	static int create_surface(void* mem, const void* previous,
-		const scene::materials::ParameterPack& material,
+		const scene::accel_struct::RayIntersectionResult& hit,
+		const scene::materials::MaterialDescriptorBase& material,
 		const math::PositionSample& position,
 		const scene::TangentSpace& tangentSpace,
 		const scene::Direction& incident
@@ -470,9 +480,9 @@ public:
 		vert->m_extension = ExtensionT{};
 		SurfaceDesc* desc = as<SurfaceDesc>(vert->desc());
 		desc->tangentSpace = tangentSpace;
-		int size = get_size(material);
-		memcpy(&desc->params, &material, size); // TODO: device compatible variant
-		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + size);
+		desc->primitiveId = hit.hitId;
+		int size = scene::materials::fetch(material, hit.uv, &desc->params);
+		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::accel_struct::RayIntersectionResult::HitID) + size);
 	}
 
 private:
@@ -490,6 +500,7 @@ private:
 	};
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace; // TODO: use packing?
+		scene::accel_struct::RayIntersectionResult::HitID primitiveId;
 		scene::materials::ParameterPack params;
 	};
 

@@ -47,7 +47,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						bool adjoint,
 						Throughput& throughput,
 						VertexType* outVertex,
-						scene::Direction& missedDir
+						scene::Direction& sampledDir
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
@@ -55,6 +55,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
 		&& !isnan(sample.origin.x) && !isnan(sample.origin.y) && !isnan(sample.origin.z)
 		&& !isnan(float(sample.pdfF)) && !isnan(float(sample.pdfB)));
+	sampledDir = sample.excident;
 
 
 	// Update throughputs
@@ -77,7 +78,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Go to the next intersection
 	ei::Ray ray {sample.origin, sample.excident};
 	scene::accel_struct::RayIntersectionResult nextHit =
-		scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1, -1 }, scene::MAX_SCENE_SIZE);
+		scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
 
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[sample.medium];
@@ -86,11 +87,8 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	throughput.guideWeight *= avg(transmission);
 	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
 
-	// If we missed the scene, terminate the ray and save the last direction for background sampling
-	if(nextHit.hitId.instanceId < 0) {
-		missedDir = ray.direction;
-		return false;
-	}
+	// If we missed the scene, terminate the ray
+	if(nextHit.hitId.instanceId < 0) return false;
 
 	// Create the new surface vertex
 	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
@@ -109,9 +107,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		matIdx = object.polygon.matIndices[nextHit.hitId.get_primitive_id()];
 	else
 		matIdx = object.spheres.matIndices[nextHit.hitId.get_primitive_id()];
-	char materialBuffer[scene::materials::MAX_MATERIAL_PARAMETER_SIZE];
-	scene::materials::fetch(scene.get_material(matIdx), nextHit.uv, as<scene::materials::ParameterPack>(materialBuffer));
-	VertexType::create_surface(outVertex, &vertex, *as<scene::materials::ParameterPack>(materialBuffer),
+	VertexType::create_surface(outVertex, &vertex, nextHit, scene.get_material(matIdx),
 				{ position, sample.pdfF.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
 				tangentSpace, sample.excident);
 	return true;
