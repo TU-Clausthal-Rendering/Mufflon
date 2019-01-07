@@ -44,11 +44,11 @@ inline LightType get_light_type(const PositionalLights& light) {
 			return LightType::POINT_LIGHT;
 		else if constexpr(std::is_same_v<Type, SpotLight>)
 			return LightType::SPOT_LIGHT;
-		else if constexpr(std::is_same_v<Type, AreaLightTriangle<CURRENT_DEV>>)
+		else if constexpr(std::is_same_v<Type, AreaLightTriangleDesc>)
 			return LightType::AREA_LIGHT_TRIANGLE;
-		else if constexpr(std::is_same_v<Type, AreaLightQuad<CURRENT_DEV>>)
+		else if constexpr(std::is_same_v<Type, AreaLightQuadDesc>)
 			return LightType::AREA_LIGHT_QUAD;
-		else if constexpr(std::is_same_v<Type, AreaLightSphere<CURRENT_DEV>>)
+		else if constexpr(std::is_same_v<Type, AreaLightSphereDesc>)
 			return LightType::AREA_LIGHT_SPHERE;
 		else
 			return LightType::NUM_LIGHTS;

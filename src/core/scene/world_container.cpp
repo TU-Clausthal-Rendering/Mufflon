@@ -412,8 +412,6 @@ void WorldContainer::load_scene_lights() {
 	std::vector<lights::PositionalLights> posLights;
 	std::vector<lights::DirectionalLight> dirLights;
 	std::optional<EnvLightHandle> envLightTex;
-	posLights.reserve(m_pointLights.size() + m_spotLights.size());
-	dirLights.reserve(m_dirLights.size());
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
 		if(!m_scenario->is_masked(&instance.get_object())) {
@@ -428,6 +426,7 @@ void WorldContainer::load_scene_lights() {
 				for(const auto& face : polygons.faces()) {
 					if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
 						auto emission = m_materials[materials[primIdx]]->get_emission();
+						mAssert(emission.texture != nullptr);
 						if(std::distance(face.begin(), face.end()) == 3) {
 							lights::AreaLightTriangleDesc al;
 							al.radianceTex = emission.texture;
@@ -438,7 +437,7 @@ void WorldContainer::load_scene_lights() {
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
 							}
-							posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
+							posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
 						} else {
 							lights::AreaLightQuadDesc al;
 							al.radianceTex = emission.texture;
@@ -449,7 +448,7 @@ void WorldContainer::load_scene_lights() {
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
 							}
-							posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
+							posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
 						}
 					}
 					++primIdx;
@@ -462,6 +461,7 @@ void WorldContainer::load_scene_lights() {
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					if(m_materials[materials[i]]->get_properties().is_emissive()) {
 						auto emission = m_materials[materials[primIdx]]->get_emission();
+						mAssert(emission.texture != nullptr);
 						lights::AreaLightSphereDesc al{
 							spheresData[i].center,
 							spheresData[i].radius,
@@ -475,6 +475,9 @@ void WorldContainer::load_scene_lights() {
 		}
 		++instIdx;
 	}
+
+	posLights.reserve(posLights.size() + m_pointLights.size() + m_spotLights.size());
+	dirLights.reserve(dirLights.size() + m_dirLights.size());
 
 	// Add regular lights
 	for(const std::string_view& name : m_scenario->get_light_names()) {

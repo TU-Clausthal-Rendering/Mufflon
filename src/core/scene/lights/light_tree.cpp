@@ -122,44 +122,59 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		return;
 	}
 
-	// Correctly set the internal nodes
-	// Start with nodes that form the last (incomplete!) level
-	std::size_t height = static_cast<std::size_t>(std::log2(lightOffsets.light_count()));
+	/* Example tree: (I are intrenal nodes, L are light sources/leaves)
+	 *                                 I0
+	 *                   I1                        I2
+	 *           I3                I4          I5      I6
+	 *      I7       I8        I9       L0  L1   L2  L3   L4
+	 *    L5  L6   L7  L8   L9   L10
+	 *
+	 */
+
+	// Compute the height of the tree IF the tree would be perfectly balanced, without
+	// the extra nodes (e.g. without L5-L10, so height == 3)
+	const std::size_t height = static_cast<std::size_t>(std::log2(lightOffsets.light_count()));
 	mAssert(height > 0u);
-	std::size_t extraNodes = lightOffsets.light_count() - static_cast<std::size_t>(std::pow(2u, height));
+	// We can then compute how many additional internal nodes there need to be (e.g. I7 - I9, so 3)
+	const std::size_t extraNodes = lightOffsets.light_count() - (1ull << height);
 	if(extraNodes > 0u) {
-		// Compute starting positions for internal nodes and lights
-		std::size_t startNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
-		std::size_t startLight = lightOffsets.light_count() - 2u * extraNodes;
-		// "Merge" together two nodes
+		// Compute starting positions for the extra internal nodes and their lights
+		// In the example, they would be startNode == 8 and startLight == 5
+		const std::size_t startNode = (1lu << height) - 1u;
+		const std::size_t startLight = lightOffsets.light_count() - 2u * extraNodes;
+		// Create the internal nodes putting together two lights
 		for(std::size_t i = 0u; i < extraNodes; ++i) {
 			mAssert(startLight + 2u * i + 1u < lightOffsets.light_count());
 			mAssert(startNode + i < get_num_internal_nodes(lightOffsets.light_count()));
-			std::size_t left = startLight + 2u * i;
-			std::size_t right = startLight + 2u * i;
+			const std::size_t left = startLight + 2u * i;
+			const std::size_t right = startLight + 2u * i + 1u;
 			Node& interiorNode = as<Node>(tree.memory)[startNode + i];
 
 			interiorNode = Node{ tree.memory, lightOffsets[left], lightOffsets.type(left),
 								 lightOffsets[right], lightOffsets.type(right), aabbDiag };
 		}
 
-		// Also merge together inner nodes for last level!
-		// Two cases: Merge two interior nodes each or (for last one) merge interior with light
-		std::size_t startInnerNode = static_cast<std::size_t>(std::pow(2u, height - 1u)) - 1u;
+		// To ensure we can later uniformly create all remaining internal nodes, we also form
+		// the "second-lowest" layer of internal nodes (e.g. I3, which may occur multiple times,
+		// and I4, of which there will at most be one kind)
+		const std::size_t startInnerNode = (1lu << (height - 1u)) - 1u;
 		for(std::size_t i = 0u; i < extraNodes / 2u; ++i) {
 			mAssert(startNode + 2u*i + 1u < get_num_internal_nodes(lightOffsets.light_count()));
-			std::size_t left = startNode + 2u * i;
-			std::size_t right = startNode + 2u * i + 1u;
+			const std::size_t left = startNode + 2u * i;
+			const std::size_t right = startNode + 2u * i + 1u;
 			Node& node = as<Node>(tree.memory)[startInnerNode + i];
 
 			node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
 						 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag };
 		}
+
+		// Create the one possible internal node that has another internal node as left child
+		// and a light source as right child (I4)
 		if(extraNodes % 2 != 0u) {
-			// One interior leftover; must be very first light
+			// One interior leftover; must be first light and last internal node
 			mAssert(startNode + extraNodes - 1u < get_num_internal_nodes(lightOffsets.light_count()));
-			std::size_t left = startNode + extraNodes - 1u;
-			std::size_t right = 0;
+			const std::size_t left = startNode + extraNodes - 1u;
+			const std::size_t right = 0;
 			Node& node = as<Node>(tree.memory)[startInnerNode + extraNodes / 2u];
 
 			node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
@@ -167,38 +182,46 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		}
 	}
 
-	// Now the nodes from the next higher (incomplete) level
-	// Take into account that up to one light has been merged already at the beginning
-	std::size_t startLight = (extraNodes % 2 == 0u) ? 0u : 1u;
-	std::size_t nodeCount = (lightOffsets.light_count() - 2u * extraNodes - startLight) / 2u;
-	// Start node for completely filled tree, but we may need an offset
-	std::size_t lightStartNode = static_cast<std::size_t>(std::pow(2u, height)) - 1u + extraNodes;
+	// Merge together the light nodes on the level featuring both light sources and internal nodes
+	// (which is the level == height, e.g. 3; the computed nodes in the example are I5 and I6)
+	// Take into account that up to one light has been merged already at the beginning (only ever L0)
+	// This step will also be executed in case of a fully balanced tree
+	const std::size_t startLight = (extraNodes % 2 == 0u) ? 0u : 1u;
+	// Compute the starting internal node index by computing how many lights there could be in
+	// this level and how many there are, which is given by the extraNodes (e.g. extraNodes is
+	// 3 (I7, I8, I9), the level can take 2^3 == 8 lights, leaves 5 lights, of which L0 was already
+	// accounted for; thus the internal node start index == 2 in the next-higher level, 4 in the tree)
+	const std::size_t levelNodeCount = lightOffsets.light_count() - 2u * extraNodes - startLight;
+	const std::size_t nodeCount = levelNodeCount / 2u;
+	const std::size_t startNodeIndex = (1ull << height) - nodeCount - 1u;
 	for(std::size_t i = 0u; i < nodeCount; ++i) {
 		mAssert(startLight + 2u * i + 1u < lightOffsets.light_count());
-		mAssert(lightStartNode + i < get_num_internal_nodes(lightOffsets.light_count()));
-		std::size_t left = startLight + 2u * i;
-		std::size_t right = startLight + 2u * i + 1u;
-		Node& node = as<Node>(tree.memory)[lightStartNode + i];
+		mAssert(startNodeIndex + i < get_num_internal_nodes(lightOffsets.light_count()));
+		const std::size_t left = startLight + 2u * i;
+		const std::size_t right = startLight + 2u * i + 1u;
+		Node& node = as<Node>(tree.memory)[startNodeIndex + i];
 
 		node = Node{ tree.memory, lightOffsets[left], lightOffsets.type(left),
 			lightOffsets[right], lightOffsets.type(right), aabbDiag };
 	}
 
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
-	height -= 1u;
-	for(std::size_t level = height; level >= 1u; --level) {
-		std::size_t nodes = static_cast<std::size_t>(std::pow(2u, level));
-		std::size_t innerNode = static_cast<std::size_t>(std::pow(2u, level - 1u)) - 1u;
-		// Accumulate for higher-up node
-		for(std::size_t i = 0u; i < nodes / 2u; ++i) {
-			mAssert(innerNode + i < get_num_internal_nodes(lightOffsets.light_count()));
-			mAssert(nodes + 2u * i < get_num_internal_nodes(lightOffsets.light_count()));
-			std::size_t left = nodes - 1u + 2u * i;
-			std::size_t right = nodes - 1u + 2u * i + 1u;
-			Node& node = as<Node>(tree.memory)[innerNode + i];
+	if(height > 1u) {
+		for(std::size_t level = height - 1u; level >= 1u; --level) {
+			// Compute the number of nodes on the current and the level below
+			const std::size_t nodes = (1ull << level);
+			const std::size_t innerNode = nodes / 2u - 1u;
+			// Accumulate for higher-up node
+			for(std::size_t i = 0u; i < nodes / 2u; ++i) {
+				mAssert(innerNode + i < get_num_internal_nodes(lightOffsets.light_count()));
+				mAssert(nodes + 2u * i < get_num_internal_nodes(lightOffsets.light_count()));
+				const std::size_t left = nodes - 1u + 2u * i;
+				const std::size_t right = nodes - 1u + 2u * i + 1u;
+				Node& node = as<Node>(tree.memory)[innerNode + i];
 
-			node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
-						 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag };
+				node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
+							 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag };
+			}
 		}
 	}
 
@@ -238,9 +261,9 @@ std::size_t get_num_internal_nodes(std::size_t elems) {
 	// Height of a balanced binary tree is log2(N) + 1
 	std::size_t height = static_cast<std::size_t>(std::log2(elems));
 	// Interior nodes are then 2^(height-1) - 1u
-	std::size_t nodes = static_cast<std::size_t>(std::pow(2u, height)) - 1u;
+	std::size_t nodes = (1lu << height) - 1u;
 	// Check if our tree is "filled" or if we have extra nodes on the bottom level
-	return nodes + (elems - static_cast<std::size_t>(std::pow(2u, height)));
+	return nodes + (elems - (1ull << height));
 }
 
 } // namespace lighttree_detail
@@ -334,26 +357,32 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	}
 	// Positional lights are more difficult since we don't know the concrete size
 	{
+		static_assert(sizeof(AreaLightQuad<Device::CPU>) == 96+16);
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
+		std::size_t i = 0u;
 		for(const PositionalLights& light : posLights) {
+			if(i == 509) {
+				const float v = 5;
+			}
+			++i;
 			std::visit(overloaded{
 				[&mem,this](const AreaLightTriangleDesc& desc) {
 					auto* dst = as<AreaLightTriangle<Device::CPU>>(mem);
-					mem += sizeof(desc);
+					mem += sizeof(*dst);
 					*dst = desc;
 					// Remember texture for synchronization
 					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
 				},
 				[&mem,this](const AreaLightQuadDesc& desc) {
 					auto* dst = as<AreaLightQuad<Device::CPU>>(mem);
-					mem += sizeof(desc);
+					mem += sizeof(*dst);
 					*dst = desc;
 					// Remember texture for synchronization
 					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
 				},
 				[&mem,this](const AreaLightSphereDesc& desc) {
 					auto* dst = as<AreaLightSphere<Device::CPU>>(mem);
-					mem += sizeof(desc);
+					mem += sizeof(*dst);
 					*dst = desc;
 					// Remember texture for synchronization
 					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
@@ -500,7 +529,7 @@ void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scen
 		set_light_medium(currLightMem, static_cast<LightType>(m_treeCpu->posLights.root.type), scene);
 		return;
 	}
-
+	// TODO: do we need to determine the medium for area lights (given by the geometry)
 	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(m_treeCpu->posLights.lightCount));
 	// Walk backwards in the nodes to iterate over lights, but leave out the odd one (if it exists)
 	const u32 exclusiveLightNodes = static_cast<u32>(m_treeCpu->posLights.lightCount / 2u);

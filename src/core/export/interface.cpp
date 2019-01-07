@@ -2146,6 +2146,7 @@ Boolean scene_move_active_camera(float x, float y, float z) {
 		return false;
 	}
 	WorldContainer::instance().get_current_scenario()->get_camera()->move(x, y, z);
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -2158,6 +2159,7 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 	WorldContainer::instance().get_current_scenario()->get_camera()->rotate_up_down(x);
 	WorldContainer::instance().get_current_scenario()->get_camera()->rotate_left_right(y);
 	WorldContainer::instance().get_current_scenario()->get_camera()->roll(z);
+	return true;
 	CATCH_ALL(false)
 }
 

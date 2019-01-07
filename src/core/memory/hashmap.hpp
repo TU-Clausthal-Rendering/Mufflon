@@ -57,13 +57,16 @@ class HashMap;
 
 template < typename K, typename V >
 class HashMap<Device::CPU, K, V> {
-	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map, std::atomic_uint32_t* counter) :
+	HashMap(u32 dataCapacity, u32 mapSize, char* map, char* data, std::atomic_uint32_t* counter) :
 		m_data(as<std::pair<K,V>>(data)),
 		m_map(as<std::atomic_uint32_t>(map)),
 		m_dataCount(counter),
 		m_mapSize(mapSize),
 		m_dataCapacity(dataCapacity)
-	{}
+	{
+		for(u32 i = 0u; i < m_mapSize; ++i)
+			m_map[i].store(~0u);
+	}
 public:
 	HashMap() : m_data(nullptr), m_map(nullptr), m_dataCount(nullptr), m_mapSize(0) {}
 	HashMap(const HashMap&) = default;
@@ -121,12 +124,14 @@ private:
 
 template < typename K, typename V >
 class HashMap<Device::CUDA, K, V> {
-	HashMap(u32 dataCapacity, u32 mapSize, char* data, char * map, std::atomic_uint32_t*) :
+	HashMap(u32 dataCapacity, u32 mapSize, char* map, char* data, std::atomic_uint32_t*) :
 		m_data(as<std::pair<K,V>>(data)),
 		m_map(as<u32>(map)),
 		m_mapSize(mapSize),
 		m_dataCount(0)
-	{}
+	{
+		cuda::check_error(cudaMemset(m_map, ~0u, sizeof(u32) * m_mapSize));
+	}
 public:
 	HashMap() : m_data(nullptr), m_map(nullptr), m_mapSize(0), m_dataCount(0) {}
 	HashMap(const HashMap&) = default;
