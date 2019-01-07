@@ -58,6 +58,7 @@ namespace gui.Dll
                     m_window.wasPressedAndClear(Key.A);
                     m_window.wasPressedAndClear(Key.Space);
                     m_window.wasPressedAndClear(Key.LeftCtrl);
+                    m_window.getMouseDiffAndReset();
                     // Signal the render loop that it may continue
                     m_startedRender.Set();
                 }
@@ -153,7 +154,7 @@ namespace gui.Dll
                         }
 
                         // Check for mouse dragging
-                        Vector drag = m_window.getMouseDiffAndClear();
+                        Vector drag = m_window.getMouseDiffAndReset();
                         if(drag.X != 0 || drag.Y != 0)
                         {
                             if(!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))

@@ -12,11 +12,7 @@
         Title="MainWindow" 
         Height="600" 
         Width="800"
-        WindowState="Maximized"
-        KeyDown="OnKeyDownHandler"
-        KeyUp="OnKeyUpHandler"
-        MouseDown="OnMouseDownHandler"
-        MouseUp="OnMouseUpHandler">
+        WindowState="Maximized">
     <Window.Resources>
         <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
         <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
@@ -222,7 +218,11 @@
                         Background="Black"
                         MaxWidth="{Binding Viewport.RenderWidth}"
                         MaxHeight="{Binding Viewport.RenderHeight}"
-                        Focusable="True">
+                        Focusable="True"
+                        MouseDown="OnMouseDownHandler"
+                        MouseMove="OnMouseMoveHandler"
+                        KeyDown="OnKeyDownHandler"
+                        KeyUp="OnKeyUpHandler">
                     </Border>
 
                     <ScrollBar 

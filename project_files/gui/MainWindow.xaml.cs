@@ -37,8 +37,8 @@ namespace gui
         private bool m_stickySpace = false;
         private bool m_stickyLCtrl = false;
         // To keep track of mouse dragging
-        Point m_lastMousePos;
-        Vector m_lastMouseDiff;
+        private Point m_lastMousePos;
+        private Vector m_lastMouseDiff;
 
         public MainWindow()
         {
@@ -97,19 +97,22 @@ namespace gui
         {
             if (e.LeftButton == MouseButtonState.Pressed)
             {
+                BorderHost.Focus();
                 m_lastMousePos = e.MouseDevice.GetPosition(this);
             }
         }
 
-        private void OnMouseUpHandler(object sender, MouseButtonEventArgs e)
+        private void OnMouseMoveHandler(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Released)
+            if(e.LeftButton == MouseButtonState.Pressed)
             {
-                m_lastMouseDiff += e.MouseDevice.GetPosition(this) - m_lastMousePos;
+                Point currPos = e.MouseDevice.GetPosition(this);
+                m_lastMouseDiff += currPos - m_lastMousePos;
+                m_lastMousePos = currPos;
             }
         }
 
-        public Vector getMouseDiffAndClear()
+        public Vector getMouseDiffAndReset()
         {
             Vector last = m_lastMouseDiff;
             m_lastMouseDiff = new Vector();
