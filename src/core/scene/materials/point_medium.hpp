@@ -11,7 +11,12 @@ namespace mufflon { namespace scene { namespace materials {
 CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
 	mAssert(scene.objects[0u].polygon.numVertices > 0u || scene.objects[0u].spheres.numSpheres > 0u);
 	// Shoot a ray to a point in the scene (any surface suffices)
-	ei::Vec3 vertex = accel_struct::get_centroid(scene.objects[0u], 0);
+	// We need to transform the vertex from object to world space
+	const ei::Mat3x3 rotation{ scene.transformations[0u] };
+	const ei::Vec3 translation{ scene.transformations[0u][3],
+								scene.transformations[0u][7],
+								scene.transformations[0u][11] };
+	const ei::Vec3 vertex = rotation * (accel_struct::get_centroid(scene.objects[scene.objectIndices[0u]], 0) + translation);
 
 	ei::Vec3 dir = vertex - pos;
 	const float length = ei::len(dir);

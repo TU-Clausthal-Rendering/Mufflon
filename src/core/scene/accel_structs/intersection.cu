@@ -528,7 +528,7 @@ void first_intersection_scene_obj_lbvh(
 	const ei::Vec3 invTranslation { -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
 									-scene.transformations[instanceId][11] };
-	ei::Ray transRay = { invRotScale * (ray.origin + invTranslation),
+	const ei::Ray transRay = { invRotScale * (ray.origin + invTranslation),
 						 normalize(invRotScale * ray.direction) };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
