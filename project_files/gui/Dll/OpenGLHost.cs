@@ -116,11 +116,10 @@ namespace gui.Dll
                 if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)Settings.Default.LoaderProfileLevel))
                     throw new Exception(Loader.loader_get_dll_error());
 
-                m_viewport.PropertyChanged += HandleResize;
-
                 while (m_isRunning)
                 {
                     //HandleCommands();
+                    HandleResize();
                     m_startedRender.WaitOne();
                     m_startedRender.Reset();
 
@@ -225,7 +224,7 @@ namespace gui.Dll
         /// <summary>
         /// asynch thread: calls the dll resize() function if the client area was resized
         /// </summary>
-        private void HandleResize(object sender, PropertyChangedEventArgs args)
+        private void HandleResize()
         {
             // viewport resize?
             int newWidth = m_viewport.Width;
