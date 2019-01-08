@@ -688,17 +688,20 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 		if(primId >= offsetSpheres) { // Sphere?
 			const i32 sphId = primId - offsetSpheres;
 			const ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
-			normal = normalize(hitPoint - obj.spheres.spheres[sphId].center);
+			const Point center { scene.transformations[hitInstanceId] * ei::Vec4(obj.spheres.spheres[sphId].center, 1.0f) };
+			normal = normalize(hitPoint - center);
 
 			// Normalization is done later
-			if(normal.x == 0.f && normal.y == 0.f)
-				tangentX = ei::Vec3(1.f, 0.f, 0.f);
+			if(normal.x == 0.0f && normal.y == 0.0f)
+				tangentX = ei::Vec3(1.0f, 0.0f, 0.0f);
 			else
-				tangentX = ei::Vec3(ei::Vec2(normal.y, -normal.x), 0.f);
+				tangentX = normalize(ei::Vec3(ei::Vec2(normal.y, -normal.x), 0.0f));
 			tangentY = ei::cross(normal, tangentX);
 
-			uv.x = atan2f(normal.x, normal.y) / (2.f * ei::PI) + 0.5f;
-			uv.y = 0.5f * normal.z + 0.5f;
+			uv.x = atan2f(normal.y, normal.x) / (2.0f * ei::PI) + 0.5f;
+			uv.y = acosf(normal.z) / ei::PI;
+			surfParams.st = uv;
+			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, normal, tangentX, tangentY, uv, surfParams };
 		} else {
 			const i32* indices = (i32*)obj.polygon.vertexIndices;
 			const ei::Vec3* meshVertices = obj.polygon.vertices;
