@@ -10,12 +10,13 @@ namespace mufflon { namespace scene { namespace lights {
 namespace summed_details {
 
 /**
-	 * Binary search on texel range (either row- or columnwise).
-	 * val: Value to compare against (lower bound)
-	 * max: Upper limit for the row or column (last valid value)
-	 * constCoord: value for the non-variable coordinate
-	 * row: find over rows or columns
-	 */
+ * Binary search on texel range (either row- or columnwise).
+ * Returns the first element that is >= val.
+ * val: Value to compare against (lower bound)
+ * max: Upper limit for the row or column (last valid value)
+ * constCoord: value for the non-variable coordinate
+ * row: find over rows or columns
+ */
 CUDA_FUNCTION __forceinline__ int lower_bound(const textures::ConstTextureDevHandle_t<CURRENT_DEV>& texture,
 											  const float val, const int max,
 											  const int constCoord, const bool row) {
@@ -23,14 +24,15 @@ CUDA_FUNCTION __forceinline__ int lower_bound(const textures::ConstTextureDevHan
 	int left = 0u;
 	int count = max + 1;
 	while(count > 0) {
-		const int curr = count / 2;
+		const int step = count / 2;
+		const int curr = left + step;
 		Pixel texel = row ? Pixel{ constCoord, curr } : Pixel{ curr, constCoord };
 		const float x = textures::read(texture, texel).x;
-		if(val < x) {
+		if(x < val) {
 			left = curr + 1;
-			count -= left;
+			count -= step + 1;
 		} else {
-			count = curr;
+			count = step;
 		}
 	}
 	return left;
@@ -107,7 +109,7 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 														  float u0, float u1) {
 	using namespace summed_details;
 
-		// First decide on the row
+	// First decide on the row
 	const Pixel texSize = textures::get_texture_size(envLight.texHandle);
 	const Pixel bottomRight = texSize - 1;
 	const float highestRowwise = textures::read(envLight.summedAreaTable, bottomRight).x;
@@ -116,23 +118,21 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 	const float x = highestRowwise * u0;
 	const int row = lower_bound(envLight.summedAreaTable, x, bottomRight.y, bottomRight.x, true);
 	// Perform inverse linear interpolation
-	const float vr0 = row == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ row - 1, bottomRight.y }).x;
-	const float vr1 = textures::read(envLight.summedAreaTable, Pixel{ row, bottomRight.y }).x;
+	const float vr0 = row == 0 ? 0.0f : textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row-1 }).x;
+	const float vr1 = textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row }).x;
 	const float rowPdf = (vr1 - vr0) * texSize.y / highestRowwise;
 	const float rowVal = (row + (x - vr0) / (vr1 - vr0)) / static_cast<float>(texSize.y);
 
 	// Decide on a column
-	float highestColumnwise = textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row }).x;
-	// Adjust the value due to the summing at the end
-	if(row > 0)
-		highestColumnwise -= textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row - 1 }).x;
+	// Adjust the value due to the summing at the end (-vr0)
+	float highestColumnwise = vr1 - vr0;
 
 	// Find the column via binary search
 	const float y = highestColumnwise * u1;
 	const int column = lower_bound(envLight.summedAreaTable, y, bottomRight.x, row, false);
 	// Perform inverse linear interpolation
-	const float vc0 = column == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ row, column - 1 }).x;
-	const float vc1 = textures::read(envLight.summedAreaTable, Pixel{ row, column }).x;
+	const float vc0 = column == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ column - 1, row }).x;
+	const float vc1 = textures::read(envLight.summedAreaTable, Pixel{ column, row }).x;
 	const float columnPdf = (vc1 - vc0) * texSize.x / highestColumnwise;
 	const float columnVal = (column + (y - vc0) / (vc1 - vc0)) / static_cast<float>(texSize.x);
 

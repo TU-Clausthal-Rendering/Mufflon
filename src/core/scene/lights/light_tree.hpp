@@ -443,9 +443,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	// First is envmap...
 	u64 rightEnv = percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
-		// TODO: sample background
-		return {};
-		//return lighttree_detail::adjustPdf(connect_light(tree.envLight, position, bounds, rnd), envProb);
+		return adjustPdf(tree.background.connect(position, bounds, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
