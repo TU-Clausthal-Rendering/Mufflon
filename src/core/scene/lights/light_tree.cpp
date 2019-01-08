@@ -352,11 +352,11 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Copy the lights into the tree
 	// Directional lights are easier, because they have a fixed size
-	{
+	if(dirLights.size() > 0.0f) {
 		std::memcpy(m_treeCpu->dirLights.memory + dirLightOffsets[0], dirLights.data(), dirLightOffsets.mem_size());
 	}
 	// Positional lights are more difficult since we don't know the concrete size
-	{
+	if(posLights.size() > 0.0f) {
 		static_assert(sizeof(AreaLightQuad<Device::CPU>) == 96+16);
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
 		std::size_t i = 0u;
