@@ -409,7 +409,7 @@ std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrS
 
 	AttribInfo& attribute = m_attributes[hdl.index];
 	const std::size_t elemSize = attribute.elemSize;
-	char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + elemSize * start;
+	char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + attribute.poolOffset + elemSize * start;
 	std::size_t read = attrStream.read(mem, elemSize * count);
 	if(read > 0)
 		this->mark_changed(Device::CPU, hdl);
@@ -426,7 +426,7 @@ std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStr
 
 	AttribInfo& attribute = m_attributes[hdl.index];
 	const std::size_t elemSize = attribute.elemSize;
-	const char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + elemSize * start;
+	const char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + attribute.poolOffset + elemSize * start;
 	return attrStream.write(mem, elemSize * count) / attribute.elemSize;
 }
 	// Resolves a name to an attribute
