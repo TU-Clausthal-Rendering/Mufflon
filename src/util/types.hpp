@@ -71,11 +71,11 @@ public:
 		return *this;
 	}
 	__host__ __device__ AngularPdf& operator*=(float probability) noexcept {
-		m_pdf /= probability;
+		m_pdf *= probability;
 		return *this;
 	}
 	__host__ __device__ AngularPdf& operator/=(float probability) noexcept {
-		m_pdf *= probability;
+		m_pdf /= probability;
 		return *this;
 	}
 	__host__ __device__ AngularPdf operator+(AngularPdf pdf) const noexcept {

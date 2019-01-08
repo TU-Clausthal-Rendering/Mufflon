@@ -57,6 +57,8 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 						   const scene::SceneDescriptor<Device::CPU>& scene) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
+	m_params.maxPathLength = 2;
+
 	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
@@ -67,8 +69,8 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 	int pathLen = 0;
 	do {
-		if(false)
-		if(pathLen+1 >= m_params.maxPathLength) {
+		if(true)
+		if(pathLen+1 <= m_params.maxPathLength) {
 			// Call NEE member function for the camera start/recursive vertices
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
@@ -76,18 +78,21 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
 				vertex->get_position(), m_currentScene->get_bounding_box(),
 				neeRnd, scene::lights::guide_flux);
-			// TODO: set startInsPrimId with a proper value.
-			bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-				scene, { vertex->get_position() , ei::normalize(nee.direction) }, { -1, -1 },
-				nee.dist); 
-			if(!anyhit) {
-				auto value = vertex->evaluate(nee.direction, scene.media);
-				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
-				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
-				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-				mAssert(!isnan(mis));
-				outputBuffer.contribute(coord, throughput, { Spectrum{nee.intensity}, 1.0f },
-					value.cosOut, value.value * mis);
+			auto value = vertex->evaluate(nee.direction, scene.media);
+			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
+			Spectrum radiance = value.value * nee.diffIrradiance;
+			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
+				bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
+					scene, { vertex->get_position() , nee.direction },
+					vertex->get_primitive_id(), nee.dist);
+				if(!anyhit) {
+					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
+					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
+					mis = 1.0f;
+					mAssert(!isnan(mis));
+					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
+						value.cosOut, radiance * mis);
+				}
 			}
 		}
 
@@ -99,7 +104,8 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
 				ei::Vec3 background = scene.lightTree.background.get_radiance(lastDir);
-				// TODO: where do we get the normal and stuff from?
+				float mis = 0.0f;
+				background *= mis;
 				outputBuffer.contribute(coord, throughput, background,
 										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 										ei::Vec3{ 0, 0, 0 });
@@ -109,13 +115,13 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
-		if(pathLen >= m_params.maxPathLength) {
+		if(pathLen <= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(scene.lightTree, 0,
 												  lastPosition, scene::lights::guide_flux);
 				//float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
-				float mis = 1.0f;
+				float mis = 0.0f;
 				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 					vertex->get_normal(), vertex->get_albedo());
 			}

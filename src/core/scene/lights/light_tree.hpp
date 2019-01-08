@@ -193,7 +193,7 @@ CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&& sample, float chance) {
 	sample.creationPdf *= chance;
-	sample.intensity /= chance;
+	sample.diffIrradiance /= chance;
 	return sample;
 }
 

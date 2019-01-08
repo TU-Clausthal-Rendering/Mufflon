@@ -54,7 +54,7 @@ public:
 		bck.m_envLight.summedAreaTable = envmap.summedAreaTable->acquire_const<DEVICE>();
 
 		// TODO: accumulate flux for envmap
-		bck.m_envLight.flux = ei::Vec3{ 0.f };
+		bck.m_envLight.flux = ei::Vec3{ 0.1f };
 
 		return bck;
 	}
@@ -90,6 +90,16 @@ public:
 	}
 
 	// TODO: sample, connect
+
+	CUDA_FUNCTION NextEventEstimation connect(const ei::Vec3& position,
+											  const ei::Box& bounds,
+											  const math::RndSet2& rnd) const {
+		switch(m_type) {
+			case BackgroundType::COLORED: return {}; // TODO
+			case BackgroundType::ENVMAP: return connect_light(m_envLight, position, bounds, rnd);
+			default: mAssert(false); return {};
+		}
+	}
 
 	constexpr CUDA_FUNCTION BackgroundType get_type() const noexcept {
 		return m_type;

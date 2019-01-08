@@ -136,7 +136,7 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 	const float columnPdf = (vc1 - vc0) * texSize.x / highestColumnwise;
 	const float columnVal = (column + (y - vc0) / (vc1 - vc0)) / static_cast<float>(texSize.x);
 
-	return EnvmapSampleResult{ Pixel{row, column}, ei::Vec2{ rowVal, columnVal }, rowPdf * columnPdf };
+	return EnvmapSampleResult{ Pixel{column, row}, ei::Vec2{ columnVal, rowVal }, rowPdf * columnPdf };
 }
 
 }}} // namespace mufflon::scene::lights
