@@ -236,19 +236,12 @@ namespace gui.Dll
             if (m_renderWidth != newWidth || m_renderHeight != newHeight ||
                 m_renderOffsetX != newOffsetX || m_renderOffsetY != newOffsetY)
             {
-                // Pause the renderer if necessary
-                bool wasRunning = m_rendererModel.IsRendering;
-                m_rendererModel.IsRendering = false;
-                m_rendererModel.reset();
-
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
                 m_renderOffsetX = newOffsetX;
                 m_renderOffsetY = newOffsetY;
                 if (!Core.resize(m_renderWidth, m_renderHeight, m_renderOffsetX, m_renderOffsetY))
                     throw new Exception(Core.core_get_dll_error());
-
-                m_rendererModel.IsRendering = wasRunning;
             }
         }
 
