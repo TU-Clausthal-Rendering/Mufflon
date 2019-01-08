@@ -137,16 +137,12 @@ namespace gui.ViewModel
                     if (!Core.world_remove_light(light.Handle))
                         throw new Exception(Core.core_get_dll_error());
                     // Also remove it from the scenario, if it was selected, and update the scene
-                    if ((light as LightModel).IsSelected)
+                    if (light.IsSelected)
                     {
                         if (currScenario == IntPtr.Zero)
                             throw new Exception(Core.core_get_dll_error());
-                        if (!Core.scenario_remove_light_by_named(currScenario, (light as LightModel).Name))
+                        if (!Core.scenario_remove_light(currScenario, light.Name))
                             throw new Exception(Core.core_get_dll_error());
-                        if (light.GetType() == typeof(EnvmapLightModel))
-                            Core.scene_mark_envmap_dirty();
-                        else
-                            Core.scene_mark_lighttree_dirty();
                         needsRebuild = true;
                     }
                 }
@@ -239,7 +235,6 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 if (args.PropertyName == nameof(PointLightModel.Intensity) && !Core.world_set_point_light_intensity(light.Handle, new Core.Vec3((light as PointLightModel).Intensity)))
                     throw new Exception(Core.core_get_dll_error());
-                Core.scene_mark_lighttree_dirty();
             }
             else if (light.GetType() == typeof(SpotLightModel))
             {
@@ -253,7 +248,6 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 if (args.PropertyName == nameof(SpotLightModel.FalloffStart) && !Core.world_set_spot_light_falloff(light.Handle, (light as SpotLightModel).FalloffStart))
                     throw new Exception(Core.core_get_dll_error());
-                Core.scene_mark_lighttree_dirty();
             }
             else if (light.GetType() == typeof(DirectionalLightModel))
             {
@@ -261,19 +255,18 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 if (args.PropertyName == nameof(DirectionalLightModel.Radiance) && !Core.world_set_dir_light_radiance(light.Handle, new Core.Vec3((light as DirectionalLightModel).Radiance)))
                     throw new Exception(Core.core_get_dll_error());
-                Core.scene_mark_lighttree_dirty();
             }
             else if (light.GetType() == typeof(EnvmapLightModel))
             {
                 if(args.PropertyName == nameof(EnvmapLightModel.Map))
                 {
-                    IntPtr envMapHandle = Core.world_add_texture((light as EnvmapLightModel).Map, Core.TextureSampling.LINEAR);
+                    string absoluteTexturePath = Path.Combine(m_models.Scene.Directory, (light as EnvmapLightModel).Map);
+                    IntPtr envMapHandle = Core.world_add_texture(absoluteTexturePath, Core.TextureSampling.LINEAR);
                     if (envMapHandle == IntPtr.Zero)
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.world_set_env_light_map(light.Handle, envMapHandle))
                         throw new Exception(Core.core_get_dll_error());
                 }
-                Core.scene_mark_envmap_dirty();
             }
 
             IntPtr currScenario = Core.world_get_current_scenario();
@@ -289,7 +282,7 @@ namespace gui.ViewModel
                 }
                 else
                 {
-                    if (!Core.scenario_remove_light_by_named(currScenario, light.Name))
+                    if (!Core.scenario_remove_light(currScenario, light.Name))
                         throw new Exception(Core.core_get_dll_error());
                 }
             }
@@ -475,20 +468,78 @@ namespace gui.ViewModel
                 light.IsSelected = false;
                 light.PropertyChanged += OnLightChanged;
             }
-            ulong count = Core.scenario_get_light_count(scenarioHdl);
-            for(ulong i = 0u; i < count; ++i)
-            {
-                string name = Core.scenario_get_light_name(scenarioHdl, i);
-                if(name == null || name.Length == 0)
-                    throw new Exception(Core.core_get_dll_error());
-                foreach (var light in m_models.Lights.Models)
+            { // Point lights
+                int count = Core.scenario_get_point_light_count(scenarioHdl);
+                for (int i = 0; i < count; ++i)
                 {
-                    if(light.Name == name)
+                    string name = Core.scenario_get_point_light_name(scenarioHdl, (ulong)i);
+                    if (name == null || name.Length == 0)
+                        throw new Exception(Core.core_get_dll_error());
+                    foreach (var light in m_models.Lights.Models)
                     {
-                        light.PropertyChanged -= OnLightChanged;
-                        light.IsSelected = true;
-                        light.PropertyChanged += OnLightChanged;
-                        break;
+                        if (light.Name == name)
+                        {
+                            light.PropertyChanged -= OnLightChanged;
+                            light.IsSelected = true;
+                            light.PropertyChanged += OnLightChanged;
+                            break;
+                        }
+                    }
+                }
+            }
+            { // Spot lights
+                int count = Core.scenario_get_spot_light_count(scenarioHdl);
+                for (int i = 0; i < count; ++i)
+                {
+                    string name = Core.scenario_get_spot_light_name(scenarioHdl, (ulong)i);
+                    if (name == null || name.Length == 0)
+                        throw new Exception(Core.core_get_dll_error());
+                    foreach (var light in m_models.Lights.Models)
+                    {
+                        if (light.Name == name)
+                        {
+                            light.PropertyChanged -= OnLightChanged;
+                            light.IsSelected = true;
+                            light.PropertyChanged += OnLightChanged;
+                            break;
+                        }
+                    }
+                }
+            }
+            { // Directional lights
+                int count = Core.scenario_get_dir_light_count(scenarioHdl);
+                for (int i = 0; i < count; ++i)
+                {
+                    string name = Core.scenario_get_dir_light_name(scenarioHdl, (ulong)i);
+                    if (name == null || name.Length == 0)
+                        throw new Exception(Core.core_get_dll_error());
+                    foreach (var light in m_models.Lights.Models)
+                    {
+                        if (light.Name == name)
+                        {
+                            light.PropertyChanged -= OnLightChanged;
+                            light.IsSelected = true;
+                            light.PropertyChanged += OnLightChanged;
+                            break;
+                        }
+                    }
+                }
+            }
+            { // Envmap light
+                if(Core.scenario_has_envmap_light(scenarioHdl))
+                {
+                    string name = Core.scenario_get_envmap_light_name(scenarioHdl);
+                    if (name == null || name.Length == 0)
+                        throw new Exception(Core.core_get_dll_error());
+                    foreach (var light in m_models.Lights.Models)
+                    {
+                        if (light.Name == name)
+                        {
+                            light.PropertyChanged -= OnLightChanged;
+                            light.IsSelected = true;
+                            light.PropertyChanged += OnLightChanged;
+                            break;
+                        }
                     }
                 }
             }
@@ -639,9 +690,11 @@ namespace gui.ViewModel
                 string name = Core.world_get_light_name(hdl);
                 if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
-                string map = Core.world_get_env_light_map(hdl);
-                if (map == null || map.Length == 0)
+                string absoluteTexPath = Core.world_get_env_light_map(hdl);
+                if (absoluteTexPath == null || absoluteTexPath.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
+                Uri scenePath = new Uri(m_models.Scene.FullPath);
+                string map = scenePath.MakeRelativeUri(new Uri(absoluteTexPath)).OriginalString;
                 m_models.Lights.Models.Add(new EnvmapLightModel()
                 {
                     Name = name,

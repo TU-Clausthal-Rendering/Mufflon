@@ -1,4 +1,5 @@
 #include "plugin/texture_plugin_interface.h"
+#include "util/filesystem.hpp"
 #include "util/log.hpp"
 #include <gli/gl.hpp>
 #include <gli/gli.hpp>
@@ -138,8 +139,13 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		CHECK_NULLPTR(path, "texture path", false);
 		CHECK_NULLPTR(path, "texture return data", false);
 
-		// Check if we need to load OpenEXR
 		std::string_view pathView = path;
+		if(!fs::exists(path)) {
+			logError("[", FUNCTION_NAME, "] Texture file '", pathView, "' does not exist");
+			return false;
+		}
+
+		// Check if we need to load OpenEXR
 		if(pathView.length() >= 4u && pathView.substr(pathView.length() - 4u).compare(".exr") == 0)
 			return load_openexr(path, texData);
 

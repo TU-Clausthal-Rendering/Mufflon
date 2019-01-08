@@ -601,9 +601,9 @@ bool JsonLoader::load_file() {
 	if(m_abort)
 		return false;
 
+	m_lights = get(m_state, document, "lights");
 	m_scenarios = get(m_state, document, "scenarios");
 	m_cameras = get(m_state, document, "cameras");
-	m_lights = get(m_state, document, "lights");
 	m_materials = get(m_state, document, "materials");
 
 	// Partially parse the default scenario

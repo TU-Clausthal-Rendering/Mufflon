@@ -402,40 +402,20 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	m_dirty.mark_changed(Device::CPU);
 }
 
-void LightTreeBuilder::set_envmap(TextureHandle envLight) {
+void LightTreeBuilder::set_envmap(lights::EnvMapLightDesc envLight) {
 	// We cannot check for texture identity here to avoid work - it might be that a texture gets
 	// deleted and another one is created in its place, resulting in the same pointer
 	// TODO: is that actually true?
 
 	this->synchronize<Device::CPU>();
-	// First remove the old mapping from the texture map
-	if(m_treeCpu->background.get_type() == BackgroundType::ENVMAP) {
-		auto iter = m_textureMap.find(m_treeCpu->background.get_envmap_light().texHandle);
-		if(iter != m_textureMap.end())
-			m_textureMap.erase(iter);
-	}
-
-	// Then create an appropriate summed area table; this depends on if we have a cube or a spherical map
-	if(envLight->get_num_layers() == 6)
-		m_envmapSum = std::make_unique<textures::Texture>(6u * envLight->get_width(), envLight->get_height(), 1u,
-														  envLight->get_format(), textures::SamplingMode::LINEAR,
-														  false);
-	else
-		m_envmapSum = std::make_unique<textures::Texture>(envLight->get_width(), envLight->get_height(), 1u,
-														  envLight->get_format(), textures::SamplingMode::LINEAR,
-														  false);
-	m_treeCpu->background = Background<Device::CPU>::envmap(envLight, m_envmapSum.get());
-	m_textureMap.emplace(envLight->acquire_const<Device::CPU>(), envLight);
+	m_treeCpu->background = Background<Device::CPU>::envmap(envLight);
+	m_envMap = envLight;
 }
 
 void LightTreeBuilder::set_envmap(ei::Vec3 color) {
 	this->synchronize<Device::CPU>();
-	// First remove the old mapping from the texture map
-	if(m_treeCpu->background.get_type() == BackgroundType::ENVMAP) {
-		auto iter = m_textureMap.find(m_treeCpu->background.get_envmap_light().texHandle);
-		if(iter != m_textureMap.end())
-			m_textureMap.erase(iter);
-	}
+	// Remove the old texture handles
+	m_envMap = lights::EnvMapLightDesc{ nullptr, nullptr };
 
 	m_treeCpu->background = Background<Device::CPU>::colored(color);
 }
@@ -501,11 +481,7 @@ void LightTreeBuilder::synchronize() {
 		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
 		// Remap the environment map
-		TextureHandle envMapTex = nullptr;
-		auto envMapIter = m_textureMap.find(m_treeCpu->background.get_envmap_light().texHandle);
-		if(envMapIter != m_textureMap.end())
-			envMapTex = envMapIter->second;
-		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(envMapTex, m_envmapSum.get());
+		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(m_envMap);
 
 		// Replace all texture handles inside the tree's data and
 		// synchronize all the remaining tree memory.

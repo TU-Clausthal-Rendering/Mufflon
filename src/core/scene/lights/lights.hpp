@@ -144,6 +144,11 @@ struct alignas(16) DirectionalLight {
 /**
  * Environment-map light.
  */
+struct EnvMapLightDesc {
+	TextureHandle envmap = nullptr;
+	TextureHandle summedAreaTable = nullptr;
+};
+
 template < Device dev >
 struct alignas(16) EnvMapLight {
 	textures::ConstTextureDevHandle_t<dev> texHandle;

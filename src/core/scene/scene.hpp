@@ -95,27 +95,23 @@ public:
 	}
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
-					std::vector<lights::DirectionalLight>&& dirLights,
-					TextureHandle envLightTexture = nullptr);
-
+					std::vector<lights::DirectionalLight>&& dirLights);
+	void set_background(lights::EnvMapLightDesc envLightTexture);
+	void set_background(const ei::Vec3& color);
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
 		mAssert(camera != nullptr);
+		m_cameraDescChanged = true;
 		m_camera = camera;
 	}
 	// Access the active camera
 	ConstCameraHandle get_camera() const noexcept {
 		return m_camera;
 	}
-	void mark_light_tree_dirty() noexcept {
-		m_lightTreeDirty = true;
-	}
-	void mark_envmap_dirty() noexcept {
-		m_envmapDirty = true;
-	}
-	void mark_materials_dirty() noexcept {
-		m_materialsDirty = true;
+
+	const lights::LightTreeBuilder& get_light_tree_builder() const {
+		return m_lightTree;
 	}
 	
 	/**
@@ -140,10 +136,10 @@ public:
 											   const std::vector<const char*>& sphereAttribs,
 											   const ei::IVec2& resolution);
 
+private:
 	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
-private:
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
 	std::map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
@@ -175,11 +171,13 @@ private:
 	std::vector<const char*> m_lastFaceAttribs;
 	std::vector<const char*> m_lastSphereAttribs;
 
-	// Dirty flags for scene contents
-	bool m_lightTreeDirty = true;
-	bool m_envmapDirty = true;
-	bool m_materialsDirty = true;
+	// Whether the light tree has changed and needs to fetch its descriptor
 	bool m_lightTreeDescChanged = true;
+	// Whether the camera has changed and needs to fetch its descriptor
+	bool m_cameraDescChanged = true;
+	// Whether the light tree needs to reevaluate its media; doesn't get set if only
+	// the envmap changes
+	bool m_lightTreeNeedsMediaUpdate = true;
 
 	ei::Box m_boundingBox;
 

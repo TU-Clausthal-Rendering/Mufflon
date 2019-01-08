@@ -152,10 +152,12 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	load_materials<dev>();
 
 	// Camera
-	// TODO: only update camera if camera has been changed?
-	m_camera->get_parameter_pack(&sceneDescriptor.camera.get(), resolution);
+	if(m_cameraDescChanged) {
+		m_camera->get_parameter_pack(&sceneDescriptor.camera.get(), resolution);
+		m_cameraDescChanged = false;
+	}
 
-	// TODO: Requery light tree only if needed?
+	// Light tree
 	if(m_lightTreeDescChanged) {
 		sceneDescriptor.lightTree = m_lightTree.acquire_const<dev>();
 		m_lightTreeDescChanged = false;
@@ -176,27 +178,37 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		this->update_camera_medium(sceneDescriptor);
 	}
 
+	// Camera doesn't get a media-changed flag because it's relatively cheap to determine?
+	if(m_cameraDescChanged)
+		this->update_camera_medium(sceneDescriptor);
+	
+	if(m_lightTreeNeedsMediaUpdate) {
+		m_lightTree.update_media(sceneDescriptor);
+		m_lightTreeNeedsMediaUpdate = false;
+	}
 
 	return sceneDescriptor;
 }
 
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
-				std::vector<lights::DirectionalLight>&& dirLights,
-				TextureHandle envLightTexture) {
-	if(m_lightTreeDirty) {
-		m_lightTree.build(std::move(posLights), std::move(dirLights),
-						  m_boundingBox);
-		m_lightTreeDescChanged = true;
-	}
-	if(m_envmapDirty) {
-		if(envLightTexture != nullptr)
-			m_lightTree.set_envmap(envLightTexture);
-		else
-			m_lightTree.set_envmap(ei::Vec3{ 0, 0, 0 });
-		m_lightTreeDescChanged = true;
-	}
-	m_lightTreeDirty = false;
-	m_envmapDirty = false;
+				std::vector<lights::DirectionalLight>&& dirLights) {
+	m_lightTree.build(std::move(posLights), std::move(dirLights),
+						m_boundingBox);
+	m_lightTreeDescChanged = true;
+	m_lightTreeNeedsMediaUpdate = true;
+}
+
+void Scene::set_background(lights::EnvMapLightDesc envLightTexture) {
+	if(envLightTexture.envmap != nullptr)
+		m_lightTree.set_envmap(envLightTexture);
+	else
+		m_lightTree.set_envmap(ei::Vec3{ 0, 0, 0 });
+	m_lightTreeDescChanged = true;
+}
+
+void Scene::set_background(const ei::Vec3& color) {
+	m_lightTree.set_envmap(color);
+	m_lightTreeDescChanged = true;
 }
 
 template < Device dev >

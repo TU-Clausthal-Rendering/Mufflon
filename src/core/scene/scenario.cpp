@@ -70,22 +70,44 @@ void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
 		m_perObjectCustomization.insert({ hdl, ObjectProperty{false, level} });
 }
 
-void Scenario::remove_light(std::size_t index) {
-	if(index < m_lightNames.size()) {
-		m_lightNames.erase(m_lightNames.begin() + index);
-		m_lightsChanged = true;
-	}
+void Scenario::remove_point_light(const std::string_view& name) {
+	m_pointLightNames.erase(std::remove_if(m_pointLightNames.begin(), m_pointLightNames.end(),
+										   [&name, this](const std::string_view& n) {
+		if(n == name) {
+			m_lightsChanged = true;
+			return true;
+		}
+		return false;
+	}), m_pointLightNames.end());
 }
 
-void Scenario::remove_light(const std::string_view& name) {
-	m_lightNames.erase(std::remove_if(m_lightNames.begin(), m_lightNames.end(),
-		[&name, this](const std::string_view& n) {
-			if(n == name) {
-				m_lightsChanged = true;
-				return true;
-			}
-			return false;
-		}), m_lightNames.end());
+void Scenario::remove_spot_light(const std::string_view& name) {
+	m_spotLightNames.erase(std::remove_if(m_spotLightNames.begin(), m_spotLightNames.end(),
+										   [&name, this](const std::string_view& n) {
+		if(n == name) {
+			m_lightsChanged = true;
+			return true;
+		}
+		return false;
+	}), m_spotLightNames.end());
+}
+
+void Scenario::remove_dir_light(const std::string_view& name) {
+	m_dirLightNames.erase(std::remove_if(m_dirLightNames.begin(), m_dirLightNames.end(),
+										   [&name, this](const std::string_view& n) {
+		if(n == name) {
+			m_lightsChanged = true;
+			return true;
+		}
+		return false;
+	}), m_dirLightNames.end());
+}
+
+void Scenario::remove_envmap_light() {
+	if(!m_envLightName.empty()) {
+		m_envLightName = "";
+		m_envmapLightsChanged = true;
+	}
 }
 
 } // namespace mufflon::scene

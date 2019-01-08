@@ -80,21 +80,46 @@ public:
 
 	// Note: no method to change name! because it is being used as
 	// key in worldcontainer
-
-	void add_light(std::string_view name) {
-		if(std::find(m_lightNames.begin(), m_lightNames.end(), name) == m_lightNames.end()) {
-			m_lightNames.push_back(name);
+	void add_point_light(std::string_view name) {
+		if(std::find(m_pointLightNames.begin(), m_pointLightNames.end(), name) == m_pointLightNames.end()) {
+			m_pointLightNames.push_back(name);
 			m_lightsChanged = true;
 		}
 	}
+	void add_spot_light(std::string_view name) {
+		if(std::find(m_spotLightNames.begin(), m_spotLightNames.end(), name) == m_spotLightNames.end()) {
+			m_spotLightNames.push_back(name);
+			m_lightsChanged = true;
+		}
+	}
+	void add_dir_light(std::string_view name) {
+		if(std::find(m_dirLightNames.begin(), m_dirLightNames.end(), name) == m_dirLightNames.end()) {
+			m_dirLightNames.push_back(name);
+			m_lightsChanged = true;
+		}
+	}
+	void set_envmap_light(std::string_view name) {
+		if(name != m_envLightName) {
+			m_envLightName = name;
+			m_envmapLightsChanged = true;
+		}
+	}
 
-	void remove_light(std::size_t index);
-	void remove_light(const std::string_view& name);
+	void remove_point_light(const std::string_view& name);
+	void remove_spot_light(const std::string_view& name);
+	void remove_dir_light(const std::string_view& name);
+	void remove_envmap_light();
 
 	// Queries whether lights have been added/removed and resets the flag
 	bool lights_dirty_reset() {
 		bool dirty = m_lightsChanged;
 		m_lightsChanged = false;
+		return dirty;
+	}
+	// Queries whether an envmap light has been added/removed and resets the flag
+	bool envmap_lights_dirty_reset() {
+		bool dirty = m_envmapLightsChanged;
+		m_envmapLightsChanged = false;
 		return dirty;
 	}
 	// Queries whether the camera has been changed and resets the flag
@@ -104,8 +129,17 @@ public:
 		return dirty;
 	}
 
-	const std::vector<std::string_view>& get_light_names() const noexcept {
-		return m_lightNames;
+	const std::vector<std::string_view>& get_point_light_names() const noexcept {
+		return m_pointLightNames;
+	}
+	const std::vector<std::string_view>& get_spot_light_names() const noexcept {
+		return m_spotLightNames;
+	}
+	const std::vector<std::string_view>& get_dir_light_names() const noexcept {
+		return m_dirLightNames;
+	}
+	std::string_view get_envmap_light_name() const noexcept {
+		return m_envLightName;
 	}
 
 private:
@@ -120,7 +154,9 @@ private:
 	};
 
 	// "Dirty" flags for rebuilding the scene
-	bool m_lightsChanged = false;
+	// Two flags exist for lights: one for envmap lights, and one for the rest
+	bool m_lightsChanged = true;
+	bool m_envmapLightsChanged = true;
 	bool m_cameraChanged = true;
 
 	std::string_view m_name;
@@ -130,7 +166,11 @@ private:
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// All lights which are enabled in this scenario
-	std::vector<std::string_view> m_lightNames;
+	std::vector<std::string_view> m_pointLightNames;
+	std::vector<std::string_view> m_spotLightNames;
+	std::vector<std::string_view> m_dirLightNames;
+	std::string_view m_envLightName;
+
 
 	std::size_t m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution = {};

@@ -137,8 +137,12 @@ public:
 			   std::vector<DirectionalLight>&& dirLights,
 			   const ei::Box& boundingBox);
 	// Updates (read replaces) the envmap light only
-	void set_envmap(TextureHandle envLight);
+	void set_envmap(lights::EnvMapLightDesc envLight);
 	void set_envmap(ei::Vec3 color);
+
+	const lights::EnvMapLightDesc& get_envmap_descriptor() const noexcept {
+		return m_envMap;
+	}
 
 	// Determines for each point- and spotlight in what medium it is
 	template < Device dev >
@@ -169,8 +173,8 @@ private:
 	// The tree is build on CPU side. For synchronization we need a possiblity to
 	// find the CUDA textures.
 	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;
-	// 'Local' summed area table, which the light tree holds ownership of
-	std::unique_ptr<textures::Texture> m_envmapSum;
+	// Envmap textures, if present (the handles are non-owning)
+	lights::EnvMapLightDesc m_envMap;
 };
 
 #endif // __CUDACC__

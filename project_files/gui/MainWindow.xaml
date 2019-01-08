@@ -391,11 +391,20 @@
                     ToolTip="Total/Used/Free"
                     Content="{Binding Statusbar.GpuMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
                 <StatusBarItem
-                    Width="200"
+                    Width="110"
                     HorizontalAlignment="Right"
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch">
-                    <ProgressBar Value="50"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Iteration: "/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Renderer.Iteration, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
                 </StatusBarItem>
             </StatusBar>
         </Grid>

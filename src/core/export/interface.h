@@ -371,6 +371,7 @@ CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, Vec3 position,
 CORE_API Boolean CDECL world_remove_camera(CameraHdl hdl);
 CORE_API LightHdl CDECL world_add_light(const char* name, LightType type);
 CORE_API Boolean CDECL world_remove_light(LightHdl hdl);
+CORE_API Boolean CDECL world_find_light(const char* name, LightHdl* hdl);
 CORE_API size_t CDECL world_get_camera_count();
 CORE_API CameraHdl CDECL world_get_camera(const char* name);
 CORE_API CameraHdl CDECL world_get_camera_by_index(size_t);
@@ -397,11 +398,16 @@ CORE_API Boolean CDECL scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj)
 CORE_API LodLevel CDECL scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj);
 CORE_API Boolean CDECL scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 										 LodLevel level);
-CORE_API IndexType CDECL scenario_get_light_count(ScenarioHdl scenario);
-CORE_API const char* CDECL scenario_get_light_name(ScenarioHdl scenario, size_t index);
-CORE_API Boolean CDECL scenario_add_light(ScenarioHdl scenario, const char* name);
-CORE_API Boolean CDECL scenario_remove_light_by_index(ScenarioHdl scenario, size_t index);
-CORE_API Boolean CDECL scenario_remove_light_by_named(ScenarioHdl scenario, const char* name);
+CORE_API IndexType CDECL scenario_get_point_light_count(ScenarioHdl scenario);
+CORE_API IndexType CDECL scenario_get_spot_light_count(ScenarioHdl scenario);
+CORE_API IndexType CDECL scenario_get_dir_light_count(ScenarioHdl scenario);
+CORE_API Boolean CDECL scenario_has_envmap_light(ScenarioHdl scenario);
+CORE_API const char* CDECL scenario_get_point_light_name(ScenarioHdl scenario, size_t index);
+CORE_API const char* CDECL scenario_get_spot_light_name(ScenarioHdl scenario, size_t index);
+CORE_API const char* CDECL scenario_get_dir_light_name(ScenarioHdl scenario, size_t index);
+CORE_API const char* CDECL scenario_get_envmap_light_name(ScenarioHdl scenario);
+CORE_API Boolean CDECL scenario_add_light(ScenarioHdl, const char* name);
+CORE_API Boolean CDECL scenario_remove_light(ScenarioHdl, const char* name);
 CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,
 													 const char* name, size_t nameLength);
 CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,
@@ -416,9 +422,6 @@ CORE_API Boolean CDECL scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* m
 CORE_API ConstCameraHdl CDECL scene_get_camera(SceneHdl scene);
 CORE_API Boolean CDECL scene_move_active_camera(float x, float y, float z);
 CORE_API Boolean CDECL scene_rotate_active_camera(float x, float y, float z);
-CORE_API void CDECL scene_mark_lighttree_dirty();
-CORE_API void CDECL scene_mark_envmap_dirty();
-CORE_API void CDECL scene_mark_material_dirty();
 
 // Light interface
 CORE_API Boolean CDECL world_get_point_light_position(ConstLightHdl hdl, Vec3* pos);

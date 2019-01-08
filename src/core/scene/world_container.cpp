@@ -82,6 +82,7 @@ CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<camera
 		return nullptr;
 	iter.first->second->set_name(iter.first->first);
 	m_cameraHandles.push_back(iter.first);
+	m_camerasDirty.emplace(camera.get(), true);
 	return iter.first->second.get();
 }
 
@@ -149,7 +150,23 @@ std::optional<u32> WorldContainer::add_light(std::string name,
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_envLights.insert(std::move(name), std::move(env));
+	m_envLightsDirty.push_back(true);
+	// Defer the creation of summed area tables to load time
+	return m_envLights.insert(std::move(name), lights::EnvMapLightDesc{ env, nullptr });
+}
+
+void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replacement) {
+	if(index >= m_envLights.size())
+		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_envLights.size()) + ")");
+	lights::EnvMapLightDesc& desc = m_envLights.get(index);
+	if(replacement != desc.envmap) {
+		this->unref_texture(desc.envmap);
+		this->unref_texture(desc.summedAreaTable);
+		desc.envmap = replacement;
+		desc.summedAreaTable = nullptr;
+		m_envLightsDirty[index] = true;
+	}
 }
 
 std::optional<std::pair<u32, lights::LightType>> WorldContainer::find_light(const std::string_view& name) {
@@ -185,7 +202,7 @@ lights::DirectionalLight* WorldContainer::get_dir_light(u32 index) {
 	return &m_dirLights.get(index);
 }
 
-TextureHandle& WorldContainer::get_env_light(u32 index) {
+lights::EnvMapLightDesc& WorldContainer::get_env_light(u32 index) {
 	if(index >= m_envLights.size())
 		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
 									+ " >= " + std::to_string(m_envLights.size()));
@@ -217,7 +234,10 @@ void WorldContainer::remove_light(u32 index, lights::LightType type) {
 			if(index >= m_envLights.size())
 				throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
 										 + " >= " + std::to_string(m_envLights.size()));
+			this->unref_texture(m_envLights.get(index).envmap);
+			this->unref_texture(m_envLights.get(index).summedAreaTable);
 			m_envLights.erase(index);
+			m_envLightsDirty.erase(m_envLightsDirty.begin() + index);
 			// TODO: delete texture?
 		} break;
 		default:
@@ -242,28 +262,48 @@ void WorldContainer::mark_camera_dirty(ConstCameraHandle hdl) {
 	// We need one for the env-map for sure, because that operation takes long
 	if(hdl == nullptr)
 		return;
-	auto iter = m_cameras.begin();
-	for(std::size_t i = 0u; i < m_cameras.size(); ++i) {
-		if(hdl == iter->second.get()) {
-			m_camerasDirty[i] = true;
-			break;
-		}
-	}
+	m_camerasDirty[hdl] = true;
 }
 
-void WorldContainer::mark_envmap_light_dirty(TextureHandle* hdl) {
-
+void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
+	if(m_scenario != nullptr) {
+		switch(type) {
+			case lights::LightType::POINT_LIGHT:
+				// Check if the light is part of the active scenario/scene
+				if(std::find(m_scenario->get_point_light_names().cbegin(), m_scenario->get_point_light_names().cend(), get_light_name(index, type))
+				   != m_scenario->get_point_light_names().cend())
+					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
+				break;
+			case lights::LightType::SPOT_LIGHT:
+				// Check if the light is part of the active scenario/scene
+				if(std::find(m_scenario->get_spot_light_names().cbegin(), m_scenario->get_spot_light_names().cend(), get_light_name(index, type))
+				   != m_scenario->get_spot_light_names().cend())
+					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
+				break;
+			case lights::LightType::DIRECTIONAL_LIGHT:
+				// Check if the light is part of the active scenario/scene
+				if(std::find(m_scenario->get_dir_light_names().cbegin(), m_scenario->get_dir_light_names().cend(), get_light_name(index, type))
+				   != m_scenario->get_dir_light_names().cend())
+					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
+				break;
+			case lights::LightType::ENVMAP_LIGHT:
+				// Check if the light is part of the active scenario/scene
+				if(m_scenario->get_envmap_light_name() == get_light_name(index, type))
+					m_envLightsDirty[index] = true;
+				break;
+		}
+	}
 }
 
 bool WorldContainer::has_texture(std::string_view name) const {
 	return m_textures.find(name) != m_textures.cend();
 }
 
-std::optional<WorldContainer::TexCacheHandle> WorldContainer::find_texture(std::string_view name) {
+TextureHandle WorldContainer::find_texture(std::string_view name) {
 	auto iter = m_textures.find(name);
 	if(iter != m_textures.end())
-		return iter;
-	return std::nullopt;
+		return &iter->second;
+	return nullptr;
 }
 
 std::optional<std::string_view> WorldContainer::get_texture_name(TextureHandle hdl) const {
@@ -276,13 +316,41 @@ std::optional<std::string_view> WorldContainer::get_texture_name(TextureHandle h
 	return std::nullopt;
 }
 
-WorldContainer::TexCacheHandle WorldContainer::add_texture(std::string_view path, u16 width,
-											  u16 height, u16 numLayers,
-											  textures::Format format, textures::SamplingMode mode,
-											  bool sRgb, std::unique_ptr<u8[]> data) {
+TextureHandle WorldContainer::add_texture(std::string_view path, u16 width,
+										  u16 height, u16 numLayers,
+										  textures::Format format, textures::SamplingMode mode,
+										  bool sRgb, std::unique_ptr<u8[]> data) {
+	mAssertMsg(m_textures.find(path) == m_textures.end(), "Duplicate texture entry");
 	// TODO: ensure that we have at least 1x1 pixels?
-	return m_textures.emplace(path, textures::Texture{ width, height, numLayers,
-							  format, mode, sRgb, move(data) }).first;
+	TextureHandle texHdl = &m_textures.emplace(path, textures::Texture{ width, height, numLayers,
+							  format, mode, sRgb, move(data) }).first->second;
+	m_texRefCount[texHdl] = 1u;
+	return texHdl;
+}
+
+void WorldContainer::ref_texture(TextureHandle hdl) {
+	auto iter = m_texRefCount.find(hdl);
+	if(iter != m_texRefCount.end())
+		++iter->second;
+}
+
+void WorldContainer::unref_texture(TextureHandle hdl) {
+	auto iter = m_texRefCount.find(hdl);
+	if(iter != m_texRefCount.end()) {
+		if(iter->second != 0u) {
+			if(--iter->second == 0u) {
+				// No more references, delete the texture
+				// This unfortunately means linear search
+				for(auto texIter = m_textures.begin(); texIter != m_textures.end(); ++texIter) {
+					if(&texIter->second == hdl) {
+						m_textures.erase(texIter);
+						break;
+					}
+				}
+				m_texRefCount.erase(iter);
+			}
+		}
+	}
 }
 
 SceneHandle WorldContainer::load_scene(Scenario& scenario) {
@@ -330,118 +398,178 @@ SceneHandle WorldContainer::reload_scene() {
 
 	if(m_scene == nullptr)
 		return load_scene(*m_scenario);
-
-	if(m_scenario->lights_dirty_reset()) {
-		this->load_scene_lights();
-	}
+	this->load_scene_lights();
 
 	// TODO: dirty flag for media?
 	// TODO: dirty flag for materials?
 
-	if(m_scenario->camera_dirty_reset())
+	// TODO: re-enable dirty flag for camera, but also pay attention to modifications
+	if(m_scenario->camera_dirty_reset() || m_camerasDirty[m_scenario->get_camera()]) {
 		m_scene->set_camera(m_scenario->get_camera());
+		m_camerasDirty[m_scenario->get_camera()] = false;
+	}
 	return m_scene.get();
 }
 
 void WorldContainer::load_scene_lights() {
-	std::vector<lights::PositionalLights> posLights;
-	std::vector<lights::DirectionalLight> dirLights;
-	TextureHandle envLightTex = nullptr;
-	u32 instIdx = 0;
-	for(auto& instance : m_instances) {
-		if(!m_scenario->is_masked(&instance.get_object())) {
-			// Find all area lights, if the object contains some
-			if(instance.get_object().is_emissive()) {
-				u32 primIdx = 0;
-				// First search in polygons (PrimitiveHandle expects poly before sphere)
-				auto& polygons = instance.get_object().get_geometry<geometry::Polygons>();
-				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex, true>(polygons.get_material_indices_hdl());
-				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point, false>(polygons.get_points_hdl());
-				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate, false>(polygons.get_uvs_hdl());
-				for(const auto& face : polygons.faces()) {
-					if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
-						auto emission = m_materials[materials[primIdx]]->get_emission();
-						mAssert(emission.texture != nullptr);
-						if(std::distance(face.begin(), face.end()) == 3) {
-							lights::AreaLightTriangleDesc al;
-							al.radianceTex = emission.texture;
-							al.scale = ei::packRGB9E5(emission.scale);
-							int i = 0;
-							for(auto vHdl : face) {
-								al.points[i] = positions[vHdl.idx()];
-								al.uv[i] = uvs[vHdl.idx()];
-								++i;
-							}
-							posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
-						} else {
-							lights::AreaLightQuadDesc al;
-							al.radianceTex = emission.texture;
-							al.scale = ei::packRGB9E5(emission.scale);
-							int i = 0;
-							for(auto vHdl : face) {
-								al.points[i] = positions[vHdl.idx()];
-								al.uv[i] = uvs[vHdl.idx()];
-								++i;
-							}
-							posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
-						}
-					}
-					++primIdx;
-				}
+	/* Possibilities:
+	 * 1. Lights have been added/removed from the scenario -> rebuild light tree
+	 * 2. Lights have been changed -> rebuild tree, but not envmap
+	 * 3. Only envmap light has been changed -> only replace envmap
+	 */
 
-				// Then get the sphere lights
-				auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
-				materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
-				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
-				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
-					if(m_materials[materials[i]]->get_properties().is_emissive()) {
-						auto emission = m_materials[materials[primIdx]]->get_emission();
-						mAssert(emission.texture != nullptr);
-						lights::AreaLightSphereDesc al{
-							spheresData[i].center,
-							spheresData[i].radius,
-							emission.texture, ei::packRGB9E5(emission.scale)
-						};
-						posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
+	if(m_lightsDirty || m_scenario->lights_dirty_reset()) {
+		std::vector<lights::PositionalLights> posLights;
+		std::vector<lights::DirectionalLight> dirLights;
+		u32 instIdx = 0;
+		for(auto& instance : m_instances) {
+			if(!m_scenario->is_masked(&instance.get_object())) {
+				// Find all area lights, if the object contains some
+				if(instance.get_object().is_emissive()) {
+					u32 primIdx = 0;
+					// First search in polygons (PrimitiveHandle expects poly before sphere)
+					auto& polygons = instance.get_object().get_geometry<geometry::Polygons>();
+					const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex, true>(polygons.get_material_indices_hdl());
+					const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point, false>(polygons.get_points_hdl());
+					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate, false>(polygons.get_uvs_hdl());
+					for(const auto& face : polygons.faces()) {
+						if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
+							auto emission = m_materials[materials[primIdx]]->get_emission();
+							mAssert(emission.texture != nullptr);
+							if(std::distance(face.begin(), face.end()) == 3) {
+								lights::AreaLightTriangleDesc al;
+								al.radianceTex = emission.texture;
+								al.scale = ei::packRGB9E5(emission.scale);
+								int i = 0;
+								for(auto vHdl : face) {
+									al.points[i] = positions[vHdl.idx()];
+									al.uv[i] = uvs[vHdl.idx()];
+									++i;
+								}
+								posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
+							} else {
+								lights::AreaLightQuadDesc al;
+								al.radianceTex = emission.texture;
+								al.scale = ei::packRGB9E5(emission.scale);
+								int i = 0;
+								for(auto vHdl : face) {
+									al.points[i] = positions[vHdl.idx()];
+									al.uv[i] = uvs[vHdl.idx()];
+									++i;
+								}
+								posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
+							}
+						}
+						++primIdx;
 					}
-					++primIdx;
+
+					// Then get the sphere lights
+					auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
+					materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+					const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
+					for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
+						if(m_materials[materials[i]]->get_properties().is_emissive()) {
+							auto emission = m_materials[materials[primIdx]]->get_emission();
+							mAssert(emission.texture != nullptr);
+							lights::AreaLightSphereDesc al{
+								spheresData[i].center,
+								spheresData[i].radius,
+								emission.texture, ei::packRGB9E5(emission.scale)
+							};
+							posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
+						}
+						++primIdx;
+					}
 				}
 			}
+			++instIdx;
 		}
-		++instIdx;
-	}
 
-	posLights.reserve(posLights.size() + m_pointLights.size() + m_spotLights.size());
-	dirLights.reserve(dirLights.size() + m_dirLights.size());
+		posLights.reserve(posLights.size() + m_pointLights.size() + m_spotLights.size());
+		dirLights.reserve(dirLights.size() + m_dirLights.size());
 
-	// Add regular lights
-	std::string_view prevEnvName;
-	for(const std::string_view& name : m_scenario->get_light_names()) {
-		if(auto pointLight = m_pointLights.find(name); pointLight) {
-			posLights.push_back({ *pointLight, ~0u });
-		} else if(auto spotLight = m_spotLights.find(name); spotLight) {
-			posLights.push_back({ *spotLight, ~0u });
-		} else if(auto dirLight = m_dirLights.find(name); dirLight) {
-			dirLights.push_back(*dirLight);
-		} else if(auto envLight = m_envLights.find(name); envLight) {
-			if(envLightTex)
-				logWarning("[WorldContainer::load_scene] Multiple envmap lights are not supported; replacing '",
-						   prevEnvName, "' with '", name);
-			envLightTex = *envLight;
-			prevEnvName = name;
-		} else {
-			logWarning("[WorldContainer::load_scene] Unknown light source '", name, "' in scenario '",
-					   m_scenario->get_name(), "'");
+		// Add regular lights
+		for(const std::string_view& name : m_scenario->get_point_light_names()) {
+			if(auto pointLight = m_pointLights.find(name); pointLight)
+				posLights.push_back(lights::PositionalLights{ *pointLight, ~0u });
+			else
+				logWarning("[WorldContainer::load_scene_lights] Unknown point light '", name, "' in scenario '",
+						   m_scenario->get_name(), "'");
 		}
-	}
+		for(const std::string_view& name : m_scenario->get_spot_light_names()) {
+			if(auto spotLight = m_spotLights.find(name); spotLight)
+				posLights.push_back(lights::PositionalLights{ *spotLight, ~0u });
+			else
+				logWarning("[WorldContainer::load_scene_lights] Unknown spot light '", name, "' in scenario '",
+						   m_scenario->get_name(), "'");
+		}
+		for(const std::string_view& name : m_scenario->get_dir_light_names()) {
+			if(auto dirLight = m_dirLights.find(name); dirLight)
+				dirLights.push_back(*dirLight);
+			else
+				logWarning("[WorldContainer::load_scene_lights] Unknown dir light '", name, "' in scenario '",
+						   m_scenario->get_name(), "'");
+		}
 
-	if(envLightTex)
-		m_scene->set_lights(std::move(posLights), std::move(dirLights),
-							envLightTex);
-	else
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));
+		m_lightsDirty = false;
+
+		// Detect whether an (or THE envmap has been added/removed)
+	}
+
+	// Find out what the active envmap light is
+	lights::EnvMapLightDesc* envLightTex = nullptr;
+	std::string_view currEnvName = m_scenario->get_envmap_light_name();
+	if(!currEnvName.empty()) {
+		auto iter = m_envLights.find(currEnvName);
+		if(iter != nullptr)
+			envLightTex = iter;
+		else
+			logWarning("[WorldContainer::load_scene_lights] Unknown envmap light '", currEnvName, "' in scenario '",
+					   m_scenario->get_name(), "'");
+	}
+
+	// Check if we changed the active envmap
+	TextureHandle prevEnvTex = m_scene->get_light_tree_builder().get_envmap_descriptor().envmap;
+	if(m_scenario->envmap_lights_dirty_reset() || (prevEnvTex != nullptr && envLightTex == nullptr) || prevEnvTex != envLightTex->envmap) {
+		// Check if we removed the envmap or changed/added it
+		if(envLightTex == nullptr) {
+			m_scene->set_background(ei::Vec3{ 0.f });
+		} else {
+			std::size_t index = m_envLights.get_index(currEnvName);
+			if(m_envLightsDirty[index]) {
+				envLightTex->summedAreaTable = this->get_summed_area_table(currEnvName, envLightTex->envmap);
+				m_envLightsDirty[index] = false;
+			}
+			m_scene->set_background(*envLightTex);
+		}
+	} else {
+		// Check if the envmap itself is dirty
+		std::size_t index = m_envLights.get_index(currEnvName);
+		if(m_envLightsDirty[index]) {
+			envLightTex->summedAreaTable = this->get_summed_area_table(currEnvName, envLightTex->envmap);
+			m_envLightsDirty[index] = false;
+			m_scene->set_background(*envLightTex);
+		}
+	}
 
 	m_scenario->lights_dirty_reset();
+}
+
+
+TextureHandle WorldContainer::get_summed_area_table(std::string_view name, TextureHandle tex) {
+	const std::string satName = std::string(name) + "##SUMMED-AREA-TABLE##";
+	TextureHandle summedAreaTable = this->find_texture(satName);
+	if(summedAreaTable == nullptr) {
+		// Differentiate between cube and polar maps
+		if(tex->get_num_layers() == 6)
+			summedAreaTable = this->add_texture(satName, 6u * tex->get_width(), tex->get_height(),
+												1u, tex->get_format(), textures::SamplingMode::LINEAR, false, nullptr);
+		else
+			summedAreaTable = this->add_texture(satName, tex->get_width(), tex->get_height(),
+												1u, tex->get_format(), textures::SamplingMode::LINEAR, false, nullptr);
+	}
+	return summedAreaTable;
 }
 
 } // namespace mufflon::scene

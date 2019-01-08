@@ -42,14 +42,14 @@ CUDA_FUNCTION __forceinline__ int lower_bound(const textures::ConstTextureDevHan
 } // namespace summed_details
 
 #ifndef __CUDA_ARCH__
-inline __host__ void create_summed_area_table(TextureHandle envmap, TextureHandle sums) {
-	auto envmapTex = envmap->acquire_const<Device::CPU>();
-	auto sumSurf = sums->aquire<Device::CPU>();
+inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
+	auto envmapTex = envlight.envmap->acquire_const<Device::CPU>();
+	auto sumSurf = envlight.summedAreaTable->aquire<Device::CPU>();
 	// Conversion to luminance
 	constexpr ei::Vec4 lumWeight{ 0.212671f, 0.715160f, 0.072169f, 0.f };
-	const int width = static_cast<int>(envmap->get_width());
-	const int height = static_cast<int>(envmap->get_height());
-	const int layers = static_cast<int>(envmap->get_num_layers());
+	const int width = static_cast<int>(envlight.envmap->get_width());
+	const int height = static_cast<int>(envlight.envmap->get_height());
+	const int layers = static_cast<int>(envlight.envmap->get_num_layers());
 
 	if(layers == 6u) {
 		// Cubemap

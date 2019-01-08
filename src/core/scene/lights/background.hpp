@@ -44,13 +44,14 @@ public:
 		bck.m_color = color;
 		return bck;
 	}
-	__host__ static Background envmap(TextureHandle envmap, TextureHandle summedAreaTable) {
-		mAssert(envmap != nullptr);
+	__host__ static Background envmap(EnvMapLightDesc envmap) {
+		mAssert(envmap.envmap != nullptr);
+		mAssert(envmap.summedAreaTable != nullptr);
 		Background bck{ BackgroundType::ENVMAP };
-		bck.m_envLight.texHandle = envmap->acquire_const<DEVICE>();
 		// Fill the summed area table with life
-		create_summed_area_table(envmap, summedAreaTable);
-		bck.m_envLight.summedAreaTable = summedAreaTable->acquire_const<DEVICE>();
+		create_summed_area_table(envmap);
+		bck.m_envLight.texHandle = envmap.envmap->acquire_const<DEVICE>();
+		bck.m_envLight.summedAreaTable = envmap.summedAreaTable->acquire_const<DEVICE>();
 
 		// TODO: accumulate flux for envmap
 		bck.m_envLight.flux = ei::Vec3{ 0.f };
@@ -60,17 +61,18 @@ public:
 
 	// Creates a copy of the background suited for the given deviec
 	template < Device newDev >
-	__host__ Background<newDev> synchronize(TextureHandle envmapOpt, TextureHandle summedOpt) {
+	__host__ Background<newDev> synchronize(EnvMapLightDesc envmapOpt) {
 		Background<newDev> newBck{ m_type };
 		switch(m_type) {
 			case BackgroundType::COLORED:
 				newBck.m_color = m_color;
 				break;
 			case BackgroundType::ENVMAP:
-				mAssert(envmap != nullptr);
+				mAssert(envmapOpt.envmap != nullptr);
+				mAssert(envmapOpt.summedAreaTable != nullptr);
 				newBck.m_envLight.flux = m_envLight.flux;
-				newBck.m_envLight.texHandle = envmapOpt->acquire_const<newDev>();
-				newBck.m_envLight.summedAreaTable = summedOpt->acquire_const<newDev>();
+				newBck.m_envLight.texHandle = envmapOpt.envmap->acquire_const<newDev>();
+				newBck.m_envLight.summedAreaTable = envmapOpt.summedAreaTable->acquire_const<newDev>();
 				break;
 		}
 		return newBck;

@@ -67,8 +67,14 @@ namespace gui.ViewModel
             }
         }
 
-        public bool IsRendering {
+        public bool IsRendering
+        {
             get => m_models.Renderer.IsRendering;
+        }
+
+        public uint Iteration
+        {
+            get => m_models.Renderer.Iteration;
         }
 
         public bool AutoStartOnLoad
@@ -145,7 +151,7 @@ namespace gui.ViewModel
                     break;
                 case nameof(Models.Renderer.IsRendering):
                     // Update the parameters of the renderer
-                    if(m_models.Renderer.IsRendering)
+                    if (m_models.Renderer.IsRendering)
                     {
                         foreach(object prop in RendererProperties) {
                             if(prop is RendererPropertyBool)
@@ -167,6 +173,11 @@ namespace gui.ViewModel
                         }
                     }
                     OnPropertyChanged(nameof(IsRendering));
+                    break;
+                case nameof(Models.Renderer.Iteration):
+                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                        OnPropertyChanged(nameof(Iteration));
+                    }));
                     break;
             }
         }
