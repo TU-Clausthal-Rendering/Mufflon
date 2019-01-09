@@ -271,7 +271,8 @@ CUDA_FUNCTION struct { math::DirectionSample dir; Spectrum radiance; }
 		dir.pdf = AngularPdf{ sample.pdf / (2.f * ei::PI * ei::PI * sinTheta) };
 	}
 
-	ei::Vec3 radiance { textures::sample(light.texHandle, sample.uv, layer) };
+	// Use always nearest sampling (otherwise the sampler is biased).
+	ei::Vec3 radiance { textures::read(light.texHandle, sample.texel, layer) };
 	return { dir, radiance };
 }
 

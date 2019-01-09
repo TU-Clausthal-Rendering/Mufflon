@@ -226,6 +226,7 @@ public:
 	constexpr i32 get_height() const noexcept { return m_height; }
 	constexpr i32 get_num_layers() const noexcept { return m_numLayers; }
 	constexpr Format get_format() const noexcept { return m_format; }
+	constexpr SamplingMode get_sampling_mode() const noexcept { return m_mode; }
 	constexpr std::size_t get_size() const noexcept {
 		return static_cast<std::size_t>(m_width * m_height * m_numLayers * PIXEL_SIZE(m_format));
 	}

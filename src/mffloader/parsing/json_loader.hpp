@@ -45,7 +45,7 @@ public:
 	void clear_state();
 
 private:
-	TextureHdl load_texture(const char* name);
+	TextureHdl load_texture(const char* name, TextureSampling sampling = TextureSampling::SAMPLING_LINEAR);
 	MaterialParams* load_material(rapidjson::Value::ConstMemberIterator matIter);
 	void free_material(MaterialParams* mat);
 	bool load_cameras(const ei::Box& aabb);

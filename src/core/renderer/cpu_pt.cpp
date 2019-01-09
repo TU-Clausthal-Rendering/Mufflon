@@ -70,8 +70,13 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	int pathLen = 0;
 	do {
 		if(true)
-		if(pathLen+1 <= m_params.maxPathLength) {
-			// Call NEE member function for the camera start/recursive vertices
+		if(pathLen > 0.0f && pathLen+1 <= m_params.maxPathLength) {
+			// Call NEE member function for recursive vertices.
+			// Do not connect to the camera, because this makes the renderer much more
+			// complicated. Our decision: The PT should be as simple as possible!
+			// What means more complicated?
+			// A connnection to the camera results in a different pixel. In a multithreaded
+			// environment this means that we need a write mutex for each pixel.
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
@@ -82,7 +87,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				bool anyhit = mufflon::scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
+				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
 					scene, { vertex->get_position() , nee.direction },
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
@@ -100,15 +105,17 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
 		scene::Direction lastDir;
-		if(!walk(scene, *vertex, rnd, 0.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
 				ei::Vec3 background = scene.lightTree.background.get_radiance(lastDir);
-				float mis = 0.0f;
-				background *= mis;
-				outputBuffer.contribute(coord, throughput, background,
-										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-										ei::Vec3{ 0, 0, 0 });
+				if(any(greater(background, 0.0f))) {
+					float mis = 0.0f;
+					background *= mis;
+					outputBuffer.contribute(coord, throughput, background,
+											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
+											ei::Vec3{ 0, 0, 0 });
+				}
 			}
 			break;
 		}

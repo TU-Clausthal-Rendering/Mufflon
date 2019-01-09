@@ -201,6 +201,22 @@ public:
 		return math::EvalValue{};
 	}
 
+	// TODO: fractional pixel coords?
+	Pixel get_pixel(const scene::Direction& excident) const {
+		if(m_type == Interaction::CAMERA_PINHOLE) {
+			const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
+			cameras::ProjectionResult proj = pinholecam_project(*desc, excident);
+			return proj.coord;
+		}
+		if(m_type == Interaction::CAMERA_FOCUS) {
+			const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
+			cameras::ProjectionResult proj = focuscam_project(*desc, m_position, excident);
+			return proj.coord;
+		}
+		// TODO: get from first vertex of path?
+		return Pixel{-1};
+	}
+
 	/*
 	 * Create a new outgoing direction. This method can be used in a loop
 	 * to fully Monte Carlo integrate the rendering equation at this vertex.

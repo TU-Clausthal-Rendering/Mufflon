@@ -150,6 +150,8 @@ std::optional<u32> WorldContainer::add_light(std::string name,
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;
 	}
+	if(env) mAssertMsg(env->get_sampling_mode() == textures::SamplingMode::NEAREST,
+		"Sampling mode must be nearest, otherwise the importance sampling is biased.");
 	m_envLightsDirty.push_back(true);
 	// Defer the creation of summed area tables to load time
 	return m_envLights.insert(std::move(name), lights::EnvMapLightDesc{ env, nullptr });
@@ -159,6 +161,8 @@ void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replaceme
 	if(index >= m_envLights.size())
 		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
 								 + " >= " + std::to_string(m_envLights.size()) + ")");
+	if(replacement) mAssertMsg(replacement->get_sampling_mode() == textures::SamplingMode::NEAREST,
+		"Sampling mode must be nearest, otherwise the importance sampling is biased.");
 	lights::EnvMapLightDesc& desc = m_envLights.get(index);
 	if(replacement != desc.envmap) {
 		this->unref_texture(desc.envmap);

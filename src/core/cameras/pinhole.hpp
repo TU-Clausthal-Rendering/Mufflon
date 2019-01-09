@@ -84,6 +84,7 @@ pinholecam_sample_ray(const PinholeParams& params, const scene::Point& exitPosWo
 CUDA_FUNCTION ProjectionResult
 pinholecam_project(const PinholeParams& params, const scene::Direction& excident) {
 	float cosOut = dot(params.viewDir, excident);
+	if(cosOut < 0.0f) return ProjectionResult{};
 
 	// Compute screen coordinate for this position
 	ei::Vec3 xAxis = cross(params.viewDir, params.up);
@@ -96,7 +97,7 @@ pinholecam_project(const PinholeParams& params, const scene::Direction& excident
 	if(!(uv.x > -1 && uv.x <= 1 && uv.y > -1 && uv.y <= 1))
 		return ProjectionResult{};
 
-	Pixel pixelCoord{ floor((uv * -0.5f + 0.5f) * params.resolution) };
+	Pixel pixelCoord{ floor((uv * 0.5f + 0.5f) * params.resolution) };
 	// Need to check the boundaries. In rare cases values like uv.x==-0.999999940
 	// cause pixel coordinates in equal to the resolution.
 	if(pixelCoord.x >= params.resolution.x) { pixelCoord.x = u32(params.resolution.x) - 1; }

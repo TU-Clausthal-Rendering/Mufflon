@@ -64,7 +64,7 @@ void JsonLoader::clear_state() {
 	m_materialMap.clear();
 }
 
-TextureHdl JsonLoader::load_texture(const char* name) {
+TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
@@ -74,7 +74,7 @@ TextureHdl JsonLoader::load_texture(const char* name) {
 	if (!fs::exists(path))
 		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
 	path = fs::canonical(path);
-	TextureHdl tex = world_add_texture(path.string().c_str(), TextureSampling::SAMPLING_LINEAR);
+	TextureHdl tex = world_add_texture(path.string().c_str(), sampling);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -403,7 +403,7 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
-			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
+			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")), TextureSampling::SAMPLING_NEAREST);
 			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
 			// TODO: incorporate scale
 

@@ -111,8 +111,11 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 	} else {
 		// Spherical map
 		// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
-		const float v = acos(direction.y) / ei::PI;
+		float v = acos(direction.y) / ei::PI;
 		const float u = atan2(direction.z, direction.x) / (ei::PI * 2.f);
+		// Clamp (no wrapping in v direction)
+		const Pixel texSize = textures::get_texture_size(envmap);
+		v = ei::min(v, (texSize.x - 0.5f) / texSize.x);
 		return sample(envmap, UvCoordinate{ u, v });
 	}
 }

@@ -34,7 +34,7 @@ struct PathHead {
  * vertex: generic vertex which is sampled to proceed on the path
  * adjoint: is this a light sub-path?
  * rndSet: a set of random numbers to sample the vertex
- * u0: a uniform random number for roussion roulette.
+ * u0: a uniform random number for roussion roulette or -1 to disable roulette.
  * throughput [in/out]: The throughput value which is changed by the current sampling event/russion roulette.
  * sampledDir [out]: the ray which was sampled in the walk
  * nextHit [out]: The intersection result of the walk (if any)
@@ -63,14 +63,16 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	throughput.guideWeight *= 1.0f - expf(-(sample.pdfF * sample.pdfF) / 5.0f);
 
 	// Russian roulette
-	float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
-	if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
-		throughput = Throughput{ Spectrum { 0.f }, 0.f };
-		return false;
-	} else {
-		// Continue and compensate if rouletteWeight < 1.
-		throughput.weight /= continuationPropability;
-		throughput.guideWeight /= continuationPropability;
+	if(u0 >= 0.0f) {
+		float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
+		if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
+			throughput = Throughput{ Spectrum { 0.f }, 0.f };
+			return false;
+		} else {
+			// Continue and compensate if rouletteWeight < 1.
+			throughput.weight /= continuationPropability;
+			throughput.guideWeight /= continuationPropability;
+		}
 	}
 
 	// TODO: optional energy clamping
