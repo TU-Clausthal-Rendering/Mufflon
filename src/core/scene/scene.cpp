@@ -198,17 +198,11 @@ void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 	m_lightTreeNeedsMediaUpdate = true;
 }
 
-void Scene::set_background(lights::EnvMapLightDesc envLightTexture) {
-	if(envLightTexture.envmap != nullptr)
-		m_lightTree.set_envmap(envLightTexture);
-	else
-		m_lightTree.set_envmap(ei::Vec3{ 0, 0, 0 });
-	m_lightTreeDescChanged = true;
-}
-
-void Scene::set_background(const ei::Vec3& color) {
-	m_lightTree.set_envmap(color);
-	m_lightTreeDescChanged = true;
+void Scene::set_background(lights::Background& envLight) {
+	if(&envLight != m_lightTree.get_envLight()) {
+		m_lightTree.set_envLight(envLight);
+		m_lightTreeDescChanged = true;
+	}
 }
 
 template < Device dev >

@@ -5,6 +5,7 @@
 #include "scene.hpp"
 #include "handles.hpp"
 #include "lights/lights.hpp"
+#include "lights/background.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
 #include "util/indexed_string_map.hpp"
@@ -92,7 +93,7 @@ public:
 	lights::PointLight* get_point_light(u32 index);
 	lights::SpotLight* get_spot_light(u32 index);
 	lights::DirectionalLight* get_dir_light(u32 index);
-	lights::EnvMapLightDesc& get_env_light(u32 index);
+	lights::Background* get_env_light(u32 index);
 	// Delete a light using its handle
 	void remove_light(u32 index, lights::LightType type);
 	// Get the name of a light
@@ -104,7 +105,7 @@ public:
 	// Add new textures to the scene
 	bool has_texture(std::string_view name) const;
 	TextureHandle find_texture(std::string_view name);
-	std::optional<std::string_view> get_texture_name(TextureHandle hdl) const;
+	std::optional<std::string_view> get_texture_name(ConstTextureHandle hdl) const;
 	TextureHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
 							   textures::Format format, textures::SamplingMode mode,
 							   bool sRgb, std::unique_ptr<u8[]> data);
@@ -142,8 +143,6 @@ private:
 
 	SceneHandle load_scene(Scenario& scenario);
 	void load_scene_lights();
-	// Creates the summed area table for an envmap light and places it into the texture cache
-	TextureHandle get_summed_area_table(std::string_view name, TextureHandle tex);
 
 	// Global container object for everything
 	static WorldContainer s_container;
@@ -166,15 +165,12 @@ private:
 	util::IndexedStringMap<lights::PointLight> m_pointLights;
 	util::IndexedStringMap<lights::SpotLight> m_spotLights;
 	util::IndexedStringMap<lights::DirectionalLight> m_dirLights;
-	util::IndexedStringMap<lights::EnvMapLightDesc> m_envLights;
+	util::IndexedStringMap<lights::Background> m_envLights;
 	// Dirty flags to keep track of changed values
 	bool m_lightsDirty = true;
-	std::vector<u8> m_envLightsDirty;
 	// Texture cache
 	std::map<std::string, textures::Texture, std::less<>> m_textures;
 	std::map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has
-
-	// TODO: cameras, lights, materials
 
 	// Current scene
 	ScenarioHandle m_scenario = nullptr;

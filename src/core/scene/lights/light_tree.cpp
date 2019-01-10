@@ -8,6 +8,7 @@
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/lights/light_medium.hpp"
+#include "background.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cmath>
@@ -24,7 +25,7 @@ float get_flux(const void* light, u16 type, const ei::Vec3& aabbDiag) {
 		case u16(LightType::AREA_LIGHT_QUAD): return ei::sum(get_flux(*as<AreaLightQuad<Device::CPU>>(light)));
 		case u16(LightType::AREA_LIGHT_SPHERE): return ei::sum(get_flux(*as<AreaLightSphere<Device::CPU>>(light)));
 		case u16(LightType::DIRECTIONAL_LIGHT): return ei::sum(get_flux(*as<DirectionalLight>(light), aabbDiag));
-		case u16(LightType::ENVMAP_LIGHT): return ei::sum(get_flux(*as<EnvMapLight<Device::CPU>>(light)));
+		case u16(LightType::ENVMAP_LIGHT): return ei::sum(as<BackgroundDesc<Device::CPU>>(light)->flux);
 		case LightSubTree::Node::INTERNAL_NODE_TYPE: return as<LightSubTree::Node>(light)->left.flux + as<LightSubTree::Node>(light)->right.flux;
 	}
 	return 0.0f;
@@ -299,8 +300,6 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	unload<Device::CPU>();
 	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
 	m_treeCpu->primToNodePath = m_primToNodePath.acquire<Device::CPU>();
-	// Default envmap is black
-	m_treeCpu->background = Background<Device::CPU>::black();
 
 	if(posLights.size() == 0u && dirLights.size() == 0u) {
 		// Shortcut if no lights are specified
@@ -402,24 +401,6 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	m_dirty.mark_changed(Device::CPU);
 }
 
-void LightTreeBuilder::set_envmap(lights::EnvMapLightDesc envLight) {
-	// We cannot check for texture identity here to avoid work - it might be that a texture gets
-	// deleted and another one is created in its place, resulting in the same pointer
-	// TODO: is that actually true?
-
-	this->synchronize<Device::CPU>();
-	m_treeCpu->background = Background<Device::CPU>::envmap(envLight);
-	m_envMap = envLight;
-}
-
-void LightTreeBuilder::set_envmap(ei::Vec3 color) {
-	this->synchronize<Device::CPU>();
-	// Remove the old texture handles
-	m_envMap = lights::EnvMapLightDesc{ nullptr, nullptr };
-
-	m_treeCpu->background = Background<Device::CPU>::colored(color);
-}
-
 void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {
 	switch(type) {
 		case LightSubTree::Node::INTERNAL_NODE_TYPE: {
@@ -481,7 +462,10 @@ void LightTreeBuilder::synchronize() {
 		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
 		// Remap the environment map
-		m_treeCuda->background = m_treeCpu->background.synchronize<Device::CUDA>(m_envMap);
+		if(m_envLight)
+			m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>();
+		else // Default envmap is black
+			m_treeCuda->background = Background::black().acquire_const<Device::CUDA>();
 
 		// Replace all texture handles inside the tree's data and
 		// synchronize all the remaining tree memory.
@@ -489,6 +473,11 @@ void LightTreeBuilder::synchronize() {
 
 		m_dirty.mark_synced(dev);
 	} else {
+		// The background can always be outdated
+		if(m_envLight)
+			m_treeCpu->background = m_envLight->acquire_const<Device::CPU>();
+		else // Default envmap is black
+			m_treeCpu->background = Background::black().acquire_const<Device::CPU>();
 		// TODO: backsync? Would need another hashmap for texture mapping.
 	}
 }

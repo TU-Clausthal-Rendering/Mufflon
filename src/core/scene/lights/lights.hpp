@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
@@ -142,18 +142,20 @@ struct alignas(16) DirectionalLight {
 };
 
 /**
- * Environment-map light.
+ * Environment light.
  */
-struct EnvMapLightDesc {
-	TextureHandle envmap = nullptr;
-	TextureHandle summedAreaTable = nullptr;
+enum class BackgroundType {
+	COLORED,
+	ENVMAP
 };
 
 template < Device dev >
-struct alignas(16) EnvMapLight {
-	textures::ConstTextureDevHandle_t<dev> texHandle;
+struct alignas(16) BackgroundDesc {
+	textures::ConstTextureDevHandle_t<dev> envmap;
 	textures::ConstTextureDevHandle_t<dev> summedAreaTable;
-	ei::Vec3 flux;
+	BackgroundType type;
+	Spectrum color;				// Color for uniform backgrounds OR scale in case of envLights
+	Spectrum flux;
 };
 
 // Asserts to make sure the compiler actually followed our orders
@@ -203,7 +205,7 @@ CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const AreaLightSphere<C
 CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const DirectionalLight& light) {
 	return light.direction;
 }
-CUDA_FUNCTION __forceinline__ const ei::Vec3 get_center(const EnvMapLight<CURRENT_DEV>& light) {
+CUDA_FUNCTION __forceinline__ const ei::Vec3 get_center(const BackgroundDesc<CURRENT_DEV>& light) {
 	return ei::Vec3{0.0f};
 }
 
@@ -214,7 +216,6 @@ Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light);
 Spectrum get_flux(const AreaLightQuad<Device::CPU>& light);
 Spectrum get_flux(const AreaLightSphere<Device::CPU>& light);
 Spectrum get_flux(const DirectionalLight& light, const ei::Vec3& aabbDiag);
-inline Spectrum get_flux(const EnvMapLight<Device::CPU>& light) { return light.flux; }
 
 
 // ************************************************************************* //

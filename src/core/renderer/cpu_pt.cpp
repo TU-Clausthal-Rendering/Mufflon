@@ -7,6 +7,7 @@
 #include "core/scene/materials/medium.hpp"
 #include "core/math/rng.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
+#include "core/scene/lights/light_tree_sampling.hpp"
 #include <random>
 
 namespace mufflon::renderer {
@@ -106,7 +107,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = scene.lightTree.background.evaluate(lastDir.direction);
+				auto background = evaluate_background(scene.lightTree.background, lastDir.direction);
 				if(any(greater(background.value, 0.0f))) {
 					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
 					background.value *= mis;
@@ -144,8 +145,6 @@ void CpuPathTracer::init_rngs(int num) {
 void CpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
 	if(scene != m_currentScene) {
 		m_currentScene = scene;
-		// Make sure the scene is loaded completely for the use on CPU side
-		m_currentScene->synchronize<Device::CPU>();
 		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
 		m_reset = true;
 	}

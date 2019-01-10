@@ -27,6 +27,7 @@
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
+    <ClCompile Include="..\..\src\core\scene\lights\background.cpp" />
     <ClCompile Include="..\..\src\core\scene\lights\lights.cpp" />
     <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp" />
     <ClCompile Include="..\..\src\core\scene\materials\material.cpp" />
@@ -186,7 +187,8 @@
     <ClInclude Include="..\..\src\core\scene\handles.hpp" />
     <ClInclude Include="..\..\src\core\scene\instance.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\background.hpp" />
-    <ClInclude Include="..\..\src\core\scene\lights\importance_sampling.hpp" />
+    <ClInclude Include="..\..\src\core\scene\lights\light_tree_sampling.hpp" />
+    <ClInclude Include="..\..\src\core\scene\lights\texture_sampling.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\lights.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\light_medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp" />

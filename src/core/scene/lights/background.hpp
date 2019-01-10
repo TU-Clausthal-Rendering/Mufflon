@@ -1,20 +1,15 @@
 ﻿#pragma once
 
 #include "lights.hpp"
-#include "importance_sampling.hpp"
 #include "core/export/api.h"
 #include "util/assert.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/interface.hpp"
+#include "core/concepts.hpp"
 #include <ei/vector.hpp>
 
 namespace mufflon { namespace scene { namespace lights {
-
-enum class BackgroundType {
-	COLORED,
-	ENVMAP
-};
 
 /**
  * This class represents the scene's background.
@@ -23,134 +18,77 @@ enum class BackgroundType {
  * be sample-able from a direction and 2. they need to be able to
  * compute accumulated flux.
  */
-template < Device dev >
 class Background {
 public:
-	static constexpr Device DEVICE = dev;
-
 	Background() : m_type(BackgroundType::COLORED), m_color(ei::Vec3{ 0.f }) {}
-	Background(const Background&) = default;
+	Background(const Background&) = delete;
 	Background(Background&&) = default;
-	Background& operator=(const Background&) = default;
+	Background& operator=(const Background&) = delete;
 	Background& operator=(Background&&) = default;
 	~Background() = default;
 
 	// Constructors for creating the proper type of background
-	__host__ static Background black() {
-		return colored(ei::Vec3{ 0.f });
-	}
-	__host__ static Background colored(ei::Vec3 color) {
+	static Background black() {
 		Background bck{ BackgroundType::COLORED };
-		bck.m_color = color;
+		bck.m_color = Spectrum { 0.0f };
+		bck.m_flux = Spectrum { 0.0f };
 		return bck;
 	}
-	__host__ static Background envmap(EnvMapLightDesc envmap) {
-		mAssert(envmap.envmap != nullptr);
-		mAssert(envmap.summedAreaTable != nullptr);
+	static Background colored(Spectrum color) {
+		Background bck{ BackgroundType::COLORED };
+		bck.m_color = Spectrum { color };
+		bck.m_flux = Spectrum { color }; // TODO: compute real flux (depends on scene size)
+		return bck;
+	}
+	static Background envmap(TextureHandle envmap) {
+		mAssert(envmap != nullptr);
 		Background bck{ BackgroundType::ENVMAP };
-		// Fill the summed area table with life
-		create_summed_area_table(envmap);
-		bck.m_envLight.texHandle = envmap.envmap->acquire_const<DEVICE>();
-		bck.m_envLight.summedAreaTable = envmap.summedAreaTable->acquire_const<DEVICE>();
-
-		// TODO: accumulate flux for envmap
-		bck.m_envLight.flux = ei::Vec3{ 0.1f };
-
+		bck.m_envLight = envmap;
+		// Flux will be computed together with the SAT
+		bck.m_flux = Spectrum { 1.0f }; // TODO: compute real flux (depends on scene size)
+		bck.m_color = Spectrum { 1.0f }; // Default factor, TODO: real factor
 		return bck;
 	}
 
 	// Creates a copy of the background suited for the given deviec
 	template < Device newDev >
-	__host__ Background<newDev> synchronize(EnvMapLightDesc envmapOpt) {
-		Background<newDev> newBck{ m_type };
-		switch(m_type) {
-			case BackgroundType::COLORED:
-				newBck.m_color = m_color;
-				break;
-			case BackgroundType::ENVMAP:
-				mAssert(envmapOpt.envmap != nullptr);
-				mAssert(envmapOpt.summedAreaTable != nullptr);
-				newBck.m_envLight.flux = m_envLight.flux;
-				newBck.m_envLight.texHandle = envmapOpt.envmap->acquire_const<newDev>();
-				newBck.m_envLight.summedAreaTable = envmapOpt.summedAreaTable->acquire_const<newDev>();
-				break;
-		}
-		return newBck;
+	void synchronize() {
+		m_envLight->synchronize<newDev>();
+		m_summedAreaTable->synchronize<newDev>();
 	}
 
-	CUDA_FUNCTION math::EvalValue evaluate(const ei::Vec3& direction) const {
-		switch(m_type) {
-			case BackgroundType::COLORED: return { m_color, 1.0f, AngularPdf{0.0f}, 
-				AngularPdf{1.0f / (4.0f * ei::PI)} };
-			case BackgroundType::ENVMAP: {
-				UvCoordinate uv;
-				Spectrum radiance { textures::sample(m_envLight.texHandle, direction, uv) };
-				// Get the p-value which was used to create the summed area table
-				constexpr Spectrum LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
-				// Get the integral from the table
-				const Pixel texSize = textures::get_texture_size(m_envLight.summedAreaTable);
-				const float cdf = textures::read(m_envLight.summedAreaTable, texSize - 1).x / (texSize.y * texSize.x);
-				float pdfScale = dot(LUM_WEIGHT, radiance);
-				// To complete the PDF we need the Jacobians of the map
-				if(textures::get_texture_layers(m_envLight.texHandle) == 6u) {
-					// Cube map
-					//ei::Vec3 projDir = direction / ei::max(direction);
-					//pdfScale = powf(lensq(projDir), 1.5f) / 24.0f;
-					// Should be equivalent to:
-					const float length = 1.0f / ei::max(direction);
-					pdfScale *= length * length * length / 24.0f;
-				} else {
-					// Polar map
-					// The sin(θ) from luminance scale cancels out with the sin(θ)
-					// from the Jacobian.
-					const int pixelY = ei::floor(uv.y * texSize.y);
-					const float sinPixel = sinf(ei::PI * static_cast<float>(pixelY + 0.5f) / static_cast<float>(texSize.y));
-					const float sinJac = sqrtf(1.0f - direction.y * direction.y);
-					pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
-				}
-				return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
-			}
-			default: mAssert(false); return {};
-		}
+	template < Device dev >
+	void unload() {
+		if(m_envLight) m_envLight->unload<dev>();
+		if(m_summedAreaTable) m_summedAreaTable->unload<dev>();
 	}
 
-	// TODO: sample, connect
+	template< Device dev >
+	const BackgroundDesc<dev> acquire_const();
 
-	CUDA_FUNCTION NextEventEstimation connect(const ei::Vec3& position,
-											  const ei::Box& bounds,
-											  const math::RndSet2& rnd) const {
-		switch(m_type) {
-			case BackgroundType::COLORED: return {}; // TODO
-			case BackgroundType::ENVMAP: return connect_light(m_envLight, position, bounds, rnd);
-			default: mAssert(false); return {};
-		}
-	}
-
-	constexpr CUDA_FUNCTION BackgroundType get_type() const noexcept {
+	constexpr BackgroundType get_type() noexcept {
 		return m_type;
 	}
 
-	CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux() const {
-		switch(m_type) {
-			case BackgroundType::COLORED: return ei::Vec3{ 0.f };
-			case BackgroundType::ENVMAP: return m_envLight.flux;
-			default: mAssert(false); return {};
-		}
+	ConstTextureHandle get_envmap() const noexcept {
+		return m_envLight;
 	}
-
-	constexpr CUDA_FUNCTION const EnvMapLight<DEVICE>& get_envmap_light() const noexcept {
+	TextureHandle get_envmap() noexcept {
 		return m_envLight;
 	}
 
+
 private:
-	// Typed constructor is hidden because different types require different extra parameters
-	template < Device >
-	friend class Background;
 	Background(BackgroundType type) : m_type(type) {}
 
 	BackgroundType m_type;
-	Spectrum m_color;
-	EnvMapLight<DEVICE> m_envLight;
+	Spectrum m_color;				// Color for uniform backgrounds OR scale in case of envLights
+	// Multiple textures for the environment + sampling
+	TextureHandle m_envLight = nullptr;
+	std::unique_ptr<textures::Texture> m_summedAreaTable = nullptr;
+	Spectrum m_flux;				// Precomputed value for the flux of the environment light
 };
+
+template DeviceManagerConcept<Background>;
 
 }}} // namespace mufflon::scene::lights

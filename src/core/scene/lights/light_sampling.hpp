@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "lights.hpp"
-#include "importance_sampling.hpp"
+#include "texture_sampling.hpp"
 #include "core/export/api.h"
 #include "ei/vector.hpp"
 #include "ei/conversions.hpp"
@@ -220,17 +220,20 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const DirectionalLight& li
 // *** ENVMAP ***
 // Samples a direction and evaluates the envmap's radiance in that direction
 CUDA_FUNCTION struct { math::DirectionSample dir; Spectrum radiance; }
-	sample_light_dir(const EnvMapLight<CURRENT_DEV>& light,
-					 const float u0, const float u1) {
+sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
+				 const float u0, const float u1) {
+	if(light.type == BackgroundType::COLORED) return {};
+	// TODO: sample other types of backgrounds too.
+
 	// First we sample the envmap texel
-	EnvmapSampleResult sample = importance_sample_envmap(light, u0, u1);
+	EnvmapSampleResult sample = importance_sample_texture(light.summedAreaTable, u0, u1);
 	// Depending on the type of envmap we will sample a different layer of the texture
-	const u16 layers = textures::get_texture_layers(light.texHandle);
+	const u16 layers = textures::get_texture_layers(light.envmap);
 	int layer = 0u;
 	math::DirectionSample dir{};
 	if(layers == 6u) {
 		// Cubemap: adjust the layer and texel
-		const Pixel texSize = textures::get_texture_size(light.texHandle);
+		const Pixel texSize = textures::get_texture_size(light.envmap);
 		int layer = sample.texel.x / texSize.x;
 		sample.texel.x -= layer * texSize.x;
 		// Bring the UV into the interval as well
@@ -273,11 +276,11 @@ CUDA_FUNCTION struct { math::DirectionSample dir; Spectrum radiance; }
 	}
 
 	// Use always nearest sampling (otherwise the sampler is biased).
-	ei::Vec3 radiance { textures::read(light.texHandle, sample.texel, layer) };
+	ei::Vec3 radiance { textures::read(light.envmap, sample.texel, layer) };
 	return { dir, radiance };
 }
 
-CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const EnvMapLight<CURRENT_DEV>& light,
+CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const BackgroundDesc<CURRENT_DEV>& light,
 													  const ei::Box& bounds,
 													  const math::RndSet2_1& rnd) {
 	auto sample = sample_light_dir(light, rnd.u0, rnd.u1);
@@ -398,7 +401,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Directiona
 		AreaPdf::infinite()	// Dummy pdf (the directional sampling pdf, converted)
 	};
 }
-CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLight<CURRENT_DEV>& light,
+CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const BackgroundDesc<CURRENT_DEV>& light,
 																const ei::Vec3& pos,
 																const ei::Box& bounds,
 																const math::RndSet2& rnd) {
@@ -411,6 +414,47 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const EnvMapLigh
 		sample.dir.direction, 1.0f, diffIrradiance, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
 		sample.dir.pdf.to_area_pdf(1.0f, ei::sq(MAX_SCENE_SIZE))
 	};
+}
+
+// Evaluate a directional hit of the background.
+// This function would be more logical in lights.hpp. But it requires textures
+// and would increase header dependencies.
+template < Device dev >
+CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<dev>& background,
+												  const ei::Vec3& direction) {
+	switch(background.type) {
+		case BackgroundType::COLORED: return { background.color, 1.0f, AngularPdf{0.0f}, 
+			AngularPdf{1.0f / (4.0f * ei::PI)} };
+		case BackgroundType::ENVMAP: {
+			UvCoordinate uv;
+			Spectrum radiance { textures::sample(background.envmap, direction, uv) };
+			// Get the p-value which was used to create the summed area table
+			constexpr Spectrum LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
+			// Get the integral from the table
+			const Pixel texSize = textures::get_texture_size(background.summedAreaTable);
+			const float cdf = textures::read(background.summedAreaTable, texSize - 1).x / (texSize.y * texSize.x);
+			float pdfScale = dot(LUM_WEIGHT, radiance);
+			// To complete the PDF we need the Jacobians of the map
+			if(textures::get_texture_layers(background.envmap) == 6u) {
+				// Cube map
+				//ei::Vec3 projDir = direction / ei::max(direction);
+				//pdfScale = powf(lensq(projDir), 1.5f) / 24.0f;
+				// Should be equivalent to:
+				const float length = 1.0f / ei::max(direction);
+				pdfScale *= length * length * length / 24.0f;
+			} else {
+				// Polar map
+				// The sin(θ) from luminance scale cancels out with the sin(θ)
+				// from the Jacobian.
+				const int pixelY = ei::floor(uv.y * texSize.y);
+				const float sinPixel = sinf(ei::PI * static_cast<float>(pixelY + 0.5f) / static_cast<float>(texSize.y));
+				const float sinJac = sqrtf(1.0f - direction.y * direction.y);
+				pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
+			}
+			return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
+		}
+		default: mAssert(false); return {};
+	}
 }
 
 }}} // namespace mufflon::scene::lights

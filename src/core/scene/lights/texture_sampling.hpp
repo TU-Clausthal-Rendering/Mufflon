@@ -1,9 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/interface.hpp"
+#include "core/math/sample_types.hpp"
 
 namespace mufflon { namespace scene { namespace lights {
 
@@ -38,20 +39,36 @@ CUDA_FUNCTION __forceinline__ int lower_bound(const textures::ConstTextureDevHan
 	return left;
 }
 
-
 } // namespace summed_details
 
-#ifndef __CUDA_ARCH__
-inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
-	auto envmapTex = envlight.envmap->acquire_const<Device::CPU>();
-	auto sumSurf = envlight.summedAreaTable->aquire<Device::CPU>();
+// The result of importance sampling an envmap
+struct EnvmapSampleResult {
+	Pixel texel;
+	ei::Vec2 uv;
+	float pdf;
+};
+
+
+#ifndef __CUDACC__
+inline std::unique_ptr<textures::Texture> create_summed_area_table(textures::ConstTextureDevHandle_t<Device::CPU> texture) {
+	mAssert(texture->get_num_layers() == 1 || texture->get_num_layers() == 6);
+	auto res = std::make_unique<textures::Texture>(
+		texture->get_width() * texture->get_num_layers(), // Place all cubemap faces side by side
+		texture->get_height(),
+		1u,
+		textures::Format::R32F,
+		textures::SamplingMode::NEAREST,
+		false
+	);
+
+	auto sumTex = res->acquire<Device::CPU>();
 	// Conversion to luminance
 	constexpr ei::Vec4 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f, 0.0f };
-	const int width = static_cast<int>(envlight.envmap->get_width());
-	const int height = static_cast<int>(envlight.envmap->get_height());
-	const int layers = static_cast<int>(envlight.envmap->get_num_layers());
+	const int width = static_cast<int>(texture->get_width());
+	const int height = static_cast<int>(texture->get_height());
+	const int layers = static_cast<int>(texture->get_num_layers());
 
-	if(layers == 6u) {
+	if(layers == 6) {
 		// Cubemap
 		// Code taken from Johannes' renderer
 		// Layers are encoded as continuous in the rows
@@ -60,14 +77,14 @@ inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
 			float accumLumX = 0.f;
 			for(int l = 0; l < layers; ++l) {
 				for(int x = 0; x < width; ++x) {
-					const float luminance = ei::dot(LUM_WEIGHT, textures::read(envmapTex, Pixel{ x, y }, l));
+					const float luminance = ei::dot(LUM_WEIGHT, textures::read(texture, Pixel{ x, y }, l));
 					accumLumX += luminance;
-					textures::write(sumSurf, Pixel{ x + width * l, y }, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
+					textures::write(sumTex, Pixel{ x + width * l, y }, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
 				}
 			}
 			// In the last texel of a row we store the accumulated PDF for the columns
 			accumLumY += accumLumX;
-			textures::write(sumSurf, Pixel{ 6 * width - 1, y }, ei::Vec4{ accumLumY, 0.f, 0.f, 0.f });
+			textures::write(sumTex, Pixel{ 6 * width - 1, y }, ei::Vec4{ accumLumY, 0.f, 0.f, 0.f });
 		}
 	} else {
 		// Polarmap
@@ -78,48 +95,40 @@ inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
 			float accumLumX = 0.f;
 			for(int x = 0; x < width; ++x) {
 				const Pixel texel{ x, y };
-				const float luminance = ei::dot(LUM_WEIGHT, textures::read(envmapTex, texel));
+				const float luminance = ei::dot(LUM_WEIGHT, textures::read(texture, texel));
 				accumLumX += luminance * sinTheta;
-				textures::write(sumSurf, texel, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
+				textures::write(sumTex, texel, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
 			}
 
 			// In the last texel of a row we store the accumulated PDF for the columns
 			accumLumY += accumLumX;
-			textures::write(sumSurf, Pixel{ width - 1, y }, ei::Vec4{ accumLumY, 0.f, 0.f, 0.f });
+			textures::write(sumTex, Pixel{ width - 1, y }, ei::Vec4{ accumLumY, 0.f, 0.f, 0.f });
 		}
 	}
+	return std::move(res);
 }
-#endif // __CUDA_ARCH__
-
-// The resuult of importance sampling an envmap
-struct EnvmapSampleResult {
-	Pixel texel;
-	ei::Vec2 uv;
-	float pdf;
-};
+#endif // __CUDACC__
 
 /**
- * Importance-samples a texel from a spherical envmap.
- * Expects both the envmap and a summed area table of its luminance.
+ * Importance-samples a texel from a summed area table.
  * Requires two uniform random numbers in [0, 1].
- * If the envmap is a cube map, the UV.x coordinate will be in [0, 6] instead.
- * Similarly, texel.x will range from 0 to 6*envmap width.
+ * The return UV-coordinate will always be in [0,1]².
  */
-CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURRENT_DEV>& envLight,
-														  float u0, float u1) {
+CUDA_FUNCTION EnvmapSampleResult importance_sample_texture(textures::ConstTextureDevHandle_t<CURRENT_DEV> summedAreaTable,
+														   float u0, float u1) {
 	using namespace summed_details;
 
 	// First decide on the row
-	const Pixel texSize = textures::get_texture_size(envLight.texHandle);
+	const Pixel texSize = textures::get_texture_size(summedAreaTable);
 	const Pixel bottomRight = texSize - 1;
-	const float highestRowwise = textures::read(envLight.summedAreaTable, bottomRight).x;
+	const float highestRowwise = textures::read(summedAreaTable, bottomRight).x;
 
 	// Find the row via binary search
 	const float x = highestRowwise * u0;
-	const int row = lower_bound(envLight.summedAreaTable, x, bottomRight.y, bottomRight.x, true);
+	const int row = lower_bound(summedAreaTable, x, bottomRight.y, bottomRight.x, true);
 	// Perform inverse linear interpolation
-	const float vr0 = row == 0 ? 0.0f : textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row-1 }).x;
-	const float vr1 = textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row }).x;
+	const float vr0 = row == 0 ? 0.0f : textures::read(summedAreaTable, Pixel{ bottomRight.x, row-1 }).x;
+	const float vr1 = textures::read(summedAreaTable, Pixel{ bottomRight.x, row }).x;
 	const float rowVal = (row + (x - vr0) / (vr1 - vr0)) / static_cast<float>(texSize.y);
 
 	// Decide on a column
@@ -128,10 +137,10 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 
 	// Find the column via binary search
 	const float y = highestColumnwise * u1;
-	const int column = lower_bound(envLight.summedAreaTable, y, bottomRight.x, row, false);
+	const int column = lower_bound(summedAreaTable, y, bottomRight.x, row, false);
 	// Perform inverse linear interpolation
-	const float vc0 = column == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ column - 1, row }).x;
-	const float vc1 = column == bottomRight.x ? highestRowwise : textures::read(envLight.summedAreaTable, Pixel{ column, row }).x;
+	const float vc0 = column == 0 ? 0.f : textures::read(summedAreaTable, Pixel{ column - 1, row }).x;
+	const float vc1 = column == bottomRight.x ? highestRowwise : textures::read(summedAreaTable, Pixel{ column, row }).x;
 	const float columnVal = (column + (y - vc0) / (vc1 - vc0)) / static_cast<float>(texSize.x);
 
 	// The following computations are equivalent:
@@ -142,5 +151,24 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 
 	return EnvmapSampleResult{ Pixel{column, row}, ei::Vec2{ columnVal, rowVal }, pdf };
 }
+
+/*CUDA_FUNCTION NextEventEstimation connect(const BackgroundDesc<CURRENT_DEV>& background,
+										  const ei::Vec3& position,
+										  const ei::Box& bounds,
+										  const math::RndSet2& rnd) {
+	switch(background.type) {
+		case BackgroundType::COLORED: return {}; // TODO
+		case BackgroundType::ENVMAP: return connect_light(background.envLight, position, bounds, rnd);
+		default: mAssert(false); return {};
+	}
+}
+
+CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const BackgroundDesc<CURRENT_DEV>& background) {
+	switch(background.type) {
+		case BackgroundType::COLORED: return ei::Vec3{ 0.f };
+		case BackgroundType::ENVMAP: return background.envLight.flux;
+		default: mAssert(false); return {};
+	}
+}*/
 
 }}} // namespace mufflon::scene::lights

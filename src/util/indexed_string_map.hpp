@@ -21,7 +21,7 @@ class IndexedStringMap {
 public:
 	u32 insert(std::string key, DataT&& value) {
 		m_mapKeyStore.push_back(std::make_unique<std::string>(move(key)));
-		m_data.push_back(value);
+		m_data.push_back(std::move(value));
 		auto it = m_map.emplace(*m_mapKeyStore.back(), m_data.size()-1);
 		return u32(m_data.size()-1);
 	}

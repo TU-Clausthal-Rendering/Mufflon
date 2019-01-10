@@ -4,6 +4,7 @@
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"
 #include <iostream>
+#include <ei/conversions.hpp>
 
 namespace mufflon::scene {
 
@@ -150,11 +151,12 @@ std::optional<u32> WorldContainer::add_light(std::string name,
 		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	if(env) mAssertMsg(env->get_sampling_mode() == textures::SamplingMode::NEAREST,
-		"Sampling mode must be nearest, otherwise the importance sampling is biased.");
-	m_envLightsDirty.push_back(true);
-	// Defer the creation of summed area tables to load time
-	return m_envLights.insert(std::move(name), lights::EnvMapLightDesc{ env, nullptr });
+	if(env) {
+		mAssertMsg(env->get_sampling_mode() == textures::SamplingMode::NEAREST,
+			"Sampling mode must be nearest, otherwise the importance sampling is biased.");
+		return m_envLights.insert(std::move(name), lights::Background::envmap(env));
+	}
+	return m_envLights.insert(std::move(name), lights::Background::black());
 }
 
 void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replacement) {
@@ -163,13 +165,10 @@ void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replaceme
 								 + " >= " + std::to_string(m_envLights.size()) + ")");
 	if(replacement) mAssertMsg(replacement->get_sampling_mode() == textures::SamplingMode::NEAREST,
 		"Sampling mode must be nearest, otherwise the importance sampling is biased.");
-	lights::EnvMapLightDesc& desc = m_envLights.get(index);
-	if(replacement != desc.envmap) {
-		this->unref_texture(desc.envmap);
-		this->unref_texture(desc.summedAreaTable);
-		desc.envmap = replacement;
-		desc.summedAreaTable = nullptr;
-		m_envLightsDirty[index] = true;
+	lights::Background& desc = m_envLights.get(index);
+	if(replacement != desc.get_envmap()) {
+		this->unref_texture(desc.get_envmap());
+		desc = lights::Background::envmap(replacement);
 	}
 }
 
@@ -206,11 +205,11 @@ lights::DirectionalLight* WorldContainer::get_dir_light(u32 index) {
 	return &m_dirLights.get(index);
 }
 
-lights::EnvMapLightDesc& WorldContainer::get_env_light(u32 index) {
+lights::Background* WorldContainer::get_env_light(u32 index) {
 	if(index >= m_envLights.size())
 		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
 									+ " >= " + std::to_string(m_envLights.size()));
-	return m_envLights.get(index);
+	return &m_envLights.get(index);
 }
 
 
@@ -238,11 +237,8 @@ void WorldContainer::remove_light(u32 index, lights::LightType type) {
 			if(index >= m_envLights.size())
 				throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
 										 + " >= " + std::to_string(m_envLights.size()));
-			this->unref_texture(m_envLights.get(index).envmap);
-			this->unref_texture(m_envLights.get(index).summedAreaTable);
+			this->unref_texture(m_envLights.get(index).get_envmap());
 			m_envLights.erase(index);
-			m_envLightsDirty.erase(m_envLightsDirty.begin() + index);
-			// TODO: delete texture?
 		} break;
 		default:
 			throw std::runtime_error("[WorldContainer::remove_light] Invalid light type.");
@@ -291,9 +287,7 @@ void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
 			case lights::LightType::ENVMAP_LIGHT:
-				// Check if the light is part of the active scenario/scene
-				if(m_scenario->get_envmap_light_name() == get_light_name(index, type))
-					m_envLightsDirty[index] = true;
+				// Nothing to flag. The m_lightsDirty is to track light-tree rebuilds.
 				break;
 		}
 	}
@@ -310,7 +304,7 @@ TextureHandle WorldContainer::find_texture(std::string_view name) {
 	return nullptr;
 }
 
-std::optional<std::string_view> WorldContainer::get_texture_name(TextureHandle hdl) const {
+std::optional<std::string_view> WorldContainer::get_texture_name(ConstTextureHandle hdl) const {
 	// Gotta iterate entire map... very expensive operation
 	// TODO: use bimap?
 	for(auto iter = m_textures.cbegin(); iter != m_textures.cend(); ++iter) {
@@ -522,58 +516,19 @@ void WorldContainer::load_scene_lights() {
 	}
 
 	// Find out what the active envmap light is
-	lights::EnvMapLightDesc* envLightTex = nullptr;
+	lights::Background* envLightTex = nullptr;
 	std::string_view currEnvName = m_scenario->get_envmap_light_name();
 	if(!currEnvName.empty()) {
 		auto iter = m_envLights.find(currEnvName);
-		if(iter != nullptr)
+		if(iter != nullptr) {
 			envLightTex = iter;
-		else
+			m_scene->set_background(*iter);
+		} else
 			logWarning("[WorldContainer::load_scene_lights] Unknown envmap light '", currEnvName, "' in scenario '",
 					   m_scenario->get_name(), "'");
 	}
 
-	// Check if we changed the active envmap
-	TextureHandle prevEnvTex = m_scene->get_light_tree_builder().get_envmap_descriptor().envmap;
-	if(m_scenario->envmap_lights_dirty_reset() || (prevEnvTex != nullptr && envLightTex == nullptr) || prevEnvTex != envLightTex->envmap) {
-		// Check if we removed the envmap or changed/added it
-		if(envLightTex == nullptr) {
-			m_scene->set_background(ei::Vec3{ 0.f });
-		} else {
-			std::size_t index = m_envLights.get_index(currEnvName);
-			if(m_envLightsDirty[index]) {
-				envLightTex->summedAreaTable = this->get_summed_area_table(currEnvName, envLightTex->envmap);
-				m_envLightsDirty[index] = false;
-			}
-			m_scene->set_background(*envLightTex);
-		}
-	} else {
-		// Check if the envmap itself is dirty
-		std::size_t index = m_envLights.get_index(currEnvName);
-		if(m_envLightsDirty[index]) {
-			envLightTex->summedAreaTable = this->get_summed_area_table(currEnvName, envLightTex->envmap);
-			m_envLightsDirty[index] = false;
-			m_scene->set_background(*envLightTex);
-		}
-	}
-
 	m_scenario->lights_dirty_reset();
-}
-
-
-TextureHandle WorldContainer::get_summed_area_table(std::string_view name, TextureHandle tex) {
-	const std::string satName = std::string(name) + "##SUMMED-AREA-TABLE##";
-	TextureHandle summedAreaTable = this->find_texture(satName);
-	if(summedAreaTable == nullptr) {
-		// Differentiate between cube and polar maps
-		if(tex->get_num_layers() == 6)
-			summedAreaTable = this->add_texture(satName, 6u * tex->get_width(), tex->get_height(),
-												1u, tex->get_format(), textures::SamplingMode::LINEAR, false, nullptr);
-		else
-			summedAreaTable = this->add_texture(satName, tex->get_width(), tex->get_height(),
-												1u, tex->get_format(), textures::SamplingMode::LINEAR, false, nullptr);
-	}
-	return summedAreaTable;
 }
 
 } // namespace mufflon::scene

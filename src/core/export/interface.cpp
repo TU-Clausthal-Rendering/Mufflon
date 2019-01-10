@@ -2313,7 +2313,7 @@ Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
 const char* world_get_env_light_map(ConstLightHdl hdl) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	const TextureHandle& envmap = s_world.get_env_light(hdl.index).envmap;
+	ConstTextureHandle envmap = s_world.get_env_light(hdl.index)->get_envmap();
 	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
 	auto nameOpt = s_world.get_texture_name(envmap);
 	if(!nameOpt.has_value()) {

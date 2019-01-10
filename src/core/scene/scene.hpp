@@ -96,8 +96,7 @@ public:
 
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights);
-	void set_background(lights::EnvMapLightDesc envLightTexture);
-	void set_background(const ei::Vec3& color);
+	void set_background(lights::Background& envLightTexture);
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {

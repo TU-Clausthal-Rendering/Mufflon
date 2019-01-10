@@ -199,7 +199,7 @@ public:
 
 	// Aquire a writing (and thus dirtying) accessor
 	template < Device dev >
-	TextureDevHandle_t<dev> aquire() {
+	TextureDevHandle_t<dev> acquire() {
 		mAssertMsg(NUM_CHANNELS(m_format) != 3, "Write access to RGB formats is not possible on the GPU -> not allowed in all our code.");
 		this->synchronize<dev>();
 		return m_handles.get<TextureDevHandle_t<dev>>();
