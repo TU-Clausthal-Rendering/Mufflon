@@ -183,10 +183,11 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightSphere<CURR
 	// We don't need to convert the "normal" due to sphere symmetry
 	const math::DirectionSample normal = math::sample_dir_sphere_uniform(rnd.u0, rnd.u1);
 	const Spectrum scale = ei::unpackRGB9E5(light.scale);
+	UvCoordinate uvDummy;
 	return Photon{
 		math::PositionSample{ light.position + normal.direction * light.radius,
 							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		Spectrum{sample(light.radianceTex, normal.direction)} * scale,
+		Spectrum{sample(light.radianceTex, normal.direction, uvDummy)} * scale,
 		LightType::AREA_LIGHT_SPHERE,
 		{normal.direction, 4*ei::PI*ei::sq(light.radius)}
 	};
@@ -374,7 +375,8 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 	const float cDist = sqrtf(cDistSq);
 	connectionDir /= cDist;
 	// Compute the contribution (diffIrradiance)
-	Spectrum radiance { sample(light.radianceTex, globalDir) };
+	UvCoordinate uvDummy;
+	Spectrum radiance { sample(light.radianceTex, globalDir, uvDummy) };
 	radiance *= light.radius * light.radius / (float(dir.pdf) * cDistSq);
 	return NextEventEstimation{
 		connectionDir, -dot(globalDir, connectionDir),

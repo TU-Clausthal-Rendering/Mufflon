@@ -47,7 +47,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						bool adjoint,
 						Throughput& throughput,
 						VertexType* outVertex,
-						scene::Direction& sampledDir
+						math::DirectionSample& sampledDir
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
@@ -55,8 +55,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
 		&& !isnan(sample.origin.x) && !isnan(sample.origin.y) && !isnan(sample.origin.z)
 		&& !isnan(float(sample.pdfF)) && !isnan(float(sample.pdfB)));
-	sampledDir = sample.excident;
-
+	sampledDir = {sample.excident, sample.pdfF};
 
 	// Update throughputs
 	throughput.weight *= sample.throughput;

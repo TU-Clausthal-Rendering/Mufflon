@@ -45,11 +45,11 @@ __global__ static void sample(Pixel imageDims,
 
 			const float phi = 2.f * ei::PI * (coord.x + 0.5f) / static_cast<float>(imageDims.x);
 			const float theta = ei::PI * (coord.y + 0.5f) / static_cast<float>(imageDims.y);
-			ei::Vec3 testRadiance = lightTree.background.get_radiance(ei::Vec3{
+			ei::Vec3 testRadiance = lightTree.background.evaluate(ei::Vec3{
 				sinf(theta) * cosf(phi),
 				sinf(theta) * sinf(phi),
 				cosf(theta)
-			});
+			}).value;
 			outputBuffer.contribute(coord, throughput, testRadiance,
 									ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 									ei::Vec3{ 0, 0, 0 });

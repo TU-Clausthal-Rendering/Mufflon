@@ -65,8 +65,8 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 #endif
 }
 
-// Samples an environment map
-inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction) {
+// Samples an environment map and returns the uv-coordinate too
+inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
 #ifndef __CUDA_ARCH__
 	int layers = envmap->get_num_layers();
 #else // __CUDA_ARCH__
@@ -107,7 +107,8 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 		// Normalize the UV coordinates into [0, 1]
 		u = (u + 1.f) / 2.f;
 		v = (v + 1.f) / 2.f;
-		return sample(envmap, UvCoordinate{ u, v }, layer);
+		uvOut = UvCoordinate{ u, v };
+		return sample(envmap, uvOut, layer);
 	} else {
 		// Spherical map
 		// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
@@ -115,8 +116,9 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 		const float u = atan2(direction.z, direction.x) / (ei::PI * 2.f);
 		// Clamp (no wrapping in v direction)
 		const Pixel texSize = textures::get_texture_size(envmap);
-		v = ei::min(v, (texSize.x - 0.5f) / texSize.x);
-		return sample(envmap, UvCoordinate{ u, v });
+		v = ei::min(v, (texSize.y - 0.5f) / texSize.y);
+		uvOut = UvCoordinate{ u, v };
+		return sample(envmap, uvOut);
 	}
 }
 

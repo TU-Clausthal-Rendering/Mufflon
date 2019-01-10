@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "lights.hpp"
 #include "importance_sampling.hpp"
@@ -78,12 +78,37 @@ public:
 		return newBck;
 	}
 
-	CUDA_FUNCTION Spectrum get_radiance(const ei::Vec3& direction) const {
+	CUDA_FUNCTION math::EvalValue evaluate(const ei::Vec3& direction) const {
 		switch(m_type) {
-			case BackgroundType::COLORED: return m_color;
+			case BackgroundType::COLORED: return { m_color, 1.0f, AngularPdf{0.0f}, 
+				AngularPdf{1.0f / (4.0f * ei::PI)} };
 			case BackgroundType::ENVMAP: {
-				ei::Vec4 sample = textures::sample(m_envLight.texHandle, direction);
-				return Spectrum{ sample.x, sample.y, sample.z };
+				UvCoordinate uv;
+				Spectrum radiance { textures::sample(m_envLight.texHandle, direction, uv) };
+				// Get the p-value which was used to create the summed area table
+				constexpr Spectrum LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
+				// Get the integral from the table
+				const Pixel texSize = textures::get_texture_size(m_envLight.summedAreaTable);
+				const float cdf = textures::read(m_envLight.summedAreaTable, texSize - 1).x / (texSize.y * texSize.x);
+				float pdfScale = dot(LUM_WEIGHT, radiance);
+				// To complete the PDF we need the Jacobians of the map
+				if(textures::get_texture_layers(m_envLight.texHandle) == 6u) {
+					// Cube map
+					//ei::Vec3 projDir = direction / ei::max(direction);
+					//pdfScale = powf(lensq(projDir), 1.5f) / 24.0f;
+					// Should be equivalent to:
+					const float length = 1.0f / ei::max(direction);
+					pdfScale *= length * length * length / 24.0f;
+				} else {
+					// Polar map
+					// The sin(θ) from luminance scale cancels out with the sin(θ)
+					// from the Jacobian.
+					const int pixelY = ei::floor(uv.y * texSize.y);
+					const float sinPixel = sinf(ei::PI * static_cast<float>(pixelY + 0.5f) / static_cast<float>(texSize.y));
+					const float sinJac = sqrtf(1.0f - direction.y * direction.y);
+					pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
+				}
+				return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
 			}
 			default: mAssert(false); return {};
 		}

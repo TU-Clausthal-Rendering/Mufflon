@@ -69,7 +69,6 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 	int pathLen = 0;
 	do {
-		if(true)
 		if(pathLen > 0.0f && pathLen+1 <= m_params.maxPathLength) {
 			// Call NEE member function for recursive vertices.
 			// Do not connect to the camera, because this makes the renderer much more
@@ -93,7 +92,6 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-					mis = 1.0f;
 					mAssert(!isnan(mis));
 					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 						value.cosOut, radiance * mis);
@@ -104,15 +102,15 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		// Walk
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-		scene::Direction lastDir;
+		math::DirectionSample lastDir;
 		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				ei::Vec3 background = scene.lightTree.background.get_radiance(lastDir);
-				if(any(greater(background, 0.0f))) {
-					float mis = 0.0f;
-					background *= mis;
-					outputBuffer.contribute(coord, throughput, background,
+				auto background = scene.lightTree.background.evaluate(lastDir.direction);
+				if(any(greater(background.value, 0.0f))) {
+					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
+					background.value *= mis;
+					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
 				}

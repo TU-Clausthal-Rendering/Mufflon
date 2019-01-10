@@ -46,7 +46,7 @@ inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
 	auto envmapTex = envlight.envmap->acquire_const<Device::CPU>();
 	auto sumSurf = envlight.summedAreaTable->aquire<Device::CPU>();
 	// Conversion to luminance
-	constexpr ei::Vec4 lumWeight{ 0.212671f, 0.715160f, 0.072169f, 0.f };
+	constexpr ei::Vec4 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f, 0.0f };
 	const int width = static_cast<int>(envlight.envmap->get_width());
 	const int height = static_cast<int>(envlight.envmap->get_height());
 	const int layers = static_cast<int>(envlight.envmap->get_num_layers());
@@ -60,7 +60,7 @@ inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
 			float accumLumX = 0.f;
 			for(int l = 0; l < layers; ++l) {
 				for(int x = 0; x < width; ++x) {
-					const float luminance = ei::dot(lumWeight, textures::read(envmapTex, Pixel{ x, y }, l));
+					const float luminance = ei::dot(LUM_WEIGHT, textures::read(envmapTex, Pixel{ x, y }, l));
 					accumLumX += luminance;
 					textures::write(sumSurf, Pixel{ x + width * l, y }, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
 				}
@@ -78,7 +78,7 @@ inline __host__ void create_summed_area_table(EnvMapLightDesc envlight) {
 			float accumLumX = 0.f;
 			for(int x = 0; x < width; ++x) {
 				const Pixel texel{ x, y };
-				const float luminance = ei::dot(lumWeight, textures::read(envmapTex, texel));
+				const float luminance = ei::dot(LUM_WEIGHT, textures::read(envmapTex, texel));
 				accumLumX += luminance * sinTheta;
 				textures::write(sumSurf, texel, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
 			}
@@ -120,7 +120,6 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 	// Perform inverse linear interpolation
 	const float vr0 = row == 0 ? 0.0f : textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row-1 }).x;
 	const float vr1 = textures::read(envLight.summedAreaTable, Pixel{ bottomRight.x, row }).x;
-	const float rowPdf = (vr1 - vr0) * texSize.y / highestRowwise;
 	const float rowVal = (row + (x - vr0) / (vr1 - vr0)) / static_cast<float>(texSize.y);
 
 	// Decide on a column
@@ -132,11 +131,16 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_envmap(const EnvMapLight<CURR
 	const int column = lower_bound(envLight.summedAreaTable, y, bottomRight.x, row, false);
 	// Perform inverse linear interpolation
 	const float vc0 = column == 0 ? 0.f : textures::read(envLight.summedAreaTable, Pixel{ column - 1, row }).x;
-	const float vc1 = textures::read(envLight.summedAreaTable, Pixel{ column, row }).x;
-	const float columnPdf = (vc1 - vc0) * texSize.x / highestColumnwise;
+	const float vc1 = column == bottomRight.x ? highestRowwise : textures::read(envLight.summedAreaTable, Pixel{ column, row }).x;
 	const float columnVal = (column + (y - vc0) / (vc1 - vc0)) / static_cast<float>(texSize.x);
 
-	return EnvmapSampleResult{ Pixel{column, row}, ei::Vec2{ columnVal, rowVal }, rowPdf * columnPdf };
+	// The following computations are equivalent:
+	// const float rowPdf = (vr1 - vr0) * texSize.y / highestRowwise;
+	// const float columnPdf = (vc1 - vc0) * texSize.x / highestColumnwise;
+	// const float pdf = rowPdf * columnPdf;
+	const float pdf = (vc1 - vc0) * texSize.x * texSize.y / highestRowwise;
+
+	return EnvmapSampleResult{ Pixel{column, row}, ei::Vec2{ columnVal, rowVal }, pdf };
 }
 
 }}} // namespace mufflon::scene::lights
