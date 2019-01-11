@@ -446,7 +446,7 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 }
 
 template < Device dev >
-void LightTreeBuilder::synchronize() {
+void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 	if(dev == Device::CUDA && m_dirty.needs_sync(dev)) {
 		if(!m_treeCpu)
 			throw std::runtime_error("[LightTreeBuilder::synchronize] There is no source for light-tree synchronization!");
@@ -463,9 +463,9 @@ void LightTreeBuilder::synchronize() {
 
 		// Remap the environment map
 		if(m_envLight)
-			m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>();
+			m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>(sceneBounds);
 		else // Default envmap is black
-			m_treeCuda->background = Background::black().acquire_const<Device::CUDA>();
+			m_treeCuda->background = Background::black().acquire_const<Device::CUDA>(sceneBounds);
 
 		// Replace all texture handles inside the tree's data and
 		// synchronize all the remaining tree memory.
@@ -475,9 +475,9 @@ void LightTreeBuilder::synchronize() {
 	} else {
 		// The background can always be outdated
 		if(m_envLight)
-			m_treeCpu->background = m_envLight->acquire_const<Device::CPU>();
+			m_treeCpu->background = m_envLight->acquire_const<Device::CPU>(sceneBounds);
 		else // Default envmap is black
-			m_treeCpu->background = Background::black().acquire_const<Device::CPU>();
+			m_treeCpu->background = Background::black().acquire_const<Device::CPU>(sceneBounds);
 		// TODO: backsync? Would need another hashmap for texture mapping.
 	}
 }
@@ -515,7 +515,7 @@ void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scen
 
 template < Device dev >
 void LightTreeBuilder::update_media(const SceneDescriptor<dev>& scene) {
-	this->synchronize<dev>();
+	this->synchronize<dev>(scene.aabb);
 	if constexpr(dev == Device::CPU)
 		this->update_media_cpu(scene);
 	else if constexpr(dev == Device::CUDA)
@@ -536,8 +536,8 @@ void LightTreeBuilder::unload() {
 	// TODO: unload envmap handle
 }
 
-template void LightTreeBuilder::synchronize<Device::CPU>();
-template void LightTreeBuilder::synchronize<Device::CUDA>();
+template void LightTreeBuilder::synchronize<Device::CPU>(const ei::Box&);
+template void LightTreeBuilder::synchronize<Device::CUDA>(const ei::Box&);
 //template void LightTreeBuilder::synchronize<Device::OPENGL>();
 template void LightTreeBuilder::unload<Device::CPU>();
 template void LightTreeBuilder::unload<Device::CUDA>();

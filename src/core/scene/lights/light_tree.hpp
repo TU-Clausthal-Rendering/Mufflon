@@ -150,14 +150,14 @@ public:
 	void update_media(const SceneDescriptor<dev>& descriptor);
 
 	template < Device dev >
-	const LightTree<dev>& acquire_const() noexcept {
-		this->synchronize<dev>();
+	const LightTree<dev>& acquire_const(const ei::Box& sceneBounds) {
+		this->synchronize<dev>(sceneBounds);
 		if constexpr(dev == Device::CPU) return *m_treeCpu;
 		else return *m_treeCuda;
 	}
 
 	template < Device dev >
-	void synchronize();
+	void synchronize(const ei::Box& sceneBounds);
 
 	template < Device dev >
 	void unload();
@@ -177,6 +177,8 @@ private:
 	// Environment light model, may be black, a texture or an analytic model
 	lights::Background* m_envLight { nullptr };
 };
+
+template DeviceManagerConcept<LightTreeBuilder>;
 
 #endif // __CUDACC__
 

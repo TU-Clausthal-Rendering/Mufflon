@@ -37,7 +37,8 @@ public:
 	static Background colored(Spectrum color) {
 		Background bck{ BackgroundType::COLORED };
 		bck.m_color = Spectrum { color };
-		bck.m_flux = Spectrum { color }; // TODO: compute real flux (depends on scene size)
+		// Flux will be computed in acquire_const
+		bck.m_flux = Spectrum { 1.0f };
 		return bck;
 	}
 	static Background envmap(TextureHandle envmap) {
@@ -46,13 +47,11 @@ public:
 		bck.m_envLight = envmap;
 		// Flux will be computed together with the SAT
 		bck.m_flux = Spectrum { 1.0f }; // TODO: compute real flux (depends on scene size)
-		bck.m_color = Spectrum { 1.0f }; // Default factor, TODO: real factor
+		bck.m_color = Spectrum { 1.0f }; // Default factor
 		return bck;
 	}
 
 	void set_scale(const Spectrum& color) {
-		// Rescale flux to the new factor
-		m_flux *= color / m_color; // TODO: this can fail if m_color=0. Solution: use 'raw' flux and multiply with color on acquire. Must be in coincidence with colred backs
 		m_color = color;
 	}
 
@@ -70,7 +69,7 @@ public:
 	}
 
 	template< Device dev >
-	const BackgroundDesc<dev> acquire_const();
+	const BackgroundDesc<dev> acquire_const(const ei::Box& bounds);
 
 	constexpr BackgroundType get_type() noexcept {
 		return m_type;
@@ -95,6 +94,7 @@ private:
 	Spectrum m_flux;				// Precomputed value for the flux of the environment light
 
 	void compute_envmap_flux(const ei::Box& bounds);
+	void compute_constant_flux(const ei::Box& bounds);
 };
 
 template DeviceManagerConcept<Background>;

@@ -60,7 +60,7 @@ public:
 				// TODO
 			}
 		}
-		m_lightTree.synchronize<dev>();
+		m_lightTree.synchronize<dev>(m_boundingBox);
 		m_media.synchronize<dev>();
 	}
 

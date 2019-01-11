@@ -159,7 +159,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 	// Light tree
 	if(m_lightTreeDescChanged) {
-		sceneDescriptor.lightTree = m_lightTree.acquire_const<dev>();
+		sceneDescriptor.lightTree = m_lightTree.acquire_const<dev>(m_boundingBox);
 		m_lightTreeDescChanged = false;
 	}
 
