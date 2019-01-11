@@ -145,7 +145,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-				   ei::abs(ray.direction.x) && ei::abs(ray.direction.z))
+				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x - ray.origin.x) / ray.direction.x;
 				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
 					t0 = (u0*v0*a.y + u0 * b.y + v0 * c.y + d.y - ray.origin.y) / ray.direction.y;
@@ -157,7 +157,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 			u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u1 >= 0.f && u1 <= 1.f) {
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-				   ei::abs(ray.direction.x) && ei::abs(ray.direction.z))
+				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
 				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
 					t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y - ray.origin.y) / ray.direction.y;
