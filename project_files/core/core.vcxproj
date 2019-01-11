@@ -179,6 +179,7 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\tangent_space.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\descriptors.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />

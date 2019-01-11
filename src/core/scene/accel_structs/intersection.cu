@@ -64,7 +64,6 @@ CUDA_FUNCTION bool intersect(const ei::Vec3& boxMin, const ei::Vec3& boxMax,
 #endif // __CUDA_ARCH__
 }
 
-/*
 // Helper functions for the intersection test
 CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, const float A2,
 											 const float B1, const float B2, const float C1,
@@ -76,19 +75,10 @@ CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, cons
 	else
 		return (-v * C2 - D2) / a;
 }
-CUDA_FUNCTION __forceinline__ float computeT(const ei::Ray& ray, const ei::Vec3& p) {
-	if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) && ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
-		return (p.x - ray.origin.x) / ray.direction.x;
-	else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
-		return (p.y - ray.origin.y) / ray.direction.y;
-	else
-		return (p.z - ray.origin.z) / ray.direction.z;
-}
 
 // Quad intersection test
 CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ray, ei::Vec2& uv) {
 	// Implementation from http://www.sci.utah.edu/~kpotter/publications/ramsey-2004-RBPI.pdf
-	// Using following index mapping: p00 = 0, p10 = 1, p01 = 3, p11 = 2
 	const ei::Vec3& p00 = quad.v0;
 	const ei::Vec3& p10 = quad.v1;
 	const ei::Vec3& p01 = quad.v3;
@@ -98,14 +88,51 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 	const ei::Vec3 b = p10 - p00;
 	const ei::Vec3 c = p01 - p00;
 	const ei::Vec3 d = p00;
-	const float A1 = a.x * ray.direction.z - a.z * ray.direction.x;
-	const float B1 = b.x * ray.direction.z - b.z * ray.direction.x;
-	const float C1 = c.x * ray.direction.z - c.z * ray.direction.x;
-	const float D1 = (d.x - ray.origin.x) * ray.direction.z - (d.z - ray.origin.z) * ray.direction.x;
-	const float A2 = a.y * ray.direction.z - a.z * ray.direction.y;
-	const float B2 = b.y * ray.direction.z - b.z * ray.direction.y;
-	const float C2 = c.y * ray.direction.z - c.z * ray.direction.y;
-	const float D2 = (d.y - ray.origin.y) * ray.direction.z - (d.z - ray.origin.z) * ray.direction.y;
+
+	const float AXY = a.y*ray.direction.x - a.x*ray.direction.y;
+	const float AXZ = a.z*ray.direction.x - a.x*ray.direction.z;
+	const float AYZ = a.z*ray.direction.y - a.y*ray.direction.z;
+	const float BXY = b.y*ray.direction.x - b.x*ray.direction.y;
+	const float BXZ = b.z*ray.direction.x - b.x*ray.direction.z;
+	const float BYZ = b.z*ray.direction.y - b.y*ray.direction.z;
+	const float CXY = c.y*ray.direction.x - c.x*ray.direction.y;
+	const float CXZ = c.z*ray.direction.x - c.x*ray.direction.z;
+	const float CYZ = c.z*ray.direction.y - c.y*ray.direction.z;
+	const float DXY = (d.y - ray.origin.y) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.y;
+	const float DXZ = (d.z - ray.origin.z) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.z;
+	const float DYZ = (d.z - ray.origin.z) * ray.direction.y - (d.y - ray.origin.y) * ray.direction.z;
+
+	float A1, A2, B1, B2, C1, C2, D1, D2;
+		// Use the component with largest ray direction component to avoid singularities
+	if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) && ei::abs(ray.direction.x) >= ei::abs(ray.direction.z)) {
+		A1 = AXY;
+		B1 = BXY;
+		C1 = CXY;
+		D1 = DXY;
+		A2 = AXZ;
+		B2 = BXZ;
+		C2 = CXZ;
+		D2 = DXZ;
+	} else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z)) {
+		A1 = -AXY;
+		B1 = -BXY;
+		C1 = -CXY;
+		D1 = -DXY;
+		A2 = AYZ;
+		B2 = BYZ;
+		C2 = CYZ;
+		D2 = DYZ;
+	} else {
+		A1 = AXZ;
+		B1 = BXZ;
+		C1 = CXZ;
+		D1 = DXZ;
+		A2 = AYZ;
+		B2 = BYZ;
+		C2 = CYZ;
+		D2 = DYZ;
+	}
+
 	// Solve quadratic equ. for number of hitpoints
 	float t = -1.f;
 	float v0, v1;
@@ -114,19 +141,28 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 		float u0, u1;
 		float t0 = -1.f;
 		float t1 = -1.f;
-		// TODO: deal with NaNs due to perfectly perpendicular ray
 		if(v0 >= 0.f && v0 <= 1.f) {
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
-				ei::Vec3 p0 = ei::bilerp(p00, p10, p01, p11, u0, v0);
-				t0 = computeT(ray, p0);
+				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
+				   ei::abs(ray.direction.x) && ei::abs(ray.direction.z))
+					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x - ray.origin.x) / ray.direction.x;
+				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
+					t0 = (u0*v0*a.y + u0 * b.y + v0 * c.y + d.y - ray.origin.y) / ray.direction.y;
+				else
+					t0 = (u0*v0*a.z + u0 * b.z + v0 * c.z + d.z - ray.origin.z) / ray.direction.z;
 			}
 		}
 		if(v1 >= 0.f && v1 <= 1.f) {
 			u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u1 >= 0.f && u1 <= 1.f) {
-				ei::Vec3 p1 = ei::bilerp(p00, p10, p01, p11, u1, v1);
-				t1 = computeT(ray, p1);
+				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
+				   ei::abs(ray.direction.x) && ei::abs(ray.direction.z))
+					t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
+				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
+					t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y - ray.origin.y) / ray.direction.y;
+				else
+					t1 = (u1*v1*a.z + u1 * b.z + v1 * c.z + d.z - ray.origin.z) / ray.direction.z;
 			}
 		}
 		if(t0 > 0.f) {
@@ -141,95 +177,6 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 			uv = ei::Vec2(u1, v1);
 			t = t1;
 		}
-	}
-	return t;
-}*/
-
-
-
-// Quad intersection test
-CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ray, ei::Vec2& uv) {
-	// Implementation from http://graphics.cs.kuleuven.be/publications/LD05ERQIT/LD05ERQIT_paper.pdf
-	// Using following index mapping: p00 = 0, p10 = 1, p01 = 3, p11 = 2
-	constexpr float EPSILON = 0.00001f;
-
-	const ei::Vec3& p00 = quad.v1;
-	const ei::Vec3& p10 = quad.v2;
-	const ei::Vec3& p01 = quad.v0;
-	const ei::Vec3& p11 = quad.v3;
-
-	// Reject rays using the barycentric coordinates of the intersection point with respect to T
-	const ei::Vec3 e01 = p10 - p00;
-	const ei::Vec3 e03 = p01 - p00;
-	const ei::Vec3 P = ei::cross(ray.direction, e03);
-	const float det = ei::dot(e01, P);
-	const ei::Vec3 T = ray.origin - p00;
-	const float alpha = ei::dot(T, P) / det;
-	if(alpha < 0.f || alpha > 1.f)
-		return -1.f;
-	const ei::Vec3 Q = ei::cross(T, e01);
-	const float beta = ei::dot(ray.direction, Q) / det;
-	if(beta < 0.f || beta > 1.f)
-		return -1.f;
-
-	// Reject rays using the barycentric coordinates of the intersection point with respect to T'
-	if((alpha + beta) > 1.f) {
-		const ei::Vec3 e23 = p01 - p11;
-		const ei::Vec3 e21 = p10 - p11;
-		const ei::Vec3 Pt = ei::cross(ray.direction, e21);
-		const float dett = ei::dot(e23, Pt);
-		if(ei::abs(dett) < EPSILON)
-			return -1.f;
-		const ei::Vec3 Tt = ray.origin - p11;
-		const float alphat = ei::dot(Tt, Pt) / dett;
-		if(alphat < 0.f || alphat > 1.f)
-			return -1.f;
-		const ei::Vec3 Qt = ei::cross(Tt, e23);
-		const float betat = ei::dot(ray.direction, Qt) / dett;
-		if(betat < 0.f || betat > 1.f)
-			return -1.f;
-	}
-
-	// Compute the ray parameter of the intersection point
-	const float t = ei::dot(e03, Q) / det;
-	if(t < 0.f)
-		return -1.f;
-
-	// Compute the barycentric coordinates of V11
-	const ei::Vec3 e02 = p11 - p00;
-	const ei::Vec3 N = ei::cross(e01, e03);
-	float a11, b11;
-	if(ei::abs(N.x) >= ei::abs(N.y) && ei::abs(N.x) >= ei::abs(N.z)) {
-		a11 = (e02.y * e03.z - e02.z * e03.y) / N.x;
-		b11 = (e01.y * e02.z - e01.z * e02.y) / N.x;
-	} else if(ei::abs(N.y) >= ei::abs(N.x) && ei::abs(N.y) >= ei::abs(N.z)) {
-		a11 = (e02.z * e03.x - e02.x * e03.z) / N.y;
-		b11 = (e01.z * e02.x - e01.x * e02.z) / N.y;
-	} else {
-		a11 = (e02.x * e03.y - e02.y * e03.x) / N.z;
-		b11 = (e01.x * e02.y - e01.y * e02.x) / N.z;
-	}
-
-	// Compute the bilinear coordinates of the intersection point
-	if(ei::abs(a11 - 1.f) < EPSILON) {
-		uv.x = alpha;
-		if(ei::abs(b11 - 1.f) < EPSILON)
-			uv.y = beta;
-		else
-			uv.y = beta / (alpha * (b11 - 1.f) + 1.f);
-	} else if(ei::abs(b11 - 1.f) < EPSILON) {
-		uv.x = alpha / (beta * (a11 - 1.f) + 1.f);
-		uv.y = beta;
-	} else {
-		const float A = -(b11 - 1.f);
-		const float B = -alpha * (b11 - 1.f) - beta * (a11 - 1.f) - 1.f;
-		const float C = alpha;
-		const float delta = B * B - 4 * A*C;
-		const float Q = -0.5f * (B + ei::sgn(B) * sqrtf(delta));
-		uv.x = Q / A;
-		if(uv.x < 0.f || uv.x > 1.f)
-			uv.x = C / Q;
-		uv.y = beta / (uv.x * (b11 - 1.f) + 1.f);
 	}
 
 	return t;
@@ -281,9 +228,11 @@ CUDA_FUNCTION bool intersects_primitve(
 										   meshVertices[ids[1]],
 										   meshVertices[ids[2]],
 										   meshVertices[ids[3]] };
-			const float t = intersectQuad(quad, ray, surfParams.bilinear);
+			ei::Vec2 bilinear;
+			const float t = intersectQuad(quad, ray, bilinear);
 			if(t > 0.f && t < hitT) {
 				hitT = t;
+				surfParams.bilinear = bilinear;
 				hitPrimId = primId;
 				return true;
 			}
@@ -724,8 +673,9 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 				tangentX = det * (dx0 * du1.y - dx1 * du0.y);
 				tangentY = det * (dx1 * du0.x - dx0 * du1.x);
 
-				// TODO: proper way around?
-				normal = ei::cross(tangentX, tangentY);
+				// Don't use the UV tangents to compute the normal, since they may be reversed
+				normal = ei::cross(v[1u] - v[0u], v[2u] - v[0u]);
+				mAssert(ei::dot(normal, obj.polygon.normals[ids.x]) > 0.f);
 
 				uv = uvV[0] * surfParams.barycentric.x + uvV[1] * surfParams.barycentric.y +
 					uvV[2] * (1.f - surfParams.barycentric.x - surfParams.barycentric.y);
@@ -759,7 +709,12 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 				tangentX = ei::Vec3{ tangents(0, 0), tangents(1, 0), tangents(2, 0) };
 				tangentY = ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) };
 
-				normal = ei::cross(tangentX, tangentY);
+				// Check if we need to flip the normal (UV coordinates may not coincide with ST)
+				if(duds.x*dudt.y - dudt.x*duds.y >= 0)
+					normal = ei::cross(tangentY, tangentX);
+				else
+					normal = ei::cross(tangentX, tangentY);
+				mAssert(ei::dot(normal, obj.polygon.normals[ids.x]) > 0.f);
 				uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], surfParams.bilinear.x, surfParams.bilinear.y);
 			}
 		}

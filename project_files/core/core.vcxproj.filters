@@ -672,6 +672,9 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\tangent_space.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>

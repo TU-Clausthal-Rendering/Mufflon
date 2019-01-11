@@ -27,10 +27,6 @@ struct RayIntersectionResult {
 	struct HitID {
 		i32 instanceId;
 		i32 primId;
-
-		__host__ __device__ u32 get_primitive_id() const {
-			return static_cast<u32>(primId & 0x7FFFFFFF); // Remove the bit for identifying quad sides
-		}
 	} hitId;
 	ei::Vec3 normal;
 	ei::Vec3 tangentX;

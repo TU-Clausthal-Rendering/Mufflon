@@ -23,7 +23,7 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	mAssert(res.hitId.instanceId != -1l);
 	// From the intersection we get the primitive, from which we can look up the material
 	const i32 instanceId = res.hitId.instanceId;
-	const u32 primitiveId = res.hitId.get_primitive_id();
+	const u32 primitiveId = static_cast<u32>(res.hitId.primId);
 
 	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[instanceId]];
 	const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;

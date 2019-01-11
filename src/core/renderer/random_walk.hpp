@@ -5,6 +5,7 @@
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/descriptors.hpp"
+#include "core/scene/accel_structs/tangent_space.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -51,7 +52,10 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
-	if(sample.type == math::PathEventType::INVALID) return false;
+	if(sample.type == math::PathEventType::INVALID) {
+		throughput = Throughput{ Spectrum { 0.f }, 0.f };
+		return false;
+	}
 	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
 		&& !isnan(sample.origin.x) && !isnan(sample.origin.y) && !isnan(sample.origin.z)
 		&& !isnan(float(sample.pdfF)) && !isnan(float(sample.pdfB)));
@@ -89,25 +93,21 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
 
 	// If we missed the scene, terminate the ray
-	if(nextHit.hitId.instanceId < 0) return false;
+	if(nextHit.hitId.instanceId < 0)
+		return false;
 
 	// Create the new surface vertex
 	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
-	float incidentCos = dot(nextHit.normal, sample.excident);
-	scene::TangentSpace tangentSpace{
-		nextHit.normal, // TODO: shading normal?
-		nextHit.normal,
-		nextHit.tangentX,
-		nextHit.tangentY
-	};
+	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// TODO: get tangent space and parameter pack from nextHit
 	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[nextHit.hitId.instanceId]];
 	scene::MaterialIndex matIdx;
 	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
-	if(nextHit.hitId.get_primitive_id() < FACE_COUNT)
-		matIdx = object.polygon.matIndices[nextHit.hitId.get_primitive_id()];
+	if(static_cast<u32>(nextHit.hitId.primId) < FACE_COUNT)
+		matIdx = object.polygon.matIndices[nextHit.hitId.primId];
 	else
-		matIdx = object.spheres.matIndices[nextHit.hitId.get_primitive_id()];
+		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
+	const float incidentCos = dot(nextHit.normal, sample.excident);
 	VertexType::create_surface(outVertex, &vertex, nextHit, scene.get_material(matIdx),
 				{ position, sample.pdfF.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
 				tangentSpace, sample.excident);
