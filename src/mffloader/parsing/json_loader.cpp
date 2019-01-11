@@ -404,7 +404,7 @@ bool JsonLoader::load_lights() {
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")), TextureSampling::SAMPLING_NEAREST);
-			auto scaleIter = get(m_state, light, "scale");
+			auto scaleIter = get(m_state, light, "scale", false);
 			ei::Vec3 color { 1.0f };
 			if(scaleIter != light.MemberEnd()) {
 				if(scaleIter->value.IsArray())
