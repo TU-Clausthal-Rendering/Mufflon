@@ -28,25 +28,39 @@ namespace mufflon {
 template<class T>
 struct DeviceManagerConcept {
 private:
-//	template<class T, typename S = decltype(&T::acquire_const)> static constexpr bool has_acquire_const() { return true; }
-	//template<class T> static constexpr bool has_acquire_const(...) { return false; }
-	template<class T, typename = decltype(std::declval<T>().acquire_const<Device::CPU>())> static constexpr bool has_acquire_const() { return true; }
+	template<class> struct result_type_of;
+	template<class R, class... Args> struct result_type_of<R (Args...)> {
+		using type = R;
+	};
+	template<class R, class... Args> struct result_type_of<R (T::*)(Args...)> {
+		using type = R;
+	};
+	template<class R, class... Args> struct result_type_of<R (T::*)(Args...) noexcept> {
+		using type = R;
+	};
+	template<class T>
+	using result_type_of_t = typename result_type_of<T>::type;
+
+	// Runs fine with cpp, but not with nvcc around...
+	template<class T, typename = decltype(&T::acquire_const<Device::CPU>)> static constexpr bool has_acquire_const() { return true; }
 	template<class T> static constexpr bool has_acquire_const(...) { return false; }
-	template<class T, typename = std::enable_if_t<std::is_trivially_copyable< std::remove_cv_t<std::decay_t< decltype(std::declval<T>().acquire_const<Device::CPU>())>> >::value>> static constexpr bool descriptor_is_copyable() { return true; }
+	template<class T, typename = std::enable_if_t<std::is_trivially_copyable<
+		std::remove_cv_t<std::decay_t< result_type_of_t<decltype(&T::acquire_const<Device::CPU>)> >>
+	>::value>> static constexpr bool descriptor_is_copyable() { return true; }
 	template<class T> static constexpr bool descriptor_is_copyable(...) { return false; }
-	template<class T, typename = decltype(std::declval<T>().unload<Device::CPU>())> static constexpr bool has_unload() { return true; }
+	template<class T, typename = decltype(&T::unload<Device::CPU>)> static constexpr bool has_unload() { return true; }
 	template<class T> static constexpr bool has_unload(...) { return false; }
-	template<class T, typename = decltype(std::declval<T>().synchronize<Device::CPU>())> static constexpr bool has_sync() { return true; }
+	template<class T, typename = decltype(&T::synchronize<Device::CPU>)> static constexpr bool has_sync() { return true; }
 	template<class T> static constexpr bool has_sync(...) { return false; }
 
 public:
 	//static_assert(std::is_member_function_pointer<decltype(&T::acquire_const)>::value
 	//	&& std::is_trivially_copyable<decltype(std::declval<T>().acquire_const())>::value,
 	//	"Manager classes must provide readable access to a copyabel multi-device descriptor. The function shall not have any parameter.");
-	static_assert(has_acquire_const<T>(), "Must have a member acquire_const<Device>() without any argument.");
+	static_assert(has_acquire_const<T>(), "Must have a member acquire_const<Device>().");
 	static_assert(descriptor_is_copyable<T>(), "Descriptors returned by aquire_const<Device>() must be trivially copyable.");
-	static_assert(has_unload<T>(), "Must have a member unload<Device>() without any arguments.");
-	static_assert(has_sync<T>(), "Must have a member synchronize<Device>() without any arguments.");
+	static_assert(has_unload<T>(), "Must have a member unload<Device>().");
+	static_assert(has_sync<T>(), "Must have a member synchronize<Device>().");
 };
 #else
 // There are compilation issues with the meta-programming above (although they are pure
