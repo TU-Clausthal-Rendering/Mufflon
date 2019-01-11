@@ -404,11 +404,18 @@ bool JsonLoader::load_lights() {
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")), TextureSampling::SAMPLING_NEAREST);
-			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
-			// TODO: incorporate scale
+			auto scaleIter = get(m_state, light, "scale");
+			ei::Vec3 color { 1.0f };
+			if(scaleIter != light.MemberEnd()) {
+				if(scaleIter->value.IsArray())
+					color = read<ei::Vec3>(m_state, scaleIter);
+				else
+					color = ei::Vec3{ read<float>(m_state, scaleIter) };
+			}
 
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP); hdl.type == LIGHT_ENVMAP) {
 				world_set_env_light_map(hdl, texture);
+				world_set_env_light_scale(hdl, util::pun<Vec3>(color));
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light

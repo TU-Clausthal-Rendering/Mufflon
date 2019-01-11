@@ -2336,6 +2336,15 @@ Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {
 	CATCH_ALL(false)
 }
 
+CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
+	s_world.get_env_light(hdl.index)->set_scale(util::pun<Spectrum>(color));
+	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
+	return true;
+	CATCH_ALL(false)
+}
+
 Boolean render_enable_renderer(RendererType type) {
 	TRY
 	switch(type) {

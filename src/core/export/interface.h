@@ -444,6 +444,7 @@ CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 directio
 CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
 CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
 CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
+CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);

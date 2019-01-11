@@ -134,7 +134,7 @@ PBRT type of spot light: "intensity" * clamp((cosθ - "cosWidth") / ("falloffSta
 `"type": "envmap"`
 
     "map": "<texture name>",        // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as radiance [W/m²sr]
-    "scale": float,                 // An energy scaling factor for the environment map
+    "scale": float | [r,g,b],       // An energy scaling factor for the environment map
 
 `"type": "goniometric"`\
 A measured light source. Similar to a point light
@@ -157,7 +157,7 @@ Materials
                 | <texture>,            // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
                                         // OR a texture with one or three channels (relative path)
                                         // DEFAULT: 0.5
-	"ndf": "{BS,GGX,Cos}",				// Name of the normal distribution function (default GGX)
+    "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
                                         // DEFAULT: [0.5, 0.5, 0.5]
 

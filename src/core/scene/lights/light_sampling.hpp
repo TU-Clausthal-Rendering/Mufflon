@@ -277,6 +277,7 @@ sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 
 	// Use always nearest sampling (otherwise the sampler is biased).
 	ei::Vec3 radiance { textures::read(light.envmap, sample.texel, layer) };
+	radiance *= light.color;
 	return { dir, radiance };
 }
 
@@ -451,6 +452,7 @@ CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<dev>& bac
 				const float sinJac = sqrtf(1.0f - direction.y * direction.y);
 				pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
 			}
+			radiance *= background.color;
 			return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
 		}
 		default: mAssert(false); return {};

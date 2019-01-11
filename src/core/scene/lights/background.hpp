@@ -50,6 +50,12 @@ public:
 		return bck;
 	}
 
+	void set_scale(const Spectrum& color) {
+		// Rescale flux to the new factor
+		m_flux *= color / m_color;
+		m_color = color;
+	}
+
 	// Creates a copy of the background suited for the given deviec
 	template < Device newDev >
 	void synchronize() {
