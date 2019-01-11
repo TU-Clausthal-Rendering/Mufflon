@@ -50,6 +50,7 @@ namespace gui.ViewModel
             public void Execute(object parameter)
             {
                 m_models.Scene.LoadScene(Path);
+                m_models.Renderer.Iteration = 0u;
             }
 
             public event EventHandler CanExecuteChanged

@@ -173,7 +173,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 				uv = ei::Vec2(u0, v0);
 				t = t0;
 			}
-		} else if(t1 > 0.f) {
+		} else {
 			uv = ei::Vec2(u1, v1);
 			t = t1;
 		}
@@ -230,6 +230,7 @@ CUDA_FUNCTION bool intersects_primitve(
 										   meshVertices[ids[3]] };
 			ei::Vec2 bilinear;
 			const float t = intersectQuad(quad, ray, bilinear);
+
 			if(t > 0.f && t < hitT) {
 				hitT = t;
 				surfParams.bilinear = bilinear;
@@ -631,6 +632,7 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 		ei::Vec2 uv;
 
 		i32 primId = hitPrimId;
+
 
 		const ObjectDescriptor<dev>& obj = scene.objects[ scene.objectIndices[hitInstanceId] ];
 		const i32 offsetSpheres = obj.polygon.numTriangles + obj.polygon.numQuads;

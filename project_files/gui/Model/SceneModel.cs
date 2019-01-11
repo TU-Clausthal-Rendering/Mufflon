@@ -100,13 +100,6 @@ namespace gui.Model
 
         public void LoadScene(string path)
         {
-            if (path == FullPath)
-            {
-                MessageBox.Show("Scene is already loaded", "", MessageBoxButton.OK,
-                    MessageBoxImage.Exclamation);
-                return; // true;
-            }
-
             if (!File.Exists(path))
             {
                 if (MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
