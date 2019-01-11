@@ -17,7 +17,7 @@ namespace gui.ViewModel
             m_models = models;
 
             PlayPauseCommand = new PlayPauseCommand(models);
-            ResetCommand = new ResetCommand(models);
+            ResetCommand = new ResetCommand(models, PlayPauseCommand);
             SaveScreenShotCommand = new ScreenShotCommand(m_models);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
@@ -28,8 +28,6 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(RendererModel.IsRendering):
-                    m_models.App.GlHost.IsRendering = m_models.Renderer.IsRendering;
-
                     OnPropertyChanged(nameof(PauseIconVisibility));
                     OnPropertyChanged(nameof(PlayIconVisibility));
                     break;

@@ -70,6 +70,14 @@ namespace gui.Model
             get => (m_fullPath != null);
         }
 
+        public bool IsSane
+        {
+            get
+            {
+                return Core.scene_is_sane();
+            }
+        }
+
         // scene root directory
         public string Directory => Path.GetDirectoryName(FullPath);
 
@@ -81,6 +89,13 @@ namespace gui.Model
             if (Settings.Default.LastScenes == null)
                 Settings.Default.LastScenes = new StringCollection();
             Scenarios = new ObservableCollection<string>();
+        }
+
+        public void ReloadCurrentScenario()
+        {
+            if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                throw new Exception(Core.core_get_dll_error());
+            OnPropertyChanged(nameof(IsSane));
         }
 
         public void LoadScene(string path)

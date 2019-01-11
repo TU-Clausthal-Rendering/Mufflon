@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Controls;
+using System.Windows.Input;
 using gui.Annotations;
 using gui.Dll;
 using gui.Model;
@@ -50,6 +51,7 @@ namespace gui.ViewModel
 
 
         private readonly Models m_models;
+        private ICommand m_playPause;
         private RendererItem m_selectedRenderer;
         private DataGrid m_propertiesGrid;
         
@@ -91,9 +93,10 @@ namespace gui.ViewModel
         public ObservableCollection<RendererItem> Renderers { get; }
         public ObservableCollection<object> RendererProperties { get; }
 
-        public RendererViewModel(MainWindow window, Models models)
+        public RendererViewModel(MainWindow window, Models models, ICommand playPause)
         {
             m_models = models;
+            m_playPause = playPause;
             m_propertiesGrid = (DataGrid)((UserControl)window.FindName("RendererPropertiesControl")).FindName("RendererPropertiesGrid");
             RendererProperties = new ObservableCollection<object>();
             AutoStartOnLoad = Settings.Default.AutoStartOnLoad;
@@ -136,8 +139,8 @@ namespace gui.ViewModel
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());
-                    if (m_models.Scene.IsLoaded && AutoStartOnLoad)
-                        m_models.Renderer.IsRendering = true;
+                    if (AutoStartOnLoad && m_playPause.CanExecute(null))
+                        m_playPause.Execute(null);
                     break;
             }
         }
@@ -175,7 +178,7 @@ namespace gui.ViewModel
                     OnPropertyChanged(nameof(IsRendering));
                     break;
                 case nameof(Models.Renderer.Iteration):
-                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                         OnPropertyChanged(nameof(Iteration));
                     }));
                     break;

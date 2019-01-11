@@ -399,6 +399,8 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale);
 	fill_map(posLights, m_treeCpu->primToNodePath);
 	m_dirty.mark_changed(Device::CPU);
+
+	m_lightCount = static_cast<u32>(posLights.size() + dirLights.size());
 }
 
 void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {

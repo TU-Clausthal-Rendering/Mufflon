@@ -39,31 +39,8 @@ namespace gui.Dll
         // render thread (asynchronous openGL drawing)
         private Thread m_renderThread;
         private bool m_isRunning = true;
-        private bool m_isRendering = false;
 
         // Blocker for when nothing is rendering to avoid busy-loop
-        private ManualResetEvent m_startedRender = new ManualResetEvent(false);
-
-        public bool IsRendering {
-            set
-            {
-                if (m_isRendering == value) return;
-                m_isRendering = value;
-                if (m_isRendering)
-                {
-                    // Clear the sticky input once
-                    m_window.wasPressedAndClear(Key.W);
-                    m_window.wasPressedAndClear(Key.S);
-                    m_window.wasPressedAndClear(Key.D);
-                    m_window.wasPressedAndClear(Key.A);
-                    m_window.wasPressedAndClear(Key.Space);
-                    m_window.wasPressedAndClear(Key.LeftCtrl);
-                    m_window.getMouseDiffAndReset();
-                    // Signal the render loop that it may continue
-                    m_startedRender.Set();
-                }
-            }
-        }
         private readonly ConcurrentQueue<string> m_commandQueue = new ConcurrentQueue<string>();
 
         // helper to detect resize in render thread
@@ -119,66 +96,68 @@ namespace gui.Dll
 
                 while (m_isRunning)
                 {
+
                     //HandleCommands();
                     HandleResize();
-                    m_startedRender.WaitOne();
-                    m_startedRender.Reset();
+                    // Try to acquire the lock - if we're waiting, we're not rendering
+                    m_rendererModel.RenderLock.WaitOne();
 
-                    if (m_isRendering)
-                    {
-                        bool needsReload = false;
+                    bool needsReload = false;
 
-                        // Check for keyboard input
-                        float x = 0f;
-                        float y = 0f;
-                        float z = 0f;
-                        // TODO: why does it need to be mirrored?
-                        if(m_window.wasPressedAndClear(Key.W))
-                            z += keySpeed;
-                        if (m_window.wasPressedAndClear(Key.S))
-                            z -= keySpeed;
-                        if (m_window.wasPressedAndClear(Key.D))
-                            x -= keySpeed;
-                        if (m_window.wasPressedAndClear(Key.A))
-                            x += keySpeed;
-                        if (m_window.wasPressedAndClear(Key.Space))
-                            y += keySpeed;
-                        if (m_window.wasPressedAndClear(Key.LeftCtrl))
-                            y -= keySpeed;
+                    // Check for keyboard input
+                    float x = 0f;
+                    float y = 0f;
+                    float z = 0f;
+                    // TODO: why does it need to be mirrored?
+                    if(m_window.wasPressedAndClear(Key.W))
+                        z += keySpeed;
+                    if (m_window.wasPressedAndClear(Key.S))
+                        z -= keySpeed;
+                    if (m_window.wasPressedAndClear(Key.D))
+                        x -= keySpeed;
+                    if (m_window.wasPressedAndClear(Key.A))
+                        x += keySpeed;
+                    if (m_window.wasPressedAndClear(Key.Space))
+                        y += keySpeed;
+                    if (m_window.wasPressedAndClear(Key.LeftCtrl))
+                        y -= keySpeed;
 
-                        if(x != 0f || y != 0f || z != 0f) {
-                            // TODO: mark camera dirty
-                            if (!Core.scene_move_active_camera(x, y, z))
-                                throw new Exception(Core.core_get_dll_error());
-                            needsReload = true;
-                        }
-
-                        // Check for mouse dragging
-                        Vector drag = m_window.getMouseDiffAndReset();
-                        if(drag.X != 0 || drag.Y != 0)
-                        {
-                            if(!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
-                                throw new Exception(Core.core_get_dll_error());
-                            needsReload = true;
-                        }
-
-                        // Reload the scene if necessary
-                        if(needsReload)
-                        {
-                            if (Core.world_reload_current_scenario() == IntPtr.Zero)
-                                throw new Exception(Core.core_get_dll_error());
-                            m_rendererModel.resetFromRenderLoop();
-                        }
-
-                        if (!Core.render_iterate())
+                    if(x != 0f || y != 0f || z != 0f) {
+                        // TODO: mark camera dirty
+                        if (!Core.scene_move_active_camera(x, y, z))
                             throw new Exception(Core.core_get_dll_error());
-                        if (!Core.display_screenshot())
-                            throw new Exception(Core.core_get_dll_error());
-                        if (!Gdi32.SwapBuffers(m_deviceContext))
-                            throw new Win32Exception(Marshal.GetLastWin32Error());
-                        m_rendererModel.performedIteration();
-                        m_startedRender.Set();
+                        needsReload = true;
                     }
+
+                    // Check for mouse dragging
+                    Vector drag = m_window.getMouseDiffAndReset();
+                    if(drag.X != 0 || drag.Y != 0)
+                    {
+                        if(!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
+                            throw new Exception(Core.core_get_dll_error());
+                        needsReload = true;
+                    }
+
+                    // Reload the scene if necessary
+                    if(needsReload)
+                    {
+                        if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                            throw new Exception(Core.core_get_dll_error());
+                        if (!Core.render_reset())
+                            throw new Exception(Core.core_get_dll_error());
+                        m_rendererModel.Iteration = 0u;
+                    }
+
+                    if (!Core.render_iterate())
+                        throw new Exception(Core.core_get_dll_error());
+                    if (!Core.display_screenshot())
+                        throw new Exception(Core.core_get_dll_error());
+                    if (!Gdi32.SwapBuffers(m_deviceContext))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                    ++m_rendererModel.Iteration;
+
+                    // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
+                    m_rendererModel.RenderLock.Release();
                 }
             }
             catch (Exception e)
@@ -293,7 +272,7 @@ namespace gui.Dll
         {
             // stop render thread
             m_isRunning = false;
-            m_startedRender.Set();
+            m_rendererModel.RenderLock.Release();
             m_renderThread.Join();
 
             // destroy resources

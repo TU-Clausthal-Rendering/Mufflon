@@ -60,15 +60,19 @@ namespace gui.ViewModel
         }
 
         private Models m_models;
+        private ICommand m_playPause;
+        private ICommand m_reset;
         private ListBox m_scenarioBox;
         private ScenarioLoadStatus m_scenarioLoadDialog;
         public ObservableCollection<SceneMenuItem> LastScenes { get; }
         public ObservableCollection<string> Scenarios { get => m_models.Scene.Scenarios; }
         public bool CanLoadLastScenes { get => LastScenes.Count > 0 && !m_models.Renderer.IsRendering; }
 
-        public SceneViewModel(MainWindow window, Models models)
+        public SceneViewModel(MainWindow window, Models models, ICommand playPause, ICommand reset)
         {
             m_models = models;
+            m_playPause = playPause;
+            m_reset = reset;
             m_scenarioBox = (ListBox)window.FindName("ScenarioSelectionBox");
             m_scenarioBox.SelectionChanged += scenarioChanged;
             LastScenes = new ObservableCollection<SceneMenuItem>();
@@ -121,17 +125,13 @@ namespace gui.ViewModel
                 }
             } else if(args.Action == NotifyCollectionChangedAction.Remove)
             {
-                bool wasRendering = m_models.Renderer.IsRendering;
                 bool needsRebuild = false;
                 IntPtr currScenario = Core.world_get_current_scenario();
                 for (int i = 0; i < args.OldItems.Count; ++i)
                 {
                     LightModel light = (args.OldItems[i] as LightModel);
                     if (light.IsSelected)
-                    {
-                        m_models.Renderer.IsRendering = false;
                         needsRebuild = true;
-                    }
                     light.PropertyChanged -= OnLightChanged;
                     // remove light source
                     if (!Core.world_remove_light(light.Handle))
@@ -147,12 +147,12 @@ namespace gui.ViewModel
                     }
                 }
 
-                if(needsRebuild)
+                if (needsRebuild)
                 {
-                    if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                    if(Core.world_reload_current_scenario() == IntPtr.Zero)
                         throw new Exception(Core.core_get_dll_error());
-                    m_models.Renderer.reset();
-                    m_models.Renderer.IsRendering = wasRendering;
+                    if (m_reset.CanExecute(null))
+                        m_reset.Execute(null);
                 }
             }
         }
@@ -201,17 +201,15 @@ namespace gui.ViewModel
 
                     if (camera.IsSelected)
                     {
-                        bool wasRendering = m_models.Renderer.IsRendering;
-                        m_models.Renderer.IsRendering = false;
                         // Change the scenario's camera to the next lower
                         if (args.OldStartingIndex == 0)
                             m_models.Cameras.Models[args.OldStartingIndex].IsSelected = true;
                         else
                             m_models.Cameras.Models[args.OldStartingIndex - 1].IsSelected = true;
+                        if (m_reset.CanExecute(null))
+                            m_reset.Execute(null);
                         if (Core.world_reload_current_scenario() == IntPtr.Zero)
                             throw new Exception(Core.core_get_dll_error());
-                        m_models.Renderer.reset();
-                        m_models.Renderer.IsRendering = wasRendering;
                     }
                 }
             }
@@ -219,15 +217,8 @@ namespace gui.ViewModel
 
         private void OnLightChanged(object sender, PropertyChangedEventArgs args)
         {
-            // Lights need to reset and rebuild the scene
-            bool wasRendering = m_models.Renderer.IsRendering;
             LightModel light = (sender as LightModel);
             bool needReload = light.IsSelected || args.PropertyName == nameof(LightModel.IsSelected);
-            if (needReload)
-            {
-                m_models.Renderer.IsRendering = false;
-                m_models.Renderer.reset();
-            }
             // TODO: set name!
             if (light.GetType() == typeof(PointLightModel))
             {
@@ -289,9 +280,10 @@ namespace gui.ViewModel
 
             if (needReload)
             {
+                if (m_reset.CanExecute(null))
+                    m_reset.Execute(null);
                 if (Core.world_reload_current_scenario() == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
-                m_models.Renderer.IsRendering = wasRendering;
             }
         }
 
@@ -304,9 +296,10 @@ namespace gui.ViewModel
             // Materials need to reset and rebuild the scene
             if (currScenario == IntPtr.Zero)
                 throw new Exception(Core.core_get_dll_error());
+            if (m_reset.CanExecute(null))
+                m_reset.Execute(null);
             if (Core.world_load_scenario(currScenario) == IntPtr.Zero)
                 throw new Exception(Core.core_get_dll_error());
-            m_models.Renderer.reset();
         }
 
 
@@ -314,17 +307,10 @@ namespace gui.ViewModel
         {
             // TODO: we can find out what was changed easily
             CameraModel camera = (sender as CameraModel);
-            bool wasRendering = m_models.Renderer.IsRendering;
             // We only reload the renderer if the changed camera is selected or becomes selected;
             // since the handler will be called twice (once for the selection and once for the deselection),
             // we shouldn't reset both times
             bool needReload = camera.IsSelected;
-            if (needReload)
-            {
-                m_models.Renderer.IsRendering = false;
-                // Cameras only need to reset
-                m_models.Renderer.reset();
-            }
 
             // TODO: set name!
             // TODO: how to move/rotate camera?
@@ -359,9 +345,10 @@ namespace gui.ViewModel
 
             if (needReload)
             {
+                if (m_reset.CanExecute(null))
+                    m_reset.Execute(null);
                 if (Core.world_reload_current_scenario() == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
-                m_models.Renderer.IsRendering = wasRendering;
             }
         }
 

@@ -14,6 +14,58 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
+WorldContainer::Sanity WorldContainer::is_sane_world() const {
+	// Check for objects
+	if(m_instances.empty())
+		return Sanity::NO_INSTANCES;
+	if(m_objects.empty())
+		return Sanity::NO_OBJECTS;
+	// Check for lights
+	if(m_pointLights.empty() && m_spotLights.empty() && m_dirLights.empty() && m_envLights.empty()) {
+		// No explicit lights - check if any object has emitting materials
+		bool hasEmitters = false;
+		for(const auto& object : m_objects) {
+			if(object.second.is_emissive()) {
+				hasEmitters = true;
+				break;
+			}
+		}
+		if(!hasEmitters)
+			return Sanity::NO_LIGHTS;
+	}
+
+	// Check for cameras
+	if(m_cameras.empty())
+		return Sanity::NO_CAMERA;
+	return Sanity::SANE;
+}
+
+
+WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl) const {
+	bool hasEmitters = false;
+	bool hasObjects = false;
+	// Check for objects (and check for emitters as well)
+	for(const auto& object : m_objects) {
+		if(!hdl->is_masked(&object.second)) {
+			hasObjects = true;
+			if(object.second.is_emissive()) {
+				hasEmitters = true;
+				break;
+			}
+		}
+	}
+	if(!hasObjects)
+		return Sanity::NO_OBJECTS;
+	// Check for lights
+	if(!hasEmitters && hdl->get_point_light_names().empty() && hdl->get_spot_light_names().empty()
+	   && hdl->get_dir_light_names().empty() && hdl->get_envmap_light_name().empty())
+		return Sanity::NO_LIGHTS;
+	// Check for camera
+	if(hdl->get_camera() == nullptr)
+		return Sanity::NO_CAMERA;
+	return Sanity::SANE;
+}
+
 ObjectHandle WorldContainer::create_object(std::string name, ObjectFlags flags) {
 	auto hdl = m_objects.emplace(std::move(name), Object{});
 	if(!hdl.second)

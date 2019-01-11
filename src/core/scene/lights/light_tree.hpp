@@ -162,9 +162,16 @@ public:
 	template < Device dev >
 	void unload();
 
+	u32 get_light_count() const noexcept {
+		return m_lightCount;
+	}
+
 private:
 	void update_media_cpu(const SceneDescriptor<Device::CPU>& scene);
 	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);
+
+	// Keep track of the light count (positional and directional combined)
+	u32 m_lightCount = 0u;
 
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;

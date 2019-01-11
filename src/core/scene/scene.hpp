@@ -112,6 +112,9 @@ public:
 	const lights::LightTreeBuilder& get_light_tree_builder() const {
 		return m_lightTree;
 	}
+
+	// Checks if the scene is sane, ie. if it has lights or emitters, a camera, etc.
+	bool is_sane() const noexcept;
 	
 	/**
 	 * Creates a single structure which grants access to all scene data

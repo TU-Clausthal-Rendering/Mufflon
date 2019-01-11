@@ -8,9 +8,21 @@
 #include "core/scene/materials/point_medium.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
+#include "core/scene/lights/background.hpp"
 #include "profiler/cpu_profiler.hpp"
 
 namespace mufflon { namespace scene {
+
+bool Scene::is_sane() const noexcept {
+	if(m_camera == nullptr)
+		return false;
+	if(m_lightTree.get_envLight()->get_type() != lights::BackgroundType::ENVMAP) {
+		// No envmap: we need some kind of light
+		if(m_lightTree.get_light_count() == 0u)
+			return false;
+	}
+	return true;
+}
 
 void Scene::load_media(const std::vector<materials::Medium>& media) {
 	m_media.resize(sizeof(materials::Medium) * media.size());
@@ -45,6 +57,7 @@ void Scene::load_materials() {
 	}
 	m_materials.mark_synced(dev); // Avoid overwrites with data from different devices.
 }
+
 template < Device dev >
 const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>& vertexAttribs,
 												  const std::vector<const char*>& faceAttribs,

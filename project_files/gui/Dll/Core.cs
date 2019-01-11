@@ -346,6 +346,8 @@ namespace gui.Dll
         internal static extern bool scene_move_active_camera(float x, float y, float z);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scene_rotate_active_camera(float x, float y, float z);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scene_is_sane();
 
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

@@ -71,7 +71,7 @@ public:
 	template< Device dev >
 	const BackgroundDesc<dev> acquire_const(const ei::Box& bounds);
 
-	constexpr BackgroundType get_type() noexcept {
+	constexpr BackgroundType get_type() const noexcept {
 		return m_type;
 	}
 

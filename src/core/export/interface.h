@@ -384,6 +384,7 @@ CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_reload_current_scenario();
 CORE_API SceneHdl CDECL world_get_current_scene();
+CORE_API Boolean CDECL world_is_sane(const char** msg);
 
 // Scenario interface
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
@@ -416,12 +417,14 @@ CORE_API MaterialHdl CDECL scenario_get_assigned_material(ScenarioHdl scenario,
 														  MatIdx index);
 CORE_API Boolean CDECL scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 												MaterialHdl handle);
+CORE_API Boolean CDECL scenario_is_sane(ConstScenarioHdl, const char** msg);
 
 // Scene interface
 CORE_API Boolean CDECL scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max);
 CORE_API ConstCameraHdl CDECL scene_get_camera(SceneHdl scene);
 CORE_API Boolean CDECL scene_move_active_camera(float x, float y, float z);
 CORE_API Boolean CDECL scene_rotate_active_camera(float x, float y, float z);
+CORE_API Boolean CDECL scene_is_sane();
 
 // Light interface
 CORE_API Boolean CDECL world_get_point_light_position(ConstLightHdl hdl, Vec3* pos);

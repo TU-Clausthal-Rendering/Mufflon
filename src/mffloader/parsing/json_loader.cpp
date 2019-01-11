@@ -558,6 +558,11 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			if(!scenario_assign_material(scenarioHdl, slot, matHdl->second))
 				throw std::runtime_error("Failed to associate material '" + matHdl->first + "'");
 		}
+
+		const char* sanityMsg = "";
+		if(!scenario_is_sane(scenarioHdl, &sanityMsg))
+			throw std::runtime_error("Scenario '" + std::string(scenarioIter->name.GetString())
+									 + "' did not pass sanity check: " + std::string(sanityMsg));
 	}
 	return true;
 }
@@ -664,6 +669,10 @@ bool JsonLoader::load_file() {
 		m_state.current = ParserState::Level::ROOT;
 		if(!load_materials())
 			return false;
+		// Before we load scenarios, perform a sanity check for the currently loaded world
+		const char* sanityMsg = "";
+		if(!world_is_sane(&sanityMsg))
+			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
 		if(!load_scenarios(m_binLoader.get_material_names()))

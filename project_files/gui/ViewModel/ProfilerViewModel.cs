@@ -41,13 +41,13 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(RendererModel.Iteration):
-                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                         updateRenderingData();
                     }));
                     break;
                 case nameof(RendererModel.IsRendering):
                     if (m_models.Renderer.IsRendering)
-                        System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                        System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                             updateRenderingData();
                         }));
                     break;
@@ -59,7 +59,7 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(SceneModel.FullPath):
-                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                         updateLoadingData();
                     }));
                     break;

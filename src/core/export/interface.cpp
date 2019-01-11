@@ -1467,6 +1467,19 @@ SceneHdl world_get_current_scene() {
 	CATCH_ALL(nullptr)
 }
 
+Boolean world_is_sane(const char** msg) {
+	TRY
+	switch(s_world.is_sane_world()) {
+		case WorldContainer::Sanity::SANE: *msg = "";  return true;
+		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
+		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
+		case WorldContainer::Sanity::NO_OBJECTS: *msg = "No objects"; return false;
+		case WorldContainer::Sanity::NO_LIGHTS: *msg = "No lights or emitters"; return false;
+	}
+	return false;
+	CATCH_ALL(false)
+}
+
 TextureHdl world_get_texture(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "texture path", false);
@@ -2037,6 +2050,20 @@ Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	CATCH_ALL(false)
 }
 
+Boolean scenario_is_sane(ConstScenarioHdl scenario, const char** msg) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	switch(s_world.is_sane_scenario(static_cast<ConstScenarioHandle>(scenario))) {
+		case WorldContainer::Sanity::SANE: *msg = "";  return true;
+		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
+		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
+		case WorldContainer::Sanity::NO_OBJECTS: *msg = "No objects"; return false;
+		case WorldContainer::Sanity::NO_LIGHTS: *msg = "No lights or emitters"; return false;
+	}
+	return false;
+	CATCH_ALL(false)
+}
+
 Boolean scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
 	TRY
 	CHECK_NULLPTR(scene, "scene handle", false);
@@ -2079,6 +2106,15 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 	s_world.get_current_scenario()->get_camera()->roll(z);
 	s_world.mark_camera_dirty(s_world.get_current_scenario()->get_camera());
 	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scene_is_sane() {
+	TRY
+	ConstSceneHandle sceneHdl = s_world.get_current_scene();
+	if(sceneHdl != nullptr)
+		return sceneHdl->is_sane();
+	return false;
 	CATCH_ALL(false)
 }
 

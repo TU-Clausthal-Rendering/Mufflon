@@ -18,6 +18,12 @@ class BinaryLoader {
 public:
 	BinaryLoader() = default;
 
+	/* Loads the specified file with the given global LoD level and optionally
+	 * specific LoDs for given objects (by name). Returns false if loading was
+	 * unsuccessful. May throw.
+	 * After a successful load, properties of the loaded file may be queried via
+	 * this object; calling this function again will overwrite them, however.
+	 */
 	bool load_file(fs::path file, const mufflon::u64 globalLod,
 				   const std::unordered_map<std::string_view, mufflon::u64>& localLods);
 
