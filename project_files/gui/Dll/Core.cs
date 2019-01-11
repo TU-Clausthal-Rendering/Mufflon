@@ -285,11 +285,11 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_dir_light_direction(IntPtr hdl, ref Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_dir_light_radiance(IntPtr hdl, ref Vec3 radiance);
+        internal static extern bool world_get_dir_light_irradiance(IntPtr hdl, ref Vec3 irradiance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_dir_light_direction(IntPtr hdl, Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_set_dir_light_radiance(IntPtr hdl, Vec3 radiance);
+        internal static extern bool world_set_dir_light_irradiance(IntPtr hdl, Vec3 irradiance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_env_light_map")]
         private static extern IntPtr world_get_env_light_map_(IntPtr hdl);
         internal static string world_get_env_light_map(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_map_(hdl)); }

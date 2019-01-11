@@ -2272,13 +2272,13 @@ Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* radiance) {
+Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
 	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
 	CHECK_NULLPTR(light, "directional light handle", false);
-	if(radiance != nullptr)
-		*radiance = util::pun<Vec3>(light->radiance);
+	if(irradiance != nullptr)
+		*irradiance = util::pun<Vec3>(light->irradiance);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2299,12 +2299,12 @@ Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
+Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
 	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
 	CHECK_NULLPTR(light, "directional light handle", false);
-	light->radiance = util::pun<ei::Vec3>(radiance);
+	light->irradiance = util::pun<ei::Vec3>(irradiance);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
 	return true;
 	CATCH_ALL(false)

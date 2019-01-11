@@ -152,23 +152,4 @@ CUDA_FUNCTION EnvmapSampleResult importance_sample_texture(textures::ConstTextur
 	return EnvmapSampleResult{ Pixel{column, row}, ei::Vec2{ columnVal, rowVal }, pdf };
 }
 
-/*CUDA_FUNCTION NextEventEstimation connect(const BackgroundDesc<CURRENT_DEV>& background,
-										  const ei::Vec3& position,
-										  const ei::Box& bounds,
-										  const math::RndSet2& rnd) {
-	switch(background.type) {
-		case BackgroundType::COLORED: return {}; // TODO
-		case BackgroundType::ENVMAP: return connect_light(background.envLight, position, bounds, rnd);
-		default: mAssert(false); return {};
-	}
-}
-
-CUDA_FUNCTION __forceinline__ ei::Vec3 get_flux(const BackgroundDesc<CURRENT_DEV>& background) {
-	switch(background.type) {
-		case BackgroundType::COLORED: return ei::Vec3{ 0.f };
-		case BackgroundType::ENVMAP: return background.envLight.flux;
-		default: mAssert(false); return {};
-	}
-}*/
-
 }}} // namespace mufflon::scene::lights

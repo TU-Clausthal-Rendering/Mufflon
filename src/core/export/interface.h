@@ -439,9 +439,9 @@ CORE_API Boolean CDECL world_set_spot_light_direction(LightHdl hdl, Vec3 directi
 CORE_API Boolean CDECL world_set_spot_light_angle(LightHdl hdl, float angle);
 CORE_API Boolean CDECL world_set_spot_light_falloff(LightHdl hdl, float fallof);
 CORE_API Boolean CDECL world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction);
-CORE_API Boolean CDECL world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* radiance);
+CORE_API Boolean CDECL world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance);
 CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
-CORE_API Boolean CDECL world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance);
+CORE_API Boolean CDECL world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance);
 CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
 CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);

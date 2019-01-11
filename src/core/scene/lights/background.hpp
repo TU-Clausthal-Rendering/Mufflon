@@ -52,7 +52,7 @@ public:
 
 	void set_scale(const Spectrum& color) {
 		// Rescale flux to the new factor
-		m_flux *= color / m_color;
+		m_flux *= color / m_color; // TODO: this can fail if m_color=0. Solution: use 'raw' flux and multiply with color on acquire. Must be in coincidence with colred backs
 		m_color = color;
 	}
 
@@ -93,6 +93,8 @@ private:
 	TextureHandle m_envLight = nullptr;
 	std::unique_ptr<textures::Texture> m_summedAreaTable = nullptr;
 	Spectrum m_flux;				// Precomputed value for the flux of the environment light
+
+	void compute_envmap_flux(const ei::Box& bounds);
 };
 
 template DeviceManagerConcept<Background>;

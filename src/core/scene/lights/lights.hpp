@@ -138,7 +138,7 @@ struct alignas(16) AreaLightSphere {
  */
 struct alignas(16) DirectionalLight {
 	alignas(16) ei::Vec3 direction {0.0f, -1.0f, 0.0f};	// Direction in which the light travels (incident on surfaces)
-	alignas(16) ei::Vec3 radiance {1.0f};
+	alignas(16) ei::Vec3 irradiance {1.0f};				// W/m²
 };
 
 /**

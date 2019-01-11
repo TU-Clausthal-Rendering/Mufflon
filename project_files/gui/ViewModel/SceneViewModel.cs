@@ -253,7 +253,7 @@ namespace gui.ViewModel
             {
                 if (args.PropertyName == nameof(DirectionalLightModel.Direction) && !Core.world_set_dir_light_direction(light.Handle, new Core.Vec3((light as DirectionalLightModel).Direction)))
                     throw new Exception(Core.core_get_dll_error());
-                if (args.PropertyName == nameof(DirectionalLightModel.Radiance) && !Core.world_set_dir_light_radiance(light.Handle, new Core.Vec3((light as DirectionalLightModel).Radiance)))
+                if (args.PropertyName == nameof(DirectionalLightModel.Irradiance) && !Core.world_set_dir_light_irradiance(light.Handle, new Core.Vec3((light as DirectionalLightModel).Irradiance)))
                     throw new Exception(Core.core_get_dll_error());
             }
             else if (light.GetType() == typeof(EnvmapLightModel))
@@ -615,14 +615,14 @@ namespace gui.ViewModel
         private void loadSceneLightData(IntPtr lightHdl, DirectionalLightModel lightModel)
         {
             Core.Vec3 dir = new Core.Vec3();
-            Core.Vec3 radiance = new Core.Vec3();
+            Core.Vec3 irradiance = new Core.Vec3();
             if (!Core.world_get_dir_light_direction(lightHdl, ref dir))
                 throw new Exception(Core.core_get_dll_error());
-            if (!Core.world_get_dir_light_radiance(lightHdl, ref radiance))
+            if (!Core.world_get_dir_light_irradiance(lightHdl, ref irradiance))
                 throw new Exception(Core.core_get_dll_error());
 
             lightModel.Direction = new Vec3<float>(dir.x, dir.y, dir.z);
-            lightModel.Radiance = new Vec3<float>(radiance.x, radiance.y, radiance.z);
+            lightModel.Irradiance = new Vec3<float>(irradiance.x, irradiance.y, irradiance.z);
         }
 
         private void loadSceneLights()
