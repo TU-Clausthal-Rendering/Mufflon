@@ -143,7 +143,12 @@ namespace gui.Model
                 Logger.log("Scene '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
 
                 // Set path and load scene properties
-                FullPath = path;
+                // Special case: we're loading the same scene; the property would not trigger the OnChange,
+                // so we will need to do that
+                if (FullPath == path)
+                    OnPropertyChanged(nameof(FullPath));
+                else
+                    FullPath = path;
                 uint count = Core.world_get_scenario_count();
                 Scenarios.Clear();
                 for (uint i = 0u; i < count; ++i)
@@ -153,7 +158,7 @@ namespace gui.Model
                     throw new Exception(Core.core_get_dll_error());
                 OnPropertyChanged(nameof(Scenarios));
                 CurrentScenario = currName;
-                OnPropertyChanged(CurrentScenario);
+                OnPropertyChanged(nameof(CurrentScenario));
             } else
             {
                 Logger.log("Scene load was cancelled", Core.Severity.INFO);
