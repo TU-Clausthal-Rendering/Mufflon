@@ -443,6 +443,7 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 		if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
 			const i32 primId = nodeAddr - bvh.numInternalNodes;
 
+			// All intersection distances are in this instance's object space
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
 				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], startPrimId, hitPrimId, hitT, surfParams))
@@ -474,7 +475,8 @@ void first_intersection_scene_obj_lbvh(
 	i32& hitPrimId,
 	SurfaceParametrization& surfParams
 ) {
-	const ei::Mat3x3 invRotScale = ei::invert(ei::Mat3x3{scene.transformations[instanceId]});
+	const ei::Mat3x3 rotScale = ei::Mat3x3{ scene.transformations[instanceId] };
+	const ei::Mat3x3 invRotScale = ei::invert(rotScale);
 	const ei::Vec3 invTranslation { -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
 									-scene.transformations[instanceId][11] };
@@ -487,17 +489,27 @@ void first_intersection_scene_obj_lbvh(
 	const ei::Box& box = scene.aabbs[objId];
 	const float tmin = 1e-6f * len(box.max - box.min);
 
+	// Determine the scale of the transformation to scale the intersection distance back into world space
+	// This is only valid for uniform scaling!
+	const float transScale = cbrtf(ei::determinant(rotScale));
+	// Scale our current maximum intersection distance into the object space to avoid false negatives
+	float objSpaceHitT = hitT / transScale;
+	const float objSpaceMinT = tmin / transScale;
+
 	// Intersect the ray against the obj bounding box.
-	float t;
-	if(intersect(box.min, box.max, invDir, ood, tmin, hitT, t)) {
+	float objSpaceT;
+	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceHitT, objSpaceT)) {
 		// Intersect the ray against the obj primitive bvh.
 		const ObjectDescriptor<dev>& obj = scene.objects[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
-		if(first_intersection_obj_lbvh_imp(
-			*lbvh, obj, transRay, checkPrimId, invDir, ood, tmin,
-			hitPrimId, hitT, surfParams, traversalStack))
+		if (first_intersection_obj_lbvh_imp(
+			*lbvh, obj, transRay, checkPrimId, invDir, ood, objSpaceMinT,
+			hitPrimId, objSpaceHitT, surfParams, traversalStack)) {
+			// Translate the object-space distance into world space again
+			hitT = objSpaceHitT * transScale;
 			hitInstanceId = instanceId;
+		}
 	}
 }
 
