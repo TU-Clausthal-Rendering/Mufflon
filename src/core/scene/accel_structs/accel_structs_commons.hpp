@@ -105,7 +105,14 @@ CUDA_FUNCTION ei::Box get_bounding_box(const ObjectDescriptor<dev>& obj, i32 idx
 template < Device dev >
 CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
 	i32 objIdx = scene.objectIndices[idx];
-	return ei::transform(scene.aabbs[objIdx], scene.transformations[idx]);
+
+	const ei::Mat3x3 scaleRot = scene.scales[idx] * ei::Mat3x3{ scene.transformations[idx] };
+	const ei::Vec3 translation{
+		scene.transformations[idx][3],
+		scene.transformations[idx][7],
+		scene.transformations[idx][11],
+	};
+	return ei::transform(ei::transform(scene.aabbs[idx], scaleRot), translation);
 }
 
 }}} // namespace mufflon::scene::accel_struct

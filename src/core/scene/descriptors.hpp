@@ -90,7 +90,10 @@ struct SceneDescriptor {
 	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> objects;
 
 	AccelDescriptor accelStruct;
+	// Per instance: transformation + pre-computed scale
+	// TODO: put some of these into one array instead of separate ones
 	ArrayDevHandle_t<dev, ei::Mat3x4> transformations;
+	ArrayDevHandle_t<dev, float> scales;
 	ArrayDevHandle_t<dev, u32> objectIndices;
 	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 

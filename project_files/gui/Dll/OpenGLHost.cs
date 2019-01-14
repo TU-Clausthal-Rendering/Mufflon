@@ -101,6 +101,9 @@ namespace gui.Dll
                     HandleResize();
                     // Try to acquire the lock - if we're waiting, we're not rendering
                     m_rendererModel.RenderLock.WaitOne();
+                    // Check if we've closed
+                    if (!m_isRunning)
+                        break;
 
                     bool needsReload = false;
 

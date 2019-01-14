@@ -97,6 +97,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	const bool geometryChanged = m_accelStruct.needs_rebuild<dev>();
 	if(geometryChanged) {
 		std::vector<ei::Mat3x4> instanceTransformations;
+		std::vector<float> instanceScales;
 		std::vector<u32> objectIndices;
 		std::vector<ObjectDescriptor<dev>> objectDescs;
 		std::vector<ei::Box> objectAabbs;
@@ -111,8 +112,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 			for(InstanceHandle inst : obj.second) {
 				mAssert(inst != nullptr);
-				// TODO: crash
 				instanceTransformations.push_back(inst->get_transformation_matrix());
+				instanceScales.push_back(inst->get_scale());
 				objectIndices.push_back(objectCount);
 			}
 
@@ -132,6 +133,10 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
 		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
+		auto& instScaleDesc = m_instScaleDesc.get<unique_device_ptr<dev, float[]>>();
+		instScaleDesc = make_udevptr_array<dev, float>(instanceScales.size());
+		copy(instScaleDesc.get(), instanceScales.data(), sizeof(u32) * instanceScales.size());
+
 		auto& instObjIndicesDesc = m_instObjIndicesDesc.get<unique_device_ptr<dev, u32[]>>();
 		instObjIndicesDesc = make_udevptr_array<dev, u32>(objectIndices.size());
 		copy(instObjIndicesDesc.get(), objectIndices.data(), sizeof(u32) * objectIndices.size());
@@ -146,6 +151,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.objects = objDevDesc.get();
 		sceneDescriptor.aabbs = objAabbsDesc.get();
 		sceneDescriptor.transformations = instTransformsDesc.get();
+		sceneDescriptor.scales = instScaleDesc.get();
 		sceneDescriptor.objectIndices = instObjIndicesDesc.get();
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them
