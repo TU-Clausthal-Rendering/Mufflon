@@ -137,7 +137,7 @@ CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const
 		// Clamp (no wrapping in v direction)
 		const Pixel texSize = textures::get_texture_size(envmap);
 		v = ei::min(v, (texSize.y - 0.5f) / texSize.y);
-		uvOut = UvCoordinate{ u, v };
+		uvOut = UvCoordinate{ u, 1.f-v };
 		return sample(envmap, uvOut);
 	}
 }

@@ -250,7 +250,7 @@ sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 		// Spherical map
 		// Convert UV to spherical...
 		const float phi = sample.uv.x * 2.f * ei::PI;
-		const float theta = sample.uv.y * ei::PI;
+		const float theta = (1.f - sample.uv.y) * ei::PI;
 		// ...and then to cartesian
 		const float sinTheta = sin(theta);
 		const float cosTheta = cos(theta);
