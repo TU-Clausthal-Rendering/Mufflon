@@ -105,6 +105,19 @@ namespace gui.ViewModel
                     {
                         m_models.Scene.PropertyChanged += OnSceneChanged;
                         m_models.Scene.Scenarios.CollectionChanged += ScenariosOnCollectionChanged;
+                        if (m_models.Scene.FullPath != null)
+                        {
+                            // Temporarily disable handlers
+                            m_models.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
+                            m_models.Materials.Models.CollectionChanged -= OnMaterialsCollectionChanged;
+                            m_models.Cameras.Models.CollectionChanged -= OnCamerasCollectionChanged;
+                            LoadSceneLights();
+                            LoadSceneMaterials();
+                            LoadSceneCameras();
+                            m_models.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
+                            m_models.Materials.Models.CollectionChanged += OnMaterialsCollectionChanged;
+                            m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
+                        }
                     }
 
                     // refresh views
@@ -188,10 +201,13 @@ namespace gui.ViewModel
 
                 if (needsRebuild)
                 {
-                    if(Core.world_reload_current_scenario() == IntPtr.Zero)
-                        throw new Exception(Core.core_get_dll_error());
+                    bool wasRendering = m_models.Renderer.IsRendering;
+                    m_models.Renderer.IsRendering = false;
                     if (m_reset.CanExecute(null))
                         m_reset.Execute(null);
+                    if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                        throw new Exception(Core.core_get_dll_error());
+                    m_models.Renderer.IsRendering = wasRendering;
                 }
             }
         }
@@ -245,10 +261,13 @@ namespace gui.ViewModel
                             m_models.Cameras.Models[args.OldStartingIndex].IsSelected = true;
                         else
                             m_models.Cameras.Models[args.OldStartingIndex - 1].IsSelected = true;
+                        bool wasRendering = m_models.Renderer.IsRendering;
+                        m_models.Renderer.IsRendering = false;
                         if (m_reset.CanExecute(null))
                             m_reset.Execute(null);
                         if (Core.world_reload_current_scenario() == IntPtr.Zero)
                             throw new Exception(Core.core_get_dll_error());
+                        m_models.Renderer.IsRendering = wasRendering;
                     }
                 }
             }
@@ -319,10 +338,13 @@ namespace gui.ViewModel
 
             if (needReload)
             {
+                bool wasRendering = m_models.Renderer.IsRendering;
+                m_models.Renderer.IsRendering = false;
                 if (m_reset.CanExecute(null))
                     m_reset.Execute(null);
                 if (Core.world_reload_current_scenario() == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
+                m_models.Renderer.IsRendering = wasRendering;
             }
         }
 
@@ -384,10 +406,13 @@ namespace gui.ViewModel
 
             if (needReload)
             {
+                bool wasRendering = m_models.Renderer.IsRendering;
+                m_models.Renderer.IsRendering = false;
                 if (m_reset.CanExecute(null))
                     m_reset.Execute(null);
                 if (Core.world_reload_current_scenario() == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
+                m_models.Renderer.IsRendering = wasRendering;
             }
         }
 
@@ -470,6 +495,7 @@ namespace gui.ViewModel
                 if (ReferenceEquals(scenario, m_models.Scene.CurrentScenario))
                     SelectedScenario = view;
             }
+            LoadScenarioViews();
         }
 
         private void LoadScenarioViews()

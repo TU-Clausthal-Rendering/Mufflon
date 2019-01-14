@@ -34,11 +34,11 @@ namespace gui.Model
             set
             {
                 if(m_isRendering == value) return;
+                m_isRendering = value;
                 if (value)
                     RenderLock.Release();
                 else
                     RenderLock.WaitOne();
-                m_isRendering = value;
                 OnPropertyChanged(nameof(IsRendering));
             }
         }
