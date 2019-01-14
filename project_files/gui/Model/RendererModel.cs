@@ -19,7 +19,14 @@ namespace gui.Model
         private bool m_isRendering = false;
         private uint m_iteration = 0u;
         private Core.RendererType m_type;
-        private ManualResetEvent m_iterationComplete = new ManualResetEvent(false);
+
+        public Semaphore RenderLock = new Semaphore(1, 1);
+
+        public RendererModel()
+        {
+            // Initial state: renderer paused
+            RenderLock.WaitOne();
+        }
 
         public bool IsRendering
         {
@@ -27,14 +34,24 @@ namespace gui.Model
             set
             {
                 if(m_isRendering == value) return;
-                if (m_isRendering)
-                    waitForCompletedIteration(TimeSpan.FromSeconds(10));
+                if (value)
+                    RenderLock.Release();
+                else
+                    RenderLock.WaitOne();
                 m_isRendering = value;
                 OnPropertyChanged(nameof(IsRendering));
             }
         }
 
-        public uint Iteration { get => m_iteration; }
+        public uint Iteration {
+            get => m_iteration;
+            set
+            {
+                if (m_iteration == value) return;
+                m_iteration = value;
+                OnPropertyChanged(nameof(Iteration));
+            }
+        }
 
         public Core.RendererType Type
         {
@@ -55,53 +72,6 @@ namespace gui.Model
                 case Core.RendererType.GPU_PT: return "Pathtracer (GPU)";
             }
             return "Unknown";
-        }
-
-        public void performedIteration()
-        {
-            ++m_iteration;
-            m_iterationComplete.Set();
-            OnPropertyChanged(nameof(Iteration));
-        }
-
-        public void waitForCompletedIteration()
-        {
-            m_iterationComplete.Reset();
-            m_iterationComplete.WaitOne();
-        }
-
-        public void waitForCompletedIteration(TimeSpan timeout)
-        {
-            m_iterationComplete.Reset();
-            m_iterationComplete.WaitOne(Convert.ToInt32(timeout.TotalMilliseconds));
-        }
-
-        // Only ever call this when you're sure that the renderer is currently not running
-        public void resetFromRenderLoop()
-        {
-            m_iteration = 0u;
-            if (!Core.render_reset())
-                throw new Exception(Core.core_get_dll_error());
-        }
-
-        // Pauses the renderer and waits for the iteration to complete if necessary
-        public void reset()
-        {
-            if (IsRendering)
-            {
-                // Briefly pause the rendering process
-                IsRendering = false;
-                m_iteration = 0u;
-                if (!Core.render_reset())
-                    throw new Exception(Core.core_get_dll_error());
-                // Resume rendering
-                IsRendering = true;
-            } else
-            {
-                m_iteration = 0u;
-                if (!Core.render_reset())
-                    throw new Exception(Core.core_get_dll_error());
-            }
         }
 
         #region PropertyChanged

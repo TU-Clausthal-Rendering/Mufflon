@@ -210,9 +210,10 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_area(const Spectrum& in
 CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const DirectionalLight& light,
 													  const ei::Box& bounds,
 													  const math::RndSet2& rnd) {
+	// TODO: invalid unit? irradiance != intensity != flux, photons should have flux...
 	return Photon{
 		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1),
-		light.radiance, LightType::DIRECTIONAL_LIGHT,
+		light.irradiance, LightType::DIRECTIONAL_LIGHT,
 		{light.direction, AngularPdf::infinite()}
 	};
 }
@@ -239,18 +240,7 @@ sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 		// Bring the UV into the interval as well
 		sample.uv.x -= static_cast<float>(layer);
 		// Turn the texel coordinates into UVs and remap from [0, 1] to [-1, 1]
-
-		// See interface.hpp::sample for the reverse
-		switch(layer) {
-			case 0: dir.direction = ei::Vec3{ 1.f, sample.uv.x, -sample.uv.y }; break;
-			case 1: dir.direction = ei::Vec3{ -1.f, sample.uv.x, sample.uv.y }; break;
-			case 2: dir.direction = ei::Vec3{ sample.uv.y, 1.f, -sample.uv.x }; break;
-			case 3: dir.direction = ei::Vec3{ sample.uv.y, -1.f, sample.uv.x }; break;
-			case 4: dir.direction = ei::Vec3{ sample.uv.y, sample.uv.y, 1.f }; break;
-			case 5:
-			default:
-				dir.direction = ei::Vec3{ -sample.uv.y, sample.uv.y, -1.f }; break;
-		}
+		dir.direction = textures::cubemap_uv_to_surface(sample.uv, layer);
 		const float lsq = ei::lensq(dir.direction);
 		const float l = ei::sqrt(lsq);
 		dir.direction *= 1.f / l;
@@ -398,7 +388,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Directiona
 	// anyway). This makes it possible to convert the pdf in known ways at every
 	// kind of event.
 	return NextEventEstimation{
-		-light.direction, 0.0f, light.radiance, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
+		-light.direction, 0.0f, light.irradiance, MAX_SCENE_SIZE, ei::sq(MAX_SCENE_SIZE),
 		AreaPdf::infinite()	// Dummy pdf (the directional sampling pdf, converted)
 	};
 }
@@ -441,7 +431,7 @@ CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<dev>& bac
 				//ei::Vec3 projDir = direction / ei::max(direction);
 				//pdfScale = powf(lensq(projDir), 1.5f) / 24.0f;
 				// Should be equivalent to:
-				const float length = 1.0f / ei::max(direction);
+				const float length = 1.0f / ei::max(ei::abs(direction));
 				pdfScale *= length * length * length / 24.0f;
 			} else {
 				// Polar map

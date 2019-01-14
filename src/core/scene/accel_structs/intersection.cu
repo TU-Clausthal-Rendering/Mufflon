@@ -145,7 +145,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-				   ei::abs(ray.direction.x) && ei::abs(ray.direction.z))
+				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x - ray.origin.x) / ray.direction.x;
 				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
 					t0 = (u0*v0*a.y + u0 * b.y + v0 * c.y + d.y - ray.origin.y) / ray.direction.y;
@@ -157,7 +157,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 			u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u1 >= 0.f && u1 <= 1.f) {
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-				   ei::abs(ray.direction.x) && ei::abs(ray.direction.z))
+				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
 				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
 					t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y - ray.origin.y) / ray.direction.y;
@@ -230,6 +230,7 @@ CUDA_FUNCTION bool intersects_primitve(
 										   meshVertices[ids[3]] };
 			ei::Vec2 bilinear;
 			const float t = intersectQuad(quad, ray, bilinear);
+
 			if(t > 0.f && t < hitT) {
 				hitT = t;
 				surfParams.bilinear = bilinear;
@@ -442,6 +443,7 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 		if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
 			const i32 primId = nodeAddr - bvh.numInternalNodes;
 
+			// All intersection distances are in this instance's object space
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
 				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], startPrimId, hitPrimId, hitT, surfParams))
@@ -473,12 +475,14 @@ void first_intersection_scene_obj_lbvh(
 	i32& hitPrimId,
 	SurfaceParametrization& surfParams
 ) {
-	const ei::Mat3x3 invRotScale = ei::invert(ei::Mat3x3{scene.transformations[instanceId]});
+	const ei::Mat3x3 invRotation = ei::invert(ei::Mat3x3{ scene.transformations[instanceId] });
+	const float scale = scene.scales[instanceId];
+	const float invScale = 1.f / scale;
 	const ei::Vec3 invTranslation { -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
 									-scene.transformations[instanceId][11] };
-	const ei::Ray transRay = { invRotScale * (ray.origin + invTranslation),
-						 normalize(invRotScale * ray.direction) };
+	const ei::Ray transRay = { invScale * invRotation * (ray.origin + invTranslation),
+						 invRotation * ray.direction };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
 
@@ -486,17 +490,24 @@ void first_intersection_scene_obj_lbvh(
 	const ei::Box& box = scene.aabbs[objId];
 	const float tmin = 1e-6f * len(box.max - box.min);
 
+	// Scale our current maximum intersection distance into the object space to avoid false negatives
+	float objSpaceHitT = invScale * hitT;
+	const float objSpaceMinT = invScale * tmin;
+
 	// Intersect the ray against the obj bounding box.
-	float t;
-	if(intersect(box.min, box.max, invDir, ood, tmin, hitT, t)) {
+	float objSpaceT;
+	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceHitT, objSpaceT)) {
 		// Intersect the ray against the obj primitive bvh.
 		const ObjectDescriptor<dev>& obj = scene.objects[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
-		if(first_intersection_obj_lbvh_imp(
-			*lbvh, obj, transRay, checkPrimId, invDir, ood, tmin,
-			hitPrimId, hitT, surfParams, traversalStack))
+		if (first_intersection_obj_lbvh_imp(
+			*lbvh, obj, transRay, checkPrimId, invDir, ood, objSpaceMinT,
+			hitPrimId, objSpaceHitT, surfParams, traversalStack)) {
+			// Translate the object-space distance into world space again
+			hitT = scale * objSpaceHitT;
 			hitInstanceId = instanceId;
+		}
 	}
 }
 
@@ -632,6 +643,7 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 
 		i32 primId = hitPrimId;
 
+
 		const ObjectDescriptor<dev>& obj = scene.objects[ scene.objectIndices[hitInstanceId] ];
 		const i32 offsetSpheres = obj.polygon.numTriangles + obj.polygon.numQuads;
 		if(primId >= offsetSpheres) { // Sphere?
@@ -670,11 +682,12 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 				const ei::Vec2 du1 = uvV[2u] - uvV[0u];
 				float det = 1.f / (du0.x * du1.y - du0.y - du1.x);
 				// TODO: fetch the instance instead (issue #44)
-				tangentX = det * (dx0 * du1.y - dx1 * du0.y);
-				tangentY = det * (dx1 * du0.x - dx0 * du1.x);
+				// TODO: do the tangent's really need to be normalized?
+				tangentX = ei::normalize(det * (dx0 * du1.y - dx1 * du0.y));
+				tangentY = ei::normalize(det * (dx1 * du0.x - dx0 * du1.x));
 
 				// Don't use the UV tangents to compute the normal, since they may be reversed
-				normal = ei::cross(v[1u] - v[0u], v[2u] - v[0u]);
+				normal = ei::normalize(ei::cross(v[1u] - v[0u], v[2u] - v[0u]));
 				mAssert(ei::dot(normal, obj.polygon.normals[ids.x]) > 0.f);
 
 				uv = uvV[0] * surfParams.barycentric.x + uvV[1] * surfParams.barycentric.y +
@@ -706,15 +719,15 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 				};
 				const ei::Mat2x2 dsduv = ei::invert(dudst);
 				const ei::Matrix<float, 3, 2> tangents = dxdst * dsduv;
-				tangentX = ei::Vec3{ tangents(0, 0), tangents(1, 0), tangents(2, 0) };
-				tangentY = ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) };
+				tangentX = ei::normalize(ei::Vec3{ tangents(0, 0), tangents(1, 0), tangents(2, 0) });
+				tangentY = ei::normalize(ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) });
 
 				// Check if we need to flip the normal (UV coordinates may not coincide with ST)
 				if(duds.x*dudt.y - dudt.x*duds.y >= 0)
 					normal = ei::cross(tangentY, tangentX);
 				else
 					normal = ei::cross(tangentX, tangentY);
-				mAssert(ei::dot(normal, obj.polygon.normals[ids.x]) > 0.f);
+				normal = ei::normalize(normal);
 				uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], surfParams.bilinear.x, surfParams.bilinear.y);
 			}
 		}
@@ -722,10 +735,11 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 		// TODO: enable this for (probably) better code?
 		//normal = ei::normalize(ei::transformDir(normal, transforms[hitInstanceId]));
 		//tangent = ei::normalize(ei::transformDir(tangent, transforms[hitInstanceId]));
-		const ei::Mat3x3 transMatrix = ei::Mat3x3{ scene.transformations[hitInstanceId] };
-		normal = ei::normalize(transMatrix * normal);
-		tangentX = ei::normalize(transMatrix * tangentX);
-		tangentY = ei::normalize(transMatrix * tangentY);
+		// Since we have separated scale, rotation, and translation, we do not need to normalize the vectors again
+		const ei::Mat3x3 rotMatrix = ei::Mat3x3{ scene.transformations[hitInstanceId] };
+		normal = rotMatrix * normal;
+		tangentX = rotMatrix * tangentX;
+		tangentY = rotMatrix * tangentY;
 
 		return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, normal, tangentX, tangentY, uv, surfParams };
 	}
@@ -740,18 +754,23 @@ bool any_intersection_scene_obj_lbvh(
 	float tmax,
 	i32* traversalStack
 ) {
-	const ei::Mat3x3 invRotScale = ei::invert(ei::Mat3x3{scene.transformations[instanceId]});
-	const ei::Vec3 invTranslation { -scene.transformations[instanceId][3],
+	const ei::Mat3x3 invRotation = ei::transpose(ei::Mat3x3{ scene.transformations[instanceId] });
+	const float invScale = 1.f / scene.scales[instanceId];
+	const ei::Vec3 invTranslation{ -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
 									-scene.transformations[instanceId][11] };
-	ei::Ray transRay = { invRotScale * (ray.origin + invTranslation),
-						 normalize(invRotScale * ray.direction) };
+	const ei::Ray transRay = { invScale * invRotation * (ray.origin + invTranslation),
+						 invRotation * ray.direction };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
 
 	const i32 objId = scene.objectIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
 	const float tmin = 1e-6f * len(box.max - box.min);
+
+	// Scale our current maximum intersection distance into the object space to avoid false negatives
+	const float objSpaceMinT = invScale * tmin;
+	const float objSpaceMaxT = invScale * tmax;
 
 	// Intersect the ray against the obj bounding box.
 	float hitT;
@@ -762,7 +781,7 @@ bool any_intersection_scene_obj_lbvh(
 		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
 		// Do ray-obj test.
 		return any_intersection_obj_lbvh_imp(*lbvh, obj, transRay, checkPrimId,
-			invDir, ood, tmin, tmax, traversalStack);
+			invDir, ood, objSpaceMinT, objSpaceMaxT, traversalStack);
 	}
 	return false;
 }

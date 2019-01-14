@@ -32,16 +32,16 @@ namespace gui.Model.Light
             }
         }
 
-        private Vec3<float> m_radiance;
+        private Vec3<float> m_irradiance;
 
-        public Vec3<float> Radiance
+        public Vec3<float> Irradiance
         {
-            get => m_radiance;
+            get => m_irradiance;
             set
             {
-                if (Equals(value, m_radiance)) return;
-                m_radiance = value;
-                OnPropertyChanged(nameof(Radiance));
+                if (Equals(value, m_irradiance)) return;
+                m_irradiance = value;
+                OnPropertyChanged(nameof(Irradiance));
             }
         }
     }

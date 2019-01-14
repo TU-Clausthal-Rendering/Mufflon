@@ -12,35 +12,51 @@ namespace gui.Command
     public class ResetCommand : IGesturedCommand
     {
         private Models m_models;
+        private ICommand m_playPause;
 
-        public ResetCommand(Models models) : base("ResetGesture")
+        public ResetCommand(Models models, ICommand playPause) : base("ResetGesture")
         {
             m_models = models;
-            m_models.Renderer.PropertyChanged += RendererPropertyChanged;
+            m_playPause = playPause;
+            CanExecuteChanged += OnCanExecuteChanged;
         }
 
-        private void RendererPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void OnCanExecuteChanged(object sender, EventArgs args)
         {
-            switch (e.PropertyName) {
-                case nameof(RendererModel.IsRendering): OnCanExecuteChanged(); break;
-            }
+            CommandManager.InvalidateRequerySuggested();
         }
 
         public override bool CanExecute(object parameter)
         {
-            return m_models.Renderer.IsRendering;
+            return m_models.Scene != null && m_models.Scene.IsSane;
         }
 
         public override void Execute(object parameter)
         {
-            m_models.Renderer.reset();
+            if (m_models.Renderer.IsRendering && m_playPause.CanExecute(null))
+            {
+                m_playPause.Execute(null);
+                if (!Core.render_reset())
+                    throw new Exception(Core.core_get_dll_error());
+                m_playPause.Execute(null);
+            } else
+            {
+                if (!Core.render_reset())
+                    throw new Exception(Core.core_get_dll_error());
+            }
+            m_models.Renderer.Iteration = 0u;
         }
 
-        public override event EventHandler CanExecuteChanged;
-
-        protected void OnCanExecuteChanged()
+        public override event EventHandler CanExecuteChanged
         {
-            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            add
+            {
+                CommandManager.RequerySuggested += value;
+            }
+            remove
+            {
+                CommandManager.RequerySuggested -= value;
+            }
         }
     }
 }

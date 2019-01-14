@@ -747,6 +747,20 @@ bool BinaryLoader::read_instances() {
 		const u32 keyframe = read<u32>();
 		const u32 animInstId = read<u32>();
 		const Mat3x4 transMat = read<Mat3x4>();
+		// Check if the instance scaling is uniform
+		const ei::Mat3x3 rotScale{
+			transMat.v[0u], transMat.v[1u], transMat.v[2u],
+			transMat.v[4u], transMat.v[5u], transMat.v[6u],
+			transMat.v[8u], transMat.v[9u], transMat.v[10u]
+		};
+		const float scaleX = ei::lensq(rotScale(0u));
+		const float scaleY = ei::lensq(rotScale(1u));
+		const float scaleZ = ei::lensq(rotScale(2u));
+		if(!ei::approx(scaleX, scaleY) || !ei::approx(scaleX, scaleZ)) {
+			logWarning("[BinaryLoader::read_instances] Instance ", i, " of object ", objId, " has non-uniform scaling (",
+					   scaleX, "|", scaleY, "|", scaleZ, "), which we don't support; ignoring instance");
+			continue;
+		}
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", world_get_object_name(m_objectHandles[objId]), "\'");
 		InstanceHdl instHdl = world_create_instance(m_objectHandles[objId]);

@@ -195,16 +195,19 @@ Boolean load_texture(const char* path, TextureData* texData) {
 			for(std::size_t layer = 0u; layer < tex.layers(); ++layer) {
 				for(std::size_t face = 0u; face < tex.faces(); ++face) {
 					const unsigned char* data = reinterpret_cast<const unsigned char*>(tex.data(layer, face, mipmap));
-					//float* layerData = reinterpret_cast<float*>(&texData->data[(face + layer * tex.faces()) * layerSize]);
 					__half* layerData = reinterpret_cast<__half*>(&texData->data[(face + layer * tex.faces()) * layerSize]);
-					for(std::size_t b = 0u; b < texData->width * texData->height; ++b) {
-						eitypes::uint32 rgb9e5;
-						std::memcpy(&rgb9e5, &data[4u * b], 4u);
-						ei::Vec3 rgb = ei::unpackRGB9E5(rgb9e5);
-						layerData[channels * b + 0u] = __float2half(rgb.r);
-						layerData[channels * b + 1u] = __float2half(rgb.g);
-						layerData[channels * b + 2u] = __float2half(rgb.b);
-						layerData[channels * b + 3u] = __float2half(0.f);
+					for(std::size_t y = 0u; y < texData->height; ++y) {
+						for(std::size_t x = 0u; x < texData->width; ++x) {
+							eitypes::uint32 rgb9e5;
+							std::memcpy(&rgb9e5, &data[4u * (y * texData->width + x)], 4u);
+							ei::Vec3 rgb = ei::unpackRGB9E5(rgb9e5);
+							// We need to flip the texture on load
+							const std::size_t pixel = channels * ((texData->height - y - 1u) * texData->width + x);
+							layerData[pixel + 0u] = __float2half(rgb.r);
+							layerData[pixel + 1u] = __float2half(rgb.g);
+							layerData[pixel + 2u] = __float2half(rgb.b);
+							layerData[pixel + 3u] = __float2half(0.f);
+						}
 					}
 				}
 			}
@@ -219,14 +222,17 @@ Boolean load_texture(const char* path, TextureData* texData) {
 				for(std::size_t face = 0u; face < tex.faces(); ++face) {
 					uint8_t* layerData = &texData->data[(face + layer * tex.faces()) * layerSize];
 					const char* data = reinterpret_cast<const char*>(tex.data(layer, face, mipmap));
-					if(origChannels == channels) {
-						// Can memcpy
-						std::memcpy(layerData, data, layerSize);
-					} else {
-						// Need to do it texel by texel (should only happen for RGB without alpha)
-						for(std::size_t b = 0u; b < texData->width * texData->height; ++b) {
-							std::memcpy(&layerData[texelSize * b], &data[origTexelSize * b], origTexelSize);
-							std::memset(&layerData[texelSize * b + origTexelSize], 0, componentSize);
+					for(std::size_t y = 0u; y < texData->height; ++y) {
+						for(std::size_t x = 0u; x < texData->width; ++x) {
+							// Swap image vertically
+							const std::size_t origPixel = origTexelSize * (y * texData->width + x);
+							const std::size_t pixel = texelSize * ((texData->height - y - 1u)* texData->width + x);
+							if(origChannels == channels) {
+								std::memcpy(&layerData[pixel], &data[origPixel], origTexelSize);
+							} else {
+								std::memcpy(&layerData[pixel], &data[origPixel], origTexelSize);
+								std::memset(&layerData[pixel + origTexelSize], 0, componentSize);
+							}
 						}
 					}
 				}

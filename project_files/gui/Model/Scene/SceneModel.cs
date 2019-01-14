@@ -40,6 +40,15 @@ namespace gui.Model.Scene
             }
         }
 
+        public bool IsSane => Core.scene_is_sane();
+
+        public void ReloadCurrentScenario()
+        {
+            if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                throw new Exception(Core.core_get_dll_error());
+            OnPropertyChanged(nameof(IsSane));
+        }
+
         private async void LoadScenarioAsync(ScenarioModel scenario)
         {
             var handle = scenario.Handle;

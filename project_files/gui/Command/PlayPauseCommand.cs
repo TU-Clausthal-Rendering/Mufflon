@@ -1,20 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Input;
-using gui.Dll;
 using gui.Model;
-using gui.Model.Camera;
-using gui.Model.Light;
 
 namespace gui.Command
 {
     public class PlayPauseCommand : IGesturedCommand
     {
         private Models m_models;
+        private ManualResetEvent m_iterationComplete = new ManualResetEvent(false);
 
         public PlayPauseCommand(Models models) : base("PlayPauseGesture")
         {
@@ -29,7 +24,7 @@ namespace gui.Command
 
         public override bool CanExecute(object parameter)
         {
-            return m_models.Scene != null;
+            return m_models.Scene != null && m_models.Scene.IsSane;
         }
 
         public override void Execute(object parameter)

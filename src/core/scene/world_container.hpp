@@ -27,6 +27,14 @@ public:
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
+	enum class Sanity {
+		SANE,
+		NO_OBJECTS,
+		NO_INSTANCES,
+		NO_CAMERA,
+		NO_LIGHTS
+	};
+
 	static constexpr float SUGGESTED_MAX_SCENE_SIZE = 1024.f*1024.f;
 
 	WorldContainer(const WorldContainer&) = delete;
@@ -131,6 +139,11 @@ public:
 	SceneHandle get_current_scene() {
 		return m_scene.get();
 	}
+
+	// Performs a sanity check on the current world - has lights, cameras etc.
+	Sanity is_sane_world() const;
+	// Performs a sanity check for a given scenario (respects object masking etc.)
+	Sanity is_sane_scenario(ConstScenarioHandle hdl) const;
 
 	// Clears the world object from all resources
 	static void clear_instance();

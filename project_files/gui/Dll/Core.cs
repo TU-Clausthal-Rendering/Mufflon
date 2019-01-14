@@ -286,11 +286,11 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_dir_light_direction(IntPtr hdl, ref Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_dir_light_radiance(IntPtr hdl, ref Vec3 radiance);
+        internal static extern bool world_get_dir_light_irradiance(IntPtr hdl, ref Vec3 irradiance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_dir_light_direction(IntPtr hdl, Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_set_dir_light_radiance(IntPtr hdl, Vec3 radiance);
+        internal static extern bool world_set_dir_light_irradiance(IntPtr hdl, Vec3 irradiance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_env_light_map")]
         private static extern IntPtr world_get_env_light_map_(IntPtr hdl);
         internal static string world_get_env_light_map(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_map_(hdl)); }
@@ -347,6 +347,8 @@ namespace gui.Dll
         internal static extern bool scene_move_active_camera(float x, float y, float z);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scene_rotate_active_camera(float x, float y, float z);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scene_is_sane();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scene_get_bounding_box(IntPtr scene, out Vec3 min, out Vec3 max);
 

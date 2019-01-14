@@ -61,18 +61,7 @@ struct MaterialDescriptorBase {
 	}
 };
 
-struct ParameterPack {
-	Materials type;
-	MaterialPropertyFlags flags;
-	MediumHandle innerMedium;
-	MediumHandle outerMedium;
-
-	// Get the medium handle dependent on the sign of a direction x
-	// with respect to the normal.
-	__host__ __device__ MediumHandle get_medium(float xDotN) const {
-		return xDotN < 0.0f ? innerMedium : outerMedium;
-	}
-};
+struct ParameterPack: public MaterialDescriptorBase {};
 
 struct Emission {
 	TextureHandle texture;

@@ -68,8 +68,8 @@ namespace gui.ViewModel
 
             Profiler = new ProfilerViewModel(window, m_models);
 
-            Renderer = new RendererViewModel(window, m_models);
-            Scene = new SceneViewModel(window, m_models);
+            Renderer = new RendererViewModel(window, m_models, Toolbar.PlayPauseCommand);
+            Scene = new SceneViewModel(window, m_models, Toolbar.PlayPauseCommand, Toolbar.ResetCommand);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

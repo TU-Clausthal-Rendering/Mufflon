@@ -74,7 +74,7 @@ Spectrum get_flux(const DirectionalLight& light,
 	float surface = aabbDiag.y*aabbDiag.z*std::abs(light.direction.x)
 		+ aabbDiag.x*aabbDiag.z*std::abs(light.direction.y)
 		+ aabbDiag.x*aabbDiag.y*std::abs(light.direction.z);
-	return light.radiance * surface;
+	return light.irradiance * surface;
 }
 
 } // mufflon::scene::lights

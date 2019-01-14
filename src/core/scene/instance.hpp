@@ -22,11 +22,22 @@ public:
 	~Instance() = default;
 
 	void set_transformation_matrix(TransMatrixType mat) {
+		mAssertMsg(ei::approx(ei::len(mat(0u).subrow<0u, 3u>()), ei::len(mat(1u).subrow<0u, 3u>()))
+				   && ei::approx(ei::len(mat(0u).subrow<0u, 3u>()), ei::len(mat(2u).subrow<0u, 3u>())),
+				   "Instance transformations must have uniform scale");
 		m_transMat = std::move(mat);
+		m_scale = ei::len(m_transMat(0u).subrow<0u, 3u>());
+		m_transMat(0u).subrow<0u, 3u>() *= 1.f / m_scale;
+		m_transMat(1u).subrow<0u, 3u>() *= 1.f / m_scale;
+		m_transMat(2u).subrow<0u, 3u>() *= 1.f / m_scale;
 	}
 
 	const TransMatrixType& get_transformation_matrix() const noexcept {
 		return m_transMat;
+	}
+
+	float get_scale() const noexcept {
+		return m_scale;
 	}
 
 	ei::Box get_bounding_box() const noexcept;
@@ -41,6 +52,7 @@ public:
 private:
 	Object& m_objRef;
 	TransMatrixType m_transMat;
+	float m_scale;
 };
 
 }} // namespace mufflon::scene

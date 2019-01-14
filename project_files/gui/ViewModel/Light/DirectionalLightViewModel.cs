@@ -30,7 +30,7 @@ namespace gui.ViewModel.Light
                     OnPropertyChanged(nameof(DirectionY));
                     OnPropertyChanged(nameof(DirectionZ));
                     break;
-                case nameof(DirectionalLightModel.Radiance):
+                case nameof(DirectionalLightModel.Irradiance):
                     OnPropertyChanged(nameof(RadianceX));
                     OnPropertyChanged(nameof(RadianceY));
                     OnPropertyChanged(nameof(RadianceZ));
@@ -63,20 +63,20 @@ namespace gui.ViewModel.Light
 
         public float RadianceX
         {
-            get => m_parent.Radiance.X;
-            set => m_parent.Radiance = new Vec3<float>(value, m_parent.Radiance.Y, m_parent.Radiance.Z);
+            get => m_parent.Irradiance.X;
+            set => m_parent.Irradiance = new Vec3<float>(value, m_parent.Irradiance.Y, m_parent.Irradiance.Z);
         }
 
         public float RadianceY
         {
-            get => m_parent.Radiance.Y;
-            set => m_parent.Radiance = new Vec3<float>(m_parent.Radiance.X, value, m_parent.Radiance.Z);
+            get => m_parent.Irradiance.Y;
+            set => m_parent.Irradiance = new Vec3<float>(m_parent.Irradiance.X, value, m_parent.Irradiance.Z);
         }
 
         public float RadianceZ
         {
-            get => m_parent.Radiance.Z;
-            set => m_parent.Radiance = new Vec3<float>(m_parent.Radiance.X, m_parent.Radiance.Y, value);
+            get => m_parent.Irradiance.Z;
+            set => m_parent.Irradiance = new Vec3<float>(m_parent.Irradiance.X, m_parent.Irradiance.Y, value);
         }
     }
 }

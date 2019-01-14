@@ -55,6 +55,7 @@ namespace gui.Command
                     m_lastDirectory = Path.GetDirectoryName(file);
                     Settings.Default.lastScenePath = m_lastDirectory;
                     LoadScene(file);
+                    m_models.Renderer.Iteration = 0u;
                 }
             }
         }

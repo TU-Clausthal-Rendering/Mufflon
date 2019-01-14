@@ -8,7 +8,7 @@
 namespace mufflon { namespace scene { namespace textures {
 
 // Read a CPU or CUDA texture
-inline __host__ __device__ ei::Vec4 read(ConstTextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer = 0) {
+CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer = 0) {
 #ifndef __CUDA_ARCH__
 	return texture->read(texel, layer);
 #else
@@ -20,7 +20,7 @@ inline __host__ __device__ ei::Vec4 read(ConstTextureDevHandle_t<CURRENT_DEV> te
 #endif
 }
 
-inline __host__ __device__ ei::Vec4 read(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer = 0) {
+CUDA_FUNCTION ei::Vec4 read(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer = 0) {
 #ifndef __CUDA_ARCH__
 	return texture->read(texel, layer);
 #else
@@ -35,7 +35,7 @@ inline __host__ __device__ ei::Vec4 read(TextureDevHandle_t<CURRENT_DEV> texture
 
 
 // Write a CPU or CUDA texture
-inline __host__ __device__ void write(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, const ei::Vec4& value) {
+CUDA_FUNCTION void write(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, const ei::Vec4& value) {
 #ifndef __CUDA_ARCH__
 	texture->write(value, texel, 0);
 #else
@@ -43,7 +43,7 @@ inline __host__ __device__ void write(TextureDevHandle_t<CURRENT_DEV> texture, c
 	surf2DLayeredwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y, 0);
 #endif
 }
-inline __host__ __device__ void write(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
+CUDA_FUNCTION void write(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
 #ifndef __CUDA_ARCH__
 	texture->write(value, texel, layer);
 #else
@@ -54,7 +54,7 @@ inline __host__ __device__ void write(TextureDevHandle_t<CURRENT_DEV> texture, c
 
 
 // Sample a CPU or CUDA texture
-inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> texture, const UvCoordinate& uv, int layer = 0u) {
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> texture, const UvCoordinate& uv, int layer = 0u) {
 #ifndef __CUDA_ARCH__
 	return texture->sample(uv, layer);
 #else
@@ -65,8 +65,57 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 #endif
 }
 
+
+
+// Compute the UV coordinate in [0,1]² and the layer given a point on the cube
+CUDA_FUNCTION UvCoordinate cubemap_surface_to_uv(const Point& cubePos, int& layer) {
+	// Set the layer and UV coordinates
+	float u, v;
+	if(cubePos.x == 1.f) {
+		layer = 0u;
+		u = -cubePos.z;
+		v = cubePos.y;
+	} else if(cubePos.x == -1.f) {
+		layer = 1u;
+		u = cubePos.z;
+		v = cubePos.y;
+	} else if(cubePos.y == 1.f) {
+		layer = 2u;
+		u = cubePos.x;
+		v = -cubePos.z;
+	} else if(cubePos.y == -1.f) {
+		layer = 3u;
+		u = cubePos.x;
+		v = cubePos.z;
+	} else if(cubePos.z == 1.f) {
+		layer = 4u;
+		u = cubePos.x;
+		v = cubePos.y;
+	} else {
+		layer = 5u;
+		u = -cubePos.x;
+		v = cubePos.y;
+	}
+	// Normalize the UV coordinates into [0, 1]
+	return { (u + 1.f) / 2.f, (v + 1.f) / 2.f };
+}
+
+// Compute the postion on the unit cube given a layer index and the local uv coordinates.
+CUDA_FUNCTION Point cubemap_uv_to_surface(UvCoordinate uv, int layer) {
+	switch(layer) {
+		case 0: return Point{ 1.f, uv.y, -uv.x };
+		case 1: return Point{ -1.f, uv.y, uv.x };
+		case 2: return Point{ uv.x, 1.f, -uv.y };
+		case 3: return Point{ uv.x, -1.f, uv.y };
+		case 4: return Point{ uv.x, uv.y, 1.f };
+		case 5:
+		default:
+			return Point{ -uv.x, uv.y, -1.f };
+	}
+}
+
 // Samples an environment map and returns the uv-coordinate too
-inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
 #ifndef __CUDA_ARCH__
 	int layers = envmap->get_num_layers();
 #else // __CUDA_ARCH__
@@ -75,39 +124,10 @@ inline __host__ __device__ ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> 
 	if(layers == 6) {
 		// Cubemap
 		// Find out which face by elongating the direction
-		ei::Vec3 projDir = direction / ei::max(direction);
+		ei::Vec3 projDir = direction / ei::max(ei::abs(direction));
 		// Set the layer and UV coordinates
 		int layer;
-		float u, v;
-		if(projDir.x == 1.f) {
-			layer = 0u;
-			u = projDir.y;
-			v = -projDir.z;
-		} else if(projDir.x == -1.f) {
-			layer = 1u;
-			u = projDir.y;
-			v = projDir.z;
-		} else if(projDir.y == 1.f) {
-			layer = 2u;
-			u = -projDir.z;
-			v = projDir.x;
-		} else if(projDir.y == -1.f) {
-			layer = 3u;
-			u = projDir.z;
-			v = projDir.x;
-		} else if(projDir.z == 1.f) {
-			layer = 4u;
-			u = projDir.y;
-			v = projDir.x;
-		} else {
-			layer = 5u;
-			u = projDir.y;
-			v = -projDir.x;
-		}
-		// Normalize the UV coordinates into [0, 1]
-		u = (u + 1.f) / 2.f;
-		v = (v + 1.f) / 2.f;
-		uvOut = UvCoordinate{ u, v };
+		uvOut = cubemap_surface_to_uv(projDir, layer);
 		return sample(envmap, uvOut, layer);
 	} else {
 		// Spherical map

@@ -394,12 +394,12 @@ bool JsonLoader::load_lights() {
 		} else if(type.compare("directional") == 0) {
 			// Directional light
 			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
-			const ei::Vec3 radiance = read<ei::Vec3>(m_state, get(m_state, light, "radiance"))
+			const ei::Vec3 irradiance = read<ei::Vec3>(m_state, get(m_state, light, "radiance"))
 				* read_opt<float>(m_state, light, "scale", 1.f);
 
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL); hdl.type == LIGHT_DIRECTIONAL) {
 				world_set_dir_light_direction(hdl, util::pun<Vec3>(direction));
-				world_set_dir_light_radiance(hdl, util::pun<Vec3>(radiance));
+				world_set_dir_light_irradiance(hdl, util::pun<Vec3>(irradiance));
 			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
@@ -558,6 +558,11 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			if(!scenario_assign_material(scenarioHdl, slot, matHdl->second))
 				throw std::runtime_error("Failed to associate material '" + matHdl->first + "'");
 		}
+
+		const char* sanityMsg = "";
+		if(!scenario_is_sane(scenarioHdl, &sanityMsg))
+			throw std::runtime_error("Scenario '" + std::string(scenarioIter->name.GetString())
+									 + "' did not pass sanity check: " + std::string(sanityMsg));
 	}
 	return true;
 }
@@ -664,6 +669,10 @@ bool JsonLoader::load_file() {
 		m_state.current = ParserState::Level::ROOT;
 		if(!load_materials())
 			return false;
+		// Before we load scenarios, perform a sanity check for the currently loaded world
+		const char* sanityMsg = "";
+		if(!world_is_sane(&sanityMsg))
+			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
 		if(!load_scenarios(m_binLoader.get_material_names()))

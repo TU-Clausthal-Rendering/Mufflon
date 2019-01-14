@@ -60,7 +60,7 @@ public:
 				// TODO
 			}
 		}
-		m_lightTree.synchronize<dev>();
+		m_lightTree.synchronize<dev>(m_boundingBox);
 		m_media.synchronize<dev>();
 	}
 
@@ -112,6 +112,9 @@ public:
 	const lights::LightTreeBuilder& get_light_tree_builder() const {
 		return m_lightTree;
 	}
+
+	// Checks if the scene is sane, ie. if it has lights or emitters, a camera, etc.
+	bool is_sane() const noexcept;
 	
 	/**
 	 * Creates a single structure which grants access to all scene data
@@ -158,6 +161,8 @@ private:
 		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>[]>> m_objDevDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_instTransformsDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, float[]>,
+		unique_device_ptr<Device::CUDA, float[]>> m_instScaleDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, u32[]>,
 		unique_device_ptr<Device::CUDA, u32[]>> m_instObjIndicesDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,

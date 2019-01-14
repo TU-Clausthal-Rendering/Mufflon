@@ -59,6 +59,11 @@ public:
 	std::size_t size() const noexcept {
 		return m_data.size();
 	}
+
+	bool empty() const noexcept {
+		return size() == 0u;
+	}
+
 private:
 	std::unordered_map<std::string_view, std::size_t> m_map;
 	std::vector<std::unique_ptr<std::string>> m_mapKeyStore;

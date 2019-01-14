@@ -251,6 +251,9 @@ Boolean display_screenshot() {
 		return false;
 	}
 
+	constexpr float gamma = 2.2f;
+	constexpr float exposure = 2.0f;
+
 	constexpr const char* VERTEX_CODE = "#version 330 core\nvoid main(){}";
 	constexpr const char* GEOMETRY_CODE =
 		"#version 330 core\n"
@@ -276,8 +279,12 @@ Boolean display_screenshot() {
 		"#version 330 core\n"
 		"in vec2 texcoord;"
 		"uniform sampler2D textureSampler;"
+		"uniform float gamma;"
+		"uniform float exposure;"
 		"void main() {"
-		"	gl_FragColor.xyz = texture2D(textureSampler, texcoord).rgb;"
+		"	vec3 rgb = texture2D(textureSampler, texcoord).rgb;"
+		"	float luminance = 0.2126*rgb.r + 0.7252*rgb.g + 0.0722*rgb.b;"
+		"	gl_FragColor.xyz = pow(vec3(1.f) - exp(-rgb * exposure), vec3(1.0 / gamma));"
 		"}";
 
 	GLuint tex = 0u;
@@ -333,7 +340,23 @@ Boolean display_screenshot() {
 	glGetShaderiv(geomShader, GL_COMPILE_STATUS, &compiled[1]);
 	glGetShaderiv(fragShader, GL_COMPILE_STATUS, &compiled[2]);
 	if(compiled[0] != GL_TRUE || compiled[1] != GL_TRUE || compiled[2] != GL_TRUE) {
-		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders");
+		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders!");
+
+		GLint id;
+		if(compiled[0] != GL_TRUE)
+			id = vertShader;
+		else if(compiled[1] != GL_TRUE)
+			id = geomShader;
+		else
+			id = fragShader;
+		GLint logLength;
+		std::string msg;
+		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &logLength);
+		msg.resize(logLength + 1);
+		msg[logLength] = '\0';
+		glGetShaderInfoLog(id, logLength, NULL, msg.data());
+		logError("Error: ", msg);
+
 		cleanup();
 		return false;
 	}
@@ -366,6 +389,8 @@ Boolean display_screenshot() {
 
 	glUseProgram(program);
 	glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
+	glUniform1f(glGetUniformLocation(program, "gamma"), gamma);
+	glUniform1f(glGetUniformLocation(program, "exposure"), exposure);
 
 	glGenVertexArrays(1, &vao);
 	if(vao == 0) {
@@ -1458,6 +1483,19 @@ SceneHdl world_get_current_scene() {
 	CATCH_ALL(nullptr)
 }
 
+Boolean world_is_sane(const char** msg) {
+	TRY
+	switch(s_world.is_sane_world()) {
+		case WorldContainer::Sanity::SANE: *msg = "";  return true;
+		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
+		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
+		case WorldContainer::Sanity::NO_OBJECTS: *msg = "No objects"; return false;
+		case WorldContainer::Sanity::NO_LIGHTS: *msg = "No lights or emitters"; return false;
+	}
+	return false;
+	CATCH_ALL(false)
+}
+
 TextureHdl world_get_texture(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "texture path", false);
@@ -2028,6 +2066,20 @@ Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	CATCH_ALL(false)
 }
 
+Boolean scenario_is_sane(ConstScenarioHdl scenario, const char** msg) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	switch(s_world.is_sane_scenario(static_cast<ConstScenarioHandle>(scenario))) {
+		case WorldContainer::Sanity::SANE: *msg = "";  return true;
+		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
+		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
+		case WorldContainer::Sanity::NO_OBJECTS: *msg = "No objects"; return false;
+		case WorldContainer::Sanity::NO_LIGHTS: *msg = "No lights or emitters"; return false;
+	}
+	return false;
+	CATCH_ALL(false)
+}
+
 Boolean scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max) {
 	TRY
 	CHECK_NULLPTR(scene, "scene handle", false);
@@ -2070,6 +2122,15 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 	s_world.get_current_scenario()->get_camera()->roll(z);
 	s_world.mark_camera_dirty(s_world.get_current_scenario()->get_camera());
 	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scene_is_sane() {
+	TRY
+	ConstSceneHandle sceneHdl = s_world.get_current_scene();
+	if(sceneHdl != nullptr)
+		return sceneHdl->is_sane();
+	return false;
 	CATCH_ALL(false)
 }
 
@@ -2263,13 +2324,13 @@ Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_radiance(ConstLightHdl hdl, Vec3* radiance) {
+Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
 	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
 	CHECK_NULLPTR(light, "directional light handle", false);
-	if(radiance != nullptr)
-		*radiance = util::pun<Vec3>(light->radiance);
+	if(irradiance != nullptr)
+		*irradiance = util::pun<Vec3>(light->irradiance);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2290,12 +2351,12 @@ Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_dir_light_radiance(LightHdl hdl, Vec3 radiance) {
+Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
 	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
 	CHECK_NULLPTR(light, "directional light handle", false);
-	light->radiance = util::pun<ei::Vec3>(radiance);
+	light->irradiance = util::pun<ei::Vec3>(irradiance);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
 	return true;
 	CATCH_ALL(false)
