@@ -251,6 +251,9 @@ Boolean display_screenshot() {
 		return false;
 	}
 
+	constexpr float gamma = 2.2f;
+	constexpr float exposure = 2.0f;
+
 	constexpr const char* VERTEX_CODE = "#version 330 core\nvoid main(){}";
 	constexpr const char* GEOMETRY_CODE =
 		"#version 330 core\n"
@@ -276,8 +279,12 @@ Boolean display_screenshot() {
 		"#version 330 core\n"
 		"in vec2 texcoord;"
 		"uniform sampler2D textureSampler;"
+		"uniform float gamma;"
+		"uniform float exposure;"
 		"void main() {"
-		"	gl_FragColor.xyz = texture2D(textureSampler, texcoord).rgb;"
+		"	vec3 rgb = texture2D(textureSampler, texcoord).rgb;"
+		"	float luminance = 0.2126*rgb.r + 0.7252*rgb.g + 0.0722*rgb.b;"
+		"	gl_FragColor.xyz = pow(vec3(1.f) - exp(-rgb * exposure), vec3(1.0 / gamma));"
 		"}";
 
 	GLuint tex = 0u;
@@ -333,7 +340,23 @@ Boolean display_screenshot() {
 	glGetShaderiv(geomShader, GL_COMPILE_STATUS, &compiled[1]);
 	glGetShaderiv(fragShader, GL_COMPILE_STATUS, &compiled[2]);
 	if(compiled[0] != GL_TRUE || compiled[1] != GL_TRUE || compiled[2] != GL_TRUE) {
-		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders");
+		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders!");
+
+		GLint id;
+		if(compiled[0] != GL_TRUE)
+			id = vertShader;
+		else if(compiled[1] != GL_TRUE)
+			id = geomShader;
+		else
+			id = fragShader;
+		GLint logLength;
+		std::string msg;
+		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &logLength);
+		msg.resize(logLength + 1);
+		msg[logLength] = '\0';
+		glGetShaderInfoLog(id, logLength, NULL, msg.data());
+		logError("Error: ", msg);
+
 		cleanup();
 		return false;
 	}
@@ -366,6 +389,8 @@ Boolean display_screenshot() {
 
 	glUseProgram(program);
 	glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
+	glUniform1f(glGetUniformLocation(program, "gamma"), gamma);
+	glUniform1f(glGetUniformLocation(program, "exposure"), exposure);
 
 	glGenVertexArrays(1, &vao);
 	if(vao == 0) {

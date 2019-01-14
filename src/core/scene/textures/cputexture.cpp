@@ -10,7 +10,7 @@ namespace mufflon::scene::textures {
 CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
 					   bool sRgb, std::unique_ptr<u8[]> data) :
 	m_imageData((data == nullptr)
-				? std::make_unique<u8[]>(width * height * PIXEL_SIZE(format))
+				? std::make_unique<u8[]>(width * height * numLayers * PIXEL_SIZE(format))
 				: move(data)),
 	m_format(format),
 	m_size(width, height, numLayers)
@@ -164,7 +164,7 @@ Vec4 CpuTexture::fetch_RGB16F(int texelIdx) const {
 Vec4 CpuTexture::fetch_RGBA16F(int texelIdx) const {
 	const Vec<__half, 4>* data = as<Vec<__half, 4>>(m_imageData.get());
 	return { __half2float(data[texelIdx].x), __half2float(data[texelIdx].y),
-		__half2float(data[texelIdx].z), __half2float(data[texelIdx].z) };
+		__half2float(data[texelIdx].z), __half2float(data[texelIdx].w) };
 }
 
 Vec4 CpuTexture::fetch_R32F(int texelIdx) const {

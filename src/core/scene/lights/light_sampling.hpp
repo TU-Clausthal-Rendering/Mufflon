@@ -431,7 +431,7 @@ CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<dev>& bac
 				//ei::Vec3 projDir = direction / ei::max(direction);
 				//pdfScale = powf(lensq(projDir), 1.5f) / 24.0f;
 				// Should be equivalent to:
-				const float length = 1.0f / ei::max(direction);
+				const float length = 1.0f / ei::max(ei::abs(direction));
 				pdfScale *= length * length * length / 24.0f;
 			} else {
 				// Polar map

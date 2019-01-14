@@ -73,28 +73,28 @@ CUDA_FUNCTION UvCoordinate cubemap_surface_to_uv(const Point& cubePos, int& laye
 	float u, v;
 	if(cubePos.x == 1.f) {
 		layer = 0u;
-		u = cubePos.y;
-		v = -cubePos.z;
+		u = -cubePos.z;
+		v = cubePos.y;
 	} else if(cubePos.x == -1.f) {
 		layer = 1u;
-		u = cubePos.y;
-		v = cubePos.z;
+		u = cubePos.z;
+		v = cubePos.y;
 	} else if(cubePos.y == 1.f) {
 		layer = 2u;
-		u = -cubePos.z;
-		v = cubePos.x;
+		u = cubePos.x;
+		v = -cubePos.z;
 	} else if(cubePos.y == -1.f) {
 		layer = 3u;
-		u = cubePos.z;
-		v = cubePos.x;
+		u = cubePos.x;
+		v = cubePos.z;
 	} else if(cubePos.z == 1.f) {
 		layer = 4u;
-		u = cubePos.y;
-		v = cubePos.x;
+		u = cubePos.x;
+		v = cubePos.y;
 	} else {
 		layer = 5u;
-		u = cubePos.y;
-		v = -cubePos.x;
+		u = -cubePos.x;
+		v = cubePos.y;
 	}
 	// Normalize the UV coordinates into [0, 1]
 	return { (u + 1.f) / 2.f, (v + 1.f) / 2.f };
@@ -103,14 +103,14 @@ CUDA_FUNCTION UvCoordinate cubemap_surface_to_uv(const Point& cubePos, int& laye
 // Compute the postion on the unit cube given a layer index and the local uv coordinates.
 CUDA_FUNCTION Point cubemap_uv_to_surface(UvCoordinate uv, int layer) {
 	switch(layer) {
-		case 0: return Point{ 1.f, uv.x, -uv.y };
-		case 1: return Point{ -1.f, uv.x, uv.y };
-		case 2: return Point{ uv.y, 1.f, -uv.x };
-		case 3: return Point{ uv.y, -1.f, uv.x };
-		case 4: return Point{ uv.y, uv.y, 1.f };
+		case 0: return Point{ 1.f, uv.y, -uv.x };
+		case 1: return Point{ -1.f, uv.y, uv.x };
+		case 2: return Point{ uv.x, 1.f, -uv.y };
+		case 3: return Point{ uv.x, -1.f, uv.y };
+		case 4: return Point{ uv.x, uv.y, 1.f };
 		case 5:
 		default:
-			return Point{ -uv.y, uv.y, -1.f };
+			return Point{ -uv.x, uv.y, -1.f };
 	}
 }
 
@@ -124,7 +124,7 @@ CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const
 	if(layers == 6) {
 		// Cubemap
 		// Find out which face by elongating the direction
-		ei::Vec3 projDir = direction / ei::max(direction);
+		ei::Vec3 projDir = direction / ei::max(ei::abs(direction));
 		// Set the layer and UV coordinates
 		int layer;
 		uvOut = cubemap_surface_to_uv(projDir, layer);
