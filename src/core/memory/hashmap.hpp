@@ -165,7 +165,7 @@ public:
 		}
 		return nullptr;
 	}
-	__device__ const V* find(K key) const { return const_cast<HashMap*>(this)->find(); }
+	__device__ const V* find(K key) const { return const_cast<HashMap*>(this)->find(key); }
 
 	// Get the number of elements in the hash map
 	__device__ u32 size() const { return m_dataCount; }

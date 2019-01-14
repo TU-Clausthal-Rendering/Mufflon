@@ -449,7 +449,7 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 
 template < Device dev >
 void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
-	if(dev == Device::CUDA && m_dirty.needs_sync(dev)) {
+	if(dev == Device::CUDA && (m_dirty.needs_sync(dev) || !m_treeCuda)) {
 		if(!m_treeCpu)
 			throw std::runtime_error("[LightTreeBuilder::synchronize] There is no source for light-tree synchronization!");
 		// Easiest way to synchronize this complicated type (espacially, if the size changed)
@@ -463,25 +463,26 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
-		// Remap the environment map
-		if(m_envLight)
-			m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>(sceneBounds);
-		else // Default envmap is black
-			m_treeCuda->background = Background::black().acquire_const<Device::CUDA>(sceneBounds);
-
 		// Replace all texture handles inside the tree's data and
 		// synchronize all the remaining tree memory.
 		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
 
 		m_dirty.mark_synced(dev);
+	} 
+
+	// The background can always be outdated
+	if(dev == Device::CUDA) {
+		if(m_envLight)
+			m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>(sceneBounds);
+		else // Default envmap is black
+			m_treeCuda->background = Background::black().acquire_const<Device::CUDA>(sceneBounds);
 	} else {
-		// The background can always be outdated
 		if(m_envLight)
 			m_treeCpu->background = m_envLight->acquire_const<Device::CPU>(sceneBounds);
 		else // Default envmap is black
 			m_treeCpu->background = Background::black().acquire_const<Device::CPU>(sceneBounds);
-		// TODO: backsync? Would need another hashmap for texture mapping.
 	}
+	// TODO: backsync? Would need another hashmap for texture mapping.
 }
 
 void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scene) {

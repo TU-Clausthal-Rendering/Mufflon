@@ -32,7 +32,15 @@ struct Throughput {
 	float guideWeight;
 };
 
+// Braced-inherited initialization is only part of C++17...
 struct VertexSample : public math::PathSample {
+	VertexSample() = default;
+	CUDA_FUNCTION VertexSample(math::PathSample pathSample, scene::Point origin,
+				 scene::materials::MediumHandle medium) :
+		math::PathSample(pathSample),
+		origin(origin),
+		medium(medium) {}
+
 	scene::Point origin;
 	scene::materials::MediumHandle medium;	// TODO: fill this with life in the vertex itself
 };
@@ -56,17 +64,17 @@ struct VertexSample : public math::PathSample {
 template < typename ExtensionT, int VERTEX_ALIGNMENT >
 class PathVertex {
 public:
-	PathVertex() : m_type(Interaction::VOID) {}
+	CUDA_FUNCTION PathVertex() : m_type(Interaction::VOID) {}
 
-	bool is_end_point() const {
+	CUDA_FUNCTION bool is_end_point() const {
 		return m_type != Interaction::SURFACE;
 	}
-	bool is_orthographic() const {
+	CUDA_FUNCTION bool is_orthographic() const {
 		return m_type == Interaction::LIGHT_DIRECTIONAL
 			|| m_type == Interaction::LIGHT_ENVMAP
 			|| m_type == Interaction::CAMERA_ORTHO;
 	}
-	bool is_camera() const {
+	CUDA_FUNCTION bool is_camera() const {
 		return m_type == Interaction::CAMERA_PINHOLE
 			|| m_type == Interaction::CAMERA_FOCUS
 			|| m_type == Interaction::CAMERA_ORTHO;
@@ -74,7 +82,7 @@ public:
 
 	// Get the position of the vertex. For orthographic vertices this
 	// position is computed with respect to a referencePosition.
-	scene::Point get_position(const scene::Point& referencePosition) const {
+	CUDA_FUNCTION scene::Point get_position(const scene::Point& referencePosition) const {
 		if(m_type == Interaction::LIGHT_DIRECTIONAL
 			|| m_type == Interaction::LIGHT_ENVMAP)
 			return referencePosition - m_position * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
@@ -84,26 +92,26 @@ public:
 	}
 
 	// Get the position of the vertex. For orthographic vertices an assertion is issued
-	scene::Point get_position() const {
+	CUDA_FUNCTION scene::Point get_position() const {
 		mAssertMsg(!is_orthographic(), "Implementation error. Orthogonal vertices have no position.");
 		return m_position;
 	}
 
 	// The incident direction, or undefined for end vertices (may be abused by end vertices.
-	scene::Direction get_incident_direction() const {
+	CUDA_FUNCTION scene::Direction get_incident_direction() const {
 		mAssertMsg(!is_end_point(), "Incident direction for end points is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
 
 	// The per area PDF of the previous segment which generated this vertex
-	AreaPdf get_incident_pdf() const { return m_incidentPdf; }
+	CUDA_FUNCTION AreaPdf get_incident_pdf() const { return m_incidentPdf; }
 
 	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
 	// This method ensures compatibility with any kind of interaction.
 	// Non-hitable vertices simply return 0, surfaces return a real cosθ and
 	// some things like the LIGHT_ENVMAP return special values for the compatibility.
 	// connection: a direction with arbitrary orientation
-	float get_geometrical_factor(const scene::Direction& connection) const {
+	CUDA_FUNCTION float get_geometrical_factor(const scene::Direction& connection) const {
 		switch(m_type) {
 			// Non-hitable vertices
 			case Interaction::VOID:
@@ -132,7 +140,7 @@ public:
 	}
 
 	// Get a normal if there is any. Otherwise returns a 0-vector.
-	scene::Direction get_normal() const {
+	CUDA_FUNCTION scene::Direction get_normal() const {
 		if(m_type == Interaction::LIGHT_AREA) {
 			auto* alDesc = as<AreaLightDesc>(desc());
 			return alDesc->normal;
@@ -155,7 +163,7 @@ public:
 	// media: buffer with all media in the scene
 	// adjoint: Is this a vertex on a light sub-path?
 	// merge: Evaluation takes place in a merge?
-	math::EvalValue evaluate(const scene::Direction & excident,
+	CUDA_FUNCTION math::EvalValue evaluate(const scene::Direction & excident,
 							 const scene::materials::Medium* media,
 							 bool adjoint = false, bool merge = false
 	) const {
@@ -202,7 +210,7 @@ public:
 	}
 
 	// TODO: fractional pixel coords?
-	Pixel get_pixel(const scene::Direction& excident) const {
+	CUDA_FUNCTION Pixel get_pixel(const scene::Direction& excident) const {
 		if(m_type == Interaction::CAMERA_PINHOLE) {
 			const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
 			cameras::ProjectionResult proj = pinholecam_project(*desc, excident);
@@ -221,7 +229,7 @@ public:
 	 * Create a new outgoing direction. This method can be used in a loop
 	 * to fully Monte Carlo integrate the rendering equation at this vertex.
 	 */
-	VertexSample sample(const scene::materials::Medium* media,
+	CUDA_FUNCTION VertexSample sample(const scene::materials::Medium* media,
 						const math::RndSet2_1& rndSet,
 						bool adjoint = false
 	) const {
@@ -230,60 +238,60 @@ public:
 			case Interaction::VOID: return VertexSample{};
 			case Interaction::LIGHT_POINT: {
 				auto lout = sample_light_dir_point(m_intensity, rndSet);
-				return VertexSample{ { lout.flux, math::PathEventType::REFLECTED,
+				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction,
 									   lout.dir.pdf, AngularPdf{0.0f} },
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
 				// TODO: sample new positions on a boundary?
 				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
-				return VertexSample{ { m_intensity, math::PathEventType::REFLECTED,
+				return VertexSample{ math::PathSample{ m_intensity, math::PathEventType::REFLECTED,
 									   desc->direction, desc->dirPdf, AngularPdf{0.0f} },
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_SPOT: {
 				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
 				auto lout = sample_light_dir_spot(m_intensity, desc->direction, desc->cosThetaMax, desc->cosFalloffStart, rndSet);
-				return VertexSample{ { lout.flux, math::PathEventType::REFLECTED,
+				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, lout.dir.pdf, AngularPdf{0.0f} },
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_AREA: {
 				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
 				auto lout = sample_light_dir_area(m_intensity, desc->normal, rndSet);
-				return VertexSample{ { lout.flux, math::PathEventType::REFLECTED,
+				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, lout.dir.pdf, AngularPdf{0.0f} },
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::CAMERA_PINHOLE: {
 				const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
 				cameras::Importon importon = pinholecam_sample_ray(*desc, m_position);
-				return VertexSample{ { Spectrum{1.0f}, math::PathEventType::REFLECTED,
+				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.0f} },
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::CAMERA_FOCUS: {
 				const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
 				cameras::Importon importon = focuscam_sample_ray(*desc, m_position, Pixel{ m_incident }, rndSet);
-				return VertexSample{ { Spectrum{1.0f}, math::PathEventType::REFLECTED,
+				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.f} },
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::SURFACE: {
 				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
 				return VertexSample{ scene::materials::sample(
 										desc->tangentSpace, desc->params,
 										m_incident, media, rndSet, adjoint),
-									 m_position };
+									 m_position, scene::materials::MediumHandle{} };
 			}
 		}
 		return VertexSample{};
 	}
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
-	float get_incident_dist_sq(const void* pathMem) const {
+	CUDA_FUNCTION float get_incident_dist_sq(const void* pathMem) const {
 		if(m_offsetToPath == 0xffff) return 0.0f;
 		const PathVertex* prev = as<PathVertex>(as<u8>(pathMem) + m_offsetToPath);
 		// The m_position is always a true position (the 'this' vertex is not an
@@ -292,24 +300,24 @@ public:
 	}
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
-	const PathVertex* previous(const void* pathMem) const {
+	CUDA_FUNCTION const PathVertex* previous(const void* pathMem) const {
 		return m_offsetToPath == 0xffff ? nullptr : as<PathVertex>(as<u8>(pathMem) + m_offsetToPath);
 	}
 
 	// Access to the renderer dependent extension
-	const ExtensionT& ext() const { return m_extension; }
-	ExtensionT& ext()			  { return m_extension; }
+	CUDA_FUNCTION const ExtensionT& ext() const { return m_extension; }
+	CUDA_FUNCTION ExtensionT& ext()			  { return m_extension; }
 
 	// Get the address of the interaction specific descriptor (aligned)
 	// TODO: benchmark if internal alignment is worth it
-	const void* desc() const { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+	CUDA_FUNCTION const void* desc() const { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
 
 	/*
 	* Compute the connection vector from path0 to path1 (non-normalized).
 	* This is a non-trivial operation because of special cases like directional lights and
 	* orthographic cammeras.
 	*/
-	static ei::Vec3 get_connection(const PathVertex& path0, const PathVertex& path1) {
+	CUDA_FUNCTION static ei::Vec3 get_connection(const PathVertex& path0, const PathVertex& path1) {
 		mAssert(is_connection_possible(path0, path1));
 		if(path0.is_orthographic())
 			return path0.m_position * scene::MAX_SCENE_SIZE;
@@ -318,7 +326,7 @@ public:
 		return path1.m_position - path0.m_position;
 	}
 
-	static bool is_connection_possible(const PathVertex& path0, const PathVertex& path1) {
+	CUDA_FUNCTION static bool is_connection_possible(const PathVertex& path0, const PathVertex& path1) {
 		// Enumerate cases which are not connectible
 		return !(
 			path0.is_orthographic() && path1.is_orthographic()	// Two orthographic vertices
@@ -328,7 +336,7 @@ public:
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
-	Spectrum get_emission() const {
+	CUDA_FUNCTION Spectrum get_emission() const {
 		switch(m_type) {
 			case Interaction::VOID:
 			case Interaction::LIGHT_POINT:
@@ -350,7 +358,7 @@ public:
 		return Spectrum{0.0f};
 	}
 
-	Spectrum get_albedo() const {
+	CUDA_FUNCTION Spectrum get_albedo() const {
 		if(m_type == Interaction::SURFACE) {
 			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
 			return scene::materials::albedo(desc->params);
@@ -361,7 +369,7 @@ public:
 		return Spectrum{0.0f};
 	}
 
-	scene::accel_struct::RayIntersectionResult::HitID get_primitive_id() const {
+	CUDA_FUNCTION scene::accel_struct::RayIntersectionResult::HitID get_primitive_id() const {
 		if(m_type == Interaction::SURFACE) {
 			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
 			return desc->primitiveId;
@@ -379,7 +387,7 @@ public:
 	 * instances.															   *
 	 * Return the size of the created vertex								   *
 	************************************************************************* */
-	static int create_void(void* mem, const void* previous,
+	CUDA_FUNCTION static int create_void(void* mem, const void* previous,
 		const ei::Ray& incidentRay
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
@@ -392,7 +400,7 @@ public:
 		return round_to_align( sizeof(PathVertex) );
 	}
 
-	static int create_camera(void* mem, const void* previous,
+	CUDA_FUNCTION static int create_camera(void* mem, const void* previous,
 		const cameras::CameraParams& camera,
 		const Pixel& pixel,
 		const math::RndSet2& rndSet
@@ -426,7 +434,7 @@ public:
 		return 0;
 	}
 
-	static int create_light(void* mem, const void* previous,
+	CUDA_FUNCTION static int create_light(void* mem, const void* previous,
 		const scene::lights::Photon& lightSample,	// Positional sample for the starting point on a light source
 		math::Rng& rng								// Only used for the incomplete vertices (env-map)
 	) {
@@ -480,7 +488,7 @@ public:
 		}
 	}
 
-	static int create_surface(void* mem, const void* previous,
+	CUDA_FUNCTION static int create_surface(void* mem, const void* previous,
 		const scene::accel_struct::RayIntersectionResult& hit,
 		const scene::materials::MaterialDescriptorBase& material,
 		const math::PositionSample& position,
@@ -553,14 +561,14 @@ private:
 	// REMARK: currently 0 floats unused in 16-byte alignment
 	ExtensionT m_extension;
 
-	static constexpr int round_to_align(int s) {
+	CUDA_FUNCTION static constexpr int round_to_align(int s) {
 		return (s + (VERTEX_ALIGNMENT-1)) & ~(VERTEX_ALIGNMENT-1);
 	}
 
 	// Private because the vertex is read-only by design (desc() is a helper for vertex creation only)
-	void* desc() { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+	CUDA_FUNCTION void* desc() { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
 
-	void init_prev_offset(void* mem, const void* previous) {
+	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
 		std::size_t s = as<u8>(previous) - as<u8>(mem);
 		mAssert(s <= 0xffff);
 		m_offsetToPath = static_cast<u16>(s);

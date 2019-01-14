@@ -112,7 +112,7 @@ CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 id
 		scene.transformations[idx][7],
 		scene.transformations[idx][11],
 	};
-	return ei::transform(ei::transform(scene.aabbs[idx], scaleRot), translation);
+	return ei::transform(ei::transform(scene.aabbs[objIdx], scaleRot), translation);
 }
 
 }}} // namespace mufflon::scene::accel_struct

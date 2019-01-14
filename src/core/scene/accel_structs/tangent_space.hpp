@@ -20,10 +20,6 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 		};
 	}
 
-	if(object.polygon.numTriangles == 960) {
-		__debugbreak();
-	}
-
 	// Compute the shading normal as the interpolated version of the per-vertex normals
 	// Since the normal will be in world space, we need to transform it
 	ei::Vec3 shadingNormal;
