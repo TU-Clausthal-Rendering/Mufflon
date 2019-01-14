@@ -47,7 +47,7 @@ public:
 	// This is for interfacing - get the number of scenarios and the name of each
 	std::size_t get_scenario_count() const noexcept { return m_scenarios.size(); }
 	// Gets the scenario name - this reference invalidates when new scenarios are added!
-	const std::string& get_scenario_name(std::size_t index);
+	ScenarioHandle get_scenario(std::size_t index);
 
 	/*
 	 * Add a ready to use material to the scene. The material must be loaded completely.

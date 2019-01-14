@@ -120,11 +120,13 @@
     <Compile Include="Model\Material\TorranceMaterialModel.cs" />
     <Compile Include="Model\Material\WalterMaterialModel.cs" />
     <Compile Include="Model\RendererModel.cs" />
-    <Compile Include="Model\SceneModel.cs" />
+    <Compile Include="Model\Scene\ScenarioModel.cs" />
+    <Compile Include="Model\Scene\SceneModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />
     <Compile Include="Properties\Annotations.cs" />
+    <Compile Include="Utility\BoundingBox.cs" />
     <Compile Include="Utility\StringUtil.cs" />
     <Compile Include="Utility\SynchronizedModelList.cs" />
     <Compile Include="Utility\SynchronizedViewModelList.cs" />

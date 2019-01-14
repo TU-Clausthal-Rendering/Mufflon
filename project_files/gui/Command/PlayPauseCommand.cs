@@ -29,7 +29,7 @@ namespace gui.Command
 
         public override bool CanExecute(object parameter)
         {
-            return m_models.Scene.IsLoaded;
+            return m_models.Scene != null;
         }
 
         public override void Execute(object parameter)

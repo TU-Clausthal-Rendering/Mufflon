@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -10,20 +11,23 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using gui.Annotations;
+using gui.Command;
 using gui.Dll;
 using gui.Model;
 using gui.Model.Camera;
 using gui.Model.Light;
 using gui.Model.Material;
+using gui.Model.Scene;
 using gui.Properties;
 using gui.Utility;
 using gui.View;
+using gui.View.Helper;
 
 namespace gui.ViewModel
 {
     public class SceneViewModel : INotifyPropertyChanged
     {
-        public class SceneMenuItem : ICommand
+        public class SceneMenuItem : LoadSceneCommand
         {
             private Models m_models;
 
@@ -31,48 +35,41 @@ namespace gui.ViewModel
             public string Path { get; set; }
             public ICommand Command { get; }
 
-            public SceneMenuItem(Models models)
+            public SceneMenuItem(Models models) : base(models)
             {
                 m_models = models;
                 Command = this;
             }
 
-            SceneMenuItem(ICommand command)
-            {
-                Command = command;
-            }
-
-            public bool CanExecute(object parameter)
-            {
-                return !m_models.Renderer.IsRendering;
-            }
-
-            public void Execute(object parameter)
-            {
-                m_models.Scene.LoadScene(Path);
-            }
-
-            public event EventHandler CanExecuteChanged
-            {
-                add { }
-                remove { }
-            }
+            public override void Execute(object parameter) => LoadScene(Path);
         }
 
         private Models m_models;
-        private ListBox m_scenarioBox;
-        private ScenarioLoadStatus m_scenarioLoadDialog;
-        public ObservableCollection<SceneMenuItem> LastScenes { get; }
-        public ObservableCollection<string> Scenarios { get => m_models.Scene.Scenarios; }
-        public bool CanLoadLastScenes { get => LastScenes.Count > 0 && !m_models.Renderer.IsRendering; }
+        public ObservableCollection<SceneMenuItem> LastScenes { get; } = new ObservableCollection<SceneMenuItem>();
+
+        private ComboBoxItem<ScenarioModel> m_selectedScenario = null;
+        public ComboBoxItem<ScenarioModel> SelectedScenario
+        {
+            get => m_selectedScenario;
+            set
+            {
+                if(ReferenceEquals(value, m_selectedScenario)) return;
+                m_selectedScenario = value;
+                OnPropertyChanged(nameof(SelectedScenario));
+
+                // load selected scenario
+                if (m_selectedScenario == null) return;
+                m_models.Scene.CurrentScenario = m_selectedScenario.Cargo;
+            }
+        }
+        public ObservableCollection<ComboBoxItem<ScenarioModel>> Scenarios { get; } = new ObservableCollection<ComboBoxItem<ScenarioModel>>();
+        public bool CanLoadLastScenes => LastScenes.Count > 0 && !m_models.Renderer.IsRendering;
 
         public SceneViewModel(MainWindow window, Models models)
         {
             m_models = models;
-            m_scenarioBox = (ListBox)window.FindName("ScenarioSelectionBox");
-            m_scenarioBox.SelectionChanged += scenarioChanged;
-            LastScenes = new ObservableCollection<SceneMenuItem>();
-            foreach (string path in m_models.Scene.LastScenes)
+
+            foreach (string path in Settings.Default.LastScenes)
             {
                 LastScenes.Add(new SceneMenuItem(m_models)
                 {
@@ -86,8 +83,50 @@ namespace gui.ViewModel
             m_models.Materials.Models.CollectionChanged += OnMaterialsCollectionChanged;
             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
 
-            m_models.Scene.PropertyChanged += changeScene;
-            m_models.Renderer.PropertyChanged += renderStatusChanged;
+            // assume no scene loaded
+            Debug.Assert(m_models.Scene == null);
+            m_models.PropertyChanged += ModelsOnPropertyChanged;
+            m_models.Renderer.PropertyChanged += OnRendererChange;
+
+            Settings.Default.PropertyChanged += SettingsOnPropertyChanged;
+        }
+
+        private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(Models.Scene):
+                    // subscribe to new model
+                    if (m_models.Scene != null)
+                    {
+                        m_models.Scene.PropertyChanged += OnSceneChanged;
+                        m_models.Scene.Scenarios.CollectionChanged += ScenariosOnCollectionChanged;
+                    }
+
+                    // refresh views
+                    MakeScenerioViews();
+                    break;
+            }
+        }
+
+        private void SettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(Settings.Default.LastScenes):
+                    // TODO this wont be triggered => change to observable collection?
+                    LastScenes.Clear();
+                    foreach (string path in Settings.Default.LastScenes)
+                    {
+                        LastScenes.Add(new SceneMenuItem(m_models)
+                        {
+                            Filename = Path.GetFileName(path),
+                            Path = path
+                        });
+                    }
+                    OnPropertyChanged(nameof(CanLoadLastScenes));
+                    break;
+            }
         }
 
         private void OnLightsCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
@@ -102,12 +141,12 @@ namespace gui.ViewModel
                     if (light.GetType() == typeof(PointLightModel))
                     {
                         light.Handle = Core.world_add_light(light.Name, Core.LightType.POINT);
-                        loadSceneLightData(light.Handle, light as PointLightModel);
+                        LoadSceneLightData(light.Handle, light as PointLightModel);
                     }
                     else if (light.GetType() == typeof(SpotLightModel))
                     {
                         light.Handle = Core.world_add_light(light.Name, Core.LightType.SPOT);
-                        loadSceneLightData(light.Handle, light as SpotLightModel);
+                        LoadSceneLightData(light.Handle, light as SpotLightModel);
                     }
                     else if (light.GetType() == typeof(DirectionalLightModel))
                     {
@@ -365,7 +404,7 @@ namespace gui.ViewModel
             }
         }
 
-        private void changeScene(object sender, PropertyChangedEventArgs args)
+        private void OnSceneChanged(object sender, PropertyChangedEventArgs args)
         {
             switch(args.PropertyName)
             {
@@ -377,90 +416,86 @@ namespace gui.ViewModel
                             m_models.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
                             m_models.Materials.Models.CollectionChanged -= OnMaterialsCollectionChanged;
                             m_models.Cameras.Models.CollectionChanged -= OnCamerasCollectionChanged;
-                            loadSceneLights();
-                            loadSceneMaterials();
-                            loadSceneCameras();
+                            LoadSceneLights();
+                            LoadSceneMaterials();
+                            LoadSceneCameras();
                             m_models.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
                             m_models.Materials.Models.CollectionChanged += OnMaterialsCollectionChanged;
                             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
                         }
                     }   break;
-                case nameof(SceneModel.LastScenes):
-                    {
-                        LastScenes.Clear();
-                        foreach(string path in m_models.Scene.LastScenes)
-                        {
-                            LastScenes.Add(new SceneMenuItem(m_models)
-                            {
-                                Filename = Path.GetFileName(path),
-                                Path = path
-                            });
-                        }
-                        OnPropertyChanged(nameof(CanLoadLastScenes));
-                        
-                    }   break;
-                case nameof(SceneModel.Scenarios):
-                    {
-                        IntPtr currentScenario = Core.world_get_current_scenario();
-                        if (currentScenario == IntPtr.Zero)
-                            throw new Exception(Core.core_get_dll_error());
-                        string currentScenarioName = Core.world_get_scenario_name(currentScenario);
-                        m_scenarioBox.SelectedItem = null;
-
-                        // Select the loaded scenario (unsubscribe the event since that scenario is already loaded)
-                        m_scenarioBox.SelectionChanged -= scenarioChanged;
-                        foreach (var item in m_scenarioBox.Items)
-                        {
-                            if ((item as string) == currentScenarioName)
-                            {
-                                m_scenarioBox.SelectedItem = item;
-                                break;
-                            }
-                        }
-                        loadScenarioLights(currentScenario);
-                        loadScenarioMaterials(currentScenario);
-                        loadScenarioCamera(currentScenario);
-                        m_scenarioBox.SelectionChanged += scenarioChanged;
-                    }   break;
+                case nameof(SceneModel.CurrentScenario):
+                    LoadScenarioViews();
+                    break;
 
             }
         }
 
-        private void scenarioChanged(object sender, SelectionChangedEventArgs args)
+        private void ScenariosOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            if(args.AddedItems.Count > 0)
+            // TODO make more efficient for single value insertions
+            MakeScenerioViews();
+            /*IntPtr currentScenario = Core.world_get_current_scenario();
+            if (currentScenario == IntPtr.Zero)
+                throw new Exception(Core.core_get_dll_error());
+            string currentScenarioName = Core.world_get_scenario_name(currentScenario);
+            m_scenarioBox.SelectedItem = null;
+
+            // Select the loaded scenario (unsubscribe the event since that scenario is already loaded)
+            m_scenarioBox.SelectionChanged -= ScenarioChanged;
+            foreach (var item in m_scenarioBox.Items)
             {
-                IntPtr scenario = Core.world_find_scenario(args.AddedItems[0] as string);
-                if (scenario == IntPtr.Zero)
-                    throw new Exception(Core.core_get_dll_error());
-                // The dialog will be closed when all scenario work is done (at the end of loadScenarioViews)
-                m_scenarioLoadDialog = new ScenarioLoadStatus(args.AddedItems[0] as string);
-                loadScenarioAsync(scenario);
-                m_models.Scene.CurrentScenario = args.AddedItems[0] as string;
+                if ((item as string) == currentScenarioName)
+                {
+                    m_scenarioBox.SelectedItem = item;
+                    break;
+                }
+            }
+            LoadScenarioLights(currentScenario);
+            loadScenarioMaterials(currentScenario);
+            LoadScenarioCamera(currentScenario);
+            m_scenarioBox.SelectionChanged += ScenarioChanged;*/
+        }
+
+        /// <summary>
+        /// clears Scenarios collection and fills it with the new values.
+        /// Sets SelectedScenario as well.
+        /// </summary>
+        private void MakeScenerioViews()
+        {
+            Scenarios.Clear();
+
+            if (m_models.Scene == null)
+            {
+                SelectedScenario = null;
+                return;
+            }
+
+            // code assumes that an active scenario exists
+            Debug.Assert(m_models.Scene.CurrentScenario != null);
+
+            foreach (var scenario in m_models.Scene.Scenarios)
+            {
+                // add scenario view
+                var view = new ComboBoxItem<ScenarioModel>(scenario.Name, scenario);
+                Scenarios.Add(view);
+                // set selected item
+                if (ReferenceEquals(scenario, m_models.Scene.CurrentScenario))
+                    SelectedScenario = view;
             }
         }
 
-        private async void loadScenarioAsync(IntPtr scenario)
-        {
-            await Task.Run(() =>
-            {
-                if (Core.world_load_scenario(scenario) == IntPtr.Zero)
-                    throw new Exception(Core.core_get_dll_error());
-                Application.Current.Dispatcher.BeginInvoke(new Action(() => loadScenarioViews(scenario)));
-            });
-        }
-
-        private void loadScenarioViews(IntPtr scenarioHdl)
+        private void LoadScenarioViews()
         {
             // First fetch the scenario-specific information
-            loadScenarioLights(scenarioHdl);
-            loadScenarioMaterials(scenarioHdl);
-            loadScenarioCamera(scenarioHdl);
+            LoadScenarioLights(m_models.Scene.CurrentScenario.Handle);
+            loadScenarioMaterials(m_models.Scene.CurrentScenario.Handle);
+            LoadScenarioCamera(m_models.Scene.CurrentScenario.Handle);
 
-            m_scenarioLoadDialog.Close();
+            //m_scenarioLoadDialog.Close();
         }
 
-        private void loadScenarioLights(IntPtr scenarioHdl)
+        private void LoadScenarioLights(IntPtr scenarioHdl)
         {
             foreach (var light in m_models.Lights.Models)
             {
@@ -550,7 +585,7 @@ namespace gui.ViewModel
             // TODO
         }
 
-        private void loadScenarioCamera(IntPtr scenarioHdl)
+        private void LoadScenarioCamera(IntPtr scenarioHdl)
         {
             IntPtr cam = Core.scenario_get_camera(scenarioHdl);
             if (cam == IntPtr.Zero)
@@ -574,7 +609,7 @@ namespace gui.ViewModel
             }
         }
 
-        private void loadSceneLightData(IntPtr lightHdl, PointLightModel lightModel)
+        private static void LoadSceneLightData(IntPtr lightHdl, PointLightModel lightModel)
         {
             Core.Vec3 pos = new Core.Vec3();
             Core.Vec3 intensity = new Core.Vec3();
@@ -587,7 +622,7 @@ namespace gui.ViewModel
             lightModel.Intensity = new Vec3<float>(intensity.x, intensity.y, intensity.z);
         }
 
-        private void loadSceneLightData(IntPtr lightHdl, SpotLightModel lightModel)
+        private void LoadSceneLightData(IntPtr lightHdl, SpotLightModel lightModel)
         {
             Core.Vec3 pos = new Core.Vec3();
             Core.Vec3 dir = new Core.Vec3();
@@ -625,9 +660,11 @@ namespace gui.ViewModel
             lightModel.Radiance = new Vec3<float>(radiance.x, radiance.y, radiance.z);
         }
 
-        private void loadSceneLights()
+        private void LoadSceneLights()
         {
             m_models.Lights.Models.Clear();
+
+            if(m_models.Scene == null) return;
             // Point lights
             ulong pointLightCount = Core.world_get_point_light_count();
             for(ulong i = 0u; i < pointLightCount; ++i)
@@ -642,7 +679,7 @@ namespace gui.ViewModel
                     Name = name,
                     Handle = hdl,
                 });
-                loadSceneLightData(hdl, m_models.Lights.Models.Last() as PointLightModel);
+                LoadSceneLightData(hdl, m_models.Lights.Models.Last() as PointLightModel);
                 m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
@@ -660,7 +697,7 @@ namespace gui.ViewModel
                     Name = name,
                     Handle = hdl,
                 });
-                loadSceneLightData(hdl, m_models.Lights.Models.Last() as SpotLightModel);
+                LoadSceneLightData(hdl, m_models.Lights.Models.Last() as SpotLightModel);
                 m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
@@ -704,13 +741,13 @@ namespace gui.ViewModel
             }
         }
 
-        private void loadSceneMaterials()
+        private void LoadSceneMaterials()
         {
             // TODO
             m_models.Materials.Models.Clear();
         }
 
-        private void loadSceneCameras()
+        private void LoadSceneCameras()
         {
             m_models.Cameras.Models.Clear();
             ulong count = Core.world_get_camera_count();
@@ -792,7 +829,7 @@ namespace gui.ViewModel
             }
         }
 
-        private void renderStatusChanged(object sender, PropertyChangedEventArgs args)
+        private void OnRendererChange(object sender, PropertyChangedEventArgs args)
         {
             switch(args.PropertyName)
             {

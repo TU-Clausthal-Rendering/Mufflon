@@ -173,9 +173,10 @@
                     Background="{StaticResource BackgroundBrush}">
                     <TabItem Header="Scenario"
                              Width="Auto">
-                        <ListBox Name="ScenarioSelectionBox"
-                                 ItemsSource="{Binding Scene.Scenarios, UpdateSourceTrigger=PropertyChanged}"
-                                 IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                        <ListBox 
+                            ItemsSource="{Binding Scene.Scenarios}"
+                            SelectedItem="{Binding Scene.SelectedScenario}"
+                            IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                     </TabItem>
                     <TabItem Header="Properties"
                              Width="Auto">

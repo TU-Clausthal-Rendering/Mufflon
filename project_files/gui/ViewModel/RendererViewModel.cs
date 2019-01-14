@@ -109,7 +109,7 @@ namespace gui.ViewModel
             }
 
             // Register the handlers
-            m_models.Scene.PropertyChanged += sceneChanged;
+            m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;
 
             // Enable the last selected renderer
@@ -123,21 +123,25 @@ namespace gui.ViewModel
             m_models.Renderer.Type = (Core.RendererType)m_selectedRenderer.Type;
         }
 
-        private void sceneChanged(object sender, PropertyChangedEventArgs args)
+        private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
             switch (args.PropertyName)
             {
-                case nameof(Models.Scene.FullPath):
-                    if (!Core.render_disable_all_render_targets())
-                        throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
-                        throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_enable_renderer(m_models.Renderer.Type))
-                        throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_reset())
-                        throw new Exception(Core.core_get_dll_error());
-                    if (m_models.Scene.IsLoaded && AutoStartOnLoad)
-                        m_models.Renderer.IsRendering = true;
+                case nameof(Models.Scene):
+                    if (m_models.Scene != null)
+                    {
+                        // TODO other conditions
+                        if (!Core.render_disable_all_render_targets())
+                            throw new Exception(Core.core_get_dll_error());
+                        if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
+                            throw new Exception(Core.core_get_dll_error());
+                        if (!Core.render_enable_renderer(m_models.Renderer.Type))
+                            throw new Exception(Core.core_get_dll_error());
+                        if (!Core.render_reset())
+                            throw new Exception(Core.core_get_dll_error());
+                        if (m_models.Scene != null && AutoStartOnLoad)
+                            m_models.Renderer.IsRendering = true;
+                    }
                     break;
             }
         }

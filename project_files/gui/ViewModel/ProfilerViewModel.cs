@@ -7,6 +7,7 @@ using System.Windows.Media;
 using gui.Annotations;
 using gui.Dll;
 using gui.Model;
+using gui.Model.Scene;
 
 namespace gui.ViewModel
 {
@@ -33,7 +34,21 @@ namespace gui.ViewModel
             if (m_loaderTree == null)
                 throw new System.Exception("Failed to aquire loader tree item");
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
-            m_models.Scene.PropertyChanged += SceneOnPropertyChanged;
+            m_models.PropertyChanged += ModelsOnPropertyChanged;
+        }
+
+        private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(Models.Scene):
+                    // add scene subscription
+                    if (m_models.Scene != null)
+                    {
+                        m_models.Scene.PropertyChanged += SceneOnPropertyChanged;
+                    }
+                    break;
+            }
         }
 
         private void RendererOnPropertyChanged(object sender, PropertyChangedEventArgs args)

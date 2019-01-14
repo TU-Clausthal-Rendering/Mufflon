@@ -29,6 +29,11 @@ namespace gui.Dll
                 y = vec.Y;
                 z = vec.Z;
             }
+
+            public Vec3<float> ToUtilityVec()
+            {
+                return new Utility.Vec3<float>(x, y, z);
+            }
         };
 
         internal enum MaterialType
@@ -181,13 +186,9 @@ namespace gui.Dll
         internal static extern IntPtr world_get_current_scenario();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint world_get_scenario_count();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_scenario_name_by_index")]
-        private static extern IntPtr world_get_scenario_name_by_index_(uint index);
-        internal static string world_get_scenario_name_by_index(uint index) { return StringUtil.FromNativeUTF8(world_get_scenario_name_by_index_(index)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_scenario_name")]
-        private static extern IntPtr world_get_scenario_name_(IntPtr hdl);
-        internal static string world_get_scenario_name(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_scenario_name_(hdl)); }
-
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr world_get_scenario_by_index(uint index);
+        
         // Scenario API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_name")]
         private static extern IntPtr scenario_get_name_(IntPtr scenario);
@@ -346,6 +347,8 @@ namespace gui.Dll
         internal static extern bool scene_move_active_camera(float x, float y, float z);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scene_rotate_active_camera(float x, float y, float z);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scene_get_bounding_box(IntPtr scene, out Vec3 min, out Vec3 max);
 
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

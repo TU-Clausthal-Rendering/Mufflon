@@ -28,7 +28,7 @@ namespace gui.Command
             // First parse the current screenshot string and emplace the information
             string filename = Settings.Default.ScreenshotNamePattern;
             filename = filename.Replace("#scene", Path.GetFileNameWithoutExtension(m_models.Scene.Filename));
-            filename = filename.Replace("#scenario", m_models.Scene.CurrentScenario);
+            filename = filename.Replace("#scenario", m_models.Scene.CurrentScenario.Name);
             filename = filename.Replace("#renderer", RendererModel.getRendererName(m_models.Renderer.Type));
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
             // Gotta pause the renderer

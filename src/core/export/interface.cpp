@@ -1190,15 +1190,7 @@ uint32_t world_get_scenario_count() {
 	CATCH_ALL(0u)
 }
 
-const char* world_get_scenario_name(ConstScenarioHdl hdl) {
-	TRY
-	CHECK_NULLPTR(hdl, "scenario handle", nullptr);
-	std::string_view name = static_cast<ConstScenarioHandle>(hdl)->get_name();
-	return &name[0];
-	CATCH_ALL(nullptr)
-}
-
-const char* world_get_scenario_name_by_index(uint32_t index) {
+ScenarioHdl world_get_scenario_by_index(uint32_t index) {
 	TRY
 	const uint32_t MAX_INDEX = static_cast<uint32_t>(s_world.get_scenario_count());
 	if(index >= MAX_INDEX) {
@@ -1206,8 +1198,7 @@ const char* world_get_scenario_name_by_index(uint32_t index) {
 				 MAX_INDEX, ')');
 		return nullptr;
 	}
-	const std::string& nameRef = s_world.get_scenario_name(index);
-	return nameRef.c_str();
+	return s_world.get_scenario(index);
 	CATCH_ALL(nullptr)
 }
 
