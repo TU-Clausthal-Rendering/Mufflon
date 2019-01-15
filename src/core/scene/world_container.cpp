@@ -405,12 +405,7 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 }
 
 SceneHandle WorldContainer::load_scene(Scenario& scenario) {
-	std::vector<lights::PositionalLights> posLights;
-	std::vector<lights::DirectionalLight> dirLights;
-	std::optional<EnvLightHandle> envLightTex;
-	posLights.reserve(m_pointLights.size() + m_spotLights.size());
-	dirLights.reserve(m_dirLights.size());
-
+	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
 	m_scenario = &scenario;
 	m_scene = std::make_unique<Scene>(scenario);
 	u32 instIdx = 0;
@@ -469,7 +464,7 @@ void WorldContainer::load_scene_lights() {
 	 * 3. Only envmap light has been changed -> only replace envmap
 	 */
 
-	if(m_lightsDirty || m_scenario->lights_dirty_reset()) {
+	if(m_lightsDirty || m_scenario->lights_dirty_reset() || !m_scene->get_light_tree_builder().is_resident<Device::CPU>()) {
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
 		u32 instIdx = 0;

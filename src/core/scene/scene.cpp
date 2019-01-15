@@ -15,12 +15,16 @@
 namespace mufflon { namespace scene {
 
 bool Scene::is_sane() const noexcept {
-	if(m_scenario.get_camera() == nullptr)
+	if(m_scenario.get_camera() == nullptr) {
+		logWarning("[Scene::is_sane] No camera given.");
 		return false;
+	}
 	if(!m_lightTree.get_envLight()) {
 		// No envLight: we need some kind of light
-		if(m_lightTree.get_light_count() == 0u)
+		if(m_lightTree.get_light_count() == 0u) {
+			logWarning("[Scene::is_sane] No light sources given.");
 			return false;
+		}
 	}
 	return true;
 }

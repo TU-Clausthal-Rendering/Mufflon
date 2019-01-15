@@ -292,6 +292,7 @@ LightTreeBuilder::~LightTreeBuilder() {
 void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
 					  const ei::Box& boundingBox) {
+	logInfo("[LightTreeBuilder::build] Start building light tree.");
 	// Make sure the hashmap memory is allocated
 	m_primToNodePath.resize(int(posLights.size()));
 

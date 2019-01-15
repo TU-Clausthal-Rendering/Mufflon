@@ -165,6 +165,12 @@ public:
 		return m_lightCount;
 	}
 
+	template < Device dev >
+	bool is_resident() const {
+		if constexpr(dev == Device::CPU) return m_treeCpu != nullptr;
+		if constexpr(dev == Device::CUDA) return m_treeCuda != nullptr;
+		return false;
+	}
 private:
 	void update_media_cpu(const SceneDescriptor<Device::CPU>& scene);
 	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);

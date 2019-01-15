@@ -751,7 +751,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		numRemovedInternalNodes = numInternalNodes - collapseOffsets[numInternalNodes - 1];
 	}
 
-	logInfo("[LBVHBuilder::build_lbvh] collapsing removed ", numRemovedInternalNodes, " nodes.");
+	logPedantic("[LBVHBuilder::build_lbvh] collapsing removed ", numRemovedInternalNodes, " nodes.");
 
 	// Write the final compacted BVH
 	i32 numNodesInCollapsedBVH = (numInternalNodes - numRemovedInternalNodes);
@@ -775,6 +775,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 template < Device dev >
 void LBVHBuilder::build(ObjectDescriptor<dev>& obj, const ei::Box& sceneBB) {
+	logInfo("[LBVHBuilder::build] Building BVH for object with ", obj.numPrimitives, " primitives.");
 	build_lbvh<ObjectDescriptor<dev>>(obj, sceneBB, obj.numPrimitives);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
@@ -787,6 +788,7 @@ template < Device dev >
 void LBVHBuilder::build(
 	const SceneDescriptor<dev>& scene
 ) {
+	logInfo("[LBVHBuilder::build] Building BVH for ", scene.numInstances, " instances.");
 	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, scene.numInstances);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
