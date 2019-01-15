@@ -359,7 +359,7 @@ bool JsonLoader::load_lights() {
 			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
 				intensity = read<ei::Vec3>(m_state, intensityIter);
 			else
-				intensity = read<ei::Vec3>(m_state, get(m_state, light, "flux")) * 4.f * ei::PI;
+				intensity = read<ei::Vec3>(m_state, get(m_state, light, "flux")) / (4.0f * ei::PI);
 			intensity *= read_opt<float>(m_state, light, "scale", 1.f);
 
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT); hdl.type == LIGHT_POINT) {

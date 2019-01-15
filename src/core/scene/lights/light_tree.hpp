@@ -97,7 +97,6 @@ struct LightSubTree {
 				  "Invalid node struct size/alignment");
 
 	struct {
-		ei::Vec3 center;
 		float flux { 0.0f };
 		u16 type;
 	} root;

@@ -211,7 +211,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
 	return adjustPdf(connect_light(static_cast<LightType>(type), tree.memory + offset,
-							 position, ei::lensq(currentNode->center - position),
+							 position, ei::lensq(get_center(currentNode, type) - position),
 							 bounds, rnd), lightProb);
 }
 

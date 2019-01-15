@@ -119,7 +119,6 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 	if(lightOffsets.light_count() == 1u) {
 		tree.root.type = static_cast<u16>(lightOffsets.type(0));
 		tree.root.flux = get_flux(tree.memory + lightOffsets[0], lightOffsets.type(0), aabbDiag);
-		tree.root.center = get_center(tree.memory + lightOffsets[0], lightOffsets.type(0));
 		return;
 	}
 
@@ -229,7 +228,6 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 	// Last, set the root properties: guaranteed two lights
 	tree.root.type = Node::INTERNAL_NODE_TYPE;
 	tree.root.flux = tree.get_node(0u)->left.flux + tree.get_node(0u)->right.flux;
-	tree.root.center = tree.get_node(0u)->center;
 }
 
 void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, PrimitiveHandle, u32>& map) {
@@ -351,19 +349,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Copy the lights into the tree
 	// Directional lights are easier, because they have a fixed size
-	if(dirLights.size() > 0.0f) {
+	if(dirLights.size() > 0u) {
 		std::memcpy(m_treeCpu->dirLights.memory + dirLightOffsets[0], dirLights.data(), dirLightOffsets.mem_size());
 	}
 	// Positional lights are more difficult since we don't know the concrete size
-	if(posLights.size() > 0.0f) {
-		static_assert(sizeof(AreaLightQuad<Device::CPU>) == 96+16);
+	if(posLights.size() > 0u) {
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
-		std::size_t i = 0u;
 		for(const PositionalLights& light : posLights) {
-			if(i == 509) {
-				const float v = 5;
-			}
-			++i;
 			std::visit(overloaded{
 				[&mem,this](const AreaLightTriangleDesc& desc) {
 					auto* dst = as<AreaLightTriangle<Device::CPU>>(mem);

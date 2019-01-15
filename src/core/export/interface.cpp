@@ -1999,7 +1999,7 @@ Boolean scenario_add_light(ScenarioHdl scenario, const char* name) {
 		case lights::LightType::ENVMAP_LIGHT:
 		{
 			if(!scen.get_envmap_light_name().empty())
-				logWarning("[", FUNCTION_NAME, "] The scenario already has an envmap light; overwriting '",
+				logWarning("[", FUNCTION_NAME, "] The scenario already has an environment light; overwriting '",
 						   scen.get_envmap_light_name(), "' with '", resolvedName, "'");
 			scen.set_envmap_light(resolvedName);
 			return true;
