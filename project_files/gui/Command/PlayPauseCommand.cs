@@ -14,12 +14,6 @@ namespace gui.Command
         public PlayPauseCommand(Models models) : base("PlayPauseGesture")
         {
             m_models = models;
-            CanExecuteChanged += OnCanExecuteChanged;
-        }
-
-        private void OnCanExecuteChanged(object sender, EventArgs args)
-        {
-            CommandManager.InvalidateRequerySuggested();
         }
 
         public override bool CanExecute(object parameter)

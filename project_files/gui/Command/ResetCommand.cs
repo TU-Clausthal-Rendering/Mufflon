@@ -18,12 +18,6 @@ namespace gui.Command
         {
             m_models = models;
             m_playPause = playPause;
-            CanExecuteChanged += OnCanExecuteChanged;
-        }
-
-        private void OnCanExecuteChanged(object sender, EventArgs args)
-        {
-            CommandManager.InvalidateRequerySuggested();
         }
 
         public override bool CanExecute(object parameter)
