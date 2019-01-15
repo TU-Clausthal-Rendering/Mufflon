@@ -17,6 +17,7 @@ namespace mufflon { namespace scene {
 
 template < Device dev >
 struct SceneDescriptor;
+class Scenario;
 
 // Idea: On device side, Materials, Lights, and Cameras call their own functions in a switch statement
 
@@ -26,10 +27,8 @@ struct SceneDescriptor;
  */
 class Scene {
 public:
-	Scene(ConstCameraHandle cam,
-		  const std::vector<std::unique_ptr<materials::IMaterial>>& materialsRef) :
-		m_camera(cam),
-		m_materialsRef(materialsRef)
+	Scene(const Scenario& scenario) :
+		m_scenario(scenario)
 	{}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = default;
@@ -102,12 +101,10 @@ public:
 	void set_camera(ConstCameraHandle camera) noexcept {
 		mAssert(camera != nullptr);
 		m_cameraDescChanged = true;
-		m_camera = camera;
+		// TODO: this function is obsolete, once the scene querries the 'changed' flag from the scenario itself.
 	}
 	// Access the active camera
-	ConstCameraHandle get_camera() const noexcept {
-		return m_camera;
-	}
+	ConstCameraHandle get_camera() const noexcept;
 
 	const lights::LightTreeBuilder& get_light_tree_builder() const {
 		return m_lightTree;
@@ -142,12 +139,13 @@ private:
 	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
+	const Scenario& m_scenario;		// Reference to the scenario which is presented by this scene
+
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
 	std::map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
 	GenericResource m_media;		// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
-	ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
-	const std::vector<std::unique_ptr<materials::IMaterial>>& m_materialsRef;	// Refer the world's materials. There is no scenario dependent filtering because of global indexing.
+	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 	GenericResource m_materials;	// Device instanciation of Material parameter packs and an offset table (first table then data).
 
 	// Light tree containing all light sources enabled for the scene

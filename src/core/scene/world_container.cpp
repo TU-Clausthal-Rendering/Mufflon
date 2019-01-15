@@ -412,7 +412,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	dirLights.reserve(m_dirLights.size());
 
 	m_scenario = &scenario;
-	m_scene = std::make_unique<Scene>(scenario.get_camera(), m_materials);
+	m_scene = std::make_unique<Scene>(scenario);
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
 		if(!scenario.is_masked(&instance.get_object()))

@@ -31,7 +31,7 @@ struct EmissiveDesc {
 class Emissive : public IMaterial {
 public:
 	Emissive(TextureHandle emissiveTex, Spectrum scale) :
-		IMaterial{Materials::LAMBERT},
+		IMaterial{Materials::EMISSIVE},
 		m_emission{emissiveTex},
 		m_scale(scale)
 	{}

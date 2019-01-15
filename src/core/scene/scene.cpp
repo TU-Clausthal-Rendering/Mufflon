@@ -1,5 +1,6 @@
 #include "scene.hpp"
 #include "descriptors.hpp"
+#include "scenario.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
@@ -14,7 +15,7 @@
 namespace mufflon { namespace scene {
 
 bool Scene::is_sane() const noexcept {
-	if(m_camera == nullptr)
+	if(m_scenario.get_camera() == nullptr)
 		return false;
 	if(!m_lightTree.get_envLight()) {
 		// No envLight: we need some kind of light
@@ -34,26 +35,27 @@ void Scene::load_media(const std::vector<materials::Medium>& media) {
 template< Device dev >
 void Scene::load_materials() {
 	// 1. Pass get the sizes for the index -> material offset table
+	// TODO: if multiple slots bind the same material it would be possible to copy
+	// the offset and to upload less materials in total.
 	std::vector<int> offsets;
-	std::size_t offset = sizeof(int) * m_materialsRef.size(); // Store in one block -> table size is offset of first material
-	for(const auto& mat : m_materialsRef) {
+	std::size_t offset = sizeof(int) * m_scenario.get_num_material_slots(); // Store in one block -> table size is offset of first material
+	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
 		mAssert(offset <= std::numeric_limits<i32>::max());
 		offsets.push_back(i32(offset));
 		//offset += materials::get_handle_pack_size();
-		offset += mat->get_descriptor_size(dev);
+		offset += m_scenario.get_assigned_material(i)->get_descriptor_size(dev);
 	}
 	// Allocate the memory
 	m_materials.resize(offset);
 	char* mem = m_materials.acquire<dev>();
-	copy(mem, as<char>(offsets.data()), sizeof(int) * m_materialsRef.size());
+	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_PARAMETER_SIZE];
-	int i = 0;
-	for(const auto& mat : m_materialsRef) {
+	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
+		ConstMaterialHandle mat = m_scenario.get_assigned_material(i);
 		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_PARAMETER_SIZE);
 		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
 		copy(mem + offsets[i], buffer, size);
-		++i;
 	}
 	m_materials.mark_synced(dev); // Avoid overwrites with data from different devices.
 }
@@ -172,7 +174,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 	// Camera
 	if(m_cameraDescChanged) {
-		m_camera->get_parameter_pack(&sceneDescriptor.camera.get(), resolution);
+		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution);
 		m_cameraDescChanged = false;
 	}
 
@@ -222,6 +224,10 @@ void Scene::set_background(lights::Background& envLight) {
 		m_lightTree.set_envLight(envLight);
 		m_lightTreeDescChanged = true;
 	}
+}
+
+ConstCameraHandle Scene::get_camera() const noexcept {
+	return m_scenario.get_camera();
 }
 
 template < Device dev >

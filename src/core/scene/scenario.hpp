@@ -25,9 +25,10 @@ public:
 
 	/*
 	 * Add a new material entry to the table. The index of the material depends on the
-	 * order of declarations and is unchanging for a scene.
+	 * order of declarations and is unchanging for a scenario.
 	 */
 	MaterialIndex declare_material_slot(std::string_view binaryName);
+	MaterialIndex get_num_material_slots() const noexcept { return static_cast<MaterialIndex>(m_materialAssignment.size()); }
 	// Get the index of a slot from its name.
 	MaterialIndex get_material_slot_index(std::string_view binaryName) const;
 	/*
