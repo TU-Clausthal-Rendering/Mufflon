@@ -170,7 +170,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.objects = objDevDesc.get();
 	}
 
-	load_materials<dev>();
+	if(m_scenario.materials_dirty_reset() || !m_materials.is_resident<dev>())
+		load_materials<dev>();
 
 	// Camera
 	if(m_cameraDescChanged) {

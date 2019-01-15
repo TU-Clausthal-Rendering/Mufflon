@@ -86,6 +86,15 @@ public:
 		// The two layers should agree in the medium or explicitly define an order.
 		return m_layerA->compute_medium();
 	}
+
+	void set_factor_a(float fA) {
+		m_factorA = fA;
+		m_dirty = true;
+	}
+	void set_factor_b(float fB) {
+		m_factorB = fB;
+		m_dirty = true;
+	}
 private:
 	std::unique_ptr<IMaterial> m_layerA;
 	std::unique_ptr<IMaterial> m_layerB;

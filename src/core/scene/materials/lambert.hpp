@@ -62,6 +62,11 @@ public:
 		// Use some average dielectric refraction index and a maximum absorption
 		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
 	}
+
+	void set_albedo(TextureHandle albedo) {
+		m_albedo = albedo;
+		m_dirty = true;
+	}
 private:
 	TextureHandle m_albedo;
 };

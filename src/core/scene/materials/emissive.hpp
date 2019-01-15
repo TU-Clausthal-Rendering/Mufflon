@@ -68,6 +68,16 @@ public:
 		// Use some average dielectric refraction index and a maximum absorption
 		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
 	}
+
+	void set_emission(TextureHandle emissiveTex) {
+		m_emission = emissiveTex;
+		m_dirty = true;
+	}
+
+	void set_scale(const Spectrum& scale) {
+		m_scale = scale;
+		m_dirty = true;
+	}
 private:
 	TextureHandle m_emission;
 	Spectrum m_scale;

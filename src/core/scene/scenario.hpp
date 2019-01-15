@@ -129,6 +129,8 @@ public:
 		m_cameraChanged = false;
 		return dirty;
 	}
+	// Queries whether anything in the materials changed and resets the flag(s)
+	bool materials_dirty_reset() const;
 
 	const std::vector<std::string_view>& get_point_light_names() const noexcept {
 		return m_pointLightNames;
@@ -159,6 +161,7 @@ private:
 	bool m_lightsChanged = true;
 	bool m_envmapLightsChanged = true;
 	bool m_cameraChanged = true;
+	mutable bool m_materialAssignmentChanged = true;
 
 	std::string_view m_name;
 	// Map from binaryName to a material index (may use string_views as keys

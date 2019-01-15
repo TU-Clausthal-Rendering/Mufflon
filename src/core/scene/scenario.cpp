@@ -1,5 +1,6 @@
 #include "scenario.hpp"
 #include "util/log.hpp"
+#include "core/scene/materials/material.hpp"
 #include <algorithm>
 
 namespace mufflon::scene {
@@ -34,6 +35,7 @@ MaterialIndex Scenario::get_material_slot_index(std::string_view binaryName) con
 void Scenario::assign_material(MaterialIndex index, MaterialHandle material) {
 	// TODO: check if a renderer is active?
 	m_materialAssignment[index].material = material;
+	m_materialAssignmentChanged = true;
 }
 
 MaterialHandle Scenario::get_assigned_material(MaterialIndex index) const {
@@ -108,6 +110,15 @@ void Scenario::remove_envmap_light() {
 		m_envLightName = "";
 		m_envmapLightsChanged = true;
 	}
+}
+
+bool Scenario::materials_dirty_reset() const {
+	bool dirty = m_materialAssignmentChanged;
+	for(const auto& matAssign : m_materialAssignment) {
+		dirty |= matAssign.material->dirty_reset();
+	}
+	m_materialAssignmentChanged = false;
+	return dirty;
 }
 
 } // namespace mufflon::scene

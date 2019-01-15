@@ -87,7 +87,11 @@ public:
 
 	// A name of the material for mental recognition (no program logic depends on this name)
 	const std::string& get_name() const noexcept { return m_name; }
-	void set_name(std::string name) { m_name = move(name); }
+	void set_name(std::string name) {
+		m_name = move(name);
+		// A name change is not flagged as dirty, because it does not influence
+		// any property on renderer side.
+	}
 
 	virtual MaterialPropertyFlags get_properties() const noexcept = 0;
 
@@ -95,14 +99,6 @@ public:
 	 * Size of the material descriptor itself (mainly texture handles)
 	 * The size may vary per device.
 	 */
-	/*template< Device dev >
-	std::size_t get_handle_pack_size() const {
-		switch(m_type) {
-			case Materials::LAMBERT: return sizeof(LambertHandlePack<dev>);
-		}
-		mAssertMsg(false, "Material not (fully) implemented!");
-	}*/
-
 	virtual std::size_t get_descriptor_size(Device device) const {
 		return sizeof(MaterialDescriptorBase);
 	}
@@ -135,6 +131,7 @@ public:
 	}
 	void set_outer_medium(MediumHandle medium) {
 		m_outerMedium = medium;
+		m_dirty = true;
 	}
 	// Get the medium on opposite side of the normal.
 	MediumHandle get_inner_medium() const {
@@ -142,14 +139,23 @@ public:
 	}
 	void set_inner_medium(MediumHandle medium) {
 		m_innerMedium = medium;
+		m_dirty = true;
 	}
 
 	virtual Medium compute_medium() const = 0;
 
 	Materials get_type() const { return m_type; }
+
+	// Query if the material changed since last request and reset the flag.
+	bool dirty_reset() const {
+		bool dirty = m_dirty;
+		m_dirty = false;
+		return dirty;
+	}
 protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;
+	mutable bool m_dirty = true;			// Any property of the material changed
 private:
 	std::string m_name;
 	Materials m_type;
