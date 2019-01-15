@@ -16,8 +16,8 @@ namespace mufflon { namespace scene {
 bool Scene::is_sane() const noexcept {
 	if(m_camera == nullptr)
 		return false;
-	if(m_lightTree.get_envLight()->get_type() != lights::BackgroundType::ENVMAP) {
-		// No envmap: we need some kind of light
+	if(!m_lightTree.get_envLight()) {
+		// No envLight: we need some kind of light
 		if(m_lightTree.get_light_count() == 0u)
 			return false;
 	}
