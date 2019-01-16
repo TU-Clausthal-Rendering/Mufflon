@@ -24,10 +24,7 @@ union SurfaceParametrization {
 
 struct RayIntersectionResult {
 	float hitT;
-	struct HitID {
-		i32 instanceId;
-		i32 primId;
-	} hitId;
+	PrimitiveHandle hitId;
 	ei::Vec3 normal;
 	ei::Vec3 tangentX;
 	ei::Vec3 tangentY;
@@ -47,7 +44,7 @@ __host__ __device__
 bool any_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
@@ -56,7 +53,7 @@ __host__ __device__
 RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 

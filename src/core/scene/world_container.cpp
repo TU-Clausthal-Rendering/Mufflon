@@ -466,71 +466,74 @@ void WorldContainer::load_scene_lights() {
 	if(m_lightsDirty || m_scenario->lights_dirty_reset() || !m_scene->get_light_tree_builder().is_resident<Device::CPU>()) {
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
-		u32 instIdx = 0;
-		for(auto& instance : m_instances) {
-			if(!m_scenario->is_masked(&instance.get_object())) {
-				// Find all area lights, if the object contains some
-				if(instance.get_object().is_emissive(*m_scenario)) {
-					u32 primIdx = 0;
-					// First search in polygons (PrimitiveHandle expects poly before sphere)
-					auto& polygons = instance.get_object().get_geometry<geometry::Polygons>();
-					const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
-					const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
-					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
-					for(const auto& face : polygons.faces()) {
-						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
-						if(mat->get_properties().is_emissive()) {
-							auto emission = mat->get_emission();
-							mAssert(emission.texture != nullptr);
-							if(std::distance(face.begin(), face.end()) == 3) {
-								lights::AreaLightTriangleDesc al;
-								al.radianceTex = emission.texture;
-								al.scale = ei::packRGB9E5(emission.scale);
-								int i = 0;
-								for(auto vHdl : face) {
-									al.points[i] = positions[vHdl.idx()];
-									al.uv[i] = uvs[vHdl.idx()];
-									++i;
-								}
-								posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
-							} else {
-								lights::AreaLightQuadDesc al;
-								al.radianceTex = emission.texture;
-								al.scale = ei::packRGB9E5(emission.scale);
-								int i = 0;
-								for(auto vHdl : face) {
-									al.points[i] = positions[vHdl.idx()];
-									al.uv[i] = uvs[vHdl.idx()];
-									++i;
-								}
-								posLights.push_back({ al, PrimitiveHandle{ u64(instIdx) << 32ull | primIdx } });
-							}
-						}
-						++primIdx;
-					}
-
-					// Then get the sphere lights
-					primIdx = (u32)instance.get_object().get_geometry<geometry::Polygons>().get_face_count();
-					auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
-					materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
-					const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
-					for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
-						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
-						if(mat->get_properties().is_emissive()) {
-							auto emission = mat->get_emission();
-							mAssert(emission.texture != nullptr);
-							lights::AreaLightSphereDesc al{
-								spheresData[i].center,
-								spheresData[i].radius,
-								emission.texture, ei::packRGB9E5(emission.scale)
-							};
-							posLights.push_back({ al, u64(instIdx) << 32ull | primIdx });
-						}
-						++primIdx;
-					}
-				}
+		i32 instIdx = 0;
+		for(auto& obj : m_scene->get_objects()) {
+			if(!obj.first->is_emissive(*m_scenario)) {
+				instIdx += static_cast<i32>(obj.second.size());
+				continue;
 			}
-			++instIdx;
+			// Object contains area lights.
+			// Create one light source per polygone and instance
+			for(auto& inst : obj.second) {
+				i32 primIdx = 0;
+				// First search in polygons (PrimitiveHandle expects poly before sphere)
+				auto& polygons = obj.first->get_geometry<geometry::Polygons>();
+				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
+				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
+				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
+				for(const auto& face : polygons.faces()) {
+					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
+					if(mat->get_properties().is_emissive()) {
+						auto emission = mat->get_emission();
+						mAssert(emission.texture != nullptr);
+						if(std::distance(face.begin(), face.end()) == 3) {
+							lights::AreaLightTriangleDesc al;
+							al.radianceTex = emission.texture;
+							al.scale = ei::packRGB9E5(emission.scale);
+							int i = 0;
+							for(auto vHdl : face) {
+								al.points[i] = positions[vHdl.idx()];
+								al.uv[i] = uvs[vHdl.idx()];
+								++i;
+							}
+							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
+						} else {
+							lights::AreaLightQuadDesc al;
+							al.radianceTex = emission.texture;
+							al.scale = ei::packRGB9E5(emission.scale);
+							int i = 0;
+							for(auto vHdl : face) {
+								al.points[i] = positions[vHdl.idx()];
+								al.uv[i] = uvs[vHdl.idx()];
+								++i;
+							}
+							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
+						}
+					}
+					++primIdx;
+				}
+
+				// Then get the sphere lights
+				primIdx = (u32)obj.first->get_geometry<geometry::Polygons>().get_face_count();
+				auto& spheres = obj.first->get_geometry<geometry::Spheres>();
+				materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
+				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
+					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
+					if(mat->get_properties().is_emissive()) {
+						auto emission = mat->get_emission();
+						mAssert(emission.texture != nullptr);
+						lights::AreaLightSphereDesc al{
+							spheresData[i].center,
+							spheresData[i].radius,
+							emission.texture, ei::packRGB9E5(emission.scale)
+						};
+						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });
+					}
+					++primIdx;
+				}
+				++instIdx;
+			}
 		}
 
 		posLights.reserve(posLights.size() + m_pointLights.size() + m_spotLights.size());
@@ -539,14 +542,14 @@ void WorldContainer::load_scene_lights() {
 		// Add regular lights
 		for(const std::string_view& name : m_scenario->get_point_light_names()) {
 			if(auto pointLight = m_pointLights.find(name); pointLight)
-				posLights.push_back(lights::PositionalLights{ *pointLight, ~0u });
+				posLights.push_back(lights::PositionalLights{ *pointLight, PrimitiveHandle{} });
 			else
 				logWarning("[WorldContainer::load_scene_lights] Unknown point light '", name, "' in scenario '",
 						   m_scenario->get_name(), "'");
 		}
 		for(const std::string_view& name : m_scenario->get_spot_light_names()) {
 			if(auto spotLight = m_spotLights.find(name); spotLight)
-				posLights.push_back(lights::PositionalLights{ *spotLight, ~0u });
+				posLights.push_back(lights::PositionalLights{ *spotLight, PrimitiveHandle{} });
 			else
 				logWarning("[WorldContainer::load_scene_lights] Unknown spot light '", name, "' in scenario '",
 						   m_scenario->get_name(), "'");

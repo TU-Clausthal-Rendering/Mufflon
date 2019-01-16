@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "util/int_types.hpp"
 
 namespace mufflon { namespace cameras {
 class Camera;
@@ -42,6 +42,12 @@ using ScenarioHandle = Scenario*;
 using ConstScenarioHandle = const Scenario*;
 using ConstTextureHandle = const textures::Texture*;
 using TextureHandle = textures::Texture*;
-using PrimitiveHandle = uint64_t;		// | 32bit instance | 32 bit primitive (poly+spheres enumerated in a single sequence |
+struct PrimitiveHandle {
+	i32 instanceId { -1 };
+	i32 primId { -1 };
+	constexpr bool operator==(const PrimitiveHandle& rhs) const noexcept {
+		return instanceId == rhs.instanceId && primId == rhs.primId;
+	}
+};
 
 }} // namespace mufflon::scene

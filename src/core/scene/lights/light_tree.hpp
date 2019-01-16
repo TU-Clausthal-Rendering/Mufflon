@@ -33,7 +33,7 @@ namespace lights {
 struct PositionalLights {
 	std::variant<PointLight, SpotLight, AreaLightTriangleDesc,
 				 AreaLightQuadDesc, AreaLightSphereDesc> light;
-	PrimitiveHandle primitive { ~0u };
+	PrimitiveHandle primitive;
 };
 
 // Gets the light type as an enum value

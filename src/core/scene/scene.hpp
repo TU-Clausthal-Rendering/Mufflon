@@ -135,6 +135,10 @@ public:
 											   const std::vector<const char*>& sphereAttribs,
 											   const ei::IVec2& resolution);
 
+	// Get access to the existing objects in the scene (subset from the world)
+	const std::map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
+		return m_objects;
+	}
 private:
 	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);

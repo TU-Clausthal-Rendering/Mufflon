@@ -162,7 +162,6 @@ evaluate_subdesc(Materials type,
 		case Materials::LAMBERT:
 			return lambert_evaluate(*as<LambertParameterPack>(subParams), incidentTS, excidentTS);
 		case Materials::EMISSIVE:
-			mAssertMsg(false, "Emissive evaluation should never be called (0-contribution). Eearly out based on material check assumed.");
 			return math::EvalValue{};
 		case Materials::BLEND:
 			return blend_evaluate(*as<BlendParameterPack>(subParams), incidentTS, excidentTS, media, adjoint, merge);

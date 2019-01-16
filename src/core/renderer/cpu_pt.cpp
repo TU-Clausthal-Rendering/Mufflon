@@ -124,7 +124,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		if(pathLen <= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene.lightTree, 0,
+				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex->get_primitive_id(),
 												  lastPosition, scene::lights::guide_flux);
 				//float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				float mis = 0.0f;

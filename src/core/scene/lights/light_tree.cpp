@@ -237,7 +237,7 @@ void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, 
 	if(extraNodes > 0) ++height;
 	u32 i = 0;
 	for(const auto& light : lights) {
-		if(light.primitive != ~0u) {		// Hitable light source?
+		if(light.primitive.instanceId != -1) {		// Hitable light source?
 			u32 code = (i <= lvlOff) ? i : (i-lvlOff)*2+lvlOff;
 			// Append zero -> most significant bit is the root branch
 			code <<= 32 - height;

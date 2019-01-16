@@ -87,7 +87,7 @@ public:
 		u32 step = 0;
 		u32 expected = ~0u;
 		while(!std::atomic_compare_exchange_strong(&m_map[idx], &expected, dataIdx)) {
-			mAssertMsg(m_data[expected].first != key, "Not allowed to add the same value twice.");
+			mAssertMsg(!(m_data[expected].first == key), "Not allowed to add the same value twice.");
 			++step;
 			idx = (idx + step * step) % m_mapSize;
 			expected = ~0u;

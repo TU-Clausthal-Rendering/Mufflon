@@ -369,7 +369,7 @@ public:
 		return Spectrum{0.0f};
 	}
 
-	CUDA_FUNCTION scene::accel_struct::RayIntersectionResult::HitID get_primitive_id() const {
+	CUDA_FUNCTION scene::PrimitiveHandle get_primitive_id() const {
 		if(m_type == Interaction::SURFACE) {
 			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
 			return desc->primitiveId;
@@ -506,7 +506,7 @@ public:
 		desc->tangentSpace = tangentSpace;
 		desc->primitiveId = hit.hitId;
 		int size = scene::materials::fetch(material, hit.uv, &desc->params);
-		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::accel_struct::RayIntersectionResult::HitID) + size);
+		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + size);
 	}
 
 private:
@@ -524,7 +524,7 @@ private:
 	};
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace; // TODO: use packing?
-		scene::accel_struct::RayIntersectionResult::HitID primitiveId;
+		scene::PrimitiveHandle primitiveId;
 		scene::materials::ParameterPack params;
 	};
 

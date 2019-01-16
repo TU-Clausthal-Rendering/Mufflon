@@ -282,7 +282,7 @@ template < class Guide >
 CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 								  PrimitiveHandle primitive,
 								  const ei::Vec3& refPosition, Guide&& guide) {
-	mAssert(primitive != ~0u);
+	mAssert(primitive.instanceId != -1);
 	using namespace lighttree_detail;
 
 	float p = tree.posLights.root.flux / (tree.dirLights.root.flux + tree.posLights.root.flux + ei::sum(tree.background.flux));

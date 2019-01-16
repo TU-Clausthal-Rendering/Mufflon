@@ -467,7 +467,7 @@ template < Device dev > CUDA_FUNCTION
 void first_intersection_scene_obj_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const i32 instanceId,
 	i32* traversalStack,
 	float& hitT,
@@ -516,7 +516,7 @@ RayIntersectionResult first_intersection_scene_lbvh_imp(
 	const LBVH& bvh,
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 ) {
 	const float tmin = 1e-7f * len(scene.aabb.max - scene.aabb.min);
@@ -749,7 +749,7 @@ template < Device dev > CUDA_FUNCTION
 bool any_intersection_scene_obj_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const i32 instanceId,
 	float tmax,
 	i32* traversalStack
@@ -791,7 +791,7 @@ bool any_intersection_scene_lbvh_imp(
 	const LBVH& bvh,
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 ) {
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
@@ -889,7 +889,7 @@ template < Device dev > CUDA_FUNCTION
 bool any_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 ) {
 	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
@@ -899,13 +899,13 @@ bool any_intersection_scene_lbvh(
 
 template __host__ __device__ bool any_intersection_scene_lbvh(
 	const SceneDescriptor<Device::CUDA>& scene,
-	const ei::Ray& ray, const RayIntersectionResult::HitID& startInsPrimId,
+	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
 template __host__ __device__ bool any_intersection_scene_lbvh(
 	const SceneDescriptor<Device::CPU>& scene,
-	const ei::Ray& ray, const RayIntersectionResult::HitID& startInsPrimId,
+	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
@@ -913,7 +913,7 @@ template < Device dev > CUDA_FUNCTION
 RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const RayIntersectionResult::HitID& startInsPrimId,
+	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 ) {
 	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
@@ -924,14 +924,14 @@ RayIntersectionResult first_intersection_scene_lbvh(
 template __host__ __device__ RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<Device::CUDA>&,
 	const ei::Ray&,
-	const RayIntersectionResult::HitID&,
+	const PrimitiveHandle&,
 	const float
 );
 
 template __host__ __device__ RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<Device::CPU>& ,
 	const ei::Ray&,
-	const RayIntersectionResult::HitID&,
+	const PrimitiveHandle&,
 	const float
 );
 
