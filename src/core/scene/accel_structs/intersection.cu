@@ -774,7 +774,7 @@ bool any_intersection_scene_obj_lbvh(
 
 	// Intersect the ray against the obj bounding box.
 	float hitT;
-	if(intersect(box.min, box.max, invDir, ood, tmin, tmax, hitT)) {
+	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceMaxT, hitT)) {
 		// Intersect the ray against the obj primtive bvh.
 		const ObjectDescriptor<dev>& obj = scene.objects[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
