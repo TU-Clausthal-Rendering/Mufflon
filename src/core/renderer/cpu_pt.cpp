@@ -40,7 +40,7 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
-#pragma omp parallel for
+//#pragma omp parallel for
 	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
 		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
 	}

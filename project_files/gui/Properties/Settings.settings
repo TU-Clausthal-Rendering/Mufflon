@@ -41,7 +41,7 @@
     <Setting Name="PlayPauseGesture" Type="System.String" Scope="User">
       <Value Profile="(Default)">ALT+P</Value>
     </Setting>
-    <Setting Name="ResetGesture" Type="System.String" Scope="Application">
+    <Setting Name="ResetGesture" Type="System.String" Scope="User">
       <Value Profile="(Default)">ALT+R</Value>
     </Setting>
   </Settings>

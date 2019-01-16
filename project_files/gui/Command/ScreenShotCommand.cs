@@ -20,7 +20,7 @@ namespace gui.Command
         public override bool CanExecute(object parameter)
         {
             // TODO: only screenshot when something was rendered?
-            return true;
+            return m_models.Scene != null && m_models.Scene.Filename != null;
         }
 
         public override void Execute(object parameter)
@@ -40,8 +40,14 @@ namespace gui.Command
 
         public override event EventHandler CanExecuteChanged
         {
-            add { }
-            remove { }
+            add
+            {
+                CommandManager.RequerySuggested += value;
+            }
+            remove
+            {
+                CommandManager.RequerySuggested -= value;
+            }
         }
     }
 }

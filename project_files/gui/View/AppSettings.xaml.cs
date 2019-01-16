@@ -99,6 +99,7 @@ namespace gui.View
             OnPropertyChanged(nameof(ScreenshotFolder));
             OnPropertyChanged(nameof(ScreenshotNamePatternHistory));
             DataContext = this;
+            this.PreviewKeyDown += OnKeyPressed;
         }
 
         private void OkButtonClick(object sender, RoutedEventArgs args)
@@ -147,6 +148,12 @@ namespace gui.View
                     OnPropertyChanged(nameof(ScreenshotFolder));
                 }
             }
+        }
+
+        private void OnKeyPressed(object sender, System.Windows.Input.KeyEventArgs args)
+        {
+            if(args.Key == System.Windows.Input.Key.Escape)
+                Close();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

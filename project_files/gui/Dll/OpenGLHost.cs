@@ -264,8 +264,10 @@ namespace gui.Dll
             int newMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
             int newMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
             // Adjust the offset so that it stays roughly the same fractionally
-            m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
-            m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
+            if(oldMaxOffsetX != 0)
+                m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
+            if (oldMaxOffsetY != 0)
+                m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
         }
 
         /// <summary>

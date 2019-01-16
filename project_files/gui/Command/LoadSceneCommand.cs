@@ -11,7 +11,6 @@ using gui.Dll;
 using gui.Model.Scene;
 using gui.Properties;
 using gui.View;
-using MessageBox = System.Windows.MessageBox;
 
 namespace gui.Command
 {
@@ -19,6 +18,7 @@ namespace gui.Command
     {
         private readonly Models m_models;
         private string m_lastDirectory;
+        private KeyBinding m_keyBind;
 
         private SceneLoadStatus m_cancelDialog;
         private static readonly int MAX_LAST_SCENES = 10;
@@ -29,6 +29,8 @@ namespace gui.Command
             m_lastDirectory = Settings.Default.lastScenePath;
             if(m_lastDirectory.Length == 0)
                 m_lastDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            m_keyBind = new KeyBinding(this, new KeyGesture(Key.O, ModifierKeys.Control));
+            System.Windows.Application.Current.MainWindow.InputBindings.Add(m_keyBind);
         }
 
         public bool CanExecute(object parameter)
@@ -60,11 +62,11 @@ namespace gui.Command
             }
         }
 
-        public void LoadScene(string path)
+        protected void LoadScene(string path)
         {
             if (!File.Exists(path))
             {
-                if (MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
+                if (System.Windows.MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
                                     "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
                         MessageBoxImage.Error) == MessageBoxResult.Yes)
                 {
@@ -94,7 +96,7 @@ namespace gui.Command
 
             if (status == Loader.LoaderStatus.ERROR)
             {
-                MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
+                System.Windows.MessageBox.Show("Failed to load scene!", "Error", MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 //Logger.log(e.Message, Core.Severity.FATAL_ERROR);
                 // remove old scene

@@ -177,12 +177,15 @@ namespace gui.Properties {
             }
         }
         
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("ALT+R")]
         public string ResetGesture {
             get {
                 return ((string)(this["ResetGesture"]));
+            }
+            set {
+                this["ResetGesture"] = value;
             }
         }
     }
