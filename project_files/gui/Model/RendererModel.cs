@@ -18,7 +18,8 @@ namespace gui.Model
     {
         private bool m_isRendering = false;
         private uint m_iteration = 0u;
-        private Core.RendererType m_type;
+        private Core.RendererType m_type = Core.RendererType.CPU_PT;
+        private Core.RenderTarget m_target = Core.RenderTarget.RADIANCE;
 
         public Semaphore RenderLock = new Semaphore(1, 1);
 
@@ -61,6 +62,18 @@ namespace gui.Model
                 if (m_type == value) return;
                 m_type = value;
                 OnPropertyChanged(nameof(Type));
+            }
+        }
+
+        // The render target that will be displayed
+        public Core.RenderTarget RenderTarget
+        {
+            get => m_target;
+            set
+            {
+                if (m_target == value) return;
+                m_target = value;
+                OnPropertyChanged(nameof(RenderTarget));
             }
         }
 

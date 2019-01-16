@@ -85,11 +85,13 @@
                         <StackPanel>
                             <Image 
                                 Source="Icons/play.png"
+                                RenderOptions.BitmapScalingMode="LowQuality"
                                 Width="16"
                                 Height="16"
                                 Visibility="{Binding Toolbar.PlayIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
                             <Image 
                                 Source="Icons/pause.png"
+                                RenderOptions.BitmapScalingMode="LowQuality"
                                 Width="16"
                                 Height="16"
                                 Visibility="{Binding Toolbar.PauseIconVisibility, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
@@ -100,6 +102,7 @@
                     <Button Command="{Binding Toolbar.ResetCommand}">
                         <Image 
                             Source="Icons/restart.png"
+                            RenderOptions.BitmapScalingMode="LowQuality"
                             Width="16"
                             Height="16"/>
                     </Button>
@@ -108,6 +111,7 @@
                     <Button>
                         <Image 
                             Source="Icons/inspect_instance.png"
+                            RenderOptions.BitmapScalingMode="LowQuality"
                             Width="16"
                             Height="16"/>
                     </Button>
@@ -116,6 +120,7 @@
                     <Button>
                         <Image 
                             Source="Icons/inspect_material.png"
+                            RenderOptions.BitmapScalingMode="LowQuality"
                             Width="16"
                             Height="16"/>
                     </Button>
@@ -124,6 +129,7 @@
                     <Button>
                         <Image 
                             Source="Icons/inspect_light.png"
+                            RenderOptions.BitmapScalingMode="LowQuality"
                             Width="16"
                             Height="16"/>
                     </Button>
@@ -132,6 +138,7 @@
                     <Button Command="{Binding Toolbar.SaveScreenShotCommand}">
                         <Image
                             Source="Icons/screenshot.png"
+                            RenderOptions.BitmapScalingMode="LowQuality"
                             Width="16"
                             Height="16"/>
                     </Button>
@@ -217,11 +224,11 @@
                         x:Name="BorderHost"
                         DockPanel.Dock="Bottom"
                         Background="Black"
-                        MaxWidth="{Binding Viewport.RenderWidth}"
-                        MaxHeight="{Binding Viewport.RenderHeight}"
                         Focusable="True"
                         MouseDown="OnMouseDownHandler"
                         MouseMove="OnMouseMoveHandler"
+                        MaxWidth="{Binding Viewport.DesiredWidth}"
+                        MaxHeight="{Binding Viewport.DesiredHeight}"
                         KeyDown="OnKeyDownHandler"
                         KeyUp="OnKeyUpHandler">
                     </Border>
@@ -276,6 +283,7 @@
                                         <Image 
                                             Grid.Column="0"
                                             Source="Icons/add.png"
+                                            RenderOptions.BitmapScalingMode="LowQuality"
                                             Width="16"
                                             Height="16"/>
                                         <Label 
@@ -301,6 +309,7 @@
                                         <Image 
                                             Grid.Column="0"
                                             Source="Icons/add.png"
+                                            RenderOptions.BitmapScalingMode="LowQuality"
                                             Width="16"
                                             Height="16"/>
                                         <Label 
@@ -327,6 +336,7 @@
                                         <Image 
                                             Grid.Column="0"
                                             Source="Icons/add.png"
+                                            RenderOptions.BitmapScalingMode="LowQuality"
                                             Width="16"
                                             Height="16" Margin="0,5"/>
                                         <Label 

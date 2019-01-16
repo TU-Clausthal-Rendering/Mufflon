@@ -50,6 +50,7 @@ public:
 	i32 get_width() const noexcept { return m_size.x; }
 	i32 get_height() const noexcept { return m_size.y; }
 	i32 get_num_layers() const noexcept { return m_size.z; }
+	Format get_format() const noexcept { return m_format; }
 
 	u8* data() noexcept { return m_imageData.get(); }
 	const u8* data() const noexcept { return m_imageData.get(); }

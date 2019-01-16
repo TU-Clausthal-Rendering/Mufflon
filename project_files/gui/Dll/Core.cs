@@ -53,7 +53,7 @@ namespace gui.Dll
             GPU_PT
         };
 
-        internal enum RenderTarget
+        public enum RenderTarget
         {
             RADIANCE,
             POSITION,
@@ -103,10 +103,7 @@ namespace gui.Dll
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool display_screenshot();
-
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool resize(int width, int height, int offsetX, int offsetY);
+        internal static extern bool copy_output_to_texture(UInt32 textureId, RenderTarget target, Boolean variance);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_dll_error")]
         private static extern IntPtr core_get_dll_error_();
@@ -380,6 +377,8 @@ namespace gui.Dll
         internal static extern bool render_disable_non_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_all_render_targets();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern UInt32 render_get_target_opengl_format(RenderTarget target, Boolean variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint renderer_get_num_parameters();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_desc")]

@@ -15,6 +15,22 @@ namespace gui.Model
     /// </summary>
     public class ViewportModel : INotifyPropertyChanged
     {
+        // Zoom of the viewport
+        private float m_zoom = 1f;
+        public float Zoom
+        {
+            get => m_zoom;
+            set
+            {
+                var clamped = Math.Min(Math.Max(value, 0.01f), 100.0f);
+                if (clamped == m_zoom) return;
+                m_zoom = clamped;
+                OnPropertyChanged(nameof(Zoom));
+                OnPropertyChanged(nameof(DesiredWidth));
+                OnPropertyChanged(nameof(DesiredHeight));
+            }
+        }
+
         private int m_renderWidth = 800;
         // actual width of the backbuffer
         public int RenderWidth
@@ -42,41 +58,41 @@ namespace gui.Model
         }
 
         private int m_width = 0;
-        // width of the (visible) viewport
+        // width of the (visible) viewport (ie. size of the border, includes zoom)
         public int Width
         {
             get => m_width;
             set
             {
                 if (value == m_width) return;
-                m_width = value;
+                m_width = Math.Min(value, DesiredWidth); ;
                 OnPropertyChanged(nameof(Width));
             }
         }
 
         private int m_height = 0;
-        // height of the (visible) viewport
+        // height of the (visible) viewport (ie. size of the border, includes zoom)
         public int Height
         {
             get => m_height;
             set
             {
                 if(value == m_height) return;
-                m_height = value;
+                m_height = Math.Min(value, DesiredHeight);
                 OnPropertyChanged(nameof(Height));
             }
         }
 
         private int m_offsetX = 0;
-        // viewport offset
+        // viewport offset, includes zoom
         public int OffsetX
         {
             get => m_offsetX;
             set
             {
                 Debug.Assert(value >= 0);
-                Debug.Assert(value < RenderWidth);
-                Debug.Assert(value + Width <= RenderWidth);
+                Debug.Assert(value < DesiredWidth);
+                Debug.Assert(value + Width <= DesiredWidth);
                 if (value == m_offsetX) return;
                 m_offsetX = value;
                 OnPropertyChanged(nameof(OffsetX));
@@ -84,20 +100,26 @@ namespace gui.Model
         }
 
         private int m_offsetY = 0;
-        // viewport offset
+        // viewport offset, includes zoom
         public int OffsetY
         {
             get => m_offsetY;
             set
             {
                 Debug.Assert(value >= 0);
-                Debug.Assert(value < RenderHeight);
-                Debug.Assert(value + Height <= RenderHeight);
+                Debug.Assert(value < DesiredHeight);
+                Debug.Assert(value + Height <= DesiredHeight);
                 if (value == m_offsetY) return;
                 m_offsetY = value;
                 OnPropertyChanged(nameof(OffsetY));
             }
         }
+
+        // effective maximum size including zoom
+        public int DesiredWidth => (int)(RenderWidth * Zoom);
+
+        // effective maximum size including zoom
+        public int DesiredHeight => (int)(RenderHeight * Zoom);
 
         #region PropertyChanged
 

@@ -27,8 +27,22 @@ namespace gui.ViewModel
 
         private void BorderHostOnSizeChanged(object sender, SizeChangedEventArgs args)
         {
+
+            int oldMaxOffsetX = DesiredWidth - Math.Min(m_models.Viewport.Width, DesiredWidth);
+            int oldMaxOffsetY = DesiredHeight - Math.Min(m_models.Viewport.Height, DesiredHeight);
+
+            // Recompute the offsets for the scrollbars
             m_models.Viewport.Width = (int)args.NewSize.Width;
             m_models.Viewport.Height = (int)args.NewSize.Height;
+            int newMaxOffsetX = DesiredWidth - Math.Min(m_models.Viewport.Width, DesiredWidth);
+            int newMaxOffsetY = DesiredHeight - Math.Min(m_models.Viewport.Height, DesiredHeight);
+            // Adjust the offset so that it stays roughly the same fractionally
+            // Do not change the offset if we have a zero-sized border
+            if(oldMaxOffsetX != 0)
+                OffsetX = (int)(OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
+            if (oldMaxOffsetY != 0)
+                OffsetY = (int)(OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
+
         }
 
         private void ViewportOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -36,12 +50,18 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(ViewportModel.RenderWidth):
-                    OnPropertyChanged(nameof(ScrollMaximumX));
                     OnPropertyChanged(nameof(RenderWidth));
                     break;
                 case nameof(ViewportModel.RenderHeight):
-                    OnPropertyChanged(nameof(ScrollMaximumY));
                     OnPropertyChanged(nameof(RenderHeight));
+                    break;
+                case nameof(ViewportModel.DesiredWidth):
+                    OnPropertyChanged(nameof(ScrollMaximumX));
+                    OnPropertyChanged(nameof(DesiredWidth));
+                    break;
+                case nameof(ViewportModel.DesiredHeight):
+                    OnPropertyChanged(nameof(ScrollMaximumY));
+                    OnPropertyChanged(nameof(DesiredHeight));
                     break;
                 case nameof(ViewportModel.Width):
                     OnPropertyChanged(nameof(ScrollWidth));
@@ -57,6 +77,9 @@ namespace gui.ViewModel
                 case nameof(ViewportModel.OffsetY):
                     OnPropertyChanged(nameof(OffsetY));
                     break;
+                case nameof(ViewportModel.Zoom):
+                    OnPropertyChanged(nameof(Zoom));
+                    break;
             }
         }
 
@@ -66,17 +89,25 @@ namespace gui.ViewModel
         // maximum size if the viewport
         public int RenderHeight => m_models.Viewport.RenderHeight;
 
-        // maximum for scroll bar
-        public int ScrollMaximumX => m_models.Viewport.RenderWidth - ScrollWidth;
+        // effective maximum size including zoom
+        public int DesiredWidth => m_models.Viewport.DesiredWidth;
+
+        // effective maximum size including zoom
+        public int DesiredHeight => m_models.Viewport.DesiredHeight;
 
         // maximum for scroll bar
-        public int ScrollMaximumY => m_models.Viewport.RenderHeight - ScrollHeight;
+        public int ScrollMaximumX => DesiredWidth - ScrollWidth;
+
+        // maximum for scroll bar
+        public int ScrollMaximumY => DesiredHeight - ScrollHeight;
 
         // width of the scroll bars bar
         public int ScrollWidth => m_models.Viewport.Width;
         
         // height of the scroll bars bar
         public int ScrollHeight  => m_models.Viewport.Height;
+
+        public float Zoom => m_models.Viewport.Zoom;
 
         // scroll value
         public int OffsetX

@@ -186,6 +186,14 @@ namespace gui.ViewModel
                         OnPropertyChanged(nameof(Iteration));
                     }));
                     break;
+                case nameof(Models.Renderer.RenderTarget):
+                    UInt32 format = Core.render_get_target_opengl_format(m_models.Renderer.RenderTarget, false);
+                    if (format == 0x0500)
+                        throw new Exception(Core.core_get_dll_error());
+                    if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_models.Viewport.RenderWidth,
+                                                                    (UInt32)m_models.Viewport.RenderHeight, format))
+                        throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+                    break;
             }
         }
 

@@ -58,7 +58,7 @@ namespace gui.Model.Scene
                 if (Core.world_load_scenario(handle) == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
             });
-            
+
             // set scenario properties
             m_currentScenario = scenario;
             OnPropertyChanged(nameof(CurrentScenario));

@@ -24,7 +24,6 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
-// TODO: remove this (leftover from Felix' prototype)
 #include <glad/glad.h>
 
 #ifdef _WIN32
@@ -221,7 +220,7 @@ const char* core_get_dll_error() {
 	CATCH_ALL(nullptr)
 }
 
-bool core_set_log_level(LogLevel level) {
+Boolean core_set_log_level(LogLevel level) {
 	switch(level) {
 		case LogLevel::LOG_PEDANTIC:
 			mufflon::s_logLevel = LogSeverity::PEDANTIC;
@@ -244,172 +243,44 @@ bool core_set_log_level(LogLevel level) {
 	}
 }
 
-Boolean display_screenshot() {
+Boolean copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean variance) {
 	TRY
-	if(!s_imageOutput) {
-		logError("[", FUNCTION_NAME, "] No image to print is present");
+	CHECK(textureId != 0u, "invalid texture object", false);
+	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	const renderer::OutputValue targetFlags{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
+	if(!s_outputTargets.is_set(targetFlags)) {
+		logError("[", FUNCTION_NAME, "] Specified render target is not active");
 		return false;
 	}
 
-	constexpr float gamma = 2.2f;
-	constexpr float exposure = 2.0f;
+	textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
+	// Determine the pixel format for OpenGL
+	GLenum format = GL_INVALID_ENUM;
+	GLenum type = GL_INVALID_ENUM;
 
-	constexpr const char* VERTEX_CODE = "#version 330 core\nvoid main(){}";
-	constexpr const char* GEOMETRY_CODE =
-		"#version 330 core\n"
-		"layout(points) in;"
-		"layout(triangle_strip, max_vertices = 4) out;"
-		"out vec2 texcoord;"
-		"void main() {"
-		"	gl_Position = vec4(1.0, 1.0, 0.5, 1.0);"
-		"	texcoord = vec2(1.0, 1.0);"
-		"	EmitVertex();"
-		"	gl_Position = vec4(-1.0, 1.0, 0.5, 1.0);"
-		"	texcoord = vec2(0.0, 1.0);"
-		"	EmitVertex();"
-		"	gl_Position = vec4(1.0, -1.0, 0.5, 1.0);"
-		"	texcoord = vec2(1.0, 0.0);"
-		"	EmitVertex();"
-		"	gl_Position = vec4(-1.0, -1.0, 0.5, 1.0);"
-		"	texcoord = vec2(0.0, 0.0);"
-		"	EmitVertex();"
-		"	EndPrimitive();"
-		"}";
-	constexpr const char* FRAGMENT_CODE =
-		"#version 330 core\n"
-		"in vec2 texcoord;"
-		"uniform sampler2D textureSampler;"
-		"uniform float gamma;"
-		"uniform float exposure;"
-		"void main() {"
-		"	vec3 rgb = texture2D(textureSampler, texcoord).rgb;"
-		"	float luminance = 0.2126*rgb.r + 0.7252*rgb.g + 0.0722*rgb.b;"
-		"	gl_FragColor.xyz = pow(vec3(1.f) - exp(-rgb * exposure), vec3(1.0 / gamma));"
-		"}";
-
-	GLuint tex = 0u;
-	GLuint program = 0u;
-	GLuint vertShader = 0u;
-	GLuint geomShader = 0u;
-	GLuint fragShader = 0u;
-	GLuint vao = 0u;
-
-	auto cleanup = [&tex, &vao, &program, &vertShader, &geomShader, &fragShader]() {
-		glBindTexture(GL_TEXTURE_2D, 0u);
-		glUseProgram(0);
-		glBindVertexArray(0);
-		if(tex != 0) glDeleteTextures(1u, &tex);
-		if(vertShader != 0) glDeleteShader(vertShader);
-		if(geomShader != 0) glDeleteShader(geomShader);
-		if(fragShader != 0) glDeleteShader(fragShader);
-		if(program != 0) glDeleteProgram(program);
-		if(vao != 0) glDeleteVertexArrays(1, &vao);
-	};
-
-	// Creates an OpenGL texture, copies the screen data into it and
-	// renders it to the screen
-	glGenTextures(1u, &tex);
-	if(tex == 0) {
-		logError("[", FUNCTION_NAME, "] Failed to initialize screen texture");
-		cleanup();
-		return false;
-	}
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	vertShader = glCreateShader(GL_VERTEX_SHADER);
-	geomShader = glCreateShader(GL_GEOMETRY_SHADER);
-	fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-	if(vertShader == 0 || fragShader == 0 || geomShader == 0) {
-		logError("[", FUNCTION_NAME, "] Failed to initialize screen shaders");
-		cleanup();
-		return false;
-	}
-	glShaderSource(vertShader, 1u, &VERTEX_CODE, nullptr);
-	glShaderSource(geomShader, 1u, &GEOMETRY_CODE, nullptr);
-	glShaderSource(fragShader, 1u, &FRAGMENT_CODE, nullptr);
-	glCompileShader(vertShader);
-	glCompileShader(geomShader);
-	glCompileShader(fragShader);
-	GLint compiled[3];
-	glGetShaderiv(vertShader, GL_COMPILE_STATUS, &compiled[0]);
-	glGetShaderiv(geomShader, GL_COMPILE_STATUS, &compiled[1]);
-	glGetShaderiv(fragShader, GL_COMPILE_STATUS, &compiled[2]);
-	if(compiled[0] != GL_TRUE || compiled[1] != GL_TRUE || compiled[2] != GL_TRUE) {
-		logError("[", FUNCTION_NAME, "] Failed to compile screen shaders!");
-
-		GLint id;
-		if(compiled[0] != GL_TRUE)
-			id = vertShader;
-		else if(compiled[1] != GL_TRUE)
-			id = geomShader;
-		else
-			id = fragShader;
-		GLint logLength;
-		std::string msg;
-		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &logLength);
-		msg.resize(logLength + 1);
-		msg[logLength] = '\0';
-		glGetShaderInfoLog(id, logLength, NULL, msg.data());
-		logError("Error: ", msg);
-
-		cleanup();
-		return false;
+	switch(texPtr->get_format()) {
+		case textures::Format::R8U: format = GL_RED; type = GL_UNSIGNED_BYTE; break;
+		case textures::Format::RG8U: format = GL_RG; type = GL_UNSIGNED_BYTE; break;
+		case textures::Format::RGBA8U: format = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		case textures::Format::R16U: format = GL_RED; type = GL_UNSIGNED_SHORT; break;
+		case textures::Format::RG16U: format = GL_RG; type = GL_UNSIGNED_SHORT; break;
+		case textures::Format::RGBA16U: format = GL_RGBA; type = GL_UNSIGNED_SHORT; break;
+		case textures::Format::R16F: format = GL_RED; type = GL_HALF_FLOAT; break;
+		case textures::Format::RG16F: format = GL_RG; type = GL_HALF_FLOAT; break;
+		case textures::Format::RGBA16F: format = GL_RGBA; type = GL_HALF_FLOAT; break;
+		case textures::Format::R32F: format = GL_RED; type = GL_FLOAT; break;
+		case textures::Format::RG32F: format = GL_RG; type = GL_FLOAT; break;
+		case textures::Format::RGBA32F: format = GL_RGBA; type = GL_FLOAT; break;
+		default:
+			mAssertMsg(false, "Output buffer has unknown format!");
+			return false;
 	}
 
-	program = glCreateProgram();
-	if(program == 0u) {
-		logError("[", FUNCTION_NAME, "] Failed to initialize screen program");
-		cleanup();
-		return false;
-	}
-	glAttachShader(program, vertShader);
-	glAttachShader(program, geomShader);
-	glAttachShader(program, fragShader);
-	glLinkProgram(program);
-	GLint linkStatus;
-	glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
-	if(linkStatus != GL_TRUE) {
-		logError("[", FUNCTION_NAME, "] Failed to link screen program");
-		cleanup();
-		return false;
-	}
-	glDetachShader(program, vertShader);
-	glDetachShader(program, geomShader);
-	glDetachShader(program, fragShader);
-
-	ei::IVec2 res = s_imageOutput->get_resolution();
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, res.x, res.y, 0, GL_RGBA, GL_FLOAT,
-		s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::RADIANCE },
-			textures::Format::RGBA32F, false).data());
-
-	glUseProgram(program);
-	glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
-	glUniform1f(glGetUniformLocation(program, "gamma"), gamma);
-	glUniform1f(glGetUniformLocation(program, "exposure"), exposure);
-
-	glGenVertexArrays(1, &vao);
-	if(vao == 0) {
-		logError("[", FUNCTION_NAME, "] Failed to link screen program");
-		cleanup();
-		return false;
-	}
-	glBindVertexArray(vao);
-	glDrawArrays(GL_POINTS, 0, 1u);
-
-	cleanup();
-	return true;
-	CATCH_ALL(false)
-}
-Boolean resize(int width, int height, int offsetX, int offsetY) {
-	TRY
-	// glViewport should not be called with width or height zero
-	if(width == 0 || height == 0) return true;
-	glViewport(0, 0, width, height);
+	::glBindTexture(GL_TEXTURE_2D, textureId);
+	::glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(s_imageOutput->get_width()),
+					  static_cast<GLsizei>(s_imageOutput->get_height()), format, type,
+					  s_imageOutput->get_data(targetFlags, textures::Format::RGBA32F, false).data());
 	return true;
 	CATCH_ALL(false)
 }
@@ -2493,26 +2364,8 @@ Boolean render_save_screenshot(const char* filename) {
 
 Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 	TRY
-	switch(target) {
-		case RenderTarget::TARGET_RADIANCE:
-			s_outputTargets.set(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_POSITION:
-			s_outputTargets.set(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_ALBEDO:
-			s_outputTargets.set(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_NORMAL:
-			s_outputTargets.set(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_LIGHTNESS:
-			s_outputTargets.set(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
-			break;
-		default:
-			logError("[", FUNCTION_NAME, "] Unknown render target");
-			return false;
-	}
+	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
@@ -2521,26 +2374,8 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 
 Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 	TRY
-	switch(target) {
-		case RenderTarget::TARGET_RADIANCE:
-			s_outputTargets.clear(renderer::OutputValue::RADIANCE << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_POSITION:
-			s_outputTargets.clear(renderer::OutputValue::POSITION << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_ALBEDO:
-			s_outputTargets.clear(renderer::OutputValue::ALBEDO << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_NORMAL:
-			s_outputTargets.clear(renderer::OutputValue::NORMAL << (variance ? 8u : 0u));
-			break;
-		case RenderTarget::TARGET_LIGHTNESS:
-			s_outputTargets.clear(renderer::OutputValue::LIGHTNESS << (variance ? 8u : 0u));
-			break;
-		default:
-			logError("[", FUNCTION_NAME, "] Unknown render target");
-			return false;
-	}
+	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
@@ -2599,6 +2434,30 @@ Boolean render_disable_all_render_targets() {
 	return render_disable_variance_render_targets()
 		&& render_disable_non_variance_render_targets();
 	CATCH_ALL(false)
+}
+
+uint32_t render_get_target_opengl_format(RenderTarget target, Boolean variance) {
+	TRY
+	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	renderer::OutputValue targetFlag{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
+	switch(renderer::OutputHandler::get_target_format(targetFlag)) {
+		case textures::Format::R8U: return GL_R8;
+		case textures::Format::RG8U: return GL_RG8;
+		case textures::Format::RGBA8U: return GL_RGBA8;
+		case textures::Format::R16U: return GL_R16;
+		case textures::Format::RG16U: return GL_RG16;
+		case textures::Format::RGBA16U: return GL_RGBA16;
+		case textures::Format::R16F: return GL_R16F;
+		case textures::Format::RG16F: return GL_RG16F;
+		case textures::Format::RGBA16F: return GL_RGBA16F;
+		case textures::Format::R32F: return GL_R32F;
+		case textures::Format::RG32F: return GL_RG32F;
+		case textures::Format::RGBA32F: return GL_RGBA32F;
+		default:
+			mAssertMsg(false, "Output buffer has unknown format!");
+			return false;
+	}
+	CATCH_ALL(GL_INVALID_ENUM)
 }
 
 uint32_t renderer_get_num_parameters() {

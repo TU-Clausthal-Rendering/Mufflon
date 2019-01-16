@@ -46,8 +46,6 @@ namespace gui.Dll
         // helper to detect resize in render thread
         private int m_renderWidth = 0;
         private int m_renderHeight = 0;
-        private int m_renderOffsetX = 0;
-        private int m_renderOffsetY = 0;
 
         // TODO: this is only for testing purposes
         public static bool toggleRenderer = false;
@@ -61,6 +59,10 @@ namespace gui.Dll
             m_parent = window.BorderHost;
             m_viewport = viewport;
             m_rendererModel = rendererModel;
+            m_window.MouseWheel += OnMouseWheel;
+            m_window.SnapsToDevicePixels = true;
+            // TODO: set the initial height here, but put a listener for window(!) size
+            // TODO: On scenario change, also update the renderwith/height
         }
 
         /// <summary>
@@ -153,8 +155,23 @@ namespace gui.Dll
 
                     if (!Core.render_iterate())
                         throw new Exception(Core.core_get_dll_error());
-                    if (!Core.display_screenshot())
+                    if(!Core.copy_output_to_texture(OpenGlDisplay.opengldisplay_get_screen_texture_handle(), m_rendererModel.RenderTarget, false))
                         throw new Exception(Core.core_get_dll_error());
+
+                    // Border always keeps aspect ratio
+
+                    // Compute the offsets and dimensions of the viewport
+                    int left = m_viewport.OffsetX;
+                    int right = m_viewport.Width + m_viewport.OffsetX;
+                    int invertedOffsetY = (m_viewport.DesiredHeight - m_viewport.Height) - m_viewport.OffsetY;
+                    int bottom = invertedOffsetY;
+                    int top = m_viewport.Height + invertedOffsetY;
+                    UInt32 width = (UInt32)m_viewport.DesiredWidth;
+                    UInt32 height = (UInt32)m_viewport.DesiredHeight;
+
+                    if (!OpenGlDisplay.opengldisplay_display(left, right, bottom, top, width, height))
+                        throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+
                     if (!Gdi32.SwapBuffers(m_deviceContext))
                         throw new Win32Exception(Marshal.GetLastWin32Error());
                     ++m_rendererModel.Iteration;
@@ -167,6 +184,9 @@ namespace gui.Dll
             {
                 Dispatcher.BeginInvoke(Error, e.Message);
             }
+
+            // Clean up
+            OpenGlDisplay.opengldisplay_destroy();
             Core.mufflon_destroy();
         }
 
@@ -202,6 +222,8 @@ namespace gui.Dll
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
+            if (!OpenGlDisplay.opengldisplay_initialize(m_logCallbackPointer))
+                throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
         }
 
         /// <summary>
@@ -209,22 +231,41 @@ namespace gui.Dll
         /// </summary>
         private void HandleResize()
         {
-            // viewport resize?
-            int newWidth = m_viewport.Width;
-            int newHeight = m_viewport.Height;
-            int newOffsetX = m_viewport.OffsetX;
-            int newOffsetY = m_viewport.OffsetY;
+            // Check if we need to resize the screen texture
+            int newWidth = m_viewport.RenderWidth;
+            int newHeight = m_viewport.RenderHeight;
 
-            if (m_renderWidth != newWidth || m_renderHeight != newHeight ||
-                m_renderOffsetX != newOffsetX || m_renderOffsetY != newOffsetY)
+            if (m_renderWidth != newWidth || m_renderHeight != newHeight)
             {
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
-                m_renderOffsetX = newOffsetX;
-                m_renderOffsetY = newOffsetY;
-                if (!Core.resize(m_renderWidth, m_renderHeight, m_renderOffsetX, m_renderOffsetY))
+
+                // TODO: let GUI select what render target we render
+                UInt32 format = Core.render_get_target_opengl_format(m_rendererModel.RenderTarget, false);
+                if (format == 0x0500)
                     throw new Exception(Core.core_get_dll_error());
+                if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_renderWidth, (UInt32)m_renderHeight, format))
+                    throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
             }
+        }
+
+        // Handle zooming when mouse wheel is used
+        private void OnMouseWheel(object sender, MouseWheelEventArgs args)
+        {
+            float step = args.Delta < 0.0f ? 1.0f / 1.001f : 1.001f;
+            float value = (float)Math.Pow(step, Math.Abs(args.Delta));
+
+            float oldZoom = m_viewport.Zoom;
+            int oldMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
+            int oldMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
+            m_viewport.Zoom *= value;
+
+            // Zooming affects offset as well
+            int newMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
+            int newMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
+            // Adjust the offset so that it stays roughly the same fractionally
+            m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
+            m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
         }
 
         /// <summary>

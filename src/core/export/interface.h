@@ -3,6 +3,7 @@
 #include "api.h"
 #include "texture_data.h"
 
+
 extern "C" {
 
 #include <stdint.h>
@@ -489,6 +490,7 @@ CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_non_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
+CORE_API uint32_t CDECL render_get_target_opengl_format(RenderTarget target, Boolean variance);
 CORE_API uint32_t CDECL renderer_get_num_parameters();
 CORE_API const char* CDECL renderer_get_parameter_desc(uint32_t idx, ParameterType* type);
 CORE_API Boolean CDECL renderer_set_parameter_int(const char* name, int32_t value);
@@ -523,10 +525,9 @@ CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API void CDECL mufflon_destroy();
 
 // TODO
-CORE_API Boolean CDECL display_screenshot();
-CORE_API Boolean CDECL resize(int width, int height, int offsetX, int offsetY);
+CORE_API Boolean CDECL copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean variance);
 CORE_API const char* CDECL core_get_dll_error();
-CORE_API bool CDECL core_set_log_level(LogLevel level);
+CORE_API Boolean CDECL core_set_log_level(LogLevel level);
 
 
 //CORE_API const char* CDECL get_teststring();

@@ -126,16 +126,21 @@ public:
 
 	void set_targets(OutputValue targets);
 
+
 	// Get the formated output of one quantity for the purpose of exporting screenshots.
 	// which: The quantity to export. Causes an error if the quantity is not recorded.
 	// exportFormat: The format of the pixels in the vector (includes elementary type and number of channels).
 	// exportSRgb: Convert the values from linear to sRGB before packing the data into the exportFormat.
 	scene::textures::CpuTexture get_data(OutputValue which, scene::textures::Format exportFormat, bool exportSRgb);
 
+	// Get the actual texture data (read only) without converting to another format
+	scene::textures::ConstTextureDevHandle_t<Device::CPU> get_data(OutputValue which);
+
 	int get_width() const { return m_width; }
 	int get_height() const { return m_height; }
 	int get_num_pixels() const { return m_width * m_height; }
 	ei::IVec2 get_resolution() const { return {m_width, m_height}; }
+	static scene::textures::Format get_target_format(OutputValue which);
 private:
 	// In each block either none, m_iter... only, or all three are defined.
 	// If variances is required all three will be used and m_iter resets every iteration.

@@ -122,6 +122,7 @@ namespace gui.ViewModel
 
                     // refresh views
                     MakeScenerioViews();
+
                     break;
             }
         }
@@ -353,16 +354,19 @@ namespace gui.ViewModel
             MaterialModel material = (sender as MaterialModel);
             // TODO
 
-            IntPtr currScenario = Core.world_get_current_scenario();
-            // Materials need to reset and rebuild the scene
-            if (currScenario == IntPtr.Zero)
-                throw new Exception(Core.core_get_dll_error());
-            if (m_reset.CanExecute(null))
-                m_reset.Execute(null);
-            if (Core.world_load_scenario(currScenario) == IntPtr.Zero)
-                throw new Exception(Core.core_get_dll_error());
-        }
+            bool needReload = false;
 
+            if(needReload)
+            {
+                bool wasRendering = m_models.Renderer.IsRendering;
+                m_models.Renderer.IsRendering = false;
+                if (m_reset.CanExecute(null))
+                    m_reset.Execute(null);
+                if (Core.world_reload_current_scenario() == IntPtr.Zero)
+                    throw new Exception(Core.core_get_dll_error());
+                m_models.Renderer.IsRendering = wasRendering;
+            }
+        }
 
         private void OnCameraChanged(object sender, PropertyChangedEventArgs args)
         {
@@ -439,7 +443,6 @@ namespace gui.ViewModel
                 case nameof(SceneModel.CurrentScenario):
                     LoadScenarioViews();
                     break;
-
             }
         }
 
@@ -505,6 +508,9 @@ namespace gui.ViewModel
             loadScenarioMaterials(m_models.Scene.CurrentScenario.Handle);
             LoadScenarioCamera(m_models.Scene.CurrentScenario.Handle);
 
+            // Change display and renderer resolution
+            m_models.Viewport.RenderWidth = (int)m_models.Scene.CurrentScenario.Resolution.X;
+            m_models.Viewport.RenderHeight = (int)m_models.Scene.CurrentScenario.Resolution.Y;
             //m_scenarioLoadDialog.Close();
         }
 

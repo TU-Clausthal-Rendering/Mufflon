@@ -15,6 +15,7 @@ namespace gui.Dll
         [DllImport("opengl32.dll", CharSet = CharSet.Auto, SetLastError = true, ExactSpelling = true)]
         public static extern bool wglMakeCurrent(IntPtr hDC, IntPtr hRC);
 
-
+        [DllImport("opengl32.dll", CharSet = CharSet.Auto, SetLastError = true, ExactSpelling = true)]
+        public static extern void glViewport(int offsetX, int offsetY, UInt32 width, UInt32 height);
     }
 }

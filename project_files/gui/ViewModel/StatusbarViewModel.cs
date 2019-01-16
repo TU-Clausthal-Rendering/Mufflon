@@ -38,13 +38,13 @@ namespace gui.ViewModel
             ulong cpuTotal = Core.profiling_get_total_cpu_memory() / (1024 * 1024);
             ulong cpuFree = Core.profiling_get_free_cpu_memory() / (1024 * 1024);
             ulong cpuUsed = Core.profiling_get_used_cpu_memory() / (1024 * 1024);
-            ulong gpuTotal = Core.profiling_get_total_gpu_memory() / (1024 * 1024);
-            ulong gpuFree = Core.profiling_get_free_gpu_memory() / (1024 * 1024);
-            ulong gpuUsed = Core.profiling_get_used_gpu_memory() / (1024 * 1024);
+            //ulong gpuTotal = Core.profiling_get_total_gpu_memory() / (1024 * 1024);
+            //ulong gpuFree = Core.profiling_get_free_gpu_memory() / (1024 * 1024);
+            //ulong gpuUsed = Core.profiling_get_used_gpu_memory() / (1024 * 1024);
             m_cpuMemory = "CPU: " + cpuTotal.ToString() + "/" + cpuUsed + "/" + cpuFree + " MB";
-            m_gpuMemory = "GPU: " + gpuTotal.ToString() + "/" + gpuUsed + "/" + gpuFree + " MB";
+            //m_gpuMemory = "GPU: " + gpuTotal.ToString() + "/" + gpuUsed + "/" + gpuFree + " MB";
             OnPropertyChanged(nameof(CpuMemory));
-            OnPropertyChanged(nameof(GpuMemory));
+            //OnPropertyChanged(nameof(GpuMemory));
         }
 
 
