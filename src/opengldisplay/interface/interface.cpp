@@ -48,7 +48,7 @@ constexpr const char* FRAGMENT_CODE =
 	"void main() {"
 	"	vec3 rgb = texture2D(textureSampler, texcoord).rgb;"
 	"	float luminance = 0.2126*rgb.r + 0.7252*rgb.g + 0.0722*rgb.b;"
-	"	gl_FragColor.xyz = pow(vec3(1.f) - exp(-rgb * exposure), vec3(1.0 / gamma));"
+	"	gl_FragColor.xyz = rgb;"
 	"}";
 
 std::unique_ptr<Program> s_screenProgram = nullptr;
@@ -113,7 +113,9 @@ Boolean opengldisplay_display(int left, int right, int bottom, int top, uint32_t
 
 		// Set the viewport size
 		glViewport(0, 0, static_cast<GLsizei>(right - left), static_cast<GLsizei>(top - bottom));
-
+		// Also enable sRgb
+		glEnable(GL_FRAMEBUFFER_SRGB);
+		// Set the texture coordinates of the fullscreen quad to emulate scissoring
 		::glUniform4f(s_uvUniform,
 					  static_cast<float>(left) / static_cast<float>(width),
 					  static_cast<float>(bottom) / static_cast<float>(height),
