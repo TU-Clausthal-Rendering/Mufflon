@@ -108,20 +108,27 @@ std::size_t Polygons::add_bulk(std::string_view name, const VertexHandle& startV
 
 std::size_t Polygons::add_bulk(std::string_view name, const FaceHandle& startFace,
 							   std::size_t count, util::IByteReader& attrStream) {
-	mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData->n_vertices());
-	return m_faceAttributes.restore(name, attrStream, static_cast<std::size_t>(startFace.idx()), count);
+	return this->add_bulk(m_faceAttributes.get_attribute_handle(name), startFace,
+						  count, attrStream);
 }
 
-std::size_t Polygons::add_bulk(OpenMeshAttributePool<false>::AttributeHandle hdl, const VertexHandle& startVertex,
+std::size_t Polygons::add_bulk(VertexAttributeHandle hdl, const VertexHandle& startVertex,
 							   std::size_t count, util::IByteReader& attrStream) {
 	mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData->n_vertices());
 	return m_vertexAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startVertex.idx()), count);
 }
 
-std::size_t Polygons::add_bulk(OpenMeshAttributePool<true>::AttributeHandle hdl, const FaceHandle& startFace,
+std::size_t Polygons::add_bulk(FaceAttributeHandle hdl, const FaceHandle& startFace,
 							   std::size_t count, util::IByteReader& attrStream) {
 	mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData->n_vertices());
-	return m_faceAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startFace.idx()), count);
+	std::size_t numRead = m_faceAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startFace.idx()), count);
+	// Update material table in case this load was about materials
+	if(hdl == m_matIndicesHdl) {
+		MaterialIndex* materials = m_faceAttributes.acquire<Device::CPU, MaterialIndex>(hdl);
+		for(std::size_t i = startFace.idx(); i < startFace.idx()+numRead; ++i)
+			m_uniqueMaterials.emplace(materials[i]);
+	}
+	return numRead;
 }
 
 void Polygons::reserve(std::size_t vertices, std::size_t edges,
@@ -179,8 +186,9 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
-	m_faceAttributes.acquire<Device::CPU, u16>(m_matIndicesHdl)[hdl.idx()] = idx;
+	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
 	m_faceAttributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -229,8 +237,9 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   const VertexHandle& v2, const VertexHandle& v3,
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
-	m_faceAttributes.acquire<Device::CPU, u16>(m_matIndicesHdl)[hdl.idx()] = idx;
+	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
 	m_faceAttributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -396,10 +405,10 @@ PolygonsDescriptor<dev> Polygons::get_descriptor() {
 		static_cast<u32>(this->get_quad_count()),
 		0u,
 		0u,
-		this->acquire_const<dev, ei::Vec3, false>(this->get_points_hdl()),
-		this->acquire_const<dev, ei::Vec3, false>(this->get_normals_hdl()),
-		this->acquire_const<dev, ei::Vec2, false>(this->get_uvs_hdl()),
-		this->acquire_const<dev, u16, true>(this->get_material_indices_hdl()),
+		this->acquire_const<dev, ei::Vec3>(this->get_points_hdl()),
+		this->acquire_const<dev, ei::Vec3>(this->get_normals_hdl()),
+		this->acquire_const<dev, ei::Vec2>(this->get_uvs_hdl()),
+		this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
 		this->get_index_buffer<dev>(),
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}

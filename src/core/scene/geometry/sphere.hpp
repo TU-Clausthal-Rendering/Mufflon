@@ -6,6 +6,7 @@
 #include <ei/vector.hpp>
 #include <tuple>
 #include <vector>
+#include <unordered_set>
 
 namespace mufflon {
 enum class Device : unsigned char;
@@ -57,7 +58,7 @@ public:
 	}
 
 	template < class T >
-	AttributePool::AttributeHandle add_attribute(std::string name) {
+	SphereAttributeHandle add_attribute(std::string name) {
 		return m_attributes.add_attribute<T>(std::move(name));
 	}
 
@@ -75,7 +76,7 @@ public:
 		m_attributes.synchronize<dev>(name);
 	}
 	template < Device dev >
-	void synchronize(AttributePool::AttributeHandle hdl) {
+	void synchronize(SphereAttributeHandle hdl) {
 		m_attributes.synchronize<dev>(hdl);
 	}
 
@@ -85,11 +86,11 @@ public:
 	}
 
 	template < Device dev, class T >
-	T* acquire(typename AttributePool::AttributeHandle hdl) {
+	T* acquire(SphereAttributeHandle hdl) {
 		return m_attributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(typename AttributePool::AttributeHandle hdl) {
+	const T* acquire_const(SphereAttributeHandle hdl) {
 		return m_attributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T >
@@ -104,7 +105,7 @@ public:
 	void mark_changed(Device dev) {
 		m_attributes.mark_changed(dev);
 	}
-	void mark_changed(Device dev, AttributePool::AttributeHandle hdl) {
+	void mark_changed(Device dev, SphereAttributeHandle hdl) {
 		m_attributes.mark_changed(dev, hdl);
 	}
 	void mark_changed(Device dev, std::string_view name) {
@@ -129,13 +130,13 @@ public:
 	 */
 	std::size_t add_bulk(std::string_view name, const SphereHandle& startSphere,
 						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(AttributePool::AttributeHandle hdl, const SphereHandle& startSphere,
+	std::size_t add_bulk(SphereAttributeHandle hdl, const SphereHandle& startSphere,
 						 std::size_t count, util::IByteReader& attrStream);
 
-	AttributePool::AttributeHandle get_spheres_hdl() const noexcept {
+	SphereAttributeHandle get_spheres_hdl() const noexcept {
 		return m_spheresHdl;
 	}
-	AttributePool::AttributeHandle get_material_indices_hdl() const noexcept {
+	SphereAttributeHandle get_material_indices_hdl() const noexcept {
 		return m_matIndicesHdl;
 	}
 
@@ -159,6 +160,11 @@ public:
 		return m_attributes.get_attribute_count();
 	}
 
+	// Get a list of all materials which are referenced by any primitive
+	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
+		return m_uniqueMaterials;
+	}
+
 private:
 	template < Device dev >
 	struct AttribBuffer {
@@ -174,11 +180,15 @@ private:
 	static_assert(sizeof(ei::Sphere) == 4u * sizeof(float));
 
 	AttributePool m_attributes;
-	AttributePool::AttributeHandle m_spheresHdl;
-	AttributePool::AttributeHandle m_matIndicesHdl;
+	SphereAttributeHandle m_spheresHdl;
+	SphereAttributeHandle m_matIndicesHdl;
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
 	ei::Box m_boundingBox;
+	// Whenever a primitive is added the table of all referenced
+	// materials will be updated. Assumption: a material reference
+	// will not change afterwards.
+	std::unordered_set<MaterialIndex> m_uniqueMaterials;
 };
 
 }}} // namespace mufflon::scene::geometry

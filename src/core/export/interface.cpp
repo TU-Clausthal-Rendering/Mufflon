@@ -97,7 +97,7 @@ std::string s_lastError;
 std::vector<TextureLoaderPlugin> s_plugins;
 
 
-constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
+constexpr PolygonAttributeHdl INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX,
 	AttribDesc{
 		AttributeType::ATTR_COUNT,
@@ -105,7 +105,7 @@ constexpr PolygonAttributeHandle INVALID_POLY_VATTR_HANDLE{
 	},
 	false
 };
-constexpr PolygonAttributeHandle INVALID_POLY_FATTR_HANDLE{
+constexpr PolygonAttributeHdl INVALID_POLY_FATTR_HANDLE{
 	INVALID_INDEX,
 	AttribDesc{
 		AttributeType::ATTR_COUNT,
@@ -113,7 +113,7 @@ constexpr PolygonAttributeHandle INVALID_POLY_FATTR_HANDLE{
 	},
 	true
 };
-constexpr SphereAttributeHandle INVALID_SPHERE_ATTR_HANDLE{
+constexpr ::SphereAttributeHdl INVALID_SPHERE_ATTR_HANDLE{
 	INVALID_INDEX,
 	AttribDesc{
 		AttributeType::ATTR_COUNT,
@@ -169,7 +169,7 @@ inline auto switchAttributeType(const AttribDesc& desc, L1&& regular,
 
 // Converts a polygon attribute to the C interface handle type
 template < class AttrHdl >
-inline AttrHdl convert_poly_to_attr(const PolygonAttributeHandle& hdl) {
+inline AttrHdl convert_poly_to_attr(const PolygonAttributeHdl& hdl) {
 	using OmAttrHandle = typename AttrHdl::OmAttrHandle;
 	using CustomAttrHandle = typename AttrHdl::CustomAttrHandle;
 
@@ -298,7 +298,7 @@ Boolean polygon_reserve(ObjectHdl obj, size_t vertices, size_t edges, size_t tri
 	CATCH_ALL(false)
 }
 
-PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj, const char* name,
+PolygonAttributeHdl polygon_request_vertex_attribute(ObjectHdl obj, const char* name,
 														AttribDesc type) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_POLY_VATTR_HANDLE);
@@ -307,8 +307,8 @@ PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj, const cha
 
 	return switchAttributeType(type, [name, &type, &object](const auto& val) {
 			using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attr = object.template get_geometry<Polygons>().template add_attribute<Type, false>(name);
-		return PolygonAttributeHandle{
+		auto attr = object.template get_geometry<Polygons>().template add_vertex_attribute<Type>(name);
+		return PolygonAttributeHdl{
 			static_cast<int32_t>(attr.index),
 			type, false
 		};
@@ -319,7 +319,7 @@ PolygonAttributeHandle polygon_request_vertex_attribute(ObjectHdl obj, const cha
 	CATCH_ALL(INVALID_POLY_VATTR_HANDLE)
 }
 
-PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
+PolygonAttributeHdl polygon_request_face_attribute(ObjectHdl obj,
 													  const char* name,
 													  AttribDesc type) {
 	TRY
@@ -329,8 +329,8 @@ PolygonAttributeHandle polygon_request_face_attribute(ObjectHdl obj,
 
 	return switchAttributeType(type, [name, type, &object](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attr = object.template get_geometry<Polygons>().template add_attribute<Type, true>(name);
-		return PolygonAttributeHandle{
+		auto attr = object.template get_geometry<Polygons>().template add_face_attribute<Type>(name);
+		return PolygonAttributeHdl{
 			static_cast<int32_t>(attr.index),
 			type, true
 		};
@@ -522,7 +522,7 @@ VertexHdl polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count,
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
-Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
+Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHdl* attr,
 								  VertexHdl vertex, const void* value) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
@@ -541,10 +541,10 @@ Boolean polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHandle
 
 	return switchAttributeType(attr->type, [&object, attr, vertex, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		OpenMeshAttributePool<false>::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
-		object.template get_geometry<Polygons>().acquire<Device::CPU, Type, false>(
-			hdl)[vertex] = *static_cast<const Type*>(value);
-		object.template get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
+		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		object.template get_geometry<Polygons>().acquire<Device::CPU, Type>(hdl)[vertex]
+			= *static_cast<const Type*>(value);
+		object.template get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -567,8 +567,8 @@ Boolean polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal) 
 	}
 
 	auto hdl = object.get_geometry<Polygons>().get_normals_hdl();
-	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec3f, false>(hdl)[vertex] = util::pun<OpenMesh::Vec3f>(normal);
-	object.get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
+	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec3f>(hdl)[vertex] = util::pun<OpenMesh::Vec3f>(normal);
+	object.get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
 	return true;
 	CATCH_ALL(false)
 }
@@ -586,13 +586,13 @@ Boolean polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv) {
 	}
 
 	auto hdl = object.get_geometry<Polygons>().get_uvs_hdl();
-	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec2f, false>(hdl)[vertex] = util::pun<OpenMesh::Vec2f>(uv);
-	object.get_geometry<Polygons>().mark_changed<false>(Device::CPU, hdl);
+	object.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec2f>(hdl)[vertex] = util::pun<OpenMesh::Vec2f>(uv);
+	object.get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* attr,
+Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHdl* attr,
 								FaceHdl face, const void* value) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
@@ -611,10 +611,10 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 
 	return switchAttributeType(attr->type, [&object, attr, face, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		OpenMeshAttributePool<true>::AttributeHandle hdl{ static_cast<size_t>(attr->index) };
-		object.template get_geometry<Polygons>().acquire<Device::CPU, Type, true>(
-			hdl)[face] = *static_cast<const Type*>(value);
-		object.template get_geometry<Polygons>().mark_changed<true>(Device::CPU, hdl);
+		FaceAttributeHandle hdl{ static_cast<size_t>(attr->index) };
+		object.template get_geometry<Polygons>().acquire<Device::CPU, Type>(hdl)[face]
+			= *static_cast<const Type*>(value);
+		object.template get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -625,6 +625,8 @@ Boolean polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHandle* 
 }
 
 Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
+	// TODO: polygons have the invariant that their material never changes.
+	// This interface violates this invariant directly, remove?
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(face, "face index", false);
@@ -637,13 +639,13 @@ Boolean polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx) {
 	}
 
 	auto hdl = object.get_geometry<Polygons>().get_material_indices_hdl();
-	object.get_geometry<Polygons>().acquire<Device::CPU, u16, true>(hdl)[face] = idx;
-	object.get_geometry<Polygons>().mark_changed<true>(Device::CPU, hdl);
+	object.get_geometry<Polygons>().acquire<Device::CPU, MaterialIndex>(hdl)[face] = idx;
+	object.get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
 	return true;
 	CATCH_ALL(false)
 }
 
-size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHandle* attr,
+size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHdl* attr,
 										 VertexHdl startVertex, size_t count,
 										 FILE* stream) {
 	TRY
@@ -664,7 +666,7 @@ size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHa
 
 	return switchAttributeType(attr->type, [&object, attr, startVertex, count, &attrStream](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		OpenMeshAttributePool<false>::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return object.template get_geometry<Polygons>().add_bulk(hdl,
 										 PolyVHdl{ static_cast<int>(startVertex) },
 										 count, attrStream);
@@ -676,7 +678,7 @@ size_t polygon_set_vertex_attribute_bulk(ObjectHdl obj, const PolygonAttributeHa
 	CATCH_ALL(INVALID_SIZE)
 }
 
-size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHandle* attr,
+size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHdl* attr,
 									   FaceHdl startFace, size_t count,
 									   FILE* stream) {
 	TRY
@@ -697,7 +699,7 @@ size_t polygon_set_face_attribute_bulk(ObjectHdl obj, const PolygonAttributeHand
 
 	return switchAttributeType(attr->type, [&object, attr, startFace, count, &attrStream](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		OpenMeshAttributePool<true>::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		FaceAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return object.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
 																 count, attrStream);
 	}, [attr, name = FUNCTION_NAME]() {
@@ -725,7 +727,7 @@ size_t polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t co
 	}
 	util::FileReader matStream{ stream };
 
-	OpenMeshAttributePool<true>::AttributeHandle hdl = object.template get_geometry<Polygons>().get_material_indices_hdl();
+	FaceAttributeHandle hdl = object.template get_geometry<Polygons>().get_material_indices_hdl();
 	return object.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
 															 count, matStream);
 	CATCH_ALL(INVALID_SIZE)
@@ -792,7 +794,7 @@ Boolean spheres_reserve(ObjectHdl obj, size_t count) {
 	CATCH_ALL(false)
 }
 
-SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
+SphereAttributeHdl spheres_request_attribute(ObjectHdl obj, const char* name,
 												AttribDesc type) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", INVALID_SPHERE_ATTR_HANDLE);
@@ -801,7 +803,7 @@ SphereAttributeHandle spheres_request_attribute(ObjectHdl obj, const char* name,
 
 	return switchAttributeType(type, [name, type, &object](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		return SphereAttributeHandle{
+		return SphereAttributeHdl{
 			static_cast<int32_t>(object.template get_geometry<Spheres>().add_attribute<Type>(name).index),
 			type
 		};
@@ -864,7 +866,7 @@ SphereHdl spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
 	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
-Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
+Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHdl* attr,
 						   SphereHdl sphere, const void* value) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
@@ -882,7 +884,7 @@ Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 
 	return switchAttributeType(attr->type, [&object, attr, sphere, value](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		AttributePool::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		object.template get_geometry<Spheres>().acquire<Device::CPU, Type>(hdl)[sphere] = *static_cast<const Type*>(value);
 		object.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
 		return true;
@@ -895,6 +897,8 @@ Boolean spheres_set_attribute(ObjectHdl obj, const SphereAttributeHandle* attr,
 }
 
 Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
+	// TODO: polygons have the invariant that their material never changes.
+	// This interface violates this invariant directly, remove?
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	CHECK_GEQ_ZERO(sphere, "sphere index", false);
@@ -906,14 +910,14 @@ Boolean spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere, MatIdx idx) {
 		return false;
 	}
 
-	AttributePool::AttributeHandle hdl = object.template get_geometry<Spheres>().get_material_indices_hdl();
-	object.template get_geometry<Spheres>().acquire<Device::CPU, u16>(hdl)[sphere] = idx;
+	SphereAttributeHandle hdl = object.template get_geometry<Spheres>().get_material_indices_hdl();
+	object.template get_geometry<Spheres>().acquire<Device::CPU, MaterialIndex>(hdl)[sphere] = idx;
 	object.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
 	return true;
 	CATCH_ALL(false)
 }
 
-size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* attr,
+size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHdl* attr,
 								  SphereHdl startSphere, size_t count,
 								  FILE* stream) {
 	TRY
@@ -933,7 +937,7 @@ size_t spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHandle* at
 
 	return switchAttributeType(attr->type, [&object, attr, startSphere, count, &attrStream](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
-		AttributePool::AttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
+		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return object.template get_geometry<Spheres>().add_bulk(hdl,
 																SphereVHdl{ static_cast<size_t>(startSphere) },
 																count, attrStream);
@@ -960,7 +964,7 @@ size_t spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere, size_
 	}
 	util::FileReader matStream{ stream };
 
-	AttributePool::AttributeHandle hdl = object.template get_geometry<Spheres>().get_material_indices_hdl();
+	SphereAttributeHandle hdl = object.template get_geometry<Spheres>().get_material_indices_hdl();
 	return object.template get_geometry<Spheres>().add_bulk(hdl,
 															SphereVHdl{ static_cast<size_t>(startSphere) },
 															count, matStream);

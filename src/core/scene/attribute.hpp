@@ -17,6 +17,30 @@
 #include <vector>
 
 namespace mufflon { namespace scene {
+	// TODO: move to geometry namespace?
+
+// Represents a handle to an attribute (basically a glorified index)
+struct AttributeHandle {
+	std::size_t index = std::numeric_limits<std::size_t>::max();
+	bool operator==(const AttributeHandle& rhs) const noexcept {
+		return index == rhs.index;
+	}
+};
+// Overload aliases
+struct FaceAttributeHandle : public AttributeHandle {
+	static constexpr bool IS_FACE = true;
+	FaceAttributeHandle(const AttributeHandle& attr) : AttributeHandle{attr} {};
+	FaceAttributeHandle(std::size_t index) : AttributeHandle{index} {};
+};
+struct VertexAttributeHandle : public AttributeHandle {
+	static constexpr bool IS_FACE = false;
+	VertexAttributeHandle(const AttributeHandle& attr) : AttributeHandle{attr} {};
+	VertexAttributeHandle(std::size_t index) : AttributeHandle{index} {};
+};
+struct SphereAttributeHandle : public AttributeHandle {
+	SphereAttributeHandle(const AttributeHandle& attr) : AttributeHandle{attr} {};
+	SphereAttributeHandle(std::size_t index) : AttributeHandle{index} {};
+};
 
 /**
  * Attribute pool for multi-device attributes, shared with OpenMesh.
@@ -31,11 +55,7 @@ public:
 	static constexpr bool IS_FACE = IsFace;
 	template < class T >
 	using PropertyHandleType = std::conditional_t<IS_FACE, OpenMesh::FPropHandleT<T>, OpenMesh::VPropHandleT<T>>;
-
-	// Represents a handle to an attribute (basically a glorified index)
-	struct AttributeHandle {
-		std::size_t index = std::numeric_limits<std::size_t>::max();
-	};
+//	using AttributeHandle = std::conditional_t<IS_FACE, FaceAttributeHandle, VertexAttributeHandle>;
 
 	OpenMeshAttributePool(geometry::PolygonMeshType &mesh);
 	OpenMeshAttributePool(const OpenMeshAttributePool&) = delete;
@@ -189,7 +209,9 @@ public:
 	std::size_t get_attribute_elem_capacity() const noexcept {
 		return m_attribElemCapacity;
 	}
-	
+
+	// Resolves a name to an attribute
+	AttributeHandle get_attribute_handle(std::string_view name);
 private:
 	// Bookkeeping for attributes
 	struct AttribInfo {
@@ -198,9 +220,6 @@ private:
 		std::function<char*(geometry::PolygonMeshType&)> accessor;
 		util::DirtyFlags<Device> dirty{};
 	};
-
-	// Resolves a name to an attribute
-	AttributeHandle get_attribute_handle(std::string_view name);
 
 	geometry::PolygonMeshType &m_mesh;	// References the OpenMesh mesh
 	std::map<std::string, std::size_t, std::less<>> m_nameMap;
@@ -223,11 +242,6 @@ private:
  */
 class AttributePool {
 public:
-	// Represents a handle to an attribute (basically a glorified index)
-	struct AttributeHandle {
-		std::size_t index = std::numeric_limits<std::size_t>::max();
-	};
-
 	AttributePool() = default;
 	AttributePool(const AttributePool&) = delete;
 	AttributePool& operator=(const AttributePool&) = delete;
@@ -312,20 +326,21 @@ public:
 
 	// Loads the attribute from a byte stream, starting at elem start
 	// Resizes the attributes if necessary
+	// Returns the number of read instances.
 	std::size_t restore(AttributeHandle hdl, util::IByteReader& attrStream,
 						std::size_t start, std::size_t count);
-	std::size_t restore(std::string_view name, util::IByteReader& attrStream,
+	/*std::size_t restore(std::string_view name, util::IByteReader& attrStream,
 						std::size_t start, std::size_t count) {
 		return this->restore(get_attribute_handle(name), attrStream, start, count);
-	}
+	}*/
 
 	// Store the attribute to a byte stream, starting at elem start
 	std::size_t store(AttributeHandle hdl, util::IByteWriter& attrStream,
 					  std::size_t start, std::size_t count);
-	std::size_t store(std::string_view name, util::IByteWriter& attrStream,
+	/*std::size_t store(std::string_view name, util::IByteWriter& attrStream,
 					  std::size_t start, std::size_t count) {
 		return this->store(get_attribute_handle(name), attrStream, start, count);
-	}
+	}*/
 
 	std::size_t get_attribute_count() const noexcept {
 		return m_attributes.size();
@@ -339,6 +354,8 @@ public:
 		return m_attribElemCapacity;
 	}
 
+	// Resolves a name to an attribute
+	AttributeHandle get_attribute_handle(std::string_view name);
 private:
 	// Bookkeeping for attributes
 	struct AttribInfo {
@@ -352,9 +369,6 @@ private:
 		static constexpr Device DEVICE = dev;
 		ArrayDevHandle_t<dev, char> handle = ArrayDevHandle_t<dev, char>{};
 	};
-
-	// Resolves a name to an attribute
-	AttributeHandle get_attribute_handle(std::string_view name);
 
 	std::map<std::string, std::size_t, std::less<>> m_nameMap;
 	std::size_t m_attribElemCount = 0u;

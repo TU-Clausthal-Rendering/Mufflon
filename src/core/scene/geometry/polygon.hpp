@@ -11,6 +11,7 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
+#include <unordered_set>
 
 // Forward declarations
 namespace OpenMesh::Subdivider::Uniform {
@@ -152,9 +153,13 @@ public:
 
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
 
-	template < class T, bool face >
-	typename OpenMeshAttributePool<face>::AttributeHandle add_attribute(std::string name) {
-		return get_attributes<face>().add_attribute<T>(std::move(name));
+	template < class T >
+	typename VertexAttributeHandle add_vertex_attribute(std::string name) {
+		return m_vertexAttributes.add_attribute<T>(std::move(name));
+	}
+	template < class T >
+	typename FaceAttributeHandle add_face_attribute(std::string name) {
+		return m_faceAttributes.add_attribute<T>(std::move(name));
 	}
 
 	void remove_attribute(std::string_view name) {
@@ -165,9 +170,13 @@ public:
 	template < Device dev >
 	void synchronize();
 
-	template < Device dev, bool face >
-	void synchronize(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
-		get_attributes<face>().synchronize<dev>(hdl);
+	template < Device dev >
+	void synchronize(VertexAttributeHandle hdl) {
+		m_vertexAttributes.synchronize<dev>(hdl);
+	}
+	template < Device dev >
+	void synchronize(FaceAttributeHandle hdl) {
+		m_faceAttributes.synchronize<dev>(hdl);
 	}
 	template < Device dev, bool face >
 	void synchronize(std::string_view name) {
@@ -184,9 +193,11 @@ public:
 	void mark_changed(Device dev) {
 		get_attributes<face>().mark_changed(dev);
 	}
-	template < bool face >
-	void mark_changed(Device dev, typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
-		get_attributes<face>().mark_changed(dev, hdl);
+	void mark_changed(Device dev, VertexAttributeHandle hdl) {
+		m_vertexAttributes.mark_changed(dev, hdl);
+	}
+	void mark_changed(Device dev, FaceAttributeHandle hdl) {
+		m_faceAttributes.mark_changed(dev, hdl);
 	}
 	template < bool face >
 	void mark_changed(Device dev, std::string_view name) {
@@ -245,9 +256,9 @@ public:
 						 std::size_t count, util::IByteReader& attrStream);
 	std::size_t add_bulk(std::string_view name, const FaceHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(OpenMeshAttributePool<false>::AttributeHandle hdl, const VertexHandle& startVertex,
+	std::size_t add_bulk(VertexAttributeHandle hdl, const VertexHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(OpenMeshAttributePool<true>::AttributeHandle hdl, const FaceHandle& startVertex,
+	std::size_t add_bulk(FaceAttributeHandle hdl, const FaceHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
 
 	// Implements tessellation for uniform subdivision.
@@ -282,13 +293,21 @@ public:
 		};
 	}
 
-	template < Device dev, class T, bool face >
-	T* acquire(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
-		return get_attributes<face>().acquire<dev, T>(hdl);
+	template < Device dev, class T >
+	T* acquire(VertexAttributeHandle hdl) {
+		return m_vertexAttributes.acquire<dev, T>(hdl);
 	}
-	template < Device dev, class T, bool face >
-	const T* acquire_const(typename OpenMeshAttributePool<face>::AttributeHandle hdl) {
-		return get_attributes<face>().acquire_const<dev, T>(hdl);
+	template < Device dev, class T >
+	T* acquire(FaceAttributeHandle hdl) {
+		return m_faceAttributes.acquire<dev, T>(hdl);
+	}
+	template < Device dev, class T >
+	const T* acquire_const(VertexAttributeHandle hdl) {
+		return m_vertexAttributes.acquire_const<dev, T>(hdl);
+	}
+	template < Device dev, class T >
+	const T* acquire_const(FaceAttributeHandle hdl) {
+		return m_faceAttributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T, bool face >
 	T* acquire(std::string_view name) {
@@ -299,16 +318,16 @@ public:
 		return get_attributes<face>().acquire_const<dev, T>(name);
 	}
 
-	OpenMeshAttributePool<false>::AttributeHandle get_points_hdl() const noexcept {
+	VertexAttributeHandle get_points_hdl() const noexcept {
 		return m_pointsHdl;
 	}
-	OpenMeshAttributePool<false>::AttributeHandle get_normals_hdl() const noexcept {
+	VertexAttributeHandle get_normals_hdl() const noexcept {
 		return m_normalsHdl;
 	}
-	OpenMeshAttributePool<false>::AttributeHandle get_uvs_hdl() const noexcept {
+	VertexAttributeHandle get_uvs_hdl() const noexcept {
 		return m_uvsHdl;
 	}
-	OpenMeshAttributePool<true>::AttributeHandle get_material_indices_hdl() const noexcept {
+	FaceAttributeHandle get_material_indices_hdl() const noexcept {
 		return m_matIndicesHdl;
 	}
 
@@ -342,6 +361,11 @@ public:
 
 	std::size_t get_face_attribute_count() const noexcept {
 		return m_faceAttributes.get_attribute_count();
+	}
+
+	// Get a list of all materials which are referenced by any primitive
+	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
+		return m_uniqueMaterials;
 	}
 
 private:
@@ -397,10 +421,10 @@ private:
 	std::unique_ptr<PolygonMeshType> m_meshData;
 	VertexAttributePoolType m_vertexAttributes;
 	FaceAttributePoolType m_faceAttributes;
-	OpenMeshAttributePool<false>::AttributeHandle m_pointsHdl;
-	OpenMeshAttributePool<false>::AttributeHandle m_normalsHdl;
-	OpenMeshAttributePool<false>::AttributeHandle m_uvsHdl;
-	OpenMeshAttributePool<true>::AttributeHandle m_matIndicesHdl;
+	VertexAttributeHandle m_pointsHdl;
+	VertexAttributeHandle m_normalsHdl;
+	VertexAttributeHandle m_uvsHdl;
+	FaceAttributeHandle m_matIndicesHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
 	IndexBuffers m_indexBuffer;
 	util::DirtyFlags<Device> m_indexFlags;
@@ -413,6 +437,11 @@ private:
 	ei::Box m_boundingBox;
 	std::size_t m_triangles = 0u;
 	std::size_t m_quads = 0u;
+
+	// Whenever a primitive is added the table of all referenced
+	// materials will be updated. Assumption: a material reference
+	// will not change afterwards.
+	std::unordered_set<MaterialIndex> m_uniqueMaterials;
 };
 
 }}} // namespace mufflon::scene::geometry

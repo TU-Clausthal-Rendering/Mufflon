@@ -1,5 +1,7 @@
 #include "object.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include "core/scene/scenario.hpp"
+#include "core/scene/materials/material.hpp"
 
 
 namespace mufflon::scene {
@@ -20,6 +22,14 @@ Object::Object(Object&& obj) :
 
 Object::~Object() {
 
+}
+
+bool Object::is_emissive(const Scenario& scenario) const noexcept {
+	for(MaterialIndex m : m_geometryData.get<geometry::Polygons>().get_unique_materials())
+		if(scenario.get_assigned_material(m)->get_properties().is_emissive()) return true;
+	for(MaterialIndex m : m_geometryData.get<geometry::Spheres>().get_unique_materials())
+		if(scenario.get_assigned_material(m)->get_properties().is_emissive()) return true;
+	return false;
 }
 
 void Object::clear_accel_structure() {

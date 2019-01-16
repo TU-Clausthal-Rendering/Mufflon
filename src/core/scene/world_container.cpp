@@ -22,14 +22,13 @@ WorldContainer::Sanity WorldContainer::is_sane_world() const {
 		return Sanity::NO_OBJECTS;
 	// Check for lights
 	if(m_pointLights.empty() && m_spotLights.empty() && m_dirLights.empty() && m_envLights.empty()) {
-		// No explicit lights - check if any object has emitting materials
+		// No explicit lights - check if any emitting materials exist
 		bool hasEmitters = false;
-		for(const auto& object : m_objects) {
-			if(object.second.is_emissive()) {
+		for(const auto& mat : m_materials)
+			if(mat->get_properties().is_emissive()) {
 				hasEmitters = true;
 				break;
 			}
-		}
 		if(!hasEmitters)
 			return Sanity::NO_LIGHTS;
 	}
@@ -48,7 +47,7 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	for(const auto& object : m_objects) {
 		if(!hdl->is_masked(&object.second)) {
 			hasObjects = true;
-			if(object.second.is_emissive()) {
+			if(object.second.is_emissive(*hdl)) {
 				hasEmitters = true;
 				break;
 			}
@@ -471,16 +470,17 @@ void WorldContainer::load_scene_lights() {
 		for(auto& instance : m_instances) {
 			if(!m_scenario->is_masked(&instance.get_object())) {
 				// Find all area lights, if the object contains some
-				if(instance.get_object().is_emissive()) {
+				if(instance.get_object().is_emissive(*m_scenario)) {
 					u32 primIdx = 0;
 					// First search in polygons (PrimitiveHandle expects poly before sphere)
 					auto& polygons = instance.get_object().get_geometry<geometry::Polygons>();
-					const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex, true>(polygons.get_material_indices_hdl());
-					const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point, false>(polygons.get_points_hdl());
-					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate, false>(polygons.get_uvs_hdl());
+					const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
+					const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
+					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
 					for(const auto& face : polygons.faces()) {
-						if(m_materials[materials[primIdx]]->get_properties().is_emissive()) {
-							auto emission = m_materials[materials[primIdx]]->get_emission();
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
+						if(mat->get_properties().is_emissive()) {
+							auto emission = mat->get_emission();
 							mAssert(emission.texture != nullptr);
 							if(std::distance(face.begin(), face.end()) == 3) {
 								lights::AreaLightTriangleDesc al;
@@ -510,12 +510,14 @@ void WorldContainer::load_scene_lights() {
 					}
 
 					// Then get the sphere lights
+					primIdx = (u32)instance.get_object().get_geometry<geometry::Polygons>().get_face_count();
 					auto& spheres = instance.get_object().get_geometry<geometry::Spheres>();
 					materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
 					const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
 					for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
-						if(m_materials[materials[i]]->get_properties().is_emissive()) {
-							auto emission = m_materials[materials[primIdx]]->get_emission();
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
+						if(mat->get_properties().is_emissive()) {
+							auto emission = mat->get_emission();
 							mAssert(emission.texture != nullptr);
 							lights::AreaLightSphereDesc al{
 								spheresData[i].center,

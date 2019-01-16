@@ -57,8 +57,9 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 
 Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
 	SphereHandle hdl = this->add(point, radius);
-	m_attributes.acquire<Device::CPU, u16>(m_spheresHdl)[hdl] = idx;
+	m_attributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
 	m_attributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -87,20 +88,24 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 
 std::size_t Spheres::add_bulk(std::string_view name, const SphereHandle& startSphere,
 							  std::size_t count, util::IByteReader& attrStream) {
-	if(startSphere >= m_attributes.get_attribute_elem_count())
-		return 0u;
-	if(startSphere + count > m_attributes.get_attribute_elem_count())
-		m_attributes.reserve(startSphere + count);
-	return m_attributes.restore(name, attrStream, startSphere, count);
+	return this->add_bulk(m_attributes.get_attribute_handle(name), startSphere,
+						  count, attrStream);
 }
 
-std::size_t Spheres::add_bulk(AttributePool::AttributeHandle hdl, const SphereHandle& startSphere,
+std::size_t Spheres::add_bulk(SphereAttributeHandle hdl, const SphereHandle& startSphere,
 							  std::size_t count, util::IByteReader& attrStream) {
 	if(startSphere >= m_attributes.get_attribute_elem_count())
 		return 0u;
 	if(startSphere + count > m_attributes.get_attribute_elem_count())
 		m_attributes.reserve(startSphere + count);
-	return m_attributes.restore(hdl, attrStream, startSphere, count);
+	std::size_t numRead = m_attributes.restore(hdl, attrStream, startSphere, count);
+	// Update material table in case this load was about materials
+	if(hdl == m_matIndicesHdl) {
+		MaterialIndex* materials = m_attributes.acquire<Device::CPU, MaterialIndex>(hdl);
+		for(std::size_t i = startSphere; i < startSphere+numRead; ++i)
+			m_uniqueMaterials.emplace(materials[i]);
+	}
+	return numRead;
 }
 
 

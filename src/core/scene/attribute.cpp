@@ -220,7 +220,7 @@ std::size_t OpenMeshAttributePool<face>::store(AttributeHandle hdl, util::IByteW
 }
 
 template < bool face >
-typename OpenMeshAttributePool<face>::AttributeHandle OpenMeshAttributePool<face>::get_attribute_handle(std::string_view name) {
+AttributeHandle OpenMeshAttributePool<face>::get_attribute_handle(std::string_view name) {
 	auto mapIter = m_nameMap.find(name);
 	if(mapIter == m_nameMap.end())
 		throw std::runtime_error("Could not find attribute '" + std::string(name) + "'");
@@ -430,7 +430,7 @@ std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStr
 	return attrStream.write(mem, elemSize * count) / attribute.elemSize;
 }
 	// Resolves a name to an attribute
-AttributePool::AttributeHandle AttributePool::get_attribute_handle(std::string_view name) {
+AttributeHandle AttributePool::get_attribute_handle(std::string_view name) {
 	auto mapIter = m_nameMap.find(name);
 	if(mapIter == m_nameMap.end())
 		throw std::runtime_error("Could not find attribute '" + std::string(name) + "'");

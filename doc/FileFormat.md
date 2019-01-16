@@ -273,7 +273,7 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                <JUMP_TABLE>     // Jump table over LODs (number = D)
                D*<LOD>          // LODs sorted after detail (0 has the highest detail)
 
-    <OFLAGS> = EMISSIVE 1       // There is at least one primitive (polygon ore sphere) with an emissive material
+    <OFLAGS> = // Currently none
 
 LODs contain the real geometry. It must have sorted geometry, because attributes (like count of indices) differ per geometry.
 

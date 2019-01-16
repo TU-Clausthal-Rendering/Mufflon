@@ -33,7 +33,7 @@ template < Device dev >
 struct ObjectDescriptor;
 
 struct ObjectFlags : public util::Flags<u32> {
-	static constexpr u32 EMISSIVE = 1u;
+	// NONE
 };
 
 
@@ -93,9 +93,8 @@ public:
 	}
 
 	// Is there any emissive polygon in this object
-	bool is_emissive() const noexcept {
-		return m_flags.is_set(ObjectFlags::EMISSIVE);
-	}
+	// Requires the scenario for the material mapping.
+	bool is_emissive(const class Scenario& scenario) const noexcept;
 
 	// Get the descriptor of the object (including all geometry, but without attributes)
 	// Synchronizes implicitly
