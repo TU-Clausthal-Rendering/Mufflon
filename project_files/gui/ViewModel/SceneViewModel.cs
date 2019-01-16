@@ -73,6 +73,9 @@ namespace gui.ViewModel
             m_playPause = playPause;
             m_reset = reset;
 
+            if(Settings.Default.LastScenes == null)
+                Settings.Default.LastScenes = new StringCollection();
+
             foreach (string path in Settings.Default.LastScenes)
             {
                 LastScenes.Add(new SceneMenuItem(m_models)
