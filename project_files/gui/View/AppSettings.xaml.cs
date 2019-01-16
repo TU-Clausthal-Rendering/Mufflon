@@ -77,6 +77,7 @@ namespace gui.View
         public string PlayPauseGesture { get; set; }
         public string ResetGesture { get; set; }
         public string ScreenshotGesture { get; set; }
+        public string CameraMoveToggleGesture { get; set; }
 
         public AppSettings(ViewModels viewModels)
         {
@@ -95,6 +96,7 @@ namespace gui.View
             PlayPauseGesture = viewModels.Toolbar.PlayPauseCommand.getCurrentGesture();
             ResetGesture = viewModels.Toolbar.ResetCommand.getCurrentGesture();
             ScreenshotGesture = viewModels.Toolbar.SaveScreenShotCommand.getCurrentGesture();
+            CameraMoveToggleGesture = viewModels.Toolbar.ToggleCameraMovementCommand.getCurrentGesture();
 
             OnPropertyChanged(nameof(ScreenshotFolder));
             OnPropertyChanged(nameof(ScreenshotNamePatternHistory));
@@ -130,6 +132,7 @@ namespace gui.View
             m_viewModels.Toolbar.PlayPauseCommand.updateGesture(PlayPauseGesture);
             m_viewModels.Toolbar.ResetCommand.updateGesture(ResetGesture);
             m_viewModels.Toolbar.SaveScreenShotCommand.updateGesture(ScreenshotGesture);
+            m_viewModels.Toolbar.ToggleCameraMovementCommand.updateGesture(CameraMoveToggleGesture);
         }
 
         private void CancelButtonClick(object sender, RoutedEventArgs args)

@@ -108,6 +108,7 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0"
@@ -133,6 +134,14 @@
                         <TextBox Grid.Row="2" Grid.Column="1"
                                  Width="50"
                                  Text="{Binding ScreenshotGesture}"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0"
+                                   Text="Toggle camera movement:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="3" Grid.Column="1"
+                                 Width="50"
+                                 Text="{Binding CameraMoveToggleGesture}"/>
                     </Grid>
                 </StackPanel>
             </TabItem>

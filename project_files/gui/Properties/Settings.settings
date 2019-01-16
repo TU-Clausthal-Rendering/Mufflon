@@ -44,5 +44,8 @@
     <Setting Name="ResetGesture" Type="System.String" Scope="User">
       <Value Profile="(Default)">ALT+R</Value>
     </Setting>
+    <Setting Name="ToggleCameraMovementGesture" Type="System.String" Scope="User">
+      <Value Profile="(Default)">ALT+M</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

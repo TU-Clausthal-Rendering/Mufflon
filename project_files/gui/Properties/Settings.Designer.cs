@@ -188,5 +188,17 @@ namespace gui.Properties {
                 this["ResetGesture"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("ALT+M")]
+        public string ToggleCameraMovementGesture {
+            get {
+                return ((string)(this["ToggleCameraMovementGesture"]));
+            }
+            set {
+                this["ToggleCameraMovementGesture"] = value;
+            }
+        }
     }
 }

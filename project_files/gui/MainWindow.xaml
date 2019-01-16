@@ -18,6 +18,7 @@
         <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
         <Thickness x:Key="ThinBorder" Bottom="1"/>
         <local:NegateBooleanConverter x:Key="inverter"/>
+        <local:InvertVisibilityConverter x:Key="visinverter"/>
     </Window.Resources>
     <DockPanel Background="{StaticResource BackgroundBrush}">
         <!-- Menu Bar and Status bar grid -->
@@ -82,7 +83,8 @@
                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}">
+                    <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}"
+                            ToolTip="Play/pause the renderer">
                         <StackPanel>
                             <Image 
                                 Source="Icons/play.png"
@@ -100,7 +102,8 @@
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.ResetCommand}">
+                    <Button Command="{Binding Toolbar.ResetCommand}"
+                            ToolTip="Reset the rendering progress">
                         <Image 
                             Source="Icons/restart.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
@@ -109,7 +112,8 @@
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button>
+                    <Button
+                            ToolTip="Inspect object instance">
                         <Image 
                             Source="Icons/inspect_instance.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
@@ -118,7 +122,8 @@
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button>
+                    <Button
+                            ToolTip="Inspect material">
                         <Image 
                             Source="Icons/inspect_material.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
@@ -127,7 +132,8 @@
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button>
+                    <Button
+                            ToolTip="Inspect light source">
                         <Image 
                             Source="Icons/inspect_light.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
@@ -136,12 +142,32 @@
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.SaveScreenShotCommand}">
+                    <Button Command="{Binding Toolbar.SaveScreenShotCommand}"
+                            ToolTip="Take a screenshot">
                         <Image
                             Source="Icons/screenshot.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
                             Width="16"
                             Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button Command="{Binding Toolbar.ToggleCameraMovementCommand}"
+                            ToolTip="Allow/disallow camera movement">
+                        <StackPanel>
+                            <Image 
+                                Source="Icons/camera_move.png"
+                                RenderOptions.BitmapScalingMode="LowQuality"
+                                Width="16"
+                                Height="16"
+                                Visibility="{Binding Toolbar.CameraMoveIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Image 
+                                Source="Icons/camera_nomove.png"
+                                RenderOptions.BitmapScalingMode="LowQuality"
+                                Width="16"
+                                Height="16"
+                                Visibility="{Binding Toolbar.CameraMoveIconVisibility, Converter={StaticResource visinverter}, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
                     </Button>
                 </StatusBarItem>
             </StatusBar>

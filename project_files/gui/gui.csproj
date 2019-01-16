@@ -98,9 +98,11 @@
     <Compile Include="Command\RemoveMaterialCommand.cs" />
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
+    <Compile Include="Command\ToggleCameraMovementCommand.cs" />
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
     <Compile Include="Dll\OpenGlDisplay.cs" />
+    <Compile Include="InvertVisibilityConverter.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
     <Compile Include="Model\Camera\FocusCameraModel.cs" />
@@ -446,6 +448,10 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\screenshot.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\camera_move.png" />
+    <Resource Include="Icons\camera_nomove.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
