@@ -130,8 +130,8 @@ namespace gui.ViewModel
         {
             switch (args.PropertyName)
             {
-                case nameof(Models.Scene):
-                    if (m_models.Scene != null)
+                case nameof(Models.World):
+                    if (m_models.World != null)
                     {
                         // TODO other conditions
                         if (!Core.render_disable_all_render_targets())

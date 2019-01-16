@@ -5,13 +5,13 @@
     <Setting Name="ImagePath" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
-    <Setting Name="lastScenePath" Type="System.String" Scope="User">
+    <Setting Name="lastWorldPath" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="LastSelectedRenderer" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
-    <Setting Name="LastScenes" Type="System.Collections.Specialized.StringCollection" Scope="User">
+    <Setting Name="LastWorlds" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="AutoStartOnLoad" Type="System.Boolean" Scope="User">

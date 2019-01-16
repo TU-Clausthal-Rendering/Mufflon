@@ -27,15 +27,15 @@ namespace gui.Model
         public RendererModel Renderer { get; }
         public ViewportModel Viewport { get; }
 
-        private SceneModel m_scene = null;
-        public SceneModel Scene
+        private WorldModel m_world = null;
+        public WorldModel World
         {
-            get => m_scene;
+            get => m_world;
             set
             {
-                if(ReferenceEquals(value, m_scene)) return;
-                m_scene = value;
-                OnPropertyChanged(nameof(Scene));
+                if(ReferenceEquals(value, m_world)) return;
+                m_world = value;
+                OnPropertyChanged(nameof(World));
             }
         }
         public SynchronizedModelList<CameraModel> Cameras { get; }

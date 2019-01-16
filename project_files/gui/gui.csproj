@@ -125,7 +125,7 @@
     <Compile Include="Model\Material\WalterMaterialModel.cs" />
     <Compile Include="Model\RendererModel.cs" />
     <Compile Include="Model\Scene\ScenarioModel.cs" />
-    <Compile Include="Model\Scene\SceneModel.cs" />
+    <Compile Include="Model\Scene\WorldModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />

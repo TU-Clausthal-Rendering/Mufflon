@@ -16,7 +16,7 @@ namespace gui.Model.Scene
     /// <summary>
     /// Additional information of the loaded scene (excluding light, materials and cameras)
     /// </summary>
-    public class SceneModel : INotifyPropertyChanged
+    public class WorldModel : INotifyPropertyChanged
     {
         // path with filename and extension
         public string FullPath { get; }
@@ -82,7 +82,7 @@ namespace gui.Model.Scene
         // filename with extension
         public string Filename => Path.GetFileName(FullPath);
 
-        public SceneModel(IntPtr handle, string fullPath)
+        public WorldModel(IntPtr handle, string fullPath)
         {
             m_handle = handle;
             if(handle == IntPtr.Zero)

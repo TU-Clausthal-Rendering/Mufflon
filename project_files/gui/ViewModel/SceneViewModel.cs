@@ -59,7 +59,7 @@ namespace gui.ViewModel
 
                 // load selected scenario
                 if (m_selectedScenario == null) return;
-                m_models.Scene.CurrentScenario = m_selectedScenario.Cargo;
+                m_models.World.CurrentScenario = m_selectedScenario.Cargo;
             }
         }
         public ObservableCollection<ComboBoxItem<ScenarioModel>> Scenarios { get; } = new ObservableCollection<ComboBoxItem<ScenarioModel>>();
@@ -91,7 +91,7 @@ namespace gui.ViewModel
             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
 
             // assume no scene loaded
-            Debug.Assert(m_models.Scene == null);
+            Debug.Assert(m_models.World == null);
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += OnRendererChange;
 
@@ -102,13 +102,13 @@ namespace gui.ViewModel
         {
             switch (args.PropertyName)
             {
-                case nameof(Models.Scene):
+                case nameof(Models.World):
                     // subscribe to new model
-                    if (m_models.Scene != null)
+                    if (m_models.World != null)
                     {
-                        m_models.Scene.PropertyChanged += OnSceneChanged;
-                        m_models.Scene.Scenarios.CollectionChanged += ScenariosOnCollectionChanged;
-                        if (m_models.Scene.FullPath != null)
+                        m_models.World.PropertyChanged += OnSceneChanged;
+                        m_models.World.Scenarios.CollectionChanged += ScenariosOnCollectionChanged;
+                        if (m_models.World.FullPath != null)
                         {
                             // Temporarily disable handlers
                             m_models.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
@@ -313,7 +313,7 @@ namespace gui.ViewModel
             {
                 if(args.PropertyName == nameof(EnvmapLightModel.Map))
                 {
-                    string absoluteTexturePath = Path.Combine(m_models.Scene.Directory, (light as EnvmapLightModel).Map);
+                    string absoluteTexturePath = Path.Combine(m_models.World.Directory, (light as EnvmapLightModel).Map);
                     IntPtr envMapHandle = Core.world_add_texture(absoluteTexturePath, Core.TextureSampling.LINEAR);
                     if (envMapHandle == IntPtr.Zero)
                         throw new Exception(Core.core_get_dll_error());
@@ -427,9 +427,9 @@ namespace gui.ViewModel
         {
             switch(args.PropertyName)
             {
-                case nameof(SceneModel.FullPath):
+                case nameof(WorldModel.FullPath):
                     {
-                        if(m_models.Scene.FullPath != null)
+                        if(m_models.World.FullPath != null)
                         {
                             // Temporarily disable handlers
                             m_models.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
@@ -443,7 +443,7 @@ namespace gui.ViewModel
                             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
                         }
                     }   break;
-                case nameof(SceneModel.CurrentScenario):
+                case nameof(WorldModel.CurrentScenario):
                     LoadScenarioViews();
                     break;
             }
@@ -483,22 +483,22 @@ namespace gui.ViewModel
         {
             Scenarios.Clear();
 
-            if (m_models.Scene == null)
+            if (m_models.World == null)
             {
                 SelectedScenario = null;
                 return;
             }
 
             // code assumes that an active scenario exists
-            Debug.Assert(m_models.Scene.CurrentScenario != null);
+            Debug.Assert(m_models.World.CurrentScenario != null);
 
-            foreach (var scenario in m_models.Scene.Scenarios)
+            foreach (var scenario in m_models.World.Scenarios)
             {
                 // add scenario view
                 var view = new ComboBoxItem<ScenarioModel>(scenario.Name, scenario);
                 Scenarios.Add(view);
                 // set selected item
-                if (ReferenceEquals(scenario, m_models.Scene.CurrentScenario))
+                if (ReferenceEquals(scenario, m_models.World.CurrentScenario))
                     SelectedScenario = view;
             }
             LoadScenarioViews();
@@ -507,13 +507,13 @@ namespace gui.ViewModel
         private void LoadScenarioViews()
         {
             // First fetch the scenario-specific information
-            LoadScenarioLights(m_models.Scene.CurrentScenario.Handle);
-            loadScenarioMaterials(m_models.Scene.CurrentScenario.Handle);
-            LoadScenarioCamera(m_models.Scene.CurrentScenario.Handle);
+            LoadScenarioLights(m_models.World.CurrentScenario.Handle);
+            loadScenarioMaterials(m_models.World.CurrentScenario.Handle);
+            LoadScenarioCamera(m_models.World.CurrentScenario.Handle);
 
             // Change display and renderer resolution
-            m_models.Viewport.RenderWidth = (int)m_models.Scene.CurrentScenario.Resolution.X;
-            m_models.Viewport.RenderHeight = (int)m_models.Scene.CurrentScenario.Resolution.Y;
+            m_models.Viewport.RenderWidth = (int)m_models.World.CurrentScenario.Resolution.X;
+            m_models.Viewport.RenderHeight = (int)m_models.World.CurrentScenario.Resolution.Y;
             //m_scenarioLoadDialog.Close();
         }
 
@@ -686,7 +686,7 @@ namespace gui.ViewModel
         {
             m_models.Lights.Models.Clear();
 
-            if(m_models.Scene == null) return;
+            if(m_models.World == null) return;
             // Point lights
             ulong pointLightCount = Core.world_get_point_light_count();
             for(ulong i = 0u; i < pointLightCount; ++i)
@@ -752,7 +752,7 @@ namespace gui.ViewModel
                 string absoluteTexPath = Core.world_get_env_light_map(hdl);
                 if (absoluteTexPath == null || absoluteTexPath.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
-                Uri scenePath = new Uri(m_models.Scene.FullPath);
+                Uri scenePath = new Uri(m_models.World.FullPath);
                 string map = scenePath.MakeRelativeUri(new Uri(absoluteTexPath)).OriginalString;
                 m_models.Lights.Models.Add(new EnvmapLightModel()
                 {

@@ -41,11 +41,11 @@ namespace gui.ViewModel
         {
             switch (args.PropertyName)
             {
-                case nameof(Models.Scene):
+                case nameof(Models.World):
                     // add scene subscription
-                    if (m_models.Scene != null)
+                    if (m_models.World != null)
                     {
-                        m_models.Scene.PropertyChanged += SceneOnPropertyChanged;
+                        m_models.World.PropertyChanged += SceneOnPropertyChanged;
                     }
                     break;
             }
@@ -73,7 +73,7 @@ namespace gui.ViewModel
         {
             switch (args.PropertyName)
             {
-                case nameof(SceneModel.FullPath):
+                case nameof(WorldModel.FullPath):
                     System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                         updateLoadingData();
                     }));

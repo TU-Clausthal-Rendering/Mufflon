@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui.View"
         mc:Ignorable="d"
-        Title="Loading Scene" Height="120" Width="250"
+        Title="Loading World" Height="120" Width="250"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None">
     <Grid>

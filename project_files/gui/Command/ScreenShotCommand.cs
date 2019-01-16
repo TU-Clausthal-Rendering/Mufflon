@@ -20,15 +20,15 @@ namespace gui.Command
         public override bool CanExecute(object parameter)
         {
             // TODO: only screenshot when something was rendered?
-            return m_models.Scene != null && m_models.Scene.Filename != null;
+            return m_models.World != null && m_models.World.Filename != null;
         }
 
         public override void Execute(object parameter)
         {
             // First parse the current screenshot string and emplace the information
             string filename = Settings.Default.ScreenshotNamePattern;
-            filename = filename.Replace("#scene", Path.GetFileNameWithoutExtension(m_models.Scene.Filename));
-            filename = filename.Replace("#scenario", m_models.Scene.CurrentScenario.Name);
+            filename = filename.Replace("#scene", Path.GetFileNameWithoutExtension(m_models.World.Filename));
+            filename = filename.Replace("#scenario", m_models.World.CurrentScenario.Name);
             filename = filename.Replace("#renderer", RendererModel.getRendererName(m_models.Renderer.Type));
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
             // Gotta pause the renderer

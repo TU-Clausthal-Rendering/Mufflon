@@ -38,7 +38,7 @@ namespace gui.Command
             else
             {
                 // determine relative path
-                var u = new Uri(m_models.Scene.Directory + "/" + oldValue);
+                var u = new Uri(m_models.World.Directory + "/" + oldValue);
                 oldValue = u.AbsoluteUri;
                 oldValue = oldValue.Replace('/', '\\');
             }
@@ -52,7 +52,7 @@ namespace gui.Command
             if (ofd.ShowDialog(m_models.App.Window) != true) return;
 
             // convert absolute path to relative path
-            var root = new Uri(m_models.Scene.FullPath);
+            var root = new Uri(m_models.World.FullPath);
             var newPath = new Uri(ofd.FileName);
 
             m_setter.Invoke(root.MakeRelativeUri(newPath).OriginalString);

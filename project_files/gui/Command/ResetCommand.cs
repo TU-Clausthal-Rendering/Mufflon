@@ -22,7 +22,7 @@ namespace gui.Command
 
         public override bool CanExecute(object parameter)
         {
-            return m_models.Scene != null && m_models.Scene.IsSane;
+            return m_models.World != null && m_models.World.IsSane;
         }
 
         public override void Execute(object parameter)

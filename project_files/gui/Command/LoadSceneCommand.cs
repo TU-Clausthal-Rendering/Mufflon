@@ -66,7 +66,7 @@ namespace gui.Command
         {
             if (!File.Exists(path))
             {
-                if (System.Windows.MessageBox.Show("Scene file '" + path + "' does not exists anymore; should it " +
+                if (System.Windows.MessageBox.Show("World file '" + path + "' does not exists anymore; should it " +
                                     "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
                         MessageBoxImage.Error) == MessageBoxResult.Yes)
                 {
@@ -100,19 +100,19 @@ namespace gui.Command
                     MessageBoxImage.Error);
                 //Logger.log(e.Message, Core.Severity.FATAL_ERROR);
                 // remove old scene
-                m_models.Scene = null;
+                m_models.World = null;
                 return;
             }
             else if (status == Loader.LoaderStatus.SUCCESS)
             {
-                Logger.log("Scene '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
+                Logger.log("World '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
 
                 // Set path and load scene properties
-                m_models.Scene = new SceneModel(Core.world_get_current_scene(), path);
+                m_models.World = new WorldModel(Core.world_get_current_scene(), path);
             }
             else
             {
-                Logger.log("Scene load was cancelled", Core.Severity.INFO);
+                Logger.log("World load was cancelled", Core.Severity.INFO);
             }
         }
 
