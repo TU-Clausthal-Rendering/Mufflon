@@ -39,12 +39,13 @@ namespace gui
         // To keep track of mouse dragging
         private Point m_lastMousePos;
         private Vector m_lastMouseDiff;
+        private ViewModels m_viewModels;
 
         public MainWindow()
         {
             InitializeComponent();
-
-            DataContext = new ViewModels(this);
+            m_viewModels = new ViewModels(this);
+            DataContext = m_viewModels;
         }
 
         public void GlHostOnError(string message)
@@ -57,12 +58,12 @@ namespace gui
         {
             switch(e.Key)
             {
-                case Key.W: m_pressedW = true; m_stickyW = true; break;
-                case Key.S: m_pressedS = true; m_stickyS = true; break;
-                case Key.D: m_pressedD = true; m_stickyD = true; break;
-                case Key.A: m_pressedA = true; m_stickyA = true; break;
-                case Key.Space: m_pressedSpace = true; m_stickySpace = true; break;
-                case Key.LeftCtrl: m_pressedLCtrl = true; m_stickyLCtrl = true; break;
+                case Key.W: m_pressedW = true; m_stickyW = true; return;
+                case Key.S: m_pressedS = true; m_stickyS = true; return;
+                case Key.D: m_pressedD = true; m_stickyD = true; return;
+                case Key.A: m_pressedA = true; m_stickyA = true; return;
+                case Key.Space: m_pressedSpace = true; m_stickySpace = true; return;
+                case Key.LeftCtrl: m_pressedLCtrl = true; m_stickyLCtrl = true; return;
             }
         }
 
@@ -70,13 +71,17 @@ namespace gui
         {
             switch (e.Key)
             {
-                case Key.W: m_pressedW = false; break;
-                case Key.S: m_pressedS = false; break;
-                case Key.D: m_pressedD = false; break;
-                case Key.A: m_pressedA = false; break;
-                case Key.Space: m_pressedSpace = false; break;
-                case Key.LeftCtrl: m_pressedLCtrl = false; break;
+                case Key.W: m_pressedW = false; return;
+                case Key.S: m_pressedS = false; return;
+                case Key.D: m_pressedD = false; return;
+                case Key.A: m_pressedA = false; return;
+                case Key.Space: m_pressedSpace = false; return;
+                case Key.LeftCtrl: m_pressedLCtrl = false; return;
             }
+
+            ICommand cmd;
+            if (m_viewModels.Keybindings.TryGetValue(e.Key, out cmd) && cmd.CanExecute(null))
+                cmd.Execute(null);
         }
 
         public bool wasPressedAndClear(Key key)

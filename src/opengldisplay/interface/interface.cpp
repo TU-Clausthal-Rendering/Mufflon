@@ -44,17 +44,16 @@ constexpr const char* FRAGMENT_CODE =
 	"in vec2 texcoord;"
 	"uniform sampler2D textureSampler;"
 	"uniform float gamma;"
-	"uniform float exposure;"
 	"void main() {"
 	"	vec3 rgb = texture2D(textureSampler, texcoord).rgb;"
-	"	float luminance = 0.2126*rgb.r + 0.7252*rgb.g + 0.0722*rgb.b;"
-	"	gl_FragColor.xyz = rgb;"
+	"	float luminance = 0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b;"
+	"	gl_FragColor.xyz = rgb / luminance * pow(luminance, 1.0/gamma);"
 	"}";
 
 std::unique_ptr<Program> s_screenProgram = nullptr;
+float s_gamma = 1.f;
 GLint s_textureSamplerUniform;
 GLint s_gammaUniform;
-GLint s_exposureUniform;
 GLint s_uvUniform;
 std::unique_ptr<VertexArray> s_vao = nullptr;
 std::unique_ptr<Texture2D> s_screenTexture = nullptr;
@@ -86,19 +85,11 @@ void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
 } // namespace
 
 void opengldisplay_set_gamma(float val) {
-	::glUniform1f(s_gammaUniform, val);
-}
-
-void opengldisplay_set_exposure(float val) {
-	::glUniform1f(s_exposureUniform, val);
+	s_gamma = val;
 }
 
 float opengldisplay_get_gamma() {
-	return s_screenProgram->get_uniform_float(s_gammaUniform);
-}
-
-float opengldisplay_get_exposure() {
-	return s_screenProgram->get_uniform_float(s_exposureUniform);
+	return s_gamma;
 }
 
 const char* opengldisplay_get_dll_error() {
@@ -121,6 +112,8 @@ Boolean opengldisplay_display(int left, int right, int bottom, int top, uint32_t
 					  static_cast<float>(bottom) / static_cast<float>(height),
 					  static_cast<float>(right) / static_cast<float>(width),
 					  static_cast<float>(top) / static_cast<float>(height));
+		::glUniform1i(s_textureSamplerUniform, 0);
+		::glUniform1f(s_gammaUniform, s_gamma);
 
 		::glDrawArrays(GL_POINTS, 0, 1u);
 	} catch(const std::exception& e) {
@@ -196,12 +189,8 @@ Boolean opengldisplay_initialize(void(*logCallback)(const char*, int)) {
 
 			s_textureSamplerUniform = s_screenProgram->get_uniform_location("textureSampler");
 			s_gammaUniform = s_screenProgram->get_uniform_location("gamma");
-			s_exposureUniform = s_screenProgram->get_uniform_location("exposure");
 			s_uvUniform = s_screenProgram->get_uniform_location("uvs");
 
-			::glUniform1i(s_textureSamplerUniform, 0);
-			::glUniform1f(s_gammaUniform, 2.2f);
-			::glUniform1f(s_exposureUniform, 2.f);
 
 			s_vao = std::make_unique<VertexArray>();
 			s_screenTexture = std::make_unique<Texture2D>();

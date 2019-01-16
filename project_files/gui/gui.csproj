@@ -87,6 +87,7 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
+    <Compile Include="Command\AdjustGammaCommand.cs" />
     <Compile Include="Command\IGesturedCommand.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\ScreenShotCommand.cs" />

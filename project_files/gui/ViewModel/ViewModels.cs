@@ -47,6 +47,10 @@ namespace gui.ViewModel
         public ICommand LoadSceneCommand { get; }
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
+        public ICommand AdjustGammaUp { get; }
+        public ICommand AdjustGammaDown { get; }
+
+        public Dictionary<Key, ICommand> Keybindings { get; } = new Dictionary<Key, ICommand>();
 
         private readonly Models m_models;
 
@@ -78,6 +82,14 @@ namespace gui.ViewModel
             LoadSceneCommand = new LoadSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(this);
+            AdjustGammaUp = new AdjustGammaUpCommand();
+            AdjustGammaDown = new AdjustGammaDownCommand();
+
+            // Add keybindings
+            Keybindings.Add(Key.OemPlus, AdjustGammaUp);
+            Keybindings.Add(Key.Add, AdjustGammaUp);
+            Keybindings.Add(Key.OemMinus, AdjustGammaDown);
+            Keybindings.Add(Key.Subtract, AdjustGammaDown);
         }
     }
 }
