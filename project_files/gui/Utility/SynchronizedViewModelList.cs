@@ -23,16 +23,40 @@ namespace gui.Utility
 
         public ReadOnlyObservableCollection<TView> Views { get; }
 
-        protected SynchronizedViewModelList(SynchronizedModelList<TModel> modelList)
+        private SynchronizedModelList<TModel> m_list = null;
+
+        protected SynchronizedViewModelList()
         {
-            modelList.Models.CollectionChanged += ModelsOnCollectionChanged;
-
-            // cant initialize members from constructor due to virtual function calls
-            // => elements in models should be added after creation of view model
-            Debug.Assert(modelList.Models.Count == 0);
-
             // wrapper around m_views
             Views = new ReadOnlyObservableCollection<TView>(m_views);
+        }
+
+        /// <summary>
+        /// Registers (if not null) or unregisters (if null) the new model list that is used for synchronization
+        /// </summary>
+        /// <param name="modelList"></param>
+        protected void RegisterModelList(SynchronizedModelList<TModel> modelList)
+        {
+            if (m_list != null)
+            {
+                // unregister old list
+                m_list.Models.CollectionChanged -= ModelsOnCollectionChanged;
+                m_views.Clear();
+            }
+
+            m_list = modelList;
+            if(m_list == null) return;
+
+            // register new list
+            m_list.Models.CollectionChanged += ModelsOnCollectionChanged;
+            // init values
+            foreach (var model in m_list.Models)
+            {
+                var vm = CreateViewModel(model);
+                var view = CreateView(vm);
+                m_viewModels.Add(vm);
+                m_views.Add(view);
+            }
         }
 
         /// <summary>

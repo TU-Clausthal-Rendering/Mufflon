@@ -86,7 +86,7 @@ namespace gui.ViewModel
             }
 
             // Register the handle for scene changes
-            m_models.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
+            // TODO remove after relocation materials and camera
             m_models.Materials.Models.CollectionChanged += OnMaterialsCollectionChanged;
             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
 
@@ -111,13 +111,13 @@ namespace gui.ViewModel
                         if (m_models.World.FullPath != null)
                         {
                             // Temporarily disable handlers
-                            m_models.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
+                            // TODO remove after relocation materials and camera
                             m_models.Materials.Models.CollectionChanged -= OnMaterialsCollectionChanged;
                             m_models.Cameras.Models.CollectionChanged -= OnCamerasCollectionChanged;
                             LoadSceneLights();
                             LoadSceneMaterials();
                             LoadSceneCameras();
-                            m_models.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
+                            m_models.World.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
                             m_models.Materials.Models.CollectionChanged += OnMaterialsCollectionChanged;
                             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
                         }
@@ -432,13 +432,13 @@ namespace gui.ViewModel
                         if(m_models.World.FullPath != null)
                         {
                             // Temporarily disable handlers
-                            m_models.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
+                            m_models.World.Lights.Models.CollectionChanged -= OnLightsCollectionChanged;
                             m_models.Materials.Models.CollectionChanged -= OnMaterialsCollectionChanged;
                             m_models.Cameras.Models.CollectionChanged -= OnCamerasCollectionChanged;
                             LoadSceneLights();
                             LoadSceneMaterials();
                             LoadSceneCameras();
-                            m_models.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
+                            m_models.World.Lights.Models.CollectionChanged += OnLightsCollectionChanged;
                             m_models.Materials.Models.CollectionChanged += OnMaterialsCollectionChanged;
                             m_models.Cameras.Models.CollectionChanged += OnCamerasCollectionChanged;
                         }
@@ -519,7 +519,7 @@ namespace gui.ViewModel
 
         private void LoadScenarioLights(IntPtr scenarioHdl)
         {
-            foreach (var light in m_models.Lights.Models)
+            foreach (var light in m_models.World.Lights.Models)
             {
                 light.PropertyChanged -= OnLightChanged;
                 light.IsSelected = false;
@@ -532,7 +532,7 @@ namespace gui.ViewModel
                     string name = Core.scenario_get_point_light_name(scenarioHdl, (ulong)i);
                     if (name == null || name.Length == 0)
                         throw new Exception(Core.core_get_dll_error());
-                    foreach (var light in m_models.Lights.Models)
+                    foreach (var light in m_models.World.Lights.Models)
                     {
                         if (light.Name == name)
                         {
@@ -551,7 +551,7 @@ namespace gui.ViewModel
                     string name = Core.scenario_get_spot_light_name(scenarioHdl, (ulong)i);
                     if (name == null || name.Length == 0)
                         throw new Exception(Core.core_get_dll_error());
-                    foreach (var light in m_models.Lights.Models)
+                    foreach (var light in m_models.World.Lights.Models)
                     {
                         if (light.Name == name)
                         {
@@ -570,7 +570,7 @@ namespace gui.ViewModel
                     string name = Core.scenario_get_dir_light_name(scenarioHdl, (ulong)i);
                     if (name == null || name.Length == 0)
                         throw new Exception(Core.core_get_dll_error());
-                    foreach (var light in m_models.Lights.Models)
+                    foreach (var light in m_models.World.Lights.Models)
                     {
                         if (light.Name == name)
                         {
@@ -588,7 +588,7 @@ namespace gui.ViewModel
                     string name = Core.scenario_get_envmap_light_name(scenarioHdl);
                     if (name == null || name.Length == 0)
                         throw new Exception(Core.core_get_dll_error());
-                    foreach (var light in m_models.Lights.Models)
+                    foreach (var light in m_models.World.Lights.Models)
                     {
                         if (light.Name == name)
                         {
@@ -684,7 +684,7 @@ namespace gui.ViewModel
 
         private void LoadSceneLights()
         {
-            m_models.Lights.Models.Clear();
+            m_models.World.Lights.Models.Clear();
 
             if(m_models.World == null) return;
             // Point lights
@@ -696,13 +696,13 @@ namespace gui.ViewModel
                 if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
 
-                m_models.Lights.Models.Add(new PointLightModel()
+                m_models.World.Lights.Models.Add(new PointLightModel()
                 {
                     Name = name,
                     Handle = hdl,
                 });
-                LoadSceneLightData(hdl, m_models.Lights.Models.Last() as PointLightModel);
-                m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
+                LoadSceneLightData(hdl, m_models.World.Lights.Models.Last() as PointLightModel);
+                m_models.World.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
             // Spot lights
@@ -714,13 +714,13 @@ namespace gui.ViewModel
                 if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
 
-                m_models.Lights.Models.Add(new SpotLightModel()
+                m_models.World.Lights.Models.Add(new SpotLightModel()
                 {
                     Name = name,
                     Handle = hdl,
                 });
-                LoadSceneLightData(hdl, m_models.Lights.Models.Last() as SpotLightModel);
-                m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
+                LoadSceneLightData(hdl, m_models.World.Lights.Models.Last() as SpotLightModel);
+                m_models.World.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
             // Directional lights
@@ -732,13 +732,13 @@ namespace gui.ViewModel
                 if (name == null || name.Length == 0)
                     throw new Exception(Core.core_get_dll_error());
 
-                m_models.Lights.Models.Add(new DirectionalLightModel()
+                m_models.World.Lights.Models.Add(new DirectionalLightModel()
                 {
                     Name = name,
                     Handle = hdl,
                 });
-                loadSceneLightData(hdl, m_models.Lights.Models.Last() as DirectionalLightModel);
-                m_models.Lights.Models.Last().PropertyChanged += OnLightChanged;
+                loadSceneLightData(hdl, m_models.World.Lights.Models.Last() as DirectionalLightModel);
+                m_models.World.Lights.Models.Last().PropertyChanged += OnLightChanged;
             }
 
             // Envmap lights
@@ -754,7 +754,7 @@ namespace gui.ViewModel
                     throw new Exception(Core.core_get_dll_error());
                 Uri scenePath = new Uri(m_models.World.FullPath);
                 string map = scenePath.MakeRelativeUri(new Uri(absoluteTexPath)).OriginalString;
-                m_models.Lights.Models.Add(new EnvmapLightModel()
+                m_models.World.Lights.Models.Add(new EnvmapLightModel()
                 {
                     Name = name,
                     Handle = hdl,

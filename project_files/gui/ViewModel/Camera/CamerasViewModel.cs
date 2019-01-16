@@ -9,9 +9,10 @@ namespace gui.ViewModel.Camera
     {
         private readonly Models m_models;
 
-        public CamerasViewModel(Models models) : base(models.Cameras)
+        public CamerasViewModel(Models models)
         {
             m_models = models;
+            RegisterModelList(models.Cameras);
         }
 
         protected override CameraViewModel CreateViewModel(CameraModel model)

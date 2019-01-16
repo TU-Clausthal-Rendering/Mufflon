@@ -27,7 +27,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            m_models.Lights.Models.Remove(m_model);
+            m_models.World.Lights.Models.Remove(m_model);
         }
 
         public event EventHandler CanExecuteChanged

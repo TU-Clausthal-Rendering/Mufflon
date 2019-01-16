@@ -8,6 +8,9 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using gui.Annotations;
 using gui.Dll;
+using gui.Model.Camera;
+using gui.Model.Light;
+using gui.Model.Material;
 using gui.Properties;
 using gui.Utility;
 
@@ -24,6 +27,14 @@ namespace gui.Model.Scene
         private readonly IntPtr m_handle;
 
         public ObservableCollection<ScenarioModel> Scenarios { get; } = new ObservableCollection<ScenarioModel>();
+
+        // TODO
+        //public SynchronizedModelList<CameraModel> Cameras { get; } = new SynchronizedModelList<CameraModel>();
+
+        public SynchronizedModelList<LightModel> Lights { get; } = new SynchronizedModelList<LightModel>();
+
+        // TODO 
+        //public SynchronizedModelList<MaterialModel> Materials { get; } = new SynchronizedModelList<MaterialModel>();
 
         private ScenarioModel m_currentScenario;
         public ScenarioModel CurrentScenario

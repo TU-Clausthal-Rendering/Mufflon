@@ -56,7 +56,7 @@ namespace gui.Command
 
             lm.Name = dc.NameValue;
 
-            m_models.Lights.Models.Add(lm);
+            m_models.World.Lights.Models.Add(lm);
         }
 
         public event EventHandler CanExecuteChanged

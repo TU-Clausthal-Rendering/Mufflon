@@ -39,7 +39,6 @@ namespace gui.Model
             }
         }
         public SynchronizedModelList<CameraModel> Cameras { get; }
-        public SynchronizedModelList<LightModel> Lights { get; }
         public SynchronizedModelList<MaterialModel> Materials { get; }
 
         public ToolbarModel Toolbar { get; }
@@ -50,7 +49,6 @@ namespace gui.Model
             Renderer = new RendererModel();
             App = new AppModel(window, Viewport, Renderer);
             Cameras = new SynchronizedModelList<CameraModel>();
-            Lights = new SynchronizedModelList<LightModel>();
             Materials = new SynchronizedModelList<MaterialModel>();
             Toolbar = new ToolbarModel();
         }

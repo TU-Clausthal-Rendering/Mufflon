@@ -13,9 +13,10 @@ namespace gui.ViewModel.Material
     {
         private readonly Models m_models;
 
-        public MaterialsViewModel(Models models) : base(models.Materials)
+        public MaterialsViewModel(Models models)
         {
             m_models = models;
+            RegisterModelList(models.Materials);
         }
 
         protected override MaterialViewModel CreateViewModel(MaterialModel model)

@@ -61,12 +61,6 @@ namespace gui.Model.Scene
             }
         }
 
-        public SynchronizedModelList<CameraModel> Cameras { get; } = new SynchronizedModelList<CameraModel>();
-
-        public SynchronizedModelList<LightModel> Lights { get; } = new SynchronizedModelList<LightModel>();
-
-        public SynchronizedModelList<MaterialModel> Materials { get; } = new SynchronizedModelList<MaterialModel>();
-
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
