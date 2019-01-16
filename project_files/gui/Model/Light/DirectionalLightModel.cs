@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using gui.Dll;
+using gui.Model.Scene;
 using gui.Utility;
 using gui.ViewModel.Light;
 
@@ -19,28 +20,45 @@ namespace gui.Model.Light
             return new DirectionalLightViewModel(models, this);
         }
 
-        private Vec3<float> m_direction;
+        public DirectionalLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        {
+
+        }
 
         public Vec3<float> Direction
         {
-            get => m_direction;
+            get
+            {
+                if(!Core.world_get_dir_light_direction(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res.ToUtilityVec();
+            }
             set
             {
-                if (Equals(value, m_direction)) return;
-                m_direction = value;
+                if (Equals(value, Direction)) return;
+                if(!Core.world_set_dir_light_direction(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Direction));
             }
         }
 
-        private Vec3<float> m_irradiance;
-
         public Vec3<float> Irradiance
         {
-            get => m_irradiance;
+            get
+            {
+                if(!Core.world_get_dir_light_irradiance(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res.ToUtilityVec();
+            }
             set
             {
-                if (Equals(value, m_irradiance)) return;
-                m_irradiance = value;
+                if (Equals(value, Irradiance)) return;
+                if(!Core.world_set_dir_light_irradiance(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Irradiance));
             }
         }

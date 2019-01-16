@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model.Light;
 
 namespace gui.Dll
 {
@@ -69,6 +70,24 @@ namespace gui.Dll
             DIRECTIONAL,
             ENVMAP
         };
+
+        public static LightType FromModelLightType(LightModel.LightType type)
+        {
+            switch (type)
+            {
+                case LightModel.LightType.Point:
+                    return LightType.POINT;
+                case LightModel.LightType.Directional:
+                    return LightType.DIRECTIONAL;
+                case LightModel.LightType.Spot:
+                    return LightType.SPOT;
+                case LightModel.LightType.Envmap:
+                    return LightType.ENVMAP;
+                case LightModel.LightType.Goniometric:
+                    default:
+                    throw new NotImplementedException();
+            }
+        }
 
         public enum ProfilingLevel
         {
@@ -253,23 +272,23 @@ namespace gui.Dll
 
         // Light API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_point_light_position(IntPtr hdl, ref Vec3 pos);
+        internal static extern bool world_get_point_light_position(IntPtr hdl, out Vec3 pos);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_point_light_intensity(IntPtr hdl, ref Vec3 intensity);
+        internal static extern bool world_get_point_light_intensity(IntPtr hdl, out Vec3 intensity);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_point_light_position(IntPtr hdl, Vec3 pos);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_point_light_intensity(IntPtr hdl, Vec3 intensity);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_spot_light_position(IntPtr hdl, ref Vec3 pos);
+        internal static extern bool world_get_spot_light_position(IntPtr hdl, out Vec3 pos);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_spot_light_intensity(IntPtr hdl, ref Vec3 intensity);
+        internal static extern bool world_get_spot_light_intensity(IntPtr hdl, out Vec3 intensity);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_spot_light_direction(IntPtr hdl, ref Vec3 direction);
+        internal static extern bool world_get_spot_light_direction(IntPtr hdl, out Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_spot_light_angle(IntPtr hdl, ref float angle);
+        internal static extern bool world_get_spot_light_angle(IntPtr hdl, out float angle);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_spot_light_falloff(IntPtr hdl, ref float falloff);
+        internal static extern bool world_get_spot_light_falloff(IntPtr hdl, out float falloff);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_spot_light_position(IntPtr hdl, Vec3 pos);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -281,9 +300,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_spot_light_falloff(IntPtr hdl, float fallof);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_dir_light_direction(IntPtr hdl, ref Vec3 direction);
+        internal static extern bool world_get_dir_light_direction(IntPtr hdl, out Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_dir_light_irradiance(IntPtr hdl, ref Vec3 irradiance);
+        internal static extern bool world_get_dir_light_irradiance(IntPtr hdl, out Vec3 irradiance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_dir_light_direction(IntPtr hdl, Vec3 direction);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

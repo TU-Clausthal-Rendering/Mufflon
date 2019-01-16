@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Model.Scene;
 using gui.Utility;
 using gui.ViewModel.Light;
 
@@ -15,6 +16,11 @@ namespace gui.Model.Light
         public override LightViewModel CreateViewModel(Models models)
         {
             return new GoniometricLightViewModel(models, this);
+        }
+
+        public GoniometricLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        {
+
         }
 
         private Vec3<float> m_position;

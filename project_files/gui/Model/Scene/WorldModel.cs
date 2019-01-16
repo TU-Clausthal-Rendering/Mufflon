@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using gui.Annotations;
 using gui.Dll;
@@ -19,7 +20,7 @@ namespace gui.Model.Scene
     /// <summary>
     /// Additional information of the loaded scene (excluding light, materials and cameras)
     /// </summary>
-    public class WorldModel : INotifyPropertyChanged
+    public sealed class WorldModel : INotifyPropertyChanged
     {
         // path with filename and extension
         public string FullPath { get; }
@@ -31,6 +32,7 @@ namespace gui.Model.Scene
         // TODO
         //public SynchronizedModelList<CameraModel> Cameras { get; } = new SynchronizedModelList<CameraModel>();
 
+        // TODO make this readonly and add AddLight Method to WorldModel?
         public SynchronizedModelList<LightModel> Lights { get; } = new SynchronizedModelList<LightModel>();
 
         // TODO 
@@ -103,7 +105,18 @@ namespace gui.Model.Scene
             if (Settings.Default.LastScenes == null)
                 Settings.Default.LastScenes = new StringCollection();
 
-            // init scenarios
+            // first load lights and materials
+            LoadLights();
+
+            // load the scenario
+            LoadScenarios();
+
+            // notify lights etc. that the current scenario is loaded
+            OnPropertyChanged(nameof(CurrentScenario));
+        }
+
+        private void LoadScenarios()
+        {
             uint count = Core.world_get_scenario_count();
             for (uint i = 0u; i < count; ++i)
                 Scenarios.Add(new ScenarioModel(Core.world_get_scenario_by_index(i)));
@@ -118,8 +131,27 @@ namespace gui.Model.Scene
                     break;
                 }
             }
-            if(m_currentScenario == null)
+            if (m_currentScenario == null)
                 throw new Exception("could not find active scenario in loaded scenarios " + loadedScenario);
+        }
+
+        private void LoadLights()
+        {
+            var numPointLights = Core.world_get_point_light_count();
+            for (var i = 0u; i < numPointLights; ++i)
+                Lights.Models.Add(new PointLightModel(Core.world_get_light_handle(i, Core.LightType.POINT), this));
+
+            var numSpotLights = Core.world_get_spot_light_count();
+            for (var i = 0u; i < numSpotLights; ++i)
+                Lights.Models.Add(new SpotLightModel(Core.world_get_light_handle(i, Core.LightType.SPOT), this));
+
+            var numDirLights = Core.world_get_dir_light_count();
+            for (var i = 0u; i < numDirLights; ++i)
+                Lights.Models.Add(new DirectionalLightModel(Core.world_get_light_handle(i, Core.LightType.DIRECTIONAL), this));
+
+            var numEnvLights = Core.world_get_env_light_count();
+            for(var i = 0u; i < numEnvLights; ++i)
+                Lights.Models.Add(new EnvmapLightModel(Core.world_get_light_handle(i, Core.LightType.ENVMAP), this));
         }
 
         #region PropertyChanged
@@ -127,7 +159,7 @@ namespace gui.Model.Scene
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

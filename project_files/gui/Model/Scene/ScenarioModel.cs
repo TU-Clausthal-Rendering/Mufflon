@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -26,8 +27,75 @@ namespace gui.Model.Scene
         {
             Handle = handle;
 
-            // TODO populate lights cameras and materials
+            // TODO populate cameras and materials
+            LoadLights();
+
+            // add event handler if lights get added/removed during runtime
+            Lights.CollectionChanged += LightsOnCollectionChanged;
         }
+
+        private void LightsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
+        {
+            if(args.NewItems != null)
+                foreach (var lightName in args.NewItems)
+                {
+                    if(!Core.scenario_add_light(Handle, lightName as string))
+                        throw new Exception(Core.core_get_dll_error());
+                }
+
+            if(args.OldItems != null)
+                foreach (var lightName in args.OldItems)
+                {
+                    if(!Core.scenario_remove_light(Handle, lightName as string))
+                        throw new Exception(Core.core_get_dll_error());
+                }
+        }
+
+        private void LoadLights()
+        {
+            var numPointLights = Core.scenario_get_point_light_count(Handle);
+            for (var i = 0u; i < numPointLights; ++i)
+            {
+                var name = Core.scenario_get_point_light_name(Handle, i);
+                if (string.IsNullOrEmpty(name))
+                    throw new Exception(Core.core_get_dll_error());
+
+                Lights.Add(name);
+            }
+
+            var numSpotLights = Core.scenario_get_spot_light_count(Handle);
+            for (var i = 0u; i < numSpotLights; ++i)
+            {
+                var name = Core.scenario_get_spot_light_name(Handle, i);
+                if (string.IsNullOrEmpty(name))
+                    throw new Exception(Core.core_get_dll_error());
+
+                Lights.Add(name);
+            }
+
+
+            var numDirLights = Core.scenario_get_dir_light_count(Handle);
+            for (var i = 0u; i < numDirLights; ++i)
+            {
+                var name = Core.scenario_get_dir_light_name(Handle, i);
+                if (string.IsNullOrEmpty(name))
+                    throw new Exception(Core.core_get_dll_error());
+
+                Lights.Add(name);
+            }
+
+            // TODO make sure that a second envmap cannot be added later on
+            if (Core.scenario_has_envmap_light(Handle))
+            {
+                var name = Core.scenario_get_envmap_light_name(Handle);
+                if (string.IsNullOrEmpty(name))
+                    throw new Exception(Core.core_get_dll_error());
+
+                Lights.Add(name);
+            }
+        }
+
+        public ObservableHashSet<string> Lights { get; } = new ObservableHashSet<string>();
 
         public string Name => Core.scenario_get_name(Handle);
 

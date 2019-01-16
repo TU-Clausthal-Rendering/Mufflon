@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using gui.Dll;
 using gui.Model;
 using gui.Model.Light;
 using gui.View.Dialog;
@@ -33,28 +35,10 @@ namespace gui.Command
 
             if (dialog.ShowDialog() != true) return;
 
-            LightModel lm = null;
-            switch (dc.TypeValue)
-            {
-                case LightModel.LightType.Point:
-                    lm = new PointLightModel();
-                    break;
-                case LightModel.LightType.Directional:
-                    lm = new DirectionalLightModel();
-                    break;
-                case LightModel.LightType.Spot:
-                    lm = new SpotLightModel();
-                    break;
-                case LightModel.LightType.Envmap:
-                    lm = new EnvmapLightModel();
-                    break;
-                case LightModel.LightType.Goniometric:
-                    lm = new GoniometricLightModel();
-                    break;
-            }
-            Debug.Assert(lm != null);
+            // TODO check for handle = null? error?
+            var handle = Core.world_add_light(dc.NameValue, Core.FromModelLightType(dc.TypeValue));
 
-            lm.Name = dc.NameValue;
+            LightModel lm = LightModel.MakeFromHandle(handle, dc.TypeValue, m_models.World);
 
             m_models.World.Lights.Models.Add(lm);
         }

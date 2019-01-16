@@ -43,7 +43,7 @@ namespace gui.ViewModel.Light
                 case nameof(SpotLightModel.Width):
                     OnPropertyChanged(nameof(Width));
                     break;
-                case nameof(SpotLightModel.FalloffStart):
+                case nameof(SpotLightModel.Falloff):
                     OnPropertyChanged(nameof(FalloffStart));
                     break;
             }
@@ -116,8 +116,8 @@ namespace gui.ViewModel.Light
 
         public float FalloffStart
         {
-            get => m_parent.FalloffStart;
-            set => m_parent.FalloffStart = value;
+            get => m_parent.Falloff;
+            set => m_parent.Falloff = value;
         }
     }
 }

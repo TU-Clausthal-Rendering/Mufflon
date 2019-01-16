@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Dll;
+using gui.Model.Scene;
 using gui.ViewModel.Light;
 
 namespace gui.Model.Light
@@ -17,15 +20,34 @@ namespace gui.Model.Light
             return new EnvmapLightViewModel(models, this);
         }
 
-        private string m_map = String.Empty;
+        public EnvmapLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        {
+            
+        }
 
+        /// <summary>
+        /// absolute path of the map
+        /// </summary>
         public string Map
         {
-            get => m_map;
+            get
+            {
+                var res = Core.world_get_env_light_map(Handle); 
+                if(string.IsNullOrEmpty(res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
+            }
             set
             {
-                if (Equals(value, m_map)) return;
-                m_map = value;
+                if (Equals(value, Map)) return;
+                //var absolutePath = Path.Combine(m_world.Directory, value);
+                var texHandle = Core.world_add_texture(value, Core.TextureSampling.LINEAR);
+                if(texHandle == IntPtr.Zero)
+                    throw new Exception(Core.core_get_dll_error());
+                if(!Core.world_set_env_light_map(Handle, texHandle))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Map));
             }
         }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using gui.Dll;
+using gui.Model.Scene;
 using gui.Utility;
 using gui.ViewModel.Light;
 
@@ -19,73 +20,103 @@ namespace gui.Model.Light
             return new SpotLightViewModel(models, this);
         }
 
-        private Vec3<float> m_position;
+        public SpotLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        {
+
+        }
 
         public Vec3<float> Position
         {
-            get => m_position;
+            get
+            {
+                if(!Core.world_get_spot_light_position(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res.ToUtilityVec();
+            }
             set
             {
-                if (Equals(m_position, value)) return;
-                m_position = value;
+                if (Equals(Position, value)) return;
+                if(!Core.world_set_spot_light_position(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Position));
             }
         }
 
-        private Vec3<float> m_direction;
-
         public Vec3<float> Direction
         {
-            get => m_direction;
+            get
+            {
+                if (!Core.world_get_spot_light_direction(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res.ToUtilityVec();
+            }
             set
             {
-                if (Equals(value, m_direction)) return;
-                m_direction = value;
+                if (Equals(Direction, value)) return;
+                if (!Core.world_set_spot_light_direction(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Direction));
             }
         }
 
-        private Vec3<float> m_intensity;
-
         public Vec3<float> Intensity
         {
-            get => m_intensity;
+            get
+            {
+                if (!Core.world_get_spot_light_intensity(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res.ToUtilityVec();
+            }
             set
             {
-                if (Equals(value, m_intensity)) return;
-                m_intensity = value;
+                if (Equals(Intensity, value)) return;
+                if (!Core.world_set_spot_light_intensity(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Intensity));
             }
         }
 
-        private float m_width;
-
         public float Width
         {
-            get => m_width;
+            get
+            {
+                if (!Core.world_get_spot_light_angle(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
+            }
             set
             {
-                if (Equals(value, m_width)) return;
-                m_width = value;
+                if (Equals(Width, value)) return;
+                if (!Core.world_set_spot_light_angle(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Width));
             }
         }
 
-        private float m_falloffStart;
-
-        public float FalloffStart
+        public float Falloff
         {
             get
             {
-                Debug.Assert(Type == LightType.Spot);
-                return m_falloffStart;
+                if (!Core.world_get_spot_light_falloff(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
             }
             set
             {
-                Debug.Assert(Type == LightType.Spot);
-                if (Equals(value, m_falloffStart)) return;
-                m_falloffStart = value;
-                OnPropertyChanged(nameof(FalloffStart));
+                if (Equals(Falloff, value)) return;
+                if (!Core.world_set_spot_light_falloff(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
+                OnPropertyChanged(nameof(Falloff));
             }
         }
     }
