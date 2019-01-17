@@ -128,6 +128,7 @@ Constructor
 Namespaces
 -
 
+- snake_case
 - Nested namespaces only as
 
         namespace a::b::c {
