@@ -9,7 +9,6 @@ namespace gui.Command
     public class PlayPauseCommand : IGesturedCommand
     {
         private Models m_models;
-        private ManualResetEvent m_iterationComplete = new ManualResetEvent(false);
 
         public PlayPauseCommand(Models models) : base("PlayPauseGesture")
         {

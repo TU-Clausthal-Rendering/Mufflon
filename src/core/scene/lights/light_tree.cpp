@@ -464,17 +464,11 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 	} 
 
 	// The background can always be outdated
-	if(dev == Device::CUDA) {
-		if(m_envLight)
-			m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>(sceneBounds);
-		else // Default envmap is black
-			m_treeCuda->background = Background::black().acquire_const<Device::CUDA>(sceneBounds);
-	} else {
-		if(m_envLight)
-			m_treeCpu->background = m_envLight->acquire_const<Device::CPU>(sceneBounds);
-		else // Default envmap is black
-			m_treeCpu->background = Background::black().acquire_const<Device::CPU>(sceneBounds);
-	}
+	mAssertMsg(m_envLight != nullptr, "Background should always be set!");
+	if(dev == Device::CUDA)
+		m_treeCuda->background = m_envLight->acquire_const<Device::CUDA>(sceneBounds);
+	else
+		m_treeCpu->background = m_envLight->acquire_const<Device::CPU>(sceneBounds);
 	// TODO: backsync? Would need another hashmap for texture mapping.
 }
 

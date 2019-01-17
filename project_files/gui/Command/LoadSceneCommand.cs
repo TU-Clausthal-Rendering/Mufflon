@@ -57,7 +57,6 @@ namespace gui.Command
                     m_lastDirectory = Path.GetDirectoryName(file);
                     Settings.Default.lastScenePath = m_lastDirectory;
                     LoadScene(file);
-                    m_models.Renderer.Iteration = 0u;
                 }
             }
         }
@@ -109,6 +108,7 @@ namespace gui.Command
 
                 // Set path and load scene properties
                 m_models.World = new WorldModel(Core.world_get_current_scene(), path);
+                RefreshLastScenes(path);
             }
             else
             {
@@ -125,9 +125,8 @@ namespace gui.Command
             if (index > 0)
             {
                 // Present, but not first
-                string first = Settings.Default.LastScenes[0];
-                Settings.Default.LastScenes[0] = path;
-                Settings.Default.LastScenes[index] = first;
+                Settings.Default.LastScenes.RemoveAt(index);
+                Settings.Default.LastScenes.Insert(0, path);
             }
             else if (index < 0)
             {

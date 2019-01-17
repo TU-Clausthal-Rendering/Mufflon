@@ -84,6 +84,8 @@ namespace {
 
 // static variables for interacting with the renderer
 std::unique_ptr<renderer::IRenderer> s_currentRenderer;
+// Current iteration counter
+std::uint32_t s_currentIteration = 0u;
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
 WorldContainer& s_world = WorldContainer::instance();
@@ -1337,21 +1339,6 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	CATCH_ALL(nullptr)
 }
 
-SceneHdl world_reload_current_scenario() {
-	TRY
-	SceneHandle hdl = s_world.reload_scene();
-	if(hdl == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to reload scenario");
-		return nullptr;
-	}
-	ei::IVec2 res = s_world.get_current_scenario()->get_resolution();
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->reset();
-	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
-	return static_cast<SceneHdl>(hdl);
-	CATCH_ALL(nullptr)
-}
-
 SceneHdl world_get_current_scene() {
 	TRY
 	return static_cast<SceneHdl>(s_world.get_current_scene());
@@ -2289,6 +2276,8 @@ Boolean render_enable_renderer(RendererType type) {
 	if(s_world.get_current_scenario() != nullptr)
 		s_currentRenderer->load_scene(s_world.get_current_scene(),
 			s_world.get_current_scenario()->get_resolution());
+	if(!render_reset())
+		return false;
 	return true;
 	CATCH_ALL(false)
 }
@@ -2307,15 +2296,26 @@ Boolean render_iterate() {
 		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 		return false;
 	}
+	// Check if the scene needed a reload -> reset
+	if(s_world.reload_scene()) {
+		if(!render_reset())
+			return false;
+	}
 	s_currentRenderer->iterate(*s_imageOutput);
+	++s_currentIteration;
 	return true;
 	CATCH_ALL(false)
+}
+
+uint32_t render_get_current_iteration() {
+	return s_currentIteration;
 }
 
 Boolean render_reset() {
 	TRY
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->reset();
+	s_currentIteration = 0u;
 	return true;
 	CATCH_ALL(false)
 }

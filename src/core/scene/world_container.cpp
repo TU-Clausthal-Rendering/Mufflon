@@ -339,7 +339,10 @@ void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
 			case lights::LightType::ENVMAP_LIGHT:
-				// Nothing to flag. The m_lightsDirty is to track light-tree rebuilds.
+				// Check if the envmap is the current one
+				std::string_view currEnvName = m_scenario->get_envmap_light_name();
+				if(!currEnvName.empty() && m_envLights.get_index(currEnvName) == index)
+					m_envLightDirty = true;
 				break;
 		}
 	}
@@ -420,11 +423,15 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 				   "(Furthest point of the bounding box should not be further than "
 				   "2^20m away)");
 
+	// Everything is dirty if we load a new scene
+	m_lightsDirty = true;
+	m_envLightDirty = true;
+
 	// Load the lights
 	this->load_scene_lights();
-
 	// Make media available / resident
 	m_scene->load_media(m_media);
+	m_scene->set_camera(m_scenario->get_camera());
 
 	m_scenario->camera_dirty_reset();
 
@@ -437,13 +444,15 @@ SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
 	return load_scene(*hdl);
 }
 
-SceneHandle WorldContainer::reload_scene() {
+bool WorldContainer::reload_scene() {
 	// There is always a scenario set
 	mAssert(m_scenario != nullptr);
 
-	if(m_scene == nullptr)
-		return load_scene(*m_scenario);
-	this->load_scene_lights();
+	if(m_scene == nullptr) {
+		(void) load_scene(*m_scenario);
+		return true;
+	}
+	bool reloaded = this->load_scene_lights();
 
 	// TODO: dirty flag for media?
 	// TODO: dirty flag for materials?
@@ -452,18 +461,21 @@ SceneHandle WorldContainer::reload_scene() {
 	if(m_scenario->camera_dirty_reset() || m_camerasDirty[m_scenario->get_camera()]) {
 		m_scene->set_camera(m_scenario->get_camera());
 		m_camerasDirty[m_scenario->get_camera()] = false;
+		reloaded = true;
 	}
-	return m_scene.get();
+	return reloaded;
 }
 
-void WorldContainer::load_scene_lights() {
+bool WorldContainer::load_scene_lights() {
 	/* Possibilities:
 	 * 1. Lights have been added/removed from the scenario -> rebuild light tree
 	 * 2. Lights have been changed -> rebuild tree, but not envmap
 	 * 3. Only envmap light has been changed -> only replace envmap
 	 */
 
+	bool reloaded = false;
 	if(m_lightsDirty || m_scenario->lights_dirty_reset() || !m_scene->get_light_tree_builder().is_resident<Device::CPU>()) {
+		reloaded = true;
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
 		i32 instIdx = 0;
@@ -568,20 +580,30 @@ void WorldContainer::load_scene_lights() {
 		// Detect whether an (or THE envmap has been added/removed)
 	}
 
-	// Find out what the active envmap light is
-	lights::Background* envLightTex = nullptr;
-	std::string_view currEnvName = m_scenario->get_envmap_light_name();
-	if(!currEnvName.empty()) {
-		auto iter = m_envLights.find(currEnvName);
-		if(iter != nullptr) {
-			envLightTex = iter;
-			m_scene->set_background(*iter);
-		} else
-			logWarning("[WorldContainer::load_scene_lights] Unknown envmap light '", currEnvName, "' in scenario '",
-					   m_scenario->get_name(), "'");
+	if(m_envLightDirty || m_scenario->envmap_lights_dirty_reset()) {
+		reloaded = true;
+
+		// Find out what the active envmap light is
+		lights::Background* envLightTex = nullptr;
+		std::string_view currEnvName = m_scenario->get_envmap_light_name();
+		if(!currEnvName.empty()) {
+			auto iter = m_envLights.find(currEnvName);
+			if(iter != nullptr) {
+				envLightTex = iter;
+				m_scene->set_background(*iter);
+			} else
+				logWarning("[WorldContainer::load_scene_lights] Unknown envmap light '", currEnvName, "' in scenario '",
+						   m_scenario->get_name(), "'");
+		} else {
+			m_scene->set_background(m_defaultBackground);
+		}
+
+		m_envLightDirty = false;
 	}
 
 	m_scenario->lights_dirty_reset();
+	m_scenario->envmap_lights_dirty_reset();
+	return reloaded;
 }
 
 } // namespace mufflon::scene

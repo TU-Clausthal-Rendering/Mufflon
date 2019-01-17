@@ -195,13 +195,6 @@ namespace gui.ViewModel
                             m_models.Cameras.Models[args.OldStartingIndex].IsSelected = true;
                         else
                             m_models.Cameras.Models[args.OldStartingIndex - 1].IsSelected = true;
-                        bool wasRendering = m_models.Renderer.IsRendering;
-                        m_models.Renderer.IsRendering = false;
-                        if (m_reset.CanExecute(null))
-                            m_reset.Execute(null);
-                        if (Core.world_reload_current_scenario() == IntPtr.Zero)
-                            throw new Exception(Core.core_get_dll_error());
-                        m_models.Renderer.IsRendering = wasRendering;
                     }
                 }
             }
@@ -211,30 +204,12 @@ namespace gui.ViewModel
         {
             MaterialModel material = (sender as MaterialModel);
             // TODO
-
-            bool needReload = false;
-
-            if(needReload)
-            {
-                bool wasRendering = m_models.Renderer.IsRendering;
-                m_models.Renderer.IsRendering = false;
-                if (m_reset.CanExecute(null))
-                    m_reset.Execute(null);
-                if (Core.world_reload_current_scenario() == IntPtr.Zero)
-                    throw new Exception(Core.core_get_dll_error());
-                m_models.Renderer.IsRendering = wasRendering;
-            }
         }
 
         private void OnCameraChanged(object sender, PropertyChangedEventArgs args)
         {
             // TODO: we can find out what was changed easily
             CameraModel camera = (sender as CameraModel);
-            // We only reload the renderer if the changed camera is selected or becomes selected;
-            // since the handler will be called twice (once for the selection and once for the deselection),
-            // we shouldn't reset both times
-            bool needReload = camera.IsSelected;
-
             // TODO: set name!
             // TODO: how to move/rotate camera?
             if (args.PropertyName == nameof(CameraModel.Position) && !Core.world_set_camera_position(camera.Handle, new Core.Vec3(camera.Position)))
@@ -265,17 +240,6 @@ namespace gui.ViewModel
             if (camera.IsSelected)
                 if (!Core.scenario_set_camera(currScenario, camera.Handle))
                     throw new Exception(Core.core_get_dll_error());
-
-            if (needReload)
-            {
-                bool wasRendering = m_models.Renderer.IsRendering;
-                m_models.Renderer.IsRendering = false;
-                if (m_reset.CanExecute(null))
-                    m_reset.Execute(null);
-                if (Core.world_reload_current_scenario() == IntPtr.Zero)
-                    throw new Exception(Core.core_get_dll_error());
-                m_models.Renderer.IsRendering = wasRendering;
-            }
         }
 
         private void OnSceneChanged(object sender, PropertyChangedEventArgs args)

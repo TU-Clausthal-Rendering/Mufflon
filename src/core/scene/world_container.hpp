@@ -132,8 +132,8 @@ public:
 	 * Returns nullptr if something goes wrong.
 	 */
 	SceneHandle load_scene(ScenarioHandle hdl);
-	// Reloads the scene from the current scenario
-	SceneHandle reload_scene();
+	// Reloads the scene from the current scenario if necessary
+	bool reload_scene();
 
 	// Returns the currently loaded scene, if present
 	SceneHandle get_current_scene() {
@@ -155,7 +155,7 @@ private:
 	~WorldContainer() = default;
 
 	SceneHandle load_scene(Scenario& scenario);
-	void load_scene_lights();
+	bool load_scene_lights();
 
 	// Global container object for everything
 	static WorldContainer s_container;
@@ -179,8 +179,11 @@ private:
 	util::IndexedStringMap<lights::SpotLight> m_spotLights;
 	util::IndexedStringMap<lights::DirectionalLight> m_dirLights;
 	util::IndexedStringMap<lights::Background> m_envLights;
+	// Default background if there's no envmap
+	lights::Background m_defaultBackground = lights::Background::black();
 	// Dirty flags to keep track of changed values
 	bool m_lightsDirty = true;
+	bool m_envLightDirty = true;
 	// Texture cache
 	std::map<std::string, textures::Texture, std::less<>> m_textures;
 	std::map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has

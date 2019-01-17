@@ -382,7 +382,6 @@ CORE_API size_t CDECL world_get_env_light_count();
 CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type);
 CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
-CORE_API SceneHdl CDECL world_reload_current_scenario();
 CORE_API SceneHdl CDECL world_get_current_scene();
 CORE_API Boolean CDECL world_is_sane(const char** msg);
 
@@ -480,6 +479,7 @@ CORE_API Boolean CDECL world_set_focus_camera_aperture(CameraHdl cam, float aper
 CORE_API Boolean CDECL render_enable_renderer(RendererType type);
 CORE_API Boolean CDECL render_iterate();
 CORE_API Boolean CDECL render_reset();
+CORE_API uint32_t CDECL render_get_current_iteration();
 // TODO: what do we pass to the GUI?
 CORE_API Boolean CDECL render_save_screenshot(const char* filename);
 CORE_API Boolean CDECL render_enable_render_target(RenderTarget target, Boolean variance);

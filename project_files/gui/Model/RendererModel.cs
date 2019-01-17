@@ -17,7 +17,6 @@ namespace gui.Model
     public class RendererModel : INotifyPropertyChanged
     {
         private bool m_isRendering = false;
-        private uint m_iteration = 0u;
         private Core.RendererType m_type = Core.RendererType.CPU_PT;
         private Core.RenderTarget m_target = Core.RenderTarget.RADIANCE;
 
@@ -45,13 +44,12 @@ namespace gui.Model
         }
 
         public uint Iteration {
-            get => m_iteration;
-            set
-            {
-                if (m_iteration == value) return;
-                m_iteration = value;
-                OnPropertyChanged(nameof(Iteration));
-            }
+            get => Core.render_get_current_iteration();
+        }
+
+        public void updateIterationCount()
+        {
+            OnPropertyChanged(nameof(Iteration));
         }
 
         public Core.RendererType Type

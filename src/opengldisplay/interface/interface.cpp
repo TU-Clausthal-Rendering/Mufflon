@@ -130,7 +130,6 @@ GLuint opengldisplay_get_screen_texture_handle() {
 Boolean opengldisplay_resize_screen(uint32_t width, uint32_t height, GLenum format) {
 	// TODO: check format?
 	try {
-		glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
 		s_screenTexture = std::make_unique<Texture2D>();
 		s_screenTexture->allocate_storage(static_cast<GLsizei>(width), static_cast<GLsizei>(height),
 										static_cast<Texture2D::InternalFormat>(format));
@@ -156,7 +155,7 @@ Boolean opengldisplay_initialize(void(*logCallback)(const char*, int)) {
 			}
 
 			glDebugMessageCallback(opengl_callback, nullptr);
-			glEnable(GL_DEBUG_OUTPUT);
+			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
 			Shader vertex{ Shader::Type::VERTEX_SHADER };
 			Shader geometry{ Shader::Type::GEOMETRY_SHADER };

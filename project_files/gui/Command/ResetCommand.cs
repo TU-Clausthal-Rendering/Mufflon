@@ -27,18 +27,9 @@ namespace gui.Command
 
         public override void Execute(object parameter)
         {
-            if (m_models.Renderer.IsRendering && m_playPause.CanExecute(null))
-            {
-                m_playPause.Execute(null);
-                if (!Core.render_reset())
-                    throw new Exception(Core.core_get_dll_error());
-                m_playPause.Execute(null);
-            } else
-            {
-                if (!Core.render_reset())
-                    throw new Exception(Core.core_get_dll_error());
-            }
-            m_models.Renderer.Iteration = 0u;
+            if (!Core.render_reset())
+                throw new Exception(Core.core_get_dll_error());
+            m_models.Renderer.updateIterationCount();
         }
 
         public override event EventHandler CanExecuteChanged

@@ -195,8 +195,6 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_load_scenario(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr world_reload_current_scenario();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_current_scene();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_current_scenario();
@@ -375,6 +373,8 @@ namespace gui.Dll
         internal static extern bool render_iterate();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_reset();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern UInt32 render_get_current_iteration();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_get_screenshot();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_screenshot")]

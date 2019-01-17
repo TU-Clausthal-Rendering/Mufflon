@@ -44,17 +44,6 @@ namespace gui.Command
             var currScenario = Core.world_get_current_scenario();
             if (!Core.scenario_remove_light(currScenario, lightName))
                 throw new Exception(Core.core_get_dll_error());
-
-            // scene needs to be rebuilded
-            bool wasRendering = m_models.Renderer.IsRendering;
-            m_models.Renderer.IsRendering = false;
-
-            if(m_reset.CanExecute(null))
-                m_reset.Execute(null);
-
-            if (Core.world_reload_current_scenario() == IntPtr.Zero)
-                throw new Exception(Core.core_get_dll_error());
-            m_models.Renderer.IsRendering = wasRendering;
         }
 
         public event EventHandler CanExecuteChanged

@@ -109,8 +109,6 @@ namespace gui.Dll
 
                     if(m_viewport.AllowMovement)
                     {
-                        bool needsReload = false;
-
                         // Check for keyboard input
                         float x = 0f;
                         float y = 0f;
@@ -131,10 +129,8 @@ namespace gui.Dll
 
                         if (x != 0f || y != 0f || z != 0f)
                         {
-                            // TODO: mark camera dirty
                             if (!Core.scene_move_active_camera(x, y, z))
                                 throw new Exception(Core.core_get_dll_error());
-                            needsReload = true;
                         }
 
                         // Check for mouse dragging
@@ -143,17 +139,6 @@ namespace gui.Dll
                         {
                             if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
                                 throw new Exception(Core.core_get_dll_error());
-                            needsReload = true;
-                        }
-
-                        // Reload the scene if necessary
-                        if (needsReload)
-                        {
-                            if (Core.world_reload_current_scenario() == IntPtr.Zero)
-                                throw new Exception(Core.core_get_dll_error());
-                            if (!Core.render_reset())
-                                throw new Exception(Core.core_get_dll_error());
-                            m_rendererModel.Iteration = 0u;
                         }
                     }
 
@@ -178,10 +163,11 @@ namespace gui.Dll
 
                     if (!Gdi32.SwapBuffers(m_deviceContext))
                         throw new Win32Exception(Marshal.GetLastWin32Error());
-                    ++m_rendererModel.Iteration;
 
                     // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
                     m_rendererModel.RenderLock.Release();
+                    // We also let the GUI know that an iteration has taken place
+                    Application.Current.Dispatcher.Invoke(new Action(() => m_rendererModel.updateIterationCount()));
                 }
             }
             catch (Exception e)

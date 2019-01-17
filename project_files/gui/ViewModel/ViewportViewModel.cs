@@ -51,9 +51,13 @@ namespace gui.ViewModel
             {
                 case nameof(ViewportModel.RenderWidth):
                     OnPropertyChanged(nameof(RenderWidth));
+                    OnPropertyChanged(nameof(DesiredWidth));
+                    OnPropertyChanged(nameof(ScrollMaximumX));
                     break;
                 case nameof(ViewportModel.RenderHeight):
                     OnPropertyChanged(nameof(RenderHeight));
+                    OnPropertyChanged(nameof(DesiredHeight));
+                    OnPropertyChanged(nameof(ScrollMaximumY));
                     break;
                 case nameof(ViewportModel.DesiredWidth):
                     OnPropertyChanged(nameof(ScrollMaximumX));
