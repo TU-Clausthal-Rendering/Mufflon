@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mffloader", "project_files\loader\loader.vcxproj", "{5169EDD3-83D8-4C39-A6F0-E6D606352372}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mffloader", "project_files\mffloader\mffloader.vcxproj", "{5169EDD3-83D8-4C39-A6F0-E6D606352372}"
 	ProjectSection(ProjectDependencies) = postProject
 		{15E94C26-7D49-421A-8CE4-7D697349FB79} = {15E94C26-7D49-421A-8CE4-7D697349FB79}
 	EndProjectSection

@@ -1,7 +1,7 @@
 #include "json_helper.hpp"
 #include <cstdint>
 
-namespace loader::json {
+namespace mff_loader::json {
 
 namespace {
 
@@ -287,4 +287,4 @@ ei::IVec4 read<ei::IVec4>(ParserState& state, const rapidjson::Value& val) {
 	};
 }
 
-} // namespace loader::json
+} // namespace mff_loader::json

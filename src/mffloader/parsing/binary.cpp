@@ -9,7 +9,7 @@
 #include <miniz/miniz.h>
 #include <cstdio>
 
-namespace loader::binary {
+namespace mff_loader::binary {
 
 using namespace mufflon;
 
@@ -892,4 +892,4 @@ bool BinaryLoader::load_file(fs::path file, const u64 globalLod,
 	return true;
 }
 
-} // namespace loader::binary
+} // namespace mff_loader::binary

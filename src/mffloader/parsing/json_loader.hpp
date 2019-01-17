@@ -10,7 +10,7 @@
 #include <string>
 #include <map>
 
-namespace loader::json {
+namespace mff_loader::json {
 
 class JsonException : public std::exception {
 public:
@@ -72,4 +72,4 @@ private:
 	std::atomic_bool m_abort = false;
 };
 
-} // namespace loader::json
+} // namespace mff_loader::json

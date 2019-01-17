@@ -1,6 +1,6 @@
 #include "scene_exporter.hpp"
 
-namespace loader::exprt {
+namespace mff_loader::exprt {
 
 bool SceneExporter::save_scene()
 {
@@ -64,4 +64,4 @@ bool SceneExporter::save_scene()
 	return true;
 }
 
-} // namespace loader::exprt
+} // namespace mff_loader::exprt

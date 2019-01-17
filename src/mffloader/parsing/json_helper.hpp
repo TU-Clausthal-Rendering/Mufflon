@@ -7,7 +7,7 @@
 #include <vector>
 #include <stdexcept>
 
-namespace loader::json {
+namespace mff_loader::json {
 
 struct ParserState {
 	enum class Level {
@@ -135,4 +135,4 @@ void assertBoolean(ParserState& state, const rapidjson::Value::ConstMemberIterat
 void assertString(ParserState& state, const rapidjson::Value& val);
 void assertString(ParserState& state, const rapidjson::Value::ConstMemberIterator& val);
 
-} // namespace loader::json
+} // namespace mff_loader::json

@@ -12,7 +12,7 @@
 #include <vector>
 #include <unordered_map>
 
-namespace loader::binary {
+namespace mff_loader::binary {
 
 class BinaryLoader {
 public:
@@ -172,4 +172,4 @@ private:
 	std::atomic_bool m_abort = false;
 };
 
-} // namespace loader::binary
+} // namespace mff_loader::binary

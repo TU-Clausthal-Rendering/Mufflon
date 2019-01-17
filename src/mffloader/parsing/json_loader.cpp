@@ -11,7 +11,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace loader::json {
+namespace mff_loader::json {
 
 using namespace mufflon;
 
@@ -693,4 +693,4 @@ bool JsonLoader::load_file() {
 }
 
 
-} // namespace loader::json
+} // namespace mff_loader::json

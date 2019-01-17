@@ -5,7 +5,7 @@
 #include <rapidjson/document.h>
 #include "core/export/interface.h"
 
-namespace loader::exprt {
+namespace mff_loader::exprt {
 
 class SceneExporter
 {
@@ -28,4 +28,4 @@ private:
 	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
 };
 
-}// namespace loader::exprt
+}// namespace mff_loader::exprt

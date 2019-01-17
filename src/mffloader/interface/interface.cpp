@@ -25,7 +25,7 @@
 	}
 
 using namespace mufflon;
-using namespace loader;
+using namespace mff_loader;
 
 namespace {
 
