@@ -1247,9 +1247,16 @@ LightHdl world_add_light(const char* name, LightType type) {
 	CATCH_ALL((LightHdl{7, 0}))
 }
 
+CORE_API Boolean CDECL world_set_light_name(LightHdl hdl, const char* newName) {
+	TRY
+	s_world.set_light_name(hdl.index, static_cast<lights::LightType>(hdl.type), newName);
+	return true;
+	CATCH_ALL(false)
+}
+
 Boolean world_remove_light(LightHdl hdl) {
 	TRY
-	s_world.remove_light(hdl.index, lights::LightType(hdl.type));
+	s_world.remove_light(hdl.index, static_cast<lights::LightType>(hdl.type));
 	return true;
 	CATCH_ALL(false)
 }
@@ -2238,6 +2245,17 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	std::string_view path = nameOpt.value();
 	return &path[0];
 	CATCH_ALL(nullptr)
+}
+
+CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
+	const lights::Background* envmap = s_world.get_env_light(hdl.index);
+	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
+	if(color)
+		*color = util::pun<Vec3>(envmap->get_scale());
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {

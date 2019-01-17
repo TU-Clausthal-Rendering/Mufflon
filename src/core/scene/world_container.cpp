@@ -309,6 +309,25 @@ std::string_view WorldContainer::get_light_name(u32 index, lights::LightType typ
 	return "";
 }
 
+void WorldContainer::set_light_name(u32 index, lights::LightType type, std::string_view name) {
+	switch(type) {
+		case lights::LightType::POINT_LIGHT: {
+			m_pointLights.change_key(index, std::string(name));
+		} break;
+		case lights::LightType::SPOT_LIGHT: {
+			m_spotLights.change_key(index, std::string(name));
+		} break;
+		case lights::LightType::DIRECTIONAL_LIGHT: {
+			m_dirLights.change_key(index, std::string(name));
+		} break;
+		case lights::LightType::ENVMAP_LIGHT: {
+			m_envLights.change_key(index, std::string(name));
+		} break;
+		default:
+			throw std::runtime_error("[WorldContainer::get_light_name] Invalid light type.");
+	}
+}
+
 void WorldContainer::mark_camera_dirty(ConstCameraHandle hdl) {
 	// TODO: put the mark-dirty on scenario/scene level (one for add/remove, one for touched)?
 	// We need one for the env-map for sure, because that operation takes long

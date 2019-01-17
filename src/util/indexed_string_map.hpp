@@ -64,6 +64,13 @@ public:
 		return size() == 0u;
 	}
 
+	// Replace the name of an item while retaining its index.
+	void change_key(std::size_t index, std::string name) {
+		m_map.erase(*m_mapKeyStore.at(index));
+		m_mapKeyStore[index] = std::make_unique<std::string>(move(name));
+		m_map.emplace(*m_mapKeyStore[index], index);
+	}
+
 private:
 	std::unordered_map<std::string_view, std::size_t> m_map;
 	std::vector<std::unique_ptr<std::string>> m_mapKeyStore;

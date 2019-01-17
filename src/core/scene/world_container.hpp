@@ -106,6 +106,7 @@ public:
 	void remove_light(u32 index, lights::LightType type);
 	// Get the name of a light
 	std::string_view get_light_name(u32 index, lights::LightType type) const;
+	void set_light_name(u32 index, lights::LightType type, std::string_view name);
 	// Functions for dirtying cameras and lights
 	void mark_camera_dirty(ConstCameraHandle cam);
 	void mark_light_dirty(u32 index, lights::LightType type);

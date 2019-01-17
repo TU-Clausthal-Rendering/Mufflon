@@ -54,6 +54,9 @@ public:
 	void set_scale(const Spectrum& color) {
 		m_color = color;
 	}
+	const Spectrum& get_scale() const noexcept {
+		return m_color;
+	}
 
 	// Creates a copy of the background suited for the given deviec
 	template < Device newDev >
