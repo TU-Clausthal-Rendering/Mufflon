@@ -1,19 +1,26 @@
 #include "scene_exporter.hpp"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/prettywriter.h"
+
+#include "core/export/interface.h"
+
+#include <fstream> 
 
 namespace mff_loader::exprt {
 
 bool SceneExporter::save_scene()
 {
-	std::string jsonPath = m_filePath.string();
-	jsonPath.append(".json");
 	// TODO Open old Json
 
+	fs::path tempPath = m_filePath;
+
+	tempPath.replace_extension("json");
+
 	rapidjson::Document document;
-	rapidjson::Value objectToExport;
-	objectToExport.SetObject();
+	document.SetObject();
 
 	document.AddMember("version", FILE_VERSION, document.GetAllocator());
-	std::string binaryPathString = m_filePath.string();
+	std::string binaryPathString = m_filePath.string(); // TODO RelPath
 	binaryPathString.append(".mff");
 	rapidjson::Value binaryPath;
 	binaryPath.SetString(binaryPathString.c_str(), rapidjson::SizeType(binaryPathString.length()));
@@ -28,6 +35,19 @@ bool SceneExporter::save_scene()
 		return false;
 	if (!save_scenarios(document))
 		return false;
+
+	rapidjson::StringBuffer strbuf;
+	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+	document.Accept(writer);
+
+
+	std::string json = std::string(strbuf.GetString());
+	std::ofstream ofs(tempPath);
+
+	ofs << json;
+
+	ofs.close();
+
 
 	// Binary
 
@@ -76,6 +96,7 @@ bool SceneExporter::save_cameras(rapidjson::Document& document)
 			// TODO Exception?
 			break;
 		}
+		// TODO path viewDir up
 		rapidjson::Value cameraName;
 		cameraName.SetString(rapidjson::StringRef(world_get_camera_name(cameraHandle)));
 		cameras.AddMember(cameraName, camera, document.GetAllocator());
@@ -240,7 +261,9 @@ bool SceneExporter::save_lights(rapidjson::Document& document)
 		sca.PushBack(scale.z, document.GetAllocator());
 		light.AddMember("scale", sca, document.GetAllocator());
 
-
+		rapidjson::Value lightName;
+		lightName.SetString(rapidjson::StringRef(world_get_light_name(lightHandle)));
+		lights.AddMember(lightName, light, document.GetAllocator());
 	}
 
 	// TODO GONIOMETRIC (not implemented yet)

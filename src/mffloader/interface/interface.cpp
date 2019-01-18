@@ -7,6 +7,7 @@
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
+#include "mffloader/export/scene_exporter.hpp"
 #ifdef _WIN32
 #include <combaseapi.h>
 #endif // _WIN32
@@ -129,6 +130,38 @@ LoaderStatus loader_load_json(const char* path) {
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
+
+LoaderStatus loader_save_scene(const char* path) {
+	TRY
+	fs::path filePath(path);
+
+	// Perform some error checking
+	if (fs::exists(filePath)) {
+		filePath.replace_extension(".mff");
+		if (fs::is_directory(filePath)) {
+			logError("[", FUNCTION_NAME, "] Path '", filePath.string(), "' is already a directory");
+			return LoaderStatus::LOADER_ERROR;
+		}
+		filePath.replace_extension(".json");
+		if (fs::is_directory(filePath)) {
+			logError("[", FUNCTION_NAME, "] Path '", filePath.string(), "' is already a directory");
+			return LoaderStatus::LOADER_ERROR;
+		}
+	}
+	try {
+	exprt::SceneExporter exporter{ filePath };
+		if (!exporter.save_scene())
+			return LoaderStatus::LOADER_ERROR;
+	}
+	catch (const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] ", e.what());
+		return LoaderStatus::LOADER_ERROR;
+	}
+
+	return LoaderStatus::LOADER_SUCCESS;
+	CATCH_ALL(LoaderStatus::LOADER_ERROR)
+}
+
 
 Boolean loader_abort() {
 	if(json::JsonLoader* loader = s_jsonLoader.load(); loader != nullptr) {

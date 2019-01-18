@@ -1,10 +1,7 @@
 #pragma once
 
 #include "util/filesystem.hpp"
-#include <map>
 #include <rapidjson/document.h>
-#include "core/export/interface.h"
-
 namespace mff_loader::exprt {
 
 class SceneExporter

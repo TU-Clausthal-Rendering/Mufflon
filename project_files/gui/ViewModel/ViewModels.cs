@@ -45,6 +45,7 @@ namespace gui.ViewModel
         public ICommand AddMaterialCommand { get; }
         public ICommand AddCameraCommand { get; }
         public ICommand LoadSceneCommand { get; }
+        public ICommand SaveSceneCommand { get; }
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand AdjustGammaUp { get; }
@@ -80,6 +81,7 @@ namespace gui.ViewModel
             AddCameraCommand = new AddCameraCommand(m_models);
             AddMaterialCommand = new AddMaterialCommand(m_models);
             LoadSceneCommand = new LoadSceneCommand(m_models);
+            SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(this);
             AdjustGammaUp = new AdjustGammaUpCommand();

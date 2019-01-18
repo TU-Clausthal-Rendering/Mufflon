@@ -41,6 +41,10 @@
                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"
                               InputGestureText="Ctrl+O"
                               IsCheckable="False"/>
+                    <MenuItem Header="Save Scene"
+                              Command="{Binding SaveSceneCommand}"
+                              InputGestureText="Ctrl+S"
+                              IsCheckable="False"/>
                     <MenuItem Header="Recent scenes..."
                               ItemsSource="{Binding Scene.LastScenes}"
                               DisplayMemberPath="Filename"
