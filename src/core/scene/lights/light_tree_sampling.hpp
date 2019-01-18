@@ -34,8 +34,8 @@ CUDA_FUNCTION __forceinline__ u64 percentage_of(u64 num, float p) {
 
 // Converts the typeless memory into the given light type and samples it
 CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
-										const ei::Box& bounds,
-										const math::RndSet2& rnd) {
+								  const ei::Box& sceneBounds,
+								  const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
 		case LightType::POINT_LIGHT: return sample_light_pos(*reinterpret_cast<const PointLight*>(light), rnd);
@@ -43,23 +43,24 @@ CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
 		case LightType::AREA_LIGHT_TRIANGLE: return sample_light_pos(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
 		case LightType::AREA_LIGHT_QUAD: return sample_light_pos(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
 		case LightType::AREA_LIGHT_SPHERE: return sample_light_pos(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
-		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), bounds, rnd);
+		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), sceneBounds, rnd);
 		default: mAssert(false); return {};
 	}
 }
 
 // Converts the typeless memory into the given light type and samples it
 CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* light,
-								  const ei::Vec3& position, float distSqr,
-								  const ei::Box& bounds, const math::RndSet2& rnd) {
+												const ei::Vec3& position,
+												const ei::Box& sceneBounds,
+												const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
-		case LightType::POINT_LIGHT: return connect_light(*reinterpret_cast<const PointLight*>(light), position, distSqr, rnd);
-		case LightType::SPOT_LIGHT: return connect_light(*reinterpret_cast<const SpotLight*>(light), position, distSqr, rnd);
+		case LightType::POINT_LIGHT: return connect_light(*reinterpret_cast<const PointLight*>(light), position, rnd);
+		case LightType::SPOT_LIGHT: return connect_light(*reinterpret_cast<const SpotLight*>(light), position, rnd);
 		case LightType::AREA_LIGHT_TRIANGLE: return connect_light(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), position, rnd);
 		case LightType::AREA_LIGHT_QUAD: return connect_light(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), position, rnd);
 		case LightType::AREA_LIGHT_SPHERE: return connect_light(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), position, rnd);
-		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, bounds);
+		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, sceneBounds);
 		default: mAssert(false); return {};
 	}
 }
@@ -211,8 +212,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
 	return adjustPdf(connect_light(static_cast<LightType>(type), tree.memory + offset,
-							 position, ei::lensq(get_center(currentNode, type) - position),
-							 bounds, rnd), lightProb);
+							 position, bounds, rnd), lightProb);
 }
 
 /*

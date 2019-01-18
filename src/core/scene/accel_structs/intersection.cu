@@ -511,14 +511,14 @@ void first_intersection_scene_obj_lbvh(
 	}
 }
 
-template < Device dev > __host__ __device__
-RayIntersectionResult first_intersection_scene_lbvh_imp(
-	const LBVH& bvh,
+template < Device dev > CUDA_FUNCTION
+RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray ray,
+	const ei::Ray& ray,
 	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 ) {
+	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const float tmin = 1e-7f * len(scene.aabb.max - scene.aabb.min);
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
@@ -787,16 +787,17 @@ bool any_intersection_scene_obj_lbvh(
 }
 
 template < Device dev > CUDA_FUNCTION
-bool any_intersection_scene_lbvh_imp(
-	const LBVH& bvh,
+bool any_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
 	const PrimitiveHandle& startInsPrimId,
-	const float tmax
+	const float maxDist
 ) {
+	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
 	const float tmin = 1e-6f * len(scene.aabb.max - scene.aabb.min);
+	const float tmax = maxDist * 0.9999f; // Do not intersect the target surface
 
 	if(scene.numInstances == 1) {
 		i32 traversalStack[OBJ_STACK_SIZE];
@@ -885,17 +886,6 @@ bool any_intersection_scene_lbvh_imp(
 	}
 }
 
-template < Device dev > CUDA_FUNCTION
-bool any_intersection_scene_lbvh(
-	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
-	const float tmax
-) {
-	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
-	return any_intersection_scene_lbvh_imp<dev>(
-		*lbvh, scene, ray, startInsPrimId, tmax);
-}
 
 template __host__ __device__ bool any_intersection_scene_lbvh(
 	const SceneDescriptor<Device::CUDA>& scene,
@@ -908,18 +898,6 @@ template __host__ __device__ bool any_intersection_scene_lbvh(
 	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
-
-template < Device dev > CUDA_FUNCTION
-RayIntersectionResult first_intersection_scene_lbvh(
-	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
-	const float tmax
-) {
-	const LBVH* lbvh = (const LBVH*)scene.accelStruct.accelParameters;
-	return first_intersection_scene_lbvh_imp<dev>(
-		*lbvh, scene, ray, startInsPrimId, tmax);
-}
 
 template __host__ __device__ RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<Device::CUDA>&,

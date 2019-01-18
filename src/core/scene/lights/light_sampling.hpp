@@ -292,29 +292,31 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const BackgroundDesc<CURRE
 // Connect to a light source
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight& light,
 																const ei::Vec3& pos,
-																const float distSqr,
 																const math::RndSet2& rnd) {
-	const float dist = sqrtf(distSqr);
-	const ei::Vec3 direction = (light.position - pos) / dist;
+	ei::Vec3 direction = light.position - pos;
+	const float distSq = lensq(direction);
+	const float dist = sqrtf(distSq);
+	direction /= dist;
 	// Compute the contribution
-	Spectrum diffIrradiance = light.intensity / distSqr;
+	Spectrum diffIrradiance = light.intensity / distSq;
 	return NextEventEstimation{
-		direction, 0.0f, diffIrradiance, dist, distSqr, AreaPdf::infinite()
+		direction, 0.0f, diffIrradiance, dist, distSq, AreaPdf::infinite()
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight& light,
 																const ei::Vec3& pos,
-																const float distSqr,
 																const math::RndSet2& rnd) {
-	const float dist = sqrtf(distSqr);
-	const ei::Vec3 direction = (light.position - pos) / dist;
+	ei::Vec3 direction = light.position - pos;
+	const float distSq = lensq(direction);
+	const float dist = sqrtf(distSq);
+	direction /= dist;
 	const math::EvalValue value = evaluate_spot(-direction, light.intensity,
 										light.direction,
 										light.cosThetaMax, light.cosFalloffStart);
 	// Compute the contribution
-	Spectrum diffIrradiance = value.value / distSqr;
+	Spectrum diffIrradiance = value.value / distSq;
 	return NextEventEstimation{
-		direction, value.cosOut, diffIrradiance, dist, distSqr, AreaPdf::infinite()
+		direction, value.cosOut, diffIrradiance, dist, distSq, AreaPdf::infinite()
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightTriangle<CURRENT_DEV>& light,
