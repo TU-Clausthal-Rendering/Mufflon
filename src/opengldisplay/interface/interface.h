@@ -23,6 +23,8 @@ typedef enum {
 
 OPENGLDISPLAY_API void CDECL opengldisplay_set_gamma(float val);
 OPENGLDISPLAY_API float CDECL opengldisplay_get_gamma();
+OPENGLDISPLAY_API void CDECL opengldisplay_set_factor(float val);
+OPENGLDISPLAY_API float CDECL opengldisplay_get_factor();
 OPENGLDISPLAY_API const char* CDECL opengldisplay_get_dll_error();
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_display(int left, int right, int bottom, int top, uint32_t width, uint32_t height);
 OPENGLDISPLAY_API GLuint CDECL opengldisplay_get_screen_texture_handle();

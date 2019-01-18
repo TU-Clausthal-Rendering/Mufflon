@@ -59,12 +59,16 @@ struct SpheresDescriptor {
 };
 
 template < Device dev >
-struct ObjectDescriptor {
+struct LodDescriptor {
 	static constexpr Device DEVICE = dev;
 	PolygonsDescriptor<dev> polygon;
 	SpheresDescriptor<dev> spheres;
 	i32 numPrimitives;
 	AccelDescriptor accelStruct;
+	// Sort-of linked list, to-be-set not by the LoD itself
+	// but rather by the scene upon descriptor creation
+	u32 previous = std::numeric_limits<u32>::max();
+	u32 next = std::numeric_limits<u32>::max();
 };
 
 struct CameraDescriptor {
@@ -83,18 +87,18 @@ template < Device dev >
 struct SceneDescriptor {
 	static constexpr Device DEVICE = dev;
 	CameraDescriptor camera;
-	u32 numObjects;
+	u32 numLods;
 	i32 numInstances;
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
-	ArrayDevHandle_t<dev, ObjectDescriptor<dev>> objects;
+	ArrayDevHandle_t<dev, LodDescriptor<dev>> lods;
 
 	AccelDescriptor accelStruct;
 	// Per instance: transformation + pre-computed scale
 	// TODO: put some of these into one array instead of separate ones
 	ArrayDevHandle_t<dev, ei::Mat3x4> transformations;
 	ArrayDevHandle_t<dev, float> scales;
-	ArrayDevHandle_t<dev, u32> objectIndices;
+	ArrayDevHandle_t<dev, u32> lodIndices;
 	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 
 	// The receiver of this struct is responsible for deallocating this memory!

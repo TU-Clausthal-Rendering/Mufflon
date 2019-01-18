@@ -1,10 +1,13 @@
 #include "world_container.hpp"
 #include "util/log.hpp"
 #include "core/cameras/camera.hpp"
+#include "core/scene/lod.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"
 #include <iostream>
 #include <ei/conversions.hpp>
+#include <windows.h>
+
 
 namespace mufflon::scene {
 
@@ -48,10 +51,19 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	bool hasEmitters = false;
 	bool hasObjects = false;
 	// Check for objects (and check for emitters as well)
-	for(const auto& object : m_objects) {
-		if(!hdl->is_masked(&object.second)) {
+	for(const auto& instance : m_instances) {
+		if(!hdl->is_masked(instance.second.get())) {
 			hasObjects = true;
-			if(object.second.is_emissive(*hdl)) {
+			const Object& object = instance.second->get_object();
+			const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
+			if(object.has_lod_available(lodLevel)) {
+				const Lod& lod = object.get_lod(lodLevel);
+				if(lod.is_emissive(*hdl)) {
+					hasEmitters = true;
+					break;
+				}
+			} else {
+				// TODO: how could we possibly check this?
 				hasEmitters = true;
 				break;
 			}
@@ -71,7 +83,7 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 }
 
 ObjectHandle WorldContainer::create_object(std::string name, ObjectFlags flags) {
-	auto hdl = m_objects.emplace(std::move(name), Object{});
+	auto hdl = m_objects.emplace(std::move(name), Object{static_cast<u32>(m_objects.size())});
 	if(!hdl.second)
 		return nullptr;
 	hdl.first->second.set_name(hdl.first->first);
@@ -444,8 +456,27 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	m_scene = std::make_unique<Scene>(scenario);
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
-		if(!scenario.is_masked(&instance.second->get_object()))
+		Instance& inst = *instance.second;
+		Object& obj = inst.get_object();
+		if(!scenario.is_masked(&obj) && !scenario.is_masked(&inst)) {
+			const u32 lod = scenario.get_effective_lod(&inst);
+			if(!obj.has_lod_available(lod)) {
+				// TODO: please prettify this...
+				// Gotta refetch the LoD from file
+				/*using LodLoaderType = bool(*)(ObjectHandle, u32);
+				HINSTANCE m_handle = ::LoadLibrary(L"C:\\Users\\Florian\\Desktop\\Repos\\mufflon\\build\\Debug\\loader.dll");
+				LodLoaderType proc = reinterpret_cast<LodLoaderType>(::GetProcAddress(m_handle, "loader_load_lod"));
+				if(!proc)
+					throw std::runtime_error("Could not fetch lod loader procedure");
+				if(!proc(&obj, lod))
+					throw std::runtime_error("Failed to after-load LoD");*/
+				throw std::runtime_error("Not implemented yet; gotta solve the problem of circular dependency first");
+
+				/*if(!loader_load_lod(&obj, lod))
+					throw std::runtime_error("Failed to after-load LoD");*/
+			}
 			m_scene->add_instance(instance.second.get());
+		}
 	}
 
 	// Check if the resulting scene has issues with size
@@ -512,16 +543,18 @@ bool WorldContainer::load_scene_lights() {
 		std::vector<lights::DirectionalLight> dirLights;
 		i32 instIdx = 0;
 		for(auto& obj : m_scene->get_objects()) {
-			if(!obj.first->is_emissive(*m_scenario)) {
-				instIdx += static_cast<i32>(obj.second.size());
-				continue;
-			}
 			// Object contains area lights.
 			// Create one light source per polygone and instance
 			for(auto& inst : obj.second) {
+				mAssertMsg(obj.first->has_lod_available(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
+				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
+				if(!lod.is_emissive(*m_scenario)) {
+					instIdx += static_cast<i32>(obj.second.size());
+					continue;
+				}
 				i32 primIdx = 0;
 				// First search in polygons (PrimitiveHandle expects poly before sphere)
-				auto& polygons = obj.first->get_geometry<geometry::Polygons>();
+				auto& polygons = lod.get_geometry<geometry::Polygons>();
 				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
 				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
 				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
@@ -558,8 +591,8 @@ bool WorldContainer::load_scene_lights() {
 				}
 
 				// Then get the sphere lights
-				primIdx = (u32)obj.first->get_geometry<geometry::Polygons>().get_face_count();
-				auto& spheres = obj.first->get_geometry<geometry::Spheres>();
+				primIdx = (u32)lod.get_geometry<geometry::Polygons>().get_face_count();
+				auto& spheres = lod.get_geometry<geometry::Spheres>();
 				materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
 				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {

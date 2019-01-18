@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using gui.Annotations;
+using gui.Properties;
 
 namespace gui.Model
 {
@@ -115,7 +116,7 @@ namespace gui.Model
             }
         }
 
-        private bool m_allowMovement = true;
+        private bool m_allowMovement = Settings.Default.AllowCameraMovement;
         public bool AllowMovement
         {
             get => m_allowMovement;

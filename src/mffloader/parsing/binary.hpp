@@ -24,8 +24,11 @@ public:
 	 * After a successful load, properties of the loaded file may be queried via
 	 * this object; calling this function again will overwrite them, however.
 	 */
-	bool load_file(fs::path file, const mufflon::u64 globalLod,
-				   const std::unordered_map<std::string_view, mufflon::u64>& localLods);
+	bool load_file(fs::path file, const mufflon::u32 globalLod,
+				   const std::unordered_map<std::string_view, mufflon::u32>& objectLods,
+				   const std::unordered_map<std::string_view, mufflon::u32>& instanceLods);
+
+	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
 
 	const std::vector<std::string>& get_material_names() const noexcept {
 		return m_materialNames;
@@ -62,10 +65,14 @@ private:
 		std::string name;
 		GlobalFlag globalFlags;
 		ObjectFlags flags;
-		mufflon::u64 lodLevel;
 		ei::Box aabb;
 		mufflon::u32 keyframe;
 		mufflon::u32 animObjId;
+		ObjectHdl objHdl;
+		mufflon::u64 offset;
+	};
+
+	struct LodState {
 		mufflon::u32 numTriangles;
 		mufflon::u32 numQuads;
 		mufflon::u32 numSpheres;
@@ -74,7 +81,7 @@ private:
 		mufflon::u32 numVertAttribs;
 		mufflon::u32 numFaceAttribs;
 		mufflon::u32 numSphereAttribs;
-		ObjectHdl objHdl;
+		LodHdl lodHdl;
 	};
 
 	struct AttribState {
@@ -128,44 +135,45 @@ private:
 
 	static AttribDesc map_bin_attrib_type(AttribType type);
 	// Uncompressed data
-	AttribState read_uncompressed_attribute();
-	void read_normal_compressed_vertices();
-	void read_normal_uncompressed_vertices();
-	void read_uncompressed_triangles();
-	void read_uncompressed_quads();
-	void read_uncompressed_spheres();
-	void read_uncompressed_vertex_attributes();
-	void read_uncompressed_face_attributes();
-	void read_uncompressed_sphere_attributes();
-	void read_uncompressed_face_materials();
-	void read_uncompressed_sphere_materials();
+	AttribState read_uncompressed_attribute(const ObjectState& object, const LodState& lod);
+	void read_normal_compressed_vertices(const ObjectState& object, const LodState& lod);
+	void read_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_triangles(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_quads(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_spheres(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_vertex_attributes(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_face_attributes(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_sphere_attributes(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_face_materials(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_sphere_materials(const ObjectState& object, const LodState& lod);
 	// Deflated data
 	std::vector<unsigned char> decompress();
 	AttribState read_compressed_attribute(const unsigned char*& data);
-	void read_compressed_normal_compressed_vertices();
-	void read_compressed_normal_uncompressed_vertices();
-	void read_compressed_triangles();
-	void read_compressed_quads();
-	void read_compressed_spheres();
-	void read_compressed_vertex_attributes();
-	void read_compressed_face_attributes();
-	void read_compressed_face_materials();
-	void read_compressed_sphere_attributes();
+	void read_compressed_normal_compressed_vertices(const ObjectState& object, const LodState& lod);
+	void read_compressed_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod);
+	void read_compressed_triangles(const ObjectState& object, const LodState& lod);
+	void read_compressed_quads(const ObjectState& object, const LodState& lod);
+	void read_compressed_spheres(const ObjectState& object, const LodState& lod);
+	void read_compressed_vertex_attributes(const ObjectState& object, const LodState& lod);
+	void read_compressed_face_attributes(const ObjectState& object, const LodState& lod);
+	void read_compressed_face_materials(const ObjectState& object, const LodState& lod);
+	void read_compressed_sphere_attributes(const ObjectState& object, const LodState& lod);
 
-	bool read_instances();
-	void read_object(const mufflon::u64 globalLod,
-					 const std::unordered_map<std::string_view, mufflon::u64>& localLods);
-	void read_lod();
+	bool read_instances(const mufflon::u32 globalLod,
+						const std::unordered_map<std::string_view, mufflon::u32>& objectLods,
+						const std::unordered_map<std::string_view, mufflon::u32>& instanceLods);
+	void read_object();
+	void read_lod(const ObjectState& object, mufflon::u32 lod);
 
 	fs::path m_filePath;
 	// Parser state
 	std::ifstream m_fileStream;
 	std::ifstream::pos_type m_fileStart;
-	ObjectState m_currObjState;
 	// Parsed data
 	// The material names are wrapped in [mat:...] for ease of use in the JSON parser
 	std::vector<std::string> m_materialNames;
-	std::vector<ObjectHdl> m_objectHandles;
+	std::vector<ObjectState> m_objects;
+	std::vector<mufflon::u64> m_objJumpTable;
 	ei::Box m_aabb;
 
 	// These are for aborting a load and keeping track of progress

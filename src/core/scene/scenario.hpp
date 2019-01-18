@@ -14,7 +14,7 @@ namespace mufflon { namespace scene {
  */
 class Scenario {
 public:
-	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
+	static constexpr u64 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
 
 	Scenario();
 	Scenario(const Scenario&) = delete;
@@ -42,10 +42,10 @@ public:
 	MaterialHandle get_assigned_material(MaterialIndex index) const;
 
 	// Getter/setters for global LoD level
-	std::size_t get_global_lod_level() const noexcept {
+	u32 get_global_lod_level() const noexcept {
 		return m_globalLodLevel;
 	}
-	void set_global_lod_level(std::size_t level) noexcept {
+	void set_global_lod_level(u32 level) noexcept {
 		m_globalLodLevel = level;
 	}
 
@@ -67,12 +67,16 @@ public:
 	}
 
 	// Getter/setter for per-object and per-instance properties
-	bool is_masked(ConstObjectHandle hdl) const;
-	std::size_t get_custom_lod(ConstObjectHandle hdl) const;
+	bool is_masked(ConstObjectHandle hdl) const noexcept;
+	bool is_masked(ConstInstanceHandle hdl) const noexcept;
+	u32 get_custom_lod(ConstObjectHandle hdl) const noexcept;
+	u32 get_custom_lod(ConstInstanceHandle hdl) const noexcept;
+	// Find out the effective LoD of the instance: if it doesn't have a custom LoD, check the object and then the global LoD
+	u32 get_effective_lod(ConstInstanceHandle hdl) const noexcept;
 	void mask_object(ConstObjectHandle hdl);
 	void mask_instance(ConstInstanceHandle hdl);
-	void set_custom_lod(ConstObjectHandle hdl, std::size_t level);
-	void set_custom_lod(ConstInstanceHandle hdl, std::size_t level);
+	void set_custom_lod(ConstObjectHandle hdl, u32 level);
+	void set_custom_lod(ConstInstanceHandle hdl, u32 level);
 
 	const std::string_view& get_name() const noexcept {
 		return m_name;
@@ -153,9 +157,9 @@ private:
 		MaterialHandle material;
 	};
 
-	struct ObjectProperty {
+	struct CustomProperty {
 		bool masked = false;
-		std::size_t lod = NO_CUSTOM_LOD;
+		u32 lod = NO_CUSTOM_LOD;
 	};
 
 	// "Dirty" flags for rebuilding the scene
@@ -178,12 +182,13 @@ private:
 	u32 m_background = 0u;
 
 
-	std::size_t m_globalLodLevel = 0u;
+	u32 m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution = {};
 	CameraHandle m_camera = nullptr;
 
 	// Object blacklisting and other custom traits
-	std::map<ConstObjectHandle, ObjectProperty> m_perObjectCustomization;
+	std::map<ConstObjectHandle, CustomProperty > m_perObjectCustomization;
+	std::map<ConstInstanceHandle, CustomProperty > m_perInstanceCustomization;
 };
 
 }} // namespace mufflon::scene

@@ -31,7 +31,7 @@ constexpr i32 TreeHead = 0x10000000;
 
 // Type trait to derive some dependent types from a descriptor.
 template<typename Desc> struct desc_info {};
-template<Device dev> struct desc_info<ObjectDescriptor<dev>> {
+template<Device dev> struct desc_info<LodDescriptor<dev>> {
 	using MortonCode = u64;
 	using PrimCount = ei::IVec3;
 	using CostFactor = ei::Vec4;
@@ -277,7 +277,7 @@ static_assert(sizeof(BBCache) == 8*sizeof(float), "Alignment of BBCache is broke
 template < typename DescType > CUDA_FUNCTION
 PrimCount_t<DescType> get_count(const DescType&, i32 primIdx) { return PrimCount_t<DescType>{1}; }
 template < Device dev > CUDA_FUNCTION
-PrimCount_t<ObjectDescriptor<dev>> get_count(const ObjectDescriptor<dev>& obj, i32 primIdx) {
+PrimCount_t<LodDescriptor<dev>> get_count(const LodDescriptor<dev>& obj, i32 primIdx) {
 	if(primIdx >= i32(obj.polygon.numTriangles + obj.polygon.numQuads))
 		return {0, 0, 1};
 	if(primIdx >=  i32(obj.polygon.numTriangles))
@@ -658,7 +658,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		if(DescType::DEVICE == Device::CUDA) {
 			// Satisfy the compiler (this brach is never reached without having the correct type,
 			// so the cast is effectless. However, the cleaner 'if constexpr' is not supported in cuda.
-			//auto dobj = reinterpret_cast<const ObjectDescriptor<Device::CUDA>&>(obj);
+			//auto dobj = reinterpret_cast<const LodDescriptor<Device::CUDA>&>(obj);
 			get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codesD<DescType>);
 			calculate_morton_codesD <<< numBlocks, numThreads >>> (
 				desc, sceneBB, numPrimitives, mortonCodes, primIdsUnsorted);
@@ -774,15 +774,15 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 }
 
 template < Device dev >
-void LBVHBuilder::build(ObjectDescriptor<dev>& obj, const ei::Box& sceneBB) {
+void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& sceneBB) {
 	logInfo("[LBVHBuilder::build] Building BVH for object with ", obj.numPrimitives, " primitives.");
-	build_lbvh<ObjectDescriptor<dev>>(obj, sceneBB, obj.numPrimitives);
+	build_lbvh<LodDescriptor<dev>>(obj, sceneBB, obj.numPrimitives);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }
 
-template void LBVHBuilder::build<Device::CPU>(ObjectDescriptor<Device::CPU>&, const ei::Box&);
-template void LBVHBuilder::build<Device::CUDA>(ObjectDescriptor<Device::CUDA>&, const ei::Box&);
+template void LBVHBuilder::build<Device::CPU>(LodDescriptor<Device::CPU>&, const ei::Box&);
+template void LBVHBuilder::build<Device::CUDA>(LodDescriptor<Device::CUDA>&, const ei::Box&);
 
 template < Device dev >
 void LBVHBuilder::build(

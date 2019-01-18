@@ -100,7 +100,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// TODO: get tangent space and parameter pack from nextHit
-	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[nextHit.hitId.instanceId]];
+	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
 	scene::MaterialIndex matIdx;
 	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
 	if(static_cast<u32>(nextHit.hitId.primId) < FACE_COUNT)

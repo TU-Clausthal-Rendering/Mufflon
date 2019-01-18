@@ -3,6 +3,7 @@
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "mffloader/parsing/json_loader.hpp"
+#include "mffloader/parsing/binary.hpp"
 #include <atomic>
 #include <iostream>
 #include <mutex>
@@ -32,6 +33,7 @@ namespace {
 
 std::string s_lastError;
 std::atomic<json::JsonLoader*> s_jsonLoader = nullptr;
+fs::path s_binPath;
 
 void(*s_logCallback)(const char*, int);
 
@@ -122,11 +124,14 @@ LoaderStatus loader_load_json(const char* path) {
 		s_jsonLoader.store(&loader);
 		if(!loader.load_file())
 			return LoaderStatus::LOADER_ABORT;
+		s_binPath = loader.get_binary_file();
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
+		s_jsonLoader.store(nullptr);
 		return LoaderStatus::LOADER_ERROR;
 	}
 
+	s_jsonLoader.store(nullptr);
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
@@ -162,6 +167,20 @@ LoaderStatus loader_save_scene(const char* path) {
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
 
+Boolean loader_load_lod(ObjectHdl obj, u32 lod) {
+	TRY
+	if(obj == nullptr) {
+		logError("[", FUNCTION_NAME, "] Invalid object handle");
+		return false;
+	}
+	u32 objId;
+	if(!object_get_id(obj, &objId))
+		return false;
+	binary::BinaryLoader loader;
+	loader.load_lod(s_binPath, objId, lod);
+	return true;
+	CATCH_ALL(false)
+}
 
 Boolean loader_abort() {
 	if(json::JsonLoader* loader = s_jsonLoader.load(); loader != nullptr) {

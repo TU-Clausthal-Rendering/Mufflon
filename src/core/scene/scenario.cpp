@@ -49,17 +49,53 @@ MaterialHandle Scenario::get_assigned_material(MaterialIndex index) const {
 	return m_materialAssignment[index].material;
 }
 
-bool Scenario::is_masked(ConstObjectHandle hdl) const {
+bool Scenario::is_masked(ConstObjectHandle hdl) const noexcept {
 	auto iter = m_perObjectCustomization.find(hdl);
 	if(iter != m_perObjectCustomization.end())
 		return iter->second.masked;
 	return false;
 }
 
-std::size_t Scenario::get_custom_lod(ConstObjectHandle hdl) const {
-	auto iter = m_perObjectCustomization.find(hdl);
-	if(iter != m_perObjectCustomization.end())
-		return (iter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : iter->second.lod;
+bool Scenario::is_masked(ConstInstanceHandle hdl) const noexcept {
+	auto iter = m_perInstanceCustomization.find(hdl);
+	if(iter != m_perInstanceCustomization.end())
+		return iter->second.masked;
+	return false;
+}
+
+u32 Scenario::get_custom_lod(ConstInstanceHandle hdl) const noexcept {
+	auto instIter = m_perInstanceCustomization.find(hdl);
+	if(instIter != m_perInstanceCustomization.end())
+		return instIter->second.lod;
+	return m_globalLodLevel;
+}
+
+u32 Scenario::get_custom_lod(ConstObjectHandle hdl) const noexcept {
+	auto objIter = m_perObjectCustomization.find(hdl);
+	if(objIter != m_perObjectCustomization.end())
+		return objIter->second.lod;
+	return m_globalLodLevel;
+}
+
+u32 Scenario::get_effective_lod(ConstInstanceHandle hdl) const noexcept {
+	// Find out the effective LoD of the instance: if it doesn't have a custom LoD, check the object and then the global LoD
+	if(auto instIter = m_perInstanceCustomization.find(hdl); instIter != m_perInstanceCustomization.end()) {
+		if(instIter->second.lod == NO_CUSTOM_LOD) {
+			if(auto objIter = m_perObjectCustomization.find(&hdl->get_object()); objIter != m_perObjectCustomization.end()) {
+				return (objIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : objIter->second.lod;
+			} else {
+				return m_globalLodLevel;
+			}
+		} else {
+			return (instIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : instIter->second.lod;
+		}
+	} else {
+		if(auto objIter = m_perObjectCustomization.find(&hdl->get_object()); objIter != m_perObjectCustomization.end()) {
+			return (objIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : objIter->second.lod;
+		} else {
+			return m_globalLodLevel;
+		}
+	}
 	return m_globalLodLevel;
 }
 
@@ -68,23 +104,19 @@ void Scenario::mask_object(ConstObjectHandle hdl) {
 	if(iter != m_perObjectCustomization.end())
 		iter->second.masked = true;
 	else
-		m_perObjectCustomization.insert({ hdl, ObjectProperty{true, NO_CUSTOM_LOD} });
+		m_perObjectCustomization.insert({ hdl, CustomProperty{true, NO_CUSTOM_LOD} });
 }
 
 void Scenario::mask_instance(ConstInstanceHandle hdl) {
 	// TODO
 }
 
-void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
-	auto iter = m_perObjectCustomization.find(hdl);
-	if(iter != m_perObjectCustomization.end())
-		iter->second.lod = level;
-	else
-		m_perObjectCustomization.insert({ hdl, ObjectProperty{false, level} });
+void Scenario::set_custom_lod(ConstObjectHandle hdl, u32 level) {
+	m_perObjectCustomization[hdl].lod = level;
 }
 
-void Scenario::set_custom_lod(ConstInstanceHandle hdl, std::size_t level) {
-	// TODO:
+void Scenario::set_custom_lod(ConstInstanceHandle hdl, u32 level) {
+	m_perInstanceCustomization[hdl].lod = level;
 }
 
 void Scenario::remove_point_light(u32 light) {

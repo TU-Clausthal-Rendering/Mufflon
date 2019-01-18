@@ -52,7 +52,7 @@ CUDA_FUNCTION i32 float_bits_as_int(float v) {
 // Generic centroid overloads.
 // This helps in generalizing the code of a builder
 template < Device dev >
-CUDA_FUNCTION ei::Vec3 get_centroid(const ObjectDescriptor<dev>& obj, i32 primIdx) {
+CUDA_FUNCTION ei::Vec3 get_centroid(const LodDescriptor<dev>& obj, i32 primIdx) {
 	// Primitve order: Trianges, Quads, Spheres -> idx determines the case
 	i32 spheresOffset = obj.polygon.numQuads + obj.polygon.numTriangles;
 	if(primIdx >= spheresOffset)
@@ -72,7 +72,7 @@ CUDA_FUNCTION ei::Vec3 get_centroid(const ObjectDescriptor<dev>& obj, i32 primId
 
 template < Device dev >
 CUDA_FUNCTION ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 primIdx) {
-	i32 objIdx = scene.objectIndices[primIdx];
+	i32 objIdx = scene.lodIndices[primIdx];
 	//const ei::Box aabb = ei::transform(prim.objAabbs[objIdx], prim.matrices[idx]);
 	// Extract the translation from the matrix only (no need to compute the
 	// full bounding box.
@@ -84,7 +84,7 @@ CUDA_FUNCTION ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 primI
 // Generic bounding box overloads.
 // This helps in generalizing the code of a builder
 template < Device dev >
-CUDA_FUNCTION ei::Box get_bounding_box(const ObjectDescriptor<dev>& obj, i32 idx) {
+CUDA_FUNCTION ei::Box get_bounding_box(const LodDescriptor<dev>& obj, i32 idx) {
 	// Primitve order: Trianges, Quads, Spheres -> idx determines the case
 	i32 spheresOffset = obj.polygon.numQuads + obj.polygon.numTriangles;
 	if(idx >= spheresOffset)
@@ -104,7 +104,7 @@ CUDA_FUNCTION ei::Box get_bounding_box(const ObjectDescriptor<dev>& obj, i32 idx
 
 template < Device dev >
 CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
-	i32 objIdx = scene.objectIndices[idx];
+	i32 objIdx = scene.lodIndices[idx];
 
 	const ei::Mat3x3 scaleRot = scene.scales[idx] * ei::Mat3x3{ scene.transformations[idx] };
 	const ei::Vec3 translation{

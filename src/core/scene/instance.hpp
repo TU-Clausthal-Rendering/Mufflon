@@ -12,7 +12,11 @@ class Object;
 class Instance {
 public:
 	// TODO: identity matrix
-	Instance(std::string name, Object& obj, const ei::Mat3x4& trans = {});
+	Instance(std::string name, Object& obj, ei::Mat3x4 trans = {
+				1.f, 0.f, 0.f, 0.f,
+				0.f, 1.f, 0.f, 0.f,
+				0.f, 0.f, 1.f, 0.f 
+			 });
 	Instance(const Instance&) = default;
 	Instance(Instance&&) = default;
 	Instance& operator=(const Instance&) = delete;
@@ -42,7 +46,7 @@ public:
 		return m_scale;
 	}
 
-	ei::Box get_bounding_box() const noexcept;
+	ei::Box get_bounding_box(u32 lod) const noexcept;
 
 	Object& get_object() noexcept {
 		return m_objRef;

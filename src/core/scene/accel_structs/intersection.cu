@@ -184,7 +184,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 
 template < Device dev >
 CUDA_FUNCTION bool intersects_primitve(
-	const ObjectDescriptor<dev>& obj,
+	const LodDescriptor<dev>& obj,
 	const ei::Ray& ray,
 	const i32 primId,
 	const i32 startPrimId,
@@ -259,7 +259,7 @@ CUDA_FUNCTION bool intersects_primitve(
 template < Device dev >
 CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 	const LBVH& bvh,
-	const ObjectDescriptor<dev>& obj,
+	const LodDescriptor<dev>& obj,
 	const ei::Ray& ray,
 	const i32 startPrimId,
 	const ei::Vec3& invDir, 
@@ -365,7 +365,7 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 template < Device dev >
 CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 	const LBVH& bvh,
-	const ObjectDescriptor<dev>& obj,
+	const LodDescriptor<dev>& obj,
 	const ei::Ray& ray,
 	const i32 startPrimId,
 	const ei::Vec3& invDir, 
@@ -486,7 +486,7 @@ void first_intersection_scene_obj_lbvh(
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
 
-	const i32 objId = scene.objectIndices[instanceId];
+	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
 	const float tmin = 1e-6f * len(box.max - box.min);
 
@@ -498,7 +498,7 @@ void first_intersection_scene_obj_lbvh(
 	float objSpaceT;
 	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceHitT, objSpaceT)) {
 		// Intersect the ray against the obj primitive bvh.
-		const ObjectDescriptor<dev>& obj = scene.objects[objId];
+		const LodDescriptor<dev>& obj = scene.lods[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
 		if (first_intersection_obj_lbvh_imp(
@@ -619,7 +619,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 
 	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
 	for(int i = 0; i < scene.numInstances; ++i) {
-		auto& obj = scene.objects[ scene.objectIndices[i] ];
+		auto& obj = scene.lods[ scene.lodIndices[i] ];
 		const ei::Mat3x3 invRotScale = ei::invert(ei::Mat3x3{scene.transformations[i]});
 		const ei::Vec3 invTranslation { -scene.transformations[i][3],
 										-scene.transformations[i][7],
@@ -644,7 +644,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 		i32 primId = hitPrimId;
 
 
-		const ObjectDescriptor<dev>& obj = scene.objects[ scene.objectIndices[hitInstanceId] ];
+		const LodDescriptor<dev>& obj = scene.lods[ scene.lodIndices[hitInstanceId] ];
 		const i32 offsetSpheres = obj.polygon.numTriangles + obj.polygon.numQuads;
 		if(primId >= offsetSpheres) { // Sphere?
 			const i32 sphId = primId - offsetSpheres;
@@ -764,7 +764,7 @@ bool any_intersection_scene_obj_lbvh(
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
 
-	const i32 objId = scene.objectIndices[instanceId];
+	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
 	const float tmin = 1e-6f * len(box.max - box.min);
 
@@ -776,7 +776,7 @@ bool any_intersection_scene_obj_lbvh(
 	float hitT;
 	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceMaxT, hitT)) {
 		// Intersect the ray against the obj primtive bvh.
-		const ObjectDescriptor<dev>& obj = scene.objects[objId];
+		const LodDescriptor<dev>& obj = scene.lods[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
 		// Do ray-obj test.

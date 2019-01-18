@@ -36,7 +36,7 @@ struct LBVH {
 class LBVHBuilder {
 public:
 	template < Device dev >
-	void build(ObjectDescriptor<dev>& obj, const ei::Box& sceneBB);
+	void build(LodDescriptor<dev>& obj, const ei::Box& sceneBB);
 
 	template < Device dev >
 	void build(const SceneDescriptor<dev>& scene);

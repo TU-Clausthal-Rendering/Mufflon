@@ -37,16 +37,7 @@ public:
 	~Scene() = default;
 
 	// Add an instance to be rendered
-	void add_instance(InstanceHandle hdl) {
-		auto iter = m_objects.find(&hdl->get_object());
-		if(iter == m_objects.end())
-			m_objects.emplace(&hdl->get_object(), std::vector<InstanceHandle>{hdl}).first;
-		else
-			iter->second.push_back(hdl);
-		// Check if we already have the object somewhere
-		m_boundingBox = ei::Box(m_boundingBox, hdl->get_bounding_box());
-		clear_accel_structure();
-	}
+	void add_instance(InstanceHandle hdl);
 
 	void load_media(const std::vector<materials::Medium>& media);
 
@@ -159,8 +150,8 @@ private:
 	accel_struct::LBVHBuilder m_accelStruct;
 
 	// Resources for descriptors
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ObjectDescriptor<Device::CPU>[]>,
-		unique_device_ptr<Device::CUDA, ObjectDescriptor<Device::CUDA>[]>> m_objDevDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, LodDescriptor<Device::CPU>[]>,
+		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>> m_lodDevDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_instTransformsDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, float[]>,
@@ -168,7 +159,7 @@ private:
 	util::TaggedTuple<unique_device_ptr<Device::CPU, u32[]>,
 		unique_device_ptr<Device::CUDA, u32[]>> m_instObjIndicesDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,
-		unique_device_ptr<Device::CUDA, ei::Box[]>> m_objAabbsDesc;
+		unique_device_ptr<Device::CUDA, ei::Box[]>> m_lodAabbsDesc;
 
 	// Descriptor storage
 	util::TaggedTuple<SceneDescriptor<Device::CPU>, SceneDescriptor<Device::CUDA>> m_descStore;

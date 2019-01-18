@@ -47,5 +47,8 @@
     <Setting Name="ToggleCameraMovementGesture" Type="System.String" Scope="User">
       <Value Profile="(Default)">ALT+M</Value>
     </Setting>
+    <Setting Name="AllowCameraMovement" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

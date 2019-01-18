@@ -26,7 +26,7 @@ namespace gui.Command
         public LoadSceneCommand(Models models)
         {
             m_models = models;
-            m_lastDirectory = Settings.Default.lastScenePath;
+            m_lastDirectory = Settings.Default.lastWorldPath;
             if(m_lastDirectory.Length == 0)
                 m_lastDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             m_keyBind = new KeyBinding(this, new KeyGesture(Key.O, ModifierKeys.Control));
@@ -55,7 +55,7 @@ namespace gui.Command
                 {
                     string file = dialog.FileName;
                     m_lastDirectory = Path.GetDirectoryName(file);
-                    Settings.Default.lastScenePath = m_lastDirectory;
+                    Settings.Default.lastWorldPath = m_lastDirectory;
                     LoadScene(file);
                 }
             }
@@ -69,10 +69,10 @@ namespace gui.Command
                                     "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,
                         MessageBoxImage.Error) == MessageBoxResult.Yes)
                 {
-                    int index = Settings.Default.LastScenes.IndexOf(path);
+                    int index = Settings.Default.LastWorlds.IndexOf(path);
                     if (index >= 0)
                     {
-                        Settings.Default.LastScenes.RemoveAt(index);
+                        Settings.Default.LastWorlds.RemoveAt(index);
                     }
                 }
 
@@ -121,21 +121,21 @@ namespace gui.Command
             Debug.Assert(path != null);
             // Check if we had this scene in the last X
             // Check if the scene is already present in the list
-            int index = Settings.Default.LastScenes.IndexOf(path);
+            int index = Settings.Default.LastWorlds.IndexOf(path);
             if (index > 0)
             {
                 // Present, but not first
-                Settings.Default.LastScenes.RemoveAt(index);
-                Settings.Default.LastScenes.Insert(0, path);
+                Settings.Default.LastWorlds.RemoveAt(index);
+                Settings.Default.LastWorlds.Insert(0, path);
             }
             else if (index < 0)
             {
                 // Not present
-                if (Settings.Default.LastScenes.Count >= MAX_LAST_SCENES)
+                if (Settings.Default.LastWorlds.Count >= MAX_LAST_SCENES)
                 {
-                    Settings.Default.LastScenes.RemoveAt(Settings.Default.LastScenes.Count - 1);
+                    Settings.Default.LastWorlds.RemoveAt(Settings.Default.LastWorlds.Count - 1);
                 }
-                Settings.Default.LastScenes.Insert(0, path);
+                Settings.Default.LastWorlds.Insert(0, path);
             }
         }
 

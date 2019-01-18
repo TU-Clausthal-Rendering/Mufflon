@@ -211,6 +211,9 @@
     <ClCompile Include="..\..\src\core\scene\lights\background.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\lod.cpp">
+      <Filter>Source Files\core\scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -758,6 +761,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\texture_sampling.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lod.hpp">
+      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -71,10 +71,10 @@ namespace gui.ViewModel
             m_models = models;
             m_reset = reset;
 
-            if(Settings.Default.LastScenes == null)
-                Settings.Default.LastScenes = new StringCollection();
+            if(Settings.Default.LastWorlds == null)
+                Settings.Default.LastWorlds = new StringCollection();
 
-            foreach (string path in Settings.Default.LastScenes)
+            foreach (string path in Settings.Default.LastWorlds)
             {
                 LastScenes.Add(new SceneMenuItem(m_models)
                 {
@@ -130,10 +130,10 @@ namespace gui.ViewModel
         {
             switch (args.PropertyName)
             {
-                case nameof(Settings.Default.LastScenes):
+                case nameof(Settings.Default.LastWorlds):
                     // TODO this wont be triggered => change to observable collection?
                     LastScenes.Clear();
-                    foreach (string path in Settings.Default.LastScenes)
+                    foreach (string path in Settings.Default.LastWorlds)
                     {
                         LastScenes.Add(new SceneMenuItem(m_models)
                         {

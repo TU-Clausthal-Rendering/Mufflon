@@ -88,16 +88,19 @@
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}"
-                            ToolTip="Play/pause the renderer">
+                            ToolTip="Play/pause the renderer"
+                            SnapsToDevicePixels="True">
                         <StackPanel>
                             <Image 
                                 Source="Icons/play.png"
                                 RenderOptions.BitmapScalingMode="LowQuality"
+                                SnapsToDevicePixels="True"
                                 Width="16"
                                 Height="16"
                                 Visibility="{Binding Toolbar.PlayIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
                             <Image 
                                 Source="Icons/pause.png"
+                                SnapsToDevicePixels="True"
                                 RenderOptions.BitmapScalingMode="LowQuality"
                                 Width="16"
                                 Height="16"
@@ -107,67 +110,80 @@
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.ResetCommand}"
-                            ToolTip="Reset the rendering progress">
+                            ToolTip="Reset the rendering progress"
+                            SnapsToDevicePixels="True">
                         <Image 
                             Source="Icons/restart.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                             Width="16"
                             Height="16"/>
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button
-                            ToolTip="Inspect object instance">
+                            ToolTip="Inspect object instance"
+                            SnapsToDevicePixels="True">
                         <Image 
                             Source="Icons/inspect_instance.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                             Width="16"
                             Height="16"/>
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button
-                            ToolTip="Inspect material">
+                            ToolTip="Inspect material"
+                            SnapsToDevicePixels="True">
                         <Image 
                             Source="Icons/inspect_material.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                             Width="16"
                             Height="16"/>
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button
-                            ToolTip="Inspect light source">
+                            ToolTip="Inspect light source"
+                            SnapsToDevicePixels="True">
                         <Image 
                             Source="Icons/inspect_light.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                             Width="16"
                             Height="16"/>
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.SaveScreenShotCommand}"
-                            ToolTip="Take a screenshot">
+                            ToolTip="Take a screenshot"
+                            SnapsToDevicePixels="True">
                         <Image
                             Source="Icons/screenshot.png"
                             RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                             Width="16"
                             Height="16"/>
                     </Button>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.ToggleCameraMovementCommand}"
-                            ToolTip="Allow/disallow camera movement">
+                            ToolTip="Allow/disallow camera movement"
+                            SnapsToDevicePixels="True">
                         <StackPanel>
                             <Image 
                                 Source="Icons/camera_move.png"
                                 RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                                 Width="16"
                                 Height="16"
                                 Visibility="{Binding Toolbar.CameraMoveIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
                             <Image 
                                 Source="Icons/camera_nomove.png"
                                 RenderOptions.BitmapScalingMode="LowQuality"
+                            SnapsToDevicePixels="True"
                                 Width="16"
                                 Height="16"
                                 Visibility="{Binding Toolbar.CameraMoveIconVisibility, Converter={StaticResource visinverter}, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>

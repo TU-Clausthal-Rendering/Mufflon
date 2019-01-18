@@ -4,6 +4,8 @@
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
+#include "core/scene/lod.hpp"
+#include "core/scene/object.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/point_medium.hpp"
@@ -27,6 +29,17 @@ bool Scene::is_sane() const noexcept {
 		}
 	}
 	return true;
+}
+
+void Scene::add_instance(InstanceHandle hdl) {
+	auto iter = m_objects.find(&hdl->get_object());
+	if(iter == m_objects.end())
+		m_objects.emplace(&hdl->get_object(), std::vector<InstanceHandle>{hdl}).first;
+	else
+		iter->second.push_back(hdl);
+	// Check if we already have the object somewhere
+	m_boundingBox = ei::Box{ m_boundingBox, hdl->get_bounding_box(m_scenario.get_effective_lod(hdl)) };
+	clear_accel_structure();
 }
 
 void Scene::load_media(const std::vector<materials::Medium>& media) {
@@ -100,40 +113,59 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 	// Check if we need to update the object descriptors
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
+	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild<dev>();
 	if(geometryChanged) {
 		std::vector<ei::Mat3x4> instanceTransformations;
 		std::vector<float> instanceScales;
-		std::vector<u32> objectIndices;
-		std::vector<ObjectDescriptor<dev>> objectDescs;
-		std::vector<ei::Box> objectAabbs;
+		std::vector<u32> lodIndices;
+		std::vector<LodDescriptor<dev>> lodDescs;
+		std::vector<ei::Box> lodAabbs;
+
+		m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+		m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
 
 		// Create the object and instance descriptors
 		std::size_t instanceCount = 0u;
-		u32 objectCount = 0u;
+		u32 lodCount = 0u;
 		for(auto& obj : m_objects) {
 			mAssert(obj.first != nullptr);
-			objectDescs.push_back(obj.first->get_descriptor<dev>());
-			objectAabbs.push_back(obj.first->get_bounding_box());
+			mAssert(obj.second.size() != 0u);
+			// First determine which LoDs are actually needed
+			std::vector<u8> lods(obj.first->get_lod_slot_count(), 0u);
 
+			u32 prevLevel = std::numeric_limits<u32>::max();
 			for(InstanceHandle inst : obj.second) {
 				mAssert(inst != nullptr);
+				const u32 instanceLod = m_scenario.get_effective_lod(inst);
+				if(!lods[instanceLod]) {
+					mAssert(instanceLod < obj.first->get_lod_slot_count());
+					if(prevLevel != std::numeric_limits<u32>::max())
+						lodDescs.back().next = instanceLod;
+					Lod& lod = obj.first->get_lod(instanceLod);
+					lodDescs.push_back(lod.template get_descriptor<dev>());
+					lodDescs.back().previous = prevLevel;
+					lodAabbs.push_back(lod.get_bounding_box());
+					if(!sameAttribs)
+						lod.update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+					lods[instanceLod] = true;
+				}
 				instanceTransformations.push_back(inst->get_transformation_matrix());
 				instanceScales.push_back(inst->get_scale());
-				objectIndices.push_back(objectCount);
+				lodIndices.push_back(lodCount);
+				// Also expand scene bounding box
+				m_boundingBox = ei::Box(m_boundingBox, inst->get_bounding_box(instanceLod));
 			}
-
-			if(!sameAttribs)
-				obj.first->update_attribute_descriptor(objectDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+			lodDescs.back().previous = prevLevel;
 
 			instanceCount += obj.second.size();
-			++objectCount;
+			++lodCount;
 		}
 
 		// Allocate the device memory and copy over the descriptors
-		auto& objDevDesc = m_objDevDesc.get<unique_device_ptr<dev, ObjectDescriptor<dev>[]>>();
-		objDevDesc = make_udevptr_array<dev, ObjectDescriptor<dev>>(objectDescs.size());
-		copy(objDevDesc.get(), objectDescs.data(), objectDescs.size() * sizeof(ObjectDescriptor<dev>));
+		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
+		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
+		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
 		auto& instTransformsDesc = m_instTransformsDesc.get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
@@ -144,37 +176,57 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		copy(instScaleDesc.get(), instanceScales.data(), sizeof(u32) * instanceScales.size());
 
 		auto& instObjIndicesDesc = m_instObjIndicesDesc.get<unique_device_ptr<dev, u32[]>>();
-		instObjIndicesDesc = make_udevptr_array<dev, u32>(objectIndices.size());
-		copy(instObjIndicesDesc.get(), objectIndices.data(), sizeof(u32) * objectIndices.size());
+		instObjIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
+		copy(instObjIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
-		auto& objAabbsDesc = m_objAabbsDesc.get<unique_device_ptr<dev, ei::Box[]>>();
-		objAabbsDesc = make_udevptr_array<dev, ei::Box>(objectAabbs.size());
-		copy(objAabbsDesc.get(), objectAabbs.data(), sizeof(ei::Box) * objectAabbs.size());
+		auto& lodAabbsDesc = m_lodAabbsDesc.get<unique_device_ptr<dev, ei::Box[]>>();
+		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
+		copy(lodAabbsDesc.get(), lodAabbs.data(), sizeof(ei::Box) * lodAabbs.size());
 
-		sceneDescriptor.numObjects = static_cast<u32>(objectDescs.size());
+		sceneDescriptor.numLods = static_cast<u32>(lodDescs.size());
 		sceneDescriptor.numInstances = static_cast<i32>(instanceCount);
 		sceneDescriptor.aabb = m_boundingBox;
-		sceneDescriptor.objects = objDevDesc.get();
-		sceneDescriptor.aabbs = objAabbsDesc.get();
+		sceneDescriptor.lods = lodDevDesc.get();
+		sceneDescriptor.aabbs = lodAabbsDesc.get();
 		sceneDescriptor.transformations = instTransformsDesc.get();
 		sceneDescriptor.scales = instScaleDesc.get();
-		sceneDescriptor.objectIndices = instObjIndicesDesc.get();
+		sceneDescriptor.lodIndices = instObjIndicesDesc.get();
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them
-		std::vector<ObjectDescriptor<dev>> objectDescs;
+		std::vector<LodDescriptor<dev>> lodDescs;
 		for(auto& obj : m_objects) {
-			objectDescs.push_back(obj.first->get_descriptor<dev>());
-			obj.first->update_attribute_descriptor(objectDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+			mAssert(obj.first != nullptr);
+			mAssert(obj.second.size() != 0u);
+
+			// First determine which LoDs are actually used
+			std::vector<u8> lods(obj.first->get_lod_slot_count(), 0u);
+
+			u32 prevLevel = std::numeric_limits<u32>::max();
+			for(InstanceHandle inst : obj.second) {
+				const u32 instanceLod = m_scenario.get_effective_lod(inst);
+				mAssert(inst != nullptr);
+				if(!lods[instanceLod]) {
+					mAssert(instanceLod < obj.first->get_lod_slot_count());
+					if(prevLevel != std::numeric_limits<u32>::max())
+						lodDescs.back().next = instanceLod;
+					Lod& lod = obj.first->get_lod(instanceLod);
+					lodDescs.push_back(lod.template get_descriptor<dev>());
+					lodDescs.back().previous = prevLevel;
+					lod.update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+				}
+			}
+
+			lodDescs.back().previous = prevLevel;
 		}
 		// Allocate the device memory and copy over the descriptors
-		auto& objDevDesc = m_objDevDesc.get<unique_device_ptr<dev, ObjectDescriptor<dev>[]>>();
-		objDevDesc = make_udevptr_array<dev, ObjectDescriptor<dev>>(objectDescs.size());
-		copy(objDevDesc.get(), objectDescs.data(), objectDescs.size() * sizeof(ObjectDescriptor<dev>));
+		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
+		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
+		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
-		sceneDescriptor.objects = objDevDesc.get();
+		sceneDescriptor.lods = lodDevDesc.get();
 	}
 
-	if(m_scenario.materials_dirty_reset() || !m_materials.is_resident<dev>())
+	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<dev>())
 		load_materials<dev>();
 
 	// Camera
@@ -185,19 +237,19 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 	// Light tree
 	if(m_lightTreeDescChanged) {
-		sceneDescriptor.lightTree = m_lightTree.acquire_const<dev>(m_boundingBox);
+		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
 		m_lightTreeDescChanged = false;
 	}
 
 	// TODO: query media/materials only if needed?
-	sceneDescriptor.media = as<materials::Medium>(m_media.acquire_const<dev>());
-	sceneDescriptor.materials = as<int>(m_materials.acquire_const<dev>());
+	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
+	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
 
 	// Rebuild Instance BVH?
 	if(geometryChanged) {
 		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 		m_accelStruct.build(sceneDescriptor);
-		sceneDescriptor.accelStruct = m_accelStruct.acquire_const<dev>();
+		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
 		// For each light determine the medium
 		m_lightTree.update_media(sceneDescriptor);
 		// For the camera as well
@@ -219,7 +271,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 				std::vector<lights::DirectionalLight>&& dirLights) {
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
-						m_boundingBox);
+					  m_boundingBox);
 	m_lightTreeDescChanged = true;
 	m_lightTreeNeedsMediaUpdate = true;
 }

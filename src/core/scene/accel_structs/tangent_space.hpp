@@ -8,7 +8,7 @@ namespace mufflon { namespace scene { namespace accel_struct {
 
 CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CURRENT_DEV>& scene, const RayIntersectionResult& intersection) {
 	// TODO: check for displacement mapping?
-	const ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[intersection.hitId.instanceId]];
+	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[intersection.hitId.instanceId]];
 
 	// Check for sphere as early as possible so that tri and quad threads have better divergence
 	if(static_cast<u32>(intersection.hitId.primId) >= object.polygon.numTriangles + object.polygon.numQuads) {

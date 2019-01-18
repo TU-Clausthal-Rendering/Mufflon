@@ -181,9 +181,11 @@ typedef int32_t IndexType;
 typedef IndexType VertexHdl;
 typedef IndexType FaceHdl;
 typedef IndexType SphereHdl;
-typedef uint64_t LodLevel;
+typedef uint32_t LodLevel;
 typedef uint16_t MatIdx;
 typedef void* ObjectHdl;
+typedef void* ConstObjectHdl;
+typedef void* LodHdl;
 typedef void* InstanceHdl;
 typedef void* ScenarioHdl;
 typedef const void* ConstScenarioHdl;
@@ -341,10 +343,17 @@ CORE_API size_t CDECL spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl sta
 CORE_API size_t CDECL spheres_get_sphere_count(ObjectHdl obj);
 CORE_API Boolean CDECL spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
 
+// Object interface
+CORE_API Boolean CDECL object_has_lod(ObjectHdl hdl, LodLevel level);
+CORE_API LodHdl CDECL object_add_lod(ObjectHdl hdl, LodLevel level);
+CORE_API Boolean CDECL object_set_animation_frame(ObjectHdl hdl, uint32_t animFrame);
+CORE_API Boolean CDECL object_get_animation_frame(ObjectHdl hdl, uint32_t* animFrame);
+CORE_API Boolean CDECL object_get_id(ObjectHdl hdl, uint32_t* id);
+
 // Instance interface
 CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
-CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max);
+CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod);
 
 // World container interface
 CORE_API void CDECL world_clear_all();
@@ -413,7 +422,7 @@ CORE_API IndexType CDECL scenario_get_point_light_count(ScenarioHdl scenario);
 CORE_API IndexType CDECL scenario_get_spot_light_count(ScenarioHdl scenario);
 CORE_API IndexType CDECL scenario_get_dir_light_count(ScenarioHdl scenario);
 CORE_API Boolean CDECL scenario_has_envmap_light(ScenarioHdl scenario);
-CORE_API LightHdl CDECL scenario_get_light_handle(ScenarioHdl scenario, size_t index, LightType type);
+CORE_API LightHdl CDECL scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightType type);
 CORE_API Boolean CDECL scenario_add_light(ScenarioHdl scenario, LightHdl hdl);
 CORE_API Boolean CDECL scenario_remove_light(ScenarioHdl scenario, LightHdl hdl);
 CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,

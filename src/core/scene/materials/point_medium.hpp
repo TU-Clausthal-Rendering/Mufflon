@@ -9,11 +9,11 @@
 namespace mufflon { namespace scene { namespace materials {
 
 CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
-	mAssert(scene.objects[0u].polygon.numVertices > 0u || scene.objects[0u].spheres.numSpheres > 0u);
+	mAssert(scene.lods[0u].polygon.numVertices > 0u || scene.lods[0u].spheres.numSpheres > 0u);
 	// Shoot a ray to a point in the scene (any surface suffices)
 	// We need to transform the vertex from object to world space
 	const ei::Vec3 vertex = scene.transformations[0u] 
-		* ei::Vec4{accel_struct::get_centroid(scene.objects[scene.objectIndices[0u]], 0), 1.0f};
+		* ei::Vec4{accel_struct::get_centroid(scene.lods[scene.lodIndices[0u]], 0), 1.0f};
 
 	ei::Vec3 dir = vertex - pos;
 	const float length = ei::len(dir);
@@ -25,7 +25,7 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	const i32 instanceId = res.hitId.instanceId;
 	const u32 primitiveId = static_cast<u32>(res.hitId.primId);
 
-	const scene::ObjectDescriptor<CURRENT_DEV>& object = scene.objects[scene.objectIndices[instanceId]];
+	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[instanceId]];
 	const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;
 	scene::MaterialIndex matIdx;
 	if(primitiveId < faceCount)

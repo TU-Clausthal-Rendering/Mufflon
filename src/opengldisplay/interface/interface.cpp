@@ -44,16 +44,19 @@ constexpr const char* FRAGMENT_CODE =
 	"in vec2 texcoord;"
 	"uniform sampler2D textureSampler;"
 	"uniform float gamma;"
+	"uniform float factor;"
 	"void main() {"
 	"	vec3 rgb = texture2D(textureSampler, texcoord).rgb;"
 	"	float luminance = 0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b;"
-	"	gl_FragColor.xyz = rgb / luminance * pow(luminance, 1.0/gamma);"
+	"	gl_FragColor.xyz = factor * rgb / luminance * pow(luminance, 1.0/gamma);"
 	"}";
 
 std::unique_ptr<Program> s_screenProgram = nullptr;
-float s_gamma = 1.f;
+float s_gamma = 1.0f;
+float s_factor = 1.f;
 GLint s_textureSamplerUniform;
 GLint s_gammaUniform;
+GLint s_factorUniform;
 GLint s_uvUniform;
 std::unique_ptr<VertexArray> s_vao = nullptr;
 std::unique_ptr<Texture2D> s_screenTexture = nullptr;
@@ -92,6 +95,14 @@ float opengldisplay_get_gamma() {
 	return s_gamma;
 }
 
+void opengldisplay_set_factor(float val) {
+	s_factor = val;
+}
+
+float opengldisplay_get_factor() {
+	return s_factor;
+}
+
 const char* opengldisplay_get_dll_error() {
 	return s_lastError.c_str();
 }
@@ -114,6 +125,7 @@ Boolean opengldisplay_display(int left, int right, int bottom, int top, uint32_t
 					  static_cast<float>(top) / static_cast<float>(height));
 		::glUniform1i(s_textureSamplerUniform, 0);
 		::glUniform1f(s_gammaUniform, s_gamma);
+		::glUniform1f(s_factorUniform, s_factor);
 
 		::glDrawArrays(GL_POINTS, 0, 1u);
 	} catch(const std::exception& e) {
@@ -188,6 +200,7 @@ Boolean opengldisplay_initialize(void(*logCallback)(const char*, int)) {
 
 			s_textureSamplerUniform = s_screenProgram->get_uniform_location("textureSampler");
 			s_gammaUniform = s_screenProgram->get_uniform_location("gamma");
+			s_factorUniform = s_screenProgram->get_uniform_location("factor");
 			s_uvUniform = s_screenProgram->get_uniform_location("uvs");
 
 

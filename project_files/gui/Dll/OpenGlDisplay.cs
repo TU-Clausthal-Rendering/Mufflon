@@ -14,6 +14,10 @@ namespace gui.Dll
         internal static extern void opengldisplay_set_gamma(float val);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern float opengldisplay_get_gamma();
+        [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void opengldisplay_set_factor(float val);
+        [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern float opengldisplay_get_factor();
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "opengldisplay_get_dll_error")]
         internal static extern IntPtr opengldisplay_get_dll_error_();
         internal static string opengldisplay_get_dll_error() { return StringUtil.FromNativeUTF8(opengldisplay_get_dll_error_()); }

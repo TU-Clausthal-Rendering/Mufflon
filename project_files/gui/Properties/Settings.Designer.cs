@@ -38,12 +38,12 @@ namespace gui.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string lastScenePath {
+        public string lastWorldPath {
             get {
-                return ((string)(this["lastScenePath"]));
+                return ((string)(this["lastWorldPath"]));
             }
             set {
-                this["lastScenePath"] = value;
+                this["lastWorldPath"] = value;
             }
         }
         
@@ -61,12 +61,12 @@ namespace gui.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        public global::System.Collections.Specialized.StringCollection LastScenes {
+        public global::System.Collections.Specialized.StringCollection LastWorlds {
             get {
-                return ((global::System.Collections.Specialized.StringCollection)(this["LastScenes"]));
+                return ((global::System.Collections.Specialized.StringCollection)(this["LastWorlds"]));
             }
             set {
-                this["LastScenes"] = value;
+                this["LastWorlds"] = value;
             }
         }
         
@@ -198,6 +198,18 @@ namespace gui.Properties {
             }
             set {
                 this["ToggleCameraMovementGesture"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AllowCameraMovement {
+            get {
+                return ((bool)(this["AllowCameraMovement"]));
+            }
+            set {
+                this["AllowCameraMovement"] = value;
             }
         }
     }

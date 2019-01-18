@@ -20,7 +20,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            OpenGlDisplay.opengldisplay_set_gamma(OpenGlDisplay.opengldisplay_get_gamma() * Factor);
+            OpenGlDisplay.opengldisplay_set_factor(OpenGlDisplay.opengldisplay_get_factor() * Factor);
         }
 
         public event EventHandler CanExecuteChanged
@@ -41,7 +41,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            OpenGlDisplay.opengldisplay_set_gamma(OpenGlDisplay.opengldisplay_get_gamma() / Factor);
+            OpenGlDisplay.opengldisplay_set_factor(OpenGlDisplay.opengldisplay_get_factor() / Factor);
         }
 
         public event EventHandler CanExecuteChanged

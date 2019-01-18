@@ -37,6 +37,10 @@ public:
 			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
 	}
 
+	fs::path get_binary_file() const {
+		return m_binaryFile;
+	}
+
 	// This may be called from a different thread and leads to the current load being cancelled
 	void abort_load() { m_abort = true; m_binLoader.abort_load(); }
 	bool was_aborted() { return m_abort; }
