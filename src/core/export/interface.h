@@ -403,12 +403,9 @@ CORE_API IndexType CDECL scenario_get_point_light_count(ScenarioHdl scenario);
 CORE_API IndexType CDECL scenario_get_spot_light_count(ScenarioHdl scenario);
 CORE_API IndexType CDECL scenario_get_dir_light_count(ScenarioHdl scenario);
 CORE_API Boolean CDECL scenario_has_envmap_light(ScenarioHdl scenario);
-CORE_API const char* CDECL scenario_get_point_light_name(ScenarioHdl scenario, size_t index);
-CORE_API const char* CDECL scenario_get_spot_light_name(ScenarioHdl scenario, size_t index);
-CORE_API const char* CDECL scenario_get_dir_light_name(ScenarioHdl scenario, size_t index);
-CORE_API const char* CDECL scenario_get_envmap_light_name(ScenarioHdl scenario);
-CORE_API Boolean CDECL scenario_add_light(ScenarioHdl, const char* name);
-CORE_API Boolean CDECL scenario_remove_light(ScenarioHdl, const char* name);
+CORE_API LightHdl CDECL scenario_get_light_handle(ScenarioHdl scenario, size_t index, LightType type);
+CORE_API Boolean CDECL scenario_add_light(ScenarioHdl scenario, LightHdl hdl);
+CORE_API Boolean CDECL scenario_remove_light(ScenarioHdl scenario, LightHdl hdl);
 CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,
 													 const char* name, size_t nameLength);
 CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,

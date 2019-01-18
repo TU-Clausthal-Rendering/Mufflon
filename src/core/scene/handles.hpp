@@ -22,6 +22,8 @@ namespace materials {
 namespace lights {
 	struct PointLight;
 	struct SpotLight;
+	struct DirectionalLight;
+	class Background;
 }
 namespace textures {
 	class Texture;

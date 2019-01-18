@@ -101,7 +101,7 @@ public:
 	lights::PointLight* get_point_light(u32 index);
 	lights::SpotLight* get_spot_light(u32 index);
 	lights::DirectionalLight* get_dir_light(u32 index);
-	lights::Background* get_env_light(u32 index);
+	lights::Background* get_background(u32 index);
 	// Delete a light using its handle
 	void remove_light(u32 index, lights::LightType type);
 	// Get the name of a light
@@ -146,11 +146,17 @@ public:
 	// Performs a sanity check for a given scenario (respects object masking etc.)
 	Sanity is_sane_scenario(ConstScenarioHandle hdl) const;
 
+	// Returns a handle to the background which should be used as default
+	lights::Background& get_default_background() {
+		static lights::Background defaultBackground = lights::Background::black();
+		return defaultBackground;
+	}
+
 	// Clears the world object from all resources
 	static void clear_instance();
 
 private:
-	WorldContainer() = default;
+	WorldContainer();
 	WorldContainer(WorldContainer&&) = default;
 	WorldContainer& operator=(WorldContainer&&) = default;
 	~WorldContainer() = default;
@@ -180,8 +186,6 @@ private:
 	util::IndexedStringMap<lights::SpotLight> m_spotLights;
 	util::IndexedStringMap<lights::DirectionalLight> m_dirLights;
 	util::IndexedStringMap<lights::Background> m_envLights;
-	// Default background if there's no envmap
-	lights::Background m_defaultBackground = lights::Background::black();
 	// Dirty flags to keep track of changed values
 	bool m_lightsDirty = true;
 	bool m_envLightDirty = true;

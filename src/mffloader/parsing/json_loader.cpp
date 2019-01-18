@@ -365,6 +365,7 @@ bool JsonLoader::load_lights() {
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT); hdl.type == LIGHT_POINT) {
 				world_set_point_light_position(hdl, util::pun<Vec3>(position));
 				world_set_point_light_intensity(hdl, util::pun<Vec3>(intensity));
+				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
@@ -390,6 +391,7 @@ bool JsonLoader::load_lights() {
 				world_set_spot_light_direction(hdl, util::pun<Vec3>(direction));
 				world_set_spot_light_angle(hdl, angle);
 				world_set_spot_light_falloff(hdl, falloffStart);
+				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
@@ -400,6 +402,7 @@ bool JsonLoader::load_lights() {
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL); hdl.type == LIGHT_DIRECTIONAL) {
 				world_set_dir_light_direction(hdl, util::pun<Vec3>(direction));
 				world_set_dir_light_irradiance(hdl, util::pun<Vec3>(irradiance));
+				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
 			// Environment-mapped light
@@ -416,6 +419,7 @@ bool JsonLoader::load_lights() {
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP); hdl.type == LIGHT_ENVMAP) {
 				world_set_env_light_map(hdl, texture);
 				world_set_env_light_scale(hdl, util::pun<Vec3>(color));
+				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
@@ -503,10 +507,16 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			assertArray(m_state, lightIter);
 			m_state.objectNames.push_back("lights");
 			for(SizeType i = 0u; i < lightIter->value.Size(); ++i) {
-				const char* lightName = read<const char*>(m_state, lightIter->value[i]);
-				if(!scenario_add_light(scenarioHdl, lightName))
-					throw std::runtime_error("Failed to add light '" + std::string(lightName) + "'");
+				std::string_view lightName = read<const char*>(m_state, lightIter->value[i]);
+				auto nameIter = m_lightMap.find(lightName);
+				if(nameIter == m_lightMap.cend()) {
+					logWarning("[JsonLoader::load_scenarios] Unknown light source '", lightName, "' will be ignored");
+				} else {
+					if(!scenario_add_light(scenarioHdl, nameIter->second))
+						throw std::runtime_error("Failed to add light '" + std::string(lightName) + "'");
+				}
 			}
+			m_state.objectNames.pop_back();
 		}
 
 		// Add objects
@@ -558,6 +568,8 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			if(!scenario_assign_material(scenarioHdl, slot, matHdl->second))
 				throw std::runtime_error("Failed to associate material '" + matHdl->first + "'");
 		}
+
+		m_state.objectNames.pop_back();
 
 		const char* sanityMsg = "";
 		if(!scenario_is_sane(scenarioHdl, &sanityMsg))

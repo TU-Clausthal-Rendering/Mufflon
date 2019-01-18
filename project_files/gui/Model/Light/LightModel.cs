@@ -97,14 +97,14 @@ namespace gui.Model.Light
         // indicates if this light should be used for the current scenario
         public bool IsSelected
         {
-            get => m_world.CurrentScenario.Lights.Contains(Name);
+            get => m_world.CurrentScenario.Lights.Contains(Handle);
             set
             {
                 if (value == IsSelected) return;
                 if (value)
-                    m_world.CurrentScenario.Lights.Add(Name);
+                    m_world.CurrentScenario.Lights.Add(Handle);
                 else
-                    m_world.CurrentScenario.Lights.Remove(Name);
+                    m_world.CurrentScenario.Lights.Remove(Handle);
                 // property changed will be raised by the collection
             }
         }

@@ -64,6 +64,7 @@ private:
 	fs::path m_binaryFile;
 	std::string_view m_defaultScenario;
 	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
+	std::unordered_map<std::string_view, LightHdl> m_lightMap;
 	ParserState m_state;
 
 	binary::BinaryLoader m_binLoader;

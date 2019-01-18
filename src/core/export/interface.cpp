@@ -1312,11 +1312,15 @@ size_t world_get_dir_light_count() {
 
 size_t world_get_env_light_count() {
 	TRY
-	return s_world.get_env_light_count();
+	// Lessen the count by one due to the default background
+	return s_world.get_env_light_count() - 1u;
 	CATCH_ALL(0u)
 }
 
 CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type) {
+	// Background indices start at 1 because we have a default background light
+	if(type == LightType::LIGHT_ENVMAP)
+		return LightHdl{ u32(type), u32(index + 1u) };
 	return LightHdl{u32(type), u32(index)};
 }
 
@@ -1766,131 +1770,146 @@ Boolean scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 IndexType scenario_get_point_light_count(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_INDEX);
-	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_point_light_names().size());
+	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_point_lights().size());
 	CATCH_ALL(INVALID_INDEX)
 }
 
 IndexType scenario_get_spot_light_count(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_INDEX);
-	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_spot_light_names().size());
+	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_spot_lights().size());
 	CATCH_ALL(INVALID_INDEX)
 }
 
 IndexType scenario_get_dir_light_count(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_INDEX);
-	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_dir_light_names().size());
+	return static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_dir_lights().size());
 	CATCH_ALL(INVALID_INDEX)
 }
 
 Boolean scenario_has_envmap_light(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	return !static_cast<IndexType>(static_cast<const Scenario*>(scenario)->get_envmap_light_name().empty());
+	const Scenario& scen = *static_cast<const Scenario*>(scenario);
+	return s_world.get_background(scen.get_background())->get_type() == lights::BackgroundType::ENVMAP;
 	CATCH_ALL(INVALID_INDEX)
 }
 
-const char* scenario_get_point_light_name(ScenarioHdl scenario, size_t index) {
+LightHdl scenario_get_light_handle(ScenarioHdl scenario, size_t index, LightType type) {
+	const LightHdl invalid{ LightType::LIGHT_COUNT, std::numeric_limits<u32>::max() };
 	TRY
-	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	CHECK_NULLPTR(scenario, "scenario handle", invalid);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);
-	if(index >= scen.get_point_light_names().size()) {
-		logError("[", FUNCTION_NAME, "] Light index out of bounds (",
-				 index, " >= ", scen.get_point_light_names().size(), ")");
-		return nullptr;
+	switch(type) {
+		case LightType::LIGHT_POINT:
+			if(index >= scen.get_point_lights().size()) {
+				logError("[", FUNCTION_NAME, "] Point light index out of bounds (",
+						 index, " >= ", scen.get_point_lights().size(), ")");
+				return invalid;
+			}
+			return LightHdl{ LightType::LIGHT_POINT, scen.get_point_lights()[index] };
+			break;
+		case LightType::LIGHT_SPOT:
+			if(index >= scen.get_spot_lights().size()) {
+				logError("[", FUNCTION_NAME, "] Spot light index out of bounds (",
+						 index, " >= ", scen.get_spot_lights().size(), ")");
+				return invalid;
+			}
+			return LightHdl{ LightType::LIGHT_SPOT, scen.get_spot_lights()[index] };
+			break;
+		case LightType::LIGHT_DIRECTIONAL:
+			if(index >= scen.get_dir_lights().size()) {
+				logError("[", FUNCTION_NAME, "] Directional light index out of bounds (",
+						 index, " >= ", scen.get_dir_lights().size(), ")");
+				return invalid;
+			}
+			return LightHdl{ LightType::LIGHT_DIRECTIONAL, scen.get_dir_lights()[index] };
+			break;
+		case LightType::LIGHT_ENVMAP:
+			if(index >= 1u) {
+				logError("[", FUNCTION_NAME, "] Background index out of bounds (", index, " >= 1)");
+				return invalid;
+			}
+			return LightHdl{ LightType::LIGHT_ENVMAP, scen.get_background() };
+			break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown light type");
+			return invalid;
 	}
-	std::string_view name = scen.get_point_light_names()[index];
-	return &name[0];
-	CATCH_ALL(nullptr)
+	CATCH_ALL(invalid)
 }
 
-const char* scenario_get_spot_light_name(ScenarioHdl scenario, size_t index) {
-	TRY
-	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	const Scenario& scen = *static_cast<const Scenario*>(scenario);
-	if(index >= scen.get_spot_light_names().size()) {
-		logError("[", FUNCTION_NAME, "] Light index out of bounds (",
-				 index, " >= ", scen.get_spot_light_names().size(), ")");
-		return nullptr;
-	}
-	std::string_view name = scen.get_spot_light_names()[index];
-	return &name[0];
-	CATCH_ALL(nullptr)
-}
-
-const char* scenario_get_dir_light_name(ScenarioHdl scenario, size_t index) {
-	TRY
-	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	const Scenario& scen = *static_cast<const Scenario*>(scenario);
-	if(index >= scen.get_dir_light_names().size()) {
-		logError("[", FUNCTION_NAME, "] Light index out of bounds (",
-				 index, " >= ", scen.get_dir_light_names().size(), ")");
-		return nullptr;
-	}
-	std::string_view name = scen.get_dir_light_names()[index];
-	return &name[0];
-	CATCH_ALL(nullptr)
-}
-
-const char* scenario_get_envmap_light_name(ScenarioHdl scenario) {
-	TRY
-	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	const Scenario& scen = *static_cast<const Scenario*>(scenario);
-	std::string_view name = scen.get_envmap_light_name();
-	return &name[0];
-	CATCH_ALL(nullptr)
-}
-
-Boolean scenario_add_light(ScenarioHdl scenario, const char* name) {
+Boolean scenario_add_light(ScenarioHdl scenario, LightHdl hdl) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	CHECK_NULLPTR(name, "light name", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
-	std::string_view nameView = name;
-	std::optional<std::pair<u32, lights::LightType>> hdl = s_world.find_light(nameView);
-	if(!hdl.has_value()) {
-		logError("[", FUNCTION_NAME, "] Light source '", nameView, "' does not exist");
-		return false;
-	}
-	std::string_view resolvedName = s_world.get_light_name(hdl.value().first, hdl.value().second);
 
-	switch(hdl.value().second) {
-		case lights::LightType::POINT_LIGHT:
-			scen.add_point_light(resolvedName);
-			return true;
-		case lights::LightType::SPOT_LIGHT:
-			scen.add_spot_light(resolvedName);
-			return true;
-		case lights::LightType::DIRECTIONAL_LIGHT:
-			scen.add_dir_light(resolvedName);
-			return true;
-		case lights::LightType::ENVMAP_LIGHT:
-		{
-			if(!scen.get_envmap_light_name().empty())
+	switch(hdl.type) {
+		case LightType::LIGHT_POINT: {
+			if(s_world.get_point_light(hdl.index) == nullptr) {
+				logError("[", FUNCTION_NAME, "] Invalid point light handle");
+				return false;
+			}
+			scen.add_point_light(hdl.index);
+		}	break;
+		case LightType::LIGHT_SPOT: {
+			if(s_world.get_spot_light(hdl.index) == nullptr) {
+				logError("[", FUNCTION_NAME, "] Invalid spot light handle");
+				return false;
+			}
+			scen.add_spot_light(hdl.index);
+		}	break;
+		case LightType::LIGHT_DIRECTIONAL: {
+			if(s_world.get_dir_light(hdl.index) == nullptr) {
+				logError("[", FUNCTION_NAME, "] Invalid directional light handle");
+				return false;
+			}
+			scen.add_dir_light(hdl.index);
+		}	break;
+		case LightType::LIGHT_ENVMAP: {
+			lights::Background* light = s_world.get_background(hdl.index);
+			if(s_world.get_background(hdl.index) == nullptr) {
+				logError("[", FUNCTION_NAME, "] Invalid background light handle");
+				return false;
+			}
+			if(light->get_type() == lights::BackgroundType::ENVMAP && s_world.get_background(scen.get_background())->get_type() == lights::BackgroundType::ENVMAP) {
 				logWarning("[", FUNCTION_NAME, "] The scenario already has an environment light; overwriting '",
-						   scen.get_envmap_light_name(), "' with '", resolvedName, "'");
-			scen.set_envmap_light(resolvedName);
-			return true;
+						   s_world.get_light_name(scen.get_background(), lights::LightType::ENVMAP_LIGHT), "' with '",
+						   s_world.get_light_name(hdl.index, lights::LightType::ENVMAP_LIGHT), "'");
+			}
+			scen.set_background(hdl.index);
+		}	break;
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown or invalid light type");
 			return false;
-		}
 	}
+	return true;
 	CATCH_ALL(false)
 }
 
-Boolean scenario_remove_light(ScenarioHdl scenario, const char* name) {
+Boolean scenario_remove_light(ScenarioHdl scenario, LightHdl hdl) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	CHECK_NULLPTR(name, "light name", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
-	std::string_view nameView = name;
-	scen.remove_point_light(nameView);
-	scen.remove_spot_light(nameView);
-	scen.remove_dir_light(nameView);
-	if(nameView == scen.get_envmap_light_name())
-		scen.remove_envmap_light();
+
+	switch(hdl.type) {
+		case LightType::LIGHT_POINT: {
+			scen.remove_point_light(hdl.index);
+		}	break;
+		case LightType::LIGHT_SPOT: {
+			scen.remove_spot_light(hdl.index);
+		}	break;
+		case LightType::LIGHT_DIRECTIONAL: {
+			scen.remove_dir_light(hdl.index);
+		}	break;
+		case LightType::LIGHT_ENVMAP: {
+			scen.remove_background();
+		}	break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown or invalid light type");
+			return false;
+	}
 	return true;
 	CATCH_ALL(false)
 }
@@ -2234,7 +2253,12 @@ Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance) {
 const char* world_get_env_light_map(ConstLightHdl hdl) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	ConstTextureHandle envmap = s_world.get_env_light(hdl.index)->get_envmap();
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
+		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
+		return nullptr;
+	}
+	ConstTextureHandle envmap = background->get_envmap();
 	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
 	auto nameOpt = s_world.get_texture_name(envmap);
 	if(!nameOpt.has_value()) {
@@ -2250,10 +2274,14 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	const lights::Background* envmap = s_world.get_env_light(hdl.index);
-	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
+		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "environment-mapped light handle", false);
 	if(color)
-		*color = util::pun<Vec3>(envmap->get_scale());
+		*color = util::pun<Vec3>(background->get_scale());
 	return true;
 	CATCH_ALL(false)
 }
@@ -2271,7 +2299,12 @@ Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	s_world.get_env_light(hdl.index)->set_scale(util::pun<Spectrum>(color));
+	lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
+		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
+		return false;
+	}
+	background->set_scale(util::pun<Spectrum>(color));
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
 	return true;
 	CATCH_ALL(false)

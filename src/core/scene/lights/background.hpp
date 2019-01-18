@@ -85,6 +85,10 @@ public:
 		return m_envLight;
 	}
 
+	const Spectrum& get_color() const noexcept {
+		return m_color;
+	}
+
 
 private:
 	Background(BackgroundType type) : m_type(type) {}

@@ -16,7 +16,7 @@ class Scenario {
 public:
 	static constexpr std::size_t NO_CUSTOM_LOD = std::numeric_limits<std::size_t>::max();
 
-	Scenario() = default;
+	Scenario();
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
 	Scenario& operator=(const Scenario&) = delete;
@@ -81,35 +81,35 @@ public:
 
 	// Note: no method to change name! because it is being used as
 	// key in worldcontainer
-	void add_point_light(std::string_view name) {
-		if(std::find(m_pointLightNames.begin(), m_pointLightNames.end(), name) == m_pointLightNames.end()) {
-			m_pointLightNames.push_back(name);
+	void add_point_light(u32 light) {
+		if(std::find(m_pointLights.begin(), m_pointLights.end(), light) == m_pointLights.end()) {
+			m_pointLights.push_back(light);
 			m_lightsChanged = true;
 		}
 	}
-	void add_spot_light(std::string_view name) {
-		if(std::find(m_spotLightNames.begin(), m_spotLightNames.end(), name) == m_spotLightNames.end()) {
-			m_spotLightNames.push_back(name);
+	void add_spot_light(u32 light) {
+		if(std::find(m_spotLights.begin(), m_spotLights.end(), light) == m_spotLights.end()) {
+			m_spotLights.push_back(light);
 			m_lightsChanged = true;
 		}
 	}
-	void add_dir_light(std::string_view name) {
-		if(std::find(m_dirLightNames.begin(), m_dirLightNames.end(), name) == m_dirLightNames.end()) {
-			m_dirLightNames.push_back(name);
+	void add_dir_light(u32 light) {
+		if(std::find(m_dirLights.begin(), m_dirLights.end(), light) == m_dirLights.end()) {
+			m_dirLights.push_back(light);
 			m_lightsChanged = true;
 		}
 	}
-	void set_envmap_light(std::string_view name) {
-		if(name != m_envLightName) {
-			m_envLightName = name;
+	void set_background(u32 background) {
+		if(background != m_background) {
+			m_background = background;
 			m_envmapLightsChanged = true;
 		}
 	}
 
-	void remove_point_light(const std::string_view& name);
-	void remove_spot_light(const std::string_view& name);
-	void remove_dir_light(const std::string_view& name);
-	void remove_envmap_light();
+	void remove_point_light(u32 lightWorldIndex);
+	void remove_spot_light(u32 lightWorldIndex);
+	void remove_dir_light(u32 lightWorldIndex);
+	void remove_background();
 
 	// Queries whether lights have been added/removed and resets the flag
 	bool lights_dirty_reset() {
@@ -132,17 +132,17 @@ public:
 	// Queries whether anything in the materials changed and resets the flag(s)
 	bool materials_dirty_reset() const;
 
-	const std::vector<std::string_view>& get_point_light_names() const noexcept {
-		return m_pointLightNames;
+	const std::vector<u32>& get_point_lights() const noexcept {
+		return m_pointLights;
 	}
-	const std::vector<std::string_view>& get_spot_light_names() const noexcept {
-		return m_spotLightNames;
+	const std::vector<u32>& get_spot_lights() const noexcept {
+		return m_spotLights;
 	}
-	const std::vector<std::string_view>& get_dir_light_names() const noexcept {
-		return m_dirLightNames;
+	const std::vector<u32>& get_dir_lights() const noexcept {
+		return m_dirLights;
 	}
-	std::string_view get_envmap_light_name() const noexcept {
-		return m_envLightName;
+	u32 get_background() const noexcept {
+		return m_background;
 	}
 
 private:
@@ -170,10 +170,10 @@ private:
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// All lights which are enabled in this scenario
-	std::vector<std::string_view> m_pointLightNames;
-	std::vector<std::string_view> m_spotLightNames;
-	std::vector<std::string_view> m_dirLightNames;
-	std::string_view m_envLightName;
+	std::vector<u32> m_pointLights;
+	std::vector<u32> m_spotLights;
+	std::vector<u32> m_dirLights;
+	u32 m_background = 0u;
 
 
 	std::size_t m_globalLodLevel = 0u;

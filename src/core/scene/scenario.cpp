@@ -1,9 +1,16 @@
 #include "scenario.hpp"
+#include "world_container.hpp"
 #include "util/log.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/lights/lights.hpp"
 #include <algorithm>
 
 namespace mufflon::scene {
+
+Scenario::Scenario()
+{
+	this->remove_background();
+}
 
 MaterialIndex Scenario::declare_material_slot(std::string_view binaryName) {
 	// Catch if this slot was added before
@@ -72,44 +79,25 @@ void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
 		m_perObjectCustomization.insert({ hdl, ObjectProperty{false, level} });
 }
 
-void Scenario::remove_point_light(const std::string_view& name) {
-	m_pointLightNames.erase(std::remove_if(m_pointLightNames.begin(), m_pointLightNames.end(),
-										   [&name, this](const std::string_view& n) {
-		if(n == name) {
-			m_lightsChanged = true;
-			return true;
-		}
-		return false;
-	}), m_pointLightNames.end());
+void Scenario::remove_point_light(u32 light) {
+	if(m_pointLights.erase(std::remove(m_pointLights.begin(), m_pointLights.end(), light)) != m_pointLights.end())
+		m_lightsChanged = true;
 }
 
-void Scenario::remove_spot_light(const std::string_view& name) {
-	m_spotLightNames.erase(std::remove_if(m_spotLightNames.begin(), m_spotLightNames.end(),
-										   [&name, this](const std::string_view& n) {
-		if(n == name) {
-			m_lightsChanged = true;
-			return true;
-		}
-		return false;
-	}), m_spotLightNames.end());
+void Scenario::remove_spot_light(u32 light) {
+	if(m_spotLights.erase(std::remove(m_spotLights.begin(), m_spotLights.end(), light)) != m_spotLights.end())
+		m_lightsChanged = true;
 }
 
-void Scenario::remove_dir_light(const std::string_view& name) {
-	m_dirLightNames.erase(std::remove_if(m_dirLightNames.begin(), m_dirLightNames.end(),
-										   [&name, this](const std::string_view& n) {
-		if(n == name) {
-			m_lightsChanged = true;
-			return true;
-		}
-		return false;
-	}), m_dirLightNames.end());
+void Scenario::remove_dir_light(u32 light) {
+	if(m_dirLights.erase(std::remove(m_dirLights.begin(), m_dirLights.end(), light)) != m_dirLights.end())
+		m_lightsChanged = true;
 }
 
-void Scenario::remove_envmap_light() {
-	if(!m_envLightName.empty()) {
-		m_envLightName = "";
+void Scenario::remove_background() {
+	if(m_background != 0u)
 		m_envmapLightsChanged = true;
-	}
+	m_background = 0u;
 }
 
 bool Scenario::materials_dirty_reset() const {

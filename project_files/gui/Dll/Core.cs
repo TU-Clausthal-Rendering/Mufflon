@@ -230,31 +230,19 @@ namespace gui.Dll
             ulong level);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int scenario_get_point_light_count(IntPtr scenario);
+        internal static extern Int32 scenario_get_point_light_count(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int scenario_get_spot_light_count(IntPtr scenario);
+        internal static extern Int32 scenario_get_spot_light_count(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int scenario_get_dir_light_count(IntPtr scenario);
+        internal static extern Int32 scenario_get_dir_light_count(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_has_envmap_light(IntPtr scenario);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint ="scenario_get_point_light_name")]
-        internal static extern IntPtr scenario_get_point_light_name_(IntPtr scenario, ulong index);
-        internal static string scenario_get_point_light_name(IntPtr scenario, ulong index) { return StringUtil.FromNativeUTF8(scenario_get_point_light_name_(scenario, index)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_spot_light_name")]
-        internal static extern IntPtr scenario_get_spot_light_name_(IntPtr scenario, ulong index);
-        internal static string scenario_get_spot_light_name(IntPtr scenario, ulong index) { return StringUtil.FromNativeUTF8(scenario_get_spot_light_name_(scenario, index)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_dir_light_name")]
-        internal static extern IntPtr scenario_get_dir_light_name_(IntPtr scenario, ulong index);
-        internal static string scenario_get_dir_light_name(IntPtr scenario, ulong index) { return StringUtil.FromNativeUTF8(scenario_get_dir_light_name_(scenario, index)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_get_envmap_light_name")]
-        internal static extern IntPtr scenario_get_envmap_light_name_(IntPtr scenario);
-        internal static string scenario_get_envmap_light_name(IntPtr scenario) { return StringUtil.FromNativeUTF8(scenario_get_envmap_light_name_(scenario)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_add_light")]
-        internal static extern bool scenario_add_light_(IntPtr scenario, IntPtr name);
-        internal static bool scenario_add_light(IntPtr scenario, string name) { return scenario_add_light_(scenario, StringUtil.ToNativeUtf8(name)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_remove_light")]
-        internal static extern bool scenario_remove_light_(IntPtr scenario, IntPtr name);
-        internal static bool scenario_remove_light(IntPtr scenario, string name) { return scenario_remove_light_(scenario, StringUtil.ToNativeUtf8(name)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr scenario_get_light_handle(IntPtr scenario, ulong index, LightType type);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scenario_add_light(IntPtr scenario, IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scenario_remove_light(IntPtr scenario, IntPtr hdl);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "scenario_declare_material_slot")]
         private static extern ushort scenario_declare_material_slot_(IntPtr scenario, IntPtr name);

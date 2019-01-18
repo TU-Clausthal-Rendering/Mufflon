@@ -42,7 +42,7 @@ namespace gui.Command
 
             // TODO why do I need to do this? (why isn't this done by world_remove_light?)
             var currScenario = Core.world_get_current_scenario();
-            if (!Core.scenario_remove_light(currScenario, lightName))
+            if (!Core.scenario_remove_light(currScenario, m_model.Handle))
                 throw new Exception(Core.core_get_dll_error());
         }
 

@@ -10,6 +10,10 @@ namespace mufflon::scene {
 
 WorldContainer WorldContainer::s_container{};
 
+WorldContainer::WorldContainer() {
+	m_envLights.insert("##DefaultBlack##", lights::Background::black());
+}
+
 void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
@@ -56,8 +60,9 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	if(!hasObjects)
 		return Sanity::NO_OBJECTS;
 	// Check for lights
-	if(!hasEmitters && hdl->get_point_light_names().empty() && hdl->get_spot_light_names().empty()
-	   && hdl->get_dir_light_names().empty() && hdl->get_envmap_light_name().empty())
+	if(!hasEmitters && hdl->get_point_lights().empty() && hdl->get_spot_lights().empty()
+	   && hdl->get_dir_lights().empty() && (m_envLights.get(hdl->get_background()).get_type() == lights::BackgroundType::COLORED
+											&& ei::prod(m_envLights.get(hdl->get_background()).get_color()) == 0))
 		return Sanity::NO_LIGHTS;
 	// Check for camera
 	if(hdl->get_camera() == nullptr)
@@ -257,7 +262,7 @@ lights::DirectionalLight* WorldContainer::get_dir_light(u32 index) {
 	return &m_dirLights.get(index);
 }
 
-lights::Background* WorldContainer::get_env_light(u32 index) {
+lights::Background* WorldContainer::get_background(u32 index) {
 	if(index >= m_envLights.size())
 		throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
 									+ " >= " + std::to_string(m_envLights.size()));
@@ -341,26 +346,26 @@ void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 		switch(type) {
 			case lights::LightType::POINT_LIGHT:
 				// Check if the light is part of the active scenario/scene
-				if(std::find(m_scenario->get_point_light_names().cbegin(), m_scenario->get_point_light_names().cend(), get_light_name(index, type))
-				   != m_scenario->get_point_light_names().cend())
+				if(std::find(m_scenario->get_point_lights().cbegin(), m_scenario->get_point_lights().cend(), index)
+				   != m_scenario->get_point_lights().cend())
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
 			case lights::LightType::SPOT_LIGHT:
 				// Check if the light is part of the active scenario/scene
-				if(std::find(m_scenario->get_spot_light_names().cbegin(), m_scenario->get_spot_light_names().cend(), get_light_name(index, type))
-				   != m_scenario->get_spot_light_names().cend())
+				if(std::find(m_scenario->get_spot_lights().cbegin(), m_scenario->get_spot_lights().cend(), index)
+				   != m_scenario->get_spot_lights().cend())
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
 			case lights::LightType::DIRECTIONAL_LIGHT:
 				// Check if the light is part of the active scenario/scene
-				if(std::find(m_scenario->get_dir_light_names().cbegin(), m_scenario->get_dir_light_names().cend(), get_light_name(index, type))
-				   != m_scenario->get_dir_light_names().cend())
+				if(std::find(m_scenario->get_dir_lights().cbegin(), m_scenario->get_dir_lights().cend(), index)
+				   != m_scenario->get_dir_lights().cend())
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
 			case lights::LightType::ENVMAP_LIGHT:
 				// Check if the envmap is the current one
-				std::string_view currEnvName = m_scenario->get_envmap_light_name();
-				if(!currEnvName.empty() && m_envLights.get_index(currEnvName) == index)
+				const lights::Background& background = m_envLights.get(m_scenario->get_background());
+				if(&background == &m_envLights.get(index))
 					m_envLightDirty = true;
 				break;
 		}
@@ -571,26 +576,17 @@ bool WorldContainer::load_scene_lights() {
 		dirLights.reserve(dirLights.size() + m_dirLights.size());
 
 		// Add regular lights
-		for(const std::string_view& name : m_scenario->get_point_light_names()) {
-			if(auto pointLight = m_pointLights.find(name); pointLight)
-				posLights.push_back(lights::PositionalLights{ *pointLight, PrimitiveHandle{} });
-			else
-				logWarning("[WorldContainer::load_scene_lights] Unknown point light '", name, "' in scenario '",
-						   m_scenario->get_name(), "'");
+		for(u32 lightIndex : m_scenario->get_point_lights()) {
+			mAssert(lightIndex < m_pointLights.size());
+			posLights.push_back(lights::PositionalLights{ m_pointLights.get(lightIndex), PrimitiveHandle{} });
 		}
-		for(const std::string_view& name : m_scenario->get_spot_light_names()) {
-			if(auto spotLight = m_spotLights.find(name); spotLight)
-				posLights.push_back(lights::PositionalLights{ *spotLight, PrimitiveHandle{} });
-			else
-				logWarning("[WorldContainer::load_scene_lights] Unknown spot light '", name, "' in scenario '",
-						   m_scenario->get_name(), "'");
+		for(u32 lightIndex : m_scenario->get_spot_lights()) {
+			mAssert(lightIndex < m_spotLights.size());
+			posLights.push_back(lights::PositionalLights{ m_spotLights.get(lightIndex), PrimitiveHandle{} });
 		}
-		for(const std::string_view& name : m_scenario->get_dir_light_names()) {
-			if(auto dirLight = m_dirLights.find(name); dirLight)
-				dirLights.push_back(*dirLight);
-			else
-				logWarning("[WorldContainer::load_scene_lights] Unknown dir light '", name, "' in scenario '",
-						   m_scenario->get_name(), "'");
+		for(u32 lightIndex : m_scenario->get_dir_lights()) {
+			mAssert(lightIndex < m_dirLights.size());
+			dirLights.push_back(m_dirLights.get(lightIndex));
 		}
 
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));
@@ -603,19 +599,8 @@ bool WorldContainer::load_scene_lights() {
 		reloaded = true;
 
 		// Find out what the active envmap light is
-		lights::Background* envLightTex = nullptr;
-		std::string_view currEnvName = m_scenario->get_envmap_light_name();
-		if(!currEnvName.empty()) {
-			auto iter = m_envLights.find(currEnvName);
-			if(iter != nullptr) {
-				envLightTex = iter;
-				m_scene->set_background(*iter);
-			} else
-				logWarning("[WorldContainer::load_scene_lights] Unknown envmap light '", currEnvName, "' in scenario '",
-						   m_scenario->get_name(), "'");
-		} else {
-			m_scene->set_background(m_defaultBackground);
-		}
+		lights::Background& background = m_envLights.get(m_scenario->get_background());
+		m_scene->set_background(background);
 
 		m_envLightDirty = false;
 	}
