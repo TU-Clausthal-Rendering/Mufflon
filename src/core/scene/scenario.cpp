@@ -71,12 +71,20 @@ void Scenario::mask_object(ConstObjectHandle hdl) {
 		m_perObjectCustomization.insert({ hdl, ObjectProperty{true, NO_CUSTOM_LOD} });
 }
 
+void Scenario::mask_instance(ConstInstanceHandle hdl) {
+	// TODO
+}
+
 void Scenario::set_custom_lod(ConstObjectHandle hdl, std::size_t level) {
 	auto iter = m_perObjectCustomization.find(hdl);
 	if(iter != m_perObjectCustomization.end())
 		iter->second.lod = level;
 	else
 		m_perObjectCustomization.insert({ hdl, ObjectProperty{false, level} });
+}
+
+void Scenario::set_custom_lod(ConstInstanceHandle hdl, std::size_t level) {
+	// TODO:
 }
 
 void Scenario::remove_point_light(u32 light) {

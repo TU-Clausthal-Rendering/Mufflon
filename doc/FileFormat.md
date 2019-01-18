@@ -43,7 +43,7 @@ In the case of multiple type choices, details on further mandatory properties wi
         },
         "materials": {
             "<name1>": {
-                "type": "{lambert, torrance, walter, emissive, orennayar, blend, fresnel, glass, opaque}",
+                "type": "{lambert, torrance, walter, emissive, orennayar, blend, fresnel, glass}",
                 "outerMedium": {      // OPTIONAL, the inner medium is always specified by the other material parameters
                                       // If not given the outer medium is assumed to be vacuum (index 1, absorption 0)
                     "refractionIndex": float | [n,k],   // The real part of the refraction index (for dielectric)
@@ -67,11 +67,14 @@ In the case of multiple type choices, details on further mandatory properties wi
                 },
                 "objectProperties": {
                     "<object name (from binary)>": {    // OPTIONAL per object properties
-                        "mask",                         // Do not render this object (blacklisted)
+                        "mask": bool,                   // Do not render this object (true=blacklisted)
+                        "lod": int,                     // Use a specific LOD different/independent from global LOD
                         // More meta information
                     },
+                },
+                "instanceProperties": {}
                      "<instance name (from binary)>": { // OPTIONAL per object properties
-                        "mask",                         // Do not render this object (blacklisted)
+                        "mask": bool,                   // Do not render this object (true=blacklisted)
                         "lod": int,                     // Use a specific LOD different/independent from global LOD
                         // More meta information
                     }

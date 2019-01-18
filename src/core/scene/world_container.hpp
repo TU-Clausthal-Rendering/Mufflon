@@ -44,6 +44,10 @@ public:
 	ObjectHandle create_object(std::string name, ObjectFlags flags);
 	// Finds an object by its name
 	ObjectHandle get_object(const std::string_view& name);
+	// Find an instance by name (for some objects with only one
+	// instance both names are equal, but do not need to be).
+	// The returned handle is valid over the entire lifetime of the instance.
+	InstanceHandle get_instance(const std::string_view& name);
 	// Creates a new instance.
 	InstanceHandle create_instance(std::string name, ObjectHandle hdl);
 	// Add a created scenario and take ownership
@@ -170,7 +174,7 @@ private:
 	// All objects of the world.
 	std::map<std::string, Object, std::less<>> m_objects;
 	// All instances of the world
-	std::vector<Instance> m_instances;
+	std::unordered_map<std::string_view, std::unique_ptr<Instance>> m_instances;
 	// List of all scenarios available (mapped to their names)
 	std::map<std::string, Scenario, std::less<>> m_scenarios;
 	// All materials in the scene.

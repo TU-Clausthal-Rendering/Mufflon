@@ -86,13 +86,21 @@ ObjectHandle WorldContainer::get_object(const std::string_view& name) {
 	return nullptr;
 }
 
+InstanceHandle WorldContainer::get_instance(const std::string_view& name) {
+	auto iter = m_instances.find(name);
+	if(iter != m_instances.end())
+		return iter->second.get();
+	return nullptr;
+}
+
 InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle obj) {
 	if(obj == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid object handle");
 		return nullptr;
 	}
-	m_instances.emplace_back(std::move(Instance(move(name), *obj)));
-	return &m_instances.back();
+	auto instance = std::make_unique<Instance>(move(name), *obj);
+	std::string_view nameRef = instance->get_name();
+	return m_instances.emplace(nameRef, std::move(instance)).first->second.get();
 }
 
 ScenarioHandle WorldContainer::create_scenario(std::string name) {
@@ -436,8 +444,8 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	m_scene = std::make_unique<Scene>(scenario);
 	u32 instIdx = 0;
 	for(auto& instance : m_instances) {
-		if(!scenario.is_masked(&instance.get_object()))
-			m_scene->add_instance(&instance);
+		if(!scenario.is_masked(&instance.second->get_object()))
+			m_scene->add_instance(instance.second.get());
 	}
 
 	// Check if the resulting scene has issues with size

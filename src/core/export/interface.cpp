@@ -1049,7 +1049,14 @@ ObjectHdl world_get_object(const char* name) {
 	CATCH_ALL(nullptr)
 }
 
-CORE_API const char* CDECL world_get_object_name(ObjectHdl obj) {
+InstanceHdl world_get_instance(const char* name) {
+	TRY
+	CHECK_NULLPTR(name, "instance name", nullptr);
+	return static_cast<InstanceHdl>(s_world.get_instance(name));
+	CATCH_ALL(nullptr)
+}
+
+const char* world_get_object_name(ObjectHdl obj) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	return &reinterpret_cast<mufflon::scene::ConstObjectHandle>(obj)->get_name()[0];
@@ -1748,6 +1755,15 @@ Boolean scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj) {
 	CATCH_ALL(false)
 }
 
+Boolean scenario_mask_instance(ScenarioHdl scenario, InstanceHdl inst) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(inst, "instance handle", false);
+	static_cast<Scenario*>(scenario)->mask_instance(static_cast<const Instance*>(inst));
+	return true;
+	CATCH_ALL(false)
+}
+
 LodLevel scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", Scenario::NO_CUSTOM_LOD);
@@ -1762,6 +1778,17 @@ Boolean scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(obj, "object handle", false);
 	static_cast<Scenario*>(scenario)->set_custom_lod(static_cast<const Object*>(obj),
+													 level);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_set_instance_lod(ScenarioHdl scenario, InstanceHdl inst,
+							 LodLevel level) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(inst, "instance handle", false);
+	static_cast<Scenario*>(scenario)->set_custom_lod(static_cast<const Instance*>(inst),
 													 level);
 	return true;
 	CATCH_ALL(false)

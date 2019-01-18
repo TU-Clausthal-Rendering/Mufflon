@@ -11,28 +11,30 @@ class Object;
 
 class Instance {
 public:
-	using TransMatrixType = ei::Matrix<Real, 3, 4>;
-
 	// TODO: identity matrix
-	Instance(std::string name, Object& obj, TransMatrixType trans = {});
+	Instance(std::string name, Object& obj, const ei::Mat3x4& trans = {});
 	Instance(const Instance&) = default;
 	Instance(Instance&&) = default;
 	Instance& operator=(const Instance&) = delete;
 	Instance& operator=(Instance&&) = delete;
 	~Instance() = default;
 
-	void set_transformation_matrix(TransMatrixType mat) {
+	std::string_view get_name() const noexcept {
+		return m_name;
+	}
+
+	void set_transformation_matrix(const ei::Mat3x4& mat) {
 		mAssertMsg(ei::approx(ei::len(mat(0u).subrow<0u, 3u>()), ei::len(mat(1u).subrow<0u, 3u>()))
 				   && ei::approx(ei::len(mat(0u).subrow<0u, 3u>()), ei::len(mat(2u).subrow<0u, 3u>())),
 				   "Instance transformations must have uniform scale");
-		m_transMat = std::move(mat);
+		m_transMat = mat;
 		m_scale = ei::len(m_transMat(0u).subrow<0u, 3u>());
-		m_transMat(0u).subrow<0u, 3u>() *= 1.f / m_scale;
-		m_transMat(1u).subrow<0u, 3u>() *= 1.f / m_scale;
-		m_transMat(2u).subrow<0u, 3u>() *= 1.f / m_scale;
+		m_transMat(0u).subrow<0u, 3u>() /= m_scale;
+		m_transMat(1u).subrow<0u, 3u>() /= m_scale;
+		m_transMat(2u).subrow<0u, 3u>() /= m_scale;
 	}
 
-	const TransMatrixType& get_transformation_matrix() const noexcept {
+	const ei::Mat3x4& get_transformation_matrix() const noexcept {
 		return m_transMat;
 	}
 
@@ -52,7 +54,7 @@ public:
 private:
 	std::string m_name;
 	Object& m_objRef;
-	TransMatrixType m_transMat;
+	ei::Mat3x4 m_transMat;
 	float m_scale;
 };
 

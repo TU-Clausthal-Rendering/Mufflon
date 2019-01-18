@@ -350,6 +350,7 @@ CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Ve
 CORE_API void CDECL world_clear_all();
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
+CORE_API InstanceHdl CDECL world_get_instance(const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
 CORE_API InstanceHdl CDECL world_create_instance(const char* name, ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
@@ -395,9 +396,12 @@ CORE_API Boolean CDECL scenario_set_resolution(ScenarioHdl scenario, uint32_t wi
 CORE_API CameraHdl CDECL scenario_get_camera(ScenarioHdl scenario);
 CORE_API Boolean CDECL scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
 CORE_API Boolean CDECL scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj);
-CORE_API Boolean CDECL scenario_mask_object(ScenarioHdl scenario, ObjectHdl obj);
+CORE_API Boolean CDECL scenario_mask_object(ScenarioHdl scenario, ObjectHdl inst);
+CORE_API Boolean CDECL scenario_mask_instance(ScenarioHdl scenario, InstanceHdl obj);
 CORE_API LodLevel CDECL scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj);
 CORE_API Boolean CDECL scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
+										 LodLevel level);
+CORE_API Boolean CDECL scenario_set_instance_lod(ScenarioHdl scenario, InstanceHdl inst,
 										 LodLevel level);
 CORE_API IndexType CDECL scenario_get_point_light_count(ScenarioHdl scenario);
 CORE_API IndexType CDECL scenario_get_spot_light_count(ScenarioHdl scenario);

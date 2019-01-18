@@ -66,11 +66,13 @@ public:
 		m_cameraChanged = true;
 	}
 
-	// Getter/setter for per-object properties
+	// Getter/setter for per-object and per-instance properties
 	bool is_masked(ConstObjectHandle hdl) const;
 	std::size_t get_custom_lod(ConstObjectHandle hdl) const;
 	void mask_object(ConstObjectHandle hdl);
+	void mask_instance(ConstInstanceHandle hdl);
 	void set_custom_lod(ConstObjectHandle hdl, std::size_t level);
+	void set_custom_lod(ConstInstanceHandle hdl, std::size_t level);
 
 	const std::string_view& get_name() const noexcept {
 		return m_name;
