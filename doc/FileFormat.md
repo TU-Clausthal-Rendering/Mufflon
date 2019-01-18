@@ -68,6 +68,10 @@ In the case of multiple type choices, details on further mandatory properties wi
                 "objectProperties": {
                     "<object name (from binary)>": {    // OPTIONAL per object properties
                         "mask",                         // Do not render this object (blacklisted)
+                        // More meta information
+                    },
+                     "<instance name (from binary)>": { // OPTIONAL per object properties
+                        "mask",                         // Do not render this object (blacklisted)
                         "lod": int,                     // Use a specific LOD different/independent from global LOD
                         // More meta information
                     }
@@ -264,7 +268,7 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
             <COMPRESSED_STREAM>
 
     <OBJECT> = u32 'Obj_'       // Type check for this section
-               <STRING>         // The name, used as [obj:name] in the above JSON specification
+               <STRING>         // The name, used as <object name (from binary)> in the above JSON specification
                u32 <OFLAGS>     // Object specific flags
                u32              // Keyframe of the object if animated or 0xffffffff
                u32              // <OBJID> of the previous object in an animation sequence or 0xffffffff
@@ -354,7 +358,8 @@ Objects which are not instanced explicitly will have one instance with the ident
     <INSTANCES> = u32 'Inst'    // Type check for this section
                   u32           // Number of instances I
                   I*<INSTANCE>
-    <INSTANCE> = u32            // <OBJID> (0-based index of the object in the <OBJECTS> section)
+    <INSTANCE> = <STRING>       // Name (Custom, unique) used as <instance name (from binary)> in the json
+                 u32            // <OBJID> (0-based index of the object in the <OBJECTS> section)
                  u32            // Keyframe of the instance if animated or 0xffffffff
                  u32            // <InstID> of the previous object in an animation sequence or 0xffffffff
                  12*f32         // 3x4 transformation matrix (rotation, scaling, translation)
