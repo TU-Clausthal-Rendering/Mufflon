@@ -743,6 +743,7 @@ bool BinaryLoader::read_instances() {
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
+		const std::string name = read<std::string>();
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
 		const u32 animInstId = read<u32>();
@@ -763,7 +764,7 @@ bool BinaryLoader::read_instances() {
 		}
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", world_get_object_name(m_objectHandles[objId]), "\'");
-		InstanceHdl instHdl = world_create_instance(m_objectHandles[objId]);
+		InstanceHdl instHdl = world_create_instance(name.c_str(), m_objectHandles[objId]);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
 									 + std::to_string(objId));
@@ -784,15 +785,17 @@ bool BinaryLoader::read_instances() {
 		if(m_abort)
 			return false;
 		if(!hasInstance[i]) {
+			std::string_view objName = world_get_object_name(m_objectHandles[i]);
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
-						world_get_object_name(m_objectHandles[i]), "\'");
+						objName, "\'");
 			// Add default instance
 			const Mat3x4 transMat = Mat3x4{
 				1.f, 0.f, 0.f, 0.f,
 				0.f, 1.f, 0.f, 0.f,
 				0.f, 0.f, 1.f, 0.f
 			};
-			InstanceHdl instHdl = world_create_instance(m_objectHandles[i]);
+			std::string name = std::string(objName) + std::string("###defaultInstance");
+			InstanceHdl instHdl = world_create_instance(name.c_str(), m_objectHandles[i]);
 			if(instHdl == nullptr)
 				throw std::runtime_error("Failed to create instance for object ID "
 										 + std::to_string(i));

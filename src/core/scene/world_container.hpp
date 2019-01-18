@@ -45,7 +45,7 @@ public:
 	// Finds an object by its name
 	ObjectHandle get_object(const std::string_view& name);
 	// Creates a new instance.
-	InstanceHandle create_instance(ObjectHandle hdl);
+	InstanceHandle create_instance(std::string name, ObjectHandle hdl);
 	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name

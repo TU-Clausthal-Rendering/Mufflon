@@ -14,7 +14,7 @@ public:
 	using TransMatrixType = ei::Matrix<Real, 3, 4>;
 
 	// TODO: identity matrix
-	Instance(Object& obj, TransMatrixType trans = {});
+	Instance(std::string name, Object& obj, TransMatrixType trans = {});
 	Instance(const Instance&) = default;
 	Instance(Instance&&) = default;
 	Instance& operator=(const Instance&) = delete;
@@ -50,6 +50,7 @@ public:
 	}
 
 private:
+	std::string m_name;
 	Object& m_objRef;
 	TransMatrixType m_transMat;
 	float m_scale;

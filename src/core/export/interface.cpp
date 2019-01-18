@@ -1056,11 +1056,11 @@ CORE_API const char* CDECL world_get_object_name(ObjectHdl obj) {
 	CATCH_ALL(nullptr)
 }
 
-InstanceHdl world_create_instance(ObjectHdl obj) {
+InstanceHdl world_create_instance(const char* name, ObjectHdl obj) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(hdl));
+	return static_cast<InstanceHdl>(s_world.create_instance(move(std::string(name)), hdl));
 	CATCH_ALL(nullptr)
 }
 

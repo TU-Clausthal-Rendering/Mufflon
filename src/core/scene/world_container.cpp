@@ -86,12 +86,12 @@ ObjectHandle WorldContainer::get_object(const std::string_view& name) {
 	return nullptr;
 }
 
-InstanceHandle WorldContainer::create_instance(ObjectHandle obj) {
+InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle obj) {
 	if(obj == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid object handle");
 		return nullptr;
 	}
-	m_instances.emplace_back(*obj);
+	m_instances.emplace_back(std::move(Instance(move(name), *obj)));
 	return &m_instances.back();
 }
 

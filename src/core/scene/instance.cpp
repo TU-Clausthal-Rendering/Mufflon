@@ -3,7 +3,8 @@
 
 namespace mufflon::scene {
 
-Instance::Instance(Object& obj, TransMatrixType trans) :
+Instance::Instance(std::string name, Object& obj, TransMatrixType trans) :
+	m_name(move(name)),
 	m_objRef(obj) {
 	this->set_transformation_matrix(std::move(trans));
 }

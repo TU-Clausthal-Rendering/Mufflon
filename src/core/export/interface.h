@@ -351,7 +351,7 @@ CORE_API void CDECL world_clear_all();
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
-CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj);
+CORE_API InstanceHdl CDECL world_create_instance(const char* name, ObjectHdl obj);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);
 CORE_API uint32_t CDECL world_get_scenario_count();
