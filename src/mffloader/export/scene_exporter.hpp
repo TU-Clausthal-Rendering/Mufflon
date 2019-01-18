@@ -18,14 +18,13 @@ public:
 
 	bool save_scene();
 private:
+	bool save_cameras(rapidjson::Document& document);
+	bool save_lights(rapidjson::Document& document);
+	bool save_materials(rapidjson::Document& document);
+	bool save_scenarios(rapidjson::Document& document);
 
 	const fs::path m_filePath;
-	rapidjson::Value::ConstMemberIterator m_cameras;
-	rapidjson::Value::ConstMemberIterator m_lights;
-	rapidjson::Value::ConstMemberIterator m_materials;
-	rapidjson::Value::ConstMemberIterator m_scenarios;
-	std::string_view m_defaultScenario;
-	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
+	
 };
 
 }// namespace mff_loader::exprt
