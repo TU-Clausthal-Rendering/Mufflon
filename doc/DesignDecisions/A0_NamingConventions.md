@@ -63,7 +63,7 @@ Switch-statement:
             } break;
             case D:     // fallthrough should be avoided, but flagged if used
                 ...
-                [[falltrough]]
+                [[fallthrough]];
             case E:
         }
 

@@ -95,6 +95,10 @@ public:
 		m_factorB = fB;
 		m_dirty = true;
 	}
+	float get_factor_a() const noexcept { return m_factorA; }
+	float get_factor_b() const noexcept { return m_factorB; }
+	const IMaterial* get_layer_a() const noexcept { return m_layerA.get(); }
+	const IMaterial* get_layer_b() const noexcept { return m_layerB.get(); }
 private:
 	std::unique_ptr<IMaterial> m_layerA;
 	std::unique_ptr<IMaterial> m_layerB;

@@ -67,6 +67,9 @@ public:
 		m_albedo = albedo;
 		m_dirty = true;
 	}
+	TextureHandle get_albedo() const {
+		return m_albedo;
+	}
 private:
 	TextureHandle m_albedo;
 };

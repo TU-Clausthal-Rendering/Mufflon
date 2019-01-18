@@ -359,6 +359,12 @@ CORE_API uint32_t CDECL world_get_scenario_count();
 CORE_API ScenarioHdl CDECL world_get_scenario_by_index(uint32_t index);
 CORE_API ConstScenarioHdl CDECL world_get_current_scenario();
 CORE_API MaterialHdl CDECL world_add_material(const char* name, const MaterialParams* mat);
+CORE_API IndexType CDECL world_get_material_count();
+CORE_API MaterialHdl CDECL world_get_material(IndexType index);
+CORE_API size_t CDECL world_get_material_size(MaterialHdl material);
+// buffer must have at least world_get_material_size() bytes. After a successful get
+// buffer contains a MaterialParamsStruct and all referenced sub-layers.
+CORE_API Boolean CDECL world_get_material_data(MaterialHdl material, MaterialParams* buffer);
 // TODO: blended/fresnel materials
 // TODO: glass/opaque materials
 // TODO: add more cameras

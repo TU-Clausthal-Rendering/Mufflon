@@ -1182,6 +1182,92 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	CATCH_ALL(nullptr)
 }
 
+IndexType world_get_material_count() {
+	return static_cast<IndexType>(s_world.get_material_count());
+}
+
+MaterialHdl world_get_material(IndexType index) {
+	TRY
+	return s_world.get_material(index);
+	CATCH_ALL(nullptr)
+}
+
+size_t world_get_material_size(MaterialHdl material) {
+	TRY
+	CHECK_NULLPTR(material, "material handle", 0);
+	MaterialHandle hdl = static_cast<MaterialHandle>(material);
+	switch(hdl->get_type()) {
+		case materials::Materials::LAMBERT: [[fallthrough]];
+		case materials::Materials::TORRANCE: [[fallthrough]];
+		case materials::Materials::WALTER: [[fallthrough]];
+		case materials::Materials::EMISSIVE: [[fallthrough]];
+		case materials::Materials::ORENNAYAR:
+			return sizeof(MaterialParamsStruct);
+		case materials::Materials::BLEND:
+			return sizeof(MaterialParamsStruct)
+				+ world_get_material_size(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_a()))
+				+ world_get_material_size(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_b()));
+		case materials::Materials::FRESNEL:// TODO
+			return 0;
+		case materials::Materials::GLASS://TODO
+			return 0;
+		default:
+			logWarning("[", FUNCTION_NAME, "] Unknown material type");
+			return 0;
+	}
+	CATCH_ALL(0)
+}
+
+int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
+	CHECK_NULLPTR(material, "material handle", 0);
+	CHECK_NULLPTR(buffer, "material buffer", 0);
+	MaterialHandle hdl = static_cast<MaterialHandle>(material);
+	const materials::Medium& medium = s_world.get_medium(hdl->get_outer_medium());
+	buffer->outerMedium.absorption = util::pun<Vec3>(medium.get_absorption_coeff());
+	buffer->outerMedium.refractionIndex = util::pun<Vec2>(medium.get_refraction_index());
+	switch(hdl->get_type()) {
+		case materials::Materials::LAMBERT:
+			buffer->innerType = MATERIAL_LAMBERT;
+			buffer->inner.lambert.albedo = static_cast<materials::Lambert*>(hdl)->get_albedo();
+			break;
+		case materials::Materials::TORRANCE://TODO
+			break;
+		case materials::Materials::WALTER://TODO
+			break;
+		case materials::Materials::EMISSIVE:
+			buffer->innerType = MATERIAL_EMISSIVE;
+			buffer->inner.emissive.radiance = hdl->get_emission().texture;
+			buffer->inner.emissive.scale = util::pun<Vec3>(hdl->get_emission().scale);
+			break;
+		case materials::Materials::ORENNAYAR:
+			break;
+		case materials::Materials::BLEND: {
+			buffer->innerType = MATERIAL_BLEND;
+			buffer->inner.blend.a.factor = static_cast<materials::Blend*>(hdl)->get_factor_a();
+			buffer->inner.blend.a.mat = buffer + 1;
+			int count = _world_get_material_data(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_a()), buffer->inner.blend.a.mat);
+			buffer->inner.blend.b.factor = static_cast<materials::Blend*>(hdl)->get_factor_b();
+			buffer->inner.blend.b.mat = buffer + 1 + count;
+			count += _world_get_material_data(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_b()), buffer->inner.blend.b.mat);
+			return count + 1;
+		}
+		case materials::Materials::FRESNEL:// TODO
+			break;
+		case materials::Materials::GLASS://TODO
+			break;
+		default:
+			logWarning("[", FUNCTION_NAME, "] Unknown material type");
+			return false;
+	}
+	return 1;
+}
+
+Boolean world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
+	TRY
+	return _world_get_material_data(material, buffer) >= 1;
+	CATCH_ALL(false)
+}
+
 
 CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 								   Vec3 up, float near, float far, float vFov) {

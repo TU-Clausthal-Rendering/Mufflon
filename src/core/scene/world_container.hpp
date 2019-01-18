@@ -70,11 +70,22 @@ public:
 	 */
 	MaterialHandle add_material(std::unique_ptr<materials::IMaterial> material);
 
+	std::size_t get_material_count() const noexcept {
+		return m_materials.size();
+	}
+	MaterialHandle get_material(i32 index) {
+		return m_materials.at(index).get();
+	}
+
 	/*
 	 * Add a medium to the world. If another medium with the same properties
 	 * exists it will be returned and the number of media will not be changed.
 	 */
 	materials::MediumHandle add_medium(const materials::Medium& medium);
+
+	const materials::Medium& get_medium(materials::MediumHandle hdl) const {
+		return m_media.at(hdl);
+	}
 
 	// Add a fully specfied camera to the pool of all cameras.
 	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
