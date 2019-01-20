@@ -127,6 +127,7 @@
     <Compile Include="Model\RendererModel.cs" />
     <Compile Include="Model\Scene\ScenarioModel.cs" />
     <Compile Include="Model\Scene\WorldModel.cs" />
+    <Compile Include="Model\SettingsModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />
@@ -252,8 +253,8 @@
     <Compile Include="View\Renderer\RendererParams.xaml.cs">
       <DependentUpon>RendererParams.xaml</DependentUpon>
     </Compile>
-    <Compile Include="View\AppSettings.xaml.cs">
-      <DependentUpon>AppSettings.xaml</DependentUpon>
+    <Compile Include="View\AppSettingsView.xaml.cs">
+      <DependentUpon>AppSettingsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\ScenarioLoadStatus.xaml.cs">
       <DependentUpon>ScenarioLoadStatus.xaml</DependentUpon>
@@ -378,7 +379,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="View\AppSettings.xaml">
+    <Page Include="View\AppSettingsView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

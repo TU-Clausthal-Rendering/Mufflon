@@ -95,8 +95,6 @@ namespace gui.Model.Scene
                 throw new Exception("scene handle is nullptr");
 
             FullPath = fullPath;
-            if (Settings.Default.LastWorlds == null)
-                Settings.Default.LastWorlds = new StringCollection();
 
             // first load lights and materials
             LoadLights();

@@ -71,10 +71,7 @@ namespace gui.ViewModel
             m_models = models;
             m_reset = reset;
 
-            if(Settings.Default.LastWorlds == null)
-                Settings.Default.LastWorlds = new StringCollection();
-
-            foreach (string path in Settings.Default.LastWorlds)
+            foreach (string path in m_models.Settings.LastWorlds)
             {
                 LastScenes.Add(new SceneMenuItem(m_models)
                 {
@@ -82,6 +79,8 @@ namespace gui.ViewModel
                     Path = path
                 });
             }
+
+            m_models.Settings.LastWorlds.CollectionChanged += LastWorldsOnCollectionChanged;
 
             // Register the handle for scene changes
             // TODO remove after relocation materials and camera
@@ -92,8 +91,21 @@ namespace gui.ViewModel
             Debug.Assert(m_models.World == null);
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += OnRendererChange;
+        }
 
-            Settings.Default.PropertyChanged += SettingsOnPropertyChanged;
+        private void LastWorldsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
+        {
+            // TODO make more efficient by using args
+            LastScenes.Clear();
+            foreach (string path in m_models.Settings.LastWorlds)
+            {
+                LastScenes.Add(new SceneMenuItem(m_models)
+                {
+                    Filename = Path.GetFileName(path),
+                    Path = path
+                });
+            }
+            OnPropertyChanged(nameof(CanLoadLastScenes));
         }
 
         private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -122,26 +134,6 @@ namespace gui.ViewModel
                     // refresh views
                     MakeScenerioViews();
 
-                    break;
-            }
-        }
-
-        private void SettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
-        {
-            switch (args.PropertyName)
-            {
-                case nameof(Settings.Default.LastWorlds):
-                    // TODO this wont be triggered => change to observable collection?
-                    LastScenes.Clear();
-                    foreach (string path in Settings.Default.LastWorlds)
-                    {
-                        LastScenes.Add(new SceneMenuItem(m_models)
-                        {
-                            Filename = Path.GetFileName(path),
-                            Path = path
-                        });
-                    }
-                    OnPropertyChanged(nameof(CanLoadLastScenes));
                     break;
             }
         }

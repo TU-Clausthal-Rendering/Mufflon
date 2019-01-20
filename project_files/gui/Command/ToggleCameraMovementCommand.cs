@@ -24,7 +24,7 @@ namespace gui.Command
 
         public override void Execute(object parameter)
         {
-            m_models.Viewport.AllowMovement = !m_models.Viewport.AllowMovement;
+            m_models.Settings.AllowCameraMovement = !m_models.Settings.AllowCameraMovement;
         }
 
         public override event EventHandler CanExecuteChanged

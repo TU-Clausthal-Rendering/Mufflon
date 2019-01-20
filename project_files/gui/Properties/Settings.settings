@@ -2,10 +2,7 @@
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="gui.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
-    <Setting Name="ImagePath" Type="System.String" Scope="User">
-      <Value Profile="(Default)" />
-    </Setting>
-    <Setting Name="lastWorldPath" Type="System.String" Scope="User">
+    <Setting Name="LastWorldPath" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="LastSelectedRenderer" Type="System.Int32" Scope="User">
@@ -32,7 +29,7 @@
     <Setting Name="ScreenshotFolder" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
-    <Setting Name="ScreenShotNamePatternHistory" Type="System.Collections.Specialized.StringCollection" Scope="User">
+    <Setting Name="ScreenshotNamePatternHistory" Type="System.Collections.Specialized.StringCollection" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="ScreenshotGesture" Type="System.String" Scope="User">

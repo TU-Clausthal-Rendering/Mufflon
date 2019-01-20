@@ -26,24 +26,12 @@ namespace gui.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string ImagePath {
+        public string LastWorldPath {
             get {
-                return ((string)(this["ImagePath"]));
+                return ((string)(this["LastWorldPath"]));
             }
             set {
-                this["ImagePath"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string lastWorldPath {
-            get {
-                return ((string)(this["lastWorldPath"]));
-            }
-            set {
-                this["lastWorldPath"] = value;
+                this["LastWorldPath"] = value;
             }
         }
         
@@ -144,12 +132,12 @@ namespace gui.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        public global::System.Collections.Specialized.StringCollection ScreenShotNamePatternHistory {
+        public global::System.Collections.Specialized.StringCollection ScreenshotNamePatternHistory {
             get {
-                return ((global::System.Collections.Specialized.StringCollection)(this["ScreenShotNamePatternHistory"]));
+                return ((global::System.Collections.Specialized.StringCollection)(this["ScreenshotNamePatternHistory"]));
             }
             set {
-                this["ScreenShotNamePatternHistory"] = value;
+                this["ScreenshotNamePatternHistory"] = value;
             }
         }
         

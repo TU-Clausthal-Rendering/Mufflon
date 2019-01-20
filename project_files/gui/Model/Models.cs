@@ -24,6 +24,8 @@ namespace gui.Model
     public class Models : INotifyPropertyChanged
     {
         public AppModel App { get; }
+        public SettingsModel Settings { get; }
+
         public RendererModel Renderer { get; }
         public ViewportModel Viewport { get; }
 
@@ -45,9 +47,10 @@ namespace gui.Model
 
         public Models(MainWindow window)
         {
+            Settings = new SettingsModel();
             Viewport = new ViewportModel();
             Renderer = new RendererModel();
-            App = new AppModel(window, Viewport, Renderer);
+            App = new AppModel(window, Viewport, Renderer, Settings);
             Cameras = new SynchronizedModelList<CameraModel>();
             Materials = new SynchronizedModelList<MaterialModel>();
             Toolbar = new ToolbarModel();

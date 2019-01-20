@@ -23,7 +23,7 @@ namespace gui.Command
         public SaveSceneCommand(Models models)
         {
             m_models = models;
-            m_lastDirectory = Settings.Default.lastWorldPath;
+            m_lastDirectory = models.Settings.LastWorldPath;
             if (m_lastDirectory.Length == 0)
                 m_lastDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             m_keyBind = new KeyBinding(this, new KeyGesture(Key.S, ModifierKeys.Control));

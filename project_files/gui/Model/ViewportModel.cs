@@ -116,18 +116,6 @@ namespace gui.Model
             }
         }
 
-        private bool m_allowMovement = Settings.Default.AllowCameraMovement;
-        public bool AllowMovement
-        {
-            get => m_allowMovement;
-            set
-            {
-                if (value == m_allowMovement) return;
-                m_allowMovement = value;
-                OnPropertyChanged(nameof(AllowMovement));
-            }
-        }
-
         // effective maximum size including zoom
         public int DesiredWidth => (int)(RenderWidth * Zoom);
 

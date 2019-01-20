@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
@@ -22,13 +23,17 @@ namespace gui.ViewModel
             ToggleCameraMovementCommand = new ToggleCameraMovementCommand(models);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
-            m_models.Viewport.PropertyChanged += ViewportOnPropertyChanged;
+            m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
         }
 
-        private void ViewportOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        private void SettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
-            if (sender == m_models.Viewport && args.PropertyName == nameof(Models.Viewport.AllowMovement))
-                OnPropertyChanged(nameof(CameraMoveIconVisibility));
+            switch (args.PropertyName)
+            {
+                case nameof(SettingsModel.AllowCameraMovement):
+                    OnPropertyChanged(nameof(CameraMoveIconVisibility));
+                    break;
+            }
         }
 
         private void RendererOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -49,7 +54,7 @@ namespace gui.ViewModel
             m_models.Renderer.IsRendering ? Visibility.Visible : Visibility.Collapsed;
 
         public Visibility CameraMoveIconVisibility =>
-            m_models.Viewport.AllowMovement ? Visibility.Collapsed : Visibility.Visible;
+            m_models.Settings.AllowCameraMovement ? Visibility.Collapsed : Visibility.Visible;
 
         public IGesturedCommand PlayPauseCommand { get; }
         public IGesturedCommand ResetCommand { get; }

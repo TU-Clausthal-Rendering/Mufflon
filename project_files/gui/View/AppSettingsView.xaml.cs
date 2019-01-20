@@ -14,6 +14,7 @@ using System.Windows.Forms;
 
 namespace gui.View
 {
+    // TODO remove logic from this class and put it into view model
     /// <summary>
     /// Interaction logic for Settings.xaml
     /// </summary>
@@ -64,14 +65,13 @@ namespace gui.View
         private ViewModels m_viewModels;
 
         // General settings
-        private string m_screenshotFolder;
         public Severity LogLevel { get; set; }
         public ProfilingLevel CoreProfilerLevel { get; set; }
         public ProfilingLevel LoaderProfilerLevel { get; set; }
         // TODO: pattern file type checking?
         public string ScreenshotNamePattern { get; set; } = Settings.Default.ScreenshotNamePattern;
-        public string ScreenshotFolder { get => m_screenshotFolder; }
-        public StringCollection ScreenshotNamePatternHistory { get => Settings.Default.ScreenShotNamePatternHistory; }
+        public string ScreenshotFolder => Settings.Default.ScreenshotFolder;
+        public StringCollection ScreenshotNamePatternHistory { get => Settings.Default.ScreenshotNamePatternHistory; }
 
         // Key bindings/gestures
         public string PlayPauseGesture { get; set; }
@@ -83,13 +83,10 @@ namespace gui.View
         {
             InitializeComponent();
             m_viewModels = viewModels;
-            if (Settings.Default.ScreenshotFolder == null || Settings.Default.ScreenshotFolder.Length == 0)
-                Settings.Default.ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            m_screenshotFolder = Settings.Default.ScreenshotFolder;
-            if (Settings.Default.ScreenShotNamePatternHistory == null)
-                Settings.Default.ScreenShotNamePatternHistory = new StringCollection();
-            if (Settings.Default.ScreenShotNamePatternHistory.Count == 0)
-                Settings.Default.ScreenShotNamePatternHistory.Add(ScreenshotNamePattern);
+            if (Settings.Default.ScreenshotNamePatternHistory == null)
+                Settings.Default.ScreenshotNamePatternHistory = new StringCollection();
+            if (Settings.Default.ScreenshotNamePatternHistory.Count == 0)
+                Settings.Default.ScreenshotNamePatternHistory.Add(ScreenshotNamePattern);
             LogLevel = LogLevels[Settings.Default.LogLevel];
             CoreProfilerLevel = CoreProfilerLevels[Settings.Default.CoreProfileLevel];
             LoaderProfilerLevel = LoaderProfilerLevels[Settings.Default.LoaderProfileLevel];
@@ -114,9 +111,9 @@ namespace gui.View
             if(Settings.Default.ScreenshotNamePattern != ScreenshotNamePattern)
             {
                 Settings.Default.ScreenshotNamePattern = ScreenshotNamePattern;
-                Settings.Default.ScreenShotNamePatternHistory.Insert(0, ScreenshotNamePattern);
-                if (Settings.Default.ScreenShotNamePatternHistory.Count > MAX_SCREENSHOT_PATTERN_HISTORY)
-                    Settings.Default.ScreenshotNamePattern.Remove(Settings.Default.ScreenShotNamePatternHistory.Count - 1);
+                Settings.Default.ScreenshotNamePatternHistory.Insert(0, ScreenshotNamePattern);
+                if (Settings.Default.ScreenshotNamePatternHistory.Count > MAX_SCREENSHOT_PATTERN_HISTORY)
+                    Settings.Default.ScreenshotNamePattern.Remove(Settings.Default.ScreenshotNamePatternHistory.Count - 1);
             }
             Logger.LogLevel = LogLevel.Level; // Also sets the level in the DLLs
             if (CoreProfilerLevel.Level == Core.ProfilingLevel.OFF)
@@ -147,7 +144,7 @@ namespace gui.View
             {
                 if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
                 {
-                    m_screenshotFolder = dialog.SelectedPath;
+                    Settings.Default.ScreenshotFolder = dialog.SelectedPath;
                     OnPropertyChanged(nameof(ScreenshotFolder));
                 }
             }

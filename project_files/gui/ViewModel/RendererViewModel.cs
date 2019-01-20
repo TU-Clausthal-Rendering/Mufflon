@@ -63,31 +63,20 @@ namespace gui.ViewModel
             {
                 if (m_selectedRenderer == value) return;
                 m_selectedRenderer = value;
-                Settings.Default.LastSelectedRenderer = m_selectedRenderer.Id;
+                m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Id;
                 m_models.Renderer.Type = m_selectedRenderer.Type;
                 OnPropertyChanged(nameof(SelectedRenderer));
             }
         }
 
-        public bool IsRendering
-        {
-            get => m_models.Renderer.IsRendering;
-        }
+        public bool IsRendering => m_models.Renderer.IsRendering;
 
-        public uint Iteration
-        {
-            get => m_models.Renderer.Iteration;
-        }
+        public uint Iteration => m_models.Renderer.Iteration;
 
         public bool AutoStartOnLoad
         {
-            get => Settings.Default.AutoStartOnLoad;
-            set
-            {
-                if (Settings.Default.AutoStartOnLoad == value) return;
-                Settings.Default.AutoStartOnLoad = value;
-                OnPropertyChanged(nameof(AutoStartOnLoad));
-            }
+            get => m_models.Settings.AutoStartOnLoad;
+            set => m_models.Settings.AutoStartOnLoad = value;
         }
 
         public ObservableCollection<RendererItem> Renderers { get; }
@@ -99,7 +88,8 @@ namespace gui.ViewModel
             m_playPause = playPause;
             m_propertiesGrid = (DataGrid)((UserControl)window.FindName("RendererPropertiesControl")).FindName("RendererPropertiesGrid");
             RendererProperties = new ObservableCollection<object>();
-            AutoStartOnLoad = Settings.Default.AutoStartOnLoad;
+            
+
 
             // Enable the renderers (TODO: automatically get them from somewhere?)
             Renderers = new ObservableCollection<RendererItem>()
@@ -114,16 +104,27 @@ namespace gui.ViewModel
             // Register the handlers
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;
+            m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
 
             // Enable the last selected renderer
-            int lastSelected = Settings.Default.LastSelectedRenderer;
+            int lastSelected = models.Settings.LastSelectedRenderer;
             if (lastSelected >= Renderers.Count)
             {
                 lastSelected = 0;
-                Settings.Default.LastSelectedRenderer = 0;
+                models.Settings.LastSelectedRenderer = 0;
             }
-            m_selectedRenderer = Renderers[Settings.Default.LastSelectedRenderer];
+            m_selectedRenderer = Renderers[models.Settings.LastSelectedRenderer];
             m_models.Renderer.Type = (Core.RendererType)m_selectedRenderer.Type;
+        }
+
+        private void SettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(SettingsModel.AutoStartOnLoad):
+                    OnPropertyChanged(nameof(AutoStartOnLoad));
+                    break;
+            }
         }
 
         private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)

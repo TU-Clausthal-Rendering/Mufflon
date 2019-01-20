@@ -31,6 +31,7 @@ namespace gui.Dll
         // information about the viewport
         private readonly ViewportModel m_viewport;
         private readonly RendererModel m_rendererModel;
+        private readonly SettingsModel m_settings;
 
         // context creation
         private IntPtr m_hWnd = IntPtr.Zero;
@@ -53,12 +54,13 @@ namespace gui.Dll
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
-        public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel)
+        public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel, SettingsModel settings)
         {
             m_window = window;
             m_parent = window.BorderHost;
             m_viewport = viewport;
             m_rendererModel = rendererModel;
+            m_settings = settings;
             m_window.MouseWheel += OnMouseWheel;
             m_window.SnapsToDevicePixels = true;
             // TODO: set the initial height here, but put a listener for window(!) size
@@ -107,7 +109,7 @@ namespace gui.Dll
                     if (!m_isRunning)
                         break;
 
-                    if(m_viewport.AllowMovement)
+                    if(m_settings.AllowCameraMovement)
                     {
                         // Check for keyboard input
                         float x = 0f;
