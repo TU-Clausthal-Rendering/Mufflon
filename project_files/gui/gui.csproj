@@ -41,6 +41,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>true</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>x64</PlatformTarget>
@@ -83,6 +84,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Command\ActionCommand.cs" />
     <Compile Include="Command\AddCameraCommand.cs" />
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AddMaterialCommand.cs" />
@@ -99,6 +101,7 @@
     <Compile Include="Command\RemoveMaterialCommand.cs" />
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
+    <Compile Include="Command\SetDialogResultCommand.cs" />
     <Compile Include="Command\ToggleCameraMovementCommand.cs" />
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
@@ -169,6 +172,10 @@
     <Compile Include="ViewModel\RendererViewModel.cs" />
     <Compile Include="ViewModel\SceneViewModel.cs" />
     <Compile Include="ViewModel\SelectRendererViewModel.cs" />
+    <Compile Include="ViewModel\Settings\SettingsViewModel.cs" />
+    <Compile Include="ViewModel\Settings\GeneralSettingsViewModel.cs" />
+    <Compile Include="ViewModel\Settings\KeybindingsViewModel.cs" />
+    <Compile Include="ViewModel\Settings\OtherViewModel.cs" />
     <Compile Include="ViewModel\StatusbarViewModel.cs" />
     <Compile Include="ViewModel\ToolbarViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
@@ -201,6 +208,7 @@
     <Compile Include="View\Helper\ComboBoxItem.cs" />
     <Compile Include="View\Helper\DecimalTextBox.cs" />
     <Compile Include="View\Helper\EnterTextBox.cs" />
+    <Compile Include="View\Helper\EnumBoxItem.cs" />
     <Compile Include="View\Helper\NumericUpDown.xaml.cs">
       <DependentUpon>NumericUpDown.xaml</DependentUpon>
     </Compile>
@@ -253,8 +261,8 @@
     <Compile Include="View\Renderer\RendererParams.xaml.cs">
       <DependentUpon>RendererParams.xaml</DependentUpon>
     </Compile>
-    <Compile Include="View\AppSettingsView.xaml.cs">
-      <DependentUpon>AppSettingsView.xaml</DependentUpon>
+    <Compile Include="View\SettingsView.xaml.cs">
+      <DependentUpon>SettingsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\ScenarioLoadStatus.xaml.cs">
       <DependentUpon>ScenarioLoadStatus.xaml</DependentUpon>
@@ -379,7 +387,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="View\AppSettingsView.xaml">
+    <Page Include="View\SettingsView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

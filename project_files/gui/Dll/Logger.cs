@@ -9,7 +9,7 @@ namespace gui.Dll
         public delegate void LogEvent(string message, Brush color);
         public static event LogEvent Log;
 
-        private static Core.Severity s_logLevel = Core.Severity.INFO;
+        private static Core.Severity s_logLevel = Core.Severity.Info;
         public static Core.Severity LogLevel
         {
             get => s_logLevel;
@@ -31,11 +31,11 @@ namespace gui.Dll
             {
                 switch (severity)
                 {
-                    case Core.Severity.PEDANTIC: color = Brushes.Gray; break;
-                    case Core.Severity.WARNING: color = Brushes.Yellow; break;
-                    case Core.Severity.ERROR: color = Brushes.Red; break;
-                    case Core.Severity.FATAL_ERROR: color = Brushes.Violet; break;
-                    case Core.Severity.INFO:
+                    case Core.Severity.Pedantic: color = Brushes.Gray; break;
+                    case Core.Severity.Warning: color = Brushes.Yellow; break;
+                    case Core.Severity.Error: color = Brushes.Red; break;
+                    case Core.Severity.FatalError: color = Brushes.Violet; break;
+                    case Core.Severity.Info:
                     default:
                         color = Brushes.White; break;
                 }

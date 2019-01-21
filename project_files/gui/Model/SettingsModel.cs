@@ -26,6 +26,8 @@ namespace gui.Model
         {
             SynchronizeStringCollectionWithObservable(Settings.Default.LastWorlds, LastWorlds);
             SynchronizeStringCollectionWithObservable(Settings.Default.ScreenshotNamePatternHistory, ScreenshotNamePatternHistory);
+            if(ScreenshotNamePatternHistory.Count == 0)
+                ScreenshotNamePatternHistory.Add(ScreenshotNamePattern);
 
             LoadGestures();
             SetLogLevel(LogLevel);
@@ -67,6 +69,8 @@ namespace gui.Model
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_log_level(severity))
                 throw new Exception(Loader.loader_get_dll_error());
+            // TODO redundant?
+            Logger.LogLevel = LogLevel;
         }
 
         /// <summary>
@@ -118,9 +122,17 @@ namespace gui.Model
                     break;
                 case nameof(Settings.Default.CoreProfileLevel):
                     OnPropertyChanged(nameof(CoreProfileLevel));
+                    if(CoreProfileLevel == Core.ProfilingLevel.Off)
+                        Core.profiling_disable();
+                    else if(!Core.profiling_set_level(CoreProfileLevel))
+                        throw new Exception(Core.core_get_dll_error());
                     break;
                 case nameof(Settings.Default.LoaderProfileLevel):
                     OnPropertyChanged(nameof(LoaderProfileLevel));
+                    if(LoaderProfileLevel == Core.ProfilingLevel.Off)
+                        Loader.loader_profiling_disable();
+                    else if(!Loader.loader_profiling_set_level(LoaderProfileLevel))
+                        throw new Exception(Loader.loader_get_dll_error());
                     break;
                 case nameof(Settings.ScreenshotNamePattern):
                     OnPropertyChanged(nameof(ScreenshotNamePattern));
@@ -321,7 +333,7 @@ namespace gui.Model
                     // dont insert this item (would be the last in the list)
                     if(index == Count) return;
                     // remove the last item
-                    RemoveItem(Count - 1);
+                    RemoveAt(Count - 1);
                 }
 
                 base.InsertItem(index, item);

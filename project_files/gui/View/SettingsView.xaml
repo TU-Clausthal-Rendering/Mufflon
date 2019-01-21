@@ -1,11 +1,13 @@
-﻿<Window x:Class="gui.View.AppSettings"
+﻿<Window x:Class="gui.View.SettingsView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui.View"
         mc:Ignorable="d"
-        Title="Settings" Height="450" Width="400">
+        Title="Settings" 
+        Height="450" 
+        Width="400">
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
@@ -36,44 +38,39 @@
                                    Text="Logger output level:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"/>
-                        <ComboBox Grid.Row="0" Grid.Column="1"
-                                  Width="100" ItemsSource="{Binding LogLevels}"
-                                  Name="LogLevelBox"
-                                  DisplayMemberPath="Name"
-                                  SelectedValuePath="Level"
-                                  SelectedItem="{Binding LogLevel}"/>
+                        <ComboBox Grid.Row="0" 
+                                  Grid.Column="1"
+                                  Width="100" 
+                                  ItemsSource="{Binding General.LogLevels}"
+                                  SelectedItem="{Binding General.SelectedLogLevel}"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Core Profiler level:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"/>
                         <ComboBox Grid.Row="1" Grid.Column="1"
-                                  Width="100" ItemsSource="{Binding CoreProfilerLevels}"
-                                  Name="CoreProfilerLevelBox"
-                                  DisplayMemberPath="Name"
-                                  SelectedValuePath="Level"
-                                  SelectedItem="{Binding CoreProfilerLevel}"/>
+                                  Width="100" 
+                                  ItemsSource="{Binding General.CoreProfilerLevels}"
+                                  SelectedItem="{Binding General.SelectedCoreProfilerLevel}"/>
                         
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Loader Profiler level:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"/>
                         <ComboBox Grid.Row="2" Grid.Column="1"
-                                  Width="100" ItemsSource="{Binding LoaderProfilerLevels}"
-                                  Name="LoaderProfilerLevelBox"
-                                  DisplayMemberPath="Name"
-                                  SelectedValuePath="Level"
-                                  SelectedItem="{Binding LoaderProfilerLevel}"/>
+                                  Width="100" 
+                                  ItemsSource="{Binding General.LoaderProfilerLevels}"
+                                  SelectedItem="{Binding General.SelectedLoaderProfilerLevel}"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0"
                                    Text="Screenshot name pattern:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
-                                   ToolTip="{x:Static local:AppSettings.ScreenshotNamePatternTooltip}"/>
+                                   ToolTip="{Binding General.ScreenshotNamePatternTooltip}"/>
                         <ComboBox Grid.Row="3" Grid.Column="1"
                                   IsEditable="True"
-                                  ItemsSource="{Binding ScreenshotNamePatternHistory}"
-                                  Text="{Binding ScreenshotNamePattern}">
+                                  ItemsSource="{Binding General.ScreenshotNamePatterns}"
+                                  Text="{Binding General.SelectedScreenshotNamePattern}">
                         </ComboBox>
 
                         <TextBlock Grid.Row="4" Grid.Column="0"
@@ -87,11 +84,11 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
-                                       Text="{Binding ScreenshotFolder}"
+                                       Text="{Binding General.ScreenshotFolder}"
                                        TextTrimming="CharacterEllipsis"
                                        HorizontalAlignment="Stretch"/>
                             <Button Grid.Column="1"
-                                    Click="ScreenshotFolder_Click"
+                                    Command="{Binding General.SelectScreenshotFolderCommand}"
                                     HorizontalAlignment="Right">...</Button>
                         </Grid>
                     </Grid>
@@ -117,7 +114,7 @@
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="0" Grid.Column="1"
                                  Width="50"
-                                 Text="{Binding PlayPauseGesture}"/>
+                                 Text="{Binding Keybindings.PlayPauseGesture}"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Reset renderer:"
@@ -125,7 +122,7 @@
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="1" Grid.Column="1"
                                  Width="50"
-                                 Text="{Binding ResetGesture}"/>
+                                 Text="{Binding Keybindings.ResetGesture}"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Save screenshot:"
@@ -133,7 +130,7 @@
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="2" Grid.Column="1"
                                  Width="50"
-                                 Text="{Binding ScreenshotGesture}"/>
+                                 Text="{Binding Keybindings.ScreenshotGesture}"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0"
                                    Text="Toggle camera movement:"
@@ -141,7 +138,7 @@
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="3" Grid.Column="1"
                                  Width="50"
-                                 Text="{Binding CameraMoveToggleGesture}"/>
+                                 Text="{Binding Keybindings.CameraMoveToggleGesture}"/>
                     </Grid>
                 </StackPanel>
             </TabItem>
@@ -152,8 +149,15 @@
         <StackPanel Grid.Row="1" Grid.Column="0"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
-            <Button Width="50" Click="OkButtonClick">Ok</Button>
-            <Button Width="50" Click="CancelButtonClick">Cancel</Button>
+            <Button 
+                Width="50"
+                Command="{Binding SaveCommand}"
+                Content="Save"/>
+
+            <Button 
+                Width="50" 
+                Command="{Binding CancelCommand}"
+                Content="Cancel"/>
         </StackPanel>
     </Grid>
 </Window>

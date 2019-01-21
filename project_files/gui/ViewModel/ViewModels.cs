@@ -84,7 +84,7 @@ namespace gui.ViewModel
             LoadSceneCommand = new LoadSceneCommand(m_models);
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
-            OpenSettingsCommand = new OpenSettingsCommand(this, m_models);
+            OpenSettingsCommand = new OpenSettingsCommand(m_models);
             AdjustGammaUp = new AdjustGammaUpCommand();
             AdjustGammaDown = new AdjustGammaDownCommand();
 

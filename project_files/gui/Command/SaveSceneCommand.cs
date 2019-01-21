@@ -63,7 +63,7 @@ namespace gui.Command
 
             if (res == Loader.LoaderStatus.SUCCESS)
             {
-                Logger.log("World '" + Path.GetFileName(path) + "' was saved successfully", Core.Severity.INFO);
+                Logger.log("World '" + Path.GetFileName(path) + "' was saved successfully", Core.Severity.Info);
             }
             else
             {

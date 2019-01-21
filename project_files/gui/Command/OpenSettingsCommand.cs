@@ -3,30 +3,25 @@ using gui.ViewModel;
 using System;
 using System.Windows.Input;
 using gui.Model;
+using gui.ViewModel.Settings;
 
 namespace gui.Command
 {
     class OpenSettingsCommand : ICommand
     {
         private readonly Model.Models m_models;
-        private readonly ViewModels m_viewModels;
-        private AppSettings m_settings;
+        private readonly SettingsViewModel m_viewModel;
 
-        public OpenSettingsCommand(ViewModels viewModels, Models models)
+        public OpenSettingsCommand(Models models)
         {
-            m_viewModels = viewModels;
             m_models = models;
+            m_viewModel = new SettingsViewModel(models);
         }
 
-        event EventHandler ICommand.CanExecuteChanged
+        public event EventHandler CanExecuteChanged
         {
-            add
-            {
-            }
-
-            remove
-            {
-            }
+            add {}
+            remove {}
         }
 
         bool ICommand.CanExecute(object parameter)
@@ -36,8 +31,18 @@ namespace gui.Command
 
         void ICommand.Execute(object parameter)
         {
-            m_settings = new AppSettings(m_viewModels, m_models);
-            m_settings.Show();
+            // refresh view model
+            m_viewModel.LoadFromSettings();
+
+            var view = new SettingsView
+            {
+                DataContext = m_viewModel
+            };
+
+            if(m_models.App.ShowDialog(view) != true) return;
+
+            // return value = true => save settings
+            m_viewModel.StoreSettings();
         }
     }
 }

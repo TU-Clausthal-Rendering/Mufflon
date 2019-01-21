@@ -103,7 +103,7 @@ namespace gui.Command
             }
             else if (status == Loader.LoaderStatus.SUCCESS)
             {
-                Logger.log("World '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
+                Logger.log("World '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.Info);
 
                 // Set path and load scene properties
                 m_models.World = new WorldModel(m_models.Renderer, Core.world_get_current_scene(), path);
@@ -111,7 +111,7 @@ namespace gui.Command
             }
             else
             {
-                Logger.log("World load was cancelled", Core.Severity.INFO);
+                Logger.log("World load was cancelled", Core.Severity.Info);
             }
         }
 

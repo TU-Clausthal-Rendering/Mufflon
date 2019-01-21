@@ -91,10 +91,10 @@ namespace gui.Dll
 
         public enum ProfilingLevel
         {
-            ALL,
-            HIGH,
-            LOW,
-            OFF
+            All,
+            High,
+            Low,
+            Off
         };
 
         public enum ParameterType
@@ -106,11 +106,11 @@ namespace gui.Dll
 
         public enum Severity
         {
-            PEDANTIC,
-            INFO,
-            WARNING,
-            ERROR,
-            FATAL_ERROR
+            Pedantic,
+            Info,
+            Warning,
+            Error,
+            FatalError
         };
 
         public enum TextureSampling
