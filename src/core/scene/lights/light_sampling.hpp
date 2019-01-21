@@ -395,12 +395,16 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 	connectionDir /= cDist;
 	// Compute the contribution (diffIrradiance)
 	UvCoordinate uvDummy;
+	// TODO: instance rotation on globalDir?
 	Spectrum radiance { sample(light.radianceTex, globalDir, uvDummy) };
-	radiance *= light.radius * light.radius / (float(dir.pdf) * cDistSq);
+	const Spectrum scale = ei::unpackRGB9E5(light.scale);
+	const float sampleArea = light.radius * light.radius / float(dir.pdf);
+	const float cosOut = ei::max(0.0f, -dot(globalDir, connectionDir));
+	radiance *= cosOut * sampleArea / cDistSq;
 	return NextEventEstimation{
-		connectionDir, -dot(globalDir, connectionDir),
-		radiance,
-		cDist, cDistSq, dir.pdf.to_area_pdf(1.0f, ei::sq(light.radius))
+		connectionDir, cosOut,
+		radiance * scale,
+		cDist, cDistSq, AreaPdf{1.0f / sampleArea}
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const DirectionalLight& light,
