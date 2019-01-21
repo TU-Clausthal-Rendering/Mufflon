@@ -324,7 +324,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 				throw std::runtime_error("Failed to add focus camera");
 		} else if(type.compare("ortho") == 0) {
 			// TODO: Orthogonal camera
-			logWarning("[JsonLoader::load_cameras] Scene file: Focus cameras are not supported yet");
+			logWarning("[JsonLoader::load_cameras] Scene file: Orthogonal cameras are not supported yet");
 		} else {
 			logWarning("[JsonLoader::load_cameras] Scene file: camera object '",
 					   cameraIter->name.GetString(), "' has unknown type '", type, "'");

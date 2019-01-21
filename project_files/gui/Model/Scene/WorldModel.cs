@@ -26,6 +26,7 @@ namespace gui.Model.Scene
         public string FullPath { get; }
 
         private readonly IntPtr m_handle;
+        private RendererModel m_rendererModel;
 
         public ObservableCollection<ScenarioModel> Scenarios { get; } = new ObservableCollection<ScenarioModel>();
 
@@ -48,6 +49,7 @@ namespace gui.Model.Scene
                 Debug.Assert(Scenarios.Contains(m_currentScenario));
 
                 if(ReferenceEquals(value, m_currentScenario)) return;
+
                 // TODO add events for scenario started/finished loading (use ScenarioLoadStatus class)
                 LoadScenarioAsync(value);
             }
@@ -58,6 +60,8 @@ namespace gui.Model.Scene
         private async void LoadScenarioAsync(ScenarioModel scenario)
         {
             var handle = scenario.Handle;
+            bool wasRendering = m_rendererModel.IsRendering;
+            m_rendererModel.IsRendering = false;
 
             await Task.Run(() =>
             {
@@ -70,6 +74,8 @@ namespace gui.Model.Scene
             OnPropertyChanged(nameof(CurrentScenario));
             OnPropertyChanged(nameof(BoundingBox));
             OnPropertyChanged(nameof(IsSane));
+            if (wasRendering)
+                m_rendererModel.IsRendering = true;
         }
 
         public BoundingBox BoundingBox
@@ -89,8 +95,9 @@ namespace gui.Model.Scene
         // filename with extension
         public string Filename => Path.GetFileName(FullPath);
 
-        public WorldModel(IntPtr handle, string fullPath)
+        public WorldModel(RendererModel model, IntPtr handle, string fullPath)
         {
+            m_rendererModel = model;
             m_handle = handle;
             if(handle == IntPtr.Zero)
                 throw new Exception("scene handle is nullptr");

@@ -167,6 +167,11 @@ public:
 		return defaultBackground;
 	}
 
+	// Sets the after-load function for LoDs
+	void set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32)) {
+		m_load_lod = func;
+	}
+
 	// Clears the world object from all resources
 	static void clear_instance();
 
@@ -181,6 +186,9 @@ private:
 
 	// Global container object for everything
 	static WorldContainer s_container;
+
+	// Function pointer for loading a LoD from a scene
+	bool (CDECL *m_load_lod)(ObjectHandle obj, u32 lod) = nullptr;
 
 	// All objects of the world.
 	std::map<std::string, Object, std::less<>> m_objects;

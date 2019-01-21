@@ -132,6 +132,7 @@ LoaderStatus loader_load_json(const char* path) {
 	}
 
 	s_jsonLoader.store(nullptr);
+	core_set_lod_loader(loader_load_lod);
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }

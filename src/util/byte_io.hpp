@@ -1,9 +1,35 @@
 #pragma once
 
+#include "int_types.hpp"
 #include <cstddef>
 #include <iostream>
+#include <streambuf>
 
 namespace mufflon { namespace util {
+
+// Stream buffer to enable IOStreams on arrays
+// Taken from https://stackoverflow.com/questions/7781898/get-an-istream-from-a-char
+class ArrayStreamBuffer : public std::streambuf {
+public:
+	ArrayStreamBuffer(const char* begin, const std::size_t bytes);
+	int_type underflow();
+	int_type uflow();
+	int_type pbackfail(int_type ch);
+	std::streamsize showmanyc();
+	std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way,
+						   std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
+	std::streampos seekpos(std::streampos sp, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
+	ArrayStreamBuffer(const ArrayStreamBuffer&) = delete;
+	ArrayStreamBuffer(ArrayStreamBuffer&&) = default;
+	ArrayStreamBuffer& operator=(const ArrayStreamBuffer&) = delete;
+	ArrayStreamBuffer& operator=(ArrayStreamBuffer&&) = default;
+	~ArrayStreamBuffer() = default;
+
+private:
+	const char* const m_begin;
+	const char* const m_end;
+	const char* m_current;
+};
 
 // Interface abstracting C++ iostream/FILE descriptor into common type
 class IByteReader {

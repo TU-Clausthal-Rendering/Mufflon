@@ -182,7 +182,7 @@ inline AttrHdl convert_poly_to_attr(const PolygonAttributeHdl& hdl) {
 }
 
 // Convert attribute type to string for convenience
-inline std::string get_attr_type_name(AttribDesc desc) {
+inline std::string get_attr_type_name(const AttribDesc& desc) {
 	std::string typeName;
 	switch(desc.type) {
 		case AttributeType::ATTR_CHAR: typeName = "char"; break;
@@ -202,8 +202,24 @@ inline std::string get_attr_type_name(AttribDesc desc) {
 	return typeName;
 }
 
+inline std::size_t get_attr_size(const AttribDesc& desc) {
+	switch(desc.type) {
+		case AttributeType::ATTR_CHAR: return sizeof(i8) * desc.rows;
+		case AttributeType::ATTR_UCHAR: return sizeof(u8) * desc.rows;
+		case AttributeType::ATTR_SHORT: return sizeof(i16) * desc.rows;
+		case AttributeType::ATTR_USHORT: return sizeof(u16) * desc.rows;
+		case AttributeType::ATTR_INT: return sizeof(i32) * desc.rows;
+		case AttributeType::ATTR_UINT: return sizeof(u32) * desc.rows;
+		case AttributeType::ATTR_LONG: return sizeof(i64) * desc.rows;
+		case AttributeType::ATTR_ULONG: return sizeof(u64) * desc.rows;
+		case AttributeType::ATTR_FLOAT: return sizeof(float) * desc.rows;
+		case AttributeType::ATTR_DOUBLE: return sizeof(double) * desc.rows;
+		default: return 0u;
+	}
+}
+
 // Function delegating the logger output to the applications handle, if applicable
-void delegateLog(LogSeverity severity, const std::string& message) {
+inline void delegateLog(LogSeverity severity, const std::string& message) {
 	TRY
 	if(s_logCallback != nullptr)
 		s_logCallback(message.c_str(), static_cast<int>(severity));
@@ -212,7 +228,6 @@ void delegateLog(LogSeverity severity, const std::string& message) {
 	}
 	CATCH_ALL(;)
 }
-
 
 } // namespace
 
@@ -243,6 +258,14 @@ Boolean core_set_log_level(LogLevel level) {
 			logError("[", FUNCTION_NAME, "] Invalid log level");
 			return false;
 	}
+}
+
+Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
+	TRY
+	CHECK_NULLPTR(func, "LoD loader function", false);
+	s_world.set_lod_loader_function(reinterpret_cast<bool(*)(ObjectHandle, u32)>(func));
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean variance) {
@@ -425,100 +448,67 @@ FaceHdl polygon_add_quad_material(LodHdl lvlDtl, UVec4 vertices,
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
-VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, FILE* points,
-									 FILE* normals, FILE* uvs,
-									 size_t* pointsRead, size_t* normalsRead,
-									 size_t* uvsRead) {
+VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, const BulkLoader* points,
+								  const BulkLoader* normals, const BulkLoader* uvs,
+								  const AABB* aabb, size_t* pointsRead, size_t* normalsRead,
+								  size_t* uvsRead) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(normals, "normals stream descriptor", VertexHdl{ INVALID_INDEX });
 	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	mufflon::util::FileReader pointReader{ points };
-	mufflon::util::FileReader normalReader{ normals };
-	mufflon::util::FileReader uvReader{ uvs };
 
-	Polygons::VertexBulkReturn info = lod.template get_geometry<Polygons>().add_bulk(
-		count, pointReader, normalReader, uvReader);
+	std::unique_ptr<util::IByteReader> pointReader;
+	std::unique_ptr<util::IByteReader> normalReader;
+	std::unique_ptr<util::IByteReader> uvReader;
+	std::unique_ptr<std::istream> pointStream;
+	std::unique_ptr<std::istream> normalStream;
+	std::unique_ptr<std::istream> uvStream;
+	std::unique_ptr<util::ArrayStreamBuffer> pointBuffer;
+	std::unique_ptr<util::ArrayStreamBuffer> normalBuffer;
+	std::unique_ptr<util::ArrayStreamBuffer> uvBuffer;
+	if(points->type == BulkLoader::BULK_FILE) {
+		pointReader = std::make_unique<util::FileReader>(points->descriptor.file);
+	} else {
+		pointBuffer = std::make_unique<util::ArrayStreamBuffer>(points->descriptor.bytes, count * sizeof(Vec3));
+		pointStream = std::make_unique<std::istream>(pointBuffer.get());
+		pointReader = std::make_unique<util::StreamReader>(*pointStream);
+	}
+	if(normals != nullptr && normals->type == BulkLoader::BULK_FILE) {
+		normalReader = std::make_unique<util::FileReader>(normals->descriptor.file);
+	} else if(normals != nullptr) {
+		normalBuffer = std::make_unique<util::ArrayStreamBuffer>(normals->descriptor.bytes, count * sizeof(Vec3));
+		normalStream = std::make_unique<std::istream>(normalBuffer.get());
+		normalReader = std::make_unique<util::StreamReader>(*normalStream);
+	}
+	if(uvs->type == BulkLoader::BULK_FILE) {
+		uvReader = std::make_unique<util::FileReader>(uvs->descriptor.file);
+	} else {
+		uvBuffer = std::make_unique<util::ArrayStreamBuffer>(uvs->descriptor.bytes, count * sizeof(Vec2));
+		uvStream = std::make_unique<std::istream>(uvBuffer.get());
+		uvReader = std::make_unique<util::StreamReader>(*uvStream);
+	}
+
+	Polygons::VertexBulkReturn info;
+	if(aabb != nullptr) {
+		if(normalReader != nullptr)
+			info = lod.template get_geometry<Polygons>().add_bulk(count, *pointReader, *normalReader,
+																  *uvReader, util::pun<ei::Box>(*aabb));
+		else
+			info = lod.template get_geometry<Polygons>().add_bulk(count, *pointReader,
+																  *uvReader, util::pun<ei::Box>(*aabb));
+	} else {
+		if(normalReader != nullptr)
+			info = lod.template get_geometry<Polygons>().add_bulk(count, *pointReader, *normalReader, *uvReader);
+		else
+			info = lod.template get_geometry<Polygons>().add_bulk(count, *pointReader, *uvReader);
+	}
+
 	if(pointsRead != nullptr)
 		*pointsRead = info.readPoints;
-	if(pointsRead != nullptr)
+	if(normalsRead != nullptr)
 		*normalsRead = info.readNormals;
-	if(pointsRead != nullptr)
-		*uvsRead = info.readUvs;
-	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
-	CATCH_ALL(VertexHdl{ INVALID_INDEX })
-}
-
-VertexHdl polygon_add_vertex_bulk_no_normals(LodHdl lvlDtl, size_t count,
-											 FILE* points, FILE* uvs,
-											 size_t* pointsRead,
-											 size_t* uvsRead) {
-	TRY
-	CHECK_NULLPTR(lvlDtl, "LoD handle", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
-	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	mufflon::util::FileReader pointReader{ points };
-	mufflon::util::FileReader uvReader{ uvs };
-
-	Polygons::VertexBulkReturn info = lod.template get_geometry<Polygons>().add_bulk(
-		count, pointReader, uvReader);
-	if(pointsRead != nullptr)
-		*pointsRead = info.readPoints;
-	if(pointsRead != nullptr)
-		*uvsRead = info.readUvs;
-	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
-	CATCH_ALL(VertexHdl{ INVALID_INDEX })
-}
-
-VertexHdl polygon_add_vertex_bulk_aabb(LodHdl lvlDtl, size_t count, FILE* points,
-										  FILE* normals, FILE* uvs, Vec3 min,
-										  Vec3 max, size_t* pointsRead,
-										  size_t* normalsRead, size_t* uvsRead) {
-	TRY
-	CHECK_NULLPTR(lvlDtl, "LoD handle", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(normals, "normals stream descriptor", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
-	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	mufflon::util::FileReader pointReader{ points };
-	mufflon::util::FileReader normalReader{ normals };
-	mufflon::util::FileReader uvReader{ uvs };
-
-	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
-	Polygons::VertexBulkReturn info = lod.template get_geometry<Polygons>().add_bulk(
-		count, pointReader, normalReader, uvReader, aabb);
-	if(pointsRead != nullptr)
-		*pointsRead = info.readPoints;
-	if(pointsRead != nullptr)
-		*normalsRead = info.readNormals;
-	if(pointsRead != nullptr)
-		*uvsRead = info.readUvs;
-	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
-	CATCH_ALL(VertexHdl{ INVALID_INDEX })
-}
-
-VertexHdl polygon_add_vertex_bulk_aabb_no_normals(LodHdl lvlDtl, size_t count,
-												  FILE* points, FILE* uvs,
-												  Vec3 min, Vec3 max,
-												  size_t* pointsRead,
-												  size_t* uvsRead) {
-	TRY
-	CHECK_NULLPTR(lvlDtl, "LoD handle", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(points, "points stream descriptor", VertexHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(uvs, "UV coordinates stream descriptor", VertexHdl{ INVALID_INDEX });
-	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	mufflon::util::FileReader pointReader{ points };
-	mufflon::util::FileReader uvReader{ uvs };
-
-	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
-	Polygons::VertexBulkReturn info = lod.template get_geometry<Polygons>().add_bulk(
-		count, pointReader, uvReader, aabb);
-	if(pointsRead != nullptr)
-		*pointsRead = info.readPoints;
-	if(pointsRead != nullptr)
+	if(uvsRead != nullptr)
 		*uvsRead = info.readUvs;
 	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
@@ -649,7 +639,7 @@ Boolean polygon_set_material_idx(LodHdl lvlDtl, FaceHdl face, MatIdx idx) {
 
 size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl* attr,
 										 VertexHdl startVertex, size_t count,
-										 FILE* stream) {
+										 const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
 	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
@@ -664,14 +654,24 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHd
 				 ")");
 		return INVALID_SIZE;
 	}
-	util::FileReader attrStream{ stream };
 
-	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrStream](const auto& val) {
+	std::unique_ptr<util::IByteReader> attrReader;
+	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
+	std::unique_ptr<std::istream> attrStream;
+	if(stream->type == BulkLoader::BULK_FILE) {
+		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
+	} else {
+		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * get_attr_size(attr->type));
+		attrStream = std::make_unique<std::istream>(attrBuffer.get());
+		attrReader = std::make_unique<util::StreamReader>(*attrStream);
+	}
+
+	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrReader](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl,
 										 PolyVHdl{ static_cast<int>(startVertex) },
-										 count, attrStream);
+										 count, *attrReader);
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
 				 get_attr_type_name(attr->type));
@@ -682,7 +682,7 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHd
 
 size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl* attr,
 									   FaceHdl startFace, size_t count,
-									   FILE* stream) {
+									   const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
 	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
@@ -697,13 +697,22 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl*
 				 ")");
 		return INVALID_SIZE;
 	}
-	util::FileReader attrStream{ stream };
+	std::unique_ptr<util::IByteReader> attrReader;
+	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
+	std::unique_ptr<std::istream> attrStream;
+	if(stream->type == BulkLoader::BULK_FILE) {
+		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
+	} else {
+		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * get_attr_size(attr->type));
+		attrStream = std::make_unique<std::istream>(attrBuffer.get());
+		attrReader = std::make_unique<util::StreamReader>(*attrStream);
+	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrStream](const auto& val) {
+	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrReader](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		FaceAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
-																 count, attrStream);
+																 count, *attrReader);
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
 				 get_attr_type_name(attr->type));
@@ -713,7 +722,7 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl*
 }
 
 size_t polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t count,
-									 FILE* stream) {
+									 const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", false);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
@@ -727,11 +736,20 @@ size_t polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t co
 				 ")");
 		return INVALID_SIZE;
 	}
-	util::FileReader matStream{ stream };
+	std::unique_ptr<util::IByteReader> matReader;
+	std::unique_ptr<util::ArrayStreamBuffer> matBuffer;
+	std::unique_ptr<std::istream> matStream;
+	if(stream->type == BulkLoader::BULK_FILE) {
+		matReader = std::make_unique<util::FileReader>(stream->descriptor.file);
+	} else {
+		matBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(MaterialIndex));
+		matStream = std::make_unique<std::istream>(matBuffer.get());
+		matReader = std::make_unique<util::StreamReader>(*matStream);
+	}
 
 	FaceAttributeHandle hdl = lod.template get_geometry<Polygons>().get_material_indices_hdl();
 	return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
-															 count, matStream);
+															 count, *matReader);
 	CATCH_ALL(INVALID_SIZE)
 }
 
@@ -826,7 +844,7 @@ SphereHdl spheres_add_sphere(LodHdl lvlDtl, Vec3 point, float radius) {
 }
 
 SphereHdl spheres_add_sphere_material(LodHdl lvlDtl, Vec3 point, float radius,
-								MatIdx idx) {
+									  MatIdx idx) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", SphereHdl{ INVALID_INDEX });
 	SphereVHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Spheres>().add(
@@ -835,33 +853,29 @@ SphereHdl spheres_add_sphere_material(LodHdl lvlDtl, Vec3 point, float radius,
 	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
-SphereHdl spheres_add_sphere_bulk(LodHdl lvlDtl, size_t count,
-									 FILE* stream, size_t* readSpheres) {
+SphereHdl spheres_add_sphere_bulk(LodHdl lvlDtl, size_t count, const BulkLoader* stream,
+								  const AABB* aabb, size_t* readSpheres) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", SphereHdl{ INVALID_INDEX } );
 	CHECK_NULLPTR(stream, "sphere stream descriptor", SphereHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	mufflon::util::FileReader sphereReader{ stream };
+	std::unique_ptr<util::IByteReader> sphereReader;
+	std::unique_ptr<util::ArrayStreamBuffer> sphereBuffer;
+	std::unique_ptr<std::istream> sphereStream;
+	if(stream->type == BulkLoader::BULK_FILE) {
+		sphereReader = std::make_unique<util::FileReader>(stream->descriptor.file);
+	} else {
+		sphereBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(ei::Sphere));
+		sphereStream = std::make_unique<std::istream>(sphereBuffer.get());
+		sphereReader = std::make_unique<util::StreamReader>(*sphereStream);
+	}
 
-	Spheres::BulkReturn info = lod.template get_geometry<Spheres>().add_bulk(count, sphereReader);
-	if(readSpheres != nullptr)
-		*readSpheres = info.readSpheres;
-	return SphereHdl{ static_cast<IndexType>(info.handle) };
-	CATCH_ALL(SphereHdl{ INVALID_INDEX })
-}
+	Spheres::BulkReturn info;
+	if(aabb != nullptr)
+		info = lod.template get_geometry<Spheres>().add_bulk(count, *sphereReader, util::pun<ei::Box>(*aabb));
+	else
+		info = lod.template get_geometry<Spheres>().add_bulk(count, *sphereReader);
 
-SphereHdl spheres_add_sphere_bulk_aabb(LodHdl lvlDtl, size_t count,
-										  FILE* stream, Vec3 min, Vec3 max,
-										  size_t* readSpheres) {
-	TRY
-	CHECK_NULLPTR(lvlDtl, "LoD handle", SphereHdl{ INVALID_INDEX });
-	CHECK_NULLPTR(stream, "sphere stream descriptor", SphereHdl{ INVALID_INDEX });
-	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	mufflon::util::FileReader sphereReader{ stream };
-
-	ei::Box aabb{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) };
-	Spheres::BulkReturn info = lod.template get_geometry<Spheres>().add_bulk(count, sphereReader,
-														aabb);
 	if(readSpheres != nullptr)
 		*readSpheres = info.readSpheres;
 	return SphereHdl{ static_cast<IndexType>(info.handle) };
@@ -921,7 +935,7 @@ Boolean spheres_set_material_idx(LodHdl lvlDtl, SphereHdl sphere, MatIdx idx) {
 
 size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 								  SphereHdl startSphere, size_t count,
-								  FILE* stream) {
+								  const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
 	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
@@ -935,14 +949,23 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 				 ")");
 		return INVALID_SIZE;
 	}
-	util::FileReader attrStream{ stream };
+	std::unique_ptr<util::IByteReader> attrReader;
+	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
+	std::unique_ptr<std::istream> attrStream;
+	if(stream->type == BulkLoader::BULK_FILE) {
+		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
+	} else {
+		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * get_attr_size(attr->type));
+		attrStream = std::make_unique<std::istream>(attrBuffer.get());
+		attrReader = std::make_unique<util::StreamReader>(*attrStream);
+	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrStream](const auto& val) {
+	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrReader](const auto& val) {
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Spheres>().add_bulk(hdl,
 																SphereVHdl{ static_cast<size_t>(startSphere) },
-																count, attrStream);
+																count, *attrReader);
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
 				 get_attr_type_name(attr->type));
@@ -952,7 +975,7 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 }
 
 size_t spheres_set_material_idx_bulk(LodHdl lvlDtl, SphereHdl startSphere, size_t count,
-									 FILE* stream) {
+									 const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
@@ -964,12 +987,21 @@ size_t spheres_set_material_idx_bulk(LodHdl lvlDtl, SphereHdl startSphere, size_
 				 ")");
 		return INVALID_SIZE;
 	}
-	util::FileReader matStream{ stream };
+	std::unique_ptr<util::IByteReader> matReader;
+	std::unique_ptr<util::ArrayStreamBuffer> matBuffer;
+	std::unique_ptr<std::istream> matStream;
+	if(stream->type == BulkLoader::BULK_FILE) {
+		matReader = std::make_unique<util::FileReader>(stream->descriptor.file);
+	} else {
+		matBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(MaterialIndex));
+		matStream = std::make_unique<std::istream>(matBuffer.get());
+		matReader = std::make_unique<util::StreamReader>(*matStream);
+	}
 
 	SphereAttributeHandle hdl = lod.template get_geometry<Spheres>().get_material_indices_hdl();
 	return lod.template get_geometry<Spheres>().add_bulk(hdl,
 															SphereVHdl{ static_cast<size_t>(startSphere) },
-															count, matStream);
+															count, *matReader);
 	return INVALID_SIZE;
 	CATCH_ALL(INVALID_SIZE)
 }

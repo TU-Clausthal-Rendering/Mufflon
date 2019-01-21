@@ -455,25 +455,15 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	m_scenario = &scenario;
 	m_scene = std::make_unique<Scene>(scenario);
 	u32 instIdx = 0;
+	// TODO: unload LoDs that are not needed anymore?
 	for(auto& instance : m_instances) {
 		Instance& inst = *instance.second;
 		Object& obj = inst.get_object();
 		if(!scenario.is_masked(&obj) && !scenario.is_masked(&inst)) {
 			const u32 lod = scenario.get_effective_lod(&inst);
 			if(!obj.has_lod_available(lod)) {
-				// TODO: please prettify this...
-				// Gotta refetch the LoD from file
-				/*using LodLoaderType = bool(*)(ObjectHandle, u32);
-				HINSTANCE m_handle = ::LoadLibrary(L"C:\\Users\\Florian\\Desktop\\Repos\\mufflon\\build\\Debug\\loader.dll");
-				LodLoaderType proc = reinterpret_cast<LodLoaderType>(::GetProcAddress(m_handle, "loader_load_lod"));
-				if(!proc)
-					throw std::runtime_error("Could not fetch lod loader procedure");
-				if(!proc(&obj, lod))
-					throw std::runtime_error("Failed to after-load LoD");*/
-				throw std::runtime_error("Not implemented yet; gotta solve the problem of circular dependency first");
-
-				/*if(!loader_load_lod(&obj, lod))
-					throw std::runtime_error("Failed to after-load LoD");*/
+				if(!m_load_lod(&obj, lod))
+					throw std::runtime_error("Failed to after-load LoD");
 			}
 			m_scene->add_instance(instance.second.get());
 		}

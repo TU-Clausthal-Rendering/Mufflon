@@ -58,6 +58,11 @@ typedef struct {
 	float v[12u];
 } Mat3x4;
 
+typedef struct {
+	Vec3 min;
+	Vec3 max;
+} AABB;
+
 typedef enum {
 	ATTR_CHAR,
 	ATTR_UCHAR,
@@ -262,86 +267,86 @@ enum ParameterType {
 	PARAM_BOOL
 };
 
+// Abstraction for bulk load
+struct BulkLoader {
+	enum BulkType {
+		BULK_FILE,
+		BULK_ARRAY
+	} type;
+	union {
+		FILE* file;
+		const char* bytes;
+	} descriptor;
+};
+
 // TODO: how to handle errors
 
 // Polygon interface
-CORE_API Boolean CDECL CDECL polygon_reserve(ObjectHdl obj, size_t vertices, size_t edges,
+CORE_API Boolean CDECL CDECL polygon_reserve(LodHdl lod, size_t vertices, size_t edges,
 											size_t tris, size_t quads);
-CORE_API PolygonAttributeHdl CDECL polygon_request_vertex_attribute(ObjectHdl obj,
+CORE_API PolygonAttributeHdl CDECL polygon_request_vertex_attribute(LodHdl lod,
 																	const char* name,
 																	AttribDesc type);
-CORE_API PolygonAttributeHdl CDECL polygon_request_face_attribute(ObjectHdl obj,
+CORE_API PolygonAttributeHdl CDECL polygon_request_face_attribute(LodHdl lod,
 																  const char* name,
 																  AttribDesc type);
-CORE_API VertexHdl CDECL polygon_add_vertex(ObjectHdl obj, Vec3 point, Vec3 normal, Vec2 uv);
-CORE_API FaceHdl CDECL polygon_add_triangle(ObjectHdl obj, UVec3 vertices);
-CORE_API FaceHdl CDECL polygon_add_triangle_material(ObjectHdl obj, UVec3 vertices,
+CORE_API VertexHdl CDECL polygon_add_vertex(LodHdl lod, Vec3 point, Vec3 normal, Vec2 uv);
+CORE_API FaceHdl CDECL polygon_add_triangle(LodHdl lod, UVec3 vertices);
+CORE_API FaceHdl CDECL polygon_add_triangle_material(LodHdl lod, UVec3 vertices,
 													 MatIdx idx);
-CORE_API FaceHdl CDECL polygon_add_quad(ObjectHdl obj, UVec4 vertices);
-CORE_API FaceHdl CDECL polygon_add_quad_material(ObjectHdl obj, UVec4 vertices,
+CORE_API FaceHdl CDECL polygon_add_quad(LodHdl lod, UVec4 vertices);
+CORE_API FaceHdl CDECL polygon_add_quad_material(LodHdl lod, UVec4 vertices,
 												 MatIdx idx);
-CORE_API VertexHdl CDECL polygon_add_vertex_bulk(ObjectHdl obj, size_t count, FILE* points,
-										FILE* normals, FILE* uvs,
-										size_t* pointsRead, size_t* normalsRead,
-										size_t* uvsRead);
-CORE_API VertexHdl CDECL polygon_add_vertex_bulk_no_normals(ObjectHdl obj, size_t count, FILE* points,
-															FILE* uvs, size_t* pointsRead,
-															size_t* uvsRead);
-CORE_API VertexHdl CDECL polygon_add_vertex_bulk_aabb(ObjectHdl obj, size_t count, FILE* points,
-										FILE* normals, FILE* uvs,
-										Vec3 min, Vec3 max, size_t* pointsRead,
-										size_t* normalsRead, size_t* uvsRead);
-CORE_API VertexHdl CDECL polygon_add_vertex_bulk_aabb_no_normals(ObjectHdl obj, size_t count, FILE* points,
-																 FILE* uvs, Vec3 min, Vec3 max,
-																 size_t* pointsRead, size_t* uvsRead);
-CORE_API Boolean CDECL polygon_set_vertex_attribute(ObjectHdl obj, const PolygonAttributeHdl* attr,
+CORE_API VertexHdl CDECL polygon_add_vertex_bulk(LodHdl lod, size_t count, const BulkLoader* points,
+												 const BulkLoader* normals, const BulkLoader* uvs,
+												 const AABB* aabb, size_t* pointsRead, size_t* normalsRead,
+												 size_t* uvsRead);
+CORE_API Boolean CDECL polygon_set_vertex_attribute(LodHdl lod, const PolygonAttributeHdl* attr,
 													VertexHdl vertex, const void* value);
-CORE_API Boolean CDECL polygon_set_vertex_normal(ObjectHdl obj, VertexHdl vertex, Vec3 normal);
-CORE_API Boolean CDECL polygon_set_vertex_uv(ObjectHdl obj, VertexHdl vertex, Vec2 uv);
-CORE_API Boolean CDECL polygon_set_face_attribute(ObjectHdl obj, const PolygonAttributeHdl* attr,
+CORE_API Boolean CDECL polygon_set_vertex_normal(LodHdl lod, VertexHdl vertex, Vec3 normal);
+CORE_API Boolean CDECL polygon_set_vertex_uv(LodHdl lod, VertexHdl vertex, Vec2 uv);
+CORE_API Boolean CDECL polygon_set_face_attribute(LodHdl lod, const PolygonAttributeHdl* attr,
 											FaceHdl face, const void* value);
-CORE_API Boolean CDECL polygon_set_material_idx(ObjectHdl obj, FaceHdl face, MatIdx idx);
-CORE_API size_t CDECL polygon_set_vertex_attribute_bulk(ObjectHdl obj,
+CORE_API Boolean CDECL polygon_set_material_idx(LodHdl lod, FaceHdl face, MatIdx idx);
+CORE_API size_t CDECL polygon_set_vertex_attribute_bulk(LodHdl lod,
 														const PolygonAttributeHdl* attr,
 														VertexHdl startVertex, size_t count,
-														FILE* stream);
-CORE_API size_t CDECL polygon_set_face_attribute_bulk(ObjectHdl obj,
+														const BulkLoader* stream);
+CORE_API size_t CDECL polygon_set_face_attribute_bulk(LodHdl lod,
 												   const PolygonAttributeHdl* attr,
 												   FaceHdl startFace, size_t count,
-												   FILE* stream);
-CORE_API size_t CDECL polygon_set_material_idx_bulk(ObjectHdl obj, FaceHdl startFace, size_t count,
-												 FILE* stream);
-CORE_API size_t CDECL polygon_get_vertex_count(ObjectHdl obj);
-CORE_API size_t CDECL polygon_get_edge_count(ObjectHdl obj);
-CORE_API size_t CDECL polygon_get_face_count(ObjectHdl obj);
-CORE_API size_t CDECL polygon_get_triangle_count(ObjectHdl obj);
-CORE_API size_t CDECL polygon_get_quad_count(ObjectHdl obj);
-CORE_API Boolean CDECL polygon_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
+													  const BulkLoader* stream);
+CORE_API size_t CDECL polygon_set_material_idx_bulk(LodHdl lod, FaceHdl startFace, size_t count,
+													const BulkLoader* stream);
+CORE_API size_t CDECL polygon_get_vertex_count(LodHdl lod);
+CORE_API size_t CDECL polygon_get_edge_count(LodHdl lod);
+CORE_API size_t CDECL polygon_get_face_count(LodHdl lod);
+CORE_API size_t CDECL polygon_get_triangle_count(LodHdl lod);
+CORE_API size_t CDECL polygon_get_quad_count(LodHdl lod);
+CORE_API Boolean CDECL polygon_get_bounding_box(LodHdl lod, Vec3* min, Vec3* max);
 
 // Spheres interface
-CORE_API Boolean CDECL spheres_reserve(ObjectHdl obj, size_t count);
-CORE_API SphereAttributeHdl CDECL spheres_request_attribute(ObjectHdl obj,
+CORE_API Boolean CDECL spheres_reserve(LodHdl lod, size_t count);
+CORE_API SphereAttributeHdl CDECL spheres_request_attribute(LodHdl lod,
 															const char* name,
 															AttribDesc type);
-CORE_API SphereHdl CDECL spheres_add_sphere(ObjectHdl obj, Vec3 point, float radius);
-CORE_API SphereHdl CDECL spheres_add_sphere_material(ObjectHdl obj, Vec3 point,
+CORE_API SphereHdl CDECL spheres_add_sphere(LodHdl lod, Vec3 point, float radius);
+CORE_API SphereHdl CDECL spheres_add_sphere_material(LodHdl lod, Vec3 point,
 													 float radius, MatIdx idx);
-CORE_API SphereHdl CDECL spheres_add_sphere_bulk(ObjectHdl obj, size_t count,
-												 FILE* stream, size_t* readSpheres);
-CORE_API SphereHdl CDECL spheres_add_sphere_bulk_aabb(ObjectHdl obj, size_t count,
-													  FILE* stream, Vec3 min, Vec3 max,
-													  size_t* readSpheres);
-CORE_API Boolean CDECL spheres_set_attribute(ObjectHdl obj, const SphereAttributeHdl* attr,
+CORE_API SphereHdl CDECL spheres_add_sphere_bulk(LodHdl lod, size_t count,
+												 const BulkLoader* stream, const AABB* aabbb,
+												 size_t* readSpheres);
+CORE_API Boolean CDECL spheres_set_attribute(LodHdl lod, const SphereAttributeHdl* attr,
 									   SphereHdl sphere, const void* value);
-CORE_API Boolean CDECL spheres_set_material_idx(ObjectHdl obj, SphereHdl sphere,
+CORE_API Boolean CDECL spheres_set_material_idx(LodHdl lod, SphereHdl sphere,
 										  MatIdx idx);
-CORE_API size_t CDECL spheres_set_attribute_bulk(ObjectHdl obj, const SphereAttributeHdl* attr,
+CORE_API size_t CDECL spheres_set_attribute_bulk(LodHdl lod, const SphereAttributeHdl* attr,
 											  SphereHdl startSphere, size_t count,
-											  FILE* stream);
-CORE_API size_t CDECL spheres_set_material_idx_bulk(ObjectHdl obj, SphereHdl startSphere,
-												 size_t count, FILE* stream);
-CORE_API size_t CDECL spheres_get_sphere_count(ObjectHdl obj);
-CORE_API Boolean CDECL spheres_get_bounding_box(ObjectHdl obj, Vec3* min, Vec3* max);
+											  const BulkLoader* stream);
+CORE_API size_t CDECL spheres_set_material_idx_bulk(LodHdl lod, SphereHdl startSphere,
+												 size_t count, const BulkLoader* stream);
+CORE_API size_t CDECL spheres_get_sphere_count(LodHdl lod);
+CORE_API Boolean CDECL spheres_get_bounding_box(LodHdl lod, Vec3* min, Vec3* max);
 
 // Object interface
 CORE_API Boolean CDECL object_has_lod(ObjectHdl hdl, LodLevel level);
@@ -546,9 +551,6 @@ CORE_API void CDECL mufflon_destroy();
 CORE_API Boolean CDECL copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean variance);
 CORE_API const char* CDECL core_get_dll_error();
 CORE_API Boolean CDECL core_set_log_level(LogLevel level);
-
-
-//CORE_API const char* CDECL get_teststring();
-
+CORE_API Boolean CDECL core_set_lod_loader(Boolean (CDECL *func)(ObjectHdl, uint32_t));
 
 }

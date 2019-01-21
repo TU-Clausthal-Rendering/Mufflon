@@ -703,6 +703,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 				const ei::Vec3 v[4] = { meshVertices[ids.x], meshVertices[ids.y], meshVertices[ids.z], meshVertices[ids.w] };
 				const ei::Vec2 uvV[4] = { meshUVs[ids.x], meshUVs[ids.y], meshUVs[ids.z], meshUVs[ids.w] };
 				// Compute tangent space by using surrogate coordinate system to get interpolated UVs
+				// https://stackoverflow.com/questions/47187600/differences-in-calculating-tbn-matrix-for-triangles-versus-quads
 				// TODO: fetch the instance instead (issue #44)
 				const ei::Vec3 dxds = (1.f - surfParams.bilinear.y) * (v[3u] - v[0u]) + surfParams.bilinear.y * (v[2u] - v[1u]);
 				const ei::Vec3 dxdt = (1.f - surfParams.bilinear.x) * (v[1u] - v[0u]) + surfParams.bilinear.x * (v[2u] - v[3u]);

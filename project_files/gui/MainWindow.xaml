@@ -229,8 +229,7 @@
                              Width="Auto">
                         <ListBox 
                             ItemsSource="{Binding Scene.Scenarios}"
-                            SelectedItem="{Binding Scene.SelectedScenario}"
-                            IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                            SelectedItem="{Binding Scene.SelectedScenario}"/>
                     </TabItem>
                     <TabItem Header="Properties"
                              Width="Auto">

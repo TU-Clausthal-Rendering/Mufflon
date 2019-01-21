@@ -274,8 +274,8 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
-	std::size_t readNormals = m_vertexAttributes.restore(m_normalsHdl, pointStream, start, count);
-	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, pointStream, start, count);
+	std::size_t readNormals = m_vertexAttributes.restore(m_normalsHdl, normalStream, start, count);
+	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
 	const OpenMesh::Vec3f* points = m_vertexAttributes.acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
 	for(std::size_t i = start; i < start + readPoints; ++i) {
@@ -298,8 +298,8 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
-	std::size_t readNormals = m_vertexAttributes.restore(m_normalsHdl, pointStream, start, count);
-	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, pointStream, start, count);
+	std::size_t readNormals = m_vertexAttributes.restore(m_normalsHdl, normalStream, start, count);
+	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
 	m_boundingBox.max = ei::max(boundingBox.max, m_boundingBox.max);
 	m_boundingBox.min = ei::min(boundingBox.min, m_boundingBox.min);
@@ -318,7 +318,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
-	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, pointStream, start, count);
+	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
 	const OpenMesh::Vec3f* points = m_vertexAttributes.acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
 	for(std::size_t i = start; i < start + readPoints; ++i) {
@@ -340,7 +340,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
-	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, pointStream, start, count);
+	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
 	m_boundingBox.max = ei::max(boundingBox.max, m_boundingBox.max);
 	m_boundingBox.min = ei::min(boundingBox.min, m_boundingBox.min);

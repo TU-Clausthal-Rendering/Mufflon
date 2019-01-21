@@ -44,6 +44,7 @@
     <ClCompile Include="..\..\src\profiler\gpu_profiler.cpp" />
     <ClCompile Include="..\..\src\profiler\profiling.cpp" />
     <ClCompile Include="..\..\src\util\assert.cpp" />
+    <ClCompile Include="..\..\src\util\byte_io.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>

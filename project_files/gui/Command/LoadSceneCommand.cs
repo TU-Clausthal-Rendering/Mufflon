@@ -106,7 +106,7 @@ namespace gui.Command
                 Logger.log("World '" + Path.GetFileName(path) + "' was loaded successfully", Core.Severity.INFO);
 
                 // Set path and load scene properties
-                m_models.World = new WorldModel(Core.world_get_current_scene(), path);
+                m_models.World = new WorldModel(m_models.Renderer, Core.world_get_current_scene(), path);
                 RefreshLastScenes(path);
             }
             else
