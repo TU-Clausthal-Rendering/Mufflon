@@ -93,17 +93,17 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 
 		// Scale the flux up
 		float probLeft = currentNode->left.flux / (currentNode->left.flux + currentNode->right.flux);
-		// Compute the integer bounds: once rounded down, once rounded up
+		// Compute the integer bounds
 		u64 intervalBoundary = intervalLeft + percentage_of(intervalRight - intervalLeft, probLeft);
-		if(rndChoice <= intervalBoundary) {
+		if(rndChoice < intervalBoundary) {
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
-			intervalRight = intervalBoundary+1;	//+1 because <=, <= because we floor() anyway
+			intervalRight = intervalBoundary;
 			lightProb *= probLeft;
 		} else {
 			type = currentNode->right.type;
 			offset = currentNode->right.offset;
-			intervalLeft = intervalBoundary+1;
+			intervalLeft = intervalBoundary;
 			lightProb *= (1.0f-probLeft);
 		}
 		currentNode = tree.get_node(offset);
@@ -131,6 +131,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	// See connect() for details on the rndChoice
 	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
 								   : seed;
+	if(rndChoice == ~0ull) --rndChoice;
 
 	float fluxSum = ei::sum(tree.background.flux) + tree.dirLights.root.flux + tree.posLights.root.flux;
 	float envProb = ei::sum(tree.background.flux) / fluxSum;;
@@ -193,17 +194,17 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 
 		// Scale the flux up
 		float probLeft = guide(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
-		// Compute the integer bounds: once rounded down, once rounded up
+		// Compute the integer bounds
 		u64 intervalBoundary = intervalLeft + percentage_of(intervalRight - intervalLeft, probLeft);
-		if(rndChoice <= intervalBoundary) {
+		if(rndChoice < intervalBoundary) {
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
-			intervalRight = intervalBoundary+1;	//+1 because <=, <= because we floor() anyway
+			intervalRight = intervalBoundary;
 			lightProb *= probLeft;
 		} else {
 			type = currentNode->right.type;
 			offset = currentNode->right.offset;
-			intervalLeft = intervalBoundary+1;
+			intervalLeft = intervalBoundary;
 			lightProb *= (1.0f-probLeft);
 		}
 		currentNode = tree.get_node(offset);
@@ -244,6 +245,9 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	// correllation, but also a maximized equal distribution.
 	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
 								   : seed;
+	// Ensure that rndChoice != u64::max(). Otherwise it is possible to sample
+	// right trees with 0 probability.
+	if(rndChoice == ~0ull) --rndChoice; // TODO: better strategy?
 
 	float fluxSum = ei::sum(tree.background.flux) + tree.dirLights.root.flux + tree.posLights.root.flux;
 	float envProb = ei::sum(tree.background.flux) / fluxSum;

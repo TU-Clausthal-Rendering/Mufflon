@@ -106,6 +106,7 @@ struct alignas(16) AreaLightQuad {
 	// The forced alignment makes sure the two types CPU/GPU have the same size.
 	// Problem: radianceTex is 16 byte on GPU but only 8 on CPU.
 	alignas(16) u32 scale;			// A spectrum scale for the radiance texture in RGB9E5
+	float area;						// Precomputed surface area (very expensive numeric integration)
 
 	AreaLightQuad& operator=(const AreaLightQuadDesc& rhs) {
 		for(int i = 0; i < 4; ++i) {
@@ -114,6 +115,23 @@ struct alignas(16) AreaLightQuad {
 		}
 		scale = rhs.scale;
 		radianceTex = rhs.radianceTex->acquire_const<dev>();
+		// TODO: move this into loader or better exporter, also try adaptive quadrature
+		const ei::Vec3 e03 = points[3] - points[0];
+		const ei::Vec3 e12 = points[2] - points[1];
+		const ei::Vec3 e01 = points[1] - points[0];
+		const ei::Vec3 e32 = points[2] - points[3];
+		area = 0;
+		for(int i = 0; i <= 32; ++i) {
+			float s = i / 32.0f;
+			for(int j = 0; j <= 32; ++j) {
+				float t = j / 32.0f;
+				ei::Vec3 tangentX = ei::lerp(e03, e12, t);
+				ei::Vec3 tangentY = ei::lerp(e01, e32, s);
+				area += len(cross(tangentX, tangentY));
+			}
+		}
+		area /= 33*33;
+
 		return *this;
 	}
 };

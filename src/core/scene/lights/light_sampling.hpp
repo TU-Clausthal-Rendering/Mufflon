@@ -113,27 +113,48 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightTriangle<CU
 	const ei::Vec3 tangentX = light.points[1u] - light.points[0u];
 	const ei::Vec3 tangentY = light.points[2u] - light.points[0u];
 	ei::Vec3 normal = ei::cross(tangentX, tangentY);
-	const float area2Inv = 1.0f / len(normal);
-	normal *= area2Inv;
+	const float area2 = len(normal);
+	normal /= area2;
+	const float area = area2 * 0.5f;
 	// Sample barycentrics (we need position and uv at the same location)
 	const ei::Vec2 bary = math::sample_barycentric(rnd.u0, rnd.u1);
 	const ei::Vec3 position = light.points[0u] + tangentX * bary.x + tangentY * bary.y;
 	const ei::Vec2 uv = light.uv[0u] + (light.uv[1u] - light.uv[0u]) * bary.x + (light.uv[2u] - light.uv[0u]) * bary.y;
 	const Spectrum scale = ei::unpackRGB9E5(light.scale);
+	const Spectrum radiance = Spectrum{ sample(light.radianceTex, uv) } * scale;
 	return Photon{
-		{ position, AreaPdf{area2Inv * 2.0f} },
-		Spectrum{ sample(light.radianceTex, uv) } * scale, // TODO: radiance to intensity?
+		{ position, AreaPdf{1.0f / area} },
+		radiance * area,
 		LightType::AREA_LIGHT_TRIANGLE,
-		{normal, 0.5f / float(area2Inv)}
+		{normal, area}
 	};
 }
 
 // *** AREA LIGHT : QUAD ***
 CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightQuad<CURRENT_DEV>& light,
 													  const math::RndSet2& rnd) {
+	// The rnd coordinate is our uv.
+	// Get the geometric normal. This requires an interpolation of the edges.
+	const ei::Vec3 tangentX = (1.f - rnd.u1) * (light.points[3u] - light.points[0u]) + rnd.u1 * (light.points[2u] - light.points[1u]);
+	const ei::Vec3 tangentY = (1.f - rnd.u0) * (light.points[1u] - light.points[0u]) + rnd.u0 * (light.points[2u] - light.points[3u]);
+	const ei::Vec3 normal = normalize(cross(tangentY, tangentX));
+	// The position is obtained by simple bilinear interpolation. To avoid
+	// redundant computation we can use the intermediate results from the
+	// normal computation.
+	const ei::Vec3 position = light.points[0u] + tangentX * rnd.u0 + tangentY * rnd.u1;
+
+	const ei::Vec2 uv = ei::bilerp(light.uv[0u], light.uv[1u], light.uv[3u], light.uv[2u], rnd.u0, rnd.u1);
+
+	const Spectrum scale = ei::unpackRGB9E5(light.scale);
+	const Spectrum radiance = Spectrum{ sample(light.radianceTex, uv) } * scale;
+
+	return Photon{ { position, AreaPdf{ 1.0f / light.area } },
+		radiance * light.area,
+		LightType::AREA_LIGHT_QUAD,
+		{normal, light.area} };
 	// Two-split decision: first select triangle, then use triangle sampling.
 	// Try to hold things in registers by conditional moves later on.
-	const ei::Vec3 tangent1X = light.points[2u] - light.points[0u];
+	/*const ei::Vec3 tangent1X = light.points[2u] - light.points[0u];
 	const ei::Vec3 tangent1Y = light.points[1u] - light.points[0u];
 	const ei::Vec3 normal1 = cross(tangent1X, tangent1Y);
 	const ei::Vec3 tangent2X = light.points[3u] - light.points[0u];
@@ -174,7 +195,7 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightQuad<CURREN
 	return Photon{ { position, AreaPdf{ 1.0f / (area1 + area2) } },
 		Spectrum{sample(light.radianceTex, uv)} * scale, // TODO: radiance to intensity?
 		LightType::AREA_LIGHT_QUAD,
-		{side ? normal2 / (area2 * 2.0f) : normal1 / (area1 * 2.0f), area1 + area2} };
+		{side ? normal2 / (area2 * 2.0f) : normal1 / (area1 * 2.0f), area1 + area2} };*/
 }
 
 // *** AREA LIGHT : SPHERE ***
@@ -324,14 +345,15 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightT
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
-	const float distSqr = ei::lensq(direction);
-	const float dist = sqrtf(distSqr);
+	const float distSq = ei::lensq(direction);
+	const float dist = sqrtf(distSq);
 	direction /= dist;
-	// Compute the contribution (TODO diffIrradiance)
+	// Compute the contribution
 	const math::EvalValue value = evaluate_area(-direction, posSample.intensity,
 										posSample.source_param.area.normal);
+	Spectrum diffIrradiance = value.value / distSq;
 	return NextEventEstimation{
-		direction, value.cosOut, value.value, dist, distSqr, posSample.pos.pdf
+		direction, value.cosOut, diffIrradiance, dist, distSq, posSample.pos.pdf
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQuad<CURRENT_DEV>& light,
@@ -339,14 +361,15 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
-	const float distSqr = ei::lensq(direction);
-	const float dist = sqrtf(distSqr);
+	const float distSq = ei::lensq(direction);
+	const float dist = sqrtf(distSq);
 	direction /= dist;
-	// Compute the contribution (TODO diffIrradiance)
+	// Compute the contribution
 	const math::EvalValue value = evaluate_area(-direction, posSample.intensity,
 										posSample.source_param.area.normal);
+	Spectrum diffIrradiance = value.value / distSq;
 	return NextEventEstimation{
-		direction, value.cosOut, value.value, dist, distSqr, posSample.pos.pdf
+		direction, value.cosOut, diffIrradiance, dist, distSq, posSample.pos.pdf
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightSphere<CURRENT_DEV>& light,
