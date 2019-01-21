@@ -9,39 +9,31 @@ using gui.Dll;
 
 namespace gui.Command
 {
-    public class ResetCommand : IGesturedCommand
+    public class ResetCommand : ICommand
     {
-        private Models m_models;
-        private ICommand m_playPause;
+        private readonly Models m_models;
 
-        public ResetCommand(Models models, ICommand playPause) : base("ResetGesture")
+        public ResetCommand(Models models)
         {
             m_models = models;
-            m_playPause = playPause;
         }
 
-        public override bool CanExecute(object parameter)
+        public bool CanExecute(object parameter)
         {
             return m_models.World != null && m_models.World.IsSane;
         }
 
-        public override void Execute(object parameter)
+        public void Execute(object parameter)
         {
             if (!Core.render_reset())
                 throw new Exception(Core.core_get_dll_error());
             m_models.Renderer.updateIterationCount();
         }
 
-        public override event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged
         {
-            add
-            {
-                CommandManager.RequerySuggested += value;
-            }
-            remove
-            {
-                CommandManager.RequerySuggested -= value;
-            }
+            add => CommandManager.RequerySuggested += value;
+            remove => CommandManager.RequerySuggested -= value;
         }
     }
 }

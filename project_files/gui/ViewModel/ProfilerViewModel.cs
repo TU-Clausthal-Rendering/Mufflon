@@ -21,10 +21,10 @@ namespace gui.ViewModel
         private TreeViewItem m_renderTree;
         private TreeViewItem m_loaderTree;
 
-        public ProfilerViewModel(MainWindow window, Models models)
+        public ProfilerViewModel(Models models)
         {
             m_models = models;
-            m_profilerTree = (TreeView)window.FindName("ProfilerTreeView");
+            m_profilerTree = (TreeView)m_models.App.Window.FindName("ProfilerTreeView");
             if (m_profilerTree == null)
                 throw new System.Exception("Failed to aquire profiler tree");
             m_renderTree = (TreeViewItem)m_profilerTree.Items[RENDERING_INDEX];

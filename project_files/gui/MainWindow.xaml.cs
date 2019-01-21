@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using gui.Dll;
+using gui.Model;
 using gui.ViewModel;
 
 namespace gui
@@ -39,12 +40,14 @@ namespace gui
         // To keep track of mouse dragging
         private Point m_lastMousePos;
         private Vector m_lastMouseDiff;
+        private Models m_models;
         private ViewModels m_viewModels;
 
         public MainWindow()
         {
             InitializeComponent();
-            m_viewModels = new ViewModels(this);
+            m_models = new Models(this);
+            m_viewModels = new ViewModels(m_models);
             DataContext = m_viewModels;
         }
 
@@ -122,6 +125,13 @@ namespace gui
             Vector last = m_lastMouseDiff;
             m_lastMouseDiff = new Vector();
             return last;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            m_models.Dispose();
+
+            base.OnClosed(e);
         }
     }
 }

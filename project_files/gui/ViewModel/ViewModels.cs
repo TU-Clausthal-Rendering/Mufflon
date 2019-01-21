@@ -41,6 +41,8 @@ namespace gui.ViewModel
         public RendererViewModel Renderer { get; }
         public SceneViewModel Scene { get; }
 
+        public KeyGestureViewModel KeyGestures { get; }
+
         public ICommand AddLightCommand { get; }
         public ICommand AddMaterialCommand { get; }
         public ICommand AddCameraCommand { get; }
@@ -55,10 +57,9 @@ namespace gui.ViewModel
 
         private readonly Models m_models;
 
-        public ViewModels(MainWindow window)
+        public ViewModels(Models models)
         {
-            // model initialization
-            m_models = new Models(window);
+            m_models = models;
 
             // view model initialization
             ConsoleOutput = new ConsoleOutputViewModel(m_models);
@@ -71,10 +72,10 @@ namespace gui.ViewModel
             Toolbar = new ToolbarViewModel(m_models);
             Statusbar = new StatusbarViewModel(m_models);
 
-            Profiler = new ProfilerViewModel(window, m_models);
+            Profiler = new ProfilerViewModel(m_models);
 
-            Renderer = new RendererViewModel(window, m_models, Toolbar.PlayPauseCommand);
-            Scene = new SceneViewModel(window, m_models, Toolbar.PlayPauseCommand, Toolbar.ResetCommand);
+            Renderer = new RendererViewModel(m_models, Toolbar.PlayPauseCommand);
+            Scene = new SceneViewModel(m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);
@@ -83,9 +84,11 @@ namespace gui.ViewModel
             LoadSceneCommand = new LoadSceneCommand(m_models);
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
-            OpenSettingsCommand = new OpenSettingsCommand(this);
+            OpenSettingsCommand = new OpenSettingsCommand(this, m_models);
             AdjustGammaUp = new AdjustGammaUpCommand();
             AdjustGammaDown = new AdjustGammaDownCommand();
+
+            KeyGestures = new KeyGestureViewModel(models);
 
             // Add keybindings
             Keybindings.Add(Key.OemPlus, AdjustGammaUp);

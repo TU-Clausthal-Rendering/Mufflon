@@ -18,7 +18,7 @@ namespace gui.ViewModel
             m_models = models;
 
             PlayPauseCommand = new PlayPauseCommand(models);
-            ResetCommand = new ResetCommand(models, PlayPauseCommand);
+            ResetCommand = new ResetCommand(models);
             SaveScreenShotCommand = new ScreenShotCommand(models);
             ToggleCameraMovementCommand = new ToggleCameraMovementCommand(models);
 
@@ -56,10 +56,10 @@ namespace gui.ViewModel
         public Visibility CameraMoveIconVisibility =>
             m_models.Settings.AllowCameraMovement ? Visibility.Collapsed : Visibility.Visible;
 
-        public IGesturedCommand PlayPauseCommand { get; }
-        public IGesturedCommand ResetCommand { get; }
-        public IGesturedCommand SaveScreenShotCommand { get; }
-        public IGesturedCommand ToggleCameraMovementCommand { get; }
+        public ICommand PlayPauseCommand { get; }
+        public ICommand ResetCommand { get; }
+        public ICommand SaveScreenShotCommand { get; }
+        public ICommand ToggleCameraMovementCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

@@ -2,17 +2,20 @@
 using gui.ViewModel;
 using System;
 using System.Windows.Input;
+using gui.Model;
 
 namespace gui.Command
 {
     class OpenSettingsCommand : ICommand
     {
-        private ViewModels m_viewModels;
+        private readonly Model.Models m_models;
+        private readonly ViewModels m_viewModels;
         private AppSettings m_settings;
 
-        public OpenSettingsCommand(ViewModels viewModels)
+        public OpenSettingsCommand(ViewModels viewModels, Models models)
         {
             m_viewModels = viewModels;
+            m_models = models;
         }
 
         event EventHandler ICommand.CanExecuteChanged
@@ -33,7 +36,7 @@ namespace gui.Command
 
         void ICommand.Execute(object parameter)
         {
-            m_settings = new AppSettings(m_viewModels);
+            m_settings = new AppSettings(m_viewModels, m_models);
             m_settings.Show();
         }
     }

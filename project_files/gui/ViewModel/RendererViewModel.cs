@@ -82,11 +82,11 @@ namespace gui.ViewModel
         public ObservableCollection<RendererItem> Renderers { get; }
         public ObservableCollection<object> RendererProperties { get; }
 
-        public RendererViewModel(MainWindow window, Models models, ICommand playPause)
+        public RendererViewModel(Models models, ICommand playPause)
         {
             m_models = models;
             m_playPause = playPause;
-            m_propertiesGrid = (DataGrid)((UserControl)window.FindName("RendererPropertiesControl")).FindName("RendererPropertiesGrid");
+            m_propertiesGrid = (DataGrid)((UserControl)m_models.App.Window.FindName("RendererPropertiesControl"))?.FindName("RendererPropertiesGrid");
             RendererProperties = new ObservableCollection<object>();
             
 

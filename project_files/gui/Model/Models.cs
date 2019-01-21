@@ -63,5 +63,10 @@ namespace gui.Model
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        public void Dispose()
+        {
+            Settings.Save();
+        }
     }
 }

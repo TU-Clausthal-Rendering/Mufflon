@@ -6,35 +6,29 @@ using gui.Model;
 
 namespace gui.Command
 {
-    public class PlayPauseCommand : IGesturedCommand
+    public class PlayPauseCommand : ICommand
     {
         private Models m_models;
 
-        public PlayPauseCommand(Models models) : base("PlayPauseGesture")
+        public PlayPauseCommand(Models models)
         {
             m_models = models;
         }
 
-        public override bool CanExecute(object parameter)
+        public bool CanExecute(object parameter)
         {
             return m_models.World != null && m_models.World.IsSane;
         }
 
-        public override void Execute(object parameter)
+        public void Execute(object parameter)
         {
             m_models.Renderer.IsRendering = !m_models.Renderer.IsRendering;
         }
 
-        public override event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged
         {
-            add
-            {
-                CommandManager.RequerySuggested += value;
-            }
-            remove
-            {
-                CommandManager.RequerySuggested -= value;
-            }
+            add => CommandManager.RequerySuggested += value;
+            remove => CommandManager.RequerySuggested -= value;
         }
     }
 }

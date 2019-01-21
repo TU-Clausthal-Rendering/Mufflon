@@ -88,7 +88,6 @@
     <Compile Include="Command\AddMaterialCommand.cs" />
     <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
     <Compile Include="Command\AdjustGammaCommand.cs" />
-    <Compile Include="Command\IGesturedCommand.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
     <Compile Include="Command\ScreenShotCommand.cs" />
@@ -148,6 +147,7 @@
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
     <Compile Include="ViewModel\ConsoleInputViewModel.cs" />
     <Compile Include="ViewModel\ConsoleOutputViewModel.cs" />
+    <Compile Include="ViewModel\KeyGestureViewModel.cs" />
     <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
     <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
     <Compile Include="ViewModel\Light\GoniometricLightViewModel.cs" />

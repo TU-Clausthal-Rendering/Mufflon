@@ -14,14 +14,11 @@ namespace gui.Command
     {
         private readonly Models m_models;
         private readonly LightModel m_model;
-        private readonly ICommand m_reset;
 
         public RemoveLightCommand(Models models, LightModel model)
         {
             m_models = models;
             m_model = model;
-            // TODO replace this with something better...
-            m_reset = new ResetCommand(models, new PlayPauseCommand(models));
         }
 
         public bool CanExecute(object parameter)

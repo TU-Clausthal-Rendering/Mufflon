@@ -20,7 +20,7 @@ namespace gui.Model
     {
         private static int MaxLastWorlds { get; } = 10;
         private static int MaxScreenshotNamingPatterns { get; } = 10;
-
+        private readonly KeyGestureConverter m_gestureConverter = new KeyGestureConverter();
 
         public SettingsModel()
         {
@@ -37,13 +37,28 @@ namespace gui.Model
             Settings.Default.PropertyChanged += AppSettingsOnPropertyChanged;
         }
 
+        public void Save()
+        {
+            // store gestures
+            Settings.Default.ScreenshotGesture = ScreenshotGestureString;
+            Settings.Default.PlayPauseGesture = PlayPauseGestureString;
+            Settings.Default.ResetGesture = ResetGestureString;
+            Settings.Default.ToggleCameraMovementGesture = ToggleCameraMovementGestureString;
+
+            // store collections
+            Settings.Default.LastWorlds = ConvertToStringCollection(LastWorlds);
+            Settings.Default.ScreenshotNamePatternHistory = ConvertToStringCollection(ScreenshotNamePatternHistory);
+
+            // save settings
+            Settings.Default.Save();
+        }
+
         private void LoadGestures()
         {
-            var c = new KeyGestureConverter();
-            m_screenshotGesture = (KeyGesture) c.ConvertFromString(Settings.Default.ScreenshotGesture);
-            m_playPauseGesture = (KeyGesture) c.ConvertFromString(Settings.Default.PlayPauseGesture);
-            m_resetGesture = (KeyGesture) c.ConvertFromString(Settings.Default.ResetGesture);
-            m_toggleCameraMovementGesture = (KeyGesture) c.ConvertFromString(Settings.Default.ToggleCameraMovementGesture);
+            ScreenshotGestureString = Settings.Default.ScreenshotGesture;
+            PlayPauseGestureString = Settings.Default.PlayPauseGesture;
+            ResetGestureString = Settings.Default.ResetGesture;
+            ToggleCameraMovementGestureString = Settings.Default.ToggleCameraMovementGesture;
         }
 
         private void SetLogLevel(Core.Severity severity)
@@ -68,6 +83,18 @@ namespace gui.Model
                 dest.Add(world);
             }
         }
+
+        private StringCollection ConvertToStringCollection(ObservableCollection<string> src)
+        {
+            var res = new StringCollection();
+            foreach (var item in src)
+            {
+                res.Add(item);
+            }
+
+            return res;
+        }
+
 
         private void AppSettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
@@ -187,11 +214,18 @@ namespace gui.Model
                 if(m_screenshotGesture == value) return;
                 m_screenshotGesture = value;
                 OnPropertyChanged(nameof(ScreenshotGesture));
+                OnPropertyChanged(ScreenshotGestureString);
             }
         }
 
+        public string ScreenshotGestureString
+        {
+            get => m_screenshotGesture == null ? "" : m_gestureConverter.ConvertToString(m_screenshotGesture);
+            set => ScreenshotGesture = (KeyGesture)m_gestureConverter.ConvertFromString(value);
+        }
+
         private KeyGesture m_playPauseGesture;
-        // TODO use this
+        
         public KeyGesture PlayPauseGesture
         {
             get => m_playPauseGesture;
@@ -200,11 +234,18 @@ namespace gui.Model
                 if (m_playPauseGesture == value) return;
                 m_playPauseGesture = value;
                 OnPropertyChanged(nameof(PlayPauseGesture));
+                OnPropertyChanged(nameof(PlayPauseGestureString));
             }
         }
 
+        public string PlayPauseGestureString
+        {
+            get => m_playPauseGesture == null ? "" : m_gestureConverter.ConvertToString(m_playPauseGesture);
+            set => PlayPauseGesture = (KeyGesture) m_gestureConverter.ConvertFromString(value);
+        }
+
         private KeyGesture m_resetGesture;
-        // TODO use this
+        
         public KeyGesture ResetGesture
         {
             get => m_resetGesture;
@@ -216,8 +257,14 @@ namespace gui.Model
             }
         }
 
+        public string ResetGestureString
+        {
+            get => m_resetGesture == null ? "" : m_gestureConverter.ConvertToString(m_resetGesture);
+            set => ResetGesture = (KeyGesture)m_gestureConverter.ConvertFromString(value);
+        }
+
         private KeyGesture m_toggleCameraMovementGesture;
-        // TODO use this
+        
         public KeyGesture ToggleCameraMovementGesture
         {
             get => m_toggleCameraMovementGesture;
@@ -227,6 +274,14 @@ namespace gui.Model
                 m_toggleCameraMovementGesture = value;
                 OnPropertyChanged(nameof(ToggleCameraMovementGesture));
             }
+        }
+
+        public string ToggleCameraMovementGestureString
+        {
+            get => m_toggleCameraMovementGesture == null
+                ? ""
+                : m_gestureConverter.ConvertToString(m_toggleCameraMovementGesture);
+            set => ToggleCameraMovementGesture = (KeyGesture)m_gestureConverter.ConvertFromString(value);
         }
 
         public bool AllowCameraMovement

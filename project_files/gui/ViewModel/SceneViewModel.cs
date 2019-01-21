@@ -65,11 +65,9 @@ namespace gui.ViewModel
         public ObservableCollection<ComboBoxItem<ScenarioModel>> Scenarios { get; } = new ObservableCollection<ComboBoxItem<ScenarioModel>>();
         public bool CanLoadLastScenes => LastScenes.Count > 0 && !m_models.Renderer.IsRendering;
 
-        private ICommand m_reset;
-        public SceneViewModel(MainWindow window, Models models, ICommand playPause, ICommand reset)
+        public SceneViewModel(Models models)
         {
             m_models = models;
-            m_reset = reset;
 
             foreach (string path in m_models.Settings.LastWorlds)
             {

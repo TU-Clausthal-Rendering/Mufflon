@@ -8,22 +8,22 @@ using gui.Properties;
 
 namespace gui.Command
 {
-    public class ScreenShotCommand : IGesturedCommand
+    public class ScreenShotCommand : ICommand
     {
-        private Models m_models;
+        private readonly Models m_models;
 
-        public ScreenShotCommand(Models models) : base("ScreenshotGesture")
+        public ScreenShotCommand(Models models)
         {
             m_models = models;
         }
 
-        public override bool CanExecute(object parameter)
+        public bool CanExecute(object parameter)
         {
             // TODO: only screenshot when something was rendered?
             return m_models.World != null && m_models.World.Filename != null;
         }
 
-        public override void Execute(object parameter)
+        public void Execute(object parameter)
         {
             // First parse the current screenshot string and emplace the information
             string filename = Settings.Default.ScreenshotNamePattern;
@@ -38,16 +38,10 @@ namespace gui.Command
             m_models.Renderer.IsRendering = wasRunning;
         }
 
-        public override event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged
         {
-            add
-            {
-                CommandManager.RequerySuggested += value;
-            }
-            remove
-            {
-                CommandManager.RequerySuggested -= value;
-            }
+            add => CommandManager.RequerySuggested += value;
+            remove => CommandManager.RequerySuggested -= value;
         }
     }
 }

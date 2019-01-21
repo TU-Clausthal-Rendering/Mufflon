@@ -11,6 +11,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Input;
 
 namespace gui.View
 {
@@ -62,6 +63,7 @@ namespace gui.View
             new ProfilingLevel(){ Level = Core.ProfilingLevel.OFF, Name = "Off" }
         };
 
+        private readonly Models m_models;
         private ViewModels m_viewModels;
 
         // General settings
@@ -79,10 +81,11 @@ namespace gui.View
         public string ScreenshotGesture { get; set; }
         public string CameraMoveToggleGesture { get; set; }
 
-        public AppSettings(ViewModels viewModels)
+        public AppSettings(ViewModels viewModels, Models models)
         {
             InitializeComponent();
             m_viewModels = viewModels;
+            m_models = models;
             if (Settings.Default.ScreenshotNamePatternHistory == null)
                 Settings.Default.ScreenshotNamePatternHistory = new StringCollection();
             if (Settings.Default.ScreenshotNamePatternHistory.Count == 0)
@@ -90,13 +93,11 @@ namespace gui.View
             LogLevel = LogLevels[Settings.Default.LogLevel];
             CoreProfilerLevel = CoreProfilerLevels[Settings.Default.CoreProfileLevel];
             LoaderProfilerLevel = LoaderProfilerLevels[Settings.Default.LoaderProfileLevel];
-            PlayPauseGesture = viewModels.Toolbar.PlayPauseCommand.getCurrentGesture();
-            ResetGesture = viewModels.Toolbar.ResetCommand.getCurrentGesture();
-            ScreenshotGesture = viewModels.Toolbar.SaveScreenShotCommand.getCurrentGesture();
-            CameraMoveToggleGesture = viewModels.Toolbar.ToggleCameraMovementCommand.getCurrentGesture();
+            PlayPauseGesture = m_models.Settings.PlayPauseGestureString;
+            ResetGesture = m_models.Settings.ResetGestureString;
+            ScreenshotGesture = m_models.Settings.ScreenshotGestureString;
+            CameraMoveToggleGesture = m_models.Settings.ToggleCameraMovementGestureString;
 
-            OnPropertyChanged(nameof(ScreenshotFolder));
-            OnPropertyChanged(nameof(ScreenshotNamePatternHistory));
             DataContext = this;
             this.PreviewKeyDown += OnKeyPressed;
         }
@@ -125,11 +126,13 @@ namespace gui.View
             else if (!Loader.loader_profiling_set_level(LoaderProfilerLevel.Level))
                 throw new Exception(Loader.loader_get_dll_error());
 
-            // Keybinds
-            m_viewModels.Toolbar.PlayPauseCommand.updateGesture(PlayPauseGesture);
-            m_viewModels.Toolbar.ResetCommand.updateGesture(ResetGesture);
-            m_viewModels.Toolbar.SaveScreenShotCommand.updateGesture(ScreenshotGesture);
-            m_viewModels.Toolbar.ToggleCameraMovementCommand.updateGesture(CameraMoveToggleGesture);
+           
+            m_models.Settings.PlayPauseGestureString = PlayPauseGesture;
+            m_models.Settings.ResetGestureString = ResetGesture;
+            m_models.Settings.ScreenshotGestureString = ScreenshotGesture;
+            m_models.Settings.ToggleCameraMovementGestureString = CameraMoveToggleGesture;
+
+            m_models.Settings.Save();
         }
 
         private void CancelButtonClick(object sender, RoutedEventArgs args)

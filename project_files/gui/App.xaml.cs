@@ -21,10 +21,5 @@ namespace gui
         {
             return CultureInfo;
         }
-
-        void App_Exit(object sender, ExitEventArgs e)
-        {
-            Settings.Default.Save();
-        }
     }
 }

@@ -8,33 +8,29 @@ using gui.Properties;
 
 namespace gui.Command
 {
-    public class ToggleCameraMovementCommand : IGesturedCommand
+    public class ToggleCameraMovementCommand : ICommand
     {
-        private Models m_models;
+        private readonly Models m_models;
 
-        public ToggleCameraMovementCommand(Models models) : base("ToggleCameraMovementGesture")
+        public ToggleCameraMovementCommand(Models models)
         {
             m_models = models;
         }
 
-        public override bool CanExecute(object parameter)
+        public bool CanExecute(object parameter)
         {
             return true;
         }
 
-        public override void Execute(object parameter)
+        public void Execute(object parameter)
         {
             m_models.Settings.AllowCameraMovement = !m_models.Settings.AllowCameraMovement;
         }
 
-        public override event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged
         {
-            add
-            {
-            }
-            remove
-            {
-            }
+            add {}
+            remove {}
         }
     }
 }
