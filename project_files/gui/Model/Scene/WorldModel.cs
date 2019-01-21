@@ -69,6 +69,7 @@ namespace gui.Model.Scene
             m_currentScenario = scenario;
             OnPropertyChanged(nameof(CurrentScenario));
             OnPropertyChanged(nameof(BoundingBox));
+            OnPropertyChanged(nameof(IsSane));
         }
 
         public BoundingBox BoundingBox

@@ -3,16 +3,42 @@ using System.ComponentModel;
 using System.Threading;
 using System.Windows.Input;
 using gui.Model;
+using gui.Model.Scene;
 
 namespace gui.Command
 {
     public class PlayPauseCommand : ICommand
     {
-        private Models m_models;
+        private readonly Models m_models;
 
         public PlayPauseCommand(Models models)
         {
             m_models = models;
+            m_models.PropertyChanged += ModelsOnPropertyChanged;
+            if (m_models.World != null)
+                m_models.World.PropertyChanged += WorldOnPropertyChanged;
+        }
+
+        private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(WorldModel):
+                    if(m_models.World != null)
+                        m_models.World.PropertyChanged += WorldOnPropertyChanged;
+                    OnCanExecuteChanged();
+                    break;
+            }
+        }
+
+        private void WorldOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(WorldModel.IsSane):
+                    OnCanExecuteChanged();
+                    break;
+            }
         }
 
         public bool CanExecute(object parameter)
@@ -25,10 +51,11 @@ namespace gui.Command
             m_models.Renderer.IsRendering = !m_models.Renderer.IsRendering;
         }
 
-        public event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged;
+
+        protected virtual void OnCanExecuteChanged()
         {
-            add => CommandManager.RequerySuggested += value;
-            remove => CommandManager.RequerySuggested -= value;
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
