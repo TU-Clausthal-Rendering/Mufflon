@@ -1,0 +1,79 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 13.04.2 ] */
+
+/* [wxMaxima: input   start ] */
+load("vect");
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+express([1,0,0]~[0,1,0]); /* Check of cross pruduct */
+norm(x) := sqrt(x . x);   /* Definition of vector norm */
+norm([2,-1,2]);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+/* The 4 corners of the quad_*/
+v0:[v0x,v0y,v0z];
+v1:[v1x,v1y,v1z];
+v2:[v2x,v2y,v2z];
+v3:[v3x,v3y,v3z];
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+/* Tangent vectors at point (s,t)*/
+dxds(t) := (1-t) * (v3-v0) + t * (v2-v1);
+dxdt(s) := (1-s) * (v1-v0) + s * (v2-v3);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+/* General are of a parametrized surface
+  https://www.khanacademy.org/math/multivariable-calculus/integrating-multivariable-functions/surface-integrals-articles/a/surface-area-integrals
+*/
+integrate(integrate(norm(dxdt(s)~dxds(t)), s, 0, 1), t, 0, 1);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+/* The paper "Smooth surfaces from bilinear patches: Discrete affine minimal surfaces"
+mentiones a formula. This is an exemplaric test if the correct result is received.*/
+x0:[0,0,4];
+x1:[1,0,0];
+x2:[1,1,4];
+x3:[0,1,0];
+m:matrix(x1-x0,x2-x0,x3-x0);
+sqrt(abs(determinant(m)));
+
+dx2ds(t) := (1-t) * (x3-x0) + t * (x2-x1);
+dx2dt(s) := (1-s) * (x1-x0) + s * (x2-x3);
+dA(s,t) := ''(norm(express(dx2dt(s)~dx2ds(t))));
+quad_qags('quad_qags(dA(s,t), s, 0, 1)[1], t, 0, 1);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+float((dA(0,0)+dA(1,1))/2);
+float((dA(0,0)+dA(0.5,0.5)+dA(1,1))/3);
+float((dA(0,0)+dA(0.25,0.25)+dA(0.5,0.5)+dA(0.75,0.75)+dA(1,1))/5);
+float((dA(0,0)+dA(0.25,0.25)+dA(0.5,0.5)+dA(0.75,0.75)+dA(1,1) + dA(0.125,0.125) + dA(0.375,0.375) + dA(0.625,0.625) + dA(0.875,0.875))/9);
+float(sum(dA(k/8,k/8), k, 0, 8)/9);
+float(sum(dA(k/9,k/9), k, 0, 9)/10);
+float(sum(dA(k/16,k/16), k, 0, 16)/17);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+dxdl(s) := norm((x3-x0) * s - ((x1-x0)+(x2-x1)*s));
+integrate(dxdl(s), s, 0, 1);
+float(%);
+/* [wxMaxima: input   end   ] */
+
+/* [wxMaxima: input   start ] */
+s0:float(dA(0,0));
+s1:float(dA(0,1));
+s2:float(dA(1,0));
+s3:float(dA(1,1));
+s4:float(dA(0.5,0.5));
+float(dA(0,0.5));
+(s0+s1+s2+s3)/4;
+(s0+s1+s2+s3+s4)/5;
+/* [wxMaxima: input   end   ] */
+
+/* Maxima can't load/batch files which end with a comment! */
+"Created with wxMaxima"$

@@ -77,4 +77,51 @@ Spectrum get_flux(const DirectionalLight& light,
 	return light.irradiance * surface;
 }
 
+
+template < Device dev >
+void AreaLightQuad<dev>::recompute_area() {
+	const ei::Vec3 e03 = points[3] - points[0];
+	const ei::Vec3 e12 = points[2] - points[1];
+	const ei::Vec3 e01 = points[1] - points[0];
+	const ei::Vec3 e32 = points[2] - points[3];
+	/* Uniform
+	constexpr int SAMPLES_PER_DIM = 32;
+	area = 0;
+	for(int i = 0; i <= SAMPLES_PER_DIM; ++i) {
+		float s = i / float(SAMPLES_PER_DIM);
+		for(int j = 0; j <= SAMPLES_PER_DIM; ++j) {
+			float t = j / float(SAMPLES_PER_DIM);
+			ei::Vec3 tangentX = ei::lerp(e03, e12, t);
+			ei::Vec3 tangentY = ei::lerp(e01, e32, s);
+			area += len(cross(tangentX, tangentY));
+		}
+	}
+	area /= ei::sq(SAMPLES_PER_DIM+1);*/
+
+	/* Adaptive, quasi Monte Carlo */
+	// Get area of two opposing triangles.
+	const ei::Vec3 n0 = cross(e03, e01);
+	const ei::Vec3 n1 = cross(e12, e32);
+	const float len0 = len(n0); // = tri area*2
+	const float len1 = len(n1); // = tri area*2
+	area = (len0 + len1) / 2.0f;
+	// This is the exact area, if the quad is planar.
+	if(dot(n0, n1) / (len0 * len1) < 0.99999f) {
+		// Get more samples for numeric integration
+		int count = 2;
+		float diff = 0;
+		math::GoldenRatio2D seq(235);
+		do {
+			math::RndSet2 st( seq.next() );
+			ei::Vec3 tangentX = ei::lerp(e03, e12, st.u1);
+			ei::Vec3 tangentY = ei::lerp(e01, e32, st.u0);
+			const float sample = len(cross(tangentX, tangentY));
+			diff = sample - area;
+			area += diff / (++count);
+		} while(ei::abs(diff / area) > 1e-4f);
+	}
+}
+template struct AreaLightQuad<Device::CPU>;
+template struct AreaLightQuad<Device::CUDA>;
+
 } // mufflon::scene::lights

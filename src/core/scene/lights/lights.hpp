@@ -115,25 +115,12 @@ struct alignas(16) AreaLightQuad {
 		}
 		scale = rhs.scale;
 		radianceTex = rhs.radianceTex->acquire_const<dev>();
-		// TODO: move this into loader or better exporter, also try adaptive quadrature
-		const ei::Vec3 e03 = points[3] - points[0];
-		const ei::Vec3 e12 = points[2] - points[1];
-		const ei::Vec3 e01 = points[1] - points[0];
-		const ei::Vec3 e32 = points[2] - points[3];
-		area = 0;
-		for(int i = 0; i <= 32; ++i) {
-			float s = i / 32.0f;
-			for(int j = 0; j <= 32; ++j) {
-				float t = j / 32.0f;
-				ei::Vec3 tangentX = ei::lerp(e03, e12, t);
-				ei::Vec3 tangentY = ei::lerp(e01, e32, s);
-				area += len(cross(tangentX, tangentY));
-			}
-		}
-		area /= 33*33;
-
+		recompute_area();
 		return *this;
 	}
+
+	// TODO: move this into loader or better exporter
+	void recompute_area();
 };
 template < Device dev >
 struct alignas(16) AreaLightSphere {
