@@ -248,7 +248,7 @@ CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 		if(cosTheta >= cosFalloffStart)
 			return 1.f;
 		else
-			return powf((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 4u);
+			return ei::sq((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax));
 	}
 	return 0.f;
 }

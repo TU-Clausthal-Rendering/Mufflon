@@ -376,14 +376,13 @@ bool JsonLoader::load_lights() {
 			Radians angle;
 			Radians falloffStart;
 			if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
-				angle = std::acos(static_cast<Radians>(Degrees(read<float>(m_state, angleIter))));
+				angle = std::acos(read<float>(m_state, angleIter));
 			else
-				angle = static_cast<Radians>(Degrees(read<float>(m_state, get(m_state, light, "width"))));
+				angle = Radians(read<float>(m_state, get(m_state, light, "width")));
 			if(auto falloffIter = get(m_state, light, "cosFalloffStart", false);  falloffIter != light.MemberEnd())
 				falloffStart = std::acos(read<float>(m_state, falloffIter));
 			else
-				falloffStart = static_cast<Radians>(Degrees(read_opt<float>(m_state, light, "falloffWidth",
-																			static_cast<Radians>(Degrees(angle)))));
+				falloffStart = Radians(read_opt<float>(m_state, light, "falloffStart", angle));
 
 			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT); hdl.type == LIGHT_SPOT) {
 				world_set_spot_light_position(hdl, util::pun<Vec3>(position));

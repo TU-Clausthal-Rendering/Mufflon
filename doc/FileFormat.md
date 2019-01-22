@@ -127,15 +127,15 @@ This section lists the required attributes for the different types of light sour
 
 `"type": "spot"`\
 PBRT type of spot light: "intensity" * clamp((cosθ - "cosWidth") / ("falloffStart" - "cosWidth"), 0, 1) ^ "exponent",
-where "exponent" is set to 4.
+where "exponent" is set to 2.
 
     "position": [x,y,z],            // vec3 vec3 world space position in [m]
     "direction": [x,y,z],           // Direction in which the light travels (incident direction), not necessarily normalized
     "intensity": [a,b,c],           // Peak intensity [W/sr]
     "scale": float,                 // Multiplier for "intensity"
-    "cosWidth" or "width": float,   // An angle "width" in radiant for the half-opening angle or the
+    "cosWidth" or "width": float,   // An angle "width" in radians for the half-opening angle or the
                                     // cosine of this angle
-    "cosFalloffStart" or "falloffStart": float  // An angle "falloffStart" in radiant for the angle up to
+    "cosFalloffStart" or "falloffStart": float  // An angle "falloffStart" in radians for the angle up to
                                                 //which the peak intensity is used or the cosine of this angle
 
 `"type": "envmap"`
