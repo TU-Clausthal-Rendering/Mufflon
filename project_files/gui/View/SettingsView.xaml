@@ -4,13 +4,19 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui.View"
+        xmlns:s="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="Settings" 
-        Height="450" 
-        Width="400">
-    <Grid Margin="10">
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        MinHeight="200" 
+        MinWidth="400">
+    <Window.Resources>
+        <s:Double x:Key="StackPanelWidth">300</s:Double>
+    </Window.Resources>
+    <Grid Margin="{StaticResource DialogMargin}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -20,10 +26,12 @@
         <TabControl Grid.Row="0" Grid.Column="0"
                     TabStripPlacement="Left">
             <TabItem Header="General">
-                <StackPanel Margin="5">
+                <StackPanel Margin="{StaticResource DialogMargin}"
+                            Width="{StaticResource StackPanelWidth}"
+                            HorizontalAlignment="Left">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
@@ -33,51 +41,56 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        
+
                         <TextBlock Grid.Row="0" Grid.Column="0"
                                    Text="Logger output level:"
                                    HorizontalAlignment="Left"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center"
+                                   Margin="0,3,0,5"/>
                         <ComboBox Grid.Row="0" 
                                   Grid.Column="1"
-                                  Width="100" 
                                   ItemsSource="{Binding General.LogLevels}"
-                                  SelectedItem="{Binding General.SelectedLogLevel}"/>
+                                  SelectedItem="{Binding General.SelectedLogLevel}"
+                                  Margin="{StaticResource RightPropertyMargin}" Grid.ColumnSpan="2"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Core Profiler level:"
                                    HorizontalAlignment="Left"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center"
+                                   Margin="0,3,0,5"/>
                         <ComboBox Grid.Row="1" Grid.Column="1"
-                                  Width="100" 
+                                  Margin="{StaticResource RightPropertyMargin}"
                                   ItemsSource="{Binding General.CoreProfilerLevels}"
-                                  SelectedItem="{Binding General.SelectedCoreProfilerLevel}"/>
-                        
+                                  SelectedItem="{Binding General.SelectedCoreProfilerLevel}" Grid.ColumnSpan="2"/>
+
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Loader Profiler level:"
                                    HorizontalAlignment="Left"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center"
+                                   Margin="0,3,0,5"/>
                         <ComboBox Grid.Row="2" Grid.Column="1"
-                                  Width="100" 
+                                  Margin="{StaticResource RightPropertyMargin}"
                                   ItemsSource="{Binding General.LoaderProfilerLevels}"
-                                  SelectedItem="{Binding General.SelectedLoaderProfilerLevel}"/>
+                                  SelectedItem="{Binding General.SelectedLoaderProfilerLevel}" Grid.ColumnSpan="2"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0"
                                    Text="Screenshot name pattern:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
+                                   Margin="0,3,0,5"
                                    ToolTip="{Binding General.ScreenshotNamePatternTooltip}"/>
                         <ComboBox Grid.Row="3" Grid.Column="1"
                                   IsEditable="True"
+                                  Margin="{StaticResource RightPropertyMargin}"
                                   ItemsSource="{Binding General.ScreenshotNamePatterns}"
-                                  Text="{Binding General.SelectedScreenshotNamePattern}">
+                                  Text="{Binding General.SelectedScreenshotNamePattern}" Grid.ColumnSpan="2">
                         </ComboBox>
 
                         <TextBlock Grid.Row="4" Grid.Column="0"
                                    Text="Screenshot folder:"
                                    HorizontalAlignment="Left"
-                                   VerticalAlignment="Center"/>
-                        <Grid Grid.Row="4" Grid.Column="1">
+                                   VerticalAlignment="Center" Margin="0,2"/>
+                        <Grid Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -95,10 +108,12 @@
                 </StackPanel>
             </TabItem>
             <TabItem Header="Keybindings">
-                <StackPanel Margin="5">
+                <StackPanel Margin="{StaticResource DialogMargin}"
+                            Width="{StaticResource StackPanelWidth}"
+                            HorizontalAlignment="Left">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
@@ -111,38 +126,46 @@
                         <TextBlock Grid.Row="0" Grid.Column="0"
                                    Text="Toggle render play/pause:"
                                    HorizontalAlignment="Left"
+                                   Margin="{StaticResource LeftPropertyMargin}"
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="0" Grid.Column="1"
-                                 Width="50"
+                                  Margin="{StaticResource RightPropertyMargin}"
                                  Text="{Binding Keybindings.PlayPauseGesture}"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Reset renderer:"
+                                   Margin="{StaticResource LeftPropertyMargin}"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="1" Grid.Column="1"
-                                 Width="50"
+                                  Margin="{StaticResource RightPropertyMargin}"
                                  Text="{Binding Keybindings.ResetGesture}"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Save screenshot:"
+                                   Margin="{StaticResource LeftPropertyMargin}"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="2" Grid.Column="1"
-                                 Width="50"
+                                  Margin="{StaticResource RightPropertyMargin}"
                                  Text="{Binding Keybindings.ScreenshotGesture}"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0"
                                    Text="Toggle camera movement:"
+                                   Margin="{StaticResource LeftPropertyMargin}"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"/>
                         <TextBox Grid.Row="3" Grid.Column="1"
-                                 Width="50"
+                                  Margin="{StaticResource RightPropertyMargin}"
                                  Text="{Binding Keybindings.CameraMoveToggleGesture}"/>
                     </Grid>
                 </StackPanel>
             </TabItem>
             <TabItem Header="Other">
+                <StackPanel Margin="{StaticResource DialogMargin}"
+                            Width="{StaticResource StackPanelWidth}"
+                            HorizontalAlignment="Left">
+                </StackPanel>
             </TabItem>
         </TabControl>
 
