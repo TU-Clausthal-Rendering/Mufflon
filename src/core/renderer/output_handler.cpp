@@ -9,25 +9,25 @@ namespace mufflon::renderer {
 OutputHandler::OutputHandler(u16 width, u16 height, OutputValue targets) :
 	// If a texture is created without data, it does not allocate data yet.
 	m_cumulativeTex{
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+		Texture{"Output###Cum_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Cum_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Cum_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Cum_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Cum_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
 	},
 	m_iterationTex{
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+		Texture{"Output###Iter_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Iter_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Iter_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Iter_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Iter_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
 	},
 	m_cumulativeVarTex{
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+		Texture{"Output###CumVar_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###CumVar_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###CumVar_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###CumVar_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
+		Texture{"Output###CumVar_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
 	},
 	m_targets(targets),
 	m_iteration(-1), // if begin_iteration is called without reset=true, this will still work
@@ -118,11 +118,15 @@ void OutputHandler::set_targets(OutputValue targets) {
 		int i = 0;
 		for (u32 flag : OutputValue::iterator) {
 			// Is this atttribute recorded at all?
-			if(!targets.is_set(flag) && m_targets.is_set(flag))
-				m_cumulativeTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
+			if(!targets.is_set(flag) && m_targets.is_set(flag)) {
+				m_cumulativeTex[i].unload<Device::CPU>();
+				m_cumulativeTex[i].unload<Device::CUDA>();
+			}
 			if(!targets.is_set(flag << 8) && m_targets.is_set(flag << 8)) {
-				m_cumulativeVarTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
-				m_iterationTex[i] = std::move(Texture{ static_cast<u16>(m_width), static_cast<u16>(m_height), 1u, Format::RGBA32F, SamplingMode::NEAREST, false });
+				m_cumulativeVarTex[i].unload<Device::CPU>();
+				m_cumulativeVarTex[i].unload<Device::CUDA>();
+				m_iterationTex[i].unload<Device::CPU>();
+				m_iterationTex[i].unload<Device::CUDA>();
 			}
 			++i;
 		}

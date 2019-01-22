@@ -2449,14 +2449,7 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	}
 	ConstTextureHandle envmap = background->get_envmap();
 	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
-	auto nameOpt = s_world.get_texture_name(envmap);
-	if(!nameOpt.has_value()) {
-		logError("[", FUNCTION_NAME, "] Could not find envmap path!");
-		return nullptr;
-	}
-
-	std::string_view path = nameOpt.value();
-	return &path[0];
+	return envmap->get_name().c_str();
 	CATCH_ALL(nullptr)
 }
 

@@ -6,9 +6,7 @@
 #include "util/flag.hpp"
 #include <cuda_runtime.h>
 #include <memory>
-#ifndef __CUDACC__
-#include <string_view>
-#endif // __CUDACC__
+#include <string>
 
 namespace mufflon { namespace scene { namespace textures {
 
@@ -182,13 +180,15 @@ public:
 											   ConstTextureDevHandle_t<Device::OPENGL>>;
 
 	// Loads a texture into the CPU-RAM
-	Texture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
-			bool sRgb, std::unique_ptr<u8[]> data = nullptr);
+	Texture(std::string name, u16 width, u16 height, u16 numLayers, Format format,
+			SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data = nullptr);
 	Texture(const Texture&) = delete;
 	Texture(Texture&&) = default;
 	Texture& operator=(const Texture&) = delete;
 	Texture& operator=(Texture&&) = default;
 	~Texture();
+
+	const std::string& get_name() const noexcept { return m_name; }
 
 	// Aquire a read-only accessor
 	template < Device dev >
@@ -214,7 +214,6 @@ public:
 	void synchronize();
 
 	// Remove a texture from one device.
-	// If the resource is the last one, an error is issued and the ressource is not unloaded.
 	template < Device dev >
 	void unload();
 
@@ -245,6 +244,7 @@ private:
 	cudaArray_t m_cudaTexture;
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
+	std::string m_name;
 
 	void create_texture_cpu(std::unique_ptr<u8[]> data = nullptr);
 	void create_texture_cuda();

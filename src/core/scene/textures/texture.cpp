@@ -8,7 +8,7 @@
 
 namespace mufflon::scene::textures {
 
-Texture::Texture(u16 width, u16 height, u16 numLayers, Format format,
+Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, Format format,
 				 SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data) :
 	m_width(width),
 	m_height(height),
@@ -16,7 +16,8 @@ Texture::Texture(u16 width, u16 height, u16 numLayers, Format format,
 	m_format(format),
 	m_mode(mode),
 	m_sRgb(sRgb),
-	m_cudaTexture(nullptr)
+	m_cudaTexture(nullptr),
+	m_name(move(name))
 {
 	if(data) {
 		// A file loader provides an array with pixel data. This is loaded into
@@ -88,19 +89,13 @@ template < Device dev >
 void Texture::unload() {
 	switch(dev) {
 		case Device::CPU: {
-			if(!m_cudaTexture) {
-				logError("[Texture::unload] The CPU texture is the last instance. If unloaded the texture object would be invalid.");
-				return;
+			if(m_cpuTexture) {
+				m_handles.get<TextureDevHandle_t<Device::CPU>>() = nullptr;
+				m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>() = nullptr;
+				m_cpuTexture = nullptr;
 			}
-			m_handles.get<TextureDevHandle_t<Device::CPU>>() = nullptr;
-			m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>() = nullptr;
-			m_cpuTexture = nullptr;
 		} break;
 		case Device::CUDA: {
-			if(!m_cpuTexture) {
-				logError("[Texture::unload] The CUDA texture is the last instance. If unloaded the texture object would be invalid.");
-				return;
-			}
 			if(m_cudaTexture) {
 				// Free
 				auto& texHdl = m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>();

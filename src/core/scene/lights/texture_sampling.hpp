@@ -50,9 +50,10 @@ struct EnvmapSampleResult {
 
 
 #ifndef __CUDACC__
-inline std::unique_ptr<textures::Texture> create_summed_area_table(textures::ConstTextureDevHandle_t<Device::CPU> texture) {
+inline std::unique_ptr<textures::Texture> create_summed_area_table(TextureHandle texture) {
 	mAssert(texture->get_num_layers() == 1 || texture->get_num_layers() == 6);
 	auto res = std::make_unique<textures::Texture>(
+		texture->get_name() + "###SAT",
 		texture->get_width() * texture->get_num_layers(), // Place all cubemap faces side by side
 		texture->get_height(),
 		1u,
@@ -61,6 +62,7 @@ inline std::unique_ptr<textures::Texture> create_summed_area_table(textures::Con
 		false
 	);
 
+	auto sourceTex = texture->acquire_const<Device::CPU>();
 	auto sumTex = res->acquire<Device::CPU>();
 	// Conversion to luminance
 	constexpr ei::Vec4 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f, 0.0f };
@@ -77,7 +79,7 @@ inline std::unique_ptr<textures::Texture> create_summed_area_table(textures::Con
 			float accumLumX = 0.f;
 			for(int l = 0; l < layers; ++l) {
 				for(int x = 0; x < width; ++x) {
-					const float luminance = ei::dot(LUM_WEIGHT, textures::read(texture, Pixel{ x, y }, l));
+					const float luminance = ei::dot(LUM_WEIGHT, textures::read(sourceTex, Pixel{ x, y }, l));
 					accumLumX += luminance;
 					textures::write(sumTex, Pixel{ x + width * l, y }, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
 				}
@@ -95,7 +97,7 @@ inline std::unique_ptr<textures::Texture> create_summed_area_table(textures::Con
 			float accumLumX = 0.f;
 			for(int x = 0; x < width; ++x) {
 				const Pixel texel{ x, y };
-				const float luminance = ei::dot(LUM_WEIGHT, textures::read(texture, texel));
+				const float luminance = ei::dot(LUM_WEIGHT, textures::read(sourceTex, texel));
 				accumLumX += luminance * sinTheta;
 				textures::write(sumTex, texel, ei::Vec4{ accumLumX, 0.f, 0.f, 0.f });
 			}

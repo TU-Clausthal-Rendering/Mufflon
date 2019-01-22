@@ -399,18 +399,8 @@ bool WorldContainer::has_texture(std::string_view name) const {
 TextureHandle WorldContainer::find_texture(std::string_view name) {
 	auto iter = m_textures.find(name);
 	if(iter != m_textures.end())
-		return &iter->second;
+		return iter->second.get();
 	return nullptr;
-}
-
-std::optional<std::string_view> WorldContainer::get_texture_name(ConstTextureHandle hdl) const {
-	// Gotta iterate entire map... very expensive operation
-	// TODO: use bimap?
-	for(auto iter = m_textures.cbegin(); iter != m_textures.cend(); ++iter) {
-		if(&iter->second == hdl)
-			return iter->first;
-	}
-	return std::nullopt;
 }
 
 TextureHandle WorldContainer::add_texture(std::string_view path, u16 width,
@@ -419,8 +409,11 @@ TextureHandle WorldContainer::add_texture(std::string_view path, u16 width,
 										  bool sRgb, std::unique_ptr<u8[]> data) {
 	mAssertMsg(m_textures.find(path) == m_textures.end(), "Duplicate texture entry");
 	// TODO: ensure that we have at least 1x1 pixels?
-	TextureHandle texHdl = &m_textures.emplace(path, textures::Texture{ width, height, numLayers,
-							  format, mode, sRgb, move(data) }).first->second;
+	auto tex = std::make_unique<textures::Texture>(move(std::string(path)),
+						width, height, numLayers, format, mode, sRgb, move(data));
+	std::string_view nameRef = tex->get_name();
+	TextureHandle texHdl = tex.get();
+	m_textures.emplace(nameRef, move(tex));
 	m_texRefCount[texHdl] = 1u;
 	return texHdl;
 }
@@ -439,7 +432,7 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 				// No more references, delete the texture
 				// This unfortunately means linear search
 				for(auto texIter = m_textures.begin(); texIter != m_textures.end(); ++texIter) {
-					if(&texIter->second == hdl) {
+					if(texIter->second.get() == hdl) {
 						m_textures.erase(texIter);
 						break;
 					}

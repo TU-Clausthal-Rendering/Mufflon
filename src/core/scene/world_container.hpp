@@ -129,7 +129,6 @@ public:
 	// Add new textures to the scene
 	bool has_texture(std::string_view name) const;
 	TextureHandle find_texture(std::string_view name);
-	std::optional<std::string_view> get_texture_name(ConstTextureHandle hdl) const;
 	TextureHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
 							   textures::Format format, textures::SamplingMode mode,
 							   bool sRgb, std::unique_ptr<u8[]> data);
@@ -213,7 +212,7 @@ private:
 	bool m_lightsDirty = true;
 	bool m_envLightDirty = true;
 	// Texture cache
-	std::map<std::string, textures::Texture, std::less<>> m_textures;
+	std::unordered_map<std::string_view, std::unique_ptr<textures::Texture>> m_textures;
 	std::map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has
 
 	// Current scene
