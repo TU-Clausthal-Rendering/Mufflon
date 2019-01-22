@@ -325,13 +325,16 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 		}
 		case LightType::AREA_LIGHT_QUAD: {
 			auto& a = *as<AreaLightQuad<CURRENT_DEV>>(tree.posLights.memory + offset);
-			float area = ei::surface(ei::Triangle{a.points[0], a.points[1], a.points[2]})
-					   + ei::surface(ei::Triangle{a.points[0], a.points[2], a.points[3]});
-			return AreaPdf{ p / area };
+			return AreaPdf{ p / a.area };
 		}
 		case LightType::AREA_LIGHT_SPHERE: {
 			auto& a = *as<AreaLightSphere<CURRENT_DEV>>(tree.posLights.memory + offset);
-			float area = 4 * ei::PI * ei::sq(a.radius);
+			// Only the visible part of the sphere is sample. Therefore, the area depends
+			// on the distance between reference and sphere.
+			float cosSphere = a.radius / len(refPosition - a.position);
+			mAssert(cosSphere >= 0.0f && cosSphere <= 1.0f);
+			float solidAngle = 2 * ei::PI * (1.0f - cosSphere);
+			float area = solidAngle * ei::sq(a.radius);
 			return AreaPdf{ p / area };
 		}
 		default:

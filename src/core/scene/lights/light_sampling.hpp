@@ -377,6 +377,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 																const math::RndSet2& rnd) {
 	scene::Direction centerDir = pos - light.position;
 	float dist = len(centerDir);
+	if(dist <= light.radius) return NextEventEstimation{}; // Point inside
 	centerDir /= dist;
 	// Compute the cosθ inside the sphere, to sample the solid angle extended by
 	// the spherical cap.

@@ -233,12 +233,14 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, PrimitiveHandle, u32>& map) {
 	int height = ei::ilog2(lights.size());
 	u32 extraNodes = u32(lights.size()) - (1u << height);
-	u32 lvlOff = extraNodes * 2;		// Index of first node on the height-1 level (all nodes < lvlOff are in level height)
 	if(extraNodes > 0) ++height;
+	// Get the number of lights on level height.
+	// All lights with an higher index are on level height+1.
+	u32 numLeavesOnH = u32(lights.size()) - extraNodes * 2;
 	u32 i = 0;
 	for(const auto& light : lights) {
 		if(light.primitive.instanceId != -1) {		// Hitable light source?
-			u32 code = (i <= lvlOff) ? i : (i-lvlOff)*2+lvlOff;
+			u32 code = i < numLeavesOnH ? 2*i+2*extraNodes : i-numLeavesOnH;
 			// Append zero -> most significant bit is the root branch
 			code <<= 32 - height;
 			map.insert(light.primitive, code);
