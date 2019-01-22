@@ -539,7 +539,7 @@ bool WorldContainer::load_scene_lights() {
 				mAssertMsg(obj.first->has_lod_available(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
 				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
 				if(!lod.is_emissive(*m_scenario)) {
-					instIdx += static_cast<i32>(obj.second.size());
+					++instIdx;
 					continue;
 				}
 				i32 primIdx = 0;
