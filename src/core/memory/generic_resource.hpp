@@ -5,6 +5,7 @@
 #include "util/tagged_tuple.hpp"
 #include "util/assert.hpp"
 #include "util/flag.hpp"
+#include "core/memory/residency.hpp"
 #include "core/concepts.hpp"
 
 namespace mufflon {
@@ -76,6 +77,6 @@ private:
 		unique_device_ptr<Device::CUDA, char[]>> m_mem;
 	//unique_device_ptr<Device::OPENGL, char> m_openglMem;
 };
-template DeviceManagerConcept<GenericResource>;
+template struct DeviceManagerConcept<GenericResource>;
 
 } // namespace mufflon

@@ -310,8 +310,8 @@
       <DisableSpecificWarnings>4201;4324;4505;4819;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SupportJustMyCode>false</SupportJustMyCode>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <EnablePREfast>false</EnablePREfast>
+      <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /D/Y "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
@@ -356,8 +356,8 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DisableSpecificWarnings>4201;4324;4505;4819;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/bigobj /Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <EnablePREfast>false</EnablePREfast>
+      <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

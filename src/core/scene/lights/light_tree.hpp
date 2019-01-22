@@ -97,11 +97,11 @@ struct LightSubTree {
 				  "Invalid node struct size/alignment");
 
 	struct {
-		float flux { 0.0f };
+		float flux{ 0.0f };
 		u16 type;
 	} root;
-	std::size_t lightCount { 0 };
-	char* memory { nullptr };
+	std::size_t lightCount{ 0 };
+	char* memory{ nullptr };
 
 	CUDA_FUNCTION __forceinline__ Node* get_node(u32 offset) { return as<Node>(memory + offset); }
 	CUDA_FUNCTION __forceinline__ const Node* get_node(u32 offset) const { return as<Node>(memory + offset); }
@@ -187,10 +187,14 @@ private:
 	// find the CUDA textures.
 	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;
 	// Environment light model, may be black, a texture or an analytic model
-	lights::Background* m_envLight { nullptr };
+	lights::Background* m_envLight{ nullptr };
 };
 
-template DeviceManagerConcept<LightTreeBuilder>;
+}} // namespace scene::lights
+
+template struct DeviceManagerConcept<scene::lights::LightTreeBuilder>;
+
+namespace scene { namespace lights {
 
 #endif // __CUDACC__
 

@@ -3,6 +3,7 @@
 #include "core/concepts.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/memory/generic_resource.hpp"
+#include "core/memory/residency.hpp"
 #include "util/flag.hpp"
 #include "accel_struct_info.hpp"
 
@@ -43,7 +44,7 @@ public:
 
 	template < Device dev >
 	AccelDescriptor acquire_const() {
-		if(needs_rebuild<dev>())
+		if(needs_rebuild())
 			throw std::runtime_error("[LBVHBuilder::acquire_const] the BVH must be created with build() before a descriptor can be returned.");
 		synchronize<dev>();
 
@@ -68,10 +69,9 @@ public:
 		m_bvhNodes.synchronize<dev>();
 	}
 
-	template < Device dev >
-	bool needs_rebuild() const {
-		return (!m_primIds.is_resident<Device::CPU>() || !m_bvhNodes.is_resident<Device::CPU>())
-			&& (!m_primIds.is_resident<Device::CUDA>() || !m_bvhNodes.is_resident<Device::CUDA>());
+	bool needs_rebuild() const noexcept {
+		return (!m_primIds.template is_resident<Device::CPU>() || !m_bvhNodes.template is_resident<Device::CPU>())
+			&& (!m_primIds.template is_resident<Device::CUDA>() || !m_bvhNodes.template is_resident<Device::CUDA>());
 	}
 
 	void mark_invalid() noexcept {
@@ -89,6 +89,8 @@ private:
 					const i32 numPrimitives);
 };
 
-template DeviceManagerConcept<LBVHBuilder>;
+}} // namespace scene::accel_struct
 
-}}} // namespace mufflon::scene::accel_struct
+template struct DeviceManagerConcept<scene::accel_struct::LBVHBuilder>;
+
+} // namespace mufflon

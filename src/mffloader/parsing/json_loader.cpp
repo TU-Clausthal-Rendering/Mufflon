@@ -115,7 +115,6 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			// Lambert material
 			mat->innerType = MaterialParamType::MATERIAL_LAMBERT;
 			auto albedoIter = get(m_state, material, "albedo");
-			MaterialHdl hdl = nullptr;
 			if(albedoIter->value.IsArray()) {
 				ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
 				mat->inner.lambert.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);

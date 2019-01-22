@@ -56,10 +56,10 @@ public:
 
 	template < Device dev >
 	void unload() {
-		for(InstanceHandle instance : m_instances) {
+		/*for(InstanceHandle instance : m_instances) {
 			(void)instance;
 			// TODO
-		}
+		}*/
 		// TODO: materials etc.
 		m_lightTree.unload<dev>();
 		m_media.unload<dev>();

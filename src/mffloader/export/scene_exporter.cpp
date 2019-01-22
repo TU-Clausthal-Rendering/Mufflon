@@ -316,7 +316,7 @@ bool SceneExporter::save_scenarios(rapidjson::Document& document)
 		}
 		size_t pointLightCount = scenario_get_point_light_count(scenarioHandle);
 
-		for (size_t j = 0; j < pointLightCount; i++)
+		for (size_t j = 0; j < pointLightCount; j++)
 		{
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, j, LIGHT_POINT);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
@@ -324,14 +324,14 @@ bool SceneExporter::save_scenarios(rapidjson::Document& document)
 
 		size_t dirLightCount = scenario_get_dir_light_count(scenarioHandle);
 
-		for (size_t j = 0; j < dirLightCount; i++)
+		for (size_t j = 0; j < dirLightCount; j++)
 		{
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, j, LIGHT_DIRECTIONAL);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
 		}
 		size_t spotLightCount = scenario_get_spot_light_count(scenarioHandle);
 
-		for (size_t j = 0; j < spotLightCount; i++)
+		for (size_t j = 0; j < spotLightCount; j++)
 		{
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, j, LIGHT_SPOT);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());

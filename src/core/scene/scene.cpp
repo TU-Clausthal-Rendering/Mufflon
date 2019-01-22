@@ -114,7 +114,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	// Check if we need to update the object descriptors
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
-	const bool geometryChanged = m_accelStruct.needs_rebuild<dev>();
+	const bool geometryChanged = m_accelStruct.needs_rebuild();
 	if(geometryChanged) {
 		std::vector<ei::Mat3x4> instanceTransformations;
 		std::vector<float> instanceScales;

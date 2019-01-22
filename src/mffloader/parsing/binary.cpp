@@ -65,22 +65,6 @@ private:
 	FILE* m_desc = nullptr;
 };
 
-constexpr std::size_t get_attribute_size(AttribDesc desc) {
-	switch(desc.type) {
-		case AttributeType::ATTR_CHAR: return desc.rows * sizeof(i8);
-		case AttributeType::ATTR_UCHAR: return desc.rows * sizeof(u8);
-		case AttributeType::ATTR_SHORT: return desc.rows * sizeof(i16);
-		case AttributeType::ATTR_USHORT: return desc.rows * sizeof(u16);
-		case AttributeType::ATTR_INT: return desc.rows * sizeof(i32);
-		case AttributeType::ATTR_UINT: return desc.rows * sizeof(u32);
-		case AttributeType::ATTR_LONG: return desc.rows * sizeof(i64);
-		case AttributeType::ATTR_ULONG: return desc.rows * sizeof(u64);
-		case AttributeType::ATTR_FLOAT: return desc.rows * sizeof(float);
-		case AttributeType::ATTR_DOUBLE: return desc.rows * sizeof(double);
-		default: return 0u;
-	}
-}
-
 } // namespace
 
 
@@ -182,8 +166,8 @@ void BinaryLoader::read_normal_compressed_vertices(const ObjectState& object, co
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, points.get() };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, uvs.get() };
+	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { points.get() } };
+	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { uvs.get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -222,9 +206,9 @@ void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, 
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, points.get() };
-	BulkLoader normalsBulk{ BulkLoader::BULK_FILE, normals.get() };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, uvs.get() };
+	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { points.get() } };
+	BulkLoader normalsBulk{ BulkLoader::BULK_FILE, { normals.get() } };
+	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { uvs.get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -267,7 +251,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, attr.get() };
+	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + object.name + "'");
@@ -293,7 +277,7 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, attr.get() };
+	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + object.name + "'");
@@ -319,7 +303,7 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 		return;
 	FileDescriptor attr{ m_filePath, "rb" };
 	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, attr.get() };
+	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + object.name + "'");
@@ -344,7 +328,7 @@ void BinaryLoader::read_uncompressed_face_materials(const ObjectState& object, c
 		return;
 	FileDescriptor matIdxs{ m_filePath, "rb" };
 	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, matIdxs.get() };
+	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { matIdxs.get() } };
 
 	const u32 faces = lod.numTriangles + lod.numQuads;
 	if(polygon_set_material_idx_bulk(lod.lodHdl, static_cast<FaceHdl>(0u),
@@ -362,7 +346,7 @@ void BinaryLoader::read_uncompressed_sphere_materials(const ObjectState& object,
 		return;
 	FileDescriptor matIdxs{ m_filePath, "rb" };
 	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, matIdxs.get() };
+	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { matIdxs.get() } };
 
 	if(spheres_set_material_idx_bulk(lod.lodHdl, static_cast<SphereHdl>(0u),
 									 lod.numSpheres, &matsBulk) == INVALID_SIZE)
@@ -407,7 +391,7 @@ void BinaryLoader::read_uncompressed_spheres(const ObjectState& object, const Lo
 		return;
 	FileDescriptor spheres{ m_filePath, "rb" };
 	spheres.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader spheresBulk{ BulkLoader::BULK_FILE, spheres.get() };
+	BulkLoader spheresBulk{ BulkLoader::BULK_FILE, { spheres.get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -881,12 +865,13 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		if(m_fileStream.bad() || m_fileStream.fail())
 			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
-		// Needed to get a C file descriptor offset
-		const std::ifstream::pos_type fileStart = m_fileStream.tellg();
 
 		// Skip over the materials header
 		if(read<u32>() != MATERIALS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid materials header magic constant");
+
+		m_fileStart = m_fileStream.tellg();
+
 		const u64 objectStart = read<u64>();
 		m_fileStream.seekg(objectStart, std::ifstream::beg);
 
@@ -894,7 +879,7 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		if(read<u32>() != OBJECTS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid objects header magic constant");
 		(void) read<u64>(); // Instance start
-		GlobalFlag compressionFlags = GlobalFlag{ read<u32>() };
+		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };
 
 		// Jump to the desired object
 		const u32 jumpCount = read<u32>();
@@ -947,7 +932,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
-		const std::ifstream::pos_type fileStart = m_fileStream.tellg();
+		m_fileStart = m_fileStream.tellg();
 
 		if(m_abort)
 			return false;
@@ -960,7 +945,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		// Read the material names (and implicitly their indices)
 		m_materialNames.reserve(numMaterials);
 		for(u32 i = 0u; i < numMaterials; ++i) {
-			m_materialNames.push_back(move(read<std::string>()));
+			m_materialNames.push_back(read<std::string>());
 		}
 		if(m_abort)
 			return false;
@@ -971,7 +956,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		if(read<u32>() != OBJECTS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid objects header magic constant");
 		const u64 instanceStart = read<u64>();
-		GlobalFlag compressionFlags = GlobalFlag{ read<u32>() };
+		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };
 
 		// Parse the object jumptable
 		m_objJumpTable.resize(read<u32>());

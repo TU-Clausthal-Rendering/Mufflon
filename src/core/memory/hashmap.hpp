@@ -141,6 +141,7 @@ public:
 	// See CPU implementation for documentation
 
 	__device__ void insert(K key, V value) {
+#ifdef __CUDACC__
 		u32 hash = generic_hash(key);
 		u32 dataIdx = atomicInc(&m_dataCount, 0);
 		m_data[dataIdx].first = key;
@@ -151,6 +152,7 @@ public:
 			++step;
 			idx = (idx + step * step) % m_mapSize;
 		}
+#endif // __CUDACC__
 	}
 
 	__device__ V* find(K key) {
@@ -235,6 +237,6 @@ private:
 	u32 m_dataCapacity;			// Maximum number of data elements
 	std::atomic_uint32_t m_cpuHMCounter;		// Store the atomic counter here, because the returned HashMap<CPU> is not trivially copyable otherwise
 };
-template DeviceManagerConcept<HashMapManager<int,int>>;
+template struct DeviceManagerConcept<HashMapManager<int,int>>;
 
 } // namespace mufflon

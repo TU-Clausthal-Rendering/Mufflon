@@ -23,7 +23,7 @@ namespace gui.Command
         {
             switch (args.PropertyName)
             {
-                case nameof(WorldModel):
+                case nameof(Models.World):
                     if(m_models.World != null)
                         m_models.World.PropertyChanged += WorldOnPropertyChanged;
                     OnCanExecuteChanged();

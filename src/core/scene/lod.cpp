@@ -30,7 +30,7 @@ LodDescriptor<dev> Lod::get_descriptor() {
 	};
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
 	// (Re)build acceleration structure if necessary
-	if(m_accelStruct.needs_rebuild<dev>()) {
+	if(m_accelStruct.needs_rebuild()) {
 		auto timer = Profiler::instance().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
 		m_accelStruct.build(desc, get_bounding_box());
 	}

@@ -142,8 +142,6 @@ public:
 
 	// Default construction, creates material-index attribute.
 	Polygons();
-	// Creates polygon from already-created mesh.
-	Polygons(PolygonMeshType&& mesh);
 
 	Polygons(const Polygons&) = delete;
 	Polygons(Polygons&&);
@@ -154,11 +152,11 @@ public:
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
 
 	template < class T >
-	typename VertexAttributeHandle add_vertex_attribute(std::string name) {
+	VertexAttributeHandle add_vertex_attribute(std::string name) {
 		return m_vertexAttributes.add_attribute<T>(std::move(name));
 	}
 	template < class T >
-	typename FaceAttributeHandle add_face_attribute(std::string name) {
+	FaceAttributeHandle add_face_attribute(std::string name) {
 		return m_faceAttributes.add_attribute<T>(std::move(name));
 	}
 

@@ -63,9 +63,9 @@ public:
 
 	static constexpr std::size_t size = sizeof...(Args);
 
+	TaggedTuple() : m_tuple() {}
 	TaggedTuple(Args&& ...args) :
 		m_tuple(std::forward<Args>(args)...) {}
-	TaggedTuple() = default;
 	TaggedTuple(const TaggedTuple&) = default;
 	TaggedTuple(TaggedTuple&&) = default;
 	TaggedTuple& operator=(const TaggedTuple&) = default;

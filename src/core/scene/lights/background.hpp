@@ -14,7 +14,7 @@ namespace mufflon { namespace scene { namespace lights {
 /**
  * This class represents the scene's background.
  * Possibilities range from a plain black background over an envmap
- * to analytical models. All that is required is 1. they need to 
+ * to analytical models. All that is required is 1. they need to
  * be sample-able from a direction and 2. they need to be able to
  * compute accumulated flux.
  */
@@ -30,15 +30,15 @@ public:
 	// Constructors for creating the proper type of background
 	static Background black() {
 		Background bck{ BackgroundType::COLORED };
-		bck.m_color = Spectrum { 0.0f };
-		bck.m_flux = Spectrum { 0.0f };
+		bck.m_color = Spectrum{ 0.0f };
+		bck.m_flux = Spectrum{ 0.0f };
 		return bck;
 	}
 	static Background colored(Spectrum color) {
 		Background bck{ BackgroundType::COLORED };
-		bck.m_color = Spectrum { color };
+		bck.m_color = Spectrum{ color };
 		// Flux will be computed in acquire_const
-		bck.m_flux = Spectrum { 1.0f };
+		bck.m_flux = Spectrum{ 1.0f };
 		return bck;
 	}
 	static Background envmap(TextureHandle envmap) {
@@ -46,8 +46,8 @@ public:
 		Background bck{ BackgroundType::ENVMAP };
 		bck.m_envLight = envmap;
 		// Flux will be computed together with the SAT
-		bck.m_flux = Spectrum { 1.0f }; // TODO: compute real flux (depends on scene size)
-		bck.m_color = Spectrum { 1.0f }; // Default factor
+		bck.m_flux = Spectrum{ 1.0f }; // TODO: compute real flux (depends on scene size)
+		bck.m_color = Spectrum{ 1.0f }; // Default factor
 		return bck;
 	}
 
@@ -104,6 +104,8 @@ private:
 	void compute_constant_flux(const ei::Box& bounds);
 };
 
-template DeviceManagerConcept<Background>;
+}} // namespace scene::lights
 
-}}} // namespace mufflon::scene::lights
+template struct DeviceManagerConcept<scene::lights::Background>;
+
+} // namespace mufflon

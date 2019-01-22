@@ -64,7 +64,7 @@ rapidjson::Value::ConstMemberIterator get(ParserState& state,
 
 // Reads a value without modifying the state
 template < class T >
-inline T read(ParserState& state, const rapidjson::Value& val);
+T read(ParserState& state, const rapidjson::Value& val);
 
 // Reads a value and pushes/pops the key name onto the state's object stack
 template < class T >
