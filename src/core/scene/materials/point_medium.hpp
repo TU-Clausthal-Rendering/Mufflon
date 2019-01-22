@@ -10,14 +10,17 @@ namespace mufflon { namespace scene { namespace materials {
 
 CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
 	mAssert(scene.lods[0u].polygon.numVertices > 0u || scene.lods[0u].spheres.numSpheres > 0u);
+	mAssert(scene.lods[scene.lodIndices[0u]].polygon.numVertices > 0u
+		|| scene.lods[scene.lodIndices[0u]].spheres.numSpheres > 0u);
 	// Shoot a ray to a point in the scene (any surface suffices)
 	// We need to transform the vertex from object to world space
-	const ei::Vec3 vertex = scene.transformations[0u] 
-		* ei::Vec4{accel_struct::get_centroid(scene.lods[scene.lodIndices[0u]], 0), 1.0f};
+	const Point objSpaceCenter = accel_struct::get_centroid(scene.lods[scene.lodIndices[0u]], 0);
+	const Point vertex = scene.transformations[0u] 
+		* ei::Vec4{objSpaceCenter * scene.scales[0u], 1.0f};
 
-	ei::Vec3 dir = vertex - pos;
+	Direction dir = vertex - pos;
 	const float length = ei::len(dir);
-	dir *= 1.f / length;
+	dir /= length;
 	ei::Ray ray{ pos, dir };
 	auto res = accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, { -1l, -1l }, length + 1.f);
 	mAssert(res.hitId.instanceId != -1l);
