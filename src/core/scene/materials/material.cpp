@@ -29,7 +29,7 @@ char* IMaterial::get_descriptor(Device device, char* outBuffer) const {
 		m_innerMedium,
 		m_outerMedium
 	};
-	return outBuffer + sizeof(MaterialDescriptorBase);
+	return get_subdescriptor(device, outBuffer + sizeof(MaterialDescriptorBase));
 }
 
 

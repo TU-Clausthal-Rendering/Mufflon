@@ -7,7 +7,7 @@
 namespace mufflon { namespace scene { namespace materials {
 
 // Forward declared:
-CUDA_FUNCTION int fetch_subdesc(Materials type, const char* subDesc, const UvCoordinate& uvCoordinate, char* subParam);
+CUDA_FUNCTION int fetch_subparam(Materials type, const char* subDesc, const UvCoordinate& uvCoordinate, char* subParam);
 CUDA_FUNCTION math::EvalValue evaluate_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Direction& excidentTS, const Medium* media, bool adjoint, bool merge);
 CUDA_FUNCTION math::PathSample sample_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Medium* media, const math::RndSet2_1& rndSet, bool adjoint);
 CUDA_FUNCTION Spectrum albedo(Materials type, const char* subParams);
@@ -23,15 +23,16 @@ struct BlendParameterPack {
 struct BlendDesc {
 	float factorA;
 	float factorB;
+	u32 offsetB;	// LayerA starts at 'this+1', but LayerB is not implicitly known
 	Materials typeA;
 	Materials typeB;
 
 	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
 		// Fetch the layers recursively
 		const char* layerA = as<char>(this + 1);
-		int sizeA = fetch_subdesc(typeA, layerA, uvCoordinate, outBuffer + sizeof(BlendParameterPack));
-		const char* layerB = layerA + sizeA;
-		int sizeB = fetch_subdesc(typeB, layerB, uvCoordinate, outBuffer + sizeof(BlendParameterPack) + sizeA);
+		int sizeA = fetch_subparam(typeA, layerA, uvCoordinate, outBuffer + sizeof(BlendParameterPack));
+		const char* layerB = as<char>(this) + offsetB;
+		int sizeB = fetch_subparam(typeB, layerB, uvCoordinate, outBuffer + sizeof(BlendParameterPack) + sizeA);
 		*as<BlendParameterPack>(outBuffer) = BlendParameterPack{
 			factorA, factorB, u32(sizeof(BlendParameterPack) + sizeA), typeA, typeB
 		};
@@ -68,16 +69,20 @@ public:
 			- IMaterial::get_parameter_pack_size();	// Counted twice (in layer A and B)
 	}
 
-	char* get_descriptor(Device device, char* outBuffer) const final {
-		// First write the general descriptor and then append the lambert specific one
-		outBuffer = IMaterial::get_descriptor(device, outBuffer);
+	char* get_subdescriptor(Device device, char* outBuffer) const final {
+		char* layerBegin = outBuffer + sizeof(BlendDesc);
+		char* layerAEnd = m_layerA->get_subdescriptor(device, layerBegin);
+		char* layerBEnd = m_layerB->get_subdescriptor(device, layerAEnd);
 		*as<BlendDesc>(outBuffer) = BlendDesc{
-			m_factorA, m_factorB, m_layerA->get_type(), m_layerB->get_type()
+			m_factorA, m_factorB, u32(layerAEnd - outBuffer), m_layerA->get_type(), m_layerB->get_type()
 		};
-		outBuffer += sizeof(BlendDesc);
-		outBuffer = m_layerA->get_descriptor(device, outBuffer);
-		outBuffer = m_layerB->get_descriptor(device, outBuffer);
-		return outBuffer;
+		return layerBEnd;
+	}
+
+	Emission get_emission() const final {
+		if(m_layerA->get_properties().is_emissive())
+			return m_layerA->get_emission();
+		return m_layerB->get_emission();
 	}
 
 	Medium compute_medium() const final {

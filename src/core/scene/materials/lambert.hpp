@@ -47,9 +47,7 @@ public:
 			+ sizeof(LambertParameterPack);
 	}
 
-	char* get_descriptor(Device device, char* outBuffer) const final {
-		// First write the general descriptor and then append the lambert specific one
-		outBuffer = IMaterial::get_descriptor(device, outBuffer);
+	char* get_subdescriptor(Device device, char* outBuffer) const final {
 		device_switch(device,
 			*as<LambertDesc<dev>>(outBuffer) =
 				LambertDesc<dev>{ m_albedo->acquire_const<dev>() };

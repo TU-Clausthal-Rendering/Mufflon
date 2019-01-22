@@ -51,9 +51,7 @@ public:
 			+ sizeof(EmissiveParameterPack);
 	}
 
-	char* get_descriptor(Device device, char* outBuffer) const final {
-		// First write the general descriptor and then append the lambert specific one
-		outBuffer = IMaterial::get_descriptor(device, outBuffer);
+	char* get_subdescriptor(Device device, char* outBuffer) const final {
 		device_switch(device,
 			(*as<EmissiveDesc<dev>>(outBuffer) =
 				 EmissiveDesc<dev>{ m_emission->acquire_const<dev>(), m_scale });

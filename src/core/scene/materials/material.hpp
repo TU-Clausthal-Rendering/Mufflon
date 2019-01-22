@@ -120,7 +120,8 @@ public:
 	 * returns: a pointer to the end of the written data. I.e. outBuffer - return
 	 *		is the size of the written descriptor.
 	 */
-	virtual char* get_descriptor(Device device, char* outBuffer) const;
+	char* get_descriptor(Device device, char* outBuffer) const;
+	virtual char* get_subdescriptor(Device device, char* outBuffer) const = 0;
 
 	// Get only the texture for emissive materials
 	virtual Emission get_emission() const { return {nullptr, Spectrum{0.0f}}; }
@@ -152,10 +153,10 @@ public:
 		m_dirty = false;
 		return dirty;
 	}
-protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;
 	mutable bool m_dirty = true;			// Any property of the material changed
+
 private:
 	std::string m_name;
 	Materials m_type;

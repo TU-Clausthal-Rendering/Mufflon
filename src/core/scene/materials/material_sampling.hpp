@@ -15,15 +15,15 @@ namespace mufflon { namespace scene { namespace materials {
 
 /*
  * Get the instanciated parameters for the evaluation of the material.
- * A parameter pack consits of the material type (see Materials) followed
- * by the two media handles and and specific parameters used in the
+ * A parameter pack consists of the material type (see Materials) followed
+ * by the two media handles and a specific parameters used in the
  * sampling/evaluation routines.
  * uvCoordinate: surface texture coordinate for fetching the textures.
  * outBuffer: pointer to a writeable buffer with at least get
  *		get_parameter_pack_size(device) memory.
  * Returns the size of the fetched data.
  */
-CUDA_FUNCTION int fetch_subdesc(Materials type, const char* subDesc, const UvCoordinate& uvCoordinate, char* subParam) {
+CUDA_FUNCTION int fetch_subparam(Materials type, const char* subDesc, const UvCoordinate& uvCoordinate, char* subParam) {
 	switch(type) {
 		case Materials::LAMBERT: return as<LambertDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
 		case Materials::EMISSIVE: return as<EmissiveDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
@@ -41,7 +41,7 @@ CUDA_FUNCTION int fetch(const MaterialDescriptorBase& desc, const UvCoordinate& 
 	outBuffer->outerMedium = desc.outerMedium;
 	const char* subDesc = as<char>(&desc) + sizeof(MaterialDescriptorBase);
 	char* subParam = as<char>(outBuffer) + sizeof(ParameterPack);
-	return fetch_subdesc(desc.type, subDesc, uvCoordinate, subParam) + sizeof(ParameterPack);
+	return fetch_subparam(desc.type, subDesc, uvCoordinate, subParam) + sizeof(ParameterPack);
 }
 
 
