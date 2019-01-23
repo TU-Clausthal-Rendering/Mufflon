@@ -771,6 +771,9 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\quaternion.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\parallel.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">

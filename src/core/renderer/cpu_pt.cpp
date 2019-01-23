@@ -8,6 +8,7 @@
 #include "core/math/rng.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
+#include "util/parallel.hpp"
 #include <random>
 
 namespace mufflon::renderer {
@@ -40,7 +41,7 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
-//#pragma omp parallel for
+#pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
 		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
 	}
