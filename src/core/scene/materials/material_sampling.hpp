@@ -268,13 +268,19 @@ albedo(const ParameterPack& params) {
  * Get the self emission into some direction.
  */
 CUDA_FUNCTION Spectrum
-emission(const ParameterPack& params, const scene::Direction& excident) {
-	if(params.type == Materials::EMISSIVE) {
-		const char* subParams = as<char>(&params) + sizeof(ParameterPack);
+emission(Materials type, const char* subParams, const scene::Direction& excident) {
+	if(type == Materials::EMISSIVE)
 		return as<EmissiveParameterPack>(subParams)->radiance;
-	}
+	if(type == Materials::BLEND)
+		return blend_emission(*as<BlendParameterPack>(subParams), excident);
+	// TODO: fresnel
 	// Emission is not implemented in the majority of materials -> no check/redundant implementation
 	return Spectrum{0.0f};
+}
+
+CUDA_FUNCTION Spectrum
+emission(const ParameterPack& params, const scene::Direction& excident) {
+	return emission(params.type, as<char>(&params) + sizeof(ParameterPack), excident);
 }
 
 

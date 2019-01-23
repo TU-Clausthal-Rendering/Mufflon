@@ -11,6 +11,7 @@ CUDA_FUNCTION int fetch_subparam(Materials type, const char* subDesc, const UvCo
 CUDA_FUNCTION math::EvalValue evaluate_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Direction& excidentTS, const Medium* media, bool adjoint, bool merge);
 CUDA_FUNCTION math::PathSample sample_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Medium* media, const math::RndSet2_1& rndSet, bool adjoint);
 CUDA_FUNCTION Spectrum albedo(Materials type, const char* subParams);
+CUDA_FUNCTION Spectrum emission(Materials type, const char* subParams, const scene::Direction& excident);
 
 struct BlendParameterPack {
 	float factorA;
@@ -80,9 +81,15 @@ public:
 	}
 
 	Emission get_emission() const final {
-		if(m_layerA->get_properties().is_emissive())
-			return m_layerA->get_emission();
-		return m_layerB->get_emission();
+		if(m_layerA->get_properties().is_emissive()) {
+			Emission em = m_layerA->get_emission();
+			em.scale *= m_factorA;
+			return em;
+		} else {
+			Emission em = m_layerB->get_emission();
+			em.scale *= m_factorB;
+			return em;
+		}
 	}
 
 	Medium compute_medium() const final {
@@ -183,6 +190,13 @@ blend_albedo(const BlendParameterPack& params) {
 	const char* layerB = as<char>(&params) + params.offsetB;
 	return albedo(params.typeA, layerA) * params.factorA
 		 + albedo(params.typeB, layerB) * params.factorB;
+}
+
+CUDA_FUNCTION Spectrum blend_emission(const BlendParameterPack& params, const scene::Direction& excident) {
+	const char* layerA = as<char>(&params + 1);
+	const char* layerB = as<char>(&params) + params.offsetB;
+	return emission(params.typeA, layerA, excident) * params.factorA
+		 + emission(params.typeB, layerB, excident) * params.factorB;
 }
 
 }}} // namespace mufflon::scene::materials
