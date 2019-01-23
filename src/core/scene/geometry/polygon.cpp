@@ -7,6 +7,7 @@
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include "core/scene/tessellation/adaptive.hpp"
 
 namespace mufflon::scene::geometry {
 
@@ -327,7 +328,12 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMeshType, Real>& tessellater,
 				std::size_t divisions) {
-	tessellater(*m_meshData, divisions);
+	
+	tessellation::AdaptiveTessellater tess{ *m_meshData };
+	tess.tessellate();
+
+	/*
+	tessellater(*m_meshData, divisions);*/
 	// TODO: change number of triangles/quads!
 
 	// Let our attribute pools know that we changed sizes
@@ -375,7 +381,7 @@ void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMesh
 		for(auto vertexIter = face.begin(); vertexIter != face.end(); ++vertexIter) {
 			*(currIndices++) = static_cast<u32>(vertexIter->idx());
 			ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
-			m_boundingBox = ei::Box{ m_boundingBox, util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) };
+			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) } };
 		}
 	}
 

@@ -107,6 +107,9 @@
     <Filter Include="Source Files\profiler">
       <UniqueIdentifier>{0b4c810c-d739-4525-89c3-f8fb154f9b5f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\tessellation">
+      <UniqueIdentifier>{76820222-ebbf-4307-ab48-102d21502f75}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -216,6 +219,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\util\byte_io.cpp">
       <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\tessellation\adaptive.cpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -773,6 +779,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\parallel.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\tessellation\adaptive.hpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
