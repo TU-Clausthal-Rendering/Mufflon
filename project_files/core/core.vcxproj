@@ -146,6 +146,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\defaultconfig.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\elementarytypes.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\prime.hpp" />
+    <ClInclude Include="..\..\deps\epsilon\include\ei\quaternion.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\stdextensions.hpp" />
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\deps\glad\glad\glad.h" />

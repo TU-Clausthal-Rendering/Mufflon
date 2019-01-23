@@ -352,7 +352,7 @@ public:
 			}
 			case Interaction::SURFACE: {
 				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-				return scene::materials::emission(desc->params, m_incident);
+				return scene::materials::emission(desc->params, desc->tangentSpace.geoN, -m_incident);
 			}
 		}
 		return Spectrum{0.0f};

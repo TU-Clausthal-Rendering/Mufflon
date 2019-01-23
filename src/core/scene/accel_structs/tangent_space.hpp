@@ -51,6 +51,7 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 	if(ei::dot(shadingTangentY, intersection.tangentY) < 0)
 		shadingTangentY *= -1.f;
 	const ei::Vec3 shadingTangentX = ei::cross(shadingNormal, shadingTangentY);
+	// TODO: gram-schmidt instead of two cross products (should be faster)
 
 	return TangentSpace{
 		shadingNormal,
