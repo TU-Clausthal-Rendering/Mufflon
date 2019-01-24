@@ -9,7 +9,7 @@
         xmlns:camera="clr-namespace:gui.View.Camera"
         xmlns:viewmodel="clr-namespace:gui.ViewModel"
         mc:Ignorable="d"
-        Title="MainWindow" 
+        Title="Mufflon GUI" 
         Height="600" 
         Width="800"
         WindowState="Maximized">
