@@ -54,7 +54,7 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>logo1.ico</ApplicationIcon>
+    <ApplicationIcon>Icons\logo1.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
@@ -449,11 +449,7 @@
     <Resource Include="Icons\open.png" />
     <Resource Include="Icons\save.png" />
     <Resource Include="Icons\zoom.png" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Icons\add.png" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Icons\inspect_instance.png" />
     <Resource Include="Icons\inspect_light.png" />
     <Resource Include="Icons\inspect_material.png" />
@@ -461,16 +457,12 @@
     <Resource Include="Icons\play.png" />
     <Resource Include="Icons\restart.png" />
     <Resource Include="Icons\stop.png" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Icons\screenshot.png" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Icons\camera_move.png" />
     <Resource Include="Icons\camera_nomove.png" />
+    <Resource Include="Icons\logo1.ico" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="logo1.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
