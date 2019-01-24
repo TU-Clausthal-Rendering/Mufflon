@@ -724,7 +724,8 @@ RayIntersectionResult first_intersection_scene_lbvh(
 				tangentY = normalize(ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) });
 
 				geoNormal = normalize(cross(dxdt, dxds));
-				uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], surfParams.bilinear.x, surfParams.bilinear.y);
+				//uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], surfParams.bilinear.x, surfParams.bilinear.y);
+				uv = uvV[0u] + duds * surfParams.bilinear.v + dudt * surfParams.bilinear.u;
 			}
 		}
 

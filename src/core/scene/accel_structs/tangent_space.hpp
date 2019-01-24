@@ -43,15 +43,17 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 	}
 
 	// Transform the normal to world space (per-vertex normals are in object space)
-	shadingNormal = ei::normalize(ei::Mat3x3{ scene.transformations[intersection.hitId.instanceId] } * shadingNormal);
+	shadingNormal = normalize(ei::Mat3x3{ scene.transformations[intersection.hitId.instanceId] } * shadingNormal);
 
-	// Compute the shading tangents to make the systen orthonormal
-	ei::Vec3 shadingTangentY = ei::normalize(ei::cross(intersection.tangentX, shadingNormal));
+	// Compute orthonormal shading tangents
+	// Gram-Schmidt
+	const ei::Vec3 shadingTangentX = normalize(
+		intersection.tangentX - shadingNormal * dot(intersection.tangentX, shadingNormal));
+	ei::Vec3 shadingTangentY = cross(shadingNormal, shadingTangentX);
 	// Flip the tangent (system is not guaranteed to be either left- or right-handed)
-	if(ei::dot(shadingTangentY, intersection.tangentY) < 0)
-		shadingTangentY *= -1.f;
-	const ei::Vec3 shadingTangentX = ei::cross(shadingNormal, shadingTangentY);
-	// TODO: gram-schmidt instead of two cross products (should be faster)
+	// DISABLED: Likely not required for any shading model...
+	//if(dot(shadingTangentY, intersection.tangentY) < 0)
+	//	shadingTangentY = -shadingTangentY;
 
 	return TangentSpace{
 		shadingNormal,
