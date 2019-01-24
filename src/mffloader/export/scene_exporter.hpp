@@ -2,6 +2,8 @@
 
 #include "util/filesystem.hpp"
 #include <rapidjson/document.h>
+#include "core/export/interface.h"
+
 namespace mff_loader::exprt {
 
 class SceneExporter
@@ -13,12 +15,15 @@ public:
 		m_filePath(fs::canonical(file))
 	{}
 
-	bool save_scene();
+	bool save_scene() const;
 private:
-	bool save_cameras(rapidjson::Document& document);
-	bool save_lights(rapidjson::Document& document);
-	bool save_materials(rapidjson::Document& document);
-	bool save_scenarios(rapidjson::Document& document);
+	bool save_cameras(rapidjson::Document& document) const;
+	bool save_lights(rapidjson::Document& document) const;
+	bool save_materials(rapidjson::Document& document) const;
+	bool save_material(rapidjson::Document& document, MaterialParams materialParams) const;
+	bool save_scenarios(rapidjson::Document& document) const;
+
+	rapidjson::Value save_in_array(Vec3 value, rapidjson::Document& document) const;
 
 	const fs::path m_filePath;
 	
