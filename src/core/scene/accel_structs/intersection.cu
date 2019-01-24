@@ -475,7 +475,7 @@ void first_intersection_scene_obj_lbvh(
 	i32& hitPrimId,
 	SurfaceParametrization& surfParams
 ) {
-	const ei::Mat3x3 invRotation = ei::invert(ei::Mat3x3{ scene.transformations[instanceId] });
+	const ei::Mat3x3 invRotation = transpose(ei::Mat3x3{ scene.transformations[instanceId] });
 	const float scale = scene.scales[instanceId];
 	const float invScale = 1.f / scale;
 	const ei::Vec3 invTranslation { -scene.transformations[instanceId][3],
@@ -728,14 +728,10 @@ RayIntersectionResult first_intersection_scene_lbvh(
 			}
 		}
 
-		// TODO: enable this for (probably) better code?
-		//normal = ei::normalize(ei::transformDir(normal, transforms[hitInstanceId]));
-		//tangent = ei::normalize(ei::transformDir(tangent, transforms[hitInstanceId]));
 		// Since we have separated scale, rotation, and translation, we do not need to normalize the vectors again
-		const ei::Mat3x3 rotMatrix = ei::Mat3x3{ scene.transformations[hitInstanceId] };
-		geoNormal = rotMatrix * geoNormal;
-		tangentX = rotMatrix * tangentX;
-		tangentY = rotMatrix * tangentY;
+		geoNormal = transformDir(geoNormal, scene.transformations[hitInstanceId]);
+		tangentX = transformDir(tangentX, scene.transformations[hitInstanceId]);
+		tangentY = transformDir(tangentY, scene.transformations[hitInstanceId]);
 
 		return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
 	}
@@ -750,7 +746,7 @@ bool any_intersection_scene_obj_lbvh(
 	float tmax,
 	i32* traversalStack
 ) {
-	const ei::Mat3x3 invRotation = ei::transpose(ei::Mat3x3{ scene.transformations[instanceId] });
+	const ei::Mat3x3 invRotation = transpose(ei::Mat3x3{ scene.transformations[instanceId] });
 	const float invScale = 1.f / scene.scales[instanceId];
 	const ei::Vec3 invTranslation{ -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
