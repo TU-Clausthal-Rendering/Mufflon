@@ -250,18 +250,82 @@ bool SceneExporter::save_materials(rapidjson::Document& document) const
 		MaterialParams materialParams;
 		world_get_material_data(materialHandle, &materialParams);
 
-		if(!save_material(document, materialParams))
-			return false;
+		rapidjson::Value materialName;
+		materialName.SetString(std::to_string(i).c_str(), std::to_string(i).length(), document.GetAllocator()); // TODO get right material name (not implemented yet)
+
+		materials.AddMember(materialName, save_material(materialParams, document), document.GetAllocator());
 	}
 
+	document.AddMember("materials", materials, document.GetAllocator());
 	return true;
 }
 
-	bool SceneExporter::save_material(rapidjson::Document& document, MaterialParams materialParams) const
+rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rapidjson::Document& document) const
+{
+	MaterialParamType matType = materialParams.innerType;
+
+	rapidjson::Value material;
+	material.SetObject();
+
+	switch (matType)
 	{
-		// TODO Finish save_material
-		return true;
+	case (MaterialParamType::MATERIAL_BLEND):
+		material.AddMember("type", "blend", document.GetAllocator());
+		material.AddMember("layerA", save_material(*materialParams.inner.blend.a.mat, document), document.GetAllocator());
+		material.AddMember("layerB", save_material(*materialParams.inner.blend.b.mat, document), document.GetAllocator());
+		material.AddMember("factorA", materialParams.inner.blend.a.factor, document.GetAllocator());
+		material.AddMember("factorB", materialParams.inner.blend.b.factor, document.GetAllocator());
+		break;
+	case (MaterialParamType::MATERIAL_EMISSIVE):
+		material.AddMember("type", "emissive", document.GetAllocator());
+		// TextureHdl radianceTextureHandle = materialParams.inner.emissive.radiance;
+		// TODO Extract radiance(path) from texture handle (not Implemented yet)
+		material.AddMember("radiance", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+		material.AddMember("scale", store_in_array(materialParams.inner.emissive.scale, document), document.GetAllocator());
+		break;
+	case(MATERIAL_FRESNEL):
+		material.AddMember("type", "fresnel", document.GetAllocator());
+		material.AddMember("layerReflection", save_material(*materialParams.inner.fresnel.a, document), document.GetAllocator());
+		material.AddMember("layerRefraction", save_material(*materialParams.inner.fresnel.b, document), document.GetAllocator());
+		material.AddMember("refractionIndex", store_in_array(materialParams.inner.fresnel.refractionIndex, document), document.GetAllocator());
+		break;
+	case(MATERIAL_LAMBERT):
+		material.AddMember("type", "lambert", document.GetAllocator());
+		// TextureHdl albedoTextureHandle = materialParams.inner.lambert.albedo
+		// TODO Extract albedo(path) from texture handle (not Implemented yet)
+		material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+		break;
+	case(MATERIAL_ORENNAYAR):
+		material.AddMember("type", "orennayar", document.GetAllocator());
+		// TextureHdl albedoTextureHandle = materialParams.inner.orennayar.albedo
+		// TODO Extract albedo(path) from texture handle (not Implemented yet)
+		material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+		material.AddMember("roughness", materialParams.inner.orennayar.roughness, document.GetAllocator());
+		break;
+	case(MATERIAL_TORRANCE):
+		material.AddMember("type", "torrance", document.GetAllocator());
+		// TextureHdl albedoTextureHandle = materialParams.inner.torrance.roughness
+		// TODO Extract roughness(path) from texture handle (not Implemented yet)
+		material.AddMember("roughness", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+		material.AddMember("ndf", materialParams.inner.torrance.ndf, document.GetAllocator());
+		// TextureHdl albedoTextureHandle = materialParams.inner.torrance.albedo
+		// TODO Extract albedo(path) from texture handle (not Implemented yet)
+		material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+		break;
+	case(MATERIAL_WALTER):
+		material.AddMember("type", "walter", document.GetAllocator());
+		// TextureHdl albedoTextureHandle = materialParams.inner.walter.roughness
+		// TODO Extract roughness(path) from texture handle (not Implemented yet)
+		material.AddMember("roughness", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+		material.AddMember("ndf", materialParams.inner.walter.ndf, document.GetAllocator());
+		material.AddMember("absorption", store_in_array(materialParams.inner.walter.absorption, document), document.GetAllocator());
+	default:
+		// TODO Exception?
+		break;
 	}
+
+	return material;
+}
 
 	bool SceneExporter::save_scenarios(rapidjson::Document& document) const
 {
@@ -360,7 +424,17 @@ rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& 
 	return out;
 }
 
-rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const
+rapidjson::Value SceneExporter::store_in_array(Vec2 value, rapidjson::Document& document) const
+{
+	rapidjson::Value out;
+	out.SetArray();
+	out.PushBack(value.x, document.GetAllocator());
+	out.PushBack(value.y, document.GetAllocator());
+
+	return out;
+}
+
+	rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const
 {
 	fs::path copy = m_fileDestinationPath;
 	rapidjson::Value out;

@@ -21,10 +21,11 @@ private:
 	bool save_cameras(rapidjson::Document& document) const;
 	bool save_lights(rapidjson::Document& document) const;
 	bool save_materials(rapidjson::Document& document) const;
-	bool save_material(rapidjson::Document& document, MaterialParams materialParams) const;
+	rapidjson::Value save_material( MaterialParams materialParams, rapidjson::Document& document ) const;
 	bool save_scenarios(rapidjson::Document& document) const;
 
 	rapidjson::Value store_in_array(Vec3 value, rapidjson::Document& document) const;
+	rapidjson::Value store_in_array(Vec2 value, rapidjson::Document& document) const;
 
 	rapidjson::Value store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const;
 
