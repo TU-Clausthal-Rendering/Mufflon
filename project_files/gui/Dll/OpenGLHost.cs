@@ -36,6 +36,7 @@ namespace gui.Dll
         // context creation
         private IntPtr m_hWnd = IntPtr.Zero;
         private IntPtr m_deviceContext = IntPtr.Zero;
+        private IntPtr m_renderContext = IntPtr.Zero;
 
         // render thread (asynchronous openGL drawing)
         private Thread m_renderThread;
@@ -205,12 +206,32 @@ namespace gui.Dll
             if (!Gdi32.SetPixelFormat(m_deviceContext, pixelFormat, ref pfd))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
-            var renderingContext = OpenGl32.wglCreateContext(m_deviceContext);
-            if (renderingContext == IntPtr.Zero)
+            // Create initial context for extension loading
+            m_renderContext = OpenGl32.wglCreateContext(m_deviceContext);
+            if(m_renderContext == IntPtr.Zero)
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (!OpenGl32.wglMakeCurrent(m_deviceContext, m_renderContext))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
-            if (!OpenGl32.wglMakeCurrent(m_deviceContext, renderingContext))
-                throw new Win32Exception(Marshal.GetLastWin32Error());
+            // Check if we can create the context with custom flags
+            var wglCreateContextAttribsARB = OpenGl32.wglGetProcAddress<OpenGl32.WglCreateContextAttribsARB>("wglCreateContextAttribsARB");
+            if(wglCreateContextAttribsARB != null)
+            {
+                int[] attribList = {
+                    (int)OpenGl32.WglContextAttributeNames.CONTEXT_MAJOR_VERSION_ARB, 4,
+                    (int)OpenGl32.WglContextAttributeNames.CONTEXT_PROFILE_MASK_ARB, (int) OpenGl32.WglContextProfileFlags.WGL_CONTEXT_CORE_PROFILE_BIT,
+                    (int)OpenGl32.WglContextAttributeNames.CONTEXT_FLAGS_ARB, (int)OpenGl32.WglContextFlags.CONTEXT_FLAG_NO_ERROR_BIT
+                };
+                var extendedContext = wglCreateContextAttribsARB(m_deviceContext, IntPtr.Zero, attribList);
+                if(extendedContext != IntPtr.Zero)
+                {
+                    if (!OpenGl32.wglMakeCurrent(m_deviceContext, extendedContext))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                    if (!OpenGl32.wglDeleteContext(m_renderContext))
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                    m_renderContext = extendedContext;
+                }
+            }
 
             // dll call: initialize glad etc.
             m_logCallbackPointer = new Core.LogCallback(Logger.log);
@@ -337,6 +358,14 @@ namespace gui.Dll
             m_isRunning = false;
             m_rendererModel.RenderLock.Release();
             m_renderThread.Join();
+
+            if(m_renderContext != IntPtr.Zero)
+            {
+                if (!OpenGl32.wglMakeCurrent(m_deviceContext, IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if(!OpenGl32.wglDeleteContext(m_renderContext))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
 
             // destroy resources
             User32.DestroyWindow(hwnd.Handle);
