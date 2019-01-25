@@ -5,7 +5,7 @@
 #include "core/export/interface.h"
 
 #include <fstream> 
-
+#include "util/degrad.hpp"
 
 namespace mff_loader::exprt {
 
@@ -13,19 +13,11 @@ bool SceneExporter::save_scene() const
 {
 	// TODO Open old Json
 
-	fs::path tempPath = m_filePath;
-
-	tempPath.replace_extension("json");
-
 	rapidjson::Document document;
 	document.SetObject();
 
 	document.AddMember("version", FILE_VERSION, document.GetAllocator());
-	std::string binaryPathString = m_filePath.string(); // TODO RelPath
-	binaryPathString.append(".mff");
-	rapidjson::Value binaryPath;
-	binaryPath.SetString(binaryPathString.c_str(), rapidjson::SizeType(binaryPathString.length()));
-	document.AddMember("binary", binaryPath, document.GetAllocator());
+	document.AddMember("binary", store_in_string_relative_to_destination_path(m_mffPath, document), document.GetAllocator());
 
 	// JSON
 	if(!save_cameras(document))
@@ -41,9 +33,8 @@ bool SceneExporter::save_scene() const
 	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
 	document.Accept(writer);
 
-
 	std::string json = std::string(strbuf.GetString());
-	std::ofstream ofs(tempPath);
+	std::ofstream ofs(m_fileDestinationPath);
 
 	ofs << json;
 
@@ -75,6 +66,7 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const
 			camera.AddMember("type", "pinhole", document.GetAllocator());
 			float vFov;
 			world_get_pinhole_camera_fov(cameraHandle, &vFov);
+			vFov = static_cast<float>(mufflon::Degrees(mufflon::Radians(vFov))); // Convert Radian to Degree
 			camera.AddMember("fov", vFov, document.GetAllocator());
 			break;
 		case CAM_FOCUS:
@@ -101,15 +93,15 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const
 
 		Vec3 position; 
 		world_get_camera_position(cameraHandle, &position);
-		camera.AddMember("path", save_in_array(position, document), document.GetAllocator());
+		camera.AddMember("path", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 viewDirection;
 		world_get_camera_direction(cameraHandle, &viewDirection);
-		camera.AddMember("viewDir", save_in_array(viewDirection, document), document.GetAllocator());
+		camera.AddMember("viewDir", store_in_array(viewDirection, document), document.GetAllocator());
 
 		Vec3 upDirection;
 		world_get_camera_direction(cameraHandle, &upDirection);
-		camera.AddMember("up", save_in_array(upDirection, document), document.GetAllocator());
+		camera.AddMember("up", store_in_array(upDirection, document), document.GetAllocator());
 
 		rapidjson::Value cameraName;
 		cameraName.SetString(rapidjson::StringRef(world_get_camera_name(cameraHandle)));
@@ -137,11 +129,11 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 		Vec3 position;
 		world_get_point_light_position(lightHandle, &position);
-		light.AddMember("position", save_in_array(position, document), document.GetAllocator());
+		light.AddMember("position", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 intensity;
 		world_get_point_light_intensity(lightHandle, &intensity);
-		light.AddMember("intensity", save_in_array(intensity, document), document.GetAllocator());
+		light.AddMember("intensity", store_in_array(intensity, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
@@ -163,11 +155,11 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 		Vec3 direction;
 		world_get_dir_light_direction(lightHandle, &direction);
-		light.AddMember("direction", save_in_array(direction, document), document.GetAllocator());
+		light.AddMember("direction", store_in_array(direction, document), document.GetAllocator());
 
 		Vec3 radiance;
 		world_get_dir_light_irradiance(lightHandle, &radiance);
-		light.AddMember("radiance", save_in_array(radiance, document), document.GetAllocator());
+		light.AddMember("radiance", store_in_array(radiance, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
@@ -189,15 +181,15 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 		Vec3 position;
 		world_get_spot_light_position(lightHandle, &position);
-		light.AddMember("position", save_in_array(position, document), document.GetAllocator());
+		light.AddMember("position", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 direction;
 		world_get_spot_light_direction(lightHandle, &direction);
-		light.AddMember("direction", save_in_array(direction, document), document.GetAllocator());
+		light.AddMember("direction", store_in_array(direction, document), document.GetAllocator());
 
 		Vec3 intensity;
 		world_get_spot_light_intensity(lightHandle, &intensity);
-		light.AddMember("intensity", save_in_array(intensity, document), document.GetAllocator());
+		light.AddMember("intensity", store_in_array(intensity, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
@@ -227,17 +219,11 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 		fs::path mapPath(world_get_env_light_map(lightHandle));
 
-		//fs::relative() // TODO remove experimental from filesystem.hpp finish relative Path
-		
-
-
-		rapidjson::Value map;
-		map.SetString(rapidjson::StringRef(mapPath.string().c_str()));
-		light.AddMember("map", map, document.GetAllocator());
+		light.AddMember("map", store_in_string_relative_to_destination_path(mapPath, document), document.GetAllocator());
 
 		Vec3 scale;
 		world_get_env_light_scale(lightHandle, &scale);
-		light.AddMember("scale", save_in_array(scale, document), document.GetAllocator());
+		light.AddMember("scale", store_in_array(scale, document), document.GetAllocator());
 
 		rapidjson::Value lightName;
 		lightName.SetString(rapidjson::StringRef(world_get_light_name(lightHandle)));
@@ -363,7 +349,7 @@ bool SceneExporter::save_materials(rapidjson::Document& document) const
 }
 
 
-rapidjson::Value SceneExporter::save_in_array(Vec3 value, rapidjson::Document& document) const
+rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& document) const
 {
 	rapidjson::Value out;
 	out.SetArray();
@@ -371,6 +357,15 @@ rapidjson::Value SceneExporter::save_in_array(Vec3 value, rapidjson::Document& d
 	out.PushBack(value.y, document.GetAllocator());
 	out.PushBack(value.z, document.GetAllocator());
 
+	return out;
+}
+
+rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const
+{
+	fs::path copy = m_fileDestinationPath;
+	rapidjson::Value out;
+	std::string s = fs::relative(path, copy.remove_filename()).string();
+	out.SetString(s.c_str(), s.length(), document.GetAllocator());
 	return out;
 }
 } // namespace mff_loader::exprt

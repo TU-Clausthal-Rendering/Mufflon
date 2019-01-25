@@ -162,5 +162,8 @@
     <ClInclude Include="..\..\src\mffloader\export\scene_exporter.hpp">
       <Filter>Source Files\mffloader\export</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\degrad.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

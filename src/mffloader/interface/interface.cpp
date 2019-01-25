@@ -155,7 +155,7 @@ LoaderStatus loader_save_scene(const char* path) {
 		}
 	}
 	try {
-	exprt::SceneExporter exporter{ filePath };
+	exprt::SceneExporter exporter{ filePath, s_binPath };
 		if (!exporter.save_scene())
 			return LoaderStatus::LOADER_ERROR;
 	}

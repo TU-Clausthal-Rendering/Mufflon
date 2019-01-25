@@ -126,6 +126,7 @@
     <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp" />
     <ClInclude Include="..\..\src\profiler\profiling.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
+    <ClInclude Include="..\..\src\util\degrad.hpp" />
     <ClInclude Include="..\..\src\util\filesystem.hpp" />
     <ClInclude Include="..\..\src\util\log.hpp" />
   </ItemGroup>
