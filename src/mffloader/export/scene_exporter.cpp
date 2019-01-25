@@ -6,15 +6,42 @@
 
 #include <fstream> 
 #include "util/degrad.hpp"
+#include "util/log.hpp"
+#include "profiler/cpu_profiler.hpp"
 
 namespace mff_loader::exprt {
 
+namespace {
+
+	// Reads a file completely and returns the string containing all bytes
+	std::string read_file(fs::path path) {
+		auto scope = mufflon::Profiler::instance().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
+		mufflon::logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
+		const std::uintmax_t fileSize = fs::file_size(path);
+		std::string fileString;
+		fileString.resize(fileSize);
+
+		std::ifstream file(path, std::ios::binary);
+		file.read(&fileString[0u], fileSize);
+		if (file.gcount() != fileSize)
+			mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
+		// Finalize the string
+		fileString[file.gcount()] = '\0';
+		return fileString;
+	}
+}
+
 bool SceneExporter::save_scene() const
 {
-	// TODO Open old Json
-
 	rapidjson::Document document;
 	document.SetObject();
+
+	if(fs::is_regular_file(m_fileDestinationPath))
+	{
+		std::string oldJson = read_file(m_fileDestinationPath);
+		//document.Parse(oldJson.c_str());
+		// TODO Load oldJson 
+	}
 
 	document.AddMember("version", FILE_VERSION, document.GetAllocator());
 	document.AddMember("binary", store_in_string_relative_to_destination_path(m_mffPath, document), document.GetAllocator());
@@ -31,6 +58,8 @@ bool SceneExporter::save_scene() const
 
 	rapidjson::StringBuffer strbuf;
 	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+	writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
+	writer.SetMaxDecimalPlaces(3);
 	document.Accept(writer);
 
 	std::string json = std::string(strbuf.GetString());
@@ -386,7 +415,7 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 
 		scenario.AddMember("lights", lights, document.GetAllocator());
 
-		scenarios.AddMember("lod", scenario_get_global_lod_level(scenarioHandle), document.GetAllocator());
+		scenario.AddMember("lod", scenario_get_global_lod_level(scenarioHandle), document.GetAllocator());
 
 
 		rapidjson::Value materialAssignments;
