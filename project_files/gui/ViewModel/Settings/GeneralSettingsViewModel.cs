@@ -67,7 +67,8 @@ namespace gui.ViewModel.Settings
             "\t#scene - the name of the scene\n" +
             "\t#renderer - the name of the active renderer" +
             "\t#scenario - the name of the active scenario" +
-            "\t#iteration - the iteration at which the screenshot was taken";
+            "\t#iteration - the iteration at which the screenshot was taken" +
+            "\t#target - the render target used";
 
         public ObservableCollection<EnumBoxItem<Core.Severity>> LogLevels { get; } = 
             EnumBoxItem<Core.Severity>.MakeCollection();

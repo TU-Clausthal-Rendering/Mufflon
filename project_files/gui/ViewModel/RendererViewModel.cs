@@ -178,7 +178,9 @@ namespace gui.ViewModel
             }
             m_selectedRenderer = Renderers[models.Settings.LastSelectedRenderer];
             m_selectedRenderTarget = RenderTargets[models.Settings.LastSelectedRenderTarget];
-            m_models.Renderer.Type = (Core.RendererType)m_selectedRenderer.Type;
+            m_models.Renderer.Type = m_selectedRenderer.Type;
+            m_models.Renderer.RenderTarget = m_selectedRenderTarget.Target;
+            m_models.Renderer.RenderTargetVariance = m_selectedRenderTarget.Variance;
         }
 
         private void SettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
