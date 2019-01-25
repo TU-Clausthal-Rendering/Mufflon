@@ -117,20 +117,19 @@ private:
 
 // Returns the texture size (see texture.hpp)
 inline __host__ __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
-#ifndef __CUDA_ARCH__
 	return { texture->get_width(), texture->get_height() };
-#else // __CUDA_ARCH__
-	return Pixel{};
-#endif // __CUDA_ARCH__
 }
 
 // Returns the texture layer count (see texture.hpp)
 inline __host__ __forceinline__ u16 get_texture_layers(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
-#ifndef __CUDA_ARCH__
 	return texture->get_num_layers();
-#else // __CUDA_ARCH__
-	return 0u;
-#endif // __CUDA_ARCH__
+}
+
+inline u16 get_texture_channel_count(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
+	constexpr char CHANNEL_COUNT[int(Format::NUM)] = {
+		1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 2, 4
+	};
+	return CHANNEL_COUNT[int(texture->get_format())];
 }
 
 }}} // namespace mufflon::scene::textures

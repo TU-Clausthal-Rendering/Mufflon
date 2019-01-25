@@ -18,6 +18,8 @@
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/lambert.hpp"
+#include "core/scene/materials/microfacet_specular.hpp"
+//TODO: material_sampling.hpp is currently included implicitly (should not)
 #include "mffloader/interface/interface.h"
 #include <cuda_runtime.h>
 #include <type_traits>
@@ -1204,10 +1206,15 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			auto tex = mat->inner.lambert.albedo;
 			newMaterial = std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex));
 		}	break;
-		case MATERIAL_TORRANCE:
-			// TODO
-			logWarning("[", FUNCTION_NAME, "] Material type 'torrance' not supported yet");
-			return nullptr;
+		case MATERIAL_TORRANCE: {
+			auto albedoTex = static_cast<TextureHandle>(mat->inner.torrance.albedo);
+			auto roughnessTex = static_cast<TextureHandle>(mat->inner.torrance.roughness);
+			materials::NDF ndf = materials::NDF::GGX;
+			if(mat->inner.torrance.ndf == NDF_BECKMANN) ndf = materials::NDF::BECKMANN;
+			// TODO: cosine (not yet supported)
+			newMaterial = std::make_unique<materials::Torrance>(albedoTex, roughnessTex,
+					static_cast<materials::NDF>(ndf));
+		}	break;
 		case MATERIAL_WALTER:
 			logWarning("[", FUNCTION_NAME, "] Material type 'walter' not supported yet");
 			return nullptr;
@@ -1222,6 +1229,7 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 		case MATERIAL_BLEND: {
 			auto a = convert_material("LayerA", mat->inner.blend.a.mat);
 			auto b = convert_material("LayerB", mat->inner.blend.b.mat);
+			if(!a || !b) return nullptr;
 			newMaterial = std::make_unique<materials::Blend>(
 				move(a), mat->inner.blend.a.factor,
 				move(b), mat->inner.blend.b.factor);
@@ -1246,6 +1254,10 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 
 MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	TRY
+	if(mat->innerType >= MATERIAL_NUM) {
+		logError("[world_add_material] Invalid material params: type unknown.");
+		return nullptr;
+	}
 	MaterialHandle hdl = s_world.add_material(convert_material(name, mat));
 
 	if(hdl == nullptr) {

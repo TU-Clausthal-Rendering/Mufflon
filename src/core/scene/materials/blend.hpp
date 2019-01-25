@@ -8,8 +8,8 @@ namespace mufflon { namespace scene { namespace materials {
 
 // Forward declared:
 CUDA_FUNCTION int fetch_subparam(Materials type, const char* subDesc, const UvCoordinate& uvCoordinate, char* subParam);
-CUDA_FUNCTION math::EvalValue evaluate_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Direction& excidentTS, const Medium* media, bool adjoint, bool merge);
-CUDA_FUNCTION math::PathSample sample_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Medium* media, const math::RndSet2_1& rndSet, bool adjoint);
+CUDA_FUNCTION math::EvalValue evaluate_subdesc(Materials type, const char* subParams, const Direction& incidentTS, const Direction& excidentTS, Boundary& boundary, bool adjoint, bool merge);
+CUDA_FUNCTION math::PathSample sample_subdesc(Materials type, const char* subParams, const Direction& incidentTS, Boundary& boundary, const math::RndSet2_1& rndSet, bool adjoint);
 CUDA_FUNCTION Spectrum albedo(Materials type, const char* subParams);
 CUDA_FUNCTION Spectrum emission(Materials type, const char* subParams, const scene::Direction& geoN, const scene::Direction& excident);
 
@@ -124,7 +124,7 @@ private:
 CUDA_FUNCTION math::PathSample
 blend_sample(const BlendParameterPack& params,
 			 const Direction& incidentTS,
-			 const Medium* media,
+			 Boundary& boundary,
 			 math::RndSet2_1 rndSet,
 			 bool adjoint) {
 	const char* layerA = as<char>(&params + 1);
@@ -140,12 +140,14 @@ blend_sample(const BlendParameterPack& params,
 	math::EvalValue otherVal;
 	if(rndSet.i0 < probLayerA) {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, 0, probLayerA-1);
-		sample = sample_subdesc(params.typeA, layerA, incidentTS, media, rndSet, adjoint);
-		otherVal = evaluate_subdesc(params.typeB, layerB, incidentTS, sample.excident, media, adjoint, false);
+		sample = sample_subdesc(params.typeA, layerA, incidentTS, boundary, rndSet, adjoint);
+		if(sample.pdfF.is_zero()) return sample; // Discard
+		otherVal = evaluate_subdesc(params.typeB, layerB, incidentTS, sample.excident, boundary, adjoint, false);
 	} else {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, probLayerA, std::numeric_limits<u64>::max());
-		sample = sample_subdesc(params.typeB, as<char>(&params) + params.offsetB, incidentTS, media, rndSet, adjoint);
-		otherVal = evaluate_subdesc(params.typeA, layerA, incidentTS, sample.excident, media, adjoint, false);
+		sample = sample_subdesc(params.typeB, as<char>(&params) + params.offsetB, incidentTS, boundary, rndSet, adjoint);
+		if(sample.pdfF.is_zero()) return sample; // Discard
+		otherVal = evaluate_subdesc(params.typeA, layerA, incidentTS, sample.excident, boundary, adjoint, false);
 		p = 1.0f - p;
 	}
 
@@ -164,14 +166,14 @@ CUDA_FUNCTION math::EvalValue
 blend_evaluate(const BlendParameterPack& params,
 			   const Direction& incidentTS,
 			   const Direction& excidentTS,
-			   const Medium* media,
+			   Boundary& boundary,
 			   bool adjoint,
 			   bool merge) {
 	// Evaluate both sub-layers
 	const char* layerA = as<char>(&params + 1);
 	const char* layerB = as<char>(&params) + params.offsetB;
-	auto valA = evaluate_subdesc(params.typeA, layerA, incidentTS, excidentTS, media, adjoint, merge);
-	auto valB = evaluate_subdesc(params.typeB, layerB, incidentTS, excidentTS, media, adjoint, merge);
+	auto valA = evaluate_subdesc(params.typeA, layerA, incidentTS, excidentTS, boundary, adjoint, merge);
+	auto valB = evaluate_subdesc(params.typeB, layerB, incidentTS, excidentTS, boundary, adjoint, merge);
 	// Determine the probability choice probability to blend the pdfs correctly.
 	float fa = params.factorA * sum(albedo(params.typeA, layerA));
 	float fb = params.factorB * sum(albedo(params.typeB, layerB));

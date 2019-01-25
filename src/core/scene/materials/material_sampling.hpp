@@ -6,9 +6,11 @@
 #include "core/scene/types.hpp"
 #include "util/log.hpp"
 #include "util/assert.hpp"
+#include "microfacet_base.hpp"
 #include "lambert.hpp"
 #include "emissive.hpp"
 #include "blend.hpp"
+#include "microfacet_specular.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace materials {
@@ -28,6 +30,7 @@ CUDA_FUNCTION int fetch_subparam(Materials type, const char* subDesc, const UvCo
 		case Materials::LAMBERT: return as<LambertDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
 		case Materials::EMISSIVE: return as<EmissiveDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
 		case Materials::BLEND: return as<BlendDesc>(subDesc)->fetch(uvCoordinate, subParam);
+		case Materials::TORRANCE: return as<TorranceDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
 		default:
 			mAssertMsg(false, "Material not (fully) implemented!");
 	}
@@ -63,13 +66,16 @@ CUDA_FUNCTION ei::Vec2 solve(const ei::Mat2x2 & _A, const ei::Vec2 & _b) {
  * sampling routines internal.
  * incident: normalized incident direction. Points towards the surface.
  * adjoint: false if this is a view sub-path, true if it is a light sub-path.
+ * boundary: input of the two media incident and opposite (not excident!).
+ *		A halfvector based method should supply the sampled half vector
+ *		via set to improve performance.
  */
 // Kernel to split the sampling to specific implementations
 CUDA_FUNCTION math::PathSample
 sample_subdesc(Materials type,
 			   const char* subParams,
 			   const Direction& incidentTS,
-			   const Medium* media,
+			   Boundary& boundary,
 			   const math::RndSet2_1& rndSet,
 			   bool adjoint)
 {
@@ -80,7 +86,9 @@ sample_subdesc(Materials type,
 		case Materials::EMISSIVE:	// Not sampleable - simply let 'res' be the default value
 			return math::PathSample{};
 		case Materials::BLEND:
-			return blend_sample(*as<BlendParameterPack>(subParams), incidentTS, media, rndSet, adjoint);
+			return blend_sample(*as<BlendParameterPack>(subParams), incidentTS, boundary, rndSet, adjoint);
+		case Materials::TORRANCE:
+			return torrance_sample(*as<TorranceParameterPack>(subParams), incidentTS, boundary, rndSet);
 		default: ;
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::sample] Trying to evaluate unimplemented material type ", type);
@@ -110,9 +118,11 @@ sample(const TangentSpace& tangentSpace,
 	};
 	mAssert(ei::approx(len(incidentTS), 1.0f));
 
+	Boundary boundary { media[params.get_medium(incidentTS.z)], media[params.get_medium(-incidentTS.z)] };
+
 	// Use model specific subroutine
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	math::PathSample res = sample_subdesc(params.type, subParams, incidentTS, media, rndSet, adjoint);
+	math::PathSample res = sample_subdesc(params.type, subParams, incidentTS, boundary, rndSet, adjoint);
 
 	// Early out if result is discarded anyway
 	if(res.throughput == 0.0f) return res;
@@ -135,6 +145,8 @@ sample(const TangentSpace& tangentSpace,
 						/ (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
+	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)));
+
 	return res;
 }
 
@@ -154,7 +166,7 @@ evaluate_subdesc(Materials type,
 				 const char* subParams,
 				 const Direction& incidentTS,
 				 const Direction& excidentTS,
-				 const Medium* media,
+				 Boundary& boundary,
 				 bool adjoint,
 				 bool merge) {
 	switch(type)
@@ -164,7 +176,9 @@ evaluate_subdesc(Materials type,
 		case Materials::EMISSIVE:
 			return math::EvalValue{};
 		case Materials::BLEND:
-			return blend_evaluate(*as<BlendParameterPack>(subParams), incidentTS, excidentTS, media, adjoint, merge);
+			return blend_evaluate(*as<BlendParameterPack>(subParams), incidentTS, excidentTS, boundary, adjoint, merge);
+		case Materials::TORRANCE:
+			return torrance_evaluate(*as<TorranceParameterPack>(subParams), incidentTS, excidentTS, boundary);
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::evaluate] Trying to evaluate unimplemented material type ", type);
@@ -207,21 +221,19 @@ evaluate(const TangentSpace& tangentSpace,
 		dot(excident, tangentSpace.shadingTY),
 		eDotN
 	);
-	Direction halfTS { 0.0f, 0.0f, 1.0f };
+	Boundary boundary { media[params.get_medium(incidentTS.z)], media[params.get_medium(-incidentTS.z)] };
 	if(params.flags.is_set(MaterialPropertyFlags::HALFVECTOR_BASED)) {
-		const Medium& inMedium = media[params.get_medium(incidentTS.z)];
-		const Medium& exMedium = media[params.get_medium(excidentTS.z)];
-		halfTS = inMedium.get_refraction_index().x * incidentTS + exMedium.get_refraction_index().x * excidentTS;
-		float l = len(halfTS) * ei::sgn(halfTS.z); // Half vector always on side of the normal
-		halfTS = sdiv(halfTS, l);
+		// Precompute the half vector (reduces divergence and instruction dependency later)
+		boundary.get_halfTS(incidentTS, excidentTS);
 	}
 
 	// Call material implementation
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	math::EvalValue res = evaluate_subdesc(params.type, subParams, incidentTS, excidentTS, media, adjoint, merge);
+	math::EvalValue res = evaluate_subdesc(params.type, subParams, incidentTS, excidentTS, boundary, adjoint, merge);
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return res;
+	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)) && !isnan(res.cosOut));
 
 	// Shading normal caused density correction.
 	if(merge) {
@@ -251,6 +263,7 @@ albedo(Materials type, const char* subParams) {
 		case Materials::LAMBERT: return lambert_albedo(*as<LambertParameterPack>(subParams));
 		case Materials::EMISSIVE: return emissive_albedo(*as<EmissiveParameterPack>(subParams));
 		case Materials::BLEND: return blend_albedo(*as<BlendParameterPack>(subParams));
+		case Materials::TORRANCE: return torrance_albedo(*as<TorranceParameterPack>(subParams));
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", type);
@@ -287,7 +300,7 @@ emission(const ParameterPack& params, const scene::Direction& geoN, const scene:
 /*
  * Get the size in bytes which are consumed for the complete parameter pack
  */
-CUDA_FUNCTION int get_size(const ParameterPack& params) {
+/*CUDA_FUNCTION int get_size(const ParameterPack& params) {
 	switch(params.type)
 	{
 		case Materials::LAMBERT: return sizeof(LambertParameterPack) + sizeof(ParameterPack);
@@ -305,7 +318,7 @@ CUDA_FUNCTION int get_size(const ParameterPack& params) {
 #endif
 			return 0;
 	}
-}
+}*/
 
 // Would be necessary for regularization
 //virtual Spectrum get_maximum() const = 0;

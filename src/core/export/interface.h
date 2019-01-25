@@ -119,7 +119,7 @@ typedef enum {
 typedef enum {
 	NDF_BECKMANN,
 	NDF_GGX,
-	NDF_PHONG
+	NDF_COSINE
 } NormalDistFunction;
 
 typedef enum {
@@ -131,6 +131,7 @@ typedef enum {
 	MATERIAL_BLEND,
 	MATERIAL_FRESNEL,
 	// MATERIAL_FRESNEL_CONDUCTOR	// Maybe reintroduce
+	MATERIAL_NUM,
 } MaterialParamType;
 
 typedef enum {

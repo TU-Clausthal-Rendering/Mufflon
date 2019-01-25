@@ -54,6 +54,7 @@ public:
 	}
 
 	__host__ __device__ bool is_infinite() const { return m_pdf >= float(infinite()); }
+	__host__ __device__ bool is_zero() const { return m_pdf <= 0.0f; }
 private:
 	Real m_pdf = 0.f;
 };
@@ -87,8 +88,14 @@ public:
 	__host__ __device__ float operator*(AngularPdf pdf) const noexcept {
 		return m_pdf * pdf.m_pdf;
 	}
+	__host__ __device__ AngularPdf operator*(float probability) const noexcept {
+		return AngularPdf{ m_pdf * probability };
+	}
 	__host__ __device__ float operator/(AngularPdf pdf) const noexcept {
 		return m_pdf / pdf.m_pdf;
+	}
+	__host__ __device__ AngularPdf operator/(float probability) const noexcept {
+		return AngularPdf{ m_pdf / probability };
 	}
 	__host__ __device__ AreaPdf to_area_pdf(Real cos, Real distSqr) const noexcept {
 		return AreaPdf{ m_pdf * ei::abs(cos) / distSqr };
@@ -98,6 +105,7 @@ public:
 	}
 
 	__host__ __device__ bool is_infinite() const { return m_pdf >= float(infinite()); }
+	__host__ __device__ bool is_zero() const { return m_pdf <= 0.0f; }
 private:
 	Real m_pdf = 0.f;
 };

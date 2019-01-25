@@ -126,6 +126,15 @@ inline __host__ __device__ __forceinline__ u16 get_texture_layers(const textures
 	return texture.depth;
 }
 
+// Returns the number of channels per pixel.
+// The other specialization is located in cputexture.hpp
+CUDA_FUNCTION __forceinline__ u16 get_texture_channel_count(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
+	constexpr char CHANNEL_COUNT[int(Format::NUM)] = {
+		1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 2, 4
+	};
+	return CHANNEL_COUNT[int(texture.format)];
+}
+
 
 inline constexpr size_t PIXEL_SIZE(Format format) {
 	constexpr u8 PIXEL_SIZES[int(Format::NUM)] = {

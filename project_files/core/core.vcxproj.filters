@@ -783,6 +783,12 @@
     <ClInclude Include="..\..\src\core\scene\tessellation\adaptive.hpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\microfacet_specular.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\microfacet_base.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">

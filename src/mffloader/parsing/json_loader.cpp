@@ -129,10 +129,10 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
-			else if(ndf.compare("GGC") == 0)
+			else if(ndf.compare("GGX") == 0)
 				mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
-			else if(ndf.compare("GGC") == 0)
-				mat->inner.torrance.ndf = NormalDistFunction::NDF_GGX;
+			else if(ndf.compare("Cos") == 0)
+				mat->inner.torrance.ndf = NormalDistFunction::NDF_COSINE;
 			else
 				throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 			auto roughnessIter = get(m_state, material, "roughness");

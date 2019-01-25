@@ -205,6 +205,8 @@
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\microfacet_base.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\microfacet_specular.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\point_medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
