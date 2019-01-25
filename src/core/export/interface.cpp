@@ -282,6 +282,7 @@ Boolean copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean 
 	}
 
 	textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
+	mAssert(texPtr != nullptr);
 	// Determine the pixel format for OpenGL
 	GLenum format = GL_INVALID_ENUM;
 	GLenum type = GL_INVALID_ENUM;
@@ -2614,7 +2615,9 @@ Boolean render_save_screenshot(const char* filename) {
 Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 	TRY
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
-	s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
+	s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target)) });
+	if(variance)
+		s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
@@ -2624,17 +2627,9 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 	TRY
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
-	s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean render_enable_variance_render_targets() {
-	TRY
-	for(u32 target : renderer::OutputValue::iterator)
-		s_outputTargets.set(target << 8u);
+	if(!variance)
+		s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>(1u << target) });
+	s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
@@ -2653,8 +2648,13 @@ Boolean render_enable_non_variance_render_targets() {
 
 Boolean render_enable_all_render_targets() {
 	TRY
-	return render_enable_variance_render_targets()
-		&& render_enable_non_variance_render_targets();
+	for(u32 target : renderer::OutputValue::iterator) {
+		s_outputTargets.set(target);
+		s_outputTargets.set(target << 8u);
+	}
+	if(s_imageOutput != nullptr)
+		s_imageOutput->set_targets(s_outputTargets);
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -2668,20 +2668,18 @@ Boolean render_disable_variance_render_targets() {
 	CATCH_ALL(false)
 }
 
-Boolean render_disable_non_variance_render_targets() {
+Boolean render_disable_all_render_targets() {
 	TRY
-	for(u32 target : renderer::OutputValue::iterator)
-		s_outputTargets.clear(target);
+	s_outputTargets.clear_all();
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_disable_all_render_targets() {
+Boolean render_is_render_target_enabled(RenderTarget target, Boolean variance) {
 	TRY
-	return render_disable_variance_render_targets()
-		&& render_disable_non_variance_render_targets();
+	return s_outputTargets.is_set(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
 	CATCH_ALL(false)
 }
 

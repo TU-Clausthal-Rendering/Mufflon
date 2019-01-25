@@ -8,6 +8,14 @@
 
 namespace mufflon { namespace renderer {
 
+struct RenderTargets {
+	static constexpr u32 RADIANCE = 0u;
+	static constexpr u32 POSITION = 1u;
+	static constexpr u32 ALBEDO = 2u;
+	static constexpr u32 NORMAL = 3u;
+	static constexpr u32 LIGHTNESS = 4u;
+};
+
 struct OutputValue : util::Flags<u32> {
 	static constexpr u32 RADIANCE = 0x0001;			// Output of radiance (standard output of a renderer)
 	static constexpr u32 POSITION = 0x0002;			// Output of positions (customly integrated over paths)
@@ -31,11 +39,8 @@ struct RenderBuffer {
 	// The following texture handles may contain iteration only or all iterations summed
 	// information. The meaning of the variables is only known to the OutputHandler.
 	// The renderbuffer only needs to add values to all defined handles.
-	scene::textures::TextureDevHandle_t<dev> m_radiance = {};
-	scene::textures::TextureDevHandle_t<dev> m_position = {};
-	scene::textures::TextureDevHandle_t<dev> m_normal = {};
-	scene::textures::TextureDevHandle_t<dev> m_albedo = {};
-	scene::textures::TextureDevHandle_t<dev> m_lightness = {};
+
+	scene::textures::TextureDevHandle_t<dev> m_targets[5u] = {};
 	ei::IVec2 m_resolution;
 
 	/*
@@ -49,17 +54,17 @@ struct RenderBuffer {
 										float cosines, const ei::Vec3& value
 	) {
 		using namespace scene::textures;
-		if(is_valid(m_radiance)) {
-			ei::Vec4 prev = read(m_radiance, pixel);
+		if(is_valid(m_targets[RenderTargets::RADIANCE])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::RADIANCE], pixel);
 			ei::Vec3 newVal = viewThroughput.weight * lightThroughput.weight * value * cosines;
 			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
-			write(m_radiance, pixel, prev+ei::Vec4{newVal, 0.0f});
+			write(m_targets[RenderTargets::RADIANCE], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
-		if(is_valid(m_lightness)) {
-			ei::Vec4 prev = read(m_lightness, pixel);
+		if(is_valid(m_targets[RenderTargets::LIGHTNESS])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::LIGHTNESS], pixel);
 			float newVal = viewThroughput.guideWeight * lightThroughput.guideWeight * cosines;
 			mAssert(!isnan(newVal));
-			write(m_lightness, pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
+			write(m_targets[RenderTargets::LIGHTNESS], pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 		// Position, Normal and Albedo are handled by the random hit contribution.
 	}
@@ -73,35 +78,35 @@ struct RenderBuffer {
 										const ei::Vec3& albedo
 	) {
 		using namespace scene::textures;
-		if(is_valid(m_radiance)) {
-			ei::Vec4 prev = read(m_radiance, pixel);
+		if(is_valid(m_targets[RenderTargets::RADIANCE])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::RADIANCE], pixel);
 			ei::Vec3 newVal = viewThroughput.weight * radiance;
 			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
-			write(m_radiance, pixel, prev+ei::Vec4{newVal, 0.0f});
+			write(m_targets[RenderTargets::RADIANCE], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
-		if(is_valid(m_position)) {
-			ei::Vec4 prev = read(m_position, pixel);
+		if(is_valid(m_targets[RenderTargets::POSITION])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::POSITION], pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * position;
 			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
-			write(m_position, pixel, prev+ei::Vec4{newVal, 0.0f});
+			write(m_targets[RenderTargets::POSITION], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
-		if(is_valid(m_normal)) {
-			ei::Vec4 prev = read(m_normal, pixel);
+		if(is_valid(m_targets[RenderTargets::NORMAL])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::NORMAL], pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * normal;
 			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
-			write(m_normal, pixel, prev+ei::Vec4{newVal, 0.0f});
+			write(m_targets[RenderTargets::NORMAL], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
-		if(is_valid(m_albedo)) {
-			ei::Vec4 prev = read(m_albedo, pixel);
+		if(is_valid(m_targets[RenderTargets::ALBEDO])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::ALBEDO], pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * albedo;
 			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
-			write(m_albedo, pixel, prev+ei::Vec4{newVal, 0.0f});
+			write(m_targets[RenderTargets::ALBEDO], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
-		if(is_valid(m_lightness)) {
-			ei::Vec4 prev = read(m_lightness, pixel);
+		if(is_valid(m_targets[RenderTargets::LIGHTNESS])) {
+			ei::Vec4 prev = read(m_targets[RenderTargets::LIGHTNESS], pixel);
 			float newVal = viewThroughput.guideWeight * avg(radiance);
 			mAssert(!isnan(newVal));
-			write(m_lightness, pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
+			write(m_targets[RenderTargets::LIGHTNESS], pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 	}
 

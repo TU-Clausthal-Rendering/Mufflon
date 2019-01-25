@@ -49,16 +49,51 @@ namespace gui.ViewModel
             public string Name { get => m_name; }
         }
 
+        public class RenderTargetItem
+        {
+            private Core.RenderTarget m_target;
+            private bool m_variance;
+            private string m_name = RendererModel.getRenderTargetName(0, false);
+
+            public int Id { get; set; }
+
+            public Core.RenderTarget Target
+            {
+                get => m_target;
+                set
+                {
+                    if (m_target == value) return;
+                    m_target = value;
+                    m_name = RendererModel.getRenderTargetName(m_target, m_variance);
+                }
+            }
+
+            public bool Variance
+            {
+                get => m_variance;
+                set
+                {
+                    if (m_variance == value) return;
+                    m_variance = value;
+                    m_name = RendererModel.getRenderTargetName(m_target, m_variance);
+                }
+            }
+
+            public string Name { get => m_name; }
+        }
+
 
         private readonly Models m_models;
         private ICommand m_playPause;
+        private ICommand m_reset;
         private RendererItem m_selectedRenderer;
+        private RenderTargetItem m_selectedRenderTarget;
         private DataGrid m_propertiesGrid;
         
 
         public RendererItem SelectedRenderer
         {
-            get { return m_selectedRenderer; }
+            get => m_selectedRenderer;
             set
             {
                 if (m_selectedRenderer == value) return;
@@ -66,6 +101,20 @@ namespace gui.ViewModel
                 m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Id;
                 m_models.Renderer.Type = m_selectedRenderer.Type;
                 OnPropertyChanged(nameof(SelectedRenderer));
+            }
+        }
+
+        public RenderTargetItem SelectedRenderTarget
+        {
+            get => m_selectedRenderTarget;
+            set
+            {
+                if (m_selectedRenderTarget == value) return;
+                m_selectedRenderTarget = value;
+                m_models.Settings.LastSelectedRenderTarget = m_selectedRenderTarget.Id;
+                m_models.Renderer.RenderTarget = m_selectedRenderTarget.Target;
+                m_models.Renderer.RenderTargetVariance = m_selectedRenderTarget.Variance;
+                OnPropertyChanged(nameof(SelectedRenderTarget));
             }
         }
 
@@ -80,26 +129,40 @@ namespace gui.ViewModel
         }
 
         public ObservableCollection<RendererItem> Renderers { get; }
+        public ObservableCollection<RenderTargetItem> RenderTargets { get; }
         public ObservableCollection<object> RendererProperties { get; }
 
-        public RendererViewModel(Models models, ICommand playPause)
+        public RendererViewModel(Models models, ICommand playPause, ICommand reset)
         {
             m_models = models;
             m_playPause = playPause;
+            m_reset = reset;
             m_propertiesGrid = (DataGrid)((UserControl)m_models.App.Window.FindName("RendererPropertiesControl"))?.FindName("RendererPropertiesGrid");
             RendererProperties = new ObservableCollection<object>();
-            
-
 
             // Enable the renderers (TODO: automatically get them from somewhere?)
-            Renderers = new ObservableCollection<RendererItem>()
-            {
-                new RendererItem{ Id = 0, Type = Core.RendererType.CPU_PT },
-            };
+            Array rendererValues = Enum.GetValues(typeof(Core.RendererType));
+            Renderers = new ObservableCollection<RendererItem>();
+            int typeId = 0;
+            foreach (Core.RendererType type in rendererValues)
+                if (!Enum.GetName(typeof(Core.RendererType), type).Contains("GPU"))
+                    Renderers.Add(new RendererItem { Id = typeId++, Type = type });
             if(Core.mufflon_is_cuda_available())
             {
-                Renderers.Add(new RendererItem { Id = 1, Type = Core.RendererType.GPU_PT });
+                foreach (Core.RendererType type in rendererValues)
+                    if (Enum.GetName(typeof(Core.RendererType), type).Contains("GPU"))
+                        Renderers.Add(new RendererItem { Id = typeId++, Type = type });
             }
+
+            // Enable the render targets
+            RenderTargets = new ObservableCollection<RenderTargetItem>();
+            int targetId = 0;
+            Array targetValues = Enum.GetValues(typeof(Core.RenderTarget));
+            // Once for variance and once for without variance
+            foreach (Core.RenderTarget target in targetValues)
+                RenderTargets.Add(new RenderTargetItem() { Id = targetId++, Target = target, Variance = false });
+            foreach (Core.RenderTarget target in targetValues)
+                RenderTargets.Add(new RenderTargetItem() { Id = targetId++, Target = target, Variance = true });
 
             // Register the handlers
             m_models.PropertyChanged += ModelsOnPropertyChanged;
@@ -114,6 +177,7 @@ namespace gui.ViewModel
                 models.Settings.LastSelectedRenderer = 0;
             }
             m_selectedRenderer = Renderers[models.Settings.LastSelectedRenderer];
+            m_selectedRenderTarget = RenderTargets[models.Settings.LastSelectedRenderTarget];
             m_models.Renderer.Type = (Core.RendererType)m_selectedRenderer.Type;
         }
 
@@ -137,7 +201,8 @@ namespace gui.ViewModel
                         // TODO other conditions
                         if (!Core.render_disable_all_render_targets())
                             throw new Exception(Core.core_get_dll_error());
-                        if (!Core.render_enable_render_target(Core.RenderTarget.RADIANCE, 0))
+                        if (!Core.render_enable_render_target(m_models.Renderer.RenderTarget,
+                            m_models.Renderer.RenderTargetVariance ? 1u : 0u))
                             throw new Exception(Core.core_get_dll_error());
                         if (!Core.render_enable_renderer(m_models.Renderer.Type))
                             throw new Exception(Core.core_get_dll_error());
@@ -188,12 +253,9 @@ namespace gui.ViewModel
                     }));
                     break;
                 case nameof(Models.Renderer.RenderTarget):
-                    UInt32 format = Core.render_get_target_opengl_format(m_models.Renderer.RenderTarget, false);
-                    if (format == 0x0500)
-                        throw new Exception(Core.core_get_dll_error());
-                    if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_models.Viewport.RenderWidth,
-                                                                    (UInt32)m_models.Viewport.RenderHeight, format))
-                        throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+                case nameof(Models.Renderer.RenderTargetVariance):
+                    if (m_reset.CanExecute(null))
+                        m_reset.Execute(null);
                     break;
             }
         }

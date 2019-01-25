@@ -74,7 +74,7 @@ namespace gui.ViewModel
 
             Profiler = new ProfilerViewModel(m_models);
 
-            Renderer = new RendererViewModel(m_models, Toolbar.PlayPauseCommand);
+            Renderer = new RendererViewModel(m_models, Toolbar.PlayPauseCommand, Toolbar.ResetCommand);
             Scene = new SceneViewModel(m_models);
 
             // command initialization

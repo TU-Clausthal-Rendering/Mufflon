@@ -123,15 +123,16 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 
 		// Evaluate direct hit of area ligths
 		if(pathLen <= m_params.maxPathLength) {
+			float mis = 0.f;
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex->get_primitive_id(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
 					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
-				outputBuffer.contribute(coord, throughput, emission * mis, vertex->get_position(),
-					vertex->get_normal(), vertex->get_albedo());
 			}
+			outputBuffer.contribute(coord, throughput, emission * mis, vertex->get_position(),
+				vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }

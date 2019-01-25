@@ -373,17 +373,15 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_render_target(RenderTarget target, uint variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_variance_render_targets();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_non_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_all_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_disable_non_variance_render_targets();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_all_render_targets();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool render_is_render_target_enabled(RenderTarget target, Boolean variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt32 render_get_target_opengl_format(RenderTarget target, Boolean variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

@@ -19,6 +19,7 @@ namespace gui.Model
         private bool m_isRendering = false;
         private Core.RendererType m_type = Core.RendererType.CPU_PT;
         private Core.RenderTarget m_target = Core.RenderTarget.RADIANCE;
+        private bool m_varianceTarget = false;
 
         public Semaphore RenderLock = new Semaphore(1, 1);
 
@@ -75,6 +76,17 @@ namespace gui.Model
             }
         }
 
+        public bool RenderTargetVariance
+        {
+            get => m_varianceTarget;
+            set
+            {
+                if (m_varianceTarget == value) return;
+                m_varianceTarget = value;
+                OnPropertyChanged(nameof(RenderTargetVariance));
+            }
+        }
+
         public static string getRendererName(Core.RendererType type)
         {
             switch(type)
@@ -83,6 +95,23 @@ namespace gui.Model
                 case Core.RendererType.GPU_PT: return "Pathtracer (GPU)";
             }
             return "Unknown";
+        }
+
+        public static string getRenderTargetName(Core.RenderTarget target, bool variance)
+        {
+            string val;
+            switch(target)
+            {
+                case Core.RenderTarget.ALBEDO: val = "Albedo"; break;
+                case Core.RenderTarget.LIGHTNESS: val = "Lightness"; break;
+                case Core.RenderTarget.NORMAL: val = "Normal"; break;
+                case Core.RenderTarget.POSITION: val = "Position"; break;
+                case Core.RenderTarget.RADIANCE: val = "Radiance"; break;
+                default: val = "Unknown"; break;
+            }
+            if (variance)
+                val += " (Variance)";
+            return val;
         }
 
         #region PropertyChanged

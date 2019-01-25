@@ -87,6 +87,12 @@
                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
+                    <ComboBox Name="RenderTargetSelectionBox"
+                              ItemsSource="{Binding Renderer.RenderTargets}"
+                              SelectedItem="{Binding Renderer.SelectedRenderTarget}"
+                              DisplayMemberPath="Name"/>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}"
                             ToolTip="Play/pause the renderer"
                             SnapsToDevicePixels="True">

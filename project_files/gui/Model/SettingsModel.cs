@@ -170,6 +170,16 @@ namespace gui.Model
             }
         }
 
+        public int LastSelectedRenderTarget
+        {
+            get => Settings.Default.LastSelectedRenderTarget;
+            set
+            {
+                Debug.Assert(value >= 0);
+                Settings.Default.LastSelectedRenderTarget = value;
+            }
+        }
+
         public LimitedCollection LastWorlds { get; } = new LimitedCollection(MaxLastWorlds);
 
         public bool AutoStartOnLoad

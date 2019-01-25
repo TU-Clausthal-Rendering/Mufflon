@@ -48,6 +48,9 @@ namespace gui.Dll
         private int m_renderWidth = 0;
         private int m_renderHeight = 0;
 
+        private Core.RenderTarget m_renderTarget;
+        private bool m_varianceTarget;
+
         // TODO: this is only for testing purposes
         public static bool toggleRenderer = false;
 
@@ -102,14 +105,14 @@ namespace gui.Dll
                 {
 
                     //HandleCommands();
-                    HandleResize();
                     // Try to acquire the lock - if we're waiting, we're not rendering
                     m_rendererModel.RenderLock.WaitOne();
                     // Check if we've closed
                     if (!m_isRunning)
                         break;
+                    HandleResize();
 
-                    if(m_settings.AllowCameraMovement)
+                    if (m_settings.AllowCameraMovement)
                     {
                         // Check for keyboard input
                         float x = 0f;
@@ -146,7 +149,8 @@ namespace gui.Dll
 
                     if (!Core.render_iterate())
                         throw new Exception(Core.core_get_dll_error());
-                    if(!Core.copy_output_to_texture(OpenGlDisplay.opengldisplay_get_screen_texture_handle(), m_rendererModel.RenderTarget, false))
+                    if(!Core.copy_output_to_texture(OpenGlDisplay.opengldisplay_get_screen_texture_handle(),
+                        m_renderTarget, m_varianceTarget))
                         throw new Exception(Core.core_get_dll_error());
 
                     // Border always keeps aspect ratio
@@ -226,14 +230,35 @@ namespace gui.Dll
             // Check if we need to resize the screen texture
             int newWidth = m_viewport.RenderWidth;
             int newHeight = m_viewport.RenderHeight;
+            Core.RenderTarget newTarget = m_rendererModel.RenderTarget;
+            bool newVarianceTarget = m_rendererModel.RenderTargetVariance;
 
-            if (m_renderWidth != newWidth || m_renderHeight != newHeight)
+            // TODO: disable the old target?
+            if(newTarget != m_renderTarget || newVarianceTarget != m_varianceTarget)
+            {
+                if (!Core.render_is_render_target_enabled(m_rendererModel.RenderTarget, m_rendererModel.RenderTargetVariance))
+                {
+                    // Disable previous render target
+                    // TODO: better solution since we might want multiple render targets at a time
+                    if(!Core.render_disable_render_target(m_renderTarget, m_varianceTarget ? 1u : 0u))
+                        throw new Exception(Core.core_get_dll_error());
+                    if (!Core.render_enable_render_target(m_rendererModel.RenderTarget, m_rendererModel.RenderTargetVariance ? 1u : 0u))
+                        throw new Exception(Core.core_get_dll_error());
+                    if (!Core.render_reset())
+                        throw new Exception(Core.core_get_dll_error());
+                }
+            }
+            
+
+            if (m_renderWidth != newWidth || m_renderHeight != newHeight || newTarget != m_renderTarget || newVarianceTarget != m_varianceTarget)
             {
                 m_renderWidth = newWidth;
                 m_renderHeight = newHeight;
+                m_renderTarget = newTarget;
+                m_varianceTarget = newVarianceTarget;
 
                 // TODO: let GUI select what render target we render
-                UInt32 format = Core.render_get_target_opengl_format(m_rendererModel.RenderTarget, false);
+                UInt32 format = Core.render_get_target_opengl_format(newTarget, newVarianceTarget);
                 if (format == 0x0500)
                     throw new Exception(Core.core_get_dll_error());
                 if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_renderWidth, (UInt32)m_renderHeight, format))

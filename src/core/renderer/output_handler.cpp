@@ -53,7 +53,7 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 		if(m_targets.is_set(flag)) {
 			if(m_targets.is_set(flag << 8)) { // Variance flag set?
 				// Variance case: needs to cumulate samples per iteration
-				rb.m_radiance = m_iterationTex[i].acquire<dev>();	// Allocates if necessary
+				rb.m_targets[i] = m_iterationTex[i].acquire<dev>();	// Allocates if necessary
 				m_iterationTex[i].mark_changed(dev);
 				m_iterationTex[i].clear<dev>();
 				if(reset) {
@@ -63,7 +63,7 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 					m_cumulativeVarTex[i].clear<dev>(); // TODO: async
 				}
 			} else {
-				rb.m_radiance = m_cumulativeTex[i].acquire<dev>();	// Allocates if necessary
+				rb.m_targets[i] = m_cumulativeTex[i].acquire<dev>();	// Allocates if necessary
 				m_cumulativeTex[i].mark_changed(dev);
 				if(reset) m_cumulativeTex[i].clear<dev>();
 			}
