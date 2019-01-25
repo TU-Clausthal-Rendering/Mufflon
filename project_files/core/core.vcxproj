@@ -35,7 +35,7 @@
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
     <ClCompile Include="..\..\src\core\scene\scenario.cpp" />
     <ClCompile Include="..\..\src\core\scene\scene.cpp" />
-    <ClCompile Include="..\..\src\core\scene\tessellation\adaptive.cpp" />
+    <ClCompile Include="..\..\src\core\scene\tessellation\tessellater.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp" />
     <ClCompile Include="..\..\src\core\scene\world_container.cpp" />
@@ -211,7 +211,8 @@
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
-    <ClInclude Include="..\..\src\core\scene\tessellation\adaptive.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\tessellater.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\uniform.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp" />

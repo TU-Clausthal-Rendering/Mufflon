@@ -7,7 +7,7 @@
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
-#include "core/scene/tessellation/adaptive.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
 
 namespace mufflon::scene::geometry {
 
@@ -326,11 +326,11 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	return { hdl, readPoints, 0u, readUvs };
 }
 
-void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMeshType, Real>& tessellater,
-				std::size_t divisions) {
-	
-	tessellation::AdaptiveTessellater tess{ *m_meshData };
-	tess.tessellate();
+void Polygons::tessellate(tessellation::Tessellater& tessellater) {
+
+	const std::size_t prevTri = m_triangles;
+	const std::size_t prevQuad = m_quads;
+	tessellater.tessellate(*m_meshData);
 
 	/*
 	tessellater(*m_meshData, divisions);*/
@@ -387,7 +387,8 @@ void Polygons::tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMesh
 
 	// Flag the entire polygon as dirty
 	m_vertexAttributes.mark_changed(Device::CPU);
-	logInfo("Uniformly tessellated polygon mesh with ", divisions, " subdivisions");
+	logInfo("Uniformly tessellated polygon mesh (", prevTri, "/", prevQuad,
+			" -> ", m_triangles, "/", m_quads, ")");
 }
 /*void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
 				std::size_t divisions) {

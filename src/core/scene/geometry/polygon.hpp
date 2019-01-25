@@ -36,6 +36,12 @@ namespace mufflon { namespace scene {
 template < Device dev >
 struct PolygonsDescriptor;
 
+namespace tessellation {
+
+class Tessellater;
+
+} // namespace tessellation
+
 namespace geometry {
 
 /**
@@ -259,13 +265,9 @@ public:
 	std::size_t add_bulk(FaceAttributeHandle hdl, const FaceHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
 
-	// Implements tessellation for uniform subdivision.
-	void tessellate(OpenMesh::Subdivider::Uniform::SubdividerT<PolygonMeshType, Real>& tessellater,
-					std::size_t divisions);
-	// Implements tessellation for adaptive subdivision.
-	/*void tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<PolygonMeshType>& tessellater,
-					std::size_t divisions);*/
-					// Implements decimation.
+	// Implements tessellation for the mesh
+	void tessellate(tessellation::Tessellater& tessellater);
+	// Implements decimation.
 	void create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 					std::size_t target_vertices);
 

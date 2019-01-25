@@ -220,7 +220,7 @@
     <ClCompile Include="..\..\src\util\byte_io.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\tessellation\adaptive.cpp">
+    <ClCompile Include="..\..\src\core\scene\tessellation\tessellater.cpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
   </ItemGroup>
@@ -780,14 +780,17 @@
     <ClInclude Include="..\..\src\util\parallel.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\tessellation\adaptive.hpp">
-      <Filter>Source Files\core\scene\tessellation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_specular.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_base.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\tessellation\tessellater.hpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\tessellation\uniform.hpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

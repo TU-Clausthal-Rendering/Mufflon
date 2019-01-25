@@ -4,6 +4,7 @@
 #include "core/scene/lod.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"
+#include "core/scene/tessellation/uniform.hpp"
 #include <iostream>
 #include <ei/conversions.hpp>
 #include <windows.h>
@@ -454,6 +455,13 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 		Object& obj = inst.get_object();
 		if(!scenario.is_masked(&obj) && !scenario.is_masked(&inst)) {
 			const u32 lod = scenario.get_effective_lod(&inst);
+			/* This is how tessellation should be performed:
+			tessellation::Uniform tess;
+			tess.set_inner_level(3u);
+			tess.set_outer_level(3u);
+			tess.set_phong_tessellation(true);
+			obj.get_lod(lod).template get_geometry<geometry::Polygons>().tessellate(tess);
+			*/
 			if(!obj.has_lod_available(lod)) {
 				if(!m_load_lod(&obj, lod))
 					throw std::runtime_error("Failed to after-load LoD");
