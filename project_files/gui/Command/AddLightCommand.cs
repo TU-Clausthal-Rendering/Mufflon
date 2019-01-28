@@ -38,7 +38,7 @@ namespace gui.Command
             // TODO check for handle = null? error?
             var handle = Core.world_add_light(dc.NameValue, Core.FromModelLightType(dc.TypeValue));
 
-            LightModel lm = LightModel.MakeFromHandle(handle, dc.TypeValue, m_models.World);
+            LightModel lm = LightModel.MakeFromHandle(handle, dc.TypeValue);
 
             m_models.World.Lights.Models.Add(lm);
         }

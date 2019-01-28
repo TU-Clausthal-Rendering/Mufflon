@@ -20,7 +20,7 @@ namespace gui.Model.Light
             return new SpotLightViewModel(models, this);
         }
 
-        public SpotLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        public SpotLightModel(IntPtr handle) : base(handle)
         {
 
         }

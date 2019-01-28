@@ -20,7 +20,7 @@ namespace gui.Model.Light
             return new EnvmapLightViewModel(models, this);
         }
 
-        public EnvmapLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        public EnvmapLightModel(IntPtr handle) : base(handle)
         {
             
         }

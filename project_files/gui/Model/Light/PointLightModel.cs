@@ -20,7 +20,7 @@ namespace gui.Model.Light
             return new PointLightViewModel(models, this);
         }
 
-        public PointLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        public PointLightModel(IntPtr handle) : base(handle)
         {
 
         }

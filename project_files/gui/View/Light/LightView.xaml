@@ -23,9 +23,9 @@
                     Margin="{StaticResource LeftPropertyMargin}"
                     IsChecked="{Binding IsSelected}"/>
 
-                <TextBox
+                <TextBlock
                     Grid.Column="1"
-                    Text="{Binding Name}"/>
+                    Text="{Binding Name, FallbackValue=Name}"/>
 
                 <Button
                     Grid.Column="2"

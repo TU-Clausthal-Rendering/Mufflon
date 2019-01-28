@@ -138,19 +138,19 @@ namespace gui.Model.Scene
         {
             var numPointLights = Core.world_get_point_light_count();
             for (var i = 0u; i < numPointLights; ++i)
-                Lights.Models.Add(new PointLightModel(Core.world_get_light_handle(i, Core.LightType.POINT), this));
+                Lights.Models.Add(new PointLightModel(Core.world_get_light_handle(i, Core.LightType.POINT)));
 
             var numSpotLights = Core.world_get_spot_light_count();
             for (var i = 0u; i < numSpotLights; ++i)
-                Lights.Models.Add(new SpotLightModel(Core.world_get_light_handle(i, Core.LightType.SPOT), this));
+                Lights.Models.Add(new SpotLightModel(Core.world_get_light_handle(i, Core.LightType.SPOT)));
 
             var numDirLights = Core.world_get_dir_light_count();
             for (var i = 0u; i < numDirLights; ++i)
-                Lights.Models.Add(new DirectionalLightModel(Core.world_get_light_handle(i, Core.LightType.DIRECTIONAL), this));
+                Lights.Models.Add(new DirectionalLightModel(Core.world_get_light_handle(i, Core.LightType.DIRECTIONAL)));
 
             var numEnvLights = Core.world_get_env_light_count();
             for(var i = 0u; i < numEnvLights; ++i)
-                Lights.Models.Add(new EnvmapLightModel(Core.world_get_light_handle(i, Core.LightType.ENVMAP), this));
+                Lights.Models.Add(new EnvmapLightModel(Core.world_get_light_handle(i, Core.LightType.ENVMAP)));
         }
 
         #region PropertyChanged

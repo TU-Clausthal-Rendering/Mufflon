@@ -35,7 +35,7 @@ namespace gui.Command
             m_models.World.Lights.Models.Remove(m_model);
 
             // was the light in the current scenario?
-            if (!m_model.IsSelected) return;
+            
 
             // TODO why do I need to do this? (why isn't this done by world_remove_light?)
             var currScenario = Core.world_get_current_scenario();

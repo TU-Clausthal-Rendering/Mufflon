@@ -18,7 +18,7 @@ namespace gui.Model.Light
             return new GoniometricLightViewModel(models, this);
         }
 
-        public GoniometricLightModel(IntPtr handle, WorldModel world) : base(handle, world)
+        public GoniometricLightModel(IntPtr handle) : base(handle)
         {
 
         }

@@ -22,62 +22,14 @@ namespace gui.Model.Light
             Goniometric
         }
 
-        protected readonly WorldModel m_world;
-        private ScenarioModel m_scenario = null;
-
-        protected LightModel(IntPtr handle, WorldModel world)
+        protected LightModel(IntPtr handle)
         {
             Handle = handle;
-            m_world = world;
-            m_scenario = world.CurrentScenario;
-            m_world.PropertyChanged += WorldOnPropertyChanged;
-        }
-
-        /// <summary>
-        /// tests if IsSelected was changed => light added or removed from current scenario
-        /// </summary>
-        private void CurrentScenarioLightsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
-        {
-            var changed = 
-                (args.NewItems != null && args.NewItems.Contains(Name))
-                || (args.OldItems != null && args.OldItems.Contains(Name));
-
-            if(changed)
-                // TODO this should trigger reload scene
-                OnPropertyChanged(nameof(IsSelected));
-        }
-
-        private void WorldOnPropertyChanged(object sender, PropertyChangedEventArgs args)
-        {
-            switch (args.PropertyName)
-            {
-                case nameof(WorldModel.CurrentScenario):
-                    // scenario is only null when the light is created (because the scenarios are not initialized yet)
-                    if (m_scenario != null)
-                    {
-                        OnPropertyChanged(nameof(IsSelected));
-                        // unsubscribe from old scenario and subscribe to new one
-                        m_scenario.Lights.CollectionChanged -= CurrentScenarioLightsOnCollectionChanged;
-                    }
-                    m_scenario = m_world.CurrentScenario;
-                    m_scenario.Lights.CollectionChanged += CurrentScenarioLightsOnCollectionChanged;
-                    break;
-            }
         }
 
         public abstract LightType Type { get; }
 
-        public string Name
-        {
-            get => Core.world_get_light_name(Handle);
-            set
-            {
-                if (value == null || value == Name) return;
-                // TODO set core name
-                Debug.Assert(false);
-                OnPropertyChanged(nameof(Name));
-            }
-        }
+        public string Name => Core.world_get_light_name(Handle);
 
         private float m_scale = 1.0f;
 
@@ -94,21 +46,6 @@ namespace gui.Model.Light
             }
         }
 
-        // indicates if this light should be used for the current scenario
-        public bool IsSelected
-        {
-            get => m_world.CurrentScenario.Lights.Contains(Handle);
-            set
-            {
-                if (value == IsSelected) return;
-                if (value)
-                    m_world.CurrentScenario.Lights.Add(Handle);
-                else
-                    m_world.CurrentScenario.Lights.Remove(Handle);
-                // property changed will be raised by the collection
-            }
-        }
-
         public IntPtr Handle { get; }
 
         /// <summary>
@@ -118,19 +55,18 @@ namespace gui.Model.Light
         /// <returns></returns>
         public abstract LightViewModel CreateViewModel(Models models);
 
-        public static LightModel MakeFromHandle(IntPtr handle, LightType type, WorldModel world)
+        public static LightModel MakeFromHandle(IntPtr handle, LightType type)
         {
-            Debug.Assert(world != null);
             switch (type)
             {
                 case LightType.Point:
-                    return new PointLightModel(handle, world);
+                    return new PointLightModel(handle);
                 case LightType.Directional:
-                    return new DirectionalLightModel(handle, world);
+                    return new DirectionalLightModel(handle);
                 case LightType.Spot:
-                    return new SpotLightModel(handle, world);
+                    return new SpotLightModel(handle);
                 case LightType.Envmap:
-                    return new EnvmapLightModel(handle, world);
+                    return new EnvmapLightModel(handle);
                 case LightType.Goniometric:
                 default:
                     // not implemented

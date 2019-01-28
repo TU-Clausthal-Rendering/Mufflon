@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -10,18 +11,47 @@ using gui.Annotations;
 using gui.Command;
 using gui.Model;
 using gui.Model.Light;
+using gui.Model.Scene;
 
 namespace gui.ViewModel.Light
 {
     public abstract class LightViewModel : INotifyPropertyChanged
     {
+        private readonly Models m_models;
         private readonly LightModel m_parent;
+        private ScenarioModel m_currentScenario;
 
         protected LightViewModel(Models models, LightModel parent)
         {
+            m_models = models;
             m_parent = parent;
             RemoveCommand = new RemoveLightCommand(models, parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
+            m_currentScenario = m_models.World.CurrentScenario;
+
+            m_models.World.PropertyChanged += WorldOnPropertyChanged;
+        }
+
+        private void WorldOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(WorldModel.CurrentScenario):
+                    // unsubscribe old
+                    m_currentScenario.Lights.CollectionChanged -= ScenarioLightsOnCollectionChanged;
+                    // subscribe to new
+                    m_currentScenario = m_models.World.CurrentScenario;
+                    m_currentScenario.Lights.CollectionChanged += ScenarioLightsOnCollectionChanged;
+                    // is selected might have changed
+                    OnPropertyChanged(nameof(IsSelected));
+                    break;
+            }
+        }
+
+        private void ScenarioLightsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            // is selected might have changed
+            OnPropertyChanged(nameof(IsSelected));
         }
 
         protected virtual void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -34,19 +64,12 @@ namespace gui.ViewModel.Light
                 case nameof(LightModel.Scale):
                     OnPropertyChanged(nameof(Scale));
                     break;
-                case nameof(LightModel.IsSelected):
-                    OnPropertyChanged(nameof(IsSelected));
-                    break;
             }
         }
 
         public string Type => m_parent.Type.ToString();
 
-        public string Name
-        {
-            get => m_parent.Name;
-            set => m_parent.Name = value;
-        }
+        public string Name => m_parent.Name;
 
         public float Scale
         {
@@ -56,8 +79,15 @@ namespace gui.ViewModel.Light
 
         public bool IsSelected
         {
-            get => m_parent.IsSelected;
-            set => m_parent.IsSelected = value;
+            get => m_currentScenario.Lights.Contains(m_parent.Handle);
+            set
+            {
+                if (value == IsSelected) return;
+                if (value)
+                    m_currentScenario.Lights.Add(m_parent.Handle);
+                else
+                    m_currentScenario.Lights.Remove(m_parent.Handle);
+            }
         }
 
         public ICommand RemoveCommand { get; }
