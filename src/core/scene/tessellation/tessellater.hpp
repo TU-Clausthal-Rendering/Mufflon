@@ -83,8 +83,9 @@ protected:
 	// Performs tessellation for the inner face (triangle)
 	virtual void tessellate_inner_triangles(const u32 innerLevel, const OpenMesh::FaceHandle original);
 
-	// Triangulate the given face
-	virtual void triangulate(const OpenMesh::FaceHandle face);
+	// Triangulate the given strip between inner and outer vertices
+	virtual void triangulate_strip(const u32 lengthOuter, const u32 lengthInner,
+								   const OpenMesh::FaceHandle original);
 
 	// Mesh to be tessellated
 	geometry::PolygonMeshType* m_mesh = nullptr;
