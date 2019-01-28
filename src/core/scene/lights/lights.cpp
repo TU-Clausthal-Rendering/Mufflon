@@ -36,8 +36,7 @@ Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light) {
 
 
 Spectrum get_flux(const AreaLightQuad<Device::CPU>& light) {
-	float area = ei::surface(ei::Tetrahedron{
-		light.points[0u], light.points[1u], light.points[2u], light.points[3u]});
+	float area = light.compute_area();
 	// Sample the radiance over the entire triangle region.
 	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
 	Spectrum radianceSum{ 0.0f };
@@ -79,14 +78,14 @@ Spectrum get_flux(const DirectionalLight& light,
 
 
 template < Device dev >
-void AreaLightQuad<dev>::recompute_area() {
+float AreaLightQuad<dev>::compute_area() const {
 	const ei::Vec3 e03 = points[3] - points[0];
 	const ei::Vec3 e12 = points[2] - points[1];
 	const ei::Vec3 e01 = points[1] - points[0];
 	const ei::Vec3 e32 = points[2] - points[3];
 	/* Uniform
 	constexpr int SAMPLES_PER_DIM = 32;
-	area = 0;
+	float area = 0;
 	for(int i = 0; i <= SAMPLES_PER_DIM; ++i) {
 		float s = i / float(SAMPLES_PER_DIM);
 		for(int j = 0; j <= SAMPLES_PER_DIM; ++j) {
@@ -104,7 +103,7 @@ void AreaLightQuad<dev>::recompute_area() {
 	const ei::Vec3 n1 = cross(e12, e32);
 	const float len0 = len(n0); // = tri area*2
 	const float len1 = len(n1); // = tri area*2
-	area = (len0 + len1) / 2.0f;
+	float area = (len0 + len1) / 2.0f;
 	// This is the exact area, if the quad is planar.
 	if(dot(n0, n1) / (len0 * len1) < 0.99999f) {
 		// Get more samples for numeric integration
@@ -118,8 +117,9 @@ void AreaLightQuad<dev>::recompute_area() {
 			const float sample = len(cross(tangentX, tangentY));
 			diff = sample - area;
 			area += diff / (++count);
-		} while(ei::abs(diff / area) > 1e-4f);
+		} while(ei::abs(diff / area) > 1e-2f);
 	}
+	return area;
 }
 template struct AreaLightQuad<Device::CPU>;
 template struct AreaLightQuad<Device::CUDA>;

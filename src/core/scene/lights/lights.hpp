@@ -106,7 +106,6 @@ struct alignas(16) AreaLightQuad {
 	// The forced alignment makes sure the two types CPU/GPU have the same size.
 	// Problem: radianceTex is 16 byte on GPU but only 8 on CPU.
 	alignas(16) u32 scale;			// A spectrum scale for the radiance texture in RGB9E5
-	float area;						// Precomputed surface area (very expensive numeric integration)
 
 	AreaLightQuad& operator=(const AreaLightQuadDesc& rhs) {
 		for(int i = 0; i < 4; ++i) {
@@ -115,12 +114,12 @@ struct alignas(16) AreaLightQuad {
 		}
 		scale = rhs.scale;
 		radianceTex = rhs.radianceTex->acquire_const<dev>();
-		recompute_area();
 		return *this;
 	}
 
-	// TODO: move this into loader or better exporter
-	void recompute_area();
+	// Potentially expensive computation of the area (approximation!)
+	// This should only be used if an approximate estimate is ok (not in samplers...).
+	float compute_area() const;
 };
 template < Device dev >
 struct alignas(16) AreaLightSphere {
@@ -265,6 +264,7 @@ evaluate_spot(const scene::Direction& excident,
 CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 			  const scene::Direction& normal) {
+	mAssert(ei::approx(len(excident), 1.0f) && ei::approx(len(normal), 1.0f));
 	const float cosOut = dot(normal, excident);
 	// Early out (wrong hemisphere)
 	if(cosOut <= 0.0f) return math::EvalValue{};

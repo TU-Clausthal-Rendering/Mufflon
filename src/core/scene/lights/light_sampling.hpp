@@ -141,7 +141,9 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightQuad<CURREN
 	const ei::Vec3 e12 = light.points[2u] - light.points[1u];
 	const ei::Vec3 tangentX = (1.f - rnd.u0) * e03 + rnd.u0 * e12;
 	const ei::Vec3 tangentY = (1.f - rnd.u1) * e01 + rnd.u1 * e32;
-	const ei::Vec3 normal = normalize(cross(tangentY, tangentX));
+	ei::Vec3 normal = cross(tangentY, tangentX);
+	const float area = len(normal);
+	normal /= area;
 	// The position is obtained by simple bilinear interpolation. To avoid
 	// redundant computation we can use the intermediate results from the
 	// normal computation.
@@ -153,54 +155,10 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightQuad<CURREN
 	const Spectrum scale = ei::unpackRGB9E5(light.scale);
 	const Spectrum radiance = Spectrum{ sample(light.radianceTex, uv) } * scale;
 
-	return Photon{ { position, AreaPdf{ 1.0f / light.area } },
-		radiance * light.area,
+	return Photon{ { position, AreaPdf{ 1.0f / area } },
+		radiance * area,
 		LightType::AREA_LIGHT_QUAD,
-		{normal, light.area} };
-	// Two-split decision: first select triangle, then use triangle sampling.
-	// Try to hold things in registers by conditional moves later on.
-	/*const ei::Vec3 tangent1X = light.points[2u] - light.points[0u];
-	const ei::Vec3 tangent1Y = light.points[1u] - light.points[0u];
-	const ei::Vec3 normal1 = cross(tangent1X, tangent1Y);
-	const ei::Vec3 tangent2X = light.points[3u] - light.points[0u];
-	const ei::Vec3 tangent2Y = light.points[2u] - light.points[0u];
-	const ei::Vec3 normal2 = cross(tangent1X, tangent1Y);
-	const float area1 = len(normal1) * 0.5f;
-	const float area2 = len(normal2) * 0.5f;
-	const float split = area1 / (area1 + area2);
-	mAssert(!isnan(split));
-	// TODO: storing split could speed up things a lot (only need tangents/len of one triangle)
-
-	// Decide what side we're on
-	int side;
-	float u2;
-	if(rnd.u0 < split) {
-		// Rescale the random number to be reusable
-		u2 = rnd.u0 / split;
-		side = 0;
-	} else {
-		u2 = (rnd.u0 - split) / (1.f - split);
-		side = 1;
-	}
-
-	// Sample the position on the selected triangle and account for chance to choose the triangle
-	// Use barycentrics (we need position and uv at the same location)
-	const ei::Vec2 bary = math::sample_barycentric(u2, rnd.u1);
-	const ei::Vec3 position = light.points[0u] + (side ?
-										tangent2X * bary.x + tangent2Y * bary.y :
-										tangent1X * bary.x + tangent1Y * bary.y);
-	// TODO: compute UVs based on inverted bilinar interpolation? This is what should
-	// be done for high quality (here and in intersections with quads)
-	const ei::Vec2 uv = light.uv[0u]
-		+ (light.uv[side?2u:1u] - light.uv[0u]) * bary.x
-		+ (light.uv[side?3u:2u] - light.uv[0u]) * bary.y;
-
-	const Spectrum scale = ei::unpackRGB9E5(light.scale);
-
-	return Photon{ { position, AreaPdf{ 1.0f / (area1 + area2) } },
-		Spectrum{sample(light.radianceTex, uv)} * scale, // TODO: radiance to intensity?
-		LightType::AREA_LIGHT_QUAD,
-		{side ? normal2 / (area2 * 2.0f) : normal1 / (area1 * 2.0f), area1 + area2} };*/
+		{normal, area} };
 }
 
 // *** AREA LIGHT : SPHERE ***

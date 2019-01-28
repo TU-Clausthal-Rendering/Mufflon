@@ -284,7 +284,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
  */
 template < class Guide >
 CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
-								  PrimitiveHandle primitive,
+								  PrimitiveHandle primitive, ei::Vec2 surfaceParams,
 								  const ei::Vec3& refPosition, Guide&& guide) {
 	mAssert(primitive.instanceId != -1);
 	using namespace lighttree_detail;
@@ -324,8 +324,15 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 			return AreaPdf{ p / area };
 		}
 		case LightType::AREA_LIGHT_QUAD: {
-			auto& a = *as<AreaLightQuad<CURRENT_DEV>>(tree.posLights.memory + offset);
-			return AreaPdf{ p / a.area };
+			auto& light = *as<AreaLightQuad<CURRENT_DEV>>(tree.posLights.memory + offset);
+			// Compute the local density at the point of the surface
+			const ei::Vec3 e03 = light.points[3u] - light.points[0u];
+			const ei::Vec3 e01 = light.points[1u] - light.points[0u];
+			const ei::Vec3 e32 = light.points[2u] - light.points[3u];
+			const ei::Vec3 e12 = light.points[2u] - light.points[1u];
+			const ei::Vec3 tangentX = lerp(e03, e12, surfaceParams.x);
+			const ei::Vec3 tangentY = lerp(e01, e32, surfaceParams.y);
+			return AreaPdf{ p / len(cross(tangentY, tangentX)) };
 		}
 		case LightType::AREA_LIGHT_SPHERE: {
 			auto& a = *as<AreaLightSphere<CURRENT_DEV>>(tree.posLights.memory + offset);

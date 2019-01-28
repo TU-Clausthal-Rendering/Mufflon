@@ -99,7 +99,8 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 		if(pathLen <= maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene->lightTree, vertex->get_primitive_id() ,
+				AreaPdf backwardPdf = connect_pdf(scene->lightTree, vertex->get_primitive_id(),
+												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				//float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				float mis = 0.0f;

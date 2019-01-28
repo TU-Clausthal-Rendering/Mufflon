@@ -378,6 +378,16 @@ public:
 		return {-1, -1};
 	}
 
+	// Get the surface parametrization (st) of the primitive. Only defined for
+	// surface vertices
+	CUDA_FUNCTION ei::Vec2 get_surface_params() const {
+		if(m_type == Interaction::SURFACE) {
+			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
+			return desc->surfaceParams;
+		}
+		return {0.0f, 0.0f};
+	}
+
 	/* *************************************************************************
 	 * Creation methods (factory)											   *
 	 * Memory management of vertices is quite challenging, because its size	   *
@@ -505,8 +515,9 @@ public:
 		SurfaceDesc* desc = as<SurfaceDesc>(vert->desc());
 		desc->tangentSpace = tangentSpace;
 		desc->primitiveId = hit.hitId;
+		desc->surfaceParams = hit.surfaceParams.st;
 		int size = scene::materials::fetch(material, hit.uv, &desc->params);
-		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + size);
+		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization) + size);
 	}
 
 private:
@@ -525,6 +536,7 @@ private:
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace; // TODO: use packing?
 		scene::PrimitiveHandle primitiveId;
+		ei::Vec2 surfaceParams;
 		scene::materials::ParameterPack params;
 	};
 
