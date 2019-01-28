@@ -135,13 +135,18 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightQuad<CURREN
 													  const math::RndSet2& rnd) {
 	// The rnd coordinate is our uv.
 	// Get the geometric normal. This requires an interpolation of the edges.
-	const ei::Vec3 tangentX = (1.f - rnd.u1) * (light.points[3u] - light.points[0u]) + rnd.u1 * (light.points[2u] - light.points[1u]);
-	const ei::Vec3 tangentY = (1.f - rnd.u0) * (light.points[1u] - light.points[0u]) + rnd.u0 * (light.points[2u] - light.points[3u]);
+	const ei::Vec3 e03 = light.points[3u] - light.points[0u];
+	const ei::Vec3 e01 = light.points[1u] - light.points[0u];
+	const ei::Vec3 e32 = light.points[2u] - light.points[3u];
+	const ei::Vec3 e12 = light.points[2u] - light.points[1u];
+	const ei::Vec3 tangentX = (1.f - rnd.u0) * e03 + rnd.u0 * e12;
+	const ei::Vec3 tangentY = (1.f - rnd.u1) * e01 + rnd.u1 * e32;
 	const ei::Vec3 normal = normalize(cross(tangentY, tangentX));
 	// The position is obtained by simple bilinear interpolation. To avoid
 	// redundant computation we can use the intermediate results from the
 	// normal computation.
-	const ei::Vec3 position = light.points[0u] + tangentX * rnd.u0 + tangentY * rnd.u1;
+	const ei::Vec3 position = light.points[0u] + e03 * rnd.u1 + e01 * rnd.u0 + (e32 - e01) * (rnd.u0 * rnd.u1);
+	//const ei::Vec3 position = ei::bilerp(light.points[0u], light.points[1u], light.points[3u], light.points[2u], rnd.u0, rnd.u1);
 
 	const ei::Vec2 uv = ei::bilerp(light.uv[0u], light.uv[1u], light.uv[3u], light.uv[2u], rnd.u0, rnd.u1);
 
