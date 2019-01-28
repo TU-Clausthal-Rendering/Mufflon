@@ -298,18 +298,24 @@ void WorldContainer::remove_light(u32 index, lights::LightType type) {
 				throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
 										 + " >= " + std::to_string(m_pointLights.size()));
 			m_pointLights.erase(index);
+			for(auto& scenario : m_scenarios)
+				scenario.second.remove_point_light(index);
 		} break;
 		case lights::LightType::SPOT_LIGHT: {
 			if(index >= m_spotLights.size())
 				throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
 										 + " >= " + std::to_string(m_spotLights.size()));
 			m_spotLights.erase(index);
+			for(auto& scenario : m_scenarios)
+				scenario.second.remove_spot_light(index);
 		} break;
 		case lights::LightType::DIRECTIONAL_LIGHT: {
 			if(index >= m_dirLights.size())
 				throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
 											+ " >= " + std::to_string(m_dirLights.size()));
 			m_dirLights.erase(index);
+			for(auto& scenario : m_scenarios)
+				scenario.second.remove_dir_light(index);
 		} break;
 		case lights::LightType::ENVMAP_LIGHT: {
 			if(index >= m_envLights.size())
@@ -317,6 +323,10 @@ void WorldContainer::remove_light(u32 index, lights::LightType type) {
 										 + " >= " + std::to_string(m_envLights.size()));
 			this->unref_texture(m_envLights.get(index).get_envmap());
 			m_envLights.erase(index);
+			for(auto& scenario : m_scenarios) {
+				if(scenario.second.get_background() == index)
+					scenario.second.remove_background();
+			}
 		} break;
 		default:
 			throw std::runtime_error("[WorldContainer::remove_light] Invalid light type.");
