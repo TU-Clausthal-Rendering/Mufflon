@@ -122,10 +122,6 @@ struct alignas(16) AreaLightQuad {
 		radianceTex = rhs.radianceTex->acquire_const<dev>();
 		return *this;
 	}
-
-	// Potentially expensive computation of the area (approximation!)
-	// This should only be used if an approximate estimate is ok (not in samplers...).
-	float compute_area() const;
 };
 template < Device dev >
 struct alignas(16) AreaLightSphere {
