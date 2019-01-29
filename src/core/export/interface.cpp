@@ -1307,6 +1307,14 @@ size_t world_get_material_size(MaterialHdl material) {
 	CATCH_ALL(0)
 }
 
+const char* world_get_material_name(MaterialHdl material) {
+	TRY
+	CHECK_NULLPTR(material, "material handle", nullptr);
+	MaterialHandle hdl = static_cast<MaterialHandle>(material);
+	return hdl->get_name().c_str();
+	CATCH_ALL(nullptr)
+}
+
 int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
 	CHECK_NULLPTR(material, "material handle", 0);
 	CHECK_NULLPTR(buffer, "material buffer", 0);
@@ -1507,6 +1515,7 @@ CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type) {
 }
 
 CORE_API const char* CDECL world_get_light_name(LightHdl hdl) {
+	TRY
 	constexpr lights::LightType TYPES[] = {
 		lights::LightType::POINT_LIGHT,
 		lights::LightType::SPOT_LIGHT,
@@ -1514,6 +1523,7 @@ CORE_API const char* CDECL world_get_light_name(LightHdl hdl) {
 		lights::LightType::ENVMAP_LIGHT
 	};
 	return s_world.get_light_name(hdl.index, TYPES[hdl.type]).data();
+	CATCH_ALL(nullptr)
 }
 
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
@@ -1635,6 +1645,14 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 							  static_cast<textures::SamplingMode>(sampling),
 							  false, move(data));
 	return static_cast<TextureHdl>(hdl);
+	CATCH_ALL(nullptr)
+}
+
+const char* world_get_texture_name(TextureHdl hdl) {
+	TRY
+	CHECK_NULLPTR(hdl, "texture handle", nullptr);
+	auto tex = static_cast<TextureHandle>(hdl);
+	return tex->get_name().c_str();
 	CATCH_ALL(nullptr)
 }
 
@@ -2454,14 +2472,14 @@ Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance) {
 
 const char* world_get_env_light_map(ConstLightHdl hdl) {
 	TRY
-	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", nullptr);
 	const lights::Background* background = s_world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
 		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
 		return nullptr;
 	}
 	ConstTextureHandle envmap = background->get_envmap();
-	CHECK_NULLPTR(envmap, "environment-mapped light handle", false);
+	CHECK_NULLPTR(envmap, "environment-mapped light handle", nullptr);
 	return envmap->get_name().c_str();
 	CATCH_ALL(nullptr)
 }

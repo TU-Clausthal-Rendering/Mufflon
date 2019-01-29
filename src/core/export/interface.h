@@ -377,6 +377,7 @@ CORE_API MaterialHdl CDECL world_add_material(const char* name, const MaterialPa
 CORE_API IndexType CDECL world_get_material_count();
 CORE_API MaterialHdl CDECL world_get_material(IndexType index);
 CORE_API size_t CDECL world_get_material_size(MaterialHdl material);
+CORE_API const char* CDECL world_get_material_name(MaterialHdl material);
 // buffer must have at least world_get_material_size() bytes. After a successful get
 // buffer contains a MaterialParamsStruct and all referenced sub-layers.
 CORE_API Boolean CDECL world_get_material_data(MaterialHdl material, MaterialParams* buffer);
@@ -474,6 +475,7 @@ CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
+CORE_API const char* CDECL world_get_texture_name(TextureHdl hdl);
 
 // Camera interface
 CORE_API CameraType CDECL world_get_camera_type(ConstCameraHdl cam);
