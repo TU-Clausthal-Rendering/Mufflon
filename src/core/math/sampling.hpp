@@ -33,6 +33,18 @@ CUDA_FUNCTION __forceinline__ float rescale_sample(float x, float pLeft, float p
 	return (x - pLeft) / (pRight - pLeft);
 }
 
+// Computes u64 * [0,1] in fixed point.
+// Semantic like: u64(num * p), however doing this directly leads to invalid
+// conversions (num >= 2^63 -> 2^63).
+CUDA_FUNCTION __forceinline__ u64 percentage_of(u64 num, float p) {
+	// Get a fixed point 31 number.
+	// Multiplying with 2^32 would cause an overflow for p=1.
+	u64 pfix = u64(p * 2147483648.0f);
+	// Multiply low and high part independently and shift the results.
+	return (pfix * (num & 0x7fffffff)) >> 31	// Low 31 bits
+		  | pfix * (num >> 31);					// High 33 bits
+}
+
 // Rescale a random number inside the interval [pLeft, pRight] to [0,u64::max]
 CUDA_FUNCTION __forceinline__ u64 rescale_sample(u64 x, u64 pLeft, u64 pRight) {
 	u64 interval = pRight - pLeft;

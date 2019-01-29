@@ -19,18 +19,6 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&
 	return sample;
 }
 
-// Computes u64 * [0,1] in fixed point.
-// Semantic like: u64(num * p), however doing this directly leads to invalid
-// conversions (num >= 2^63 -> 2^63).
-CUDA_FUNCTION __forceinline__ u64 percentage_of(u64 num, float p) {
-	// Get a fixed point 31 number.
-	// Multiplying with 2^32 would cause an overflow for p=1.
-	u64 pfix = u64(p * 2147483648.0f);
-	// Multiply low and high part independently and shift the results.
-	return (pfix * (num & 0x7fffffff)) >> 31	// Low 31 bits
-		  | pfix * (num >> 31);					// High 33 bits
-}
-
 
 // Converts the typeless memory into the given light type and samples it
 CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
@@ -94,7 +82,7 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 		// Scale the flux up
 		float probLeft = currentNode->left.flux / (currentNode->left.flux + currentNode->right.flux);
 		// Compute the integer bounds
-		u64 intervalBoundary = intervalLeft + percentage_of(intervalRight - intervalLeft, probLeft);
+		u64 intervalBoundary = intervalLeft + math::percentage_of(intervalRight - intervalLeft, probLeft);
 		if(rndChoice < intervalBoundary) {
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
@@ -147,7 +135,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 		//return adjustPdf(sample_light_pos(tree.background, bounds, rnd), envProb);
 	}
 	// ...then the directional lights come...
-	u64 right = percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
+	u64 right = math::percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
 	u64 left = rightEnv;
 	float p = dirProb;	// TODO: the correct probability would be (right-left) / <64>max, but the differenze might not even noticable in a 23bit float mantissa
 	const LightSubTree* subTree = &tree.dirLights;
@@ -195,7 +183,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		// Scale the flux up
 		float probLeft = guide(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
 		// Compute the integer bounds
-		u64 intervalBoundary = intervalLeft + percentage_of(intervalRight - intervalLeft, probLeft);
+		u64 intervalBoundary = intervalLeft + math::percentage_of(intervalRight - intervalLeft, probLeft);
 		if(rndChoice < intervalBoundary) {
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
@@ -256,12 +244,12 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 
 	// Now split up based on flux
 	// First is envmap...
-	u64 rightEnv = percentage_of(std::numeric_limits<u64>::max(), envProb);
+	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
 		return adjustPdf(connect_light(tree.background, position, bounds, rnd), envProb);
 	}
 	// ...then the directional lights come...
-	u64 right = percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
+	u64 right = math::percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
 	u64 left = rightEnv;
 	float p = dirProb;	// TODO: the correct probability would be (right-left) / <64>max, but the differenze might not even noticable in a 23bit float mantissa
 	const LightSubTree* subTree = &tree.dirLights;

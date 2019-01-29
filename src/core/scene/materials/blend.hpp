@@ -133,21 +133,26 @@ blend_sample(const BlendParameterPack& params,
 	float fa = params.factorA * sum(albedo(params.typeA, layerA));
 	float fb = params.factorB * sum(albedo(params.typeB, layerB));
 	float p = fa / (fa + fb);
-	u64 probLayerA = u64( p * (std::numeric_limits<u64>::max() - 1) );
+	u64 probLayerA = math::percentage_of(std::numeric_limits<u64>::max() - 1, p);
 
 	// Sample and get the pdfs of the second layer.
 	math::PathSample sample;
 	math::EvalValue otherVal;
+	float scaleS, scaleE;
 	if(rndSet.i0 < probLayerA) {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, 0, probLayerA-1);
 		sample = sample_subdesc(params.typeA, layerA, incidentTS, boundary, rndSet, adjoint);
 		if(sample.pdfF.is_zero()) return sample; // Discard
 		otherVal = evaluate_subdesc(params.typeB, layerB, incidentTS, sample.excident, boundary, adjoint, false);
+		scaleS = float(sample.pdfF) * params.factorA;
+		scaleE = otherVal.cosOut * params.factorB;
 	} else {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, probLayerA, std::numeric_limits<u64>::max());
-		sample = sample_subdesc(params.typeB, as<char>(&params) + params.offsetB, incidentTS, boundary, rndSet, adjoint);
+		sample = sample_subdesc(params.typeB, layerB, incidentTS, boundary, rndSet, adjoint);
 		if(sample.pdfF.is_zero()) return sample; // Discard
 		otherVal = evaluate_subdesc(params.typeA, layerA, incidentTS, sample.excident, boundary, adjoint, false);
+		scaleS = float(sample.pdfF) * params.factorB;
+		scaleE = otherVal.cosOut * params.factorA;
 		p = 1.0f - p;
 	}
 
@@ -155,8 +160,7 @@ blend_sample(const BlendParameterPack& params,
 	float origPdf = float(sample.pdfF);
 	sample.pdfF = AngularPdf{ ei::lerp(float(otherVal.pdfF), float(sample.pdfF), p) };
 	sample.pdfB = AngularPdf{ ei::lerp(float(otherVal.pdfB), float(sample.pdfB), p) };
-	sample.throughput = (sample.throughput * origPdf * params.factorA
-					     + otherVal.value * otherVal.cosOut * params.factorB)
+	sample.throughput = (sample.throughput * scaleS + otherVal.value * scaleE)
 					  / float(sample.pdfF);
 	return sample;
 }
