@@ -67,7 +67,6 @@ private:
 // A variant of the PCG generator http://www.pcg-random.org with 64bit
 // state and an output of 64bit numbers as the above genertor.
 // Output permutation: RXS-M-XS (see https://en.wikipedia.org/wiki/Permuted_congruential_generator)
-// TODO: test which one is faster.
 class PCG64 {
 public:
 	__host__ __device__ PCG64() {
@@ -84,7 +83,7 @@ public:
 	__host__ __device__ u64 next() {
 		u64 x = m_state;
 		const u64 count = m_state >> 59ull;
-		m_state = m_state * 6364136223846793005ull + 19823657895641ull;
+		m_state = m_state * 6364136223846793005ull + 1442695040888963407ull;//19823657895641ull;
 		x ^= x >> (5 + count);
 		x *= 12605985483714917081ull;
 		return x ^ (x >> 43);
@@ -143,7 +142,9 @@ private:
 
 // Use Rng globally, this point can be used to switch between the two
 // generators Xoroshiro128 and PCG64.
-// Low discrepancy sequences should be used independently of this
-using Rng = Xoroshiro128;
+// Low discrepancy sequences should be used independently of this.
+// In a few experiments I found both to have equal quality and equal timings.
+// Thus it is reasonable to use the smaller one: PCG64!
+using Rng = PCG64;
 
 }} // namespace mufflon::math

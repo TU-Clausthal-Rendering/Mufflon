@@ -116,7 +116,7 @@ void GpuPathTracer::iterate(Pixel imageDims,
 							RenderBuffer<Device::CUDA> outputBuffer) const {
 	
 	std::unique_ptr<u32[]> rnds = std::make_unique<u32[]>(imageDims.x * imageDims.y);
-	math::Xoroshiro128 rng{ static_cast<u32>(std::random_device()()) };
+	math::Rng rng{ static_cast<u32>(std::random_device()()) };
 	for (int i = 0; i < imageDims.x*imageDims.y; ++i)
 		rnds[i] = static_cast<u32>(rng.next());
 	u32* devRnds = nullptr;

@@ -35,7 +35,7 @@ private:
 	bool m_reset = true;
 	ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide> m_params = {};
 	scene::SceneHandle m_currentScene = nullptr;
-	std::vector<math::Xoroshiro128> m_rngs;
+	std::vector<math::Rng> m_rngs;
 	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };
 
