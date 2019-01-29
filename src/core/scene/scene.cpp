@@ -175,9 +175,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		instScaleDesc = make_udevptr_array<dev, float>(instanceScales.size());
 		copy(instScaleDesc.get(), instanceScales.data(), sizeof(u32) * instanceScales.size());
 
-		auto& instObjIndicesDesc = m_instObjIndicesDesc.get<unique_device_ptr<dev, u32[]>>();
-		instObjIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
-		copy(instObjIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+		auto& instLodIndicesDesc = m_instLodIndicesDesc.get<unique_device_ptr<dev, u32[]>>();
+		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
+		copy(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
@@ -190,7 +190,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
 		sceneDescriptor.transformations = instTransformsDesc.get();
 		sceneDescriptor.scales = instScaleDesc.get();
-		sceneDescriptor.lodIndices = instObjIndicesDesc.get();
+		sceneDescriptor.lodIndices = instLodIndicesDesc.get();
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them
 		std::vector<LodDescriptor<dev>> lodDescs;

@@ -480,8 +480,8 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
 	for(const char* name : faceAttribs)
 		cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
-	copy<void*>(buffer.vertex, cpuVertexAttribs.data(), vertexAttribs.size());
-	copy<void*>(buffer.face, cpuFaceAttribs.data(), faceAttribs.size());
+	copy<void*>(buffer.vertex, cpuVertexAttribs.data(), sizeof(void*) * vertexAttribs.size());
+	copy<void*>(buffer.face, cpuFaceAttribs.data(), sizeof(void*) *faceAttribs.size());
 
 	descriptor.numVertexAttributes = static_cast<u32>(vertexAttribs.size());
 	descriptor.numFaceAttributes = static_cast<u32>(faceAttribs.size());
@@ -514,10 +514,10 @@ void Polygons::synchronize_index_buffer() {
 
 			// Check if we need to realloc
 			if(syncBuffer.reserved < m_triangles + m_quads)
-				this->reserve_index_buffer<sync>(m_triangles + m_quads);
+				this->reserve_index_buffer<sync>(3u * m_triangles + 4u * m_quads);
 
 			if(changedBuffer.reserved != 0u)
-				copy(syncBuffer.indices, changedBuffer.indices, m_triangles + m_quads);
+				copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
 			m_indexFlags.mark_synced(sync);
 		}
 	}

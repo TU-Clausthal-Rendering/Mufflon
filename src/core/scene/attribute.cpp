@@ -317,6 +317,8 @@ void AttributePool::mark_changed(Device dev) {
 
 template < Device dev >
 void AttributePool::synchronize() {
+	if(m_poolSize == 0u)
+		return;
 	// Always allocate memory (copies can and will only be done if there is a dirty memory)
 	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
 	bool hadNoMemory = !syncPool;

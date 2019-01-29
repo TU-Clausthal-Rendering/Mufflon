@@ -10,11 +10,14 @@
 namespace mufflon { namespace scene { namespace accel_struct {
 
 // Structure specific descriptor
+// Necessary because CUDA and MSVC disagreed about the size
+#pragma pack(push, 1)
 struct LBVH {
 	const ei::Vec4* bvh;
 	const i32* primIds;
 	i32 numInternalNodes;
 };
+#pragma pack(pop)
 
 /*
  * At first, a normal LBVH is build. See Karras "TODO"

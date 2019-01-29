@@ -492,7 +492,7 @@ CUDA_FUNCTION void mark_collapsed_nodes(
 
 template< typename DescType >
 __global__ void calculate_bounding_boxesD(
-	const DescType& desc,
+	const DescType desc,
 	const i32 numPrimitives,
 	const i32* __restrict__ sortedIndices,
 	const i32* __restrict__ parents,
@@ -717,6 +717,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			boundingBoxes.get(), deviceCounters,
 			collapseOffsets.get()
 		);
+		cuda::check_error(cudaGetLastError());
 	} else {
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			calculate_bounding_boxes(desc, idx, primIds[idx],
@@ -732,6 +733,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			boundingBoxes.get(), parents.get(),
 			collapseOffsets.get()
 		);
+		cuda::check_error(cudaGetLastError());
 	} else {
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
@@ -762,6 +764,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		copy_to_collapsed_bvhD<DescType> <<< numBlocks, numThreads >>>(
 			numNodes, numInternalNodes, numNodesInCollapsedBVH, boundingBoxes.get(), parents.get(),
 			collapseOffsets.get(), collapsedBVH);
+		cuda::check_error(cudaGetLastError());
 	} else {
 		for(i32 idx = 1; idx < numNodes; ++idx)
 			copy_to_collapsed_bvh<DescType>(

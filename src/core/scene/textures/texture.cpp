@@ -190,7 +190,8 @@ void Texture::create_texture_cuda() {
 	// Allocate the CUDA texture array
 	cuda::check_error(cudaMalloc3DArray(&m_cudaTexture, &channelDesc,
 										make_cudaExtent(m_width, m_height, m_numLayers),
-										cudaArrayLayered | cudaArraySurfaceLoadStore));
+										cudaArrayLayered | (m_format == Format::RGBA32F ?
+														cudaArraySurfaceLoadStore : 0)));
 
 	// Specify the texture view on the memory
 	cudaResourceDesc resDesc{};

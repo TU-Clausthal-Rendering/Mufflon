@@ -157,7 +157,7 @@ private:
 	util::TaggedTuple<unique_device_ptr<Device::CPU, float[]>,
 		unique_device_ptr<Device::CUDA, float[]>> m_instScaleDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, u32[]>,
-		unique_device_ptr<Device::CUDA, u32[]>> m_instObjIndicesDesc;
+		unique_device_ptr<Device::CUDA, u32[]>> m_instLodIndicesDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,
 		unique_device_ptr<Device::CUDA, ei::Box[]>> m_lodAabbsDesc;
 

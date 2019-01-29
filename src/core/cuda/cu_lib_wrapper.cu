@@ -37,7 +37,7 @@ float DeviceSort(u32 numElements,
 #endif
 
 	// Sort
-	cub::DeviceRadixSort::SortPairs(nullptr, storageSize,
+	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize,
 		keysIn, keysOut, valuesIn, valuesOut, numElements);
 	cuda::check_error(cudaGetLastError());
 

@@ -359,14 +359,6 @@ namespace gui.Dll
             m_rendererModel.RenderLock.Release();
             m_renderThread.Join();
 
-            if(m_renderContext != IntPtr.Zero)
-            {
-                if (!OpenGl32.wglMakeCurrent(m_deviceContext, IntPtr.Zero))
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-                if(!OpenGl32.wglDeleteContext(m_renderContext))
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-            }
-
             // destroy resources
             User32.DestroyWindow(hwnd.Handle);
         }

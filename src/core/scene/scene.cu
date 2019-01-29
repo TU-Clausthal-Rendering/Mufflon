@@ -29,6 +29,7 @@ namespace scene_detail {
 
 void update_camera_medium_cuda(SceneDescriptor<Device::CUDA>& scene) {
 	set_camera_medium <<<1, 1>>>(scene);
+	cuda::check_error(cudaDeviceSynchronize());
 	cuda::check_error(cudaGetLastError());
 }
 
