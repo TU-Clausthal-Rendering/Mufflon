@@ -174,7 +174,7 @@ evaluate_subdesc(Materials type,
 		case Materials::LAMBERT:
 			return lambert_evaluate(*as<LambertParameterPack>(subParams), incidentTS, excidentTS);
 		case Materials::EMISSIVE:
-			return math::EvalValue{};
+			return math::EvalValue{Spectrum{0.0f}, ei::abs(excidentTS.z), AngularPdf{0.0f}, AngularPdf{0.0f}};
 		case Materials::BLEND:
 			return blend_evaluate(*as<BlendParameterPack>(subParams), incidentTS, excidentTS, boundary, adjoint, merge);
 		case Materials::TORRANCE:

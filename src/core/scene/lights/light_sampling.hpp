@@ -48,13 +48,13 @@ struct PhotonDir {
 };
 
 struct NextEventEstimation {
-	//math::PositionSample pos;		// Not required ATM
-	//math::DirectionSample dir;	// PDF not needed, because PT is the only user of NEE, maybe required later again??
-	scene::Direction direction;		// From surface to the light source, normalized
-	float cosOut;					// Cos of the surface or 0 for non-hitable sources
-	Spectrum diffIrradiance;		// Unit: W/m²sr²
-	float dist;
-	float distSq;
+	//math::PositionSample pos;			// Not required ATM
+	//math::DirectionSample dir;		// PDF not needed, because PT is the only user of NEE, maybe required later again??
+	scene::Direction direction {0.0f};	// From surface to the light source, normalized
+	float cosOut {0.0f};				// Cos of the surface or 0 for non-hitable sources
+	Spectrum diffIrradiance {0.0f};		// Unit: W/m²sr²
+	float dist {0.0f};
+	float distSq {0.0f};
 	AreaPdf creationPdf;			// Pdf to create this connection event (depends on light choice probability and positional sampling)
 	//LightType type; // Not required ATM
 };
@@ -278,7 +278,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	ei::Vec3 direction = light.position - pos;
-	const float distSq = lensq(direction);
+	const float distSq = lensq(direction) + 1e-16f;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	// Compute the contribution
@@ -291,7 +291,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	ei::Vec3 direction = light.position - pos;
-	const float distSq = lensq(direction);
+	const float distSq = lensq(direction) + 1e-16f;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	const math::EvalValue value = evaluate_spot(-direction, light.intensity,
@@ -308,7 +308,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightT
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
-	const float distSq = ei::lensq(direction);
+	const float distSq = ei::lensq(direction) + 1e-16f;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	// Compute the contribution
@@ -324,7 +324,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
-	const float distSq = ei::lensq(direction);
+	const float distSq = ei::lensq(direction) + 1e-16f;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	// Compute the contribution
@@ -354,7 +354,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 	// Now, connect to the point on the surface
 	const scene::Point surfPos = light.position + light.radius * globalDir;
 	scene::Direction connectionDir = surfPos - pos;
-	const float cDistSq = lensq(connectionDir);
+	const float cDistSq = lensq(connectionDir) + 1e-16f;
 	const float cDist = sqrtf(cDistSq);
 	connectionDir /= cDist;
 	// Compute the contribution (diffIrradiance)
