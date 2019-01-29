@@ -11,6 +11,8 @@ namespace mufflon { namespace scene { namespace accel_struct {
 
 namespace {
 
+constexpr float SCENE_SCALE_EPS = 1e-5f;
+
 #define STACK_SIZE              96 //64          // Size of the traversal stack in local memory.
 #define OBJ_STACK_SIZE              64 //64          // Size of the traversal stack in local memory.
 enum : i32 {
@@ -188,6 +190,7 @@ CUDA_FUNCTION bool intersects_primitve(
 	const ei::Ray& ray,
 	const i32 primId,
 	const i32 startPrimId,
+	const float tmin,
 	int& hitPrimId,
 	float& hitT,				// In out: max hit distance before, if hit then returns the new distance
 	SurfaceParametrization& surfParams
@@ -218,33 +221,32 @@ CUDA_FUNCTION bool intersects_primitve(
 		const i32 indexOffset = (primId - obj.polygon.numTriangles) * 4 + obj.polygon.numTriangles * 3;
 		const ei::Vec3* meshVertices = obj.polygon.vertices;
 
-		// Check first triangle
-		if(startPrimId != primId) { // Masking to avoid self intersections
-			const ei::IVec4 ids = { obj.polygon.vertexIndices[indexOffset],
-									obj.polygon.vertexIndices[indexOffset + 1],
-									obj.polygon.vertexIndices[indexOffset + 2],
-									obj.polygon.vertexIndices[indexOffset + 3] };
-			const ei::Tetrahedron quad = { meshVertices[ids[0]],
-										   meshVertices[ids[1]],
-										   meshVertices[ids[2]],
-										   meshVertices[ids[3]] };
-			ei::Vec2 bilinear;
-			const float t = intersectQuad(quad, ray, bilinear);
+		// if(startPrimId == primId) return false; // TODO: #78 Masking to avoid self intersections
+		const ei::IVec4 ids = { obj.polygon.vertexIndices[indexOffset],
+								obj.polygon.vertexIndices[indexOffset + 1],
+								obj.polygon.vertexIndices[indexOffset + 2],
+								obj.polygon.vertexIndices[indexOffset + 3] };
+		const ei::Tetrahedron quad = { meshVertices[ids[0]],
+										meshVertices[ids[1]],
+										meshVertices[ids[2]],
+										meshVertices[ids[3]] };
+		ei::Vec2 bilinear;
+		const float t = intersectQuad(quad, ray, bilinear);
 
-			if(t > 0.f && t < hitT) {
-				hitT = t;
-				surfParams.bilinear = bilinear;
-				hitPrimId = primId;
-				return true;
-			}
+		if(t > tmin*2 && t < hitT) {
+			hitT = t;
+			surfParams.bilinear = bilinear;
+			hitPrimId = primId;
+			return true;
 		}
 	} else {
 		// Sphere.
-		if(startPrimId == primId) return false; // Masking to avoid self intersections
+		// Masking not possible for spheres: in case of transparent objects we need
+		// self intersections inside.
 		const ei::Sphere& sph = obj.spheres.spheres[primId];
 		float t;
 		// TODO: use some epsilon?
-		if(ei::intersects(ray, sph, t) && t < hitT) {
+		if(ei::intersects(ray, sph, t) && t > tmin && t < hitT) {
 			hitT = t;
 			hitPrimId = primId;
 			// Barycentrics unused; TODO: get coordinates anyway?
@@ -274,7 +276,7 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 		float hitT = tmax;
 		SurfaceParametrization surfParams;
 		i32 hitPrimitiveId;
-		if(intersects_primitve(obj, ray, 0, startPrimId, hitPrimitiveId, hitT, surfParams)) {
+		if(intersects_primitve(obj, ray, 0, startPrimId, tmin, hitPrimitiveId, hitT, surfParams)) {
 			return true;
 		}
 		return false;
@@ -345,7 +347,7 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 				float hitT = tmax;
 				SurfaceParametrization surfParams;
 				i32 hitPrimitiveId;
-				if(intersects_primitve(obj, ray, bvh.primIds[primId + i], startPrimId, hitPrimitiveId, hitT, surfParams))
+				if(intersects_primitve(obj, ray, bvh.primIds[primId + i], startPrimId, tmin, hitPrimitiveId, hitT, surfParams))
 					return true;
 			}
 
@@ -377,7 +379,7 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 ) {
 	// Fast path - no BVH
 	if(obj.numPrimitives == 1) {
-		return intersects_primitve(obj, ray, 0, startPrimId,
+		return intersects_primitve(obj, ray, 0, startPrimId, tmin,
 			hitPrimId, hitT, surfParams);
 	}
 	
@@ -446,7 +448,7 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 			// All intersection distances are in this instance's object space
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
-				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], startPrimId, hitPrimId, hitT, surfParams))
+				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], startPrimId, tmin, hitPrimId, hitT, surfParams))
 					hasHit = true;
 			}
 
@@ -488,7 +490,7 @@ void first_intersection_scene_obj_lbvh(
 
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
-	const float tmin = 1e-6f * len(box.max - box.min);
+	const float tmin = SCENE_SCALE_EPS * len(box.max - box.min);
 
 	// Scale our current maximum intersection distance into the object space to avoid false negatives
 	float objSpaceHitT = invScale * hitT;
@@ -519,7 +521,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 	const float tmax
 ) {
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
-	const float tmin = 1e-7f * len(scene.aabb.max - scene.aabb.min);
+	const float tmin = SCENE_SCALE_EPS * len(scene.aabb.max - scene.aabb.min);
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	SurfaceParametrization surfParams;
@@ -758,7 +760,7 @@ bool any_intersection_scene_obj_lbvh(
 
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
-	const float tmin = 1e-6f * len(box.max - box.min);
+	const float tmin = SCENE_SCALE_EPS * len(box.max - box.min);
 
 	// Scale our current maximum intersection distance into the object space to avoid false negatives
 	const float objSpaceMinT = invScale * tmin;
@@ -788,8 +790,8 @@ bool any_intersection_scene_lbvh(
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
-	const float tmin = 1e-6f * len(scene.aabb.max - scene.aabb.min);
-	const float tmax = maxDist * 0.9999f; // Do not intersect the target surface
+	const float tmin = SCENE_SCALE_EPS * len(scene.aabb.max - scene.aabb.min);
+	const float tmax = maxDist - tmin*2; // Do not intersect the target surface
 
 	if(scene.numInstances == 1) {
 		i32 traversalStack[OBJ_STACK_SIZE];
