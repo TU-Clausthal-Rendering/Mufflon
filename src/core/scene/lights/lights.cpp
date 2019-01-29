@@ -19,15 +19,14 @@ Spectrum get_flux(const SpotLight& light) {
 
 
 Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light) {
-	float area = ei::surface(ei::Triangle{
-		light.points[0u], light.points[1u], light.points[2u]});
+	float area = len(cross(light.posV[1u], light.posV[2u])) / 2.0f;
 	// Sample the radiance over the entire triangle region.
 	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
 	Spectrum radianceSum{ 0.0f };
 	for(int i = 0; i < 128; ++i) {// TODO: adaptive sample count?
 		const ei::Vec2 u = math::sample_uniform(gen.next());
 		const ei::Vec2 bary = math::sample_barycentric(u.x, u.y);
-		const UvCoordinate uv = light.uv[0] * (1.0f-bary.x-bary.y) + light.uv[1] * bary.x + light.uv[2] * bary.y;
+		const UvCoordinate uv = light.uvV[0u] + light.uvV[1u] * bary.x + light.uvV[2u] * bary.y;
 		radianceSum += Spectrum{sample(light.radianceTex, uv)};
 	}
 	radianceSum /= 128;
@@ -42,11 +41,11 @@ Spectrum get_flux(const AreaLightQuad<Device::CPU>& light) {
 	Spectrum radianceSum{ 0.0f };
 	for(int i = 0; i < 128; ++i) {// TODO: adaptive sample count?
 		const ei::Vec2 u = math::sample_uniform(gen.next());
-		const UvCoordinate uv = ei::bilerp(light.uv[0], light.uv[1], light.uv[3], light.uv[2], u.x, u.y);
+		const UvCoordinate uv = light.uvV[0u] + light.uvV[1u] * u.y + light.uvV[2u] * u.x + light.uvV[3u] * (u.x * u.y);
 		radianceSum += Spectrum{sample(light.radianceTex, uv)};
 	}
 	radianceSum /= 128;
-	return radianceSum * area * 2 * ei::PI;
+	return radianceSum * area * 2 * ei::PI; // TODO: put area inside the loop and use the local area/density (cross product of tangents at the point)
 }
 
 
@@ -79,11 +78,11 @@ Spectrum get_flux(const DirectionalLight& light,
 
 template < Device dev >
 float AreaLightQuad<dev>::compute_area() const {
-	const ei::Vec3 e03 = points[3] - points[0];
+	/*const ei::Vec3 e03 = points[3] - points[0];
 	const ei::Vec3 e12 = points[2] - points[1];
 	const ei::Vec3 e01 = points[1] - points[0];
 	const ei::Vec3 e32 = points[2] - points[3];
-	/* Uniform
+	// Uniform
 	constexpr int SAMPLES_PER_DIM = 32;
 	float area = 0;
 	for(int i = 0; i <= SAMPLES_PER_DIM; ++i) {
@@ -99,8 +98,8 @@ float AreaLightQuad<dev>::compute_area() const {
 
 	/* Adaptive, quasi Monte Carlo */
 	// Get area of two opposing triangles.
-	const ei::Vec3 n0 = cross(e03, e01);
-	const ei::Vec3 n1 = cross(e12, e32);
+	const ei::Vec3 n0 = cross(posV[1u], posV[2u]);
+	const ei::Vec3 n1 = cross(posV[1u] + posV[3u], posV[2u] + posV[3u]);
 	const float len0 = len(n0); // = tri area*2
 	const float len1 = len(n1); // = tri area*2
 	float area = (len0 + len1) / 2.0f;
@@ -112,8 +111,8 @@ float AreaLightQuad<dev>::compute_area() const {
 		math::GoldenRatio2D seq(235);
 		do {
 			math::RndSet2 st( seq.next() );
-			ei::Vec3 tangentX = ei::lerp(e03, e12, st.u1);
-			ei::Vec3 tangentY = ei::lerp(e01, e32, st.u0);
+			const ei::Vec3 tangentX = posV[1u] + st.u0 * posV[3u];
+			const ei::Vec3 tangentY = posV[2u] + st.u1 * posV[3u];
 			const float sample = len(cross(tangentX, tangentY));
 			diff = sample - area;
 			area += diff / (++count);

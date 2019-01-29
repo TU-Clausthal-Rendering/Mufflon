@@ -578,7 +578,7 @@ bool WorldContainer::load_scene_lights() {
 						} else {
 							lights::AreaLightQuadDesc al;
 							al.radianceTex = emission.texture;
-							al.scale = ei::packRGB9E5(emission.scale);
+							al.scale = emission.scale;
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = inst->get_transformation_matrix() * ei::Vec4{inst->get_scale() * positions[vHdl.idx()], 1.0f};
@@ -604,7 +604,7 @@ bool WorldContainer::load_scene_lights() {
 						lights::AreaLightSphereDesc al{
 							inst->get_transformation_matrix() * ei::Vec4{inst->get_scale() * spheresData[i].center, 1.0f},
 							inst->get_scale() * spheresData[i].radius,
-							emission.texture, ei::packRGB9E5(emission.scale)
+							emission.texture, emission.scale
 						};
 						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });
 					}

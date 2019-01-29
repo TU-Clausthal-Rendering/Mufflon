@@ -72,27 +72,29 @@ struct alignas(16) AreaLightQuadDesc {
 	ei::Vec3 points[4u];					// 48 bytes
 	alignas(8) UvCoordinate uv[4u];			// 32 bytes
 	alignas(8) TextureHandle radianceTex;	// 8 byes
-	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
+	Spectrum scale;							// A spectrum scale for the radiance texture
 };
 struct alignas(16) AreaLightSphereDesc {
 	ei::Vec3 position;						// 12 bytes
 	float radius;							// 4 bytes
 	alignas(8) TextureHandle radianceTex;	// 8 bytes
-	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
+	Spectrum scale;							// A spectrum scale for the radiance texture
 };
 
 template < Device dev >
 struct alignas(16) AreaLightTriangle {
-	alignas(16) ei::Vec3 points[3u];
-	u32 scale;								// A spectrum scale for the radiance texture in RGB9E5
-	alignas(8) UvCoordinate uv[3u];
+	alignas(16) ei::Vec3 posV[3u];		// Precomputed vectors: v0, v1-v0, v2-v0
+	u32 scale;							// A spectrum scale for the radiance texture in RGB9E5
+	alignas(8) UvCoordinate uvV[3u];	// Precomputed vectors analogous to positions
 	alignas(8) textures::ConstTextureDevHandle_t<dev> radianceTex;
 
 	AreaLightTriangle& operator=(const AreaLightTriangleDesc& rhs) {
-		for(int i = 0; i < 3; ++i) {
-			points[i] = rhs.points[i];
-			uv[i] = rhs.uv[i];
-		}
+		posV[0] = rhs.points[0];
+		posV[1] = rhs.points[1] - rhs.points[0];
+		posV[2] = rhs.points[2] - rhs.points[0];
+		uvV[0] = rhs.uv[0];
+		uvV[1] = rhs.uv[1] - rhs.uv[0];
+		uvV[2] = rhs.uv[2] - rhs.uv[0];
 		scale = rhs.scale;
 		radianceTex = rhs.radianceTex->acquire_const<dev>();
 		return *this;
@@ -100,18 +102,22 @@ struct alignas(16) AreaLightTriangle {
 };
 template < Device dev >
 struct alignas(16) AreaLightQuad {
-	ei::Vec3 points[4u];
-	alignas(8) UvCoordinate uv[4u];
+	ei::Vec3 posV[4u];	// Precomputed vectors: v0, v3-v0, v1-v0, v0+v2-v1-v3 for faster sampling than using positions
+	alignas(8) UvCoordinate uvV[4u];	// Precomputed vectors analogous to positions
 	alignas(8) textures::ConstTextureDevHandle_t<dev> radianceTex;
 	// The forced alignment makes sure the two types CPU/GPU have the same size.
 	// Problem: radianceTex is 16 byte on GPU but only 8 on CPU.
-	alignas(16) u32 scale;			// A spectrum scale for the radiance texture in RGB9E5
+	alignas(16) Spectrum scale;			// A spectrum scale for the radiance texture
 
 	AreaLightQuad& operator=(const AreaLightQuadDesc& rhs) {
-		for(int i = 0; i < 4; ++i) {
-			points[i] = rhs.points[i];
-			uv[i] = rhs.uv[i];
-		}
+		posV[0] = rhs.points[0];
+		posV[1] = rhs.points[3] - rhs.points[0];
+		posV[2] = rhs.points[1] - rhs.points[0];
+		posV[3] = rhs.points[2] - rhs.points[3] - posV[2];
+		uvV[0] = rhs.uv[0];
+		uvV[1] = rhs.uv[3] - rhs.uv[0];
+		uvV[2] = rhs.uv[1] - rhs.uv[0];
+		uvV[3] = rhs.uv[2] - rhs.uv[3] - uvV[2];
 		scale = rhs.scale;
 		radianceTex = rhs.radianceTex->acquire_const<dev>();
 		return *this;
@@ -126,7 +132,7 @@ struct alignas(16) AreaLightSphere {
 	ei::Vec3 position;
 	float radius;
 	alignas(8) textures::ConstTextureDevHandle_t<dev> radianceTex;
-	alignas(16) u32 scale;			// A spectrum scale for the radiance texture in RGB9E5
+	alignas(16) Spectrum scale;			// A spectrum scale for the radiance texture
 
 	AreaLightSphere& operator=(const AreaLightSphereDesc& rhs) {
 		position = rhs.position;
@@ -196,12 +202,14 @@ CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const SpotLight& light)
 	return light.position;
 }
 CUDA_FUNCTION __forceinline__ ei::Vec3 get_center(const AreaLightTriangle<CURRENT_DEV>& light) {
-	return ei::center(ei::Triangle{ light.points[0u], light.points[1u],
-									light.points[2u] });
+	return light.posV[0u] + (light.posV[1u] + light.posV[2u]) / 3.0f;
+	//return ei::center(ei::Triangle{ light.points[0u], light.points[1u],
+	//								light.points[2u] });
 }
 CUDA_FUNCTION __forceinline__ ei::Vec3 get_center(const AreaLightQuad<CURRENT_DEV>& light) {
-	return ei::center(ei::Tetrahedron{ light.points[0u], light.points[1u],
-									   light.points[2u], light.points[3u] });
+	return light.posV[0u] + (light.posV[1u] + light.posV[2u]) * 0.5f + light.posV[3u] * 0.25f;
+	//return ei::center(ei::Tetrahedron{ light.points[0u], light.points[1u],
+	//								   light.points[2u], light.points[3u] });
 }
 CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const AreaLightSphere<CURRENT_DEV>& light) {
 	return light.position;

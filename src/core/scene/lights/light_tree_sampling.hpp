@@ -308,18 +308,14 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 	switch(static_cast<LightType>(type)) {
 		case LightType::AREA_LIGHT_TRIANGLE: {
 			auto& a = *as<AreaLightTriangle<CURRENT_DEV>>(tree.posLights.memory + offset);
-			float area = ei::surface(ei::Triangle{a.points[0], a.points[1], a.points[2]});
+			float area = len(cross(a.posV[1u], a.posV[2u])) / 2.0f;
 			return AreaPdf{ p / area };
 		}
 		case LightType::AREA_LIGHT_QUAD: {
 			auto& light = *as<AreaLightQuad<CURRENT_DEV>>(tree.posLights.memory + offset);
 			// Compute the local density at the point of the surface
-			const ei::Vec3 e03 = light.points[3u] - light.points[0u];
-			const ei::Vec3 e01 = light.points[1u] - light.points[0u];
-			const ei::Vec3 e32 = light.points[2u] - light.points[3u];
-			const ei::Vec3 e12 = light.points[2u] - light.points[1u];
-			const ei::Vec3 tangentX = lerp(e03, e12, surfaceParams.x);
-			const ei::Vec3 tangentY = lerp(e01, e32, surfaceParams.y);
+			const ei::Vec3 tangentX = light.posV[1u] + surfaceParams.x * light.posV[3u];
+			const ei::Vec3 tangentY = light.posV[2u] + surfaceParams.y * light.posV[3u];
 			return AreaPdf{ p / len(cross(tangentY, tangentX)) };
 		}
 		case LightType::AREA_LIGHT_SPHERE: {

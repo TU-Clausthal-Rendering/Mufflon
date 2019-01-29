@@ -411,8 +411,8 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
 			AreaLightTriangle<Device::CUDA> cudaLight;
 			for(int i = 0; i < 3; ++i) {
-				cudaLight.points[i] = light->points[i];
-				cudaLight.uv[i] = light->uv[i];
+				cudaLight.posV[i] = light->posV[i];
+				cudaLight.uvV[i] = light->uvV[i];
 			}
 			cudaLight.scale = light->scale;
 			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
@@ -422,8 +422,8 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
 			AreaLightQuad<Device::CUDA> cudaLight;
 			for(int i = 0; i < 4; ++i) {
-				cudaLight.points[i] = light->points[i];
-				cudaLight.uv[i] = light->uv[i];
+				cudaLight.posV[i] = light->posV[i];
+				cudaLight.uvV[i] = light->uvV[i];
 			}
 			cudaLight.scale = light->scale;
 			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
