@@ -95,8 +95,8 @@ calculate_morton_code(const DescType& primitives, i32 idx,
 
 template < typename DescType >
 __global__ void calculate_morton_codesD(
-	const DescType& desc,
-	const ei::Box& sceneBB,
+	const DescType desc,
+	const ei::Box sceneBB,
 	const i32 numPrimitives,
 	MortonCode_t<DescType>* mortonCodes,
 	i32* sortIndices) {
