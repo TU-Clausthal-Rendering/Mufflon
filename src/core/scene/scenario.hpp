@@ -31,6 +31,8 @@ public:
 	MaterialIndex get_num_material_slots() const noexcept { return static_cast<MaterialIndex>(m_materialAssignment.size()); }
 	// Get the index of a slot from its name.
 	MaterialIndex get_material_slot_index(std::string_view binaryName) const;
+	// Get the slot name from its index
+	const std::string& get_material_slot_name(MaterialIndex slotIdx) const;
 	/*
 	 * Assigns a ready loaded material to a material entry.
 	 * The assignment can be changed if no renderer is in a running state.

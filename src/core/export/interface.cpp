@@ -2154,6 +2154,13 @@ MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 	CATCH_ALL(INVALID_MATERIAL)
 }
 
+const char* scenario_get_material_slot_name(ScenarioHdl scenario, MatIdx slot) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	return static_cast<const Scenario*>(scenario)->get_material_slot_name(slot).c_str();
+	CATCH_ALL(nullptr)
+}
+
 MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 										   MatIdx index) {
 	TRY
