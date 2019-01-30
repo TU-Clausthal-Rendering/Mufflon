@@ -36,14 +36,20 @@ public:
 	 */
 	template < Device dev >
 	char* acquire(bool sync = true) {
-		if(sync) synchronize<dev>();
+		if(sync)
+			synchronize<dev>();
+		else if(m_mem.template get<unique_device_ptr<dev, char[]>>() == nullptr && m_size != 0u)
+			m_mem.template get<unique_device_ptr<dev, char[]>>() = make_udevptr_array<dev, char>(m_size);
 		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
 		return pMem;
 	}
 	template < Device dev >
 	const char* acquire_const(bool sync = true) {
-		if(sync) synchronize<dev>();
+		if(sync)
+			synchronize<dev>();
+		else if(m_mem.template get<unique_device_ptr<dev, char[]>>() == nullptr && m_size != 0u)
+			m_mem.template get<unique_device_ptr<dev, char[]>>() = make_udevptr_array<dev, char>(m_size);
 		auto* pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
 		return pMem;
 	}
