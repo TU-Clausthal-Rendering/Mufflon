@@ -192,9 +192,9 @@ public:
 	Texture(std::string name, u16 width, u16 height, u16 numLayers, Format format,
 			SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data = nullptr);
 	Texture(const Texture&) = delete;
-	Texture(Texture&&) = default;
+	Texture(Texture&&);
 	Texture& operator=(const Texture&) = delete;
-	Texture& operator=(Texture&&) = default;
+	Texture& operator=(Texture&&) = delete;
 	~Texture();
 
 	const std::string& get_name() const noexcept { return m_name; }

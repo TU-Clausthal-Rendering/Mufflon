@@ -163,6 +163,9 @@ void OpenMeshAttributePool<face>::synchronize(AttributeHandle hdl) {
 template < bool face >
 template < Device dev >
 void OpenMeshAttributePool<face>::unload() {
+	m_dirty.redact_change(dev);
+	for(auto& attr : m_attributes)
+		attr.dirty.redact_change(dev);
 	// We cannot unload (CPU) OpenMesh data (without removing the property?)
 	switch(dev) {
 		case Device::CUDA:
@@ -399,6 +402,7 @@ void AttributePool::unload() {
 	auto& pool = m_pools.template get<PoolHandle<dev>>().handle;
 	if(pool)
 		pool = Allocator<dev>::free(pool, m_poolSize);
+	m_dirty.redact_change(dev);
 }
 
 // Loads the attribute from a byte stream

@@ -780,7 +780,7 @@ bool any_intersection_scene_obj_lbvh(
 	return false;
 }
 
-template < Device dev > CUDA_FUNCTION
+template < Device dev > __host__ __device__
 bool any_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,

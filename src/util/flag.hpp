@@ -58,6 +58,7 @@ public:
 	using EnumType = std::underlying_type_t<Enum>;
 
 	DirtyFlags() = default;
+
 	DirtyFlags(const DirtyFlags&) = default;
 	DirtyFlags(DirtyFlags&&) = default;
 	DirtyFlags& operator=(const DirtyFlags&) = default;
@@ -78,6 +79,18 @@ public:
 		}
 
 		m_needsSyncing = ~value;
+	}
+
+	/**
+	 * Removes a prior change for a value.
+	 */
+	void redact_change(Enum from) noexcept {
+		EnumType value = get_value(from);
+		if(m_hasChanges | value) {
+			m_hasChanges &= ~value;
+			if(!m_hasChanges)
+				m_needsSyncing = {};
+		}
 	}
 
 	/**

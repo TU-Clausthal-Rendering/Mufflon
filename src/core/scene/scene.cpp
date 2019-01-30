@@ -86,36 +86,47 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
 
 	// Check if we need to update attributes
-	bool sameAttribs = m_lastVertexAttribs.size() == vertexAttribs.size()
-		&& m_lastFaceAttribs.size() == faceAttribs.size()
-		&& m_lastSphereAttribs.size() == sphereAttribs.size();
+	auto& lastVertexAttribs = m_lastAttributeNames.template get<AttributeNames<dev>>().lastVertexAttribs;
+	auto& lastFaceAttribs = m_lastAttributeNames.template get<AttributeNames<dev>>().lastFaceAttribs;
+	auto& lastSphereAttribs = m_lastAttributeNames.template get<AttributeNames<dev>>().lastSphereAttribs;
+	bool sameAttribs = lastVertexAttribs.size() == vertexAttribs.size()
+		&& lastFaceAttribs.size() == faceAttribs.size()
+		&& lastSphereAttribs.size() == sphereAttribs.size();
 	if(sameAttribs)
 		for(auto name : vertexAttribs) {
-			if(std::find_if(m_lastVertexAttribs.cbegin(), m_lastVertexAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != m_lastVertexAttribs.cend()) {
+			if(std::find_if(lastVertexAttribs.cbegin(), lastVertexAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastVertexAttribs.cend()) {
 				sameAttribs = false;
+				lastVertexAttribs = vertexAttribs;
 				break;
 			}
 		}
 	if(sameAttribs)
 		for(auto name : faceAttribs) {
-			if(std::find_if(m_lastFaceAttribs.cbegin(), m_lastFaceAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != m_lastFaceAttribs.cend()) {
+			if(std::find_if(lastFaceAttribs.cbegin(), lastFaceAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastFaceAttribs.cend()) {
 				sameAttribs = false;
+				lastFaceAttribs = faceAttribs;
 				break;
 			}
 		}
 	if(sameAttribs)
 		for(auto name : sphereAttribs) {
-			if(std::find_if(m_lastSphereAttribs.cbegin(), m_lastSphereAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != m_lastSphereAttribs.cend()) {
+			if(std::find_if(lastSphereAttribs.cbegin(), lastSphereAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastSphereAttribs.cend()) {
 				sameAttribs = false;
+				lastSphereAttribs = sphereAttribs;
 				break;
 			}
 		}
+
 
 	// Check if we need to update the object descriptors
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged) {
+	if(geometryChanged || !sceneDescriptor.lodIndices) {
+		// Invalidate other descriptors
+		if(geometryChanged)
+			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
+
 		std::vector<ei::Mat3x4> instanceTransformations;
 		std::vector<float> instanceScales;
 		std::vector<u32> lodIndices;
@@ -163,23 +174,23 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		}
 
 		// Allocate the device memory and copy over the descriptors
-		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
+		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
 		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
 		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
-		auto& instTransformsDesc = m_instTransformsDesc.get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
 		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
-		auto& instScaleDesc = m_instScaleDesc.get<unique_device_ptr<dev, float[]>>();
+		auto& instScaleDesc = m_instScaleDesc.template get<unique_device_ptr<dev, float[]>>();
 		instScaleDesc = make_udevptr_array<dev, float>(instanceScales.size());
 		copy(instScaleDesc.get(), instanceScales.data(), sizeof(u32) * instanceScales.size());
 
-		auto& instLodIndicesDesc = m_instLodIndicesDesc.get<unique_device_ptr<dev, u32[]>>();
+		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
 		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
 		copy(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
-		auto& lodAabbsDesc = m_lodAabbsDesc.get<unique_device_ptr<dev, ei::Box[]>>();
+		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
 		copy(lodAabbsDesc.get(), lodAabbs.data(), sizeof(ei::Box) * lodAabbs.size());
 
@@ -230,15 +241,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		load_materials<dev>();
 
 	// Camera
-	if(m_cameraDescChanged) {
+	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
 		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution);
-		m_cameraDescChanged = false;
 	}
 
 	// Light tree
-	if(m_lightTreeDescChanged) {
+	if(m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
 		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
-		m_lightTreeDescChanged = false;
+		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
 
 	// TODO: query media/materials only if needed?
@@ -250,36 +260,38 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 		m_accelStruct.build(sceneDescriptor);
 		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
-		m_cameraDescChanged = true;
-		m_lightTreeNeedsMediaUpdate = true;
+		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
+		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
+	} else {
+		m_accelStruct.synchronize<dev>();
 	}
 
 	// Camera doesn't get a media-changed flag because it's relatively cheap to determine?
-	if(m_cameraDescChanged) {
+	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
 		this->update_camera_medium(sceneDescriptor);
-		m_cameraDescChanged = false;
+		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
 	
-	if(m_lightTreeNeedsMediaUpdate) {
+	if(m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
 		m_lightTree.update_media(sceneDescriptor);
-		m_lightTreeNeedsMediaUpdate = false;
+		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
 	}
-
+	
 	return sceneDescriptor;
 }
 
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
-				std::vector<lights::DirectionalLight>&& dirLights) {
+					   std::vector<lights::DirectionalLight>&& dirLights) {
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
 					  m_boundingBox);
-	m_lightTreeDescChanged = true;
-	m_lightTreeNeedsMediaUpdate = true;
+	m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });
+	m_lightTreeNeedsMediaUpdate.for_each([](auto &elem) { elem.changed = true; });
 }
 
 void Scene::set_background(lights::Background& envLight) {
 	if(&envLight != m_lightTree.get_envLight()) {
 		m_lightTree.set_envLight(envLight);
-		m_lightTreeDescChanged = true;
+		m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });
 	}
 }
 

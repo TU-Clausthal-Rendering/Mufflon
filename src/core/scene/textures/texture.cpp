@@ -27,6 +27,23 @@ Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, Format 
 	}
 }
 
+Texture::Texture(Texture&& tex) :
+	m_width(tex.m_width),
+	m_height(tex.m_height),
+	m_numLayers(tex.m_numLayers),
+	m_format(tex.m_format),
+	m_mode(tex.m_mode),
+	m_sRgb(tex.m_sRgb),
+	m_dirty(tex.m_dirty),
+	m_cpuTexture(std::move(tex.m_cpuTexture)),
+	m_cudaTexture(tex.m_cudaTexture),
+	m_handles(tex.m_handles),
+	m_constHandles(tex.m_constHandles),
+	m_name(std::move(tex.m_name))
+{
+	m_cudaTexture = nullptr;
+}
+
 Texture::~Texture() {
 	m_cpuTexture = nullptr;
 	if(m_cudaTexture) {
@@ -88,6 +105,7 @@ template void Texture::synchronize<Device::OPENGL>();
 
 template < Device dev >
 void Texture::unload() {
+	m_dirty.redact_change(dev);
 	switch(dev) {
 		case Device::CPU: {
 			if(m_cpuTexture) {
@@ -107,7 +125,7 @@ void Texture::unload() {
 				// Reset handles
 				texHdl.handle = 0;
 				surfHdl.handle = 0;
-				m_cpuTexture = nullptr;
+				m_cudaTexture = nullptr;
 			}
 		} break;
 		case Device::OPENGL: {

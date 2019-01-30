@@ -91,7 +91,7 @@ public:
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
 		mAssert(camera != nullptr);
-		m_cameraDescChanged = true;
+		m_cameraDescChanged.for_each([](auto& elem) { elem.changed = true; });
 		// TODO: this function is obsolete, once the scene querries the 'changed' flag from the scenario itself.
 	}
 	// Access the active camera
@@ -132,6 +132,18 @@ public:
 	}
 private:
 	template < Device dev >
+	struct ChangedFlag {
+		bool changed = true;
+	};
+
+	template < Device dev >
+	struct AttributeNames {
+		std::vector<const char*> lastVertexAttribs;
+		std::vector<const char*> lastFaceAttribs;
+		std::vector<const char*> lastSphereAttribs;
+	};
+
+	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
 	const Scenario& m_scenario;		// Reference to the scenario which is presented by this scene
@@ -164,17 +176,15 @@ private:
 	// Descriptor storage
 	util::TaggedTuple<SceneDescriptor<Device::CPU>, SceneDescriptor<Device::CUDA>> m_descStore;
 	// Remember what attributes are part of the descriptor
-	std::vector<const char*> m_lastVertexAttribs;
-	std::vector<const char*> m_lastFaceAttribs;
-	std::vector<const char*> m_lastSphereAttribs;
+	util::TaggedTuple<AttributeNames<Device::CPU>, AttributeNames<Device::CUDA>> m_lastAttributeNames;
 
 	// Whether the light tree has changed and needs to fetch its descriptor
-	bool m_lightTreeDescChanged = true;
+	util::TaggedTuple<ChangedFlag<Device::CPU>, ChangedFlag<Device::CUDA>> m_lightTreeDescChanged;
 	// Whether the camera has changed and needs to fetch its descriptor
-	bool m_cameraDescChanged = true;
+	util::TaggedTuple<ChangedFlag<Device::CPU>, ChangedFlag<Device::CUDA>> m_cameraDescChanged;
 	// Whether the light tree needs to reevaluate its media; doesn't get set if only
 	// the envmap changes
-	bool m_lightTreeNeedsMediaUpdate = true;
+	util::TaggedTuple<ChangedFlag<Device::CPU>, ChangedFlag<Device::CUDA>> m_lightTreeNeedsMediaUpdate;
 
 	ei::Box m_boundingBox;
 
