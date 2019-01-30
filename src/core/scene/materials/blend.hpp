@@ -30,6 +30,10 @@ struct BlendDesc {
 
 	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
 		// Fetch the layers recursively
+#ifdef __CUDA_ARCH__
+	// TODO: CUDA doesn't like recursion...
+		return 0;
+#else // __CUDA_ARCH__
 		const char* layerA = as<char>(this + 1);
 		int sizeA = fetch_subparam(typeA, layerA, uvCoordinate, outBuffer + sizeof(BlendParameterPack));
 		const char* layerB = as<char>(this) + offsetB;
@@ -38,6 +42,7 @@ struct BlendDesc {
 			factorA, factorB, u32(sizeof(BlendParameterPack) + sizeA), typeA, typeB
 		};
 		return sizeof(BlendParameterPack) + sizeA + sizeB;
+#endif // __CUDA_ARCH__
 	}
 };
 
@@ -127,6 +132,10 @@ blend_sample(const BlendParameterPack& params,
 			 Boundary& boundary,
 			 math::RndSet2_1 rndSet,
 			 bool adjoint) {
+#ifdef __CUDA_ARCH__
+	// TODO: CUDA doesn't like recursion...
+	return math::PathSample{};
+#else // __CUDA_ARCH__
 	const char* layerA = as<char>(&params + 1);
 	const char* layerB = as<char>(&params) + params.offsetB;
 	// Determine a probability for each layer.
@@ -163,6 +172,7 @@ blend_sample(const BlendParameterPack& params,
 	sample.throughput = (sample.throughput * scaleS + otherVal.value * scaleE)
 					  / float(sample.pdfF);
 	return sample;
+#endif // __CUDA_ARCH__
 }
 
 // The evaluation routine
@@ -173,6 +183,10 @@ blend_evaluate(const BlendParameterPack& params,
 			   Boundary& boundary,
 			   bool adjoint,
 			   bool merge) {
+#ifdef __CUDA_ARCH__
+	// TODO: CUDA doesn't like recursion...
+	return math::EvalValue{};
+#else // __CUDA_ARCH__
 	// Evaluate both sub-layers
 	const char* layerA = as<char>(&params + 1);
 	const char* layerB = as<char>(&params) + params.offsetB;
@@ -187,22 +201,33 @@ blend_evaluate(const BlendParameterPack& params,
 	valA.pdfF = AngularPdf{ ei::lerp(float(valB.pdfF), float(valA.pdfF), p) };
 	valA.pdfB = AngularPdf{ ei::lerp(float(valB.pdfB), float(valA.pdfB), p) };
 	return valA;
+#endif // __CUDA_ARCH__
 }
 
 // The albedo routine
 CUDA_FUNCTION Spectrum
 blend_albedo(const BlendParameterPack& params) {
+#ifdef __CUDA_ARCH__
+	// TODO: CUDA doesn't like recursion...
+	return Spectrum{};
+#else // __CUDA_ARCH__
 	const char* layerA = as<char>(&params + 1);
 	const char* layerB = as<char>(&params) + params.offsetB;
 	return albedo(params.typeA, layerA) * params.factorA
 		 + albedo(params.typeB, layerB) * params.factorB;
+#endif // __CUDA_ARCH__
 }
 
 CUDA_FUNCTION Spectrum blend_emission(const BlendParameterPack& params, const scene::Direction& geoN, const scene::Direction& excident) {
+#ifdef __CUDA_ARCH__
+	// TODO: CUDA doesn't like recursion...
+	return Spectrum{};
+#else // __CUDA_ARCH__
 	const char* layerA = as<char>(&params + 1);
 	const char* layerB = as<char>(&params) + params.offsetB;
 	return emission(params.typeA, layerA, geoN, excident) * params.factorA
 		 + emission(params.typeB, layerB, geoN, excident) * params.factorB;
+#endif // __CUDA_ARCH__
 }
 
 }}} // namespace mufflon::scene::materials

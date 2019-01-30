@@ -3071,6 +3071,7 @@ void mufflon_destroy() {
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_currentRenderer.reset();
+	cuda::check_error(cudaDeviceReset());
 	CATCH_ALL(;)
 }
 

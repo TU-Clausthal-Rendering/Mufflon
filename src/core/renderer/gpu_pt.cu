@@ -67,7 +67,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
-					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
+					const float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 					mAssert(!isnan(mis));
 					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 											value.cosOut, radiance * mis);
@@ -84,7 +84,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 				// Missed scene - sample background
 				auto background = evaluate_background(scene->lightTree.background, lastDir.direction);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
+					const float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
 					background.value *= mis;
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -102,10 +102,12 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 				AreaPdf backwardPdf = connect_pdf(scene->lightTree, vertex->get_primitive_id(),
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
-				float mis = 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
-				outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-										vertex->get_normal(), vertex->get_albedo());
+				float mis = pathLen == 1 ? 1.0f
+					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+				emission *= mis;
 			}
+			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
+									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < maxPathLength);
 #endif // __CUDA_ARCH__
