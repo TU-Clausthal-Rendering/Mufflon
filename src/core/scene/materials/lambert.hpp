@@ -17,9 +17,10 @@ struct LambertDesc {
 	textures::ConstTextureDevHandle_t<dev> albedoTex;
 
 	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
-		*as<LambertParameterPack>(outBuffer) = LambertParameterPack{
-			Spectrum{ sample(albedoTex, uvCoordinate) }
-		};
+		// Why we do this, you might ask - CUDA knows the answer. Taking this away and using 'albedoTex'
+		// directly results in a misaligned address access
+		const auto tex = albedoTex;
+		*as<LambertParameterPack>(outBuffer) = LambertParameterPack{ Spectrum{ sample(tex, uvCoordinate) } };
 		return sizeof(LambertParameterPack);
 	}
 };
