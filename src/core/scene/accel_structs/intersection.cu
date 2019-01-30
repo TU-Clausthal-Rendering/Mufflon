@@ -513,7 +513,7 @@ void first_intersection_scene_obj_lbvh(
 	}
 }
 
-template < Device dev > CUDA_FUNCTION
+template < Device dev > __host__ __device__
 RayIntersectionResult first_intersection_scene_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
@@ -739,7 +739,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 	}
 }
 
-template < Device dev > CUDA_FUNCTION
+template < Device dev > __host__ __device__
 bool any_intersection_scene_obj_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray ray,

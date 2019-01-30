@@ -250,15 +250,15 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 		m_accelStruct.build(sceneDescriptor);
 		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
-		// For each light determine the medium
-		m_lightTree.update_media(sceneDescriptor);
-		// For the camera as well
-		this->update_camera_medium(sceneDescriptor);
+		m_cameraDescChanged = true;
+		m_lightTreeNeedsMediaUpdate = true;
 	}
 
 	// Camera doesn't get a media-changed flag because it's relatively cheap to determine?
-	if(m_cameraDescChanged)
+	if(m_cameraDescChanged) {
 		this->update_camera_medium(sceneDescriptor);
+		m_cameraDescChanged = false;
+	}
 	
 	if(m_lightTreeNeedsMediaUpdate) {
 		m_lightTree.update_media(sceneDescriptor);
