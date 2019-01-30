@@ -33,6 +33,7 @@ Texture::~Texture() {
 		cuda::check_error(cudaDestroyTextureObject(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>().handle));
 		cuda::check_error(cudaDestroySurfaceObject(m_handles.get<TextureDevHandle_t<Device::CUDA>>().handle));
 		cuda::check_error(cudaFreeArray(m_cudaTexture));
+		m_cudaTexture = nullptr;
 	}
 }
 
@@ -42,7 +43,7 @@ void Texture::synchronize() {
 		logError("[Texture::synchronize] Competing changes for this texture. Some changes will be lost.");
 	if(m_dirty.needs_sync(dev)) {
 		// Create texture resources if necessary
-		if(!is_valid(m_handles.get<TextureDevHandle_t<dev>>())) {
+		if(!is_valid(m_constHandles.get<ConstTextureDevHandle_t<dev>>())) {
 			switch(dev) {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
@@ -69,7 +70,7 @@ void Texture::synchronize() {
 	} else {
 		// Alternative: might be that we weren't allocated yet
 		// Create texture resources if necessary
-		if(!is_valid(m_handles.get<TextureDevHandle_t<dev>>())) {
+		if(!is_valid(m_constHandles.get<ConstTextureDevHandle_t<dev>>())) {
 			switch(dev) {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
@@ -160,6 +161,7 @@ template void Texture::clear<Device::OPENGL>();
 
 
 void Texture::create_texture_cpu(std::unique_ptr<u8[]> data) {
+	mAssert(m_cpuTexture == nullptr);
 	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format,
 												m_mode, m_sRgb, move(data));
 	m_handles.get<TextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
@@ -167,6 +169,7 @@ void Texture::create_texture_cpu(std::unique_ptr<u8[]> data) {
 }
 
 void Texture::create_texture_cuda() {
+	mAssert(m_cudaTexture == nullptr);
 	cudaChannelFormatDesc channelDesc;
 	switch(m_format) {
 		case Format::R8U: channelDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned); break;

@@ -14,6 +14,7 @@ const BackgroundDesc<dev> Background::acquire_const(const ei::Box& bounds) {
 			mAssert(m_envLight != nullptr);
 			if(!m_summedAreaTable) { // Flux and SAT are not computed?
 				m_summedAreaTable = create_summed_area_table(m_envLight);
+				m_summedAreaTable->mark_changed(Device::CPU);
 				compute_envmap_flux(bounds);
 			}
 			return BackgroundDesc<dev>{
