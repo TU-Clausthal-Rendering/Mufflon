@@ -1656,6 +1656,16 @@ const char* world_get_texture_name(TextureHdl hdl) {
 	CATCH_ALL(nullptr)
 }
 
+Boolean world_get_texture_size(TextureHdl hdl, IVec2* size) {
+	TRY
+	CHECK_NULLPTR(hdl, "texture handle", false);
+	auto tex = static_cast<TextureHandle>(hdl);
+	(*size).x = tex->get_width();
+	(*size).y = tex->get_height();
+	return true;
+	CATCH_ALL(false)
+}
+
 CameraType world_get_camera_type(ConstCameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", CameraType::CAM_COUNT);

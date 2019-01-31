@@ -477,6 +477,7 @@ CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
 CORE_API const char* CDECL world_get_texture_name(TextureHdl hdl);
+CORE_API Boolean CDECL world_get_texture_size(TextureHdl hdl, IVec2* size);
 
 // Camera interface
 CORE_API CameraType CDECL world_get_camera_type(ConstCameraHdl cam);

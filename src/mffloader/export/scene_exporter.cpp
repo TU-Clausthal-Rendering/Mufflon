@@ -8,6 +8,7 @@
 #include "util/degrad.hpp"
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include <sstream>
 
 namespace mff_loader::exprt {
 
@@ -118,19 +119,29 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const
 			// TODO Exception?
 			break;
 		}
+		rapidjson::Value v = rapidjson::Value();
 
 
-		Vec3 position; 
+		Vec3 position; // TODO Animated
 		world_get_camera_position(cameraHandle, &position);
-		camera.AddMember("path", store_in_array(position, document), document.GetAllocator());
+		rapidjson::Value positionPath;
+		positionPath.SetArray();
+		positionPath.PushBack(store_in_array(position, document), document.GetAllocator());
+		camera.AddMember("path", positionPath, document.GetAllocator());
 
-		Vec3 viewDirection;
+		Vec3 viewDirection; // TODO Animated
 		world_get_camera_direction(cameraHandle, &viewDirection);
-		camera.AddMember("viewDir", store_in_array(viewDirection, document), document.GetAllocator());
+		rapidjson::Value  viewDirectionPath;
+		viewDirectionPath.SetArray();
+		viewDirectionPath.PushBack(store_in_array(viewDirection, document), document.GetAllocator());
+		camera.AddMember("viewDir", viewDirectionPath, document.GetAllocator());
 
-		Vec3 upDirection;
+		Vec3 upDirection; // TODO Animated
 		world_get_camera_direction(cameraHandle, &upDirection);
-		camera.AddMember("up", store_in_array(upDirection, document), document.GetAllocator());
+		rapidjson::Value upDirectionPath;
+		upDirectionPath.SetArray();
+		upDirectionPath.PushBack(store_in_array(upDirection, document), document.GetAllocator());
+		camera.AddMember("up", upDirectionPath, document.GetAllocator());
 
 		rapidjson::Value cameraName;
 		cameraName.SetString(rapidjson::StringRef(world_get_camera_name(cameraHandle)));
@@ -280,7 +291,7 @@ bool SceneExporter::save_materials(rapidjson::Document& document) const
 		world_get_material_data(materialHandle, &materialParams);
 
 		rapidjson::Value materialName;
-		materialName.SetString(std::to_string(i).c_str(), std::to_string(i).length(), document.GetAllocator()); // TODO get right material name (not implemented yet)
+		materialName.SetString(world_get_material_name(materialHandle), document.GetAllocator());
 
 		materials.AddMember(materialName, save_material(materialParams, document), document.GetAllocator());
 	}
@@ -299,55 +310,71 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 	switch (matType)
 	{
 	case (MaterialParamType::MATERIAL_BLEND):
-		material.AddMember("type", "blend", document.GetAllocator());
-		material.AddMember("layerA", save_material(*materialParams.inner.blend.a.mat, document), document.GetAllocator());
-		material.AddMember("layerB", save_material(*materialParams.inner.blend.b.mat, document), document.GetAllocator());
-		material.AddMember("factorA", materialParams.inner.blend.a.factor, document.GetAllocator());
-		material.AddMember("factorB", materialParams.inner.blend.b.factor, document.GetAllocator());
-		break;
+		{
+			material.AddMember("type", "blend", document.GetAllocator());
+			material.AddMember("layerA", save_material(*materialParams.inner.blend.a.mat, document), document.GetAllocator());
+			material.AddMember("layerB", save_material(*materialParams.inner.blend.b.mat, document), document.GetAllocator());
+			material.AddMember("factorA", materialParams.inner.blend.a.factor, document.GetAllocator());
+			material.AddMember("factorB", materialParams.inner.blend.b.factor, document.GetAllocator());
+			break;
+		}
 	case (MaterialParamType::MATERIAL_EMISSIVE):
-		material.AddMember("type", "emissive", document.GetAllocator());
-		// TextureHdl radianceTextureHandle = materialParams.inner.emissive.radiance;
-		// TODO Extract radiance(path) from texture handle (not Implemented yet)
-		material.AddMember("radiance", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
-		material.AddMember("scale", store_in_array(materialParams.inner.emissive.scale, document), document.GetAllocator());
-		break;
+		{
+			material.AddMember("type", "emissive", document.GetAllocator());
+			TextureHdl radianceTextureHandle = materialParams.inner.emissive.radiance;
+			std::string textureName = world_get_texture_name(radianceTextureHandle);
+
+			IVec2 texSize;
+			world_get_texture_size(radianceTextureHandle, &texSize);
+
+			add_member_from_texture_handle(radianceTextureHandle, "radiance", material, document);
+			material.AddMember("scale", store_in_array(materialParams.inner.emissive.scale, document), document.GetAllocator());
+			break;
+		}
 	case(MATERIAL_FRESNEL):
-		material.AddMember("type", "fresnel", document.GetAllocator());
-		material.AddMember("layerReflection", save_material(*materialParams.inner.fresnel.a, document), document.GetAllocator());
-		material.AddMember("layerRefraction", save_material(*materialParams.inner.fresnel.b, document), document.GetAllocator());
-		material.AddMember("refractionIndex", store_in_array(materialParams.inner.fresnel.refractionIndex, document), document.GetAllocator());
-		break;
+		{
+			material.AddMember("type", "fresnel", document.GetAllocator());
+			material.AddMember("layerReflection", save_material(*materialParams.inner.fresnel.a, document), document.GetAllocator());
+			material.AddMember("layerRefraction", save_material(*materialParams.inner.fresnel.b, document), document.GetAllocator());
+			material.AddMember("refractionIndex", store_in_array(materialParams.inner.fresnel.refractionIndex, document), document.GetAllocator());
+			break;
+		}
 	case(MATERIAL_LAMBERT):
-		material.AddMember("type", "lambert", document.GetAllocator());
-		// TextureHdl albedoTextureHandle = materialParams.inner.lambert.albedo
-		// TODO Extract albedo(path) from texture handle (not Implemented yet)
-		material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
-		break;
+		{
+			material.AddMember("type", "lambert", document.GetAllocator());
+			TextureHdl albedoTextureHandle = materialParams.inner.lambert.albedo;
+			add_member_from_texture_handle(albedoTextureHandle, "albedo", material, document);
+			break;
+		}
 	case(MATERIAL_ORENNAYAR):
-		material.AddMember("type", "orennayar", document.GetAllocator());
-		// TextureHdl albedoTextureHandle = materialParams.inner.orennayar.albedo
-		// TODO Extract albedo(path) from texture handle (not Implemented yet)
-		material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
-		material.AddMember("roughness", materialParams.inner.orennayar.roughness, document.GetAllocator());
-		break;
+		{
+			material.AddMember("type", "orennayar", document.GetAllocator());
+			TextureHdl albedoTextureHandle = materialParams.inner.orennayar.albedo;
+			add_member_from_texture_handle(albedoTextureHandle, "albedo", material, document);
+			material.AddMember("roughness", materialParams.inner.orennayar.roughness, document.GetAllocator());
+			break;
+		}
 	case(MATERIAL_TORRANCE):
-		material.AddMember("type", "torrance", document.GetAllocator());
-		// TextureHdl albedoTextureHandle = materialParams.inner.torrance.roughness
-		// TODO Extract roughness(path) from texture handle (not Implemented yet)
-		material.AddMember("roughness", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
-		material.AddMember("ndf", materialParams.inner.torrance.ndf, document.GetAllocator());
-		// TextureHdl albedoTextureHandle = materialParams.inner.torrance.albedo
-		// TODO Extract albedo(path) from texture handle (not Implemented yet)
-		material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
-		break;
+		{
+			material.AddMember("type", "torrance", document.GetAllocator());
+			TextureHdl roughnessTextureHandle = materialParams.inner.torrance.roughness;
+			add_member_from_texture_handle(roughnessTextureHandle, "roughness", material, document);
+			material.AddMember("ndf", materialParams.inner.torrance.ndf, document.GetAllocator());
+			TextureHdl albedoTextureHandle = materialParams.inner.torrance.albedo;
+			add_member_from_texture_handle(albedoTextureHandle, "albedo", material, document);
+			material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+			break;
+		}
 	case(MATERIAL_WALTER):
-		material.AddMember("type", "walter", document.GetAllocator());
-		// TextureHdl albedoTextureHandle = materialParams.inner.walter.roughness
-		// TODO Extract roughness(path) from texture handle (not Implemented yet)
-		material.AddMember("roughness", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
-		material.AddMember("ndf", materialParams.inner.walter.ndf, document.GetAllocator());
-		material.AddMember("absorption", store_in_array(materialParams.inner.walter.absorption, document), document.GetAllocator());
+		{
+			material.AddMember("type", "walter", document.GetAllocator());
+			TextureHdl roughnessTextureHandle = materialParams.inner.walter.roughness;
+			add_member_from_texture_handle(roughnessTextureHandle, "roughness", material, document);
+			material.AddMember("roughness", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
+			material.AddMember("ndf", materialParams.inner.walter.ndf, document.GetAllocator());
+			material.AddMember("absorption", store_in_array(materialParams.inner.walter.absorption, document), document.GetAllocator());
+			break;
+		}
 	default:
 		// TODO Exception?
 		break;
@@ -419,14 +446,14 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 
 
 		rapidjson::Value materialAssignments;
-		materialAssignments.SetArray();
+		materialAssignments.SetObject();
 
 		// TODO Material Assignments (not implemented yet)
 
 		scenario.AddMember("materialAssignments", materialAssignments, document.GetAllocator());
 
 		rapidjson::Value objectProperties;
-		objectProperties.SetArray();
+		objectProperties.SetObject();
 
 		// TODO Object Properties (not implemented yet)
 
@@ -441,8 +468,40 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 	return true;
 }
 
+bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl, std::string memberName, rapidjson::Value& saveIn,
+	rapidjson::Document& document) const
+{
+	try
+	{
+		std::string textureName = world_get_texture_name(textureHdl);
+		rapidjson::Value textureNameRj;
+		textureNameRj.SetString(textureName.c_str(), rapidjson::SizeType(textureName.length()), document.GetAllocator());
 
-rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& document) const
+
+		IVec2 texSize;
+		world_get_texture_size(textureHdl, &texSize);
+
+		rapidjson::Value name;
+		name.SetString(memberName.c_str(), rapidjson::SizeType(memberName.length()), document.GetAllocator());
+
+		if (texSize.x == 1 && texSize.y == 1)
+		{
+			saveIn.AddMember(name, store_in_array_from_float_string(textureName, document), document.GetAllocator());
+		}
+		else
+		{
+			saveIn.AddMember(name, textureNameRj, document.GetAllocator());
+		}
+	}
+	catch(std::ios_base::failure&)
+	{
+		return false;
+	}
+	return true;
+}
+
+
+	rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& document) const
 {
 	rapidjson::Value out;
 	out.SetArray();
@@ -450,6 +509,16 @@ rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& 
 	out.PushBack(value.y, document.GetAllocator());
 	out.PushBack(value.z, document.GetAllocator());
 
+	return out;
+}
+
+template<typename T>
+rapidjson::Value SceneExporter::store_in_array(std::vector<T> value, rapidjson::Document& document) const
+{
+	rapidjson::Value out;
+	out.SetArray();
+	for (auto& v : value)
+		out.PushBack(v, document.GetAllocator());
 	return out;
 }
 
@@ -462,13 +531,34 @@ rapidjson::Value SceneExporter::store_in_array(Vec2 value, rapidjson::Document& 
 
 	return out;
 }
-
+rapidjson::Value SceneExporter::store_in_array_from_float_string(std::string floatString, rapidjson::Document & document) const
+{
+	std::vector<float> values;
+	std::stringstream ss(floatString);
+	int i = 0;
+	try
+	{
+		for (i = 0; i < 4; i++)
+		{
+			float f;
+			ss >> f;
+			values.push_back(f);
+			if(ss.eof())
+				break;
+		}
+	}
+	catch (std::ios_base::failure&)
+	{
+		throw;
+	}
+	return store_in_array(values, document);
+}
 	rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const
 {
 	fs::path copy = m_fileDestinationPath;
 	rapidjson::Value out;
 	std::string s = fs::relative(path, copy.remove_filename()).string();
-	out.SetString(s.c_str(), s.length(), document.GetAllocator());
+	out.SetString(s.c_str(), rapidjson::SizeType(s.length()), document.GetAllocator());
 	return out;
 }
 } // namespace mff_loader::exprt
