@@ -31,7 +31,8 @@ namespace gui.ViewModel
             m_playPauseCommand = new PlayPauseCommand(models);
             m_resetCommand = new ResetCommand(models);
             m_screenshotCommand = new ScreenShotCommand(models);
-            m_toggleCameraMovementCommand = new ToggleCameraMovementCommand(models);
+            m_toggleCameraMovementCommand = new ActionCommand(() =>
+                models.Settings.AllowCameraMovement = !models.Settings.AllowCameraMovement);
 
             RefreshCommand(models.Settings.PlayPauseGesture, m_playPauseCommand);
             RefreshCommand(models.Settings.ResetGesture, m_resetCommand);

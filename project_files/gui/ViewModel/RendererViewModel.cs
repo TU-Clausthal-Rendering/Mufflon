@@ -34,7 +34,7 @@ namespace gui.ViewModel
         public class RendererItem
         {
             private Core.RendererType m_type;
-            private string m_name = RendererModel.getRendererName(0);
+            private string m_name = RendererModel.GetRendererName(0);
             public int Id { get; set; }
             public Core.RendererType Type
             {
@@ -43,7 +43,7 @@ namespace gui.ViewModel
                 {
                     if (m_type == value) return;
                     m_type = value;
-                    m_name = RendererModel.getRendererName(m_type);
+                    m_name = RendererModel.GetRendererName(m_type);
                 }
             }
             public string Name { get => m_name; }

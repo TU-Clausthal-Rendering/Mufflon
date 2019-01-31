@@ -43,11 +43,16 @@ namespace gui.Model
             }
         }
 
-        public uint Iteration {
-            get => Core.render_get_current_iteration();
+        public uint Iteration => Core.render_get_current_iteration();
+
+        public void Reset()
+        {
+            if (!Core.render_reset())
+                throw new Exception(Core.core_get_dll_error());
+           UpdateIterationCount();
         }
 
-        public void updateIterationCount()
+        public void UpdateIterationCount()
         {
             OnPropertyChanged(nameof(Iteration));
         }
@@ -63,7 +68,7 @@ namespace gui.Model
             }
         }
 
-        public static string getRendererName(Core.RendererType type)
+        public static string GetRendererName(Core.RendererType type)
         {
             switch(type)
             {

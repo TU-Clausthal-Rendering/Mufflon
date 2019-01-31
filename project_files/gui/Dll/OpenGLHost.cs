@@ -177,7 +177,7 @@ namespace gui.Dll
                     // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
                     m_rendererModel.RenderLock.Release();
                     // We also let the GUI know that an iteration has taken place
-                    Application.Current.Dispatcher.Invoke(new Action(() => m_rendererModel.updateIterationCount()));
+                    Application.Current.Dispatcher.Invoke(new Action(() => m_rendererModel.UpdateIterationCount()));
                 }
             }
             catch (Exception e)
@@ -305,7 +305,8 @@ namespace gui.Dll
             int newMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
             int newMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
             // Adjust the offset so that it stays roughly the same fractionally
-            if(oldMaxOffsetX != 0)
+            
+            if (oldMaxOffsetX != 0)
                 m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
             if (oldMaxOffsetY != 0)
                 m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);

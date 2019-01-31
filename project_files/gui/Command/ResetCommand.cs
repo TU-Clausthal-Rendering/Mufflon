@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using gui.Model;
 using gui.Dll;
+using gui.Model.Scene;
 
 namespace gui.Command
 {
@@ -16,6 +19,33 @@ namespace gui.Command
         public ResetCommand(Models models)
         {
             m_models = models;
+            m_models.PropertyChanged += ModelOnPropertyChanged;
+            if(m_models.World != null)
+                m_models.World.PropertyChanged += WorldOnPropertyChanged;
+        }
+
+        private void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(Models.World):
+                    if (m_models.World != null)
+                    {
+                        m_models.World.PropertyChanged += WorldOnPropertyChanged;
+                    }
+                    OnCanExecuteChanged();
+                    break;
+            }
+        }
+
+        private void WorldOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(WorldModel.IsSane):
+                    OnCanExecuteChanged();
+                    break;
+            }
         }
 
         public bool CanExecute(object parameter)
@@ -25,15 +55,14 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            if (!Core.render_reset())
-                throw new Exception(Core.core_get_dll_error());
-            m_models.Renderer.updateIterationCount();
+            m_models.Renderer.Reset();
         }
 
-        public event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged;
+
+        protected virtual void OnCanExecuteChanged()
         {
-            add => CommandManager.RequerySuggested += value;
-            remove => CommandManager.RequerySuggested -= value;
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

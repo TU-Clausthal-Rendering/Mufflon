@@ -20,7 +20,8 @@ namespace gui.ViewModel
             PlayPauseCommand = new PlayPauseCommand(models);
             ResetCommand = new ResetCommand(models);
             SaveScreenShotCommand = new ScreenShotCommand(models);
-            ToggleCameraMovementCommand = new ToggleCameraMovementCommand(models);
+            ToggleCameraMovementCommand = new ActionCommand(() =>
+                models.Settings.AllowCameraMovement = !models.Settings.AllowCameraMovement);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
