@@ -20,14 +20,13 @@ using PtPathVertex = PathVertex<u8, 4>;
 
 __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 							  scene::SceneDescriptor<Device::CUDA>* scene,
-							  const u32* seeds) {
+							  const u32* seeds, GpuPathTracer::Parameters params) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
 	};
 	if(coord.x >= outputBuffer.get_width() || coord.y >= outputBuffer.get_height())
 		return;
-	const u32 maxPathLength = 4u;
 
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
@@ -45,7 +44,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 	int pathLen = 0;
 	
 	do {
-		if(pathLen > 0 && pathLen + 1 <= maxPathLength) {
+		if(pathLen > 0 && pathLen + 1 <= params.maxPathLength) {
 			// Call NEE member function for recursive vertices.
 			// Do not connect to the camera, because this makes the renderer much more
 			// complicated. Our decision: The PT should be as simple as possible!
@@ -96,7 +95,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
-		if(pathLen <= maxPathLength) {
+		if(pathLen <= params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(scene->lightTree, vertex->get_primitive_id(),
@@ -109,7 +108,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 									vertex->get_normal(), vertex->get_albedo());
 		}
-	} while(pathLen < maxPathLength);
+	} while(pathLen < params.maxPathLength);
 #endif // __CUDA_ARCH__
 }
 
@@ -136,7 +135,8 @@ void GpuPathTracer::iterate(Pixel imageDims,
 	// TODO
 	cuda::check_error(cudaGetLastError());
 	sample<<<gridDims, blockDims>>>(std::move(outputBuffer),
-									m_scenePtr, devRnds);
+									m_scenePtr, devRnds,
+									m_params);
 	cuda::check_error(cudaGetLastError());
 	cuda::check_error(cudaFree(devRnds));
 }

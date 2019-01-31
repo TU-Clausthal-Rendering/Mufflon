@@ -22,6 +22,8 @@ struct RenderBuffer;
 
 class GpuPathTracer : public IRenderer {
 public:
+	using Parameters = ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide>;
+
 	GpuPathTracer();
 	~GpuPathTracer();
 
