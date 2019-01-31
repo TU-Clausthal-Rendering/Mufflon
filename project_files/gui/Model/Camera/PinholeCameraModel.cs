@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Dll;
 using gui.ViewModel.Camera;
 
 namespace gui.Model.Camera
@@ -16,18 +17,27 @@ namespace gui.Model.Camera
             return new PinholeCameraViewModel(models, this);
         }
 
-        private float m_fov = 25.0f;
-
         public float Fov
         {
-            get => m_fov;
+            get
+            {
+                if(!Core.world_get_pinhole_camera_fov(Handle, out var fov))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return fov;
+            }
             set
             {
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_fov) return;
-                m_fov = value;
+                if(Equals(Fov, value)) return;
+                if(!Core.world_set_pinhole_camera_fov(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Fov));
             }
+        }
+
+        public PinholeCameraModel(IntPtr handle) : base(handle)
+        {
         }
     }
 }

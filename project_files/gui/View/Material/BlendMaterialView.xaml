@@ -28,20 +28,23 @@
                 Grid.Column="1"
                 Grid.Row="0"
                 Text="{Binding FactorA}"
-                Margin="{StaticResource RightPropertyMargin}"/>
+                Margin="{StaticResource RightPropertyMargin}"
+                IsReadOnly="True"/>
 
         <TextBlock 
                 Grid.Column="0"
                 Grid.Row="1"
                 Text="factor B:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-        <TextBox
-                Grid.Column="1"
-                Grid.Row="1"
-                Text="{Binding FactorB}"
-                Margin="{StaticResource RightPropertyMargin}"/>
 
-        <Button
+        <TextBox
+            Grid.Column="1"
+            Grid.Row="1"
+            Text="{Binding FactorB}"
+            Margin="{StaticResource RightPropertyMargin}"
+            IsReadOnly="True"/>
+
+        <!--<Button
             Grid.Column="0"
             Grid.Row="2"
             Grid.ColumnSpan="2"
@@ -49,7 +52,7 @@
             Margin="{StaticResource RightPropertyMargin}"
             Visibility="{Binding ButtonAVisibility}">
             Add LayerA
-        </Button>
+        </Button>-->
 
         <Border 
             Grid.Column="0"
@@ -58,7 +61,7 @@
             Visibility="{Binding LayerAVisibility, FallbackValue=Collapsed}"
             x:Name="LayerAHost"/>
         
-        <Button
+        <!--<Button
             Grid.Column="0"
             Grid.Row="3"
             Grid.ColumnSpan="2"
@@ -66,7 +69,7 @@
             Margin="{StaticResource RightPropertyMargin}"
             Visibility="{Binding ButtonBVisibility}">
             Add LayerB
-        </Button>
+        </Button>-->
 
         <Border 
             Grid.Column="0"

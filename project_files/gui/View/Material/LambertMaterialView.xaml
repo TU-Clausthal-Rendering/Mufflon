@@ -39,14 +39,17 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <helper:EnterTextBox
-                    Grid.Column="0"
-                    Text="{Binding AlbedoX}"/>
+                Grid.Column="0"
+                Text="{Binding AlbedoX}"
+                IsReadOnly="True"/>
             <helper:EnterTextBox
-                    Grid.Column="1"
-                    Text="{Binding AlbedoY}"/>
+                Grid.Column="1"
+                Text="{Binding AlbedoY}"
+                IsReadOnly="True"/>
             <helper:EnterTextBox
-                    Grid.Column="2"
-                    Text="{Binding AlbedoZ}"/>
+                Grid.Column="2"
+                Text="{Binding AlbedoZ}"
+                IsReadOnly="True"/>
         </Grid>
 
         <!-- Texture Grid -->
@@ -61,9 +64,10 @@
             </Grid.ColumnDefinitions>
 
             <TextBox
-                    Grid.Column="0"
-                    Text="{Binding AlbedoTex}"
-                    Margin="0 0 1 0"/>
+                Grid.Column="0"
+                Text="{Binding AlbedoTex}"
+                Margin="0 0 1 0"
+                IsReadOnly="True"/>
             <Button
                     Grid.Column="1"
                     VerticalContentAlignment="Center"

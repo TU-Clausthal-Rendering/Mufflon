@@ -19,10 +19,10 @@ namespace gui.ViewModel.Light
     {
         private readonly EnvmapLightModel m_parent;
 
-        public EnvmapLightViewModel(Models models, EnvmapLightModel parent) : base(models, parent)
+        public EnvmapLightViewModel(Models world, EnvmapLightModel parent) : base(world, parent)
         {
             m_parent = parent;
-            SelectMapCommand = new SelectTextureCommand(models, () => m_parent.Map, val => m_parent.Map = val);
+            SelectMapCommand = new SelectTextureCommand(world, () => m_parent.Map, val => m_parent.Map = val);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)

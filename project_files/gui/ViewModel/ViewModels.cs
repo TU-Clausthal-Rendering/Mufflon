@@ -83,8 +83,6 @@ namespace gui.ViewModel
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);
-            AddCameraCommand = new AddCameraCommand(m_models);
-            AddMaterialCommand = new AddMaterialCommand(m_models);
             LoadSceneCommand = new LoadSceneCommand(m_models);
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);

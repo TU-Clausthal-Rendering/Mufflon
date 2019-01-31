@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -16,7 +18,18 @@ namespace gui.ViewModel.Material
         public MaterialsViewModel(Models models)
         {
             m_models = models;
-            RegisterModelList(models.Materials);
+            Debug.Assert(m_models.World == null);
+            m_models.PropertyChanged += ModelsOnPropertyChanged;
+        }
+
+        private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(Models.World):
+                    RegisterModelList(m_models.World?.Materials);
+                    break;
+            }
         }
 
         protected override MaterialViewModel CreateViewModel(MaterialModel model)

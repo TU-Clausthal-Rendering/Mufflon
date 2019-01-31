@@ -15,7 +15,7 @@ namespace gui.ViewModel.Light
     {
         private readonly PointLightModel m_parent;
 
-        public PointLightViewModel(Models models, PointLightModel parent) : base(models, parent)
+        public PointLightViewModel(Models world, PointLightModel parent) : base(world, parent)
         {
             m_parent = parent;
         }

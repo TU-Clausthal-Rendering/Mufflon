@@ -14,7 +14,7 @@ namespace gui.ViewModel.Camera
     {
         private readonly PinholeCameraModel m_parent;
 
-        public PinholeCameraViewModel(Models models, PinholeCameraModel parent) : base(models, parent)
+        public PinholeCameraViewModel(Models modelssss, PinholeCameraModel parent) : base(modelssss, parent)
         {
             m_parent = parent;
         }

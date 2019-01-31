@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using gui.Dll;
 using gui.ViewModel.Camera;
 
 namespace gui.Model.Camera
@@ -16,60 +17,85 @@ namespace gui.Model.Camera
             return new FocusCameraViewModel(models, this);
         }
 
-        private float m_focalLength = 35.0f;
-
         public float FocalLength
         {
-            get => m_focalLength;
+            get
+            {
+                if(!Core.world_get_focus_camera_focal_length(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
+            }
             set
             {
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_focalLength) return;
-                m_focalLength = value;
+                if(Equals(FocalLength, value)) return;
+                if(!Core.world_set_focus_camera_focal_length(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(FocalLength));
             }
         }
 
-        private float m_sensorHeight = 24.0f;
-
         public float SensorHeight
         {
-            get => m_sensorHeight;
+            get
+            {
+                if (!Core.world_get_focus_camera_sensor_height(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
+            }
             set
             {
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_sensorHeight) return;
-                m_sensorHeight = value;
+                if (Equals(SensorHeight, value)) return;
+                if (!Core.world_set_focus_camera_sensor_height(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(SensorHeight));
             }
         }
 
-        private float m_focusDistance;
-
         public float FocusDistance
         {
-            get => m_focusDistance;
+            get
+            {
+                if (!Core.world_get_focus_camera_focus_distance(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
+            }
             set
             {
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_focusDistance) return;
-                m_focusDistance = value;
+                if (Equals(FocusDistance, value)) return;
+                if (!Core.world_set_focus_camera_focus_distance(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(FocusDistance));
             }
         }
 
-        private float m_aperture;
-
         public float Aperture
         {
-            get => m_aperture;
+            get
+            {
+                if (!Core.world_get_focus_camera_aperture(Handle, out var res))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return res;
+            }
             set
             {
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_aperture) return;
-                m_aperture = value;
+                if (Equals(FocalLength, value)) return;
+                if (!Core.world_set_focus_camera_aperture(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Aperture));
             }
+        }
+
+        public FocusCameraModel(IntPtr handle) : base(handle)
+        {
+
         }
     }
 }

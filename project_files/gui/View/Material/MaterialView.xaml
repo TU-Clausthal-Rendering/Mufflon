@@ -12,25 +12,10 @@
     <GroupBox>
         <GroupBox.Header>
             <Grid x:Name="GroupHeaderGrid">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBox 
+                <TextBlock 
                     Grid.Column="0"
                     HorizontalAlignment="Stretch"
-                    Text="{Binding Name}"/>
-
-                <Button
-                    Grid.Column="1"
-                    Margin="5 0 0 0"
-                    Command="{Binding RemoveCommand}">
-                    <Image 
-                        Source="../../Icons/cancel.png"
-                        Width="16"
-                        Height="16"/>
-                </Button>
+                    Text="{Binding Name, FallbackValue=Name}"/>
             </Grid>
         </GroupBox.Header>
         <StackPanel x:Name="GroupItems">

@@ -17,10 +17,10 @@ namespace gui.ViewModel.Light
     {
         private readonly GoniometricLightModel m_parent;
 
-        public GoniometricLightViewModel(Models models, GoniometricLightModel parent) : base(models, parent)
+        public GoniometricLightViewModel(Models world, GoniometricLightModel parent) : base(world, parent)
         {
             m_parent = parent;
-            SelectMapCommand = new SelectTextureCommand(models, () => m_parent.Map, val => m_parent.Map = val);
+            SelectMapCommand = new SelectTextureCommand(world, () => m_parent.Map, val => m_parent.Map = val);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)

@@ -21,14 +21,17 @@ namespace gui.Model.Scene
     /// </summary>
     public class ScenarioModel : INotifyPropertyChanged
     {
+        private readonly WorldModel m_parent;
         public IntPtr Handle { get; }
 
-        public ScenarioModel(IntPtr handle)
+        public ScenarioModel(WorldModel parent, IntPtr handle)
         {
+            m_parent = parent;
             Handle = handle;
 
-            // TODO populate cameras and materials
+            // TODO populate materials
             LoadLights();
+            LoadCamera();
 
             // add event handler if lights get added/removed during runtime
             Lights.CollectionChanged += LightsOnCollectionChanged;
@@ -63,7 +66,30 @@ namespace gui.Model.Scene
                 Lights.Add(Core.scenario_get_light_handle(Handle, 0u, Core.LightType.ENVMAP));
         }
 
+        private void LoadCamera()
+        {
+            var handle = Core.scenario_get_camera(Handle);
+            m_camera = m_parent.Cameras.Models.First((cam) => Equals(cam.Handle, handle));
+        }
+
         public ObservableHashSet<IntPtr> Lights { get; } = new ObservableHashSet<IntPtr>();
+
+        private CameraModel m_camera;
+
+        public CameraModel Camera
+        {
+            get => m_camera;
+            set
+            {
+                if(ReferenceEquals(m_camera, value)) return;
+
+                if(!Core.scenario_set_camera(Handle, value.Handle))
+                    throw new Exception(Core.core_get_dll_error());
+
+                m_camera = value;
+                OnPropertyChanged(nameof(Camera));
+            }
+        }
 
         public string Name => Core.scenario_get_name(Handle);
 

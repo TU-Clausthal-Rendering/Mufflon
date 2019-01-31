@@ -13,7 +13,7 @@ namespace gui.ViewModel.Camera
     {
         private readonly OrthoCameraModel m_parent;
 
-        public OrthoCameraViewModel(Models models, OrthoCameraModel parent) : base(models, parent)
+        public OrthoCameraViewModel(Models modelssss, OrthoCameraModel parent) : base(modelssss, parent)
         {
             m_parent = parent;
         }

@@ -17,19 +17,17 @@ namespace gui.ViewModel.Light
 {
     public abstract class LightViewModel : INotifyPropertyChanged
     {
-        private readonly Models m_models;
+        private readonly WorldModel m_world;
         private readonly LightModel m_parent;
-        private ScenarioModel m_currentScenario;
 
         protected LightViewModel(Models models, LightModel parent)
         {
-            m_models = models;
+            m_world = models.World;
             m_parent = parent;
-            RemoveCommand = new RemoveLightCommand(models, parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
-            m_currentScenario = m_models.World.CurrentScenario;
 
-            m_models.World.PropertyChanged += WorldOnPropertyChanged;
+            m_world.CurrentScenario.Lights.CollectionChanged += ScenarioLightsOnCollectionChanged;
+            m_world.PropertyChanged += WorldOnPropertyChanged;
         }
 
         private void WorldOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -37,12 +35,8 @@ namespace gui.ViewModel.Light
             switch (args.PropertyName)
             {
                 case nameof(WorldModel.CurrentScenario):
-                    // unsubscribe old
-                    m_currentScenario.Lights.CollectionChanged -= ScenarioLightsOnCollectionChanged;
-                    // subscribe to new
-                    m_currentScenario = m_models.World.CurrentScenario;
-                    m_currentScenario.Lights.CollectionChanged += ScenarioLightsOnCollectionChanged;
-                    // is selected might have changed
+                    m_world.PreviousScenario.Lights.CollectionChanged -= ScenarioLightsOnCollectionChanged;
+                    m_world.CurrentScenario.Lights.CollectionChanged += ScenarioLightsOnCollectionChanged;
                     OnPropertyChanged(nameof(IsSelected));
                     break;
             }
@@ -79,18 +73,16 @@ namespace gui.ViewModel.Light
 
         public bool IsSelected
         {
-            get => m_currentScenario.Lights.Contains(m_parent.Handle);
+            get => m_world.CurrentScenario.Lights.Contains(m_parent.Handle);
             set
             {
                 if (value == IsSelected) return;
                 if (value)
-                    m_currentScenario.Lights.Add(m_parent.Handle);
+                    m_world.CurrentScenario.Lights.Add(m_parent.Handle);
                 else
-                    m_currentScenario.Lights.Remove(m_parent.Handle);
+                    m_world.CurrentScenario.Lights.Remove(m_parent.Handle);
             }
         }
-
-        public ICommand RemoveCommand { get; }
 
         /// <summary>
         /// create a new view based on this view model

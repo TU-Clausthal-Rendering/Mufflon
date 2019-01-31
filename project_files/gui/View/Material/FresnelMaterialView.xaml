@@ -36,7 +36,8 @@
             Grid.Row="0"
             Text="{Binding RefractionIndex}"
             Margin="{StaticResource RightPropertyMargin}"
-            Visibility="{Binding DielectricVisibility, FallbackValue=Hidden}"/>
+            Visibility="{Binding DielectricVisibility, FallbackValue=Hidden}"
+            IsReadOnly="True"/>
 
         <!-- conductor case -->
         <Grid
@@ -52,7 +53,8 @@
 
             <TextBox
                 Grid.Column="0"
-                Text="{Binding RefractionComplexX}"/>
+                Text="{Binding RefractionComplexX}"
+                IsReadOnly="True"/>
 
             <TextBlock 
                 Grid.Column="1"
@@ -60,10 +62,11 @@
 
             <TextBox 
                 Grid.Column="2"
-                Text="{Binding RefractionComplexY}"/>
+                Text="{Binding RefractionComplexY}"
+                IsReadOnly="True"/>
         </Grid>
 
-        <Button
+        <!--<Button
             Grid.Column="0"
             Grid.Row="1"
             Grid.ColumnSpan="2"
@@ -71,7 +74,7 @@
             Margin="{StaticResource RightPropertyMargin}"
             Visibility="{Binding ButtonReflectionVisibility}">
             Add Reflection
-        </Button>
+        </Button>-->
 
         <Border 
             Grid.Column="0"
@@ -80,7 +83,7 @@
             Visibility="{Binding LayerReflectionVisibility, FallbackValue=Collapsed}"
             x:Name="LayerAHost"/>
 
-        <Button
+        <!--<Button
             Grid.Column="0"
             Grid.Row="2"
             Grid.ColumnSpan="2"
@@ -88,7 +91,7 @@
             Margin="{StaticResource RightPropertyMargin}"
             Visibility="{Binding ButtonRefractionVisibility}">
             Add Refraction
-        </Button>
+        </Button>-->
 
         <Border 
             Grid.Column="0"

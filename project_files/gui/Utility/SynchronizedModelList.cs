@@ -15,34 +15,24 @@ namespace gui.Utility
     /// helper class to manage a list of models and a list of view models that should be synchronized.
     /// </summary>
     /// <typeparam name="TModel"></typeparam>
-    public class SynchronizedModelList<TModel> : INotifyPropertyChanged where TModel : class
+    public class SynchronizedModelList<TModel>
     {
-        // subsribe to Models.
-        public ObservableCollection<TModel> Models { get; } = new ObservableCollection<TModel>();
-        public ObservableCollection<TModel> RemovedModels { get; } = new ObservableCollection<TModel>();
+        protected readonly ObservableCollection<TModel> m_list;
 
-        public SynchronizedModelList() {
-            Models.CollectionChanged += OnModelChanged;
-        }
+        // expose readonly list
+        public IReadOnlyCollection<TModel> Models { get; }
 
-        private void OnModelChanged(object sender, NotifyCollectionChangedEventArgs args)
+        // forward event
+        public event NotifyCollectionChangedEventHandler CollectionChanged
         {
-            if(args.Action == NotifyCollectionChangedAction.Remove)
-            {
-                RemovedModels.Add(args.OldItems[0] as TModel);
-            }
+            add => m_list.CollectionChanged += value;
+            remove => m_list.CollectionChanged -= value;
         }
 
-        #region PropertyChanged
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        [NotifyPropertyChangedInvocator]
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public SynchronizedModelList()
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            m_list = new ObservableCollection<TModel>();
+            Models = new ReadOnlyObservableCollection<TModel>(m_list);
         }
-
-        #endregion
     }
 }

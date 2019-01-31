@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -21,11 +22,22 @@ namespace gui.Command
         public AddLightCommand(Models models)
         {
             m_models = models;
+            m_models.PropertyChanged += ModelsOnPropertyChanged;
+        }
+
+        private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(Models.World):
+                    OnCanExecuteChanged();
+                    break;
+            }
         }
 
         public bool CanExecute(object parameter)
         {
-            return true;
+            return m_models.World != null;
         }
 
         public void Execute(object parameter)
@@ -35,18 +47,14 @@ namespace gui.Command
 
             if (dialog.ShowDialog() != true) return;
 
-            // TODO check for handle = null? error?
-            var handle = Core.world_add_light(dc.NameValue, Core.FromModelLightType(dc.TypeValue));
-
-            LightModel lm = LightModel.MakeFromHandle(handle, dc.TypeValue);
-
-            m_models.World.Lights.Models.Add(lm);
+            m_models.World.Lights.AddLight(dc.NameValue, dc.TypeValue);
         }
 
-        public event EventHandler CanExecuteChanged
+        public event EventHandler CanExecuteChanged;
+
+        protected virtual void OnCanExecuteChanged()
         {
-            add { }
-            remove { }
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

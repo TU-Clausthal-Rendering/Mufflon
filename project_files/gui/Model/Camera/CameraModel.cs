@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using gui.Annotations;
+using gui.Dll;
 using gui.Utility;
 using gui.ViewModel;
 using gui.ViewModel.Camera;
@@ -21,105 +22,111 @@ namespace gui.Model.Camera
             Ortho
         }
 
+        protected CameraModel(IntPtr handle)
+        {
+            Handle = handle;
+        }
+
         public abstract CameraType Type { get; }
 
-        private string m_name = String.Empty;
+        public string Name => Core.world_get_camera_name(Handle);
 
-        public string Name
-        {
-            get => m_name;
-            set
-            {
-                if (value == null || value == m_name) return;
-                m_name = value;
-                OnPropertyChanged(nameof(Name));
-            }
-        }
-
-        private bool m_isSelected = false;
-        // indicates if this camera should be used for the renderer
-        public bool IsSelected
-        {
-            get => m_isSelected;
-            set
-            {
-                if (value == m_isSelected) return;
-                m_isSelected = value;
-                OnPropertyChanged(nameof(IsSelected));
-            }
-        }
-
-        private Vec3<float> m_position = new Vec3<float>();
         public Vec3<float> Position
         {
-            get => m_position;
+            get
+            { 
+                if(!Core.world_get_camera_position(Handle, out var pos))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return pos.ToUtilityVec();
+            }
             set
             {
-                if (Equals(m_position, value)) return;
-                m_position = value;
+                if (Equals(Position, value)) return;
+                if(!Core.world_set_camera_position(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Position));
             }
         }
 
-        private Vec3<float> m_viewDir = new Vec3<float>();
         public Vec3<float> ViewDirection
         {
-            get => m_viewDir;
+            get
+            {
+                if(!Core.world_get_camera_direction(Handle, out var dir))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return dir.ToUtilityVec();
+            }
             set
             {
-                if (Equals(m_viewDir, value)) return;
-                m_viewDir = value;
+                if (Equals(ViewDirection, value)) return;
+                if(!Core.world_set_camera_direction(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(ViewDirection));
             }
         }
 
-        private Vec3<float> m_upDir = new Vec3<float>();
         public Vec3<float> Up
         {
-            get => m_upDir;
+            get
+            {
+                if (!Core.world_get_camera_up(Handle, out var up))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return up.ToUtilityVec();
+            }
             set
             {
-                if (Equals(m_upDir, value)) return;
-                m_upDir = value;
+                if (Equals(Up, value)) return;
+                if (!Core.world_set_camera_up(Handle, new Core.Vec3(value)))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Up));
             }
         }
 
-        private float m_near = 1e-5f;
         public float Near
         {
-            get => m_near;
+            get
+            {
+                if (!Core.world_get_camera_near(Handle, out var up))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return up;
+            }
             set
             {
-                if (m_near == value) return;
-                m_near = value;
+                if (Equals(Near, value)) return;
+                if (!Core.world_set_camera_near(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Near));
             }
         }
 
-        private float m_far = 1e5f;
         public float Far
         {
-            get => m_far;
+            get
+            {
+                if (!Core.world_get_camera_far(Handle, out var far))
+                    throw new Exception(Core.core_get_dll_error());
+
+                return far;
+            }
             set
             {
-                if (m_far == value) return;
-                m_far = value;
+                if (Equals(Far, value)) return;
+                if (!Core.world_set_camera_far(Handle, value))
+                    throw new Exception(Core.core_get_dll_error());
+
                 OnPropertyChanged(nameof(Far));
             }
         }
 
-        private IntPtr m_handle = IntPtr.Zero;
-        public IntPtr Handle
-        {
-            get => m_handle;
-            set
-            {
-                if (m_handle == value) return;
-                m_handle = value;
-                OnPropertyChanged(nameof(Handle));
-            }
-        }
+        public IntPtr Handle { get; }
 
         /// <summary>
         /// creates a new view model based on this model
@@ -127,6 +134,21 @@ namespace gui.Model.Camera
         /// <param name="models"></param>
         /// <returns></returns>
         public abstract CameraViewModel CreateViewModel(Models models);
+
+        public static CameraModel MakeFromHandle(IntPtr handle, Core.CameraType type)
+        {
+            switch (type)
+            {
+                case Core.CameraType.PINHOLE:
+                    return new PinholeCameraModel(handle);
+                case Core.CameraType.FOCUS:
+                    return new FocusCameraModel(handle);
+                default:
+                    // not implemented
+                    Debug.Assert(false);
+                    throw new NotImplementedException();
+            }
+        }
 
         #region PropertyChanged
 

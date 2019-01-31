@@ -33,8 +33,6 @@ namespace gui.ViewModel.Material
                 var vm = m_parent.LayerB.CreateViewModel(models);
                 LayerB = vm.CreateView();
             }
-            AddLayerACommand = new AddRecursiveMaterialCommand(models, model => parent.LayerA = model, model => parent.LayerA = null, "LayerA");
-            AddLayerBCommand = new AddRecursiveMaterialCommand(models, model => parent.LayerB = model, model => parent.LayerB = null, "LayerB");
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -98,15 +96,11 @@ namespace gui.ViewModel.Material
 
         public object LayerA { get; private set; } = null;
 
-        public ICommand AddLayerACommand { get; }
-
         public Visibility ButtonAVisibility => LayerA == null ? Visibility.Visible : Visibility.Collapsed;
 
         public Visibility LayerAVisibility => LayerA != null ? Visibility.Visible : Visibility.Collapsed;
 
         public object LayerB { get; private set; } = null;
-
-        public ICommand AddLayerBCommand { get; }
 
         public Visibility ButtonBVisibility => LayerB == null ? Visibility.Visible : Visibility.Collapsed;
 

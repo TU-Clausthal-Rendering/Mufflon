@@ -22,18 +22,12 @@ namespace gui.ViewModel.Material
         protected MaterialViewModel(Models models, MaterialModel parent)
         {
             this.m_parent = parent;
-            RemoveCommand = new RemoveMaterialCommand(parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
         }
 
         protected virtual void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
-            switch (args.PropertyName)
-            {
-                case nameof(MaterialModel.Name):
-                    OnPropertyChanged(nameof(Name));
-                    break;
-            }
+            // add name change if it will ever be available
         }
 
         public UIElement CreateView()
@@ -45,15 +39,9 @@ namespace gui.ViewModel.Material
 
         protected abstract UIElement CreateInternalView();
 
-        public string Name
-        {
-            get => m_parent.Name;
-            set => m_parent.Name = value;
-        }
+        public string Name => m_parent.Name;
 
         public string Type => m_parent.Type.ToString();
-
-        public ICommand RemoveCommand { get; }
 
         #region PropertyChanged
 

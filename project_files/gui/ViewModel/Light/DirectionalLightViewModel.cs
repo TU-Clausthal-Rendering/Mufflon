@@ -15,7 +15,7 @@ namespace gui.ViewModel.Light
     {
         private readonly DirectionalLightModel m_parent;
 
-        public DirectionalLightViewModel(Models models, DirectionalLightModel parent) : base(models, parent)
+        public DirectionalLightViewModel(Models world, DirectionalLightModel parent) : base(world, parent)
         {
             m_parent = parent;
         }

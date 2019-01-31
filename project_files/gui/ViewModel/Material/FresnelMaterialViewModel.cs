@@ -33,8 +33,6 @@ namespace gui.ViewModel.Material
                 var vm = m_parent.LayerReflection.CreateViewModel(m_models);
                 LayerReflection = vm.CreateView();
             }
-            AddLayerReflectionCommand = new AddRecursiveMaterialCommand(models, model => parent.LayerReflection = model, model => parent.LayerReflection = null, "Reflection");
-            AddLayerRefractionCommand = new AddRecursiveMaterialCommand(models, model => parent.LayerRefraction = model, model => parent.LayerRefraction = null, "Refraction");
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)

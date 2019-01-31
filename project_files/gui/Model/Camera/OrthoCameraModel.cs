@@ -43,5 +43,9 @@ namespace gui.Model.Camera
                 OnPropertyChanged(nameof(Height));
             }
         }
+
+        public OrthoCameraModel(IntPtr handle) : base(handle)
+        {
+        }
     }
 }

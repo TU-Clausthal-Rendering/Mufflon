@@ -40,7 +40,7 @@ namespace gui.Utility
             if (m_list != null)
             {
                 // unregister old list
-                m_list.Models.CollectionChanged -= ModelsOnCollectionChanged;
+                m_list.CollectionChanged -= ModelsOnCollectionChanged;
                 m_views.Clear();
             }
 
@@ -48,7 +48,7 @@ namespace gui.Utility
             if(m_list == null) return;
 
             // register new list
-            m_list.Models.CollectionChanged += ModelsOnCollectionChanged;
+            m_list.CollectionChanged += ModelsOnCollectionChanged;
             // init values
             foreach (var model in m_list.Models)
             {

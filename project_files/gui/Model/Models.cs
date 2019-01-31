@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using gui.Annotations;
 using gui.Model.Camera;
+using gui.Model.Controller;
 using gui.Model.Light;
 using gui.Model.Material;
 using gui.Model.Scene;
@@ -23,6 +24,8 @@ namespace gui.Model
     /// </summary>
     public class Models : INotifyPropertyChanged
     {
+        // models
+
         public AppModel App { get; }
         public SettingsModel Settings { get; }
 
@@ -40,23 +43,27 @@ namespace gui.Model
                 OnPropertyChanged(nameof(World));
             }
         }
-        public SynchronizedModelList<CameraModel> Cameras { get; }
-        public SynchronizedModelList<MaterialModel> Materials { get; }
 
         public ToolbarModel Toolbar { get; }
 
         public RenderTargetSelectionModel RenderTargetSelection { get; }
 
+        // model controller 
+
+        public ScenarioChangedController ScenarioChangedController { get; }
+
         public Models(MainWindow window)
         {
+            // init models first
             Settings = new SettingsModel();
             Viewport = new ViewportModel();
             Renderer = new RendererModel();
             RenderTargetSelection = new RenderTargetSelectionModel();
             App = new AppModel(window, Viewport, Renderer, RenderTargetSelection, Settings);
-            Cameras = new SynchronizedModelList<CameraModel>();
-            Materials = new SynchronizedModelList<MaterialModel>();
             Toolbar = new ToolbarModel();
+
+            // init controller last
+            ScenarioChangedController = new ScenarioChangedController(this);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

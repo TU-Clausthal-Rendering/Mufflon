@@ -30,14 +30,17 @@ namespace gui.Model.Scene
 
         public ObservableCollection<ScenarioModel> Scenarios { get; } = new ObservableCollection<ScenarioModel>();
 
-        // TODO
-        //public SynchronizedModelList<CameraModel> Cameras { get; } = new SynchronizedModelList<CameraModel>();
+        public LightsModel Lights { get; }
 
-        // TODO make this readonly and add AddLight Method to WorldModel?
-        public SynchronizedModelList<LightModel> Lights { get; } = new SynchronizedModelList<LightModel>();
+        public CamerasModel Cameras { get; }
 
-        // TODO 
-        //public SynchronizedModelList<MaterialModel> Materials { get; } = new SynchronizedModelList<MaterialModel>();
+        public MaterialsModel Materials { get; }
+
+        /// <summary>
+        /// references the previous scenario or null.
+        /// This property is excluded from NotifyPropertyChanged since it changes with CurrentScenario
+        /// </summary>
+        public ScenarioModel PreviousScenario { get; private set; } = null;
 
         private ScenarioModel m_currentScenario;
         public ScenarioModel CurrentScenario
@@ -70,6 +73,7 @@ namespace gui.Model.Scene
             });
 
             // set scenario properties
+            PreviousScenario = m_currentScenario;
             m_currentScenario = scenario;
             OnPropertyChanged(nameof(CurrentScenario));
             OnPropertyChanged(nameof(BoundingBox));
@@ -104,8 +108,10 @@ namespace gui.Model.Scene
 
             FullPath = fullPath;
 
-            // first load lights and materials
-            LoadLights();
+            // first load lights, cameras and materials
+            Lights = new LightsModel();
+            Materials = new MaterialsModel();
+            Cameras = new CamerasModel();
 
             // load the scenario
             LoadScenarios();
@@ -118,7 +124,7 @@ namespace gui.Model.Scene
         {
             uint count = Core.world_get_scenario_count();
             for (uint i = 0u; i < count; ++i)
-                Scenarios.Add(new ScenarioModel(Core.world_get_scenario_by_index(i)));
+                Scenarios.Add(new ScenarioModel(this, Core.world_get_scenario_by_index(i)));
 
             // which scenario was loaded?
             var loadedScenario = Core.world_get_current_scenario();
@@ -132,25 +138,6 @@ namespace gui.Model.Scene
             }
             if (m_currentScenario == null)
                 throw new Exception("could not find active scenario in loaded scenarios " + loadedScenario);
-        }
-
-        private void LoadLights()
-        {
-            var numPointLights = Core.world_get_point_light_count();
-            for (var i = 0u; i < numPointLights; ++i)
-                Lights.Models.Add(new PointLightModel(Core.world_get_light_handle(i, Core.LightType.POINT)));
-
-            var numSpotLights = Core.world_get_spot_light_count();
-            for (var i = 0u; i < numSpotLights; ++i)
-                Lights.Models.Add(new SpotLightModel(Core.world_get_light_handle(i, Core.LightType.SPOT)));
-
-            var numDirLights = Core.world_get_dir_light_count();
-            for (var i = 0u; i < numDirLights; ++i)
-                Lights.Models.Add(new DirectionalLightModel(Core.world_get_light_handle(i, Core.LightType.DIRECTIONAL)));
-
-            var numEnvLights = Core.world_get_env_light_count();
-            for(var i = 0u; i < numEnvLights; ++i)
-                Lights.Models.Add(new EnvmapLightModel(Core.world_get_light_handle(i, Core.LightType.ENVMAP)));
         }
 
         #region PropertyChanged

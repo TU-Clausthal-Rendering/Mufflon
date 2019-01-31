@@ -16,7 +16,7 @@ namespace gui.ViewModel.Camera
     {
         private readonly FocusCameraModel m_parent;
 
-        public FocusCameraViewModel(Models models, FocusCameraModel parent) : base(models, parent)
+        public FocusCameraViewModel(Models modelssss, FocusCameraModel parent) : base(modelssss, parent)
         {
             m_parent = parent;
         }

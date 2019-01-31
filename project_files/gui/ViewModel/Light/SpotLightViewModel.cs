@@ -15,7 +15,7 @@ namespace gui.ViewModel.Light
     {
         private readonly SpotLightModel m_parent;
 
-        public SpotLightViewModel(Models models, SpotLightModel parent) : base(models, parent)
+        public SpotLightViewModel(Models world, SpotLightModel parent) : base(world, parent)
         {
             m_parent = parent;
         }

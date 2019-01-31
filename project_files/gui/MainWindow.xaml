@@ -319,7 +319,7 @@
                             <StackPanel>
                                 <ItemsControl ItemsSource="{Binding Materials.Views}"
                                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
-                                <Button Command="{Binding AddMaterialCommand}"
+                                <!--<Button Command="{Binding AddMaterialCommand}"
                                         IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -336,7 +336,7 @@
                                             Grid.Column="1"
                                             Content="Add Material"/>
                                     </Grid>
-                                </Button>
+                                </Button>-->
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
@@ -372,7 +372,7 @@
                             HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
                                 <ItemsControl ItemsSource="{Binding Cameras.Views}"/>
-                                <Button Command="{Binding AddCameraCommand}">
+                                <!--<Button Command="{Binding AddCameraCommand}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -389,7 +389,7 @@
                                             Grid.Column="1"
                                             Content="Add Camera" Grid.ColumnSpan="2"/>
                                     </Grid>
-                                </Button>
+                                </Button>-->
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

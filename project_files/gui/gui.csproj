@@ -90,10 +90,7 @@
     </ApplicationDefinition>
     <Compile Include="AndBooleanConverter.cs" />
     <Compile Include="Command\ActionCommand.cs" />
-    <Compile Include="Command\AddCameraCommand.cs" />
     <Compile Include="Command\AddLightCommand.cs" />
-    <Compile Include="Command\AddMaterialCommand.cs" />
-    <Compile Include="Command\AddRecursiveMaterialCommand.cs" />
     <Compile Include="Command\AdjustGammaCommand.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
@@ -101,9 +98,6 @@
     <Compile Include="Command\SelectRendererCommand.cs" />
     <Compile Include="Command\LoadSceneCommand.cs" />
     <Compile Include="Command\PlayPauseCommand.cs" />
-    <Compile Include="Command\RemoveCameraCommand.cs" />
-    <Compile Include="Command\RemoveLightCommand.cs" />
-    <Compile Include="Command\RemoveMaterialCommand.cs" />
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Command\SetDialogResultCommand.cs" />
@@ -114,13 +108,16 @@
     <Compile Include="InvertVisibilityConverter.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
+    <Compile Include="Model\Camera\CamerasModel.cs" />
     <Compile Include="Model\Camera\FocusCameraModel.cs" />
     <Compile Include="Model\Camera\OrthoCameraModel.cs" />
     <Compile Include="Model\Camera\PinholeCameraModel.cs" />
+    <Compile Include="Model\Controller\ScenarioChangedController.cs" />
     <Compile Include="Model\Light\DirectionalLightModel.cs" />
     <Compile Include="Model\Light\EnvmapLightModel.cs" />
     <Compile Include="Model\Light\GoniometricLightModel.cs" />
     <Compile Include="Model\Light\LightModel.cs" />
+    <Compile Include="Model\Light\LightsModel.cs" />
     <Compile Include="Model\Light\PointLightModel.cs" />
     <Compile Include="Model\Light\SpotLightModel.cs" />
     <Compile Include="Model\Material\BlendMaterialModel.cs" />
@@ -128,6 +125,7 @@
     <Compile Include="Model\Material\FresnelMaterialModel.cs" />
     <Compile Include="Model\Material\LambertMaterialModel.cs" />
     <Compile Include="Model\Material\MaterialModel.cs" />
+    <Compile Include="Model\Material\MaterialsModel.cs" />
     <Compile Include="Model\Material\OrennayarMaterialModel.cs" />
     <Compile Include="Model\Material\TorranceMaterialModel.cs" />
     <Compile Include="Model\Material\WalterMaterialModel.cs" />
@@ -472,7 +470,6 @@
     <Resource Include="Icons\camera_nomove.png" />
     <Resource Include="Icons\logo1.ico" />
   </ItemGroup>
-  <ItemGroup>
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -27,7 +27,7 @@
                     Grid.Column="1"
                     Text="{Binding Name, FallbackValue=Name}"/>
 
-                <Button
+                <!--<Button
                     Grid.Column="2"
                     Margin="5 0 0 0"
                     Command="{Binding RemoveCommand}">
@@ -35,7 +35,7 @@
                         Source="../../Icons/cancel.png"
                         Width="16"
                         Height="16"/>
-                </Button>
+                </Button>-->
             </Grid>
         </GroupBox.Header>
         <StackPanel x:Name="GroupItems">

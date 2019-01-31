@@ -341,6 +341,7 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <InterleaveSourceInPTX>true</InterleaveSourceInPTX>
     </CudaCompile>
     <CudaLink>
       <PerformDeviceLink>true</PerformDeviceLink>
