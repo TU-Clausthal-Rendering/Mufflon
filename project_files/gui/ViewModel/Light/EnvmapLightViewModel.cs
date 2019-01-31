@@ -11,18 +11,21 @@ using System.Windows.Input;
 using gui.Command;
 using gui.Model;
 using gui.Model.Light;
+using gui.Model.Scene;
 using gui.View.Light;
 
 namespace gui.ViewModel.Light
 {
     public class EnvmapLightViewModel : LightViewModel
     {
+        private readonly WorldModel m_world;
         private readonly EnvmapLightModel m_parent;
 
-        public EnvmapLightViewModel(Models world, EnvmapLightModel parent) : base(world, parent)
+        public EnvmapLightViewModel(Models models, EnvmapLightModel parent) : base(models, parent)
         {
+            m_world = models.World;
             m_parent = parent;
-            SelectMapCommand = new SelectTextureCommand(world, () => m_parent.Map, val => m_parent.Map = val);
+            SelectMapCommand = new SelectTextureCommand(models, () => Map, val => Map = val);
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -41,11 +44,14 @@ namespace gui.ViewModel.Light
             return new LightView(this, new EnvmapLightView());
         }
 
-        // readonly property
         public string Map
         {
             get => m_parent.Map;
-            set => m_parent.Map = value;
+            set
+            {
+                var absolutePath = Path.Combine(m_world.Directory, value);
+                m_parent.Map = absolutePath;
+            }
         }
 
         public ICommand SelectMapCommand { get; }

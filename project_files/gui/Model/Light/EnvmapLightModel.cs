@@ -41,7 +41,7 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(value, Map)) return;
-                //var absolutePath = Path.Combine(m_world.Directory, value);
+                
                 var texHandle = Core.world_add_texture(value, Core.TextureSampling.LINEAR);
                 if(texHandle == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
