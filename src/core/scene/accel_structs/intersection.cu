@@ -682,7 +682,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 				const ei::Vec3 dx1 = v[2u] - v[0u];
 				const ei::Vec2 du0 = uvV[1u] - uvV[0u];
 				const ei::Vec2 du1 = uvV[2u] - uvV[0u];
-				float det = 1.f / (du0.x * du1.y - du0.y - du1.x);
+				float det = 1.f / (du0.x * du1.y - du0.y * du1.x);
 				// TODO: fetch the instance instead (issue #44)
 				// TODO: do the tangent's really need to be normalized?
 				tangentX = normalize(det * (dx0 * du1.y - dx1 * du0.y));
@@ -690,6 +690,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 
 				// Don't use the UV tangents to compute the normal, since they may be reversed
 				geoNormal = normalize(cross(v[1u] - v[0u], v[2u] - v[0u]));
+
 				mAssert(dot(geoNormal, obj.polygon.normals[ids.x]) > 0.f);
 
 				uv = uvV[0] * surfParams.barycentric.x + uvV[1] * surfParams.barycentric.y +
@@ -729,6 +730,10 @@ RayIntersectionResult first_intersection_scene_lbvh(
 				uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], surfParams.bilinear.x, surfParams.bilinear.y);
 			}
 		}
+
+		mAssert(!(isnan(tangentX.x) || isnan(tangentX.y) || isnan(tangentX.z)));
+		mAssert(!(isnan(tangentY.x) || isnan(tangentY.y) || isnan(tangentY.z)));
+		mAssert(!(isnan(geoNormal.x) || isnan(geoNormal.y) || isnan(geoNormal.z)));
 
 		// Since we have separated scale, rotation, and translation, we do not need to normalize the vectors again
 		geoNormal = transformDir(geoNormal, scene.transformations[hitInstanceId]);
