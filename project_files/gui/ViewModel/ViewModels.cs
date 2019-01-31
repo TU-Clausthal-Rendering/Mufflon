@@ -16,6 +16,7 @@ using gui.Model.Material;
 using gui.Utility;
 using gui.View;
 using gui.ViewModel.Camera;
+using gui.ViewModel.Dialog;
 using gui.ViewModel.Light;
 using gui.ViewModel.Material;
 
@@ -45,9 +46,9 @@ namespace gui.ViewModel
 
         public KeyGestureViewModel KeyGestures { get; }
 
+        public LoadWorldViewModel LoadWorld { get; }
+
         public ICommand AddLightCommand { get; }
-        public ICommand AddMaterialCommand { get; }
-        public ICommand AddCameraCommand { get; }
         public ICommand LoadSceneCommand { get; }
         public ICommand SaveSceneCommand { get; }
         public ICommand SelectRendererCommand { get; }
@@ -80,6 +81,8 @@ namespace gui.ViewModel
             Scene = new SceneViewModel(m_models);
 
             RenderTargetSelection = new RenderTargetSelectionViewModel(m_models.RenderTargetSelection, Toolbar.ResetCommand);
+
+            LoadWorld = new LoadWorldViewModel(m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

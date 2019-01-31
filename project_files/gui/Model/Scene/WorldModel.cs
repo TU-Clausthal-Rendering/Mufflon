@@ -25,8 +25,7 @@ namespace gui.Model.Scene
         // path with filename and extension
         public string FullPath { get; }
 
-        private readonly IntPtr m_handle;
-        private RendererModel m_rendererModel;
+        private readonly RendererModel m_rendererModel;
 
         public ObservableCollection<ScenarioModel> Scenarios { get; } = new ObservableCollection<ScenarioModel>();
 
@@ -86,7 +85,7 @@ namespace gui.Model.Scene
         {
             get
             {
-                if (!Core.scene_get_bounding_box(m_handle, out var min, out var max))
+                if (!Core.scene_get_bounding_box(Core.world_get_current_scene(), out var min, out var max))
                     throw new Exception(Core.core_get_dll_error());
 
                 return new BoundingBox(min.ToUtilityVec(), max.ToUtilityVec());
@@ -99,13 +98,9 @@ namespace gui.Model.Scene
         // filename with extension
         public string Filename => Path.GetFileName(FullPath);
 
-        public WorldModel(RendererModel model, IntPtr handle, string fullPath)
+        public WorldModel(RendererModel model, string fullPath)
         {
             m_rendererModel = model;
-            m_handle = handle;
-            if(handle == IntPtr.Zero)
-                throw new Exception("scene handle is nullptr");
-
             FullPath = fullPath;
 
             // first load lights, cameras and materials

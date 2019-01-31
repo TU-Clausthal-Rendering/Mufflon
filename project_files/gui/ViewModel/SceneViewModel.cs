@@ -41,7 +41,7 @@ namespace gui.ViewModel
                 Command = this;
             }
 
-            public override void Execute(object parameter) => LoadScene(Path);
+            public override void Execute(object parameter) => m_models.LoadSceneAsynch(Path);
         }
 
         private readonly Models m_models;

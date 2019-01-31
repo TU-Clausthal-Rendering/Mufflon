@@ -112,6 +112,7 @@
     <Compile Include="Model\Camera\OrthoCameraModel.cs" />
     <Compile Include="Model\Camera\PinholeCameraModel.cs" />
     <Compile Include="Model\Controller\ScenarioChangedController.cs" />
+    <Compile Include="Model\Events\LoadEvent.cs" />
     <Compile Include="Model\Light\DirectionalLightModel.cs" />
     <Compile Include="Model\Light\EnvmapLightModel.cs" />
     <Compile Include="Model\Light\GoniometricLightModel.cs" />
@@ -153,6 +154,7 @@
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
     <Compile Include="ViewModel\ConsoleInputViewModel.cs" />
     <Compile Include="ViewModel\ConsoleOutputViewModel.cs" />
+    <Compile Include="ViewModel\Dialog\LoadWorldViewModel.cs" />
     <Compile Include="ViewModel\KeyGestureViewModel.cs" />
     <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
     <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
