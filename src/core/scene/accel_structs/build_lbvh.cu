@@ -95,7 +95,7 @@ calculate_morton_code(const DescType& primitives, i32 idx,
 
 template < typename DescType >
 __global__ void calculate_morton_codesD(
-	const DescType desc,
+	const DescType* desc,
 	const ei::Box sceneBB,
 	const i32 numPrimitives,
 	MortonCode_t<DescType>* mortonCodes,
@@ -105,7 +105,7 @@ __global__ void calculate_morton_codesD(
 	if (idx >= numPrimitives)
 		return;
 
-	mortonCodes[idx] = calculate_morton_code(desc, idx, sceneBB);
+	mortonCodes[idx] = calculate_morton_code(*desc, idx, sceneBB);
 	sortIndices[idx] = idx;
 }
 
@@ -492,7 +492,7 @@ CUDA_FUNCTION void mark_collapsed_nodes(
 
 template< typename DescType >
 __global__ void calculate_bounding_boxesD(
-	const DescType desc,
+	const DescType* desc,
 	const i32 numPrimitives,
 	const i32* __restrict__ sortedIndices,
 	const i32* __restrict__ parents,
@@ -511,7 +511,7 @@ __global__ void calculate_bounding_boxesD(
 	if (idx >= numPrimitives)
 		return;
 
-	calculate_bounding_boxes<DescType>(desc, idx, sortedIndices[idx],
+	calculate_bounding_boxes<DescType>(*desc, idx, sortedIndices[idx],
 		numPrimitives, parents, boundingBoxes, counters, nodeMarks,
 		firstThreadInBlock, lastThreadInBlock, sharedBb);
 }
@@ -634,6 +634,12 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	const i32 numInternalNodes = numPrimitives - 1;
 	const i32 numNodes = numInternalNodes + numPrimitives;
 
+	// Device copy of descriptor
+	unique_device_ptr<DescType::DEVICE, DescType> deviceDesc;
+	if(DescType::DEVICE != Device::CPU) {
+		deviceDesc = make_udevptr<DescType::DEVICE, DescType>();
+		copy(deviceDesc.get(), &desc, sizeof(DescType));
+	}
 
 	i32 numBlocks, numThreads; // TODO: move to local scopes
 
@@ -661,7 +667,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			//auto dobj = reinterpret_cast<const LodDescriptor<Device::CUDA>&>(obj);
 			get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codesD<DescType>);
 			calculate_morton_codesD <<< numBlocks, numThreads >>> (
-				desc, sceneBB, numPrimitives, mortonCodes, primIdsUnsorted);
+				deviceDesc.get(), sceneBB, numPrimitives, mortonCodes, primIdsUnsorted);
 			cuda::check_error(cudaGetLastError());
 
 			// Sort based on Morton codes.
@@ -713,7 +719,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		get_maximum_occupancy_variable_smem(numBlocks, numThreads, numPrimitives,
 			calculate_bounding_boxesD<DescType>, functor);
 		calculate_bounding_boxesD<<< numBlocks, numThreads, bboxCacheSize >>>(
-			desc, numPrimitives, primIds, parents.get(),
+			deviceDesc.get(), numPrimitives, primIds, parents.get(),
 			boundingBoxes.get(), deviceCounters,
 			collapseOffsets.get()
 		);
