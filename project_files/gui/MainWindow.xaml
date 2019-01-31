@@ -87,12 +87,6 @@
                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
-                    <ComboBox Name="RenderTargetSelectionBox"
-                              ItemsSource="{Binding Renderer.RenderTargets}"
-                              SelectedItem="{Binding Renderer.SelectedRenderTarget}"
-                              DisplayMemberPath="Name"/>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
                     <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}"
                             ToolTip="Play/pause the renderer"
                             SnapsToDevicePixels="True">
@@ -225,7 +219,7 @@
                     <ColumnDefinition Width="*"/>
                     <!-- properties page -->
                     <ColumnDefinition Width="5"/>
-                    <ColumnDefinition Width="160"/>
+                    <ColumnDefinition Width="200"/>
                 </Grid.ColumnDefinitions>
 
                 <TabControl
@@ -316,7 +310,7 @@
                     Grid.Column="4"
                     Background="{StaticResource BackgroundBrush}">
                     <TabItem Header="Renderer">
-
+                        <view:RenderTargetSelectionView/>
                     </TabItem>
                     <TabItem Header="Material">
                         <ScrollViewer 

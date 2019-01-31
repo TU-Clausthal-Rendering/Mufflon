@@ -184,7 +184,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 		auto& instScaleDesc = m_instScaleDesc.template get<unique_device_ptr<dev, float[]>>();
 		instScaleDesc = make_udevptr_array<dev, float>(instanceScales.size());
-		copy(instScaleDesc.get(), instanceScales.data(), sizeof(u32) * instanceScales.size());
+		copy(instScaleDesc.get(), instanceScales.data(), sizeof(float) * instanceScales.size());
 
 		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
 		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());

@@ -45,12 +45,15 @@ namespace gui.Model
 
         public ToolbarModel Toolbar { get; }
 
+        public RenderTargetSelectionModel RenderTargetSelection { get; }
+
         public Models(MainWindow window)
         {
             Settings = new SettingsModel();
             Viewport = new ViewportModel();
             Renderer = new RendererModel();
-            App = new AppModel(window, Viewport, Renderer, Settings);
+            RenderTargetSelection = new RenderTargetSelectionModel();
+            App = new AppModel(window, Viewport, Renderer, RenderTargetSelection, Settings);
             Cameras = new SynchronizedModelList<CameraModel>();
             Materials = new SynchronizedModelList<MaterialModel>();
             Toolbar = new ToolbarModel();

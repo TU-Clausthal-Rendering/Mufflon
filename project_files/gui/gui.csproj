@@ -88,6 +88,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="AndBooleanConverter.cs" />
     <Compile Include="Command\ActionCommand.cs" />
     <Compile Include="Command\AddCameraCommand.cs" />
     <Compile Include="Command\AddLightCommand.cs" />
@@ -131,6 +132,7 @@
     <Compile Include="Model\Material\TorranceMaterialModel.cs" />
     <Compile Include="Model\Material\WalterMaterialModel.cs" />
     <Compile Include="Model\RendererModel.cs" />
+    <Compile Include="Model\RenderTargetSelectionModel.cs" />
     <Compile Include="Model\Scene\ScenarioModel.cs" />
     <Compile Include="Model\Scene\WorldModel.cs" />
     <Compile Include="Model\SettingsModel.cs" />
@@ -174,6 +176,7 @@
     <Compile Include="ViewModel\Material\WalterMaterialViewModel.cs" />
     <Compile Include="ViewModel\ProfilerViewModel.cs" />
     <Compile Include="ViewModel\RendererViewModel.cs" />
+    <Compile Include="ViewModel\RenderTargetSelectionViewModel.cs" />
     <Compile Include="ViewModel\SceneViewModel.cs" />
     <Compile Include="ViewModel\SelectRendererViewModel.cs" />
     <Compile Include="ViewModel\Settings\SettingsViewModel.cs" />
@@ -264,6 +267,9 @@
     </Compile>
     <Compile Include="View\Renderer\RendererParams.xaml.cs">
       <DependentUpon>RendererParams.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\RenderTargetSelectionView.xaml.cs">
+      <DependentUpon>RenderTargetSelectionView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\SettingsView.xaml.cs">
       <DependentUpon>SettingsView.xaml</DependentUpon>
@@ -388,6 +394,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Renderer\RendererParams.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\RenderTargetSelectionView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

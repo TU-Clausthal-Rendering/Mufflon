@@ -31,8 +31,8 @@ namespace gui.Command
             filename = filename.Replace("#scenario", m_models.World.CurrentScenario.Name);
             filename = filename.Replace("#renderer", RendererModel.getRendererName(m_models.Renderer.Type));
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
-            filename = filename.Replace("#target", RendererModel.getRenderTargetName(m_models.Renderer.RenderTarget,
-                m_models.Renderer.RenderTargetVariance));
+            filename = filename.Replace("#target", RenderTargetSelectionModel.getRenderTargetName(m_models.RenderTargetSelection.VisibleTarget,
+                m_models.RenderTargetSelection.IsVarianceVisible));
             // Gotta pause the renderer
             bool wasRunning = m_models.Renderer.IsRendering;
             m_models.Renderer.IsRendering = false;

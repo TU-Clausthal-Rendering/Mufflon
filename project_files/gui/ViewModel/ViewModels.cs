@@ -41,6 +41,8 @@ namespace gui.ViewModel
         public RendererViewModel Renderer { get; }
         public SceneViewModel Scene { get; }
 
+        public RenderTargetSelectionViewModel RenderTargetSelection { get; }
+
         public KeyGestureViewModel KeyGestures { get; }
 
         public ICommand AddLightCommand { get; }
@@ -76,6 +78,8 @@ namespace gui.ViewModel
 
             Renderer = new RendererViewModel(m_models, Toolbar.PlayPauseCommand, Toolbar.ResetCommand);
             Scene = new SceneViewModel(m_models);
+
+            RenderTargetSelection = new RenderTargetSelectionViewModel(m_models.RenderTargetSelection, Toolbar.ResetCommand);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

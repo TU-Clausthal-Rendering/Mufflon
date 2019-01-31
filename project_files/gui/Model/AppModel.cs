@@ -15,13 +15,14 @@ namespace gui.Model
         public OpenGLHost GlHost { get; }
         public Window TopmostWindow => m_windowStack.Peek();
 
-        public AppModel(MainWindow window, ViewportModel viewport, RendererModel rendererModel, SettingsModel settings)
+        public AppModel(MainWindow window, ViewportModel viewport, RendererModel rendererModel,
+            RenderTargetSelectionModel targetModel, SettingsModel settings)
         {
             Window = window;
             m_windowStack.Push(window);
 
             // init gl host
-            GlHost = new OpenGLHost(window, viewport, rendererModel, settings);
+            GlHost = new OpenGLHost(window, viewport, rendererModel, targetModel, settings);
             GlHost.Error += window.GlHostOnError;
             window.Loaded += (sender, args) => window.BorderHost.Child = GlHost;
         }

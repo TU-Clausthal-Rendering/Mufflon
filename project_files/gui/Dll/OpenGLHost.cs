@@ -31,6 +31,7 @@ namespace gui.Dll
         // information about the viewport
         private readonly ViewportModel m_viewport;
         private readonly RendererModel m_rendererModel;
+        private readonly RenderTargetSelectionModel m_renderTargetModel;
         private readonly SettingsModel m_settings;
 
         // context creation
@@ -58,12 +59,14 @@ namespace gui.Dll
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
-        public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel, SettingsModel settings)
+        public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel,
+            RenderTargetSelectionModel targetModel,SettingsModel settings)
         {
             m_window = window;
             m_parent = window.BorderHost;
             m_viewport = viewport;
             m_rendererModel = rendererModel;
+            m_renderTargetModel = targetModel;
             m_settings = settings;
             m_window.MouseWheel += OnMouseWheel;
             m_window.SnapsToDevicePixels = true;
@@ -251,19 +254,19 @@ namespace gui.Dll
             // Check if we need to resize the screen texture
             int newWidth = m_viewport.RenderWidth;
             int newHeight = m_viewport.RenderHeight;
-            Core.RenderTarget newTarget = m_rendererModel.RenderTarget;
-            bool newVarianceTarget = m_rendererModel.RenderTargetVariance;
+            Core.RenderTarget newTarget = m_renderTargetModel.VisibleTarget;
+            bool newVarianceTarget = m_renderTargetModel.IsVarianceVisible;
 
             // TODO: disable the old target?
             if(newTarget != m_renderTarget || newVarianceTarget != m_varianceTarget)
             {
-                if (!Core.render_is_render_target_enabled(m_rendererModel.RenderTarget, m_rendererModel.RenderTargetVariance))
+                if (!Core.render_is_render_target_enabled(m_renderTargetModel.VisibleTarget, m_renderTargetModel.IsVarianceVisible))
                 {
                     // Disable previous render target
                     // TODO: better solution since we might want multiple render targets at a time
                     if(!Core.render_disable_render_target(m_renderTarget, m_varianceTarget ? 1u : 0u))
                         throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_enable_render_target(m_rendererModel.RenderTarget, m_rendererModel.RenderTargetVariance ? 1u : 0u))
+                    if (!Core.render_enable_render_target(m_renderTargetModel.VisibleTarget, m_renderTargetModel.IsVarianceVisible ? 1u : 0u))
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());
