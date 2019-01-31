@@ -89,34 +89,34 @@ namespace gui.ViewModel
 
     public class RenderTargetSelectionViewModel : INotifyPropertyChanged
     {
-        private RenderTargetSelectionModel m_model;
+        private Models m_models;
         private ICommand m_reset;
 
         public ObservableCollection<RenderTargetSelectionItem> TargetData { get; set; } =
             new ObservableCollection<RenderTargetSelectionItem>();
 
-        public RenderTargetSelectionViewModel(RenderTargetSelectionModel model, ICommand reset)
+        public RenderTargetSelectionViewModel(Models models, ICommand reset)
         {
-            m_model = model;
+            m_models = models;
             m_reset = reset;
 
             var targets = Enum.GetValues(typeof(Core.RenderTarget));
             foreach(Core.RenderTarget target in targets)
             {
                 var targetItem = new RenderTargetSelectionItem(target);
-                targetItem.PropertyChanged += OnSelectionChanged;
-                targetItem.Enabled = m_model.TargetStatus[(int)target].Enabled;
-                targetItem.EnabledVariance = m_model.TargetStatus[(int)target].VarianceEnabled;
-                if (target == m_model.VisibleTarget)
+                targetItem.Enabled = m_models.RenderTargetSelection.TargetStatus[(int)target].Enabled;
+                targetItem.EnabledVariance = m_models.RenderTargetSelection.TargetStatus[(int)target].VarianceEnabled;
+                if (target == m_models.RenderTargetSelection.VisibleTarget)
                 {
                     targetItem.Visible = true;
-                    targetItem.VarianceVisible = m_model.IsVarianceVisible;
+                    targetItem.VarianceVisible = m_models.RenderTargetSelection.IsVarianceVisible;
                 }
                 TargetData.Add(targetItem);
 
-                m_model.TargetStatus[(int)target].PropertyChanged += OnModelChanged;
+                m_models.RenderTargetSelection.TargetStatus[(int)target].PropertyChanged += OnModelChanged;
+                targetItem.PropertyChanged += OnSelectionChanged;
             }
-            m_model.PropertyChanged += OnModelChanged;
+            m_models.RenderTargetSelection.PropertyChanged += OnModelChanged;
             OnPropertyChanged(nameof(TargetData));
         }
 
@@ -130,26 +130,22 @@ namespace gui.ViewModel
                         data.VarianceVisible = false;
                         data.Visible = false;
                     }
-                    TargetData[(int)m_model.VisibleTarget].Visible = true;
-                    TargetData[(int)m_model.VisibleTarget].VarianceVisible = m_model.IsVarianceVisible;
+                    TargetData[(int)m_models.RenderTargetSelection.VisibleTarget].Visible = true;
+                    TargetData[(int)m_models.RenderTargetSelection.VisibleTarget].VarianceVisible = m_models.RenderTargetSelection.IsVarianceVisible;
                     break;
                 case nameof(RenderTargetSelectionModel.IsVarianceVisible):
-                    TargetData[(int)m_model.VisibleTarget].VarianceVisible = m_model.IsVarianceVisible;
+                    TargetData[(int)m_models.RenderTargetSelection.VisibleTarget].VarianceVisible = m_models.RenderTargetSelection.IsVarianceVisible;
                     break;
                 case nameof(RenderTargetSelectionModel.TargetEnabledStatus.Enabled):
                 {
                     var target = sender as RenderTargetSelectionModel.TargetEnabledStatus;
-                    if (!TargetData[(int)target.Target].Enabled && target.Enabled && m_reset.CanExecute(null))
-                        m_reset.Execute(null);
                     TargetData[(int)target.Target].Enabled = target.Enabled;
                 }   break;
                 case nameof(RenderTargetSelectionModel.TargetEnabledStatus.VarianceEnabled):
                 {
                     var target = sender as RenderTargetSelectionModel.TargetEnabledStatus;
                     TargetData[(int)target.Target].EnabledVariance = target.VarianceEnabled;
-                    if (!TargetData[(int)target.Target].EnabledVariance && target.VarianceEnabled && m_reset.CanExecute(null))
-                        m_reset.Execute(null);
-                    }   break;
+                }   break;
             }
         }
 
@@ -160,16 +156,28 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(RenderTargetSelectionItem.Enabled):
-                    m_model.TargetStatus[(int)target.Target].Enabled = target.Enabled;
-                    break;
+                {
+                    bool wasRunning = m_models.Renderer.IsRendering;
+                    m_models.Renderer.IsRendering = false;
+                    if (target.Enabled && m_reset.CanExecute(null))
+                        m_reset.Execute(null);
+                    m_models.RenderTargetSelection.TargetStatus[(int)target.Target].Enabled = target.Enabled;
+                    m_models.Renderer.IsRendering = wasRunning;
+                }   break;
                 case nameof(RenderTargetSelectionItem.EnabledVariance):
-                    m_model.TargetStatus[(int)target.Target].VarianceEnabled = target.EnabledVariance;
-                    break;
+                {
+                    bool wasRunning = m_models.Renderer.IsRendering;
+                    m_models.Renderer.IsRendering = false;
+                    if (target.EnabledVariance && m_reset.CanExecute(null))
+                        m_reset.Execute(null);
+                    m_models.RenderTargetSelection.TargetStatus[(int)target.Target].VarianceEnabled = target.EnabledVariance;
+                    m_models.Renderer.IsRendering = wasRunning;
+                }   break;
                 case nameof(RenderTargetSelectionItem.Visible):
                     if(target.Visible)
                     {
                         target.Enabled = true;
-                        m_model.VisibleTarget = target.Target;
+                        m_models.RenderTargetSelection.VisibleTarget = target.Target;
                     }
                     break;
                 case nameof(RenderTargetSelectionItem.VarianceVisible):
@@ -177,18 +185,18 @@ namespace gui.ViewModel
                     // is that guaranteed?
                     if(target.VarianceVisible)
                     {
-                        if(m_model.VisibleTarget == target.Target)
+                        if(m_models.RenderTargetSelection.VisibleTarget == target.Target)
                         {
-                            m_model.IsVarianceVisible = true;
+                            m_models.RenderTargetSelection.IsVarianceVisible = true;
                         } else
                         {
-                            m_model.VisibleTarget = target.Target;
+                            m_models.RenderTargetSelection.VisibleTarget = target.Target;
                             target.VarianceVisible = true;
-                            m_model.IsVarianceVisible = target.VarianceVisible;
+                            m_models.RenderTargetSelection.IsVarianceVisible = target.VarianceVisible;
                         }
                     } else
                     {
-                        m_model.IsVarianceVisible = false;
+                        m_models.RenderTargetSelection.IsVarianceVisible = false;
                     }
                     break;
             }

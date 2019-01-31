@@ -110,7 +110,7 @@ private:
 			logError("[ParameterHandler::", action, "_param] Parameter '", name, "' is not of type ", expectedName, ".");
 			return nullptr;
 		}
-		return as<const char*>(this) + it->second.offset;
+		return as<char>(this) + it->second.offset;
 	}
 #endif
 };

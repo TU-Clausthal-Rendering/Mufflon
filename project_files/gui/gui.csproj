@@ -267,7 +267,7 @@
     <Compile Include="View\Renderer\RendererParams.xaml.cs">
       <DependentUpon>RendererParams.xaml</DependentUpon>
     </Compile>
-    <Compile Include="View\RenderTargetSelectionView.xaml.cs">
+    <Compile Include="View\Renderer\RenderTargetSelectionView.xaml.cs">
       <DependentUpon>RenderTargetSelectionView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\SettingsView.xaml.cs">
@@ -396,7 +396,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="View\RenderTargetSelectionView.xaml">
+    <Page Include="View\Renderer\RenderTargetSelectionView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

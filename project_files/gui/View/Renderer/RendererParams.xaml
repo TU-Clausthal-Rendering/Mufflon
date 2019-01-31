@@ -53,7 +53,9 @@
             </DataTemplate>
             <DataTemplate x:Key="IntTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyInt}">
-                <helper:NumericUpDown Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
+                <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                     HorizontalContentAlignment="Right"
+                                     VerticalContentAlignment="Center"/>
             </DataTemplate>
             <DataTemplate x:Key="FloatTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyFloat}">

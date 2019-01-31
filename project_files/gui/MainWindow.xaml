@@ -231,11 +231,6 @@
                             ItemsSource="{Binding Scene.Scenarios}"
                             SelectedItem="{Binding Scene.SelectedScenario}"/>
                     </TabItem>
-                    <TabItem Header="Properties"
-                             Width="Auto">
-                        <renderer:RendererParams x:Name="RendererPropertiesControl"
-                                                 IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
-                    </TabItem>
                     <TabItem Header="Profiler"
                              Width="Auto">
                         <TreeView Grid.Row="2"
@@ -310,7 +305,14 @@
                     Grid.Column="4"
                     Background="{StaticResource BackgroundBrush}">
                     <TabItem Header="Renderer">
-                        <view:RenderTargetSelectionView/>
+                        <StackPanel>
+                            <Border BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1">
+                                <renderer:RenderTargetSelectionView/>
+                            </Border>
+                            <Separator Background="{StaticResource BorderBrush}"/>
+                            <renderer:RendererParams x:Name="RendererPropertiesControl"/>
+                        </StackPanel>
                     </TabItem>
                     <TabItem Header="Material">
                         <ScrollViewer 

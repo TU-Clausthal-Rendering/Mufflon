@@ -80,7 +80,7 @@ namespace gui.ViewModel
             Renderer = new RendererViewModel(m_models, Toolbar.PlayPauseCommand, Toolbar.ResetCommand);
             Scene = new SceneViewModel(m_models);
 
-            RenderTargetSelection = new RenderTargetSelectionViewModel(m_models.RenderTargetSelection, Toolbar.ResetCommand);
+            RenderTargetSelection = new RenderTargetSelectionViewModel(m_models, Toolbar.ResetCommand);
 
             LoadWorld = new LoadWorldViewModel(m_models);
 

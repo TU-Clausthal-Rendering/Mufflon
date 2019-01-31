@@ -1,7 +1,7 @@
 ﻿using System.Windows.Controls;
 using gui.ViewModel;
 
-namespace gui.View
+namespace gui.View.Renderer
 {
     /// <summary>
     /// Interaction logic for RenderTargetSelectionView.xaml
