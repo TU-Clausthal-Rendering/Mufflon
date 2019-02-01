@@ -262,6 +262,9 @@ namespace gui.Dll
                 throw new Exception(Core.core_get_dll_error());
             if (!OpenGlDisplay.opengldisplay_set_logger(m_logCallbackPointer))
                 throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+
+            // Update what renderers we might have
+            Application.Current.Dispatcher.Invoke(new Action(() => m_rendererModel.RendererCount = Core.render_get_renderer_count()));
         }
 
         /// <summary>

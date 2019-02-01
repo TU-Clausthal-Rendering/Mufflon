@@ -3,8 +3,18 @@
 #include "core/scene/scene.hpp"
 #include "core/scene/world_container.hpp"
 #include "profiler/gpu_profiler.hpp"
+#include <random>
 
 namespace mufflon::renderer {
+
+namespace gpupt_detail {
+
+void call_kernel(const dim3& gridDims, const dim3& blockDims,
+				 RenderBuffer<Device::CUDA>&& outputBuffer,
+				 scene::SceneDescriptor<Device::CUDA>* scene,
+				 const u32* seeds, const GpuPathTracer::Parameters& params);
+
+} // namespace gpupt_detail
 
 GpuPathTracer::GpuPathTracer() : m_params{} {}
 
@@ -48,6 +58,34 @@ void GpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolu
 		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
 		m_reset = true;
 	}
+}
+
+void GpuPathTracer::iterate(Pixel imageDims,
+							RenderBuffer<Device::CUDA> outputBuffer) const {
+
+	std::unique_ptr<u32[]> rnds = std::make_unique<u32[]>(imageDims.x * imageDims.y);
+	math::Rng rng{ static_cast<u32>(std::random_device()()) };
+	for(int i = 0; i < imageDims.x*imageDims.y; ++i)
+		rnds[i] = static_cast<u32>(rng.next());
+	u32* devRnds = nullptr;
+	cuda::check_error(cudaMalloc(&devRnds, sizeof(u32) * imageDims.x * imageDims.y));
+	cuda::check_error(cudaMemcpy(devRnds, rnds.get(), sizeof(u32) * imageDims.x * imageDims.y,
+					  cudaMemcpyDefault));
+
+	// TODO: pass scene data to kernel!
+	dim3 blockDims{ 16u, 16u, 1u };
+	dim3 gridDims{
+		1u + static_cast<u32>(imageDims.x - 1) / blockDims.x,
+		1u + static_cast<u32>(imageDims.y - 1) / blockDims.y,
+		1u
+	};
+
+	// TODO
+	cuda::check_error(cudaGetLastError());
+	gpupt_detail::call_kernel(gridDims, blockDims, std::move(outputBuffer),
+							  m_scenePtr, devRnds, m_params);
+	cuda::check_error(cudaGetLastError());
+	cuda::check_error(cudaFree(devRnds));
 }
 
 } // namespace mufflon::renderer

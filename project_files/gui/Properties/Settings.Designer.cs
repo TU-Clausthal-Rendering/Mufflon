@@ -38,9 +38,9 @@ namespace gui.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int LastSelectedRenderer {
+        public uint LastSelectedRenderer {
             get {
-                return ((int)(this["LastSelectedRenderer"]));
+                return ((uint)(this["LastSelectedRenderer"]));
             }
             set {
                 this["LastSelectedRenderer"] = value;

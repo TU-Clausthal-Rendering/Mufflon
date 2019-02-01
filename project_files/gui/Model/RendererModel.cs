@@ -18,7 +18,8 @@ namespace gui.Model
     public class RendererModel : INotifyPropertyChanged
     {
         private bool m_isRendering = false;
-        private Core.RendererType m_type = Core.RendererType.CPU_PT;
+        private UInt32 m_rendererIndex = 0u;
+        private UInt32 m_rendererCount = 0u;
 
         public RendererModel()
         {
@@ -66,25 +67,26 @@ namespace gui.Model
             OnPropertyChanged(nameof(Iteration));
         }
 
-        public Core.RendererType Type
+        public UInt32 RendererCount
         {
-            get => m_type;
+            get => m_rendererCount;
             set
             {
-                if (m_type == value) return;
-                m_type = value;
-                OnPropertyChanged(nameof(Type));
+                if (m_rendererCount == value) return;
+                m_rendererCount = value;
+                OnPropertyChanged(nameof(RendererCount));
             }
         }
 
-        public static string GetRendererName(Core.RendererType type)
+        public UInt32 RendererIndex
         {
-            switch(type)
+            get => m_rendererIndex;
+            set
             {
-                case Core.RendererType.CPU_PT: return "Pathtracer (CPU)";
-                case Core.RendererType.GPU_PT: return "Pathtracer (GPU)";
+                if (m_rendererIndex == value) return;
+                m_rendererIndex = value;
+                OnPropertyChanged(nameof(RendererIndex));
             }
-            return "Unknown";
         }
 
         #region PropertyChanged

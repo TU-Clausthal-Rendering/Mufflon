@@ -9,8 +9,7 @@
 #include "profiler/gpu_profiler.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/renderer/output_handler.hpp"
-#include "core/renderer/cpu_pt.hpp"
-#include "core/renderer/gpu_pt.hpp"
+#include "core/renderer/renderers.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
 #include "core/scene/object.hpp"
@@ -83,7 +82,7 @@ using SphereVHdl = Spheres::SphereHandle;
 namespace {
 
 // static variables for interacting with the renderer
-std::unique_ptr<renderer::IRenderer> s_currentRenderer;
+renderer::IRenderer* s_currentRenderer;
 // Current iteration counter
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
@@ -100,6 +99,8 @@ std::mutex s_iterationMutex{};
 // Plugin container
 std::vector<TextureLoaderPlugin> s_plugins;
 
+// List of renderers
+std::vector<std::unique_ptr<renderer::IRenderer>> s_renderers;
 
 constexpr PolygonAttributeHdl INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX,
@@ -218,6 +219,19 @@ inline std::size_t get_attr_size(const AttribDesc& desc) {
 		case AttributeType::ATTR_DOUBLE: return sizeof(double) * desc.rows;
 		default: return 0u;
 	}
+}
+
+// Initializes all renderers
+template < std::size_t I = 0u >
+inline void init_renderers() {
+	if constexpr(I == 0u)
+		s_renderers.clear();
+	using RendererType = typename renderer::Renderers::Type<I>;
+	// Only initialize CUDA renderers if CUDA is enabled
+	if(s_cudaDevIndex >= 0 || !RendererType::uses_device(Device::CUDA))
+		s_renderers.push_back(std::make_unique<RendererType>());
+	if constexpr(I + 1u < renderer::Renderers::size)
+		init_renderers<I + 1u>();
 }
 
 // Function delegating the logger output to the applications handle, if applicable
@@ -2573,24 +2587,32 @@ CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color) {
 	CATCH_ALL(false)
 }
 
-Boolean render_enable_renderer(RendererType type) {
+uint32_t render_get_renderer_count() {
+	return static_cast<uint32_t>(s_renderers.size());
+}
+
+const char* render_get_renderer_name(uint32_t index) {
 	TRY
+	CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
+	return &s_renderers[index]->get_name()[0u];
+	CATCH_ALL(nullptr)
+}
+
+Boolean render_renderer_uses_device(uint32_t index, RenderDevice dev) {
+	TRY
+	CHECK(index < s_renderers.size(), "renderer index out of bounds", false);
+	return s_renderers[index]->uses_device(static_cast<Device>(dev));
+	CATCH_ALL(false)
+}
+
+Boolean render_enable_renderer(uint32_t index) {
+	TRY
+	CHECK(index < s_renderers.size(), "renderer index out of bounds", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
-	switch(type) {
-		case RendererType::RENDERER_CPU_PT: {
-			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>();
-		}	break;
-		case RendererType::RENDERER_GPU_PT: {
-			s_currentRenderer = std::make_unique<renderer::GpuPathTracer>();
-		}	break;
-		default: {
-			logError("[", FUNCTION_NAME, "] Unknown renderer type");
-			return false;
-		}
-	}
+	s_currentRenderer = s_renderers[index].get();
 	if(s_world.get_current_scenario() != nullptr)
 		s_currentRenderer->load_scene(s_world.get_current_scene(),
-			s_world.get_current_scenario()->get_resolution());
+									  s_world.get_current_scenario()->get_resolution());
 	s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
@@ -3078,6 +3100,9 @@ Boolean mufflon_initialize() {
 			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
 		}
 
+		// Initialize renderers
+		init_renderers<>();
+
 		initialized = true;
 	}
 	return initialized;
@@ -3110,7 +3135,6 @@ void mufflon_destroy() {
 	TRY
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
-	s_currentRenderer.reset();
 	cuda::check_error(cudaDeviceReset());
 	CATCH_ALL(;)
 }

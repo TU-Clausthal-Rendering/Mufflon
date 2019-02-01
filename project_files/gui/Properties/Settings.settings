@@ -5,7 +5,7 @@
     <Setting Name="LastWorldPath" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
-    <Setting Name="LastSelectedRenderer" Type="System.Int32" Scope="User">
+    <Setting Name="LastSelectedRenderer" Type="System.UInt32" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="LastWorlds" Type="System.Collections.Specialized.StringCollection" Scope="User">

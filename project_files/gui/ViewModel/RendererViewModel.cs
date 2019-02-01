@@ -111,17 +111,16 @@ namespace gui.ViewModel
         // Describes an item in the renderer selection combobox
         public class RendererItem
         {
-            private Core.RendererType m_type;
-            private string m_name = RendererModel.GetRendererName(0);
-            public int Id { get; set; }
-            public Core.RendererType Type
+            private UInt32 m_index = UInt32.MaxValue;
+            private string m_name;
+            public UInt32 Index
             {
-                get => m_type;
+                get => m_index;
                 set
                 {
-                    if (m_type == value) return;
-                    m_type = value;
-                    m_name = RendererModel.GetRendererName(m_type);
+                    if (m_index == value) return;
+                    m_index = value;
+                    m_name = Core.render_get_renderer_name(m_index);
                 }
             }
             public string Name { get => m_name; }
@@ -142,8 +141,8 @@ namespace gui.ViewModel
             {
                 if (m_selectedRenderer == value) return;
                 m_selectedRenderer = value;
-                m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Id;
-                m_models.Renderer.Type = m_selectedRenderer.Type;
+                m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Index;
+                m_models.Renderer.RendererIndex = m_selectedRenderer.Index;
                 OnPropertyChanged(nameof(SelectedRenderer));
             }
         }
@@ -158,8 +157,8 @@ namespace gui.ViewModel
             set => m_models.Settings.AutoStartOnLoad = value;
         }
 
-        public ObservableCollection<RendererItem> Renderers { get; }
-        public ObservableCollection<object> RendererProperties { get; }
+        public ObservableCollection<RendererItem> Renderers { get; } = new ObservableCollection<RendererItem>();
+        public ObservableCollection<object> RendererProperties { get; } = new ObservableCollection<object>();
 
         public RendererViewModel(Models models, ICommand playPause, ICommand reset)
         {
@@ -167,39 +166,13 @@ namespace gui.ViewModel
             m_playPause = playPause;
             m_reset = reset;
             m_propertiesGrid = (DataGrid)((UserControl)m_models.App.Window.FindName("RendererPropertiesControl"))?.FindName("RendererPropertiesGrid");
-            RendererProperties = new ObservableCollection<object>();
-
-            // Enable the renderers (TODO: automatically get them from somewhere?)
-            Array rendererValues = Enum.GetValues(typeof(Core.RendererType));
-            Renderers = new ObservableCollection<RendererItem>();
-            int typeId = 0;
-            foreach (Core.RendererType type in rendererValues)
-                if (!Enum.GetName(typeof(Core.RendererType), type).Contains("GPU"))
-                    Renderers.Add(new RendererItem { Id = typeId++, Type = type });
-            if(Core.mufflon_is_cuda_available())
-            {
-                foreach (Core.RendererType type in rendererValues)
-                    if (Enum.GetName(typeof(Core.RendererType), type).Contains("GPU"))
-                        Renderers.Add(new RendererItem { Id = typeId++, Type = type });
-            }
 
             // Register the handlers
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
 
-            // Enable the last selected renderer
-            int lastSelected = models.Settings.LastSelectedRenderer;
-            if (lastSelected >= Renderers.Count)
-            {
-                lastSelected = 0;
-                models.Settings.LastSelectedRenderer = 0;
-            }
-            m_selectedRenderer = Renderers[models.Settings.LastSelectedRenderer];
-            if (m_models.Renderer.Type == m_selectedRenderer.Type)
-                rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.Type)));
-            else
-                m_models.Renderer.Type = m_selectedRenderer.Type;
+            // Renderer initialization is deferred until the render DLL is initialized
         }
 
         private void SettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -232,9 +205,31 @@ namespace gui.ViewModel
         {
             switch (args.PropertyName)
             {
-                case nameof(Models.Renderer.Type):
+                case nameof(Models.Renderer.RendererIndex):
                     rendererTypeChanged();
                     break;
+                case nameof(Models.Renderer.RendererCount):
+                {
+                    // Enable the renderers
+                    Renderers.Clear();
+                    for (UInt32 i = 0u; i < m_models.Renderer.RendererCount; ++i)
+                    {
+                        Renderers.Add(new RendererItem() { Index = i });
+                    }
+                    // Enable the last selected renderer
+                    uint lastSelected = m_models.Settings.LastSelectedRenderer;
+                    if (lastSelected >= Renderers.Count)
+                    {
+                        lastSelected = 0;
+                        m_models.Settings.LastSelectedRenderer = 0;
+                    }
+                        SelectedRenderer = Renderers[(int)m_models.Settings.LastSelectedRenderer];
+                    if (m_models.Renderer.RendererIndex == SelectedRenderer.Index)
+                        rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.RendererIndex)));
+                    else
+                        m_models.Renderer.RendererIndex = SelectedRenderer.Index;
+                    OnPropertyChanged(nameof(Renderers));
+                    }   break;
                 case nameof(Models.Renderer.IsRendering):
                     OnPropertyChanged(nameof(IsRendering));
                     break;
@@ -255,7 +250,7 @@ namespace gui.ViewModel
         {
             if (m_reset.CanExecute(null))
                 m_reset.Execute(null);
-            if (!Core.render_enable_renderer(m_models.Renderer.Type))
+            if (!Core.render_enable_renderer(m_models.Renderer.RendererIndex))
                 throw new Exception(Core.core_get_dll_error());
 
             // Change the properties

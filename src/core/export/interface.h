@@ -89,12 +89,6 @@ typedef enum {
 } CameraType;
 
 typedef enum {
-	RENDERER_CPU_PT,
-	RENDERER_GPU_PT,
-	RENDERER_COUNT
-} RendererType;
-
-typedef enum {
 	TARGET_RADIANCE,
 	TARGET_POSITION,
 	TARGET_ALBEDO,
@@ -279,6 +273,13 @@ struct BulkLoader {
 		FILE* file;
 		const char* bytes;
 	} descriptor;
+};
+
+enum RenderDevice {
+	DEVICE_NONE = 0u,
+	DEVICE_CPU = 1u,
+	DEVICE_CUDA = 2u,
+	DEVICE_OPENGL = 4u
 };
 
 // TODO: how to handle errors
@@ -506,7 +507,10 @@ CORE_API Boolean CDECL world_set_focus_camera_sensor_height(CameraHdl cam, float
 CORE_API Boolean CDECL world_set_focus_camera_aperture(CameraHdl cam, float aperture);
 
 // Interface for rendering
-CORE_API Boolean CDECL render_enable_renderer(RendererType type);
+CORE_API uint32_t CDECL render_get_renderer_count();
+CORE_API const char* CDECL render_get_renderer_name(uint32_t index);
+CORE_API RenderDevice CDECL render_get_renderer_device(uint32_t index);
+CORE_API Boolean CDECL render_enable_renderer(uint32_t index);
 CORE_API Boolean CDECL render_iterate();
 CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();

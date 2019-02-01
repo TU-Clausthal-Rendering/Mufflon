@@ -804,6 +804,9 @@
     <ClInclude Include="..\..\src\core\scene\materials\material_definitions.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\renderers.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">

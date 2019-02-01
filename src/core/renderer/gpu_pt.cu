@@ -1,5 +1,5 @@
-#include "gpu_pt.hpp"
 #include "output_handler.hpp"
+#include "parameter.hpp"
 #include "core/cuda/error.hpp"
 #include "core/math/rng.hpp"
 #include "core/scene/lights/light_tree.hpp"
@@ -16,11 +16,13 @@ using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
 
+using Parameters = ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide>;
+
 using PtPathVertex = PathVertex<u8, 4>;
 
 __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 							  scene::SceneDescriptor<Device::CUDA>* scene,
-							  const u32* seeds, GpuPathTracer::Parameters params) {
+							  const u32* seeds, Parameters params) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
@@ -112,33 +114,16 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 #endif // __CUDA_ARCH__
 }
 
-void GpuPathTracer::iterate(Pixel imageDims,
-							RenderBuffer<Device::CUDA> outputBuffer) const {
-	
-	std::unique_ptr<u32[]> rnds = std::make_unique<u32[]>(imageDims.x * imageDims.y);
-	math::Rng rng{ static_cast<u32>(std::random_device()()) };
-	for (int i = 0; i < imageDims.x*imageDims.y; ++i)
-		rnds[i] = static_cast<u32>(rng.next());
-	u32* devRnds = nullptr;
-	cuda::check_error(cudaMalloc(&devRnds, sizeof(u32) * imageDims.x * imageDims.y));
-	cuda::check_error(cudaMemcpy(devRnds, rnds.get(), sizeof(u32) * imageDims.x * imageDims.y,
-		cudaMemcpyDefault));
+namespace gpupt_detail {
 
-	// TODO: pass scene data to kernel!
-	dim3 blockDims{ 16u, 16u, 1u };
-	dim3 gridDims{
-		1u + static_cast<u32>(imageDims.x - 1) / blockDims.x,
-		1u + static_cast<u32>(imageDims.y - 1) / blockDims.y,
-		1u
-	};
-
-	// TODO
-	cuda::check_error(cudaGetLastError());
-	sample<<<gridDims, blockDims>>>(std::move(outputBuffer),
-									m_scenePtr, devRnds,
-									m_params);
-	cuda::check_error(cudaGetLastError());
-	cuda::check_error(cudaFree(devRnds));
+void call_kernel(const dim3& gridDims, const dim3& blockDims,
+				 RenderBuffer<Device::CUDA>&& outputBuffer,
+				 scene::SceneDescriptor<Device::CUDA>* scene,
+				 const u32* seeds, const Parameters& params) {
+	sample<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
+									seeds, params);
 }
+
+} // namespace gpupt_detail
 
 }} // namespace mufflon::renderer

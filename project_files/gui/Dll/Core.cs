@@ -48,12 +48,6 @@ namespace gui.Dll
             Focus
         };
 
-        public enum RendererType
-        {
-            CPU_PT,
-            GPU_PT
-        };
-
         public enum RenderTarget
         {
             Radiance,
@@ -125,6 +119,14 @@ namespace gui.Dll
             Cpu = 1,
             Cuda = 2,
             OpenGL = 4
+        };
+
+        public enum RenderDevice
+        {
+            DEVICE_NONE = 0,
+            DEVICE_CPU = 1,
+            DEVICE_CUDA = 2,
+            DEVICE_OPENGL = 4
         };
 
         public delegate void LogCallback(string message, Severity severity);
@@ -367,7 +369,14 @@ namespace gui.Dll
 
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_renderer(RendererType type);
+        internal static extern UInt32 render_get_renderer_count();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_renderer_name")]
+        private static extern IntPtr render_get_renderer_name_(UInt32 index);
+        internal static string render_get_renderer_name(UInt32 index) { return StringUtil.FromNativeUTF8(render_get_renderer_name_(index)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern RenderDevice render_get_renderer_device(UInt32 index);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool render_enable_renderer(UInt32 index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_iterate();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

@@ -179,6 +179,7 @@
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\renderers.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />

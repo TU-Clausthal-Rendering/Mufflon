@@ -160,7 +160,7 @@ namespace gui.Model
             }
         }
 
-        public int LastSelectedRenderer
+        public uint LastSelectedRenderer
         {
             get => Settings.Default.LastSelectedRenderer;
             set

@@ -33,6 +33,8 @@ public:
 	virtual IParameterHandler& get_parameters() final { return m_params; }
 	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
 	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) override;
+	virtual std::string_view get_name() const noexcept { return "Pathtracer (CUDA)"; }
+	static bool uses_device(Device dev) noexcept { return Device::CUDA == dev; }
 
 private:
 	// Used so that we don't need to include everything in CU files

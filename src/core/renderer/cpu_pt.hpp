@@ -25,6 +25,9 @@ public:
 	virtual IParameterHandler& get_parameters() final { return m_params; }
 	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
 	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) override;
+	virtual std::string_view get_name() const noexcept { return "Pathtracer (CPU)"; }
+	static bool uses_device(Device dev) noexcept { return Device::CPU == dev; }
+
 private:
 	// Create one sample path (actual PT algorithm)
 	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
