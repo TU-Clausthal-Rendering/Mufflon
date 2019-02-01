@@ -275,6 +275,12 @@ Boolean copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean 
 	CHECK(textureId != 0u, "invalid texture object", false);
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+
+	if(s_imageOutput == nullptr) {
+		// No renderer has rendered yet -> silent "fail", no copy
+		return true;
+	}
+
 	const renderer::OutputValue targetFlags{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
 	if(!s_outputTargets.is_set(targetFlags)) {
 		logError("[", FUNCTION_NAME, "] Specified render target is not active");

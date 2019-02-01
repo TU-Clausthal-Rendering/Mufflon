@@ -20,13 +20,13 @@ namespace gui.Model
         private bool m_isRendering = false;
         private Core.RendererType m_type = Core.RendererType.CPU_PT;
 
-        public Semaphore RenderLock = new Semaphore(1, 1);
-
         public RendererModel()
         {
             // Initial state: renderer paused
             RenderLock.WaitOne();
         }
+
+        public Semaphore RenderLock = new Semaphore(1, 1);
 
         public bool IsRendering
         {
