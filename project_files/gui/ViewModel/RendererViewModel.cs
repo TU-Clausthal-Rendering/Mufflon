@@ -294,8 +294,8 @@ namespace gui.ViewModel
                         break;
                     case Core.ParameterType.PARAM_FLOAT:
                         {
-                            int value = 0;
-                            if (Core.renderer_get_parameter_int(name, ref value))
+                            float value = 0;
+                            if (Core.renderer_get_parameter_float(name, ref value))
                             {
                                 var prop = new RendererPropertyFloat(name) { Value = value };
                                 prop.PropertyChanged += OnRenderPropertyChanged;
