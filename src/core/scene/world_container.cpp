@@ -476,6 +476,20 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 				if(!m_load_lod(&obj, lod))
 					throw std::runtime_error("Failed to after-load LoD");
 			}
+
+			// Check if the instance scaling is uniform in case of spheres
+			if(obj.get_lod(lod).get_geometry<geometry::Spheres>().get_sphere_count() > 0u) {
+				const ei::Mat3x4& transMat = inst.get_transformation_matrix();
+				const float scaleX = ei::len(ei::Vec<float, 3>(transMat, 0u, 0u));
+				const float scaleY = ei::len(ei::Vec<float, 3>(transMat, 0u, 1u));
+				const float scaleZ = ei::len(ei::Vec<float, 3>(transMat, 0u, 2u));
+				if(!(ei::approx(scaleX, scaleY) && ei::approx(scaleX, scaleZ))) {
+					logWarning("Instance of object ", obj.get_object_id(),
+							   "containing spheres with non-uniform scale detected; will be ignored");
+					continue;
+				}
+			}
+
 			m_scene->add_instance(instance.second.get());
 		}
 	}
@@ -601,9 +615,10 @@ bool WorldContainer::load_scene_lights() {
 					if(mat->get_properties().is_emissive()) {
 						auto emission = mat->get_emission();
 						mAssert(emission.texture != nullptr);
+						mAssert(ei::approx(inst->get_scale().x, inst->get_scale().y) && ei::approx(inst->get_scale().x, inst->get_scale().z));
 						lights::AreaLightSphereDesc al{
 							inst->get_transformation_matrix() * ei::Vec4{inst->get_scale() * spheresData[i].center, 1.0f},
-							inst->get_scale() * spheresData[i].radius,
+							inst->get_scale().x * spheresData[i].radius,
 							emission.texture, emission.scale
 						};
 						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });

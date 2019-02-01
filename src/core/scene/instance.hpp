@@ -28,21 +28,26 @@ public:
 	}
 
 	void set_transformation_matrix(const ei::Mat3x4& mat) {
-		mAssertMsg(ei::approx(ei::len(mat(0u).subrow<0u, 3u>()), ei::len(mat(1u).subrow<0u, 3u>()))
-				   && ei::approx(ei::len(mat(0u).subrow<0u, 3u>()), ei::len(mat(2u).subrow<0u, 3u>())),
-				   "Instance transformations must have uniform scale");
 		m_transMat = mat;
-		m_scale = ei::len(m_transMat(0u).subrow<0u, 3u>());
-		m_transMat(0u).subrow<0u, 3u>() /= m_scale;
-		m_transMat(1u).subrow<0u, 3u>() /= m_scale;
-		m_transMat(2u).subrow<0u, 3u>() /= m_scale;
+		m_scale.x = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 0u));
+		m_scale.y = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 1u));
+		m_scale.z = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 2u));
+		m_transMat(0u, 0u) /= m_scale.x;
+		m_transMat(1u, 0u) /= m_scale.x;
+		m_transMat(2u, 0u) /= m_scale.x;
+		m_transMat(0u, 1u) /= m_scale.y;
+		m_transMat(1u, 1u) /= m_scale.y;
+		m_transMat(2u, 1u) /= m_scale.y;
+		m_transMat(0u, 2u) /= m_scale.z;
+		m_transMat(1u, 2u) /= m_scale.z;
+		m_transMat(2u, 2u) /= m_scale.z;
 	}
 
 	const ei::Mat3x4& get_transformation_matrix() const noexcept {
 		return m_transMat;
 	}
 
-	float get_scale() const noexcept {
+	ei::Vec3 get_scale() const noexcept {
 		return m_scale;
 	}
 
@@ -59,7 +64,7 @@ private:
 	std::string m_name;
 	Object& m_objRef;
 	ei::Mat3x4 m_transMat;
-	float m_scale;
+	ei::Vec3 m_scale;
 };
 
 }} // namespace mufflon::scene
