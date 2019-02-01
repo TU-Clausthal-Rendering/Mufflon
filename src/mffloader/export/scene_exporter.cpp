@@ -14,22 +14,69 @@ namespace mff_loader::exprt {
 
 namespace {
 
-	// Reads a file completely and returns the string containing all bytes
-	std::string read_file(fs::path path) {
-		auto scope = mufflon::Profiler::instance().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
-		mufflon::logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
-		const std::uintmax_t fileSize = fs::file_size(path);
-		std::string fileString;
-		fileString.resize(fileSize);
+// Reads a file completely and returns the string containing all bytes
+std::string read_file(fs::path path) {
+	auto scope = mufflon::Profiler::instance().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
+	mufflon::logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
+	const std::uintmax_t fileSize = fs::file_size(path);
+	std::string fileString;
+	fileString.resize(fileSize);
 
-		std::ifstream file(path, std::ios::binary);
-		file.read(&fileString[0u], fileSize);
-		if (file.gcount() != fileSize)
-			mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
-		// Finalize the string
-		fileString[file.gcount()] = '\0';
-		return fileString;
+	std::ifstream file(path, std::ios::binary);
+	file.read(&fileString[0u], fileSize);
+	if (file.gcount() != fileSize)
+		mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
+	// Finalize the string
+	fileString[file.gcount()] = '\0';
+	return fileString;
+}
+class CutomPrettyWriter : public rapidjson::PrettyWriter<rapidjson::StringBuffer>
+{
+public:
+	CutomPrettyWriter(rapidjson::StringBuffer& sBuf)
+		: rapidjson::PrettyWriter<rapidjson::StringBuffer>(sBuf)
+	{}
+	bool Double(double d) { Prefix(rapidjson::kNumberType); return EndValue(WriteDouble(d)); }
+	bool WriteDouble(double d) {
+		if (rapidjson::internal::Double(d).IsNanOrInf()) {
+			// Note: This code path can only be reached if (RAPIDJSON_WRITE_DEFAULT_FLAGS & kWriteNanAndInfFlag).
+			if (!(rapidjson::kWriteDefaultFlags & rapidjson::kWriteNanAndInfFlag))
+				return false;
+			if (rapidjson::internal::Double(d).IsNan()) {
+				PutReserve(*os_, 3);
+				PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
+				return true;
+			}
+			if (rapidjson::internal::Double(d).Sign()) {
+				PutReserve(*os_, 9);
+				PutUnsafe(*os_, '-');
+			}
+			else
+				PutReserve(*os_, 8);
+			PutUnsafe(*os_, 'I'); PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'f');
+			PutUnsafe(*os_, 'i'); PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'i'); PutUnsafe(*os_, 't'); PutUnsafe(*os_, 'y');
+			return true;
+		}
+
+		char *buffer = os_->Push(25);
+
+		/*double dCopy = d;
+		int i = 0;
+		if (d != 0.0)
+		{
+			for (i = -1; abs(dCopy) < 1.0; i++)
+			{
+				dCopy *= 10;
+			}
+		}
+		char* end = rapidjson::internal::dtoa(d, buffer, std::min(maxDecimalPlaces_ + i, 324));*/
+
+		int end = sprintf(buffer, "%.3g", d);
+
+		os_->Pop(static_cast<size_t>(25 - end));
+		return true;
 	}
+};
 }
 
 bool SceneExporter::save_scene() const
@@ -58,9 +105,9 @@ bool SceneExporter::save_scene() const
 		return false;
 
 	rapidjson::StringBuffer strbuf;
-	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+	CutomPrettyWriter writer(strbuf); // Overwritten to take relevant decimal places
 	writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
-	writer.SetMaxDecimalPlaces(3);
+	writer.SetMaxDecimalPlaces(3); // Overwritten to take relevant decimal places
 	document.Accept(writer);
 
 	std::string json = std::string(strbuf.GetString());
@@ -116,6 +163,7 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const
 			break;
 			// TODO ORTHO (not implemented yet)
 		default:
+			assert(false);
 			// TODO Exception?
 			break;
 		}
@@ -283,29 +331,34 @@ bool SceneExporter::save_materials(rapidjson::Document& document) const
 	materials.SetObject();
 	size_t materialCount = world_get_material_count();
 
+	std::vector<std::byte> buffer;
 	for (size_t i = 0; i < materialCount; i++)
 	{
 		MaterialHdl materialHandle = world_get_material(IndexType(i));
 
-		MaterialParams materialParams;
-		world_get_material_data(materialHandle, &materialParams);
+		buffer.resize(world_get_material_size(materialHandle));
+
+		MaterialParams* materialParams = reinterpret_cast<MaterialParams*>(buffer.data());
+
+		world_get_material_data(materialHandle, materialParams);
 
 		rapidjson::Value materialName;
 		materialName.SetString(world_get_material_name(materialHandle), document.GetAllocator());
 
-		materials.AddMember(materialName, save_material(materialParams, document), document.GetAllocator());
+		materials.AddMember(materialName, save_material(*materialParams, document), document.GetAllocator());
 	}
 
 	document.AddMember("materials", materials, document.GetAllocator());
 	return true;
 }
 
-rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rapidjson::Document& document) const
+rapidjson::Value SceneExporter::save_material(const MaterialParams& materialParams, rapidjson::Document& document) const
 {
 	MaterialParamType matType = materialParams.innerType;
 
 	rapidjson::Value material;
 	material.SetObject();
+
 
 	switch (matType)
 	{
@@ -322,11 +375,6 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 		{
 			material.AddMember("type", "emissive", document.GetAllocator());
 			TextureHdl radianceTextureHandle = materialParams.inner.emissive.radiance;
-			std::string textureName = world_get_texture_name(radianceTextureHandle);
-
-			IVec2 texSize;
-			world_get_texture_size(radianceTextureHandle, &texSize);
-
 			add_member_from_texture_handle(radianceTextureHandle, "radiance", material, document);
 			material.AddMember("scale", store_in_array(materialParams.inner.emissive.scale, document), document.GetAllocator());
 			break;
@@ -376,6 +424,7 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 			break;
 		}
 	default:
+		assert(false);
 		// TODO Exception?
 		break;
 	}
@@ -481,9 +530,11 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 	return true;
 }
 
-bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl, std::string memberName, rapidjson::Value& saveIn,
+bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl, const std::string& memberName, rapidjson::Value& saveIn,
 	rapidjson::Document& document) const
 {
+	if (textureHdl == nullptr)
+		return false;
 	try
 	{
 		std::string textureName = world_get_texture_name(textureHdl);
