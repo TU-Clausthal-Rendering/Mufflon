@@ -11,6 +11,7 @@
 #include "emissive.hpp"
 #include "blend.hpp"
 #include "microfacet_specular.hpp"
+#include "microfacet_refractive.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace materials {
@@ -31,6 +32,7 @@ CUDA_FUNCTION int fetch_subparam(Materials type, const char* subDesc, const UvCo
 		case Materials::EMISSIVE: return as<EmissiveDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
 		case Materials::BLEND: return as<BlendDesc>(subDesc)->fetch(uvCoordinate, subParam);
 		case Materials::TORRANCE: return as<TorranceDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
+		case Materials::WALTER: return as<WalterDesc<CURRENT_DEV>>(subDesc)->fetch(uvCoordinate, subParam);
 		default:
 			mAssertMsg(false, "Material not (fully) implemented!");
 	}
@@ -89,6 +91,8 @@ sample_subdesc(Materials type,
 			return blend_sample(*as<BlendParameterPack>(subParams), incidentTS, boundary, rndSet, adjoint);
 		case Materials::TORRANCE:
 			return torrance_sample(*as<TorranceParameterPack>(subParams), incidentTS, boundary, rndSet);
+		case Materials::WALTER:
+			return walter_sample(*as<WalterParameterPack>(subParams), incidentTS, boundary, rndSet, adjoint);
 		default: ;
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::sample] Trying to evaluate unimplemented material type ", type);
@@ -179,6 +183,8 @@ evaluate_subdesc(Materials type,
 			return blend_evaluate(*as<BlendParameterPack>(subParams), incidentTS, excidentTS, boundary, adjoint, merge);
 		case Materials::TORRANCE:
 			return torrance_evaluate(*as<TorranceParameterPack>(subParams), incidentTS, excidentTS, boundary);
+		case Materials::WALTER:
+			return walter_evaluate(*as<WalterParameterPack>(subParams), incidentTS, excidentTS, boundary, adjoint);
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::evaluate] Trying to evaluate unimplemented material type ", type);
@@ -264,6 +270,7 @@ albedo(Materials type, const char* subParams) {
 		case Materials::EMISSIVE: return emissive_albedo(*as<EmissiveParameterPack>(subParams));
 		case Materials::BLEND: return blend_albedo(*as<BlendParameterPack>(subParams));
 		case Materials::TORRANCE: return torrance_albedo(*as<TorranceParameterPack>(subParams));
+		case Materials::WALTER: return walter_albedo(*as<WalterParameterPack>(subParams));
 		default:
 #ifndef __CUDA_ARCH__
 			logWarning("[materials::albedo] Trying to evaluate unimplemented material type ", type);

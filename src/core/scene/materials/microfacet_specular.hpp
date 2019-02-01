@@ -3,6 +3,7 @@
 #include "material.hpp"
 #include "microfacet_base.hpp"
 #include "core/export/api.h"
+#include "core/memory/dyntype_memory.hpp"
 #include "core/math/sampling.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/interface.hpp"
@@ -80,7 +81,7 @@ public:
 		return m_albedo;
 	}
 	TextureHandle get_roughness() const noexcept {
-		return m_albedo;
+		return m_roughness;
 	}
 	NDF get_ndf() const noexcept {
 		return m_ndf;
@@ -91,18 +92,14 @@ private:
 	NDF m_ndf;
 };
 
-namespace mat_details {
-
-}
-
 
 
 // The importance sampling routine
 CUDA_FUNCTION math::PathSample
 torrance_sample(const TorranceParameterPack& params,
-			   const Direction& incidentTS,
-			   Boundary& boundary,
-			   const math::RndSet2_1& rndSet) {
+				const Direction& incidentTS,
+				Boundary& boundary,
+				const math::RndSet2_1& rndSet) {
 	// Importance sampling for the ndf
 	math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
 
@@ -136,10 +133,9 @@ torrance_sample(const TorranceParameterPack& params,
 // The evaluation routine
 CUDA_FUNCTION math::EvalValue
 torrance_evaluate(const TorranceParameterPack& params,
-				 const Direction& incidentTS,
-				 const Direction& excidentTS,
-				 Boundary& boundary) {
-	using namespace mat_details;
+				  const Direction& incidentTS,
+				  const Direction& excidentTS,
+				  Boundary& boundary) {
 	// No transmission
 	if(incidentTS.z * excidentTS.z < 0.0f) return math::EvalValue{};
 

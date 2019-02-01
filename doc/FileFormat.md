@@ -175,7 +175,8 @@ Materials
                                         // OR a texture with one or three channels (relative path)
                                         // DEFAULT: 0.5
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
-    "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
+    "absorption": [r,g,b],              // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
+    "ior": float                        // Dielectric index of refraction
 
 `"type": "emissive"`
 
@@ -186,7 +187,7 @@ Materials
 
     "albedo": [r,g,b] | <texture>,  // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
                                     // DEFAULT: [0.5, 0.5, 0.5]
-    "roughness": float              // [0,π/2], with 0 this resembles to "lambert"
+    "roughness": float              // [0,π], with 0 this resembles to "lambert"
                                     // DEFAULT: 1.0
 
 `"type": "blend"`\
@@ -206,7 +207,7 @@ E.g. "factorA" = "factorB" = 1 makes sense for an "emissive", "lambert" mixed ma
 `"type": "fresnel"`\
 Angular dependent blending of two layers (dielectric-dielectric DD or dielectric-conductor DC fresnel).
 
-    "refractionIndex": float | [n,k], // The real part of the refraction index (for DD) OR complex number (vec2, for DC)
+    "ior": float | [n,k], // The real part of the index of refraction (for DD) OR complex number (vec2, for DC)
     "layerReflection": {
         <recursive material>        // A different material beginning with "type"...
     },

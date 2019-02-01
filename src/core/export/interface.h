@@ -220,6 +220,7 @@ typedef struct {
 	TextureHdl roughness;
 	NormalDistFunction ndf;
 	Vec3 absorption;
+	float refractionIndex;
 } WalterParams;
 typedef struct {
 	TextureHdl radiance;

@@ -19,6 +19,7 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/lambert.hpp"
 #include "core/scene/materials/microfacet_specular.hpp"
+#include "core/scene/materials/microfacet_refractive.hpp"
 //TODO: material_sampling.hpp is currently included implicitly (should not)
 #include "mffloader/interface/interface.h"
 #include <cuda_runtime.h>
@@ -1212,13 +1213,17 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			auto roughnessTex = static_cast<TextureHandle>(mat->inner.torrance.roughness);
 			materials::NDF ndf = materials::NDF::GGX;
 			if(mat->inner.torrance.ndf == NDF_BECKMANN) ndf = materials::NDF::BECKMANN;
-			// TODO: cosine (not yet supported)
-			newMaterial = std::make_unique<materials::Torrance>(albedoTex, roughnessTex,
-					static_cast<materials::NDF>(ndf));
+			if(mat->inner.torrance.ndf == NDF_COSINE) logWarning("[", FUNCTION_NAME, "] NDF 'cosine' not supported yet (using ggx).");
+			newMaterial = std::make_unique<materials::Torrance>(albedoTex, roughnessTex, ndf);
 		}	break;
-		case MATERIAL_WALTER:
-			logWarning("[", FUNCTION_NAME, "] Material type 'walter' not supported yet");
-			return nullptr;
+		case MATERIAL_WALTER: {
+			auto roughnessTex = static_cast<TextureHandle>(mat->inner.walter.roughness);
+			materials::NDF ndf = materials::NDF::GGX;
+			if(mat->inner.walter.ndf == NDF_BECKMANN) ndf = materials::NDF::BECKMANN;
+			if(mat->inner.walter.ndf == NDF_COSINE) logWarning("[", FUNCTION_NAME, "] NDF 'cosine' not supported yet (using ggx).");
+			newMaterial = std::make_unique<materials::Walter>(util::pun<Spectrum>(mat->inner.walter.absorption),
+				roughnessTex, mat->inner.walter.refractionIndex, ndf);
+		}	break;
 		case MATERIAL_EMISSIVE: {
 			auto tex = mat->inner.emissive.radiance;
 			newMaterial = std::make_unique<materials::Emissive>(static_cast<TextureHandle>(tex),

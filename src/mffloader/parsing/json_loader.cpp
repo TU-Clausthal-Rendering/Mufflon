@@ -98,7 +98,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			m_state.objectNames.push_back(outerIter->name.GetString());
 			const Value& outerMedium = outerIter->value;
 			mat->outerMedium.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, outerMedium, "absorption")));
-			auto refractIter = get(m_state, outerMedium, "refractionIndex");
+			auto refractIter = get(m_state, outerMedium, "ior");
 			if(refractIter->value.IsArray()) {
 				mat->outerMedium.refractionIndex = util::pun<Vec2>(read<ei::Vec2>(m_state, refractIter));
 			} else {
@@ -161,10 +161,10 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;
-			else if(ndf.compare("GGC") == 0)
+			else if(ndf.compare("GGX") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_GGX;
-			else if(ndf.compare("GGC") == 0)
-				mat->inner.walter.ndf = NormalDistFunction::NDF_GGX;
+			else if(ndf.compare("Cos") == 0)
+				mat->inner.walter.ndf = NormalDistFunction::NDF_COSINE;
 			else
 				throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 			auto roughnessIter = get(m_state, material, "roughness");
@@ -179,6 +179,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
 			} else
 				throw std::runtime_error("Invalid type for roughness");
+
+			mat->inner.walter.refractionIndex = read<float>(m_state, get(m_state, material, "ior"));
 
 		} else if(type.compare("emissive") == 0) {
 			// Emissive material
@@ -216,7 +218,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		} else if(type.compare("fresnel") == 0) {
 			// Fresnel material
 			mat->innerType = MaterialParamType::MATERIAL_FRESNEL;
-			auto refrIter = get(m_state, material, "refractionIndex");
+			auto refrIter = get(m_state, material, "ior");
 			if(refrIter->value.IsNumber()) {
 				mat->inner.fresnel.refractionIndex = Vec2{ read<float>(m_state, refrIter), 0.0f };
 			} else if(refrIter->value.IsArray()) {
