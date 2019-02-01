@@ -437,6 +437,7 @@ CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,
 CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,
 												 const char* name, size_t nameLength);
 CORE_API const char* CDECL scenario_get_material_slot_name(ScenarioHdl scenario, MatIdx slot);
+CORE_API size_t CDECL scenario_get_material_slot_count(ScenarioHdl scenario);
 CORE_API MaterialHdl CDECL scenario_get_assigned_material(ScenarioHdl scenario,
 														  MatIdx index);
 CORE_API Boolean CDECL scenario_assign_material(ScenarioHdl scenario, MatIdx index,

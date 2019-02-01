@@ -2170,6 +2170,12 @@ const char* scenario_get_material_slot_name(ScenarioHdl scenario, MatIdx slot) {
 	return static_cast<const Scenario*>(scenario)->get_material_slot_name(slot).c_str();
 	CATCH_ALL(nullptr)
 }
+size_t scenario_get_material_slot_count(ScenarioHdl scenario){
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", 0);
+	return static_cast<const Scenario*>(scenario)->get_num_material_slots();
+	CATCH_ALL(0)
+}
 
 MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 										   MatIdx index) {

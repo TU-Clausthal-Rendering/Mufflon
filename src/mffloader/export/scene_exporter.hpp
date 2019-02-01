@@ -38,4 +38,50 @@ private:
 	const fs::path m_mffPath;
 };
 
+/*class CutomPrettyWriter : public rapidjson::PrettyWriter<rapidjson::StringBuffer>
+{
+public:
+	CutomPrettyWriter(rapidjson::StringBuffer& sBuf)
+		: rapidjson::PrettyWriter<rapidjson::StringBuffer>(sBuf)
+	{}
+	bool Double(double d) { Prefix(rapidjson::kNumberType); return EndValue(WriteDouble(d)); }
+	bool WriteDouble(double d) {
+		if (rapidjson::internal::Double(d).IsNanOrInf()) {
+			// Note: This code path can only be reached if (RAPIDJSON_WRITE_DEFAULT_FLAGS & kWriteNanAndInfFlag).
+			if (!(rapidjson::kWriteDefaultFlags & rapidjson::kWriteNanAndInfFlag))
+				return false;
+			if (rapidjson::internal::Double(d).IsNan()) {
+				PutReserve(*os_, 3);
+				PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
+				return true;
+			}
+			if (rapidjson::internal::Double(d).Sign()) {
+				PutReserve(*os_, 9);
+				PutUnsafe(*os_, '-');
+			}
+			else
+				PutReserve(*os_, 8);
+			PutUnsafe(*os_, 'I'); PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'f');
+			PutUnsafe(*os_, 'i'); PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'i'); PutUnsafe(*os_, 't'); PutUnsafe(*os_, 'y');
+			return true;
+		}
+
+		char *buffer = os_->Push(25);
+
+		double dCopy = d;
+		int i;
+		if(d != 0.0)
+		{
+			for(i = 0; abs(dCopy) < 0.0; i++)
+			{
+				dCopy *= 10;
+			}
+		}
+		char* end = rapidjson::internal::dtoa(d, buffer, 3 + i);
+		os_->Pop(static_cast<size_t>(25 - (end - buffer)));
+		return true;
+	}
+};*/
+
+
 }// namespace mff_loader::exprt

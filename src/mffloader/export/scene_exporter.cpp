@@ -448,8 +448,21 @@ rapidjson::Value SceneExporter::save_material(MaterialParams materialParams, rap
 		rapidjson::Value materialAssignments;
 		materialAssignments.SetObject();
 
-		// TODO Material Assignments (not implemented yet)
+		size_t materialSlotCount = scenario_get_material_slot_count(scenarioHandle);
+		for(size_t j = 0; j < materialSlotCount; j++)
+		{
+			const char* materialSlotName = scenario_get_material_slot_name(scenarioHandle, MatIdx(j));
+			MaterialHdl materialHandle = scenario_get_assigned_material(scenarioHandle, MatIdx(j));
+			const char* materialName = world_get_material_name(materialHandle);
 
+			rapidjson::Value matSlotName;
+			matSlotName.SetString(materialSlotName, rapidjson::SizeType(strlen(materialSlotName)));
+
+			rapidjson::Value matName;
+			matName.SetString(materialName, rapidjson::SizeType(strlen(materialName)));
+			materialAssignments.AddMember(matSlotName, matName, document.GetAllocator());
+		}
+		
 		scenario.AddMember("materialAssignments", materialAssignments, document.GetAllocator());
 
 		rapidjson::Value objectProperties;
