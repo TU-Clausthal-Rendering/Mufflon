@@ -57,6 +57,9 @@ namespace gui.Dll
         // TODO: this is only for testing purposes
         public static bool toggleRenderer = false;
 
+        // Tracks whether the background was cleared in a window message
+        private bool m_backgroundCleared = true;
+
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
@@ -330,8 +333,14 @@ namespace gui.Dll
 
         protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg == (int)Gdi32.WmMessages.PAINT)
+            if (msg == (int)Gdi32.WmMessages.ERASEBKGND)
             {
+                m_backgroundCleared = true;
+                handled = true;
+            }
+            if (msg == (int)Gdi32.WmMessages.PAINT && m_backgroundCleared && m_isRunning)
+            {
+                m_backgroundCleared = false;
                 m_rendererModel.RenderLock.Release();
                 m_rendererModel.RenderLock.WaitOne();
                 handled = true;
