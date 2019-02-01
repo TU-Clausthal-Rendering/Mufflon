@@ -23,6 +23,7 @@
     <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\silhouette\wireframe.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
@@ -180,6 +181,8 @@
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderers.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\silhouette\silhouette.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\silhouette\wireframe.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />

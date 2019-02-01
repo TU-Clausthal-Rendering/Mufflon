@@ -110,6 +110,9 @@
     <Filter Include="Source Files\core\scene\tessellation">
       <UniqueIdentifier>{76820222-ebbf-4307-ab48-102d21502f75}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\silhouette">
+      <UniqueIdentifier>{f4dbfb21-e78e-4715-8173-69c35ac67ff4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -222,6 +225,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\tessellation\tessellater.cpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\silhouette\wireframe.cpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -806,6 +812,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\renderers.hpp">
       <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\silhouette\silhouette.hpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\silhouette\wireframe.hpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -8,7 +8,7 @@
 
 namespace mufflon::renderer {
 
-using Renderers = util::TaggedTuple<CpuPathTracer, GpuPathTracer>;
+using Renderers = util::TaggedTuple<CpuPathTracer, GpuPathTracer, silhouette::WireframeRenderer>;
 //using Renderers = util::TaggedTuple<CpuPathTracer, GpuPathTracer, silhouette::WireframeRenderer,	silhouette::SilhouetteTracer>;
 
 } // namespace mufflon::renderer
