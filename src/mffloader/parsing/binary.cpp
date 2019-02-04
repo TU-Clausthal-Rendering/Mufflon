@@ -2,6 +2,7 @@
 #include "core/export/interface.h"
 #include "util/log.hpp"
 #include "util/punning.hpp"
+#include "util/string_view.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/conversions.hpp>
 #include <ei/3dtypes.hpp>
@@ -753,8 +754,8 @@ void BinaryLoader::read_object() {
 }
 
 bool BinaryLoader::read_instances(const u32 globalLod,
-								  const std::unordered_map<std::string_view, u32>& objectLods,
-								  const std::unordered_map<std::string_view, u32>& instanceLods) {
+								  const std::unordered_map<StringView, u32>& objectLods,
+								  const std::unordered_map<StringView, u32>& instanceLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
@@ -803,7 +804,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		if(m_abort)
 			return false;
 		if(!hasInstance[i]) {
-			std::string_view objName = m_objects[i].name;
+			StringView objName = m_objects[i].name;
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
 						objName, "\'");
 			// Add default instance
@@ -902,8 +903,8 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 }
 
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
-							 const std::unordered_map<std::string_view, mufflon::u32>& objectLods,
-							 const std::unordered_map<std::string_view, mufflon::u32>& instanceLods) {
+							 const std::unordered_map<StringView, mufflon::u32>& objectLods,
+							 const std::unordered_map<StringView, mufflon::u32>& instanceLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))

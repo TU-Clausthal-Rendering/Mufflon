@@ -29,6 +29,12 @@
     <Filter Include="Source Files\opengldisplay\opengl">
       <UniqueIdentifier>{cee3f9cd-4db0-4ef7-a9c3-18bc2d1fe67c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core">
+      <UniqueIdentifier>{3f265779-4a5c-412b-b867-4a5becbb96da}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\export">
+      <UniqueIdentifier>{bb1ce606-9e61-4199-8abb-535065c4b9de}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\glad\glad\glad.h">
@@ -57,6 +63,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\opengldisplay\interface\interface.h">
       <Filter>Source Files\opengldisplay\interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\texture_data.h">
+      <Filter>Source Files\core\export</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

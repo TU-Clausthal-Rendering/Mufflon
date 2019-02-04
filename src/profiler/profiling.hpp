@@ -3,7 +3,7 @@
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <type_traits>
 #include <unordered_map>
 
@@ -43,8 +43,8 @@ public:
 	std::ostream& save_snapshots(std::ostream& stream) const;
 	std::ostream& save_total_and_snapshots(std::ostream& stream) const;
 
-	ProfileState* find_child(std::string_view name);
-	ProfileState* add_child(std::string_view name, std::unique_ptr<ProfileState>&& child);
+	ProfileState* find_child(StringView name);
+	ProfileState* add_child(StringView name, std::unique_ptr<ProfileState>&& child);
 
 protected:
 	virtual void start_sample() = 0;
@@ -59,14 +59,14 @@ private:
 
 	ProfileState*& m_activeRef;
 	ProfileState* m_parent;
-	std::unordered_map<std::string_view, std::unique_ptr<ProfileState>> m_children;
+	std::unordered_map<StringView, std::unique_ptr<ProfileState>> m_children;
 };
 
 class Profiler {
 public:
 	template < class Prof >
 	[[nodiscard]]
-	std::optional<ProfileState::ProfileScope> start(std::string_view name, ProfileLevel level = ProfileLevel::HIGH) {
+	std::optional<ProfileState::ProfileScope> start(StringView name, ProfileLevel level = ProfileLevel::HIGH) {
 		if(m_enabled && level >= m_activation) {
 			if(m_active != nullptr) {
 				// Use cascaded profiler
@@ -89,15 +89,15 @@ public:
 	static Profiler& instance();
 
 	void reset_all();
-	void reset(std::string_view name);
-	void reset_from(std::string_view name);
+	void reset(StringView name);
+	void reset_from(StringView name);
 	// Saves the current sample data and resets this and children's state
-	void create_snapshot(std::string_view name);
-	void create_snapshot_from(std::string_view name);
+	void create_snapshot(StringView name);
+	void create_snapshot_from(StringView name);
 	void create_snapshot_all();
-	void save_current_state(std::string_view path) const;
-	void save_snapshots(std::string_view path) const;
-	void save_total_and_snapshots(std::string_view path) const;
+	void save_current_state(StringView path) const;
+	void save_snapshots(StringView path) const;
+	void save_total_and_snapshots(StringView path) const;
 	std::string save_current_state() const;
 	std::string save_snapshots() const;
 	std::string save_total_and_snapshots() const;
@@ -125,7 +125,7 @@ private:
 	bool m_enabled = false;
 	ProfileState* m_active = nullptr;
 	ProfileLevel m_activation = ProfileLevel::ALL;
-	std::unordered_map<std::string_view, std::unique_ptr<ProfileState>> m_profilers;
+	std::unordered_map<StringView, std::unique_ptr<ProfileState>> m_profilers;
 };
 
 } // namespace mufflon

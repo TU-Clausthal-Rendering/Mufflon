@@ -4,6 +4,8 @@
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/flag.hpp"
+#include "util/string_view.hpp"
+#include <array>
 #include <cuda_runtime.h>
 #include <memory>
 #include <string>
@@ -158,17 +160,15 @@ inline constexpr int NUM_CHANNELS(Format format) {
 	return NUM_CHANNELS[int(format)];
 }
 
-#ifndef __CUDACC__
-inline constexpr std::string_view FORMAT_NAME(Format format) {
-	constexpr std::string_view NAMES[static_cast<std::underlying_type_t<Format>>(Format::NUM)] = {
-		"FORMAT_R8U", "FORMAT_RG8U", "FORMAT_RGBA8U",
-		"FORMAT_R16U", "FORMAT_RG16U", "FORMAT_RGBA16U",
-		"FORMAT_R16F", "FORMAT_RG16F", "FORMAT_RGBA16F",
-		"FORMAT_R32F", "FORMAT_RG32F", "FORMAT_RGBA32F",
-	};
+inline StringView FORMAT_NAME(Format format) {
+	static std::array<StringView, static_cast<std::underlying_type_t<Format>>(Format::NUM)> NAMES = { {
+		StringView{"FORMAT_R8U"}, StringView{"FORMAT_RG8U"}, StringView{"FORMAT_RGBA8U"},
+		StringView{"FORMAT_R16U"}, StringView{"FORMAT_RG16U"}, StringView{"FORMAT_RGBA16U"},
+		StringView{"FORMAT_R16F"}, StringView{"FORMAT_RG16F"}, StringView{"FORMAT_RGBA16F"},
+		StringView{"FORMAT_R32F"}, StringView{"FORMAT_RG32F"}, StringView{"FORMAT_RGBA32F"},
+	} };
 	return NAMES[static_cast<std::underlying_type_t<Format>>(format)];
 }
-#endif // __CUDACC__
 
 enum class SamplingMode {
 	NEAREST,

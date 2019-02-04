@@ -23,14 +23,14 @@ ProfileState::ProfileState(ProfileState*& active) :
 	m_activeRef(active),
 	m_parent(active) {}
 
-ProfileState* ProfileState::find_child(std::string_view name) {
+ProfileState* ProfileState::find_child(StringView name) {
 	auto iter = m_children.find(name);
 	if(iter != m_children.end())
 		return iter->second.get();
 	return nullptr;
 }
 
-ProfileState* ProfileState::add_child(std::string_view name, std::unique_ptr<ProfileState>&& child) {
+ProfileState* ProfileState::add_child(StringView name, std::unique_ptr<ProfileState>&& child) {
 	return m_children.emplace(name, std::move(child)).first->second.get();
 }
 
@@ -99,7 +99,7 @@ void Profiler::reset_all() {
 		profiler.second->reset_all();
 }
 
-void Profiler::reset(std::string_view name) {
+void Profiler::reset(StringView name) {
 	if(m_active != nullptr) {
 		// Use cascaded profiler
 		ProfileState* state = m_active->find_child(name);
@@ -113,7 +113,7 @@ void Profiler::reset(std::string_view name) {
 	}
 }
 
-void Profiler::reset_from(std::string_view name) {
+void Profiler::reset_from(StringView name) {
 	if(m_active != nullptr) {
 		// Use cascaded profiler
 		ProfileState* state = m_active->find_child(name);
@@ -127,7 +127,7 @@ void Profiler::reset_from(std::string_view name) {
 	}
 }
 
-void Profiler::create_snapshot(std::string_view name) {
+void Profiler::create_snapshot(StringView name) {
 	if(m_active != nullptr) {
 		// Use cascaded profiler
 		ProfileState* state = m_active->find_child(name);
@@ -141,7 +141,7 @@ void Profiler::create_snapshot(std::string_view name) {
 	}
 }
 
-void Profiler::create_snapshot_from(std::string_view name) {
+void Profiler::create_snapshot_from(StringView name) {
 	if(m_active != nullptr) {
 		// Use cascaded profiler
 		ProfileState* state = m_active->find_child(name);
@@ -160,8 +160,8 @@ void Profiler::create_snapshot_all() {
 		profiler.second->create_snapshot_all();
 }
 
-void Profiler::save_current_state(std::string_view path) const {
-	fs::path file = path;
+void Profiler::save_current_state(StringView path) const {
+	fs::path file = std::string(path);
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_current_state] could not open output file '",
@@ -181,8 +181,8 @@ void Profiler::save_current_state(std::string_view path) const {
 	}
 }
 
-void Profiler::save_snapshots(std::string_view path) const {
-	fs::path file = path;
+void Profiler::save_snapshots(StringView path) const {
+	fs::path file = std::string(path);
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_snapshots] could not open output file '",
@@ -202,8 +202,8 @@ void Profiler::save_snapshots(std::string_view path) const {
 	}
 }
 
-void Profiler::save_total_and_snapshots(std::string_view path) const {
-	fs::path file = path;
+void Profiler::save_total_and_snapshots(StringView path) const {
+	fs::path file = std::string(path);
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_snapshots] could not open output file '",

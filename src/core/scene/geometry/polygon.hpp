@@ -8,7 +8,7 @@
 #include <ei/3dtypes.hpp>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <optional>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <tuple>
 #include <vector>
 #include <unordered_set>
@@ -166,7 +166,7 @@ public:
 		return m_faceAttributes.add_attribute<T>(std::move(name));
 	}
 
-	void remove_attribute(std::string_view name) {
+	void remove_attribute(StringView name) {
 		throw std::runtime_error("Operation not implemented yet");
 	}
 
@@ -183,7 +183,7 @@ public:
 		m_faceAttributes.synchronize<dev>(hdl);
 	}
 	template < Device dev, bool face >
-	void synchronize(std::string_view name) {
+	void synchronize(StringView name) {
 		get_attributes<face>().synchronize<dev>(name);
 	}
 
@@ -204,7 +204,7 @@ public:
 		m_faceAttributes.mark_changed(dev, hdl);
 	}
 	template < bool face >
-	void mark_changed(Device dev, std::string_view name) {
+	void mark_changed(Device dev, StringView name) {
 		get_attributes<face>().mark_changed(dev, name);
 	}
 
@@ -256,9 +256,9 @@ public:
 	 * The number of read values will be capped by the number of vertice present
 	 * after the starting position.
 	 */
-	std::size_t add_bulk(std::string_view name, const VertexHandle& startVertex,
+	std::size_t add_bulk(StringView name, const VertexHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(std::string_view name, const FaceHandle& startVertex,
+	std::size_t add_bulk(StringView name, const FaceHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
 	std::size_t add_bulk(VertexAttributeHandle hdl, const VertexHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
@@ -310,11 +310,11 @@ public:
 		return m_faceAttributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T, bool face >
-	T* acquire(std::string_view name) {
+	T* acquire(StringView name) {
 		return get_attributes<face>().acquire<dev, T>(name);
 	}
 	template < Device dev, class T, bool face >
-	const T* acquire_const(std::string_view name) {
+	const T* acquire_const(StringView name) {
 		return get_attributes<face>().acquire_const<dev, T>(name);
 	}
 

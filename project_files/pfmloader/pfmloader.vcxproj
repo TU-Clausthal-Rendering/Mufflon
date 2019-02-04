@@ -130,6 +130,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h" />
     <ClInclude Include="..\..\src\util\log.hpp" />
+    <ClInclude Include="..\..\src\util\string_view.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pfmloader\interface.cpp" />

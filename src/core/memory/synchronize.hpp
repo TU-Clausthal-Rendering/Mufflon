@@ -11,11 +11,7 @@ namespace synchronize_detail {
 template < std::size_t I, Device dev, class Tuple, class T, class... Args >
 void synchronize_impl(Tuple& tuple, util::DirtyFlags<Device>& flags,
 					  T& sync, Args... args) {
-#ifdef __CUDACC__
 	if(I < Tuple::size) {
-#else // __CUDACC__
-	if constexpr(I < Tuple::size) {
-#endif // __CUDACC__
 		// Workaround for VS2017 bug: otherwise you may use the 'Type' template of the
 		// tagged tuple
 		auto& changed = tuple.template get<I>();

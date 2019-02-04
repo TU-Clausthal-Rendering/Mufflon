@@ -23,7 +23,7 @@ public:
 	Instance& operator=(Instance&&) = delete;
 	~Instance() = default;
 
-	std::string_view get_name() const noexcept {
+	StringView get_name() const noexcept {
 		return m_name;
 	}
 

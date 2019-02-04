@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/filesystem.hpp"
+#include "util/string_view.hpp"
 #include "json_helper.hpp"
 #include "binary.hpp"
 #include "core/export/interface.h"
@@ -64,11 +65,11 @@ private:
 	rapidjson::Value::ConstMemberIterator m_lights;
 	rapidjson::Value::ConstMemberIterator m_materials;
 	rapidjson::Value::ConstMemberIterator m_scenarios;
-	std::string_view m_version;
+	mufflon::StringView m_version;
 	fs::path m_binaryFile;
-	std::string_view m_defaultScenario;
+	mufflon::StringView m_defaultScenario;
 	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
-	std::unordered_map<std::string_view, LightHdl> m_lightMap;
+	std::unordered_map<mufflon::StringView, LightHdl> m_lightMap;
 	ParserState m_state;
 
 	binary::BinaryLoader m_binLoader;

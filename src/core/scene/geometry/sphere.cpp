@@ -86,7 +86,7 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 	return { hdl, readRadPos };
 }
 
-std::size_t Spheres::add_bulk(std::string_view name, const SphereHandle& startSphere,
+std::size_t Spheres::add_bulk(StringView name, const SphereHandle& startSphere,
 							  std::size_t count, util::IByteReader& attrStream) {
 	return this->add_bulk(m_attributes.get_attribute_handle(name), startSphere,
 						  count, attrStream);

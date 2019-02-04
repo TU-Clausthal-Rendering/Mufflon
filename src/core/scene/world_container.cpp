@@ -92,14 +92,14 @@ ObjectHandle WorldContainer::create_object(std::string name, ObjectFlags flags) 
 	return &hdl.first->second;
 }
 
-ObjectHandle WorldContainer::get_object(const std::string_view& name) {
+ObjectHandle WorldContainer::get_object(const StringView& name) {
 	auto iter = m_objects.find(name);
 	if(iter != m_objects.end())
 		return &iter->second;
 	return nullptr;
 }
 
-InstanceHandle WorldContainer::get_instance(const std::string_view& name) {
+InstanceHandle WorldContainer::get_instance(const StringView& name) {
 	auto iter = m_instances.find(name);
 	if(iter != m_instances.end())
 		return iter->second.get();
@@ -112,7 +112,7 @@ InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle ob
 		return nullptr;
 	}
 	auto instance = std::make_unique<Instance>(move(name), *obj);
-	std::string_view nameRef = instance->get_name();
+	StringView nameRef = instance->get_name();
 	return m_instances.emplace(nameRef, std::move(instance)).first->second.get();
 }
 
@@ -123,7 +123,7 @@ ScenarioHandle WorldContainer::create_scenario(std::string name) {
 	return &hdl->second;
 }
 
-ScenarioHandle WorldContainer::get_scenario(const std::string_view& name) {
+ScenarioHandle WorldContainer::get_scenario(const StringView& name) {
 	auto iter = m_scenarios.find(name);
 	if(iter != m_scenarios.end())
 		return &iter->second;
@@ -179,7 +179,7 @@ void WorldContainer::remove_camera(CameraHandle hdl) {
 	}
 }
 
-CameraHandle WorldContainer::get_camera(std::string_view name) {
+CameraHandle WorldContainer::get_camera(StringView name) {
 	auto it = m_cameras.find(name);
 	if(it == m_cameras.end()) {
 		logError("[WorldContainer::get_camera] Cannot find a camera with name '", name, "'");
@@ -250,7 +250,7 @@ void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replaceme
 	}
 }
 
-std::optional<std::pair<u32, lights::LightType>> WorldContainer::find_light(const std::string_view& name) {
+std::optional<std::pair<u32, lights::LightType>> WorldContainer::find_light(const StringView& name) {
 	if(m_pointLights.find(name) != nullptr)
 		return std::make_pair(u32(m_pointLights.get_index(name)), lights::LightType::POINT_LIGHT);
 	if(m_spotLights.find(name) != nullptr)
@@ -333,7 +333,7 @@ void WorldContainer::remove_light(u32 index, lights::LightType type) {
 	}
 }
 
-std::string_view WorldContainer::get_light_name(u32 index, lights::LightType type) const {
+StringView WorldContainer::get_light_name(u32 index, lights::LightType type) const {
 	switch(type) {
 		case lights::LightType::POINT_LIGHT: return m_pointLights.get_key(index);
 		case lights::LightType::SPOT_LIGHT: return m_spotLights.get_key(index);
@@ -345,7 +345,7 @@ std::string_view WorldContainer::get_light_name(u32 index, lights::LightType typ
 	return "";
 }
 
-void WorldContainer::set_light_name(u32 index, lights::LightType type, std::string_view name) {
+void WorldContainer::set_light_name(u32 index, lights::LightType type, StringView name) {
 	switch(type) {
 		case lights::LightType::POINT_LIGHT: {
 			m_pointLights.change_key(index, std::string(name));
@@ -403,26 +403,26 @@ void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 	}
 }
 
-bool WorldContainer::has_texture(std::string_view name) const {
+bool WorldContainer::has_texture(StringView name) const {
 	return m_textures.find(name) != m_textures.cend();
 }
 
-TextureHandle WorldContainer::find_texture(std::string_view name) {
+TextureHandle WorldContainer::find_texture(StringView name) {
 	auto iter = m_textures.find(name);
 	if(iter != m_textures.end())
 		return iter->second.get();
 	return nullptr;
 }
 
-TextureHandle WorldContainer::add_texture(std::string_view path, u16 width,
+TextureHandle WorldContainer::add_texture(StringView path, u16 width,
 										  u16 height, u16 numLayers,
 										  textures::Format format, textures::SamplingMode mode,
 										  bool sRgb, std::unique_ptr<u8[]> data) {
 	mAssertMsg(m_textures.find(path) == m_textures.end(), "Duplicate texture entry");
 	// TODO: ensure that we have at least 1x1 pixels?
-	auto tex = std::make_unique<textures::Texture>(move(std::string(path)),
+	auto tex = std::make_unique<textures::Texture>(move(to_string(path)),
 						width, height, numLayers, format, mode, sRgb, move(data));
-	std::string_view nameRef = tex->get_name();
+	StringView nameRef = tex->get_name();
 	TextureHandle texHdl = tex.get();
 	m_textures.emplace(nameRef, move(tex));
 	m_texRefCount[texHdl] = 1u;

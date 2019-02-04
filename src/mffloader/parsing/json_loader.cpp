@@ -110,7 +110,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			mat->outerMedium.refractionIndex = Vec2{ 1.0f, 0.0f };
 		}
 
-		std::string_view type = read<const char*>(m_state, get(m_state, material, "type"));
+		StringView type = read<const char*>(m_state, get(m_state, material, "type"));
 		if(type.compare("lambert") == 0) {
 			// Lambert material
 			mat->innerType = MaterialParamType::MATERIAL_LAMBERT;
@@ -126,7 +126,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		} else if(type.compare("torrance") == 0) {
 			// Torrance material
 			mat->innerType = MaterialParamType::MATERIAL_TORRANCE;
-			std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
+			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
 			else if(ndf.compare("GGX") == 0)
@@ -158,7 +158,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		} else if(type.compare("walter") == 0) {
 			// Walter material
 			mat->innerType = MaterialParamType::MATERIAL_WALTER;
-			std::string_view ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
+			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;
 			else if(ndf.compare("GGC") == 0)
@@ -289,7 +289,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		const float sceneDiag = ei::abs(ei::len(aabb.max - aabb.min));
 		const float near = read_opt<float>(m_state, camera, "near", DEFAULT_NEAR_PLANE * sceneDiag);
 		const float far = read_opt<float>(m_state, camera, "far", DEFAULT_FAR_PLANE * sceneDiag);
-		std::string_view type = read<const char*>(m_state, get(m_state, camera, "type"));
+		StringView type = read<const char*>(m_state, get(m_state, camera, "type"));
 		std::vector<ei::Vec3> camPath;
 		std::vector<ei::Vec3> camViewDir;
 		std::vector<ei::Vec3> camUp;
@@ -350,7 +350,7 @@ bool JsonLoader::load_lights() {
 		m_state.objectNames.push_back(lightIter->name.GetString());
 
 		// Read common values (aka the type only)
-		std::string_view type = read<const char*>(m_state, get(m_state, light, "type"));
+		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
 			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
@@ -505,7 +505,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			assertArray(m_state, lightIter);
 			m_state.objectNames.push_back("lights");
 			for(SizeType i = 0u; i < lightIter->value.Size(); ++i) {
-				std::string_view lightName = read<const char*>(m_state, lightIter->value[i]);
+				StringView lightName = read<const char*>(m_state, lightIter->value[i]);
 				auto nameIter = m_lightMap.find(lightName);
 				if(nameIter == m_lightMap.cend()) {
 					logWarning("[JsonLoader::load_scenarios] Unknown light source '", lightName, "' will be ignored");
@@ -525,7 +525,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			m_state.objectNames.push_back(objectsIter->name.GetString());
 			assertObject(m_state, objectsIter->value);
 			for(auto objIter = objectsIter->value.MemberBegin(); objIter != objectsIter->value.MemberEnd(); ++objIter) {
-				std::string_view objectName = objIter->name.GetString();
+				StringView objectName = objIter->name.GetString();
 				m_state.objectNames.push_back(&objectName[0u]);
 				const Value& object = objIter->value;
 				assertObject(m_state, object);
@@ -552,7 +552,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			m_state.objectNames.push_back(instancesIter->name.GetString());
 			assertObject(m_state, objectsIter->value);
 			for(auto instIter = instancesIter->value.MemberBegin(); instIter != instancesIter->value.MemberEnd(); ++instIter) {
-				std::string_view instName = instIter->name.GetString();
+				StringView instName = instIter->name.GetString();
 				m_state.objectNames.push_back(&instName[0u]);
 				const Value& instance = instIter->value;
 				assertObject(m_state, instance);
@@ -581,7 +581,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			if(m_abort)
 				return false;
 			// The binary names from the loader already wrap the name in the desired format
-			std::string_view matName = read<const char*>(m_state, get(m_state, materialsIter->value,
+			StringView matName = read<const char*>(m_state, get(m_state, materialsIter->value,
 																 binName.c_str()));
 			logPedantic("[JsonLoader::load_scenarios] Associating material '", matName,
 						"' with binary name '", binName, "'");
@@ -668,15 +668,15 @@ bool JsonLoader::load_file() {
 	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, "'");
 
 	// First parse binary file
-	std::unordered_map<std::string_view, u32> defaultObjectLods;
-	std::unordered_map<std::string_view, u32> defaultInstanceLods;
+	std::unordered_map<StringView, u32> defaultObjectLods;
+	std::unordered_map<StringView, u32> defaultInstanceLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("objectProperties");
 		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the object name
-			std::string_view objectName = propIter->name.GetString();
+			StringView objectName = propIter->name.GetString();
 			m_state.objectNames.push_back(&objectName[0u]);
 			const Value& object = propIter->value;
 			assertObject(m_state, object);
@@ -696,7 +696,7 @@ bool JsonLoader::load_file() {
 		m_state.objectNames.push_back("instanceProperties");
 		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the instance name
-			std::string_view instanceName = propIter->name.GetString();
+			StringView instanceName = propIter->name.GetString();
 			m_state.objectNames.push_back(&instanceName[0u]);
 			const Value& instance = propIter->value;
 			assertObject(m_state, instance);

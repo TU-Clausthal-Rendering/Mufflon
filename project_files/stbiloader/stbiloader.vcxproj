@@ -131,6 +131,7 @@
     <ClInclude Include="..\..\deps\stbi\stb_image.h" />
     <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h" />
     <ClInclude Include="..\..\src\util\log.hpp" />
+    <ClInclude Include="..\..\src\util\string_view.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\stbiloader\interface.cpp" />

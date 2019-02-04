@@ -165,5 +165,8 @@
     <ClInclude Include="..\..\src\util\degrad.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\string_view.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

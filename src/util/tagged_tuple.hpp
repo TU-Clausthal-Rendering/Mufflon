@@ -110,16 +110,7 @@ public:
 
 	template < class Op, std::size_t I = 0u >
 	void for_each(Op&& op) {
-#ifdef __CUDACC__
-		if(I < size) {
-#else // __CUDACC__
-		if constexpr(I < size) {
-#endif // __CUDACC__
-			op(get<I>());
-			for_each<Op, I + 1u>(std::move(op));
-		} else {
-			(void)op;
-		}
+		ForEachHelper<Op, size - 1u>::for_each(*this, std::move(op));
 	}
 
 private:
@@ -134,6 +125,21 @@ private:
 	// Recurse until we find the type and count the recursions
 	template < class T, class H, class... Tails >
 	struct Index<T, H, Tails...> : public std::integral_constant<std::size_t, 1 + Index<T, Tails...>::value> {};
+
+	// Helper class because C++14 doesn't have constexpr yet...
+	template < class Op, std::size_t I >
+	struct ForEachHelper {
+		static void for_each(TaggedTuple<Args...>& tuple, Op&& op) {
+			op(tuple.get<I>());
+			ForEachHelper<Op, I - 1u>::for_each(tuple, std::move(op));
+		}
+	};
+	template < class Op >
+	struct ForEachHelper<Op, 0u> {
+		static void for_each(TaggedTuple<Args...>& tuple, Op&& op) {
+			op(tuple.get<0u>());
+		}
+	};
 
 	TupleType m_tuple;
 };

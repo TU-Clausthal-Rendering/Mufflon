@@ -11,7 +11,7 @@
 #include <climits>
 #include <stdexcept>
 #include <string>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <type_traits>
 #include <map>
 #include <vector>
@@ -154,12 +154,12 @@ public:
 	}
 
 	template < Device dev, class T >
-	ArrayDevHandle_t<dev, T> acquire(std::string_view name) {
+	ArrayDevHandle_t<dev, T> acquire(StringView name) {
 		return acquire<dev, T>(get_attribute_handle(name));
 	}
 
 	template < Device dev, class T >
-	ConstArrayDevHandle_t<dev, T> acquire_const(std::string_view name) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
 		return acquire_const<dev, T>(get_attribute_handle(name));
 	}
 
@@ -168,7 +168,7 @@ public:
 	template < Device dev >
 	void synchronize(AttributeHandle hdl);
 	template < Device dev >
-	void synchronize(std::string_view name) {
+	void synchronize(StringView name) {
 		return synchronize(get_attribute_handle(name));
 	}
 
@@ -177,7 +177,7 @@ public:
 
 	void mark_changed(Device dev, AttributeHandle hdl);
 	void mark_changed(Device dev);
-	void mark_changed(Device dev, std::string_view name) {
+	void mark_changed(Device dev, StringView name) {
 		mark_changed(dev, get_attribute_handle(name));
 	}
 
@@ -185,7 +185,7 @@ public:
 	// Resizes the attributes if necessary
 	std::size_t restore(AttributeHandle hdl, util::IByteReader& attrStream,
 						std::size_t start, std::size_t count);
-	std::size_t restore(std::string_view name, util::IByteReader& attrStream,
+	std::size_t restore(StringView name, util::IByteReader& attrStream,
 						std::size_t start, std::size_t count) {
 		return this->restore(get_attribute_handle(name), attrStream, start, count);
 	}
@@ -193,7 +193,7 @@ public:
 	// Store the attribute to a byte stream, starting at elem start
 	std::size_t store(AttributeHandle hdl, util::IByteWriter& attrStream,
 					  std::size_t start, std::size_t count);
-	std::size_t store(std::string_view name, util::IByteWriter& attrStream,
+	std::size_t store(StringView name, util::IByteWriter& attrStream,
 					  std::size_t start, std::size_t count) {
 		return this->store(get_attribute_handle(name), attrStream, start, count);
 	}
@@ -211,7 +211,7 @@ public:
 	}
 
 	// Resolves a name to an attribute
-	AttributeHandle get_attribute_handle(std::string_view name);
+	AttributeHandle get_attribute_handle(StringView name);
 private:
 	// Bookkeeping for attributes
 	struct AttribInfo {
@@ -297,12 +297,12 @@ public:
 	}
 
 	template < Device dev, class T >
-	ArrayDevHandle_t<dev, T> acquire(std::string_view name) {
+	ArrayDevHandle_t<dev, T> acquire(StringView name) {
 		return acquire<dev, T>(get_attribute_handle(name));
 	}
 
 	template < Device dev, class T >
-	ConstArrayDevHandle_t<dev, T> acquire_const(std::string_view name) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
 		return acquire_const<dev, T>(get_attribute_handle(name));
 	}
 
@@ -311,7 +311,7 @@ public:
 	template < Device dev >
 	void synchronize(AttributeHandle hdl);
 	template < Device dev >
-	void synchronize(std::string_view name) {
+	void synchronize(StringView name) {
 		return synchronize(get_attribute_handle(name));
 	}
 
@@ -320,7 +320,7 @@ public:
 
 	void mark_changed(Device dev, AttributeHandle hdl);
 	void mark_changed(Device dev);
-	void mark_changed(Device dev, std::string_view name) {
+	void mark_changed(Device dev, StringView name) {
 		mark_changed(dev, get_attribute_handle(name));
 	}
 
@@ -329,7 +329,7 @@ public:
 	// Returns the number of read instances.
 	std::size_t restore(AttributeHandle hdl, util::IByteReader& attrStream,
 						std::size_t start, std::size_t count);
-	/*std::size_t restore(std::string_view name, util::IByteReader& attrStream,
+	/*std::size_t restore(StringView name, util::IByteReader& attrStream,
 						std::size_t start, std::size_t count) {
 		return this->restore(get_attribute_handle(name), attrStream, start, count);
 	}*/
@@ -337,7 +337,7 @@ public:
 	// Store the attribute to a byte stream, starting at elem start
 	std::size_t store(AttributeHandle hdl, util::IByteWriter& attrStream,
 					  std::size_t start, std::size_t count);
-	/*std::size_t store(std::string_view name, util::IByteWriter& attrStream,
+	/*std::size_t store(StringView name, util::IByteWriter& attrStream,
 					  std::size_t start, std::size_t count) {
 		return this->store(get_attribute_handle(name), attrStream, start, count);
 	}*/
@@ -355,7 +355,7 @@ public:
 	}
 
 	// Resolves a name to an attribute
-	AttributeHandle get_attribute_handle(std::string_view name);
+	AttributeHandle get_attribute_handle(StringView name);
 private:
 	// Bookkeeping for attributes
 	struct AttribInfo {

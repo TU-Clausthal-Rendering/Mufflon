@@ -1167,7 +1167,7 @@ ScenarioHdl world_create_scenario(const char* name) {
 ScenarioHdl world_find_scenario(const char* name) {
 	TRY
 	CHECK_NULLPTR(name, "scenario name", nullptr);
-	std::string_view nameView{ name };
+	StringView nameView{ name };
 	ScenarioHandle hdl = s_world.get_scenario(nameView);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find scenario '",
@@ -1687,7 +1687,7 @@ CameraType world_get_camera_type(ConstCameraHdl cam) {
 const char* world_get_camera_name(ConstCameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", nullptr);
-	std::string_view name = static_cast<const cameras::Camera*>(cam)->get_name();
+	StringView name = static_cast<const cameras::Camera*>(cam)->get_name();
 	return &name[0];
 	CATCH_ALL(nullptr)
 }
@@ -2155,7 +2155,7 @@ MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
-	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
+	StringView nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
 	return static_cast<Scenario*>(scenario)->declare_material_slot(nameView);
 	CATCH_ALL(INVALID_MATERIAL)
 }
@@ -2165,7 +2165,7 @@ MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
-	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
+	StringView nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
 	return static_cast<const Scenario*>(scenario)->get_material_slot_index(nameView);
 	CATCH_ALL(INVALID_MATERIAL)
 }

@@ -2,7 +2,7 @@
 
 #include "lod.hpp"
 #include <memory>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <vector>
 
 namespace mufflon::scene {
@@ -36,13 +36,13 @@ public:
 
 	// Returns the name of the object (references the string in the object map
 	// located in the world container)
-	const std::string_view& get_name() const noexcept {
+	const StringView& get_name() const noexcept {
 		return m_name;
 	}
 
 	// Sets the name of the object (care: since it takes a stringview, the
 	// underlying string must NOT be moved/changed)
-	void set_name(std::string_view name) noexcept {
+	void set_name(StringView name) noexcept {
 		m_name = name;
 	}
 
@@ -102,7 +102,7 @@ public:
 	void unload();
 
 private:
-	std::string_view m_name;
+	StringView m_name;
 	std::vector<std::unique_ptr<Lod>> m_lods;
 	const u32 m_objectId;
 

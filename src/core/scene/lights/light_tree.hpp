@@ -62,12 +62,10 @@ struct LightSubTree {
 	struct alignas(16) Node {
 		static constexpr u16 INTERNAL_NODE_TYPE = std::numeric_limits<u16>::max();
 
-#ifndef __CUDACC__
 		Node(const char* base,
 			 u32 leftOffset, u16 leftType,
 			 u32 rightOffset, u16 rightType,
 			 const ei::Vec3& bounds);
-#endif // __CUDACC__
 
 		// Layout: [4,4,2]=10, [2,4,4]=10, [4,4,4]=12 bytes
 		// Necessary duplication due to memory layout (2x32+16 and 16+2x32 bits)

@@ -792,6 +792,9 @@
     <ClInclude Include="..\..\src\core\scene\tessellation\uniform.hpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\string_view.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">

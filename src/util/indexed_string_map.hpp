@@ -5,7 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <memory>
 
 namespace mufflon { namespace util {
@@ -40,19 +40,19 @@ public:
 
 	DataT& get(std::size_t index) { return m_data.at(index); }
 	const DataT& get(std::size_t index) const { return m_data.at(index); }
-	DataT* find(std::string_view name) {
+	DataT* find(StringView name) {
 		auto it = m_map.find(name);
 		if(it == m_map.end()) return nullptr;
 		return &m_data.at(it->second);
 	}
-	const DataT* find(std::string_view name) const {
+	const DataT* find(StringView name) const {
 		return const_cast<IndexedStringMap*>(this)->find(name);
 	}
 
-	const std::string_view get_key(std::size_t index) const {
+	const StringView get_key(std::size_t index) const {
 		return *m_mapKeyStore.at(index);
 	}
-	const std::size_t get_index(std::string_view name) const {
+	const std::size_t get_index(StringView name) const {
 		return m_map.at(name);
 	}
 
@@ -72,7 +72,7 @@ public:
 	}
 
 private:
-	std::unordered_map<std::string_view, std::size_t> m_map;
+	std::unordered_map<StringView, std::size_t> m_map;
 	std::vector<std::unique_ptr<std::string>> m_mapKeyStore;
 	std::vector<DataT> m_data;
 };

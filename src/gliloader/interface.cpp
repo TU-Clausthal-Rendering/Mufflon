@@ -1,6 +1,7 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
+#include "util/string_view.hpp"
 #include <gli/gl.hpp>
 #include <gli/gli.hpp>
 #include <ei/conversions.hpp>
@@ -139,7 +140,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		CHECK_NULLPTR(path, "texture path", false);
 		CHECK_NULLPTR(path, "texture return data", false);
 
-		std::string_view pathView = path;
+		StringView pathView = path;
 		if(!fs::exists(path)) {
 			logError("[", FUNCTION_NAME, "] Texture file '", pathView, "' does not exist");
 			return false;
