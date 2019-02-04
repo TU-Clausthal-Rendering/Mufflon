@@ -121,14 +121,6 @@ namespace gui.Dll
             OpenGL = 4
         };
 
-        public enum RenderDevice
-        {
-            DEVICE_NONE = 0,
-            DEVICE_CPU = 1,
-            DEVICE_CUDA = 2,
-            DEVICE_OPENGL = 4
-        };
-
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
