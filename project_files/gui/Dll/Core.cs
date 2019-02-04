@@ -39,13 +39,13 @@ namespace gui.Dll
 
         internal enum MaterialType
         {
-            LAMBERT
+            Lambert
         };
 
         public enum CameraType
         {
-            PINHOLE,
-            FOCUS
+            Pinhole,
+            Focus
         };
 
         public enum RendererType
@@ -56,19 +56,19 @@ namespace gui.Dll
 
         public enum RenderTarget
         {
-            RADIANCE,
-            POSITION,
-            ALBEDO,
-            NORMAL,
-            LIGHTNESS
+            Radiance,
+            Position,
+            Albedo,
+            Normal,
+            Lightness
         };
 
         public enum LightType
         {
-            POINT,
-            SPOT,
-            DIRECTIONAL,
-            ENVMAP
+            Point,
+            Spot,
+            Directional,
+            Envmap
         };
 
         public static LightType FromModelLightType(LightModel.LightType type)
@@ -76,13 +76,13 @@ namespace gui.Dll
             switch (type)
             {
                 case LightModel.LightType.Point:
-                    return LightType.POINT;
+                    return LightType.Point;
                 case LightModel.LightType.Directional:
-                    return LightType.DIRECTIONAL;
+                    return LightType.Directional;
                 case LightModel.LightType.Spot:
-                    return LightType.SPOT;
+                    return LightType.Spot;
                 case LightModel.LightType.Envmap:
-                    return LightType.ENVMAP;
+                    return LightType.Envmap;
                 case LightModel.LightType.Goniometric:
                     default:
                     throw new NotImplementedException();
@@ -99,9 +99,9 @@ namespace gui.Dll
 
         public enum ParameterType
         {
-            PARAM_INT,
-            PARAM_FLOAT,
-            PARAM_BOOL
+            Int,
+            Float,
+            Bool
         };
 
         public enum Severity
@@ -115,8 +115,16 @@ namespace gui.Dll
 
         public enum TextureSampling
         {
-            NEAREST,
-            LINEAR
+            Nearest,
+            Linear
+        };
+
+        public enum RenderDevice
+        {
+            None = 0,
+            Cpu = 1,
+            Cuda = 2,
+            OpenGL = 4
         };
 
         public delegate void LogCallback(string message, Severity severity);

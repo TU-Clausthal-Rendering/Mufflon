@@ -263,14 +263,14 @@ namespace gui.ViewModel
             uint numParams = Core.renderer_get_num_parameters();
             for (uint i = 0; i < numParams; ++i)
             {
-                Core.ParameterType type = Core.ParameterType.PARAM_BOOL;
+                Core.ParameterType type = Core.ParameterType.Bool;
                 string name = Core.renderer_get_parameter_desc(i, ref type);
                 if (name.Length <= 0)
                     continue;
 
                 switch (type)
                 {
-                    case Core.ParameterType.PARAM_BOOL:
+                    case Core.ParameterType.Bool:
                         {
                             uint value = 0;
                             if (Core.renderer_get_parameter_bool(name, ref value))
@@ -281,7 +281,7 @@ namespace gui.ViewModel
                             }
                         }
                         break;
-                    case Core.ParameterType.PARAM_INT:
+                    case Core.ParameterType.Int:
                         {
                             int value = 0;
                             if (Core.renderer_get_parameter_int(name, ref value))
@@ -292,7 +292,7 @@ namespace gui.ViewModel
                             }
                         }
                         break;
-                    case Core.ParameterType.PARAM_FLOAT:
+                    case Core.ParameterType.Float:
                         {
                             float value = 0;
                             if (Core.renderer_get_parameter_float(name, ref value))

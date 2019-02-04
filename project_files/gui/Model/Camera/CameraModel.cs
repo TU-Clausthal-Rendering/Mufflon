@@ -139,9 +139,9 @@ namespace gui.Model.Camera
         {
             switch (type)
             {
-                case Core.CameraType.PINHOLE:
+                case Core.CameraType.Pinhole:
                     return new PinholeCameraModel(handle);
-                case Core.CameraType.FOCUS:
+                case Core.CameraType.Focus:
                     return new FocusCameraModel(handle);
                 default:
                     // not implemented

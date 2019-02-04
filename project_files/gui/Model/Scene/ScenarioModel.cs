@@ -57,13 +57,13 @@ namespace gui.Model.Scene
         private void LoadLights()
         {
             for (var i = 0u; i < Core.scenario_get_point_light_count(Handle); ++i)
-                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.POINT));
+                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.Point));
             for (var i = 0u; i < Core.scenario_get_spot_light_count(Handle); ++i)
-                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.SPOT));
+                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.Spot));
             for (var i = 0u; i < Core.scenario_get_dir_light_count(Handle); ++i)
-                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.DIRECTIONAL));
+                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.Directional));
             if(Core.scenario_has_envmap_light(Handle))
-                Lights.Add(Core.scenario_get_light_handle(Handle, 0u, Core.LightType.ENVMAP));
+                Lights.Add(Core.scenario_get_light_handle(Handle, 0u, Core.LightType.Envmap));
         }
 
         private void LoadCamera()

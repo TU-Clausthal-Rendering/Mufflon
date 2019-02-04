@@ -42,7 +42,7 @@ namespace gui.Model.Light
             {
                 if (Equals(value, Map)) return;
                 
-                var texHandle = Core.world_add_texture(value, Core.TextureSampling.LINEAR);
+                var texHandle = Core.world_add_texture(value, Core.TextureSampling.Linear);
                 if(texHandle == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
                 if(!Core.world_set_env_light_map(Handle, texHandle))

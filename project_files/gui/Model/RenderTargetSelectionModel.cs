@@ -77,7 +77,7 @@ namespace gui.Model
         }
 
         private ObservableCollection<TargetEnabledStatus> m_targetStatus = new ObservableCollection<TargetEnabledStatus>();
-        private Core.RenderTarget m_visibleTarget = Core.RenderTarget.RADIANCE;
+        private Core.RenderTarget m_visibleTarget = Core.RenderTarget.Radiance;
         private bool m_isVarianceVisible = false;
 
         public RenderTargetSelectionModel()
@@ -86,7 +86,7 @@ namespace gui.Model
             foreach(Core.RenderTarget target in targets)
                 m_targetStatus.Add(new TargetEnabledStatus(target));
             // Default: radiance is enabled
-            m_targetStatus[(int)Core.RenderTarget.RADIANCE].Enabled = true;
+            m_targetStatus[(int)Core.RenderTarget.Radiance].Enabled = true;
         }
 
         public ObservableCollection<TargetEnabledStatus> TargetStatus { get => m_targetStatus; }
@@ -118,16 +118,7 @@ namespace gui.Model
         
         public static string getRenderTargetName(Core.RenderTarget target, bool variance)
         {
-            string val;
-            switch (target)
-            {
-                case Core.RenderTarget.ALBEDO: val = "Albedo"; break;
-                case Core.RenderTarget.LIGHTNESS: val = "Lightness"; break;
-                case Core.RenderTarget.NORMAL: val = "Normal"; break;
-                case Core.RenderTarget.POSITION: val = "Position"; break;
-                case Core.RenderTarget.RADIANCE: val = "Radiance"; break;
-                default: val = "Unknown"; break;
-            }
+            string val = Enum.GetName(typeof(Core.RenderTarget), target);
             if (variance)
                 val += " (Variance)";
             return val;
