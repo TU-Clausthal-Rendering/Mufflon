@@ -657,17 +657,17 @@ RayIntersectionResult first_intersection_scene_lbvh(
 			const i32 sphId = primId - offsetSpheres;
 			const ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
 			const Point center { scene.transformations[hitInstanceId] * ei::Vec4(obj.spheres.spheres[sphId].center, 1.0f) };
-			geoNormal = hitPoint - center;
+			geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
 
-			// Normalization is done later
 			if(geoNormal.x == 0.0f && geoNormal.y == 0.0f)
 				tangentX = ei::Vec3(1.0f, 0.0f, 0.0f);
 			else
-				tangentX = normalize(ei::Vec3(ei::Vec2(geoNormal.y, -geoNormal.x), 0.0f));
+				tangentX = ei::Vec3(normalize(ei::Vec2(geoNormal.y, -geoNormal.x)), 0.0f);
 			tangentY = cross(geoNormal, tangentX);
 
-			uv.x = atan2f(geoNormal.y, geoNormal.x) / (2.0f * ei::PI) + 0.5f;
-			uv.y = acosf(geoNormal.z) / ei::PI;
+			const ei::Vec3 localN = transpose(rotation) * geoNormal;
+			uv.x = atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f;
+			uv.y = acosf(localN.z) / ei::PI;
 			surfParams.st = uv;
 			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
 		} else {
@@ -736,14 +736,15 @@ RayIntersectionResult first_intersection_scene_lbvh(
 			}
 		}
 
+		// Transform the normal and tangents into world space
+		// Polygon objects are allowed to have a non-uniform scaling
+		geoNormal = normalize(rotation * (geoNormal / scale));
+		tangentX = normalize(rotation * (tangentX / scale));
+		tangentY = normalize(rotation * (tangentY / scale));
+
 		mAssert(!(isnan(tangentX.x) || isnan(tangentX.y) || isnan(tangentX.z)));
 		mAssert(!(isnan(tangentY.x) || isnan(tangentY.y) || isnan(tangentY.z)));
 		mAssert(!(isnan(geoNormal.x) || isnan(geoNormal.y) || isnan(geoNormal.z)));
-
-		// Normalize the geometric tangent space
-		geoNormal = ei::normalize(rotation * (geoNormal / scale));
-		tangentX = ei::normalize(rotation * (tangentX / scale));
-		tangentY = ei::normalize(rotation * (tangentY / scale));
 
 		return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
 	}
