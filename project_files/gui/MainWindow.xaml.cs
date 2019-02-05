@@ -46,6 +46,10 @@ namespace gui
         public MainWindow()
         {
             InitializeComponent();
+
+            if (!Core.mufflon_initialize())
+                throw new Exception(Core.core_get_dll_error());
+
             m_models = new Models(this);
             m_viewModels = new ViewModels(m_models);
             DataContext = m_viewModels;

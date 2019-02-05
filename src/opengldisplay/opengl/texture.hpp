@@ -149,7 +149,7 @@ public:
 		m_width = width;
 		m_height = height;
 		m_format = format;
-		::glTextureStorage2D(m_id, 1u, static_cast<GLenum>(m_format), m_width, m_height);
+		//::glTextureStorage2D(m_id, 1u, static_cast<GLenum>(m_format), m_width, m_height);
 	}
 	Texture2D(const Texture2D&) = delete;
 	Texture2D(Texture2D&& tex) : m_id(tex.m_id) {

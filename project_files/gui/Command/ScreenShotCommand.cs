@@ -33,11 +33,7 @@ namespace gui.Command
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
             filename = filename.Replace("#target", RenderTargetSelectionModel.getRenderTargetName(m_models.RenderTargetSelection.VisibleTarget,
                 m_models.RenderTargetSelection.IsVarianceVisible));
-            // Gotta pause the renderer
-            bool wasRunning = m_models.Renderer.IsRendering;
-            m_models.Renderer.IsRendering = false;
             Core.render_save_screenshot(Path.Combine(Settings.Default.ScreenshotFolder, filename));
-            m_models.Renderer.IsRendering = wasRunning;
         }
 
         public event EventHandler CanExecuteChanged

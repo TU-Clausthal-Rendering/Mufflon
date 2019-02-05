@@ -62,8 +62,6 @@ namespace gui.Model.Scene
         private async void LoadScenarioAsync(ScenarioModel scenario)
         {
             var handle = scenario.Handle;
-            bool wasRendering = m_rendererModel.IsRendering;
-            m_rendererModel.IsRendering = false;
 
             await Task.Run(() =>
             {
@@ -77,8 +75,6 @@ namespace gui.Model.Scene
             OnPropertyChanged(nameof(CurrentScenario));
             OnPropertyChanged(nameof(BoundingBox));
             OnPropertyChanged(nameof(IsSane));
-            if (wasRendering)
-                m_rendererModel.IsRendering = true;
         }
 
         public BoundingBox BoundingBox

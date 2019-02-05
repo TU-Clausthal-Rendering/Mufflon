@@ -518,7 +518,6 @@ CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
 CORE_API Boolean CDECL render_is_render_target_enabled(RenderTarget target, Boolean variance);
-CORE_API uint32_t CDECL render_get_target_opengl_format(RenderTarget target, Boolean variance);
 CORE_API uint32_t CDECL renderer_get_num_parameters();
 CORE_API const char* CDECL renderer_get_parameter_desc(uint32_t idx, ParameterType* type);
 CORE_API Boolean CDECL renderer_set_parameter_int(const char* name, int32_t value);
@@ -547,13 +546,16 @@ CORE_API size_t CDECL profiling_get_free_gpu_memory();
 CORE_API size_t CDECL profiling_get_used_gpu_memory();
 
 // Interface for initialization and destruction
-CORE_API Boolean CDECL mufflon_initialize(void(*logCallback)(const char*, int));
+CORE_API Boolean CDECL mufflon_initialize();
+CORE_API Boolean CDECL mufflon_set_logger(void(*logCallback)(const char*, int));
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API void CDECL mufflon_destroy();
 
-// TODO
-CORE_API Boolean CDECL copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean variance);
+
+CORE_API Boolean CDECL core_get_target_format(RenderTarget target, TextureFormat* format);
+CORE_API Boolean CDECL core_get_target_image(RenderTarget target, Boolean variance, TextureFormat format,
+											 bool sRgb,const char** ptr);
 CORE_API const char* CDECL core_get_dll_error();
 CORE_API Boolean CDECL core_set_log_level(LogLevel level);
 CORE_API Boolean CDECL core_set_lod_loader(Boolean (CDECL *func)(ObjectHdl, uint32_t));

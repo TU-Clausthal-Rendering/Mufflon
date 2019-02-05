@@ -10,6 +10,23 @@ namespace gui.Dll
 {
     static public class OpenGlDisplay
     {
+        public enum TextureFormat
+        {
+            R8U,
+            RG8U,
+            RGBA8U,
+            R16U,
+            RG16U,
+            RGBA16U,
+            R16F,
+            RG16F,
+            RGBA16F,
+            R32F,
+            RG32F,
+            RGBA32F,
+            Invalid
+        };
+
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void opengldisplay_set_gamma(float val);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -26,11 +43,15 @@ namespace gui.Dll
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt32 opengldisplay_get_screen_texture_handle();
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern Boolean opengldisplay_resize_screen(UInt32 width, UInt32 height, UInt32 format);
+        internal static extern Boolean opengldisplay_resize_screen(UInt32 width, UInt32 height, TextureFormat format);
+        [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern Boolean opengldisplay_write(IntPtr data);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern Boolean opengldisplay_set_log_level(Core.Severity level);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern Boolean opengldisplay_initialize(Core.LogCallback callback);
+        internal static extern Boolean opengldisplay_initialize();
+        [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern Boolean opengldisplay_set_logger(Core.LogCallback callback);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void opengldisplay_destroy();
 

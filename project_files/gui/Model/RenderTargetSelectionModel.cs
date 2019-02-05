@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -12,8 +13,6 @@ namespace gui.Model
         public class TargetEnabledStatus : INotifyPropertyChanged
         {
             private Core.RenderTarget m_target;
-            private bool m_enabled = false;
-            private bool m_varianceEnabled = false;
 
             public TargetEnabledStatus(Core.RenderTarget target)
             {
@@ -24,11 +23,10 @@ namespace gui.Model
 
             public bool Enabled
             {
-                get => m_enabled;
+                get => Core.render_is_render_target_enabled(Target, false);
                 set
                 {
-                    if (value == m_enabled) return;
-                    m_enabled = value;
+                    if (value == Core.render_is_render_target_enabled(Target, false)) return;
                     if (value)
                     {
                         if (!Core.render_enable_render_target(m_target, VarianceEnabled ? 1u : 0u))
@@ -46,11 +44,10 @@ namespace gui.Model
 
             public bool VarianceEnabled
             {
-                get => m_varianceEnabled;
+                get => Core.render_is_render_target_enabled(Target, true);
                 set
                 {
-                    if (value == m_varianceEnabled) return;
-                    m_varianceEnabled = value;
+                    if (value == Core.render_is_render_target_enabled(Target, true)) return;
                     if(value)
                     {
                         Enabled = true;
@@ -76,7 +73,7 @@ namespace gui.Model
             #endregion
         }
 
-        private ObservableCollection<TargetEnabledStatus> m_targetStatus = new ObservableCollection<TargetEnabledStatus>();
+        private List<TargetEnabledStatus> m_targetStatus = new List<TargetEnabledStatus>();
         private Core.RenderTarget m_visibleTarget = Core.RenderTarget.Radiance;
         private bool m_isVarianceVisible = false;
 
@@ -89,7 +86,7 @@ namespace gui.Model
             m_targetStatus[(int)Core.RenderTarget.Radiance].Enabled = true;
         }
 
-        public ObservableCollection<TargetEnabledStatus> TargetStatus { get => m_targetStatus; }
+        public IReadOnlyList<TargetEnabledStatus> TargetStatus { get => m_targetStatus; }
 
         public Core.RenderTarget VisibleTarget
         {

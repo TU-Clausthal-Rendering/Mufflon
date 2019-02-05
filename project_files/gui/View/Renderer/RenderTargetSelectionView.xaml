@@ -6,8 +6,7 @@
              xmlns:global="clr-namespace:gui"
              xmlns:local="clr-namespace:gui.View.Renderer"
              mc:Ignorable="d" 
-             d:DesignHeight="150" d:DesignWidth="200"
-             Background="White">
+             d:DesignHeight="150" d:DesignWidth="200">
     <UserControl.Resources>
         <global:NegateBooleanConverter x:Key="inverter"/>
         <global:AndBooleanConverter x:Key="and"/>
@@ -39,13 +38,14 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Row="0"
-                                    Grid.Column="0"
-                                    Margin="{StaticResource LeftPropertyMargin}"
-                                    Text="{Binding TargetName}"/>
+                                   Grid.Column="0"
+                                   Margin="{StaticResource LeftPropertyMargin}"
+                                   Text="{Binding TargetName}"/>
                         <CheckBox Grid.Row="0"
-                                    Grid.Column="1"
-                                    Margin="{StaticResource RightPropertyMargin}"
-                                    IsChecked="{Binding Enabled}">
+                                  Grid.Column="1"
+                                  ToolTip="If enabled, the renderer will track the target in a displayable texture"
+                                  Margin="{StaticResource RightPropertyMargin}"
+                                  IsChecked="{Binding Enabled}">
                             <CheckBox.IsEnabled>
                                 <MultiBinding Converter="{StaticResource and}">
                                     <Binding Path="Visible" Converter="{StaticResource inverter}"/>
@@ -54,20 +54,23 @@
                             </CheckBox.IsEnabled>
                         </CheckBox>
                         <CheckBox Grid.Row="0"
-                                    Grid.Column="2"
-                                    Margin="{StaticResource RightPropertyMargin}"
-                                    IsChecked="{Binding EnabledVariance}"
-                                    IsEnabled="{Binding VarianceVisible, Converter={StaticResource inverter}}"/>
+                                  Grid.Column="2"
+                                  ToolTip="If enabled, the renderer will track the target's variance in a displayable texture"
+                                  Margin="{StaticResource RightPropertyMargin}"
+                                  IsChecked="{Binding EnabledVariance}"
+                                  IsEnabled="{Binding VarianceVisible, Converter={StaticResource inverter}}"/>
                         <RadioButton Grid.Row="0"
-                                        Grid.Column="3"
-                                        Margin="{StaticResource RightPropertyMargin}"
-                                        GroupName="VisibilitButtons"
-                                        IsChecked="{Binding Visible}"/>
+                                     Grid.Column="3"
+                                     Margin="{StaticResource RightPropertyMargin}"
+                                     GroupName="VisibilitButtons"
+                                     ToolTip="Display the target"
+                                     IsChecked="{Binding Visible}"/>
                         <RadioButton Grid.Row="0"
-                                        Grid.Column="4"
-                                        Margin="{StaticResource RightPropertyMargin}"
-                                        GroupName="VisibilitButtons"
-                                        IsChecked="{Binding VarianceVisible}"/>
+                                     Grid.Column="4"
+                                     Margin="{StaticResource RightPropertyMargin}"
+                                     ToolTip="Display the target's variance"
+                                     GroupName="VisibilitButtons"
+                                     IsChecked="{Binding VarianceVisible}"/>
                     </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

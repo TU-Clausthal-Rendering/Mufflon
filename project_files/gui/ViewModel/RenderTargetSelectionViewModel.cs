@@ -20,10 +20,12 @@ namespace gui.ViewModel
         private bool m_enabledVariance = false;
         private bool m_visible = false;
         private bool m_varianceVisible = false;
+        private RenderTargetSelectionModel m_model;
 
-        public RenderTargetSelectionItem(Core.RenderTarget target)
+        public RenderTargetSelectionItem(Core.RenderTarget target, RenderTargetSelectionModel model)
         {
             m_target = target;
+            m_model = model;
         }
 
         public Core.RenderTarget Target { get => m_target;}
@@ -36,6 +38,7 @@ namespace gui.ViewModel
             set
             {
                 if (value == m_enabled) return;
+                m_model.TargetStatus[(int)m_target].Enabled = value;
                 m_enabled = value;
                 OnPropertyChanged(nameof(Enabled));
             }
@@ -47,6 +50,7 @@ namespace gui.ViewModel
             set
             {
                 if (value == m_enabledVariance) return;
+                m_model.TargetStatus[(int)m_target].VarianceEnabled = value;
                 m_enabledVariance = value;
                 OnPropertyChanged(nameof(EnabledVariance));
             }
@@ -58,6 +62,11 @@ namespace gui.ViewModel
             set
             {
                 if (value == m_visible) return;
+                if(value)
+                {
+                    m_model.IsVarianceVisible = false;
+                    m_model.VisibleTarget = m_target;
+                }
                 m_visible = value;
                 OnPropertyChanged(nameof(Visible));
             }
@@ -69,6 +78,11 @@ namespace gui.ViewModel
             set
             {
                 if (value == m_varianceVisible) return;
+                if(value)
+                {
+                    Visible = true;
+                    m_model.IsVarianceVisible = true;
+                }
                 m_varianceVisible = value;
                 OnPropertyChanged(nameof(VarianceVisible));
             }
@@ -103,7 +117,7 @@ namespace gui.ViewModel
             var targets = Enum.GetValues(typeof(Core.RenderTarget));
             foreach(Core.RenderTarget target in targets)
             {
-                var targetItem = new RenderTargetSelectionItem(target);
+                var targetItem = new RenderTargetSelectionItem(target, m_models.RenderTargetSelection);
                 targetItem.Enabled = m_models.RenderTargetSelection.TargetStatus[(int)target].Enabled;
                 targetItem.EnabledVariance = m_models.RenderTargetSelection.TargetStatus[(int)target].VarianceEnabled;
                 if (target == m_models.RenderTargetSelection.VisibleTarget)
@@ -114,7 +128,6 @@ namespace gui.ViewModel
                 TargetData.Add(targetItem);
 
                 m_models.RenderTargetSelection.TargetStatus[(int)target].PropertyChanged += OnModelChanged;
-                targetItem.PropertyChanged += OnSelectionChanged;
             }
             m_models.RenderTargetSelection.PropertyChanged += OnModelChanged;
             OnPropertyChanged(nameof(TargetData));
@@ -146,59 +159,6 @@ namespace gui.ViewModel
                     var target = sender as RenderTargetSelectionModel.TargetEnabledStatus;
                     TargetData[(int)target.Target].EnabledVariance = target.VarianceEnabled;
                 }   break;
-            }
-        }
-
-        // TODO: disable disabling if target is visible
-        private void OnSelectionChanged(object sender, PropertyChangedEventArgs args)
-        {
-            RenderTargetSelectionItem target = sender as RenderTargetSelectionItem;
-            switch (args.PropertyName)
-            {
-                case nameof(RenderTargetSelectionItem.Enabled):
-                {
-                    bool wasRunning = m_models.Renderer.IsRendering;
-                    m_models.Renderer.IsRendering = false;
-                    if (target.Enabled && m_reset.CanExecute(null))
-                        m_reset.Execute(null);
-                    m_models.RenderTargetSelection.TargetStatus[(int)target.Target].Enabled = target.Enabled;
-                    m_models.Renderer.IsRendering = wasRunning;
-                }   break;
-                case nameof(RenderTargetSelectionItem.EnabledVariance):
-                {
-                    bool wasRunning = m_models.Renderer.IsRendering;
-                    m_models.Renderer.IsRendering = false;
-                    if (target.EnabledVariance && m_reset.CanExecute(null))
-                        m_reset.Execute(null);
-                    m_models.RenderTargetSelection.TargetStatus[(int)target.Target].VarianceEnabled = target.EnabledVariance;
-                    m_models.Renderer.IsRendering = wasRunning;
-                }   break;
-                case nameof(RenderTargetSelectionItem.Visible):
-                    if(target.Visible)
-                    {
-                        target.Enabled = true;
-                        m_models.RenderTargetSelection.VisibleTarget = target.Target;
-                    }
-                    break;
-                case nameof(RenderTargetSelectionItem.VarianceVisible):
-                    // TODO: we hope that the newly selected radio button is pressed last;
-                    // is that guaranteed?
-                    if(target.VarianceVisible)
-                    {
-                        if(m_models.RenderTargetSelection.VisibleTarget == target.Target)
-                        {
-                            m_models.RenderTargetSelection.IsVarianceVisible = true;
-                        } else
-                        {
-                            m_models.RenderTargetSelection.VisibleTarget = target.Target;
-                            target.VarianceVisible = true;
-                            m_models.RenderTargetSelection.IsVarianceVisible = target.VarianceVisible;
-                        }
-                    } else
-                    {
-                        m_models.RenderTargetSelection.IsVarianceVisible = false;
-                    }
-                    break;
             }
         }
 

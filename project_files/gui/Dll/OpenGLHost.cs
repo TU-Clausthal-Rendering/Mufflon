@@ -159,9 +159,12 @@ namespace gui.Dll
 
                         if (!Core.render_iterate())
                             throw new Exception(Core.core_get_dll_error());
-                        if (!Core.copy_output_to_texture(OpenGlDisplay.opengldisplay_get_screen_texture_handle(),
-                            m_renderTarget, m_varianceTarget))
+                        IntPtr imageData = IntPtr.Zero;
+                        if(!Core.core_get_target_image(m_renderTarget, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
+                            false, out imageData) || imageData == IntPtr.Zero)
                             throw new Exception(Core.core_get_dll_error());
+                        if (!OpenGlDisplay.opengldisplay_write(imageData))
+                            throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
 
                         // We also let the GUI know that an iteration has taken place
                         Application.Current.Dispatcher.BeginInvoke(new Action(() => m_rendererModel.UpdateIterationCount()));
@@ -244,12 +247,16 @@ namespace gui.Dll
             }
 
             // dll call: initialize glad etc.
+            if (!OpenGlDisplay.opengldisplay_initialize())
+                throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+
+            // Set the logger callback
             m_logCallbackPointer = new Core.LogCallback(Logger.log);
-            if (!Core.mufflon_initialize(m_logCallbackPointer))
+            if (!Core.mufflon_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
-            if (!OpenGlDisplay.opengldisplay_initialize(m_logCallbackPointer))
+            if (!OpenGlDisplay.opengldisplay_set_logger(m_logCallbackPointer))
                 throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
         }
 
@@ -289,8 +296,8 @@ namespace gui.Dll
                 m_varianceTarget = newVarianceTarget;
 
                 // TODO: let GUI select what render target we render
-                UInt32 format = Core.render_get_target_opengl_format(newTarget, newVarianceTarget);
-                if (format == 0x0500)
+                OpenGlDisplay.TextureFormat format;
+                if(!Core.core_get_target_format(m_renderTarget, out format))
                     throw new Exception(Core.core_get_dll_error());
                 if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_renderWidth, (UInt32)m_renderHeight, format))
                     throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
