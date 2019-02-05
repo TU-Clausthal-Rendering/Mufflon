@@ -1,10 +1,9 @@
 #pragma once
 
-#if defined(DEBUG_ENABLED) || defined(_DEBUG) || defined(DEBUG)
+#include "util/assert.hpp"
 
-#define PARALLEL_FOR
-#else
-
+#ifndef DEBUG_ENABLED
 #define PARALLEL_FOR omp parallel for
-
-#endif
+#else // DEBUG_ENABLED
+#define PARALLEL_FOR
+#endif // DEBUG_ENABLED

@@ -366,7 +366,7 @@ namespace gui.Dll
         private static extern IntPtr render_get_renderer_name_(UInt32 index);
         internal static string render_get_renderer_name(UInt32 index) { return StringUtil.FromNativeUTF8(render_get_renderer_name_(index)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern RenderDevice render_get_renderer_device(UInt32 index);
+        internal static extern bool render_renderer_uses_device(UInt32 index, RenderDevice dev);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_renderer(UInt32 index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

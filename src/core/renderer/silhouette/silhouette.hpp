@@ -6,7 +6,7 @@
 #include "core/scene/descriptors.hpp"
 #include <vector>
 
-namespace mufflon::renderer::silhouette {
+namespace mufflon::renderer {
 
 template < Device >
 struct RenderBuffer;
@@ -22,8 +22,9 @@ public:
 	virtual IParameterHandler& get_parameters() final { return m_params; }
 	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
 	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) override;
-	virtual std::string_view get_name() const noexcept { return "Shadow silhouettes"; }
-	static bool uses_device(Device dev) noexcept { return Device::CPU == dev; }
+	virtual StringView get_name() const noexcept { return "Shadow silhouettes"; }
+	virtual bool uses_device(Device dev) noexcept override { return may_use_device(dev); }
+	static bool may_use_device(Device dev) noexcept { return Device::CPU == dev; }
 private:
 	// Create one sample path (actual PT algorithm)
 	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
@@ -38,4 +39,4 @@ private:
 	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };
 
-} // namespace mufflon::renderer::silhouette
+} // namespace mufflon::renderer

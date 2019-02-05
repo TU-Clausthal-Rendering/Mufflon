@@ -1,13 +1,14 @@
-#include "output_handler.hpp"
-#include "parameter.hpp"
+#include "pt_params.hpp"
 #include "core/cuda/error.hpp"
 #include "core/math/rng.hpp"
+#include "core/renderer/output_handler.hpp"
+#include "core/renderer/parameter.hpp"
+#include "core/renderer/path_util.hpp"
+#include "core/renderer/random_walk.hpp"
 #include "core/scene/lights/light_tree.hpp"
 #include "core/scene/textures/interface.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
-#include "path_util.hpp"
-#include "random_walk.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <random>
@@ -16,13 +17,11 @@ using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
 
-using Parameters = ParameterHandler<PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide>;
-
 using PtPathVertex = PathVertex<u8, 4>;
 
 __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 							  scene::SceneDescriptor<Device::CUDA>* scene,
-							  const u32* seeds, Parameters params) {
+							  const u32* seeds, PtParameters params) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
@@ -30,7 +29,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 	if(coord.x >= outputBuffer.get_width() || coord.y >= outputBuffer.get_height())
 		return;
 
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+	const int pixel = coord.x + coord.y * outputBuffer.get_width();
 
 	math::Rng rng(seeds[pixel]);
 
@@ -119,7 +118,7 @@ namespace gpupt_detail {
 void call_kernel(const dim3& gridDims, const dim3& blockDims,
 				 RenderBuffer<Device::CUDA>&& outputBuffer,
 				 scene::SceneDescriptor<Device::CUDA>* scene,
-				 const u32* seeds, const Parameters& params) {
+				 const u32* seeds, const PtParameters& params) {
 	sample<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
 									seeds, params);
 }

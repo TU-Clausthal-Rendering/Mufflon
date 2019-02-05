@@ -1,5 +1,5 @@
-#include "path_util.hpp"
-#include "output_handler.hpp"
+#include "core/renderer/path_util.hpp"
+#include "core/renderer/output_handler.hpp"
 #include "core/memory/dyntype_memory.hpp"
 #include <array>
 

@@ -121,6 +121,21 @@ namespace gui.ViewModel
                     if (m_index == value) return;
                     m_index = value;
                     m_name = Core.render_get_renderer_name(m_index);
+                    var devices = Enum.GetValues(typeof(Core.RenderDevice));
+                    int count = 0;
+                    foreach(Core.RenderDevice device in devices)
+                    {
+                        if(Core.render_renderer_uses_device(m_index, device))
+                        {
+                            if (count++ == 0)
+                                m_name += " (";
+                            else
+                                m_name += ", ";
+                            m_name += Enum.GetName(typeof(Core.RenderDevice), device);
+                        }
+                    }
+                    if (count > 0)
+                        m_name += ")";
                 }
             }
             public string Name { get => m_name; }

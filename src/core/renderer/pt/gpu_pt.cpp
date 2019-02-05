@@ -1,5 +1,5 @@
 #include "gpu_pt.hpp"
-#include "output_handler.hpp"
+#include "core/renderer/output_handler.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/world_container.hpp"
 #include "profiler/gpu_profiler.hpp"
@@ -12,7 +12,7 @@ namespace gpupt_detail {
 void call_kernel(const dim3& gridDims, const dim3& blockDims,
 				 RenderBuffer<Device::CUDA>&& outputBuffer,
 				 scene::SceneDescriptor<Device::CUDA>* scene,
-				 const u32* seeds, const GpuPathTracer::Parameters& params);
+				 const u32* seeds, const PtParameters& params);
 
 } // namespace gpupt_detail
 

@@ -20,10 +20,11 @@
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
-    <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp" />
-    <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp" />
-    <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp" />
-    <ClCompile Include="..\..\src\core\renderer\silhouette\wireframe.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
@@ -173,16 +174,19 @@
     <ClInclude Include="..\..\src\core\memory\hashmap.hpp" />
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\gpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\pt\pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderers.hpp" />
     <ClInclude Include="..\..\src\core\renderer\silhouette\silhouette.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\silhouette\wireframe.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\wireframe\cpu_wireframe.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\wireframe\gpu_wireframe.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_params.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />
@@ -248,9 +252,10 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
-    <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu" />
     <ClCompile Include="..\..\src\core\renderer\output_handler.cpp" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\intersection.cu" />

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "path_util.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
 #include "core/scene/textures/interface.hpp"
@@ -49,8 +50,8 @@ struct RenderBuffer {
 	 *		BxDF * BxDF / distSq for connections.
 	 */
 	__host__ __device__ void contribute(Pixel pixel,
-										const math::Throughput & viewThroughput,
-										const math::Throughput & lightThroughput,
+										const math::Throughput& viewThroughput,
+										const math::Throughput& lightThroughput,
 										float cosines, const ei::Vec3& value
 	) {
 		using namespace scene::textures;

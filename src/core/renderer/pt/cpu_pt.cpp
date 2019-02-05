@@ -1,14 +1,15 @@
 #include "cpu_pt.hpp"
-#include "path_util.hpp"
-#include "random_walk.hpp"
-#include "output_handler.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
-#include "core/scene/materials/medium.hpp"
 #include "core/math/rng.hpp"
+#include "core/renderer/output_handler.hpp"
+#include "core/renderer/parameter.hpp"
+#include "core/renderer/path_util.hpp"
+#include "core/renderer/random_walk.hpp"
+#include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
-#include "util/parallel.hpp"
 #include <random>
 
 namespace mufflon::renderer {

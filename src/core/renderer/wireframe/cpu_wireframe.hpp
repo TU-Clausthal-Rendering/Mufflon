@@ -1,7 +1,9 @@
 #pragma once
 
+#include "wireframe_params.hpp"
 #include "core/math/rng.hpp"
 #include "core/memory/residency.hpp"
+#include "core/renderer/renderer.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/scene/descriptors.hpp"
 #include <vector>
@@ -11,21 +13,21 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
-namespace silhouette {
-
-class WireframeRenderer : public IRenderer {
+class CpuWireframe : public IRenderer {
 public:
 	// Initialize all resources required by this renderer.
-	WireframeRenderer();
-	~WireframeRenderer() = default;
+	CpuWireframe();
+	~CpuWireframe() = default;
 
 	virtual void iterate(OutputHandler& outputBuffer) override;
 	virtual void reset() override;
 	virtual IParameterHandler& get_parameters() final { return m_params; }
 	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
 	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) override;
-	virtual std::string_view get_name() const noexcept { return "Wireframe"; }
-	static bool uses_device(Device dev) noexcept { return Device::CPU == dev; }
+	virtual StringView get_name() const noexcept { return "Wireframe"; }
+	virtual bool uses_device(Device dev) noexcept override { return may_use_device(dev); }
+	static bool may_use_device(Device dev) noexcept { return Device::CPU == dev; }
+
 private:
 	// Create one sample path (actual PT algorithm)
 	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
@@ -34,11 +36,10 @@ private:
 	void init_rngs(int num);
 
 	bool m_reset = true;
-	ParameterHandler<PWireframeThickness> m_params = {};
+	WireframeParameters m_params = {};
 	scene::SceneHandle m_currentScene = nullptr;
 	std::vector<math::Rng> m_rngs;
 	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };
 
-} // namespace spilhouette
 } // namespace mufflon::renderer

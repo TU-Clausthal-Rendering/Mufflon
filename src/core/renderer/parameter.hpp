@@ -170,4 +170,11 @@ struct PWireframeThickness {
 	}
 };
 
+struct PWireframeNormalize {
+	bool normalize = false;
+	static ParamDesc get_desc() noexcept {
+		return { "Normalize thickness", ParameterTypes::BOOL };
+	}
+};
+
 }} // namespace mufflon::renderer

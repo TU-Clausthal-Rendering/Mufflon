@@ -1,22 +1,23 @@
-#include "wireframe.hpp"
+#include "cpu_wireframe.hpp"
+#include "util/parallel.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include <random>
 
-namespace mufflon::renderer::silhouette {
+namespace mufflon::renderer {
 
 using PtPathVertex = PathVertex<u8, 4>;
 
-WireframeRenderer::WireframeRenderer() {
+CpuWireframe::CpuWireframe() {
 	// TODO: init one RNG per thread?
 	m_rngs.emplace_back(static_cast<u32>(std::random_device()()));
 
 	// The PT does not need additional memory resources like photon maps.
 }
 
-void WireframeRenderer::iterate(OutputHandler& outputBuffer) {
+void CpuWireframe::iterate(OutputHandler& outputBuffer) {
 	// (Re) create the random number generators
 	if(m_rngs.size() != outputBuffer.get_num_pixels()
 	   || m_reset)
@@ -41,15 +42,15 @@ void WireframeRenderer::iterate(OutputHandler& outputBuffer) {
 	outputBuffer.end_iteration<Device::CPU>();
 }
 
-void WireframeRenderer::reset() {
+void CpuWireframe::reset() {
 	this->m_reset = true;
 }
 
-void WireframeRenderer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+void CpuWireframe::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
 						   const scene::SceneDescriptor<Device::CPU>& scene) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
-	//m_params.maxPathLength = 2;
+	constexpr ei::Vec3 borderColor{ 1.f };
 
 	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
@@ -84,20 +85,56 @@ void WireframeRenderer::sample(const Pixel coord, RenderBuffer<Device::CPU>& out
 				const float baryZ = 1.f - nextHit.surfaceParams.barycentric.x - nextHit.surfaceParams.barycentric.y;
 				minBary = minBary > baryZ ? baryZ : minBary;
 
+				float thickness = m_params.thickness;
+				if(m_params.normalize) {
+					const ei::IVec3 idx{
+						object.polygon.vertexIndices[3 * nextHit.hitId.primId + 0],
+						object.polygon.vertexIndices[3 * nextHit.hitId.primId + 1],
+						object.polygon.vertexIndices[3 * nextHit.hitId.primId + 2]
+					};
+					const float area = ei::surface(ei::Triangle{
+						object.polygon.vertices[idx.x],
+						object.polygon.vertices[idx.y],
+						object.polygon.vertices[idx.z]
+					});
+					thickness /= area;
+				}
+
 				if(minBary > m_params.thickness) {
 					ray.origin = ray.origin + ray.direction * (nextHit.hitT + 0.0001f);
 				} else {
-					outputBuffer.contribute(coord, throughput, ei::Vec3{ 1.f },
+					outputBuffer.contribute(coord, throughput, borderColor,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
 					break;
 				}
 			} else if(static_cast<u32>(nextHit.hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
-				if((nextHit.surfaceParams.bilinear.x > m_params.thickness && nextHit.surfaceParams.bilinear.x < 1.f - m_params.thickness)
-				   && (nextHit.surfaceParams.bilinear.y > m_params.thickness && nextHit.surfaceParams.bilinear.y < 1.f - m_params.thickness)) {
+				float thickness = m_params.thickness;
+				if(m_params.normalize) {
+					const i32 quadId = nextHit.hitId.primId - object.polygon.numTriangles;
+					const ei::IVec4 idx{
+						object.polygon.vertexIndices[3 * object.polygon.numTriangles + 4 * quadId + 0],
+						object.polygon.vertexIndices[3 * object.polygon.numTriangles + 4 * quadId + 1],
+						object.polygon.vertexIndices[3 * object.polygon.numTriangles + 4 * quadId + 2],
+						object.polygon.vertexIndices[3 * object.polygon.numTriangles + 4 * quadId + 3]
+					};
+					const float area = ei::surface(ei::Triangle{
+						object.polygon.vertices[idx.x],
+						object.polygon.vertices[idx.y],
+						object.polygon.vertices[idx.z]
+					 }) + ei::surface(ei::Triangle{
+						object.polygon.vertices[idx.x],
+						object.polygon.vertices[idx.z],
+						object.polygon.vertices[idx.w]
+					});
+					thickness /= area;
+				}
+
+				if((nextHit.surfaceParams.bilinear.x > thickness && nextHit.surfaceParams.bilinear.x < 1.f - thickness)
+				   && (nextHit.surfaceParams.bilinear.y > thickness && nextHit.surfaceParams.bilinear.y < 1.f - thickness)) {
 					ray.origin = ray.origin + ray.direction * (nextHit.hitT + 0.0001f);
 				} else {
-					outputBuffer.contribute(coord, throughput, ei::Vec3{ 1.f },
+					outputBuffer.contribute(coord, throughput, borderColor,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
 					break;
@@ -110,14 +147,14 @@ void WireframeRenderer::sample(const Pixel coord, RenderBuffer<Device::CPU>& out
 	}
 }
 
-void WireframeRenderer::init_rngs(int num) {
+void CpuWireframe::init_rngs(int num) {
 	m_rngs.resize(num);
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i);
 }
 
-void WireframeRenderer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
+void CpuWireframe::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
 	if(scene != m_currentScene) {
 		m_currentScene = scene;
 		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
@@ -125,4 +162,4 @@ void WireframeRenderer::load_scene(scene::SceneHandle scene, const ei::IVec2& re
 	}
 }
 
-} // namespace mufflon::renderer::silhouette
+} // namespace mufflon::renderer

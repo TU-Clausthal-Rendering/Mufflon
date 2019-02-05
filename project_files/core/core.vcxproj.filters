@@ -110,8 +110,17 @@
     <Filter Include="Source Files\core\scene\tessellation">
       <UniqueIdentifier>{76820222-ebbf-4307-ab48-102d21502f75}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\pt">
+      <UniqueIdentifier>{e8b62354-8731-426f-ab58-75e97283d3f3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\bpt">
+      <UniqueIdentifier>{92996a37-f46b-4060-ac27-dca23ae4c5e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\wireframe">
+      <UniqueIdentifier>{074bee21-e7ed-49eb-978d-358d1185538a}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\core\renderer\silhouette">
-      <UniqueIdentifier>{f4dbfb21-e78e-4715-8173-69c35ac67ff4}</UniqueIdentifier>
+      <UniqueIdentifier>{106d2a6f-3e42-44e5-bc0c-6c48b9713311}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -163,26 +172,17 @@
     <ClCompile Include="..\..\src\core\cameras\camera.cpp">
       <Filter>Source Files\core\cameras</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\cpu_pt.cpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\lights\light_tree.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp">
       <Filter>Source Files\core\memory</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\gpu_pt.cpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\deps\glad\glad.c">
       <Filter>Source Files\deps\glad</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\export\interface.cpp">
       <Filter>Source Files\core\export</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\cpu_bpt.cpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\plugin\plugin.cpp">
       <Filter>Source Files\plugin</Filter>
@@ -226,8 +226,20 @@
     <ClCompile Include="..\..\src\core\scene\tessellation\tessellater.cpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\silhouette\wireframe.cpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
+    <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp">
+      <Filter>Source Files\core\renderer\bpt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -360,14 +372,8 @@
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\cpu_pt.hpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\handles.hpp">
       <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\path_util.hpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp">
       <Filter>Source Files\core\memory</Filter>
@@ -389,9 +395,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\gpu_pt.hpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
@@ -816,14 +819,29 @@
     <ClInclude Include="..\..\src\core\renderer\silhouette\silhouette.hpp">
       <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\wireframe.hpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
+    <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\path_util.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\cpu_wireframe.hpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_params.hpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\pt\pt_params.hpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\gpu_wireframe.hpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="..\..\src\core\renderer\gpu_pt.cu">
-      <Filter>Source Files\core\renderer</Filter>
-    </CudaCompile>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
       <Filter>Source Files\core\cuda</Filter>
     </CudaCompile>
@@ -844,6 +862,12 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\scene.cu">
       <Filter>Source Files\core\scene</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>
