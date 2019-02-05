@@ -141,6 +141,8 @@ public:
 	// Get the actual texture data (read only) without converting to another format
 	scene::textures::ConstTextureDevHandle_t<Device::CPU> get_data(OutputValue which);
 
+	int get_current_iteration() const noexcept { return m_iteration; }
+
 	int get_width() const { return m_width; }
 	int get_height() const { return m_height; }
 	int get_num_pixels() const { return m_width * m_height; }

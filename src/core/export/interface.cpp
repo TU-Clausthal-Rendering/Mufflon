@@ -86,7 +86,6 @@ namespace {
 // static variables for interacting with the renderer
 std::unique_ptr<renderer::IRenderer> s_currentRenderer;
 // Current iteration counter
-std::uint32_t s_currentIteration = 0u;
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
 std::unique_ptr<textures::CpuTexture> s_screenTexture;
@@ -2580,17 +2579,17 @@ Boolean render_iterate() {
 		return false;
 	}
 	// Check if the scene needed a reload -> reset
-	if(s_world.reload_scene()) {
+	if(s_world.reload_scene())
 		s_currentRenderer->reset();
-	}
 	s_currentRenderer->iterate(*s_imageOutput);
-	++s_currentIteration;
 	return true;
 	CATCH_ALL(false)
 }
 
 uint32_t render_get_current_iteration() {
-	return s_currentIteration;
+	if(s_imageOutput == nullptr)
+		return 0u;
+	return static_cast<uint32_t>(s_imageOutput->get_current_iteration() + 1);
 }
 
 Boolean render_reset() {
@@ -2598,7 +2597,6 @@ Boolean render_reset() {
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->reset();
-	s_currentIteration = 0u;
 	return true;
 	CATCH_ALL(false)
 }
@@ -2659,6 +2657,8 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 		s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
@@ -2683,6 +2683,8 @@ Boolean render_enable_non_variance_render_targets() {
 		s_outputTargets.set(target);
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
@@ -2696,6 +2698,8 @@ Boolean render_enable_all_render_targets() {
 	}
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
