@@ -2,6 +2,8 @@
 
 #include "core/export/api.h"
 #include "util/types.hpp"
+#include "core/math/sampling.hpp"
+#include "medium.hpp"
 #include <cuda_runtime.h>
 #include <ei/vector.hpp>
 
@@ -190,6 +192,8 @@ CUDA_FUNCTION math::DirectionSample sample_ndf(NDF ndf, ei::Vec2 roughness, cons
 
 			return math::DirectionSample{dir, pdf};
 		}
+		default:
+			mAssertMsg(false, "NDF not supported.");
 	}
 	return math::DirectionSample{};
 }

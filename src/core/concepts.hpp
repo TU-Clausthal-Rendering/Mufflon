@@ -5,6 +5,23 @@
 
 namespace mufflon {
 
+namespace concept_details {
+	template<class> struct result_type_of;
+	template<class R, class... Args> struct result_type_of<R (Args...)> {
+		using type = R;
+	};
+	template<class T, class R, class... Args> struct result_type_of<R (T::*)(Args...)> {
+		using type = R;
+	};
+#if __cplusplus >= 201703L
+	template<class T, class R, class... Args> struct result_type_of<R (T::*)(Args...) noexcept> {
+		using type = R;
+	};
+#endif // __CUDACC__
+	template<class T>
+	using result_type_of_t = typename result_type_of<T>::type;
+}
+
 /* The manager concept is a host (cpu) class which provides access
  * and synchronization to some resource for rendering.
  * A manager should not implement any functions on the data. Rather,
@@ -27,26 +44,10 @@ namespace mufflon {
 template<class T>
 struct DeviceManagerConcept {
 private:
-	template<class> struct result_type_of;
-	template<class R, class... Args> struct result_type_of<R (Args...)> {
-		using type = R;
-	};
-	template<class R, class... Args> struct result_type_of<R (T::*)(Args...)> {
-		using type = R;
-	};
-#if __cplusplus >= 201703L
-	template<class R, class... Args> struct result_type_of<R (T::*)(Args...) noexcept> {
-		using type = R;
-	};
-#endif // __CUDACC__
-	template<class T>
-	using result_type_of_t = typename result_type_of<T>::type;
-
-	// Runs fine with cpp, but not with nvcc around...
 	template<class T, typename G = decltype(&T::template acquire_const<Device::CPU>)> static constexpr bool has_acquire_const(int) { return true; }
 	template<class T> static constexpr bool has_acquire_const(...) { return false; }
 	template<class T, typename = std::enable_if_t<std::is_trivially_copyable<
-		std::remove_cv_t<std::decay_t< result_type_of_t<decltype(&T::template acquire_const<Device::CPU>)> >>
+		std::remove_cv_t<std::decay_t< concept_details::result_type_of_t<decltype(&T::template acquire_const<Device::CPU>)> >>
 	>::value>> static constexpr bool descriptor_is_copyable(int) { return true; }
 	template<class T> static constexpr bool descriptor_is_copyable(...) { return false; }
 	template<class T, typename = decltype(&T::template unload<Device::CPU>)> static constexpr bool has_unload(int) { return true; }

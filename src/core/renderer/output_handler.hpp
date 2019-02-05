@@ -4,7 +4,7 @@
 #include "core/scene/textures/cputexture.hpp"
 #include "core/scene/textures/interface.hpp"
 #include "util/flag.hpp"
-#include "path_util.hpp"
+#include "core/math/sample_types.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -49,8 +49,8 @@ struct RenderBuffer {
 	 *		BxDF * BxDF / distSq for connections.
 	 */
 	__host__ __device__ void contribute(Pixel pixel,
-										const Throughput & viewThroughput,
-										const Throughput & lightThroughput,
+										const math::Throughput & viewThroughput,
+										const math::Throughput & lightThroughput,
 										float cosines, const ei::Vec3& value
 	) {
 		using namespace scene::textures;
@@ -71,7 +71,7 @@ struct RenderBuffer {
 
 	// Handle contribution of random hit events
 	__host__ __device__ void contribute(Pixel pixel,
-										const Throughput & viewThroughput,
+										const math::Throughput & viewThroughput,
 										const ei::Vec3& radiance,
 										const ei::Vec3& position,
 										const ei::Vec3& normal,

@@ -1,7 +1,6 @@
 #include "object.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "core/scene/scenario.hpp"
-#include "core/scene/materials/material.hpp"
 
 
 namespace mufflon::scene {

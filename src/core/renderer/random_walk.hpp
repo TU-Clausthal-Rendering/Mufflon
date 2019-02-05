@@ -12,7 +12,7 @@ namespace mufflon { namespace renderer {
 // Collection of parameters produced or used by a random walk
 // TODO: vertex customization?
 struct PathHead {
-	Throughput throughput;			// General throughput with guide heuristics
+	math::Throughput throughput;	// General throughput with guide heuristics
 	scene::Point position;
 	AngularPdf pdfF;				// Forward PDF of the last sampling PDF
 	scene::Direction excident;		// May be zero-vector for start points
@@ -46,14 +46,14 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						const VertexType& vertex,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
-						Throughput& throughput,
+						math::Throughput& throughput,
 						VertexType* outVertex,
 						math::DirectionSample& sampledDir
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
 	if(sample.type == math::PathEventType::INVALID) {
-		throughput = Throughput{ Spectrum { 0.f }, 0.f };
+		throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
 		return false;
 	}
 	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
@@ -69,7 +69,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	if(u0 >= 0.0f) {
 		float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
 		if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
-			throughput = Throughput{ Spectrum { 0.f }, 0.f };
+			throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
 			return false;
 		} else {
 			// Continue and compensate if rouletteWeight < 1.

@@ -12,15 +12,13 @@
 #include "core/renderer/cpu_pt.hpp"
 #include "core/renderer/gpu_pt.hpp"
 #include "core/cameras/pinhole.hpp"
+#include "core/cameras/focus.hpp"
 #include "core/scene/object.hpp"
 #include "core/scene/world_container.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/lights.hpp"
-#include "core/scene/materials/lambert.hpp"
-#include "core/scene/materials/microfacet_specular.hpp"
-#include "core/scene/materials/microfacet_refractive.hpp"
-//TODO: material_sampling.hpp is currently included implicitly (should not)
+#include "core/scene/materials/material.hpp"
 #include "mffloader/interface/interface.h"
 #include <cuda_runtime.h>
 #include <type_traits>
@@ -1198,47 +1196,78 @@ ConstScenarioHdl world_get_current_scenario() {
 }
 
 namespace {
+materials::NDF convertNdf(NormalDistFunction ndf) {
+	materials::NDF ndfNew = materials::NDF::GGX;
+	if(ndf == NDF_BECKMANN) ndfNew = materials::NDF::BECKMANN;
+	if(ndf == NDF_COSINE) logWarning("[", FUNCTION_NAME, "] NDF 'cosine' not supported yet (using ggx).");
+	return ndfNew;
+}
+std::tuple<TextureHandle> to_ctor_args(const LambertParams& params) {
+	return {static_cast<TextureHandle>(params.albedo)};
+}
+std::tuple<TextureHandle, Spectrum> to_ctor_args(const EmissiveParams& params) {
+	return {static_cast<TextureHandle>(params.radiance),
+			util::pun<Spectrum>(params.scale)};
+}
+std::tuple<TextureHandle, TextureHandle, materials::NDF> to_ctor_args(const TorranceParams& params) {
+	return {static_cast<TextureHandle>(params.albedo),
+			static_cast<TextureHandle>(params.roughness),
+			convertNdf(params.ndf)};
+}
+std::tuple<Spectrum, float, TextureHandle, materials::NDF> to_ctor_args(const WalterParams& params) {
+	return {util::pun<Spectrum>(params.absorption),
+			params.refractionIndex,
+			static_cast<TextureHandle>(params.roughness),
+			convertNdf(params.ndf)};
+}
 std::unique_ptr<materials::IMaterial> convert_material(const char* name, const MaterialParams* mat) {
+	using namespace materials;
+	using std::get;
 	CHECK_NULLPTR(name, "material name", nullptr);
 	CHECK_NULLPTR(mat, "material parameters", nullptr);
 
-	std::unique_ptr<materials::IMaterial> newMaterial;
+	std::unique_ptr<IMaterial> newMaterial;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT: {
-			auto tex = mat->inner.lambert.albedo;
-			newMaterial = std::make_unique<materials::Lambert>(static_cast<TextureHandle>(tex));
+			auto p = to_ctor_args(mat->inner.lambert);
+			newMaterial = std::make_unique<Material<Materials::LAMBERT>>( get<0>(p) );
 		}	break;
 		case MATERIAL_TORRANCE: {
-			auto albedoTex = static_cast<TextureHandle>(mat->inner.torrance.albedo);
-			auto roughnessTex = static_cast<TextureHandle>(mat->inner.torrance.roughness);
-			materials::NDF ndf = materials::NDF::GGX;
-			if(mat->inner.torrance.ndf == NDF_BECKMANN) ndf = materials::NDF::BECKMANN;
-			if(mat->inner.torrance.ndf == NDF_COSINE) logWarning("[", FUNCTION_NAME, "] NDF 'cosine' not supported yet (using ggx).");
-			newMaterial = std::make_unique<materials::Torrance>(albedoTex, roughnessTex, ndf);
+			auto p = to_ctor_args(mat->inner.torrance);
+			newMaterial = std::make_unique<Material<Materials::TORRANCE>>( get<0>(p), get<1>(p), get<2>(p) );
 		}	break;
 		case MATERIAL_WALTER: {
-			auto roughnessTex = static_cast<TextureHandle>(mat->inner.walter.roughness);
-			materials::NDF ndf = materials::NDF::GGX;
-			if(mat->inner.walter.ndf == NDF_BECKMANN) ndf = materials::NDF::BECKMANN;
-			if(mat->inner.walter.ndf == NDF_COSINE) logWarning("[", FUNCTION_NAME, "] NDF 'cosine' not supported yet (using ggx).");
-			newMaterial = std::make_unique<materials::Walter>(util::pun<Spectrum>(mat->inner.walter.absorption),
-				roughnessTex, mat->inner.walter.refractionIndex, ndf);
+			auto p = to_ctor_args(mat->inner.walter);
+			newMaterial = std::make_unique<Material<Materials::WALTER>>(
+				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
 		}	break;
 		case MATERIAL_EMISSIVE: {
-			auto tex = mat->inner.emissive.radiance;
-			newMaterial = std::make_unique<materials::Emissive>(static_cast<TextureHandle>(tex),
-								util::pun<Spectrum>(mat->inner.emissive.scale));
+			auto p = to_ctor_args(mat->inner.emissive);
+			newMaterial = std::make_unique<Material<Materials::EMISSIVE>>( get<0>(p), get<1>(p) );
 		}	break;
 		case MATERIAL_ORENNAYAR:
 			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
 			return nullptr;
 		case MATERIAL_BLEND: {
-			auto a = convert_material("LayerA", mat->inner.blend.a.mat);
-			auto b = convert_material("LayerB", mat->inner.blend.b.mat);
-			if(!a || !b) return nullptr;
-			newMaterial = std::make_unique<materials::Blend>(
-				move(a), mat->inner.blend.a.factor,
-				move(b), mat->inner.blend.b.factor);
+			// Order materials to reduce the number of cases
+			const MaterialParams* layerA = mat->inner.blend.a.mat;
+			const MaterialParams* layerB = mat->inner.blend.b.mat;
+			if(mat->inner.blend.a.mat->innerType < mat->inner.blend.b.mat->innerType)
+				std::swap(layerA, layerB);
+			if(layerA->innerType == MATERIAL_LAMBERT && layerB->innerType == MATERIAL_EMISSIVE) {
+				newMaterial = std::make_unique<Material<Materials::LAMBERT_EMISSIVE>>(
+					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
+					to_ctor_args(layerA->inner.lambert),
+					to_ctor_args(layerB->inner.emissive));
+			} else if(layerA->innerType == MATERIAL_TORRANCE && layerB->innerType == MATERIAL_LAMBERT) {
+				newMaterial = std::make_unique<Material<Materials::TORRANCE_LAMBERT>>(
+					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
+					to_ctor_args(layerA->inner.torrance),
+					to_ctor_args(layerB->inner.lambert));
+			} else {
+				logWarning("[", FUNCTION_NAME, "] Unsupported 'blend' material. The combination of layers is not supported.");
+				return nullptr;
+			}
 		}	break;
 		case MATERIAL_FRESNEL:
 			logWarning("[", FUNCTION_NAME, "] Material type 'fresnel' not supported yet");
@@ -1291,20 +1320,14 @@ size_t world_get_material_size(MaterialHdl material) {
 	CHECK_NULLPTR(material, "material handle", 0);
 	MaterialHandle hdl = static_cast<MaterialHandle>(material);
 	switch(hdl->get_type()) {
-		case materials::Materials::LAMBERT: [[fallthrough]];
-		case materials::Materials::TORRANCE: [[fallthrough]];
-		case materials::Materials::WALTER: [[fallthrough]];
 		case materials::Materials::EMISSIVE: [[fallthrough]];
-		case materials::Materials::ORENNAYAR:
+		case materials::Materials::LAMBERT: [[fallthrough]];
+		case materials::Materials::ORENNAYAR: [[fallthrough]];
+		case materials::Materials::TORRANCE: [[fallthrough]];
+		case materials::Materials::WALTER:
 			return sizeof(MaterialParamsStruct);
-		case materials::Materials::BLEND:
-			return sizeof(MaterialParamsStruct)
-				+ world_get_material_size(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_a()))
-				+ world_get_material_size(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_b()));
-		case materials::Materials::FRESNEL:// TODO
-			return 0;
-		case materials::Materials::GLASS://TODO
-			return 0;
+		case materials::Materials::LAMBERT_EMISSIVE:
+			return sizeof(MaterialParamsStruct) * 3;
 		default:
 			logWarning("[", FUNCTION_NAME, "] Unknown material type");
 			return 0;
@@ -1321,6 +1344,7 @@ const char* world_get_material_name(MaterialHdl material) {
 }
 
 int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
+	using namespace materials;
 	CHECK_NULLPTR(material, "material handle", 0);
 	CHECK_NULLPTR(buffer, "material buffer", 0);
 	MaterialHandle hdl = static_cast<MaterialHandle>(material);
@@ -1328,35 +1352,34 @@ int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
 	buffer->outerMedium.absorption = util::pun<Vec3>(medium.get_absorption_coeff());
 	buffer->outerMedium.refractionIndex = util::pun<Vec2>(medium.get_refraction_index());
 	switch(hdl->get_type()) {
-		case materials::Materials::LAMBERT:
-			buffer->innerType = MATERIAL_LAMBERT;
-			buffer->inner.lambert.albedo = static_cast<materials::Lambert*>(hdl)->get_albedo();
-			break;
-		case materials::Materials::TORRANCE://TODO
-			break;
-		case materials::Materials::WALTER://TODO
-			break;
-		case materials::Materials::EMISSIVE:
+		case Materials::EMISSIVE:
 			buffer->innerType = MATERIAL_EMISSIVE;
 			buffer->inner.emissive.radiance = hdl->get_emission().texture;
 			buffer->inner.emissive.scale = util::pun<Vec3>(hdl->get_emission().scale);
 			break;
-		case materials::Materials::ORENNAYAR:
+		case Materials::LAMBERT:
+			buffer->innerType = MATERIAL_LAMBERT;
+			//TODO
+			//buffer->inner.lambert.albedo = static_cast<Material<Materials::LAMBERT>*>(hdl)->get_albedo();
 			break;
-		case materials::Materials::BLEND: {
-			buffer->innerType = MATERIAL_BLEND;
+		case Materials::ORENNAYAR://TODO
+			break;
+		case Materials::TORRANCE://TODO
+			break;
+		case Materials::WALTER://TODO
+			break;
+		case Materials::LAMBERT_EMISSIVE: {
+			/*buffer->innerType = MATERIAL_BLEND;
 			buffer->inner.blend.a.factor = static_cast<materials::Blend*>(hdl)->get_factor_a();
 			buffer->inner.blend.a.mat = buffer + 1;
 			int count = _world_get_material_data(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_a()), buffer->inner.blend.a.mat);
 			buffer->inner.blend.b.factor = static_cast<materials::Blend*>(hdl)->get_factor_b();
 			buffer->inner.blend.b.mat = buffer + 1 + count;
 			count += _world_get_material_data(MaterialHdl(static_cast<materials::Blend*>(hdl)->get_layer_b()), buffer->inner.blend.b.mat);
-			return count + 1;
+			return count + 1;*/
+			//TODO
+			break;
 		}
-		case materials::Materials::FRESNEL:// TODO
-			break;
-		case materials::Materials::GLASS://TODO
-			break;
 		default:
 			logWarning("[", FUNCTION_NAME, "] Unknown material type");
 			return false;

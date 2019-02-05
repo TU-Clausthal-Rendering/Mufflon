@@ -4,7 +4,7 @@
 #include "core/scene/types.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/accel_structs/accel_structs_commons.hpp"
-#include "core/scene/materials/material.hpp"
+#include "core/scene/materials/material_definitions.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 

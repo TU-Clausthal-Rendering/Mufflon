@@ -9,6 +9,7 @@
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
 #include "util/indexed_string_map.hpp"
+#include "core/scene/materials/medium.hpp"
 #include <map>
 #include <memory>
 #include <vector>

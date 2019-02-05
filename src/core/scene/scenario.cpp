@@ -1,7 +1,7 @@
 #include "scenario.hpp"
 #include "world_container.hpp"
 #include "util/log.hpp"
-#include "core/scene/materials/material.hpp"
+//#include "core/scene/materials/material.hpp"
 #include "core/scene/lights/lights.hpp"
 #include <algorithm>
 
@@ -146,9 +146,9 @@ void Scenario::remove_background() {
 
 bool Scenario::materials_dirty_reset() const {
 	bool dirty = m_materialAssignmentChanged;
-	for(const auto& matAssign : m_materialAssignment) {
+/*	for(const auto& matAssign : m_materialAssignment) {
 		dirty |= matAssign.material->dirty_reset();
-	}
+	}*/
 	m_materialAssignmentChanged = false;
 	return dirty;
 }

@@ -6,70 +6,13 @@
 #include "core/scene/types.hpp"
 #include "core/scene/handles.hpp"
 #include "medium.hpp"
+#include "material_definitions.hpp"
 #include <string>
+#include <array>
 
-namespace mufflon { namespace scene { namespace materials {
+namespace mufflon::scene::materials {
 
-/**
- * List of all implemented materials. These materials may form a hierarchy through
- * BLEND or FRESNEL. This enum is used to dynamically dispatch sampler, evaluation
- * and fetch kernels.
- */
-enum class Materials: u16 {
-	LAMBERT,		// Lambert diffuse
-	TORRANCE,		// Torrance-Sparrow microfacet reflection
-	WALTER,			// Walter microfacet refraction
-	EMISSIVE,		// Emitting surface
-	ORENNAYAR,		// Oren-Nayar diffuse
-	BLEND,			// Mix two other materials
-	FRESNEL,		// Mix two other materials using Fresnel equations
-	GLASS,			// Mix of FRESNEL [TORRANCE, WALTER]
-
-	NUM				// How many materials are there?
-};
-#ifndef __CUDA_ARCH__
 const std::string& to_string(Materials type);
-#endif
-
-struct MaterialPropertyFlags : public util::Flags<u16> {
-	static constexpr u16 EMISSIVE = 1u;		// Is any component of this material able to emit light?
-	static constexpr u16 REFLECTIVE = 2u;	// BRDF = Is there any contribution from reflections? (contribution for incident and excident on the same side)
-	static constexpr u16 REFRACTIVE = 4u;	// BTDF = Is there any contribution from refractions? (contribution for incident and excident on opposite sides)
-	static constexpr u16 HALFVECTOR_BASED = 8u;	// Does this material need a half vector for evaluations?
-
-	MaterialPropertyFlags() = default;
-	MaterialPropertyFlags(u16 m) { mask = m; }
-
-	bool is_emissive() const noexcept { return is_set(EMISSIVE); }
-	bool is_reflective() const noexcept { return is_set(REFLECTIVE); }
-	bool is_refractive() const noexcept { return is_set(REFRACTIVE); }
-	bool is_halfv_based() const noexcept { return is_set(HALFVECTOR_BASED); }
-};
-
-// Base definition of material descriptors.
-// Each implementation of a material adds some additional information to this descriptor.
-struct MaterialDescriptorBase {
-	Materials type;
-	MaterialPropertyFlags flags;
-	MediumHandle innerMedium;
-	MediumHandle outerMedium;
-
-	// Get the medium handle dependent on the sign of a direction x
-	// with respect to the normal.
-	__host__ __device__ MediumHandle get_medium(float xDotN) const {
-		return xDotN < 0.0f ? innerMedium : outerMedium;
-	}
-};
-
-struct ParameterPack: public MaterialDescriptorBase {};
-
-struct Emission {
-	TextureHandle texture;
-	Spectrum scale;
-};
-
-// TODO remove this and provide a scene based (detect which material needs the most at runtime) max size instead
-constexpr std::size_t MAX_MATERIAL_PARAMETER_SIZE = 256;
 
 
 /**
@@ -120,8 +63,7 @@ public:
 	 * returns: a pointer to the end of the written data. I.e. outBuffer - return
 	 *		is the size of the written descriptor.
 	 */
-	char* get_descriptor(Device device, char* outBuffer) const;
-	virtual char* get_subdescriptor(Device device, char* outBuffer) const = 0;
+	virtual char* get_descriptor(Device device, char* outBuffer) const = 0;
 
 	// Get only the texture for emissive materials
 	virtual Emission get_emission() const { return {nullptr, Spectrum{0.0f}}; }
@@ -132,7 +74,7 @@ public:
 	}
 	void set_outer_medium(MediumHandle medium) {
 		m_outerMedium = medium;
-		m_dirty = true;
+		//m_dirty = true;
 	}
 	// Get the medium on opposite side of the normal.
 	MediumHandle get_inner_medium() const {
@@ -140,7 +82,7 @@ public:
 	}
 	void set_inner_medium(MediumHandle medium) {
 		m_innerMedium = medium;
-		m_dirty = true;
+		//m_dirty = true;
 	}
 
 	virtual Medium compute_medium() const = 0;
@@ -148,18 +90,67 @@ public:
 	Materials get_type() const { return m_type; }
 
 	// Query if the material changed since last request and reset the flag.
-	bool dirty_reset() const {
+	/*bool dirty_reset() const {
 		bool dirty = m_dirty;
 		m_dirty = false;
 		return dirty;
-	}
+	}*/
+
+protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;
-	mutable bool m_dirty = true;			// Any property of the material changed
+	//mutable bool m_dirty = true;			// Any property of the material changed
 
 private:
 	std::string m_name;
 	Materials m_type;
 };
 
-}}} // namespace mufflon::scene::materials
+static_assert(sizeof(MaterialDescriptorBase) % 8 == 0, "Size must be a multiple of 8byte, such that the appended texture handles are aligned porperly.");
+
+// Automatic implementation of the IMaterial interface.
+// To create a new material instance use 'new Material<Materials::TYPE>'.
+template<Materials M>
+class Material : public IMaterial {
+public:
+	using SubMaterial = mat_type<M>;
+
+	template<typename... Args>
+	Material(Args&&... args) : IMaterial{M},
+		m_material{m_textures, 0, std::forward<Args&&>(args)...}
+	{}
+
+	MaterialPropertyFlags get_properties() const noexcept final;
+	static constexpr std::size_t _get_descriptor_size(Device device) {
+		size_t texDescSize = device == Device::CPU ? sizeof(textures::ConstTextureDevHandle_t<Device::CPU>)
+												   : sizeof(textures::ConstTextureDevHandle_t<Device::CUDA>);
+		return sizeof(MaterialDescriptorBase) + sizeof(SubMaterial::NonTexParams)
+			+ int(SubMaterial::Textures::TEX_COUNT) * texDescSize;
+	}
+	std::size_t get_descriptor_size(Device device) const final { return _get_descriptor_size(device); }
+	std::size_t get_parameter_pack_size() const final;
+	char* get_descriptor(Device device, char* outBuffer) const final;
+	Emission get_emission() const final;
+	Medium compute_medium() const final;
+
+private:
+	TextureHandle m_textures[int(SubMaterial::Textures::TEX_COUNT)];
+	SubMaterial m_material;
+};
+
+// Automatic detection of the maximum possible descriptor size
+template<int... Is>
+constexpr std::array<int, sizeof...(Is)> enumerate_desc_sizes(
+    std::integer_sequence<int, Is...>) {
+	return {{int(ei::max(Material<Materials(Is)>::_get_descriptor_size(Device::CPU),
+						 Material<Materials(Is)>::_get_descriptor_size(Device::CUDA)))...}};
+}
+constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
+	int maxSize = 0;
+	for(int size : enumerate_desc_sizes(std::make_integer_sequence<int, int(Materials::NUM)>{}))
+		if(size > maxSize) maxSize = size;
+	return sizeof(MaterialDescriptorBase) + maxSize;
+}
+
+
+} // namespace mufflon::scene::materials

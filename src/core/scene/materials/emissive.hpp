@@ -1,91 +1,47 @@
 #pragma once
 
-#include "material.hpp"
 #include "core/export/api.h"
 #include "core/math/sampling.hpp"
+#include "material_definitions.hpp"
 #include "core/scene/textures/texture.hpp"
-#include "core/scene/textures/interface.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
-struct EmissiveParameterPack {
-	Spectrum radiance;
-};
+CUDA_FUNCTION MatSampleEmissive fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+									  const ei::Vec4* texValues,
+									  int texOffset,
+									  const typename MatEmissive::NonTexParams& params) {
+	return MatSampleEmissive{
+		Spectrum{texValues[MatEmissive::EMISSION+texOffset]} * params.scale
+	};
+}
 
-template<Device dev>
-struct EmissiveDesc {
-	textures::ConstTextureDevHandle_t<dev> emission;
-	Spectrum scale;
+CUDA_FUNCTION math::PathSample sample(const MatSampleEmissive& params,
+									  const Direction& incidentTS,
+									  Boundary& boundary,
+									  const math::RndSet2_1& rndSet,
+									  bool adjoint) {
+	return math::PathSample{};
+}
 
-	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
-		*as<EmissiveParameterPack>(outBuffer) = EmissiveParameterPack{
-			Spectrum{ sample(emission, uvCoordinate) } * scale
-		};
-		return sizeof(EmissiveParameterPack);
-	}
-};
-
-// Lambertian self-emitting surface (uniform radiance in all view directions).
-// This class is a special case - it has an BSDF value of 0 and is not sampleable
-// instead it is the only class providing a non-zero output on get_emission().
-class Emissive : public IMaterial {
-public:
-	Emissive(TextureHandle emissiveTex, Spectrum scale) :
-		IMaterial{Materials::EMISSIVE},
-		m_emission{emissiveTex},
-		m_scale(scale)
-	{}
-
-	MaterialPropertyFlags get_properties() const noexcept final {
-		return MaterialPropertyFlags::EMISSIVE;
-	}
-
-	std::size_t get_descriptor_size(Device device) const final {
-		std::size_t s = IMaterial::get_descriptor_size(device);
-		device_switch(device, return sizeof(EmissiveDesc<dev>) + s);
-		return 0;
-	}
-
-	std::size_t get_parameter_pack_size() const final {
-		return IMaterial::get_parameter_pack_size()
-			+ sizeof(EmissiveParameterPack);
-	}
-
-	char* get_subdescriptor(Device device, char* outBuffer) const final {
-		device_switch(device,
-			(*as<EmissiveDesc<dev>>(outBuffer) =
-				 EmissiveDesc<dev>{ m_emission->acquire_const<dev>(), m_scale });
-			return outBuffer + sizeof(EmissiveDesc<dev>);
-		);
-		return nullptr;
-	}
-
-	Emission get_emission() const final { return {m_emission, m_scale}; }
-
-	Medium compute_medium() const final {
-		// Use some average dielectric refraction index and a maximum absorption
-		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
-	}
-
-	void set_emission(TextureHandle emissiveTex) {
-		m_emission = emissiveTex;
-		m_dirty = true;
-	}
-
-	void set_scale(const Spectrum& scale) {
-		m_scale = scale;
-		m_dirty = true;
-	}
-private:
-	TextureHandle m_emission;
-	Spectrum m_scale;
-};
+CUDA_FUNCTION math::EvalValue evaluate(const MatSampleEmissive& params,
+									   const Direction& incidentTS,
+									   const Direction& excidentTS ,
+									   Boundary& boundary) {
+	return math::EvalValue{};
+}
 
 // The albedo routine
-CUDA_FUNCTION Spectrum
-emissive_albedo(const EmissiveParameterPack& params) {
+CUDA_FUNCTION Spectrum albedo(const MatSampleEmissive& params) {
 	// Return 0 to force layered models to never sample this.
 	return Spectrum{0.0f};
 }
+
+CUDA_FUNCTION Spectrum emission(const MatSampleEmissive& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return dot(geoN, excident) > 0.0f ? params.radiance : Spectrum{0.0f};
+}
+
+template MaterialSampleConcept<MatSampleEmissive>;
+template MaterialConcept<MatEmissive>;
 
 }}} // namespace mufflon::scene::materials

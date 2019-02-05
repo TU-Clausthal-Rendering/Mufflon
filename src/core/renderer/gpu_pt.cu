@@ -32,7 +32,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 
 	math::Rng rng(seeds[pixel]);
 
-	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path

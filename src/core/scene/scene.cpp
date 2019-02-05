@@ -67,10 +67,10 @@ void Scene::load_materials() {
 	char* mem = m_materials.acquire<dev>();
 	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
-	char buffer[materials::MAX_MATERIAL_PARAMETER_SIZE];
+	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
 		ConstMaterialHandle mat = m_scenario.get_assigned_material(i);
-		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_PARAMETER_SIZE);
+		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_DESCRIPTOR_SIZE());
 		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
 		copy(mem + offsets[i], buffer, size);
 	}

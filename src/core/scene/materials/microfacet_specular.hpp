@@ -1,105 +1,34 @@
 #pragma once
 
-#include "material.hpp"
-#include "microfacet_base.hpp"
 #include "core/export/api.h"
-#include "core/memory/dyntype_memory.hpp"
 #include "core/math/sampling.hpp"
-#include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/interface.hpp"
+#include "material_definitions.hpp"
+#include "microfacet_base.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
-struct TorranceParameterPack {
-	Spectrum albedo;
-	float angle;
-	ei::Vec2 roughness;
-	NDF ndf;
-};
-
-template<Device dev>
-struct TorranceDesc {
-	textures::ConstTextureDevHandle_t<dev> albedoTex;
-	textures::ConstTextureDevHandle_t<dev> roughnessTex;
-	NDF ndf;
-
-	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
-		ei::Vec4 roughness = sample(roughnessTex, uvCoordinate);
-		if(get_texture_channel_count(roughnessTex) == 1)
-			roughness.y = roughness.x;
-		*as<TorranceParameterPack>(outBuffer) = TorranceParameterPack{
-			Spectrum{ sample(albedoTex, uvCoordinate) },
-			roughness.z, {roughness.x, roughness.y},
-			ndf
-		};
-		return sizeof(TorranceParameterPack);
-	}
-};
-
-// Class for the handling of the Torrance-Sparrow microfacet reflection model.
-class Torrance : public IMaterial {
-public:
-	Torrance(TextureHandle albedo, TextureHandle roughness, NDF ndf) :
-		IMaterial{Materials::TORRANCE},
-		m_albedo{albedo},
-		m_roughness{roughness},
-		m_ndf{ndf}
-	{}
-
-	MaterialPropertyFlags get_properties() const noexcept final {
-		return MaterialPropertyFlags::REFLECTIVE | MaterialPropertyFlags::HALFVECTOR_BASED;
-	}
-
-	std::size_t get_descriptor_size(Device device) const final {
-		std::size_t s = IMaterial::get_descriptor_size(device);
-		device_switch(device, return sizeof(TorranceDesc<dev>) + s);
-		return 0;
-	}
-
-	std::size_t get_parameter_pack_size() const final {
-		return IMaterial::get_parameter_pack_size()
-			+ sizeof(TorranceParameterPack);
-	}
-
-	char* get_subdescriptor(Device device, char* outBuffer) const final {
-		device_switch(device,
-			(*as<TorranceDesc<dev>>(outBuffer) =
-				TorranceDesc<dev>{ m_albedo->acquire_const<dev>(),
-								   m_roughness->acquire_const<dev>(),
-								   m_ndf });
-			return outBuffer + sizeof(TorranceDesc<dev>);
-		);
-		return nullptr;
-	}
-
-	Medium compute_medium() const final {
-		// Use some average dielectric refraction index and a maximum absorption
-		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
-	}
-
-	TextureHandle get_albedo() const noexcept {
-		return m_albedo;
-	}
-	TextureHandle get_roughness() const noexcept {
-		return m_roughness;
-	}
-	NDF get_ndf() const noexcept {
-		return m_ndf;
-	}
-private:
-	TextureHandle m_albedo;
-	TextureHandle m_roughness;
-	NDF m_ndf;
-};
-
+CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+									  const ei::Vec4* texValues,
+									  int texOffset,
+									  const typename MatTorrance::NonTexParams& params) {
+	ei::Vec2 roughness { texValues[MatTorrance::ROUGHNESS+texOffset].x };
+	if(get_texture_channel_count(textures[MatTorrance::ROUGHNESS+texOffset]) > 1)
+		roughness.y = texValues[MatTorrance::ROUGHNESS+texOffset].y;
+	return MatSampleTorrance{
+		Spectrum{texValues[MatTorrance::ALBEDO+texOffset]},
+		texValues[MatTorrance::ROUGHNESS+texOffset].z,
+		roughness, params.ndf
+	};
+}
 
 
 // The importance sampling routine
-CUDA_FUNCTION math::PathSample
-torrance_sample(const TorranceParameterPack& params,
-				const Direction& incidentTS,
-				Boundary& boundary,
-				const math::RndSet2_1& rndSet) {
+CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
+									  const Direction& incidentTS,
+									  Boundary& boundary,
+									  const math::RndSet2_1& rndSet,
+									  bool) {
 	// Importance sampling for the ndf
 	math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
 
@@ -118,7 +47,7 @@ torrance_sample(const TorranceParameterPack& params,
 	float gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
 	float g = geoshadowing_vcavity_reflection(gi, ge);
 	if(ge == 0.0f || gi == 0.0f) // Completely nullyfy the invalid result
-		g = gi = ge = 0.0f;
+		return math::PathSample {};
 
 	// Copy the sign for two sided diffuse
 	return math::PathSample {
@@ -131,11 +60,10 @@ torrance_sample(const TorranceParameterPack& params,
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::EvalValue
-torrance_evaluate(const TorranceParameterPack& params,
-				  const Direction& incidentTS,
-				  const Direction& excidentTS,
-				  Boundary& boundary) {
+CUDA_FUNCTION math::EvalValue evaluate(const MatSampleTorrance& params,
+									   const Direction& incidentTS,
+									   const Direction& excidentTS,
+									   Boundary& boundary) {
 	// No transmission
 	if(incidentTS.z * excidentTS.z < 0.0f) return math::EvalValue{};
 
@@ -162,9 +90,15 @@ torrance_evaluate(const TorranceParameterPack& params,
 }
 
 // The albedo routine
-CUDA_FUNCTION Spectrum
-torrance_albedo(const TorranceParameterPack& params) {
+CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
 	return params.albedo;
 }
+
+CUDA_FUNCTION Spectrum emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return Spectrum{0.0f};
+}
+
+template MaterialSampleConcept<MatSampleTorrance>;
+template MaterialConcept<MatTorrance>;
 
 }}} // namespace mufflon::scene::materials

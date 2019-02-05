@@ -3,7 +3,6 @@
 #include "light_tree.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
-#include "core/scene/materials/material.hpp"
 #include "core/scene/materials/point_medium.hpp"
 
 namespace mufflon { namespace scene { namespace lights {

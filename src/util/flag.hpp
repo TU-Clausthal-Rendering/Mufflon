@@ -45,7 +45,7 @@ struct Flags {
 	// Check if exactly one flag is set
 	CUDA_FUNCTION bool is_unique() const noexcept { return is_power_of_two(mask); }
 
-	CUDA_FUNCTION operator T () const noexcept { return mask; }
+	constexpr CUDA_FUNCTION operator T () const noexcept { return mask; }
 };
 
 /**

@@ -1,85 +1,25 @@
 #pragma once
 
-#include "material.hpp"
 #include "core/export/api.h"
 #include "core/math/sampling.hpp"
+#include "material_definitions.hpp"
 #include "core/scene/textures/texture.hpp"
-#include "core/scene/textures/interface.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
-struct LambertParameterPack {
-	Spectrum albedo;
-};
-
-template<Device dev>
-struct LambertDesc {
-	textures::ConstTextureDevHandle_t<dev> albedoTex;
-
-	CUDA_FUNCTION int fetch(const UvCoordinate& uvCoordinate, char* outBuffer) const {
-		// Why we do this, you might ask - CUDA knows the answer. Taking this away and using 'albedoTex'
-		// directly results in a misaligned address access
-		const auto tex = albedoTex;
-		*as<LambertParameterPack>(outBuffer) = LambertParameterPack{ Spectrum{ sample(tex, uvCoordinate) } };
-		return sizeof(LambertParameterPack);
-	}
-};
-
-// Class for the handling of the Lambertian material.
-class Lambert : public IMaterial {
-public:
-	Lambert(TextureHandle albedo) :
-		IMaterial{Materials::LAMBERT},
-		m_albedo{albedo}
-	{}
-
-	MaterialPropertyFlags get_properties() const noexcept final {
-		return MaterialPropertyFlags::REFLECTIVE;
-	}
-
-	std::size_t get_descriptor_size(Device device) const final {
-		std::size_t s = IMaterial::get_descriptor_size(device);
-		device_switch(device, return sizeof(LambertDesc<dev>) + s);
-		return 0;
-	}
-
-	std::size_t get_parameter_pack_size() const final {
-		return IMaterial::get_parameter_pack_size()
-			+ sizeof(LambertParameterPack);
-	}
-
-	char* get_subdescriptor(Device device, char* outBuffer) const final {
-		device_switch(device,
-			*as<LambertDesc<dev>>(outBuffer) =
-				LambertDesc<dev>{ m_albedo->acquire_const<dev>() };
-			return outBuffer + sizeof(LambertDesc<dev>);
-		);
-		return nullptr;
-	}
-
-	Medium compute_medium() const final {
-		// Use some average dielectric refraction index and a maximum absorption
-		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
-	}
-
-	void set_albedo(TextureHandle albedo) {
-		m_albedo = albedo;
-		m_dirty = true;
-	}
-	TextureHandle get_albedo() const {
-		return m_albedo;
-	}
-private:
-	TextureHandle m_albedo;
-};
+CUDA_FUNCTION MatSampleLambert fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+									 const ei::Vec4* texValues,
+									 int texOffset,
+									 const typename MatLambert::NonTexParams& params) {
+	return MatSampleLambert{Spectrum{texValues[MatLambert::ALBEDO + texOffset]}};
+}
 
 
-
-// The importance sampling routine
-CUDA_FUNCTION math::PathSample
-lambert_sample(const LambertParameterPack& params,
-			   const Direction& incidentTS,
-			   const math::RndSet2_1& rndSet) {
+CUDA_FUNCTION math::PathSample sample(const MatSampleLambert& params,
+									  const Direction& incidentTS,
+									  Boundary& boundary,
+									  const math::RndSet2_1& rndSet,
+									  bool adjoint) {
 	// Importance sampling for lambert: BRDF * cos(theta)
 	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1).direction;
 	// Copy the sign for two sided diffuse
@@ -92,11 +32,10 @@ lambert_sample(const LambertParameterPack& params,
 	};
 }
 
-// The evaluation routine
-CUDA_FUNCTION math::EvalValue
-lambert_evaluate(const LambertParameterPack& params,
-				 const Direction& incidentTS,
-				 const Direction& excidentTS) {
+CUDA_FUNCTION math::EvalValue evaluate(const MatSampleLambert& params,
+									   const Direction& incidentTS,
+									   const Direction& excidentTS ,
+									   Boundary& boundary) {
 	// No transmission - already checked by material, but in a combined model we might get a call
 	if(incidentTS.z * excidentTS.z < 0.0f) return math::EvalValue{};
 	// Two sided diffuse (therefore the abs())
@@ -108,10 +47,15 @@ lambert_evaluate(const LambertParameterPack& params,
 	};
 }
 
-// The albedo routine
-CUDA_FUNCTION Spectrum
-lambert_albedo(const LambertParameterPack& params) {
+CUDA_FUNCTION Spectrum albedo(const MatSampleLambert& params) {
 	return params.albedo;
 }
+
+CUDA_FUNCTION Spectrum emission(const MatSampleLambert& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return Spectrum{0.0f};
+}
+
+template MaterialSampleConcept<MatSampleLambert>;
+template MaterialConcept<MatLambert>;
 
 }}} // namespace mufflon::scene::materials

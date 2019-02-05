@@ -27,11 +27,6 @@ enum class Interaction : u16 {
 	LIGHT_AREA,			// An area-light vertex
 };
 
-struct Throughput {
-	Spectrum weight;
-	float guideWeight;
-};
-
 // Braced-inherited initialization is only part of C++17...
 struct VertexSample : public math::PathSample {
 	VertexSample() = default;
