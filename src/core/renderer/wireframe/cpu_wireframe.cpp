@@ -77,7 +77,6 @@ void CpuWireframe::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBu
 		} else {
 			const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
 
-			// TODO: remove, it's for wireframe rendering
 			if(static_cast<u32>(nextHit.hitId.primId) < object.polygon.numTriangles) {
 				float minBary = nextHit.surfaceParams.barycentric.x;
 				minBary = minBary > nextHit.surfaceParams.barycentric.y ?

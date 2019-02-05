@@ -137,9 +137,9 @@ namespace gui.Dll
                             if (m_window.wasPressedAndClear(Key.S))
                                 z -= keySpeed;
                             if (m_window.wasPressedAndClear(Key.D))
-                                x -= keySpeed;
-                            if (m_window.wasPressedAndClear(Key.A))
                                 x += keySpeed;
+                            if (m_window.wasPressedAndClear(Key.A))
+                                x -= keySpeed;
                             if (m_window.wasPressedAndClear(Key.Space))
                                 y += keySpeed;
                             if (m_window.wasPressedAndClear(Key.LeftCtrl))
@@ -155,7 +155,7 @@ namespace gui.Dll
                             Vector drag = m_window.getMouseDiffAndReset();
                             if (drag.X != 0 || drag.Y != 0)
                             {
-                                if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
+                                if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, mouseSpeed * (float)drag.X, 0))
                                     throw new Exception(Core.core_get_dll_error());
                             }
                         }

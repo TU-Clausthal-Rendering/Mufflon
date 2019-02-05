@@ -5,13 +5,7 @@
 #include "core/renderer/path_util.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_sampling.hpp"
-
-#include "core/cuda/error.hpp"
-#include "core/renderer/random_walk.hpp"
-#include "core/scene/lights/light_tree.hpp"
-#include "core/scene/textures/interface.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
-
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <ei/vector.hpp>
@@ -48,23 +42,21 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 	VertexSample sample = vertex->sample(scene->media, math::RndSet2_1{ rng.next(), rng.next() }, false);
 	ei::Ray ray{ sample.origin, sample.excident };
 
-	/*
 #ifdef __CUDA_ARCH__
 	while(true) {
 		scene::accel_struct::RayIntersectionResult nextHit =
-			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, vertex->get_primitive_id(), scene::MAX_SCENE_SIZE);
+			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(*scene, ray, vertex->get_primitive_id(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
-			auto background = evaluate_background(scene.lightTree.background, ray.direction);
-			if(ei::any(ei::greater(background.value, 0.0f))) {
+			auto background = evaluate_background(scene->lightTree.background, ray.direction);
+			if(any(greater(background.value, 0.0f))) {
 				outputBuffer.contribute(coord, throughput, background.value,
 										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 										ei::Vec3{ 0, 0, 0 });
 			}
 			break;
 		} else {
-			const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
+			const scene::LodDescriptor<CURRENT_DEV>& object = scene->lods[scene->lodIndices[nextHit.hitId.instanceId]];
 
-			// TODO: remove, it's for wireframe rendering
 			if(static_cast<u32>(nextHit.hitId.primId) < object.polygon.numTriangles) {
 				float minBary = nextHit.surfaceParams.barycentric.x;
 				minBary = minBary > nextHit.surfaceParams.barycentric.y ?
@@ -133,7 +125,6 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 		}
 	}
 #endif // __CUDA_ARCH__
-	*/
 }
 
 namespace gpuwireframe_detail {
