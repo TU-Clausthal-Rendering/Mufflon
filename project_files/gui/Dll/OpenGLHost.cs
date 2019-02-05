@@ -33,6 +33,7 @@ namespace gui.Dll
         private readonly ViewportModel m_viewport;
         private readonly RendererModel m_rendererModel;
         private readonly RenderTargetSelectionModel m_renderTargetModel;
+        private readonly StatusbarModel m_statusbarModel;
         private readonly SettingsModel m_settings;
 
         // context creation
@@ -64,13 +65,14 @@ namespace gui.Dll
         private Core.LogCallback m_logCallbackPointer = null;
 
         public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel,
-            RenderTargetSelectionModel targetModel,SettingsModel settings)
+            RenderTargetSelectionModel targetModel, StatusbarModel statusbar, SettingsModel settings)
         {
             m_window = window;
             m_parent = window.BorderHost;
             m_viewport = viewport;
             m_rendererModel = rendererModel;
             m_renderTargetModel = targetModel;
+            m_statusbarModel = statusbar;
             m_settings = settings;
             m_window.MouseWheel += OnMouseWheel;
             m_window.SnapsToDevicePixels = true;
@@ -111,6 +113,7 @@ namespace gui.Dll
 
                 while (m_isRunning)
                 {
+                    m_statusbarModel.UpdateMemory();
 
                     //HandleCommands();
                     // Try to acquire the lock - if we're waiting, we're not rendering

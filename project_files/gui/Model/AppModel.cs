@@ -16,13 +16,13 @@ namespace gui.Model
         public Window TopmostWindow => m_windowStack.Peek();
 
         public AppModel(MainWindow window, ViewportModel viewport, RendererModel rendererModel,
-            RenderTargetSelectionModel targetModel, SettingsModel settings)
+            RenderTargetSelectionModel targetModel, StatusbarModel statusbar, SettingsModel settings)
         {
             Window = window;
             m_windowStack.Push(window);
 
             // init gl host
-            GlHost = new OpenGLHost(window, viewport, rendererModel, targetModel, settings);
+            GlHost = new OpenGLHost(window, viewport, rendererModel, targetModel, statusbar, settings);
             GlHost.Error += window.GlHostOnError;
             window.Loaded += (sender, args) => window.BorderHost.Child = GlHost;
         }

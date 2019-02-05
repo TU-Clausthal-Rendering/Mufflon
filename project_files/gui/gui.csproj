@@ -125,6 +125,7 @@
     <Compile Include="Model\Scene\ScenarioModel.cs" />
     <Compile Include="Model\Scene\WorldModel.cs" />
     <Compile Include="Model\SettingsModel.cs" />
+    <Compile Include="Model\StatusbarModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />
