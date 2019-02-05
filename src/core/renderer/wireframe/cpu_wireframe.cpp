@@ -52,7 +52,7 @@ void CpuWireframe::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBu
 
 	constexpr ei::Vec3 borderColor{ 1.f };
 
-	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path

@@ -301,6 +301,7 @@ Boolean core_get_target_image(RenderTarget target, Boolean variance,
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	std::scoped_lock lock{ s_iterationMutex };
 	if(ptr != nullptr) {
 		const renderer::OutputValue targetFlags{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
 		if(!s_outputTargets.is_set(targetFlags)) {

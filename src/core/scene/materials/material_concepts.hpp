@@ -1,6 +1,7 @@
 #include "util/flag.hpp"
 #include "core/math/sample_types.hpp"
 #include "core/scene/handles.hpp"
+#include "core/scene/textures/texture.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 

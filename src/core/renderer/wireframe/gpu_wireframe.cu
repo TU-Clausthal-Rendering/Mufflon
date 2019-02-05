@@ -38,7 +38,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 
 	constexpr ei::Vec3 borderColor{ 1.f };
 
-	Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	math::Rng rng(seeds[pixel]);
