@@ -52,6 +52,15 @@ namespace gui.Model
            UpdateIterationCount();
         }
 
+        public void Iterate(uint times)
+        {
+            for(uint i = 0u; i < times; ++i)
+            {
+                RenderLock.Release();
+                RenderLock.WaitOne();
+            }
+        }
+
         public void UpdateIterationCount()
         {
             OnPropertyChanged(nameof(Iteration));

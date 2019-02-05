@@ -51,6 +51,8 @@ namespace gui.Model
                     if(value)
                     {
                         Enabled = true;
+                        if (!Core.render_enable_render_target(m_target, 1u))
+                            throw new Exception(Core.core_get_dll_error());
                     } else
                     {
                         if (!Core.render_disable_render_target(m_target, 1u))
@@ -106,8 +108,12 @@ namespace gui.Model
             set
             {
                 if (value == m_isVarianceVisible) return;
-                if(value)
+                if (value)
+                {
+                    TargetStatus[(int)VisibleTarget].Enabled = true;
                     TargetStatus[(int)VisibleTarget].VarianceEnabled = true;
+                }
+
                 m_isVarianceVisible = value;
                 OnPropertyChanged(nameof(IsVarianceVisible));
             }

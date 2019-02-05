@@ -162,12 +162,6 @@ namespace gui.Dll
 
                         if (!Core.render_iterate())
                             throw new Exception(Core.core_get_dll_error());
-                        IntPtr imageData = IntPtr.Zero;
-                        if(!Core.core_get_target_image(m_renderTarget, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
-                            false, out imageData) || imageData == IntPtr.Zero)
-                            throw new Exception(Core.core_get_dll_error());
-                        if (!OpenGlDisplay.opengldisplay_write(imageData))
-                            throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
 
                         // We also let the GUI know that an iteration has taken place
                         Application.Current.Dispatcher.BeginInvoke(new Action(() => m_rendererModel.UpdateIterationCount()));
@@ -184,6 +178,13 @@ namespace gui.Dll
                     UInt32 width = (UInt32)m_viewport.DesiredWidth;
                     UInt32 height = (UInt32)m_viewport.DesiredHeight;
 
+                    IntPtr imageData = IntPtr.Zero;
+                    if (!Core.core_get_target_image(m_renderTarget, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
+                        false, out imageData))
+                        throw new Exception(Core.core_get_dll_error());
+                    if(imageData != IntPtr.Zero)
+                        if (!OpenGlDisplay.opengldisplay_write(imageData))
+                            throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
                     if (!OpenGlDisplay.opengldisplay_display(left, right, bottom, top, width, height))
                         throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
                     if (!Gdi32.SwapBuffers(m_deviceContext))
@@ -348,11 +349,11 @@ namespace gui.Dll
                 m_backgroundCleared = true;
                 handled = true;
             }
-            if (msg == (int)Gdi32.WmMessages.PAINT && m_backgroundCleared && m_isRunning)
+            if (msg == (int)Gdi32.WmMessages.PAINT && m_backgroundCleared && m_isRunning && !m_rendererModel.IsRendering)
             {
                 m_backgroundCleared = false;
-                m_rendererModel.RenderLock.Release();
-                m_rendererModel.RenderLock.WaitOne();
+                // Iterate once to update the background
+                m_rendererModel.Iterate(1u);
                 handled = true;
             }
             return base.WndProc(hwnd, msg, wParam, lParam, ref handled);

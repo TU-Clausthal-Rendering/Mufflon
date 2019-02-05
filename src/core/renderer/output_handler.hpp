@@ -130,6 +130,7 @@ public:
 	void end_iteration();
 
 	void set_targets(OutputValue targets);
+	OutputValue get_target() const noexcept { return m_targets; }
 
 
 	// Get the formated output of one quantity for the purpose of exporting screenshots.

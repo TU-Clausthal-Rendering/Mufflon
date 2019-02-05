@@ -170,40 +170,30 @@ Boolean opengldisplay_write(const char* data) {
 	}
 	// Determine the pixel format for OpenGL
 	GLenum type = GL_INVALID_ENUM;
+	GLenum format = GL_INVALID_ENUM;
 
 	// Since we know what we came from, we can induce the pixel format from the internal format
 	switch(s_screenTexture->get_format()) {
-		case Texture2D::InternalFormat::R8UI:
-		case Texture2D::InternalFormat::RG8UI:
-		case Texture2D::InternalFormat::RGBA8UI:
-			type = GL_UNSIGNED_BYTE;
-			break;
-		case Texture2D::InternalFormat::R16UI:
-		case Texture2D::InternalFormat::RG16UI:
-		case Texture2D::InternalFormat::RGBA16UI:
-			type = GL_UNSIGNED_SHORT;
-			break;
-		case Texture2D::InternalFormat::R16F:
-		case Texture2D::InternalFormat::RG16F:
-		case Texture2D::InternalFormat::RGBA16F:
-			type = GL_HALF_FLOAT;
-			break;
-		case Texture2D::InternalFormat::R32F:
-		case Texture2D::InternalFormat::RG32F:
-		case Texture2D::InternalFormat::RGBA32F:
-			type = GL_FLOAT;
-			break;
+		case Texture2D::InternalFormat::R8UI: format = GL_RED; type = GL_UNSIGNED_BYTE; break;
+		case Texture2D::InternalFormat::RG8UI: format = GL_RG; type = GL_UNSIGNED_BYTE; break;
+		case Texture2D::InternalFormat::RGBA8UI: format = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		case Texture2D::InternalFormat::R16UI: format = GL_RED; type = GL_UNSIGNED_SHORT; break;
+		case Texture2D::InternalFormat::RG16UI: format = GL_RG; type = GL_UNSIGNED_SHORT; break;
+		case Texture2D::InternalFormat::RGBA16UI: format = GL_RGBA; type = GL_UNSIGNED_SHORT; break;
+		case Texture2D::InternalFormat::R16F: format = GL_RED; type = GL_HALF_FLOAT; break;
+		case Texture2D::InternalFormat::RG16F: format = GL_RG; type = GL_HALF_FLOAT; break;
+		case Texture2D::InternalFormat::RGBA16F: format = GL_RGBA; type = GL_HALF_FLOAT; break;
+		case Texture2D::InternalFormat::R32F: format = GL_RED; type = GL_FLOAT; break;
+		case Texture2D::InternalFormat::RG32F: format = GL_RG; type = GL_FLOAT; break;
+		case Texture2D::InternalFormat::RGBA32F: format = GL_RGBA; type = GL_FLOAT; break;
 		default:
 			logError("[", FUNCTION_NAME, "] Output buffer has unknown format!");
 			return false;
 	}
 
 	s_screenTexture->bind_as_texture(0u);
-	::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 800, 600, 0, GL_RGBA, GL_FLOAT, data);
-	/*::glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(s_screenTexture->get_width()),
-					  static_cast<GLsizei>(s_screenTexture->get_height()),
-					  static_cast<GLenum>(s_screenTexture->get_format()), type,
-					  data);*/
+	::glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(s_screenTexture->get_width()),
+					  static_cast<GLsizei>(s_screenTexture->get_height()), format, type, data);
 	return true;
 }
 

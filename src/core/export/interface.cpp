@@ -294,12 +294,17 @@ Boolean core_get_target_image(RenderTarget target, Boolean variance,
 			logError("[", FUNCTION_NAME, "] Specified render target is not active");
 			return false;
 		}
-
-		if(format >= TextureFormat::FORMAT_NUM)
-			(void)core_get_target_format(target, &format);
-		s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
-		textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
-		*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
+		
+		// If there's no output yet, we "return" a nullptr
+		if(s_imageOutput != nullptr) {
+			if(format >= TextureFormat::FORMAT_NUM)
+				(void)core_get_target_format(target, &format);
+			s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+			textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
+			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
+		} else {
+			*ptr = nullptr;
+		}
 	}
 	return true;
 	CATCH_ALL(false)
