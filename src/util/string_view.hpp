@@ -92,7 +92,15 @@ public:
 	constexpr BasicStringView substr(size_type pos = 0, size_type count = npos) const {
 		return BasicStringView{ m_data + pos, std::min(count == npos ? m_size : count, size() - pos) };
 	}
-	constexpr int compare(BasicStringView v) const noexcept { return traits_type::compare(data(), v.data(), std::min(size(), v.size())); }
+	constexpr int compare(BasicStringView v) const noexcept {
+		int c = traits_type::compare(data(), v.data(), std::min(size(), v.size()));
+		if(c==0) {
+			if(size() < v.size()) return -1;
+			if(size() == v.size()) return 0;
+			return 1;
+		}
+		return c;
+	}
 	constexpr int compare(size_type pos1, size_type count1, BasicStringView v) const { return substr(pos1, count1).compare(v); }
 	constexpr int compare(size_type pos1, size_type count1, BasicStringView v,
 						  size_type pos2, size_type count2) const {

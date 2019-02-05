@@ -16,7 +16,7 @@ MaterialIndex Scenario::declare_material_slot(StringView binaryName) {
 	// Catch if this slot was added before
 	auto it = m_materialIndices.find(binaryName);
 	if(it != m_materialIndices.end()) {
-		logError("[Scene::declare_material_slot] Trying to add an already existend material slot: '", binaryName, "', but names must be unique.");
+		logError("[Scenario::declare_material_slot] Trying to add an already existend material slot: '", binaryName, "', but names must be unique.");
 		return it->second;
 	}
 
@@ -32,7 +32,7 @@ MaterialIndex Scenario::declare_material_slot(StringView binaryName) {
 MaterialIndex Scenario::get_material_slot_index(StringView binaryName) const {
 	auto it = m_materialIndices.find(binaryName);
 	if(it == m_materialIndices.end()) {
-		logError("[Scene::get_material_slot_index] Cannot find the material slot '", binaryName, "'");
+		logError("[Scenario::get_material_slot_index] Cannot find the material slot '", binaryName, "'");
 		return 0;
 	}
 
