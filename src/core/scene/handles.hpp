@@ -50,6 +50,9 @@ struct PrimitiveHandle {
 	constexpr bool operator==(const PrimitiveHandle& rhs) const noexcept {
 		return instanceId == rhs.instanceId && primId == rhs.primId;
 	}
+	constexpr bool operator!=(const PrimitiveHandle& rhs) const noexcept {
+		return instanceId != rhs.instanceId || primId != rhs.primId;
+	}
 };
 
 }} // namespace mufflon::scene
