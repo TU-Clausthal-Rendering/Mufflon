@@ -648,8 +648,10 @@ RayIntersectionResult first_intersection_scene_lbvh(
 
 		i32 primId = hitPrimId;
 
+		const LodDescriptor<dev>& obj = scene.lods[scene.lodIndices[hitInstanceId]];
+		const ei::Vec3& scale = scene.scales[hitInstanceId];
+		ei::Mat3x3 rotation = ei::Mat3x3{ scene.transformations[hitInstanceId] };
 
-		const LodDescriptor<dev>& obj = scene.lods[ scene.lodIndices[hitInstanceId] ];
 		const i32 offsetSpheres = obj.polygon.numTriangles + obj.polygon.numQuads;
 		if(primId >= offsetSpheres) { // Sphere?
 			const i32 sphId = primId - offsetSpheres;
@@ -692,7 +694,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 				tangentY = det * (dx1 * du0.x - dx0 * du1.x);
 
 				// Don't use the UV tangents to compute the normal, since they may be reversed
-				geoNormal = cross(v[1u] - v[0u], v[2u] - v[0u]);
+				geoNormal = cross(dx0, dx1);
 
 				mAssert(dot(geoNormal, obj.polygon.normals[ids.x]) > 0.f);
 
@@ -738,12 +740,10 @@ RayIntersectionResult first_intersection_scene_lbvh(
 		mAssert(!(isnan(tangentY.x) || isnan(tangentY.y) || isnan(tangentY.z)));
 		mAssert(!(isnan(geoNormal.x) || isnan(geoNormal.y) || isnan(geoNormal.z)));
 
-		// Transform the normal and tangents into world space
-		const ei::Vec3& scale = scene.scales[hitInstanceId];
-		ei::Mat3x3 rotation = ei::Mat3x3{ scene.transformations[hitInstanceId] };
-		geoNormal = ei::normalize(rotation * (geoNormal * scale));
-		tangentX = ei::normalize(rotation * (tangentX * scale));
-		tangentY = ei::normalize(rotation * (tangentY * scale));
+		// Normalize the geometric tangent space
+		geoNormal = ei::normalize(rotation * (geoNormal / scale));
+		tangentX = ei::normalize(rotation * (tangentX / scale));
+		tangentY = ei::normalize(rotation * (tangentY / scale));
 
 		return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
 	}
