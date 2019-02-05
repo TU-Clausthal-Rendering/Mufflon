@@ -58,6 +58,7 @@ namespace gui.ViewModel.Settings
             s.CoreProfileLevel = SelectedCoreProfilerLevel.Cargo;
             s.LoaderProfileLevel = SelectedLoaderProfilerLevel.Cargo;
             s.ScreenshotNamePattern = SelectedScreenshotNamePattern;
+            s.ScreenshotFolder = ScreenshotFolder;
             // TODO history?
         }
 

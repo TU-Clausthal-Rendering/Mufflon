@@ -103,12 +103,12 @@ namespace gui.Dll
             try
             {
                 InitializeOpenGl();
-                Logger.LogLevel = (Core.Severity)Settings.Default.LogLevel;
+                Logger.LogLevel = (Core.Severity)m_settings.LogLevel;
                 Core.profiling_enable();
                 Loader.loader_profiling_enable();
-                if (!Core.profiling_set_level((Core.ProfilingLevel)Settings.Default.CoreProfileLevel))
+                if (!Core.profiling_set_level((Core.ProfilingLevel)m_settings.CoreProfileLevel))
                     throw new Exception(Core.core_get_dll_error());
-                if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)Settings.Default.LoaderProfileLevel))
+                if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)m_settings.LoaderProfileLevel))
                     throw new Exception(Loader.loader_get_dll_error());
 
                 while (m_isRunning)
