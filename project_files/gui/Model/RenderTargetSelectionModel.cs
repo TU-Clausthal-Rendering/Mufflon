@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -12,8 +13,6 @@ namespace gui.Model
         public class TargetEnabledStatus : INotifyPropertyChanged
         {
             private Core.RenderTarget m_target;
-            private bool m_enabled = false;
-            private bool m_varianceEnabled = false;
 
             public TargetEnabledStatus(Core.RenderTarget target)
             {
@@ -24,11 +23,10 @@ namespace gui.Model
 
             public bool Enabled
             {
-                get => m_enabled;
+                get => Core.render_is_render_target_enabled(Target, false);
                 set
                 {
-                    if (value == m_enabled) return;
-                    m_enabled = value;
+                    if (value == Core.render_is_render_target_enabled(Target, false)) return;
                     if (value)
                     {
                         if (!Core.render_enable_render_target(m_target, VarianceEnabled ? 1u : 0u))
@@ -46,14 +44,15 @@ namespace gui.Model
 
             public bool VarianceEnabled
             {
-                get => m_varianceEnabled;
+                get => Core.render_is_render_target_enabled(Target, true);
                 set
                 {
-                    if (value == m_varianceEnabled) return;
-                    m_varianceEnabled = value;
+                    if (value == Core.render_is_render_target_enabled(Target, true)) return;
                     if(value)
                     {
                         Enabled = true;
+                        if (!Core.render_enable_render_target(m_target, 1u))
+                            throw new Exception(Core.core_get_dll_error());
                     } else
                     {
                         if (!Core.render_disable_render_target(m_target, 1u))
@@ -76,8 +75,8 @@ namespace gui.Model
             #endregion
         }
 
-        private ObservableCollection<TargetEnabledStatus> m_targetStatus = new ObservableCollection<TargetEnabledStatus>();
-        private Core.RenderTarget m_visibleTarget = Core.RenderTarget.RADIANCE;
+        private List<TargetEnabledStatus> m_targetStatus = new List<TargetEnabledStatus>();
+        private Core.RenderTarget m_visibleTarget = Core.RenderTarget.Radiance;
         private bool m_isVarianceVisible = false;
 
         public RenderTargetSelectionModel()
@@ -86,10 +85,10 @@ namespace gui.Model
             foreach(Core.RenderTarget target in targets)
                 m_targetStatus.Add(new TargetEnabledStatus(target));
             // Default: radiance is enabled
-            m_targetStatus[(int)Core.RenderTarget.RADIANCE].Enabled = true;
+            m_targetStatus[(int)Core.RenderTarget.Radiance].Enabled = true;
         }
 
-        public ObservableCollection<TargetEnabledStatus> TargetStatus { get => m_targetStatus; }
+        public IReadOnlyList<TargetEnabledStatus> TargetStatus { get => m_targetStatus; }
 
         public Core.RenderTarget VisibleTarget
         {
@@ -109,8 +108,12 @@ namespace gui.Model
             set
             {
                 if (value == m_isVarianceVisible) return;
-                if(value)
+                if (value)
+                {
+                    TargetStatus[(int)VisibleTarget].Enabled = true;
                     TargetStatus[(int)VisibleTarget].VarianceEnabled = true;
+                }
+
                 m_isVarianceVisible = value;
                 OnPropertyChanged(nameof(IsVarianceVisible));
             }
@@ -118,16 +121,7 @@ namespace gui.Model
         
         public static string getRenderTargetName(Core.RenderTarget target, bool variance)
         {
-            string val;
-            switch (target)
-            {
-                case Core.RenderTarget.ALBEDO: val = "Albedo"; break;
-                case Core.RenderTarget.LIGHTNESS: val = "Lightness"; break;
-                case Core.RenderTarget.NORMAL: val = "Normal"; break;
-                case Core.RenderTarget.POSITION: val = "Position"; break;
-                case Core.RenderTarget.RADIANCE: val = "Radiance"; break;
-                default: val = "Unknown"; break;
-            }
+            string val = Enum.GetName(typeof(Core.RenderTarget), target);
             if (variance)
                 val += " (Variance)";
             return val;

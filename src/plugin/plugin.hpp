@@ -3,7 +3,7 @@
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
 #include <string>
-#include <string_view>
+#include "util/string_view.hpp"
 
 namespace mufflon {
 
@@ -18,7 +18,7 @@ public:
 
 	bool is_loaded() const;
 	void close();
-	bool has_function(std::string_view name) const;
+	bool has_function(StringView name) const;
 
 	const fs::path& get_path() const noexcept {
 		return m_pluginPath;
@@ -29,7 +29,7 @@ protected:
 	using FunctionPtr = R(*)(Args...);
 
 	template < class R, class... Args >
-	FunctionPtr<R, Args...> load_function(std::string_view name) const {
+	FunctionPtr<R, Args...> load_function(StringView name) const {
 		using FunctionType = FunctionPtr<R, Args...>;
 		if(is_loaded()) {
 			FunctionType proc = static_cast<FunctionType>(this->load_procedure(&name[0u]));

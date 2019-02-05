@@ -23,13 +23,13 @@ TextureLoaderPlugin::TextureLoaderPlugin(fs::path path) :
 	}
 }
 
-bool TextureLoaderPlugin::can_load_format(std::string_view extension) const {
+bool TextureLoaderPlugin::can_load_format(StringView extension) const {
 	if(!m_canLoadFunc)
 		throw std::runtime_error("No function bound for 'can_load_format'");
 	return m_canLoadFunc(&extension[0u]);
 }
 
-bool TextureLoaderPlugin::load(std::string_view filePath, TextureData* texData) const {
+bool TextureLoaderPlugin::load(StringView filePath, TextureData* texData) const {
 	if(!m_loadFunc)
 		throw std::runtime_error("No function bound for 'load'");
 	return m_loadFunc(&filePath[0u], texData);

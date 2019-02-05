@@ -57,6 +57,8 @@ namespace gui.Model
 
         public ScenarioChangedController ScenarioChangedController { get; }
 
+        public StatusbarModel Statusbar { get; }
+
         public Models(MainWindow window)
         {
             // init models first
@@ -64,8 +66,9 @@ namespace gui.Model
             Viewport = new ViewportModel();
             Renderer = new RendererModel();
             RenderTargetSelection = new RenderTargetSelectionModel();
-            App = new AppModel(window, Viewport, Renderer, RenderTargetSelection, Settings);
             Toolbar = new ToolbarModel();
+            Statusbar = new StatusbarModel();
+            App = new AppModel(window, Viewport, Renderer, RenderTargetSelection, Statusbar, Settings);
 
             // init controller last
             ScenarioChangedController = new ScenarioChangedController(this);

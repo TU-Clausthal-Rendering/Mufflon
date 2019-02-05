@@ -62,7 +62,7 @@ public:
 		return m_attributes.add_attribute<T>(std::move(name));
 	}
 
-	void remove_attribute(std::string_view name) {
+	void remove_attribute(StringView name) {
 		throw std::runtime_error("Operation not implemented yet");
 	}
 
@@ -72,7 +72,7 @@ public:
 		m_attributes.synchronize<dev>();
 	}
 	template < Device dev >
-	void synchronize(std::string_view name) {
+	void synchronize(StringView name) {
 		m_attributes.synchronize<dev>(name);
 	}
 	template < Device dev >
@@ -94,11 +94,11 @@ public:
 		return m_attributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	T* acquire(std::string_view name) {
+	T* acquire(StringView name) {
 		return m_attributes.acquire<dev, T>(name);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(std::string_view name) {
+	const T* acquire_const(StringView name) {
 		return m_attributes.acquire_const<dev, T>(name);
 	}
 
@@ -108,7 +108,7 @@ public:
 	void mark_changed(Device dev, SphereAttributeHandle hdl) {
 		m_attributes.mark_changed(dev, hdl);
 	}
-	void mark_changed(Device dev, std::string_view name) {
+	void mark_changed(Device dev, StringView name) {
 		m_attributes.mark_changed(dev, name);
 	}
 
@@ -128,7 +128,7 @@ public:
 	 * The number of read values will be capped by the number of spheres present
 	 * after the starting position.
 	 */
-	std::size_t add_bulk(std::string_view name, const SphereHandle& startSphere,
+	std::size_t add_bulk(StringView name, const SphereHandle& startSphere,
 						 std::size_t count, util::IByteReader& attrStream);
 	std::size_t add_bulk(SphereAttributeHandle hdl, const SphereHandle& startSphere,
 						 std::size_t count, util::IByteReader& attrStream);

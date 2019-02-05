@@ -113,16 +113,16 @@ public:
 		::glUseProgram(0u);
 	}
 
-	GLuint get_uniform_location(std::string_view name) const {
+	GLuint get_uniform_location(const char* name) const {
 		if(m_id == 0u)
 			throw std::runtime_error("Invalid program object");
 		return ::glGetUniformLocation(m_id, &name[0u]);
 	}
 
-	GLuint get_attribute_location(std::string_view name) const {
+	GLuint get_attribute_location(const char* name) const {
 		if(m_id == 0u)
 			throw std::runtime_error("Invalid program object");
-		return ::glGetAttribLocation(m_id, &name[0u]);
+		return ::glGetAttribLocation(m_id, name);
 	}
 
 	GLfloat get_uniform_float(GLuint location) const {

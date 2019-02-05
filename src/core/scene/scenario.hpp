@@ -3,7 +3,7 @@
 #include "handles.hpp"
 #include "types.hpp"
 #include <map>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <vector>
 
 namespace mufflon { namespace scene {
@@ -27,10 +27,10 @@ public:
 	 * Add a new material entry to the table. The index of the material depends on the
 	 * order of declarations and is unchanging for a scenario.
 	 */
-	MaterialIndex declare_material_slot(std::string_view binaryName);
+	MaterialIndex declare_material_slot(StringView binaryName);
 	MaterialIndex get_num_material_slots() const noexcept { return static_cast<MaterialIndex>(m_materialAssignment.size()); }
 	// Get the index of a slot from its name.
-	MaterialIndex get_material_slot_index(std::string_view binaryName) const;
+	MaterialIndex get_material_slot_index(StringView binaryName) const;
 	// Get the slot name from its index
 	const std::string& get_material_slot_name(MaterialIndex slotIdx) const;
 	/*
@@ -80,10 +80,10 @@ public:
 	void set_custom_lod(ConstObjectHandle hdl, u32 level);
 	void set_custom_lod(ConstInstanceHandle hdl, u32 level);
 
-	const std::string_view& get_name() const noexcept {
+	const StringView& get_name() const noexcept {
 		return m_name;
 	}
-	void set_name(std::string_view name) noexcept {
+	void set_name(StringView name) noexcept {
 		m_name = name;
 	}
 
@@ -171,7 +171,7 @@ private:
 	bool m_cameraChanged = true;
 	mutable bool m_materialAssignmentChanged = true;
 
-	std::string_view m_name;
+	StringView m_name;
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
 	std::map<std::string, MaterialIndex, std::less<>> m_materialIndices;

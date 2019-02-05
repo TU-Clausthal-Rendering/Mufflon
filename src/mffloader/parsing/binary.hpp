@@ -8,7 +8,7 @@
 #include <atomic>
 #include <fstream>
 #include <string>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <vector>
 #include <unordered_map>
 
@@ -25,8 +25,8 @@ public:
 	 * this object; calling this function again will overwrite them, however.
 	 */
 	bool load_file(fs::path file, const mufflon::u32 globalLod,
-				   const std::unordered_map<std::string_view, mufflon::u32>& objectLods,
-				   const std::unordered_map<std::string_view, mufflon::u32>& instanceLods);
+				   const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
+				   const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
 
 	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
 
@@ -160,8 +160,8 @@ private:
 	void read_compressed_sphere_attributes(const ObjectState& object, const LodState& lod);
 
 	bool read_instances(const mufflon::u32 globalLod,
-						const std::unordered_map<std::string_view, mufflon::u32>& objectLods,
-						const std::unordered_map<std::string_view, mufflon::u32>& instanceLods);
+						const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
+						const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
 	void read_object();
 	void read_lod(const ObjectState& object, mufflon::u32 lod);
 

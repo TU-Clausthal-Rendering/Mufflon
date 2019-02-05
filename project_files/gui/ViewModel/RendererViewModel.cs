@@ -263,17 +263,17 @@ namespace gui.ViewModel
             uint numParams = Core.renderer_get_num_parameters();
             for (uint i = 0; i < numParams; ++i)
             {
-                Core.ParameterType type = Core.ParameterType.PARAM_BOOL;
-                string name = Core.renderer_get_parameter_desc(i, ref type);
+                Core.ParameterType type;
+                string name = Core.renderer_get_parameter_desc(i, out type);
                 if (name.Length <= 0)
                     continue;
 
                 switch (type)
                 {
-                    case Core.ParameterType.PARAM_BOOL:
+                    case Core.ParameterType.Bool:
                         {
-                            uint value = 0;
-                            if (Core.renderer_get_parameter_bool(name, ref value))
+                            uint value;
+                            if (Core.renderer_get_parameter_bool(name, out value))
                             {
                                 var prop = new RendererPropertyBool(name) { Value = value != 0u };
                                 prop.PropertyChanged += OnRenderPropertyChanged;
@@ -281,10 +281,10 @@ namespace gui.ViewModel
                             }
                         }
                         break;
-                    case Core.ParameterType.PARAM_INT:
+                    case Core.ParameterType.Int:
                         {
-                            int value = 0;
-                            if (Core.renderer_get_parameter_int(name, ref value))
+                            int value;
+                            if (Core.renderer_get_parameter_int(name, out value))
                             {
                                 var prop = new RendererPropertyInt(name) { Value = value };
                                 prop.PropertyChanged += OnRenderPropertyChanged;
@@ -292,10 +292,10 @@ namespace gui.ViewModel
                             }
                         }
                         break;
-                    case Core.ParameterType.PARAM_FLOAT:
+                    case Core.ParameterType.Float:
                         {
-                            float value = 0;
-                            if (Core.renderer_get_parameter_float(name, ref value))
+                            float value;
+                            if (Core.renderer_get_parameter_float(name, out value))
                             {
                                 var prop = new RendererPropertyFloat(name) { Value = value };
                                 prop.PropertyChanged += OnRenderPropertyChanged;

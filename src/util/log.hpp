@@ -1,9 +1,8 @@
 #pragma once
 
 #include <string>
-#ifndef __CUDACC__
-#include <string_view>
-#endif // __CUDACC__
+#include "util/string_view.hpp"
+
 
 /// Log levels from 0 (all things including pendantic) to 3 (only errors and fatal errors)
 #ifndef CA_LOG_LEVEL
@@ -34,6 +33,7 @@ void registerMessageHandler(MessageHandlerFunc _func);
 void disableStdHandler();
 	
 namespace details {
+
 		
 	// This one calls all the callbacks
 	void logMessage(LogSeverity _severity, const std::string& _msg);
@@ -41,9 +41,6 @@ namespace details {
 	// Dummy conversion methods to make all types compatible
 	inline const char* to_string(const char* _str) { return _str; }
 	inline const std::string& to_string(const std::string& _str) { return _str; }
-#ifndef __CUDACC__
-	inline const std::string_view& to_string(const std::string_view& _str) { return _str; }
-#endif
 	using std::to_string;
 
 	// This one builds the message string

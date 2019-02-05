@@ -31,6 +31,9 @@
     <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h">
       <Filter>Source Files\plugin</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\util\string_view.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\stbiloader\interface.cpp">

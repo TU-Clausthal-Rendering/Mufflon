@@ -448,7 +448,7 @@
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch"
                     ToolTip="Total/Used/Free"
-                    Content="{Binding Statusbar.GpuMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    Content="{Binding Statusbar.CudaMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
                 <StatusBarItem
                     Width="110"
                     HorizontalAlignment="Right"

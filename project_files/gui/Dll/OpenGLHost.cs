@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -32,6 +33,7 @@ namespace gui.Dll
         private readonly ViewportModel m_viewport;
         private readonly RendererModel m_rendererModel;
         private readonly RenderTargetSelectionModel m_renderTargetModel;
+        private readonly StatusbarModel m_statusbarModel;
         private readonly SettingsModel m_settings;
 
         // context creation
@@ -56,17 +58,21 @@ namespace gui.Dll
         // TODO: this is only for testing purposes
         public static bool toggleRenderer = false;
 
+        // Tracks whether the background was cleared in a window message
+        private bool m_backgroundCleared = true;
+
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
 
         public OpenGLHost(MainWindow window, ViewportModel viewport, RendererModel rendererModel,
-            RenderTargetSelectionModel targetModel,SettingsModel settings)
+            RenderTargetSelectionModel targetModel, StatusbarModel statusbar, SettingsModel settings)
         {
             m_window = window;
             m_parent = window.BorderHost;
             m_viewport = viewport;
             m_rendererModel = rendererModel;
             m_renderTargetModel = targetModel;
+            m_statusbarModel = statusbar;
             m_settings = settings;
             m_window.MouseWheel += OnMouseWheel;
             m_window.SnapsToDevicePixels = true;
@@ -107,6 +113,7 @@ namespace gui.Dll
 
                 while (m_isRunning)
                 {
+                    m_statusbarModel.UpdateMemory();
 
                     //HandleCommands();
                     // Try to acquire the lock - if we're waiting, we're not rendering
@@ -116,49 +123,52 @@ namespace gui.Dll
                         break;
                     HandleResize();
 
-                    if (m_settings.AllowCameraMovement)
+                    if (m_rendererModel.IsRendering)
                     {
-                        // Check for keyboard input
-                        float x = 0f;
-                        float y = 0f;
-                        float z = 0f;
-                        // TODO: why does it need to be mirrored?
-                        if (m_window.wasPressedAndClear(Key.W))
-                            z += keySpeed;
-                        if (m_window.wasPressedAndClear(Key.S))
-                            z -= keySpeed;
-                        if (m_window.wasPressedAndClear(Key.D))
-                            x -= keySpeed;
-                        if (m_window.wasPressedAndClear(Key.A))
-                            x += keySpeed;
-                        if (m_window.wasPressedAndClear(Key.Space))
-                            y += keySpeed;
-                        if (m_window.wasPressedAndClear(Key.LeftCtrl))
-                            y -= keySpeed;
-
-                        if (x != 0f || y != 0f || z != 0f)
+                        if (m_settings.AllowCameraMovement)
                         {
-                            if (!Core.scene_move_active_camera(x, y, z))
-                                throw new Exception(Core.core_get_dll_error());
+                            // Check for keyboard input
+                            float x = 0f;
+                            float y = 0f;
+                            float z = 0f;
+                            // TODO: why does it need to be mirrored?
+                            if (m_window.wasPressedAndClear(Key.W))
+                                z += keySpeed;
+                            if (m_window.wasPressedAndClear(Key.S))
+                                z -= keySpeed;
+                            if (m_window.wasPressedAndClear(Key.D))
+                                x -= keySpeed;
+                            if (m_window.wasPressedAndClear(Key.A))
+                                x += keySpeed;
+                            if (m_window.wasPressedAndClear(Key.Space))
+                                y += keySpeed;
+                            if (m_window.wasPressedAndClear(Key.LeftCtrl))
+                                y -= keySpeed;
+
+                            if (x != 0f || y != 0f || z != 0f)
+                            {
+                                if (!Core.scene_move_active_camera(x, y, z))
+                                    throw new Exception(Core.core_get_dll_error());
+                            }
+
+                            // Check for mouse dragging
+                            Vector drag = m_window.getMouseDiffAndReset();
+                            if (drag.X != 0 || drag.Y != 0)
+                            {
+                                if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
+                                    throw new Exception(Core.core_get_dll_error());
+                            }
                         }
 
-                        // Check for mouse dragging
-                        Vector drag = m_window.getMouseDiffAndReset();
-                        if (drag.X != 0 || drag.Y != 0)
-                        {
-                            if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
-                                throw new Exception(Core.core_get_dll_error());
-                        }
+                        if (!Core.render_iterate())
+                            throw new Exception(Core.core_get_dll_error());
+
+                        // We also let the GUI know that an iteration has taken place
+                        Application.Current.Dispatcher.BeginInvoke(new Action(() => m_rendererModel.UpdateIterationCount()));
                     }
 
-                    if (!Core.render_iterate())
-                        throw new Exception(Core.core_get_dll_error());
-                    if(!Core.copy_output_to_texture(OpenGlDisplay.opengldisplay_get_screen_texture_handle(),
-                        m_renderTarget, m_varianceTarget))
-                        throw new Exception(Core.core_get_dll_error());
-
+                    // Refresh the display
                     // Border always keeps aspect ratio
-
                     // Compute the offsets and dimensions of the viewport
                     int left = m_viewport.OffsetX;
                     int right = m_viewport.Width + m_viewport.OffsetX;
@@ -168,16 +178,20 @@ namespace gui.Dll
                     UInt32 width = (UInt32)m_viewport.DesiredWidth;
                     UInt32 height = (UInt32)m_viewport.DesiredHeight;
 
+                    IntPtr imageData = IntPtr.Zero;
+                    if (!Core.core_get_target_image(m_renderTarget, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
+                        false, out imageData))
+                        throw new Exception(Core.core_get_dll_error());
+                    if(imageData != IntPtr.Zero)
+                        if (!OpenGlDisplay.opengldisplay_write(imageData))
+                            throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
                     if (!OpenGlDisplay.opengldisplay_display(left, right, bottom, top, width, height))
                         throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
-
                     if (!Gdi32.SwapBuffers(m_deviceContext))
                         throw new Win32Exception(Marshal.GetLastWin32Error());
 
                     // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
                     m_rendererModel.RenderLock.Release();
-                    // We also let the GUI know that an iteration has taken place
-                    Application.Current.Dispatcher.Invoke(new Action(() => m_rendererModel.UpdateIterationCount()));
                 }
             }
             catch (Exception e)
@@ -237,12 +251,16 @@ namespace gui.Dll
             }
 
             // dll call: initialize glad etc.
+            if (!OpenGlDisplay.opengldisplay_initialize())
+                throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+
+            // Set the logger callback
             m_logCallbackPointer = new Core.LogCallback(Logger.log);
-            if (!Core.mufflon_initialize(m_logCallbackPointer))
+            if (!Core.mufflon_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
-            if (!OpenGlDisplay.opengldisplay_initialize(m_logCallbackPointer))
+            if (!OpenGlDisplay.opengldisplay_set_logger(m_logCallbackPointer))
                 throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
         }
 
@@ -282,8 +300,8 @@ namespace gui.Dll
                 m_varianceTarget = newVarianceTarget;
 
                 // TODO: let GUI select what render target we render
-                UInt32 format = Core.render_get_target_opengl_format(newTarget, newVarianceTarget);
-                if (format == 0x0500)
+                OpenGlDisplay.TextureFormat format;
+                if(!Core.core_get_target_format(m_renderTarget, out format))
                     throw new Exception(Core.core_get_dll_error());
                 if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_renderWidth, (UInt32)m_renderHeight, format))
                     throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
@@ -322,6 +340,23 @@ namespace gui.Dll
                 //Core.execute_command(command);
                 // TODO: reintroduce?
             }
+        }
+
+        protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == (int)Gdi32.WmMessages.ERASEBKGND)
+            {
+                m_backgroundCleared = true;
+                handled = true;
+            }
+            if (msg == (int)Gdi32.WmMessages.PAINT && m_backgroundCleared && m_isRunning && !m_rendererModel.IsRendering)
+            {
+                m_backgroundCleared = false;
+                // Iterate once to update the background
+                m_rendererModel.Iterate(1u);
+                handled = true;
+            }
+            return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
         }
 
         /// <summary>

@@ -78,13 +78,13 @@ Polygons::~Polygons() {
 	});
 }
 
-std::size_t Polygons::add_bulk(std::string_view name, const VertexHandle& startVertex,
+std::size_t Polygons::add_bulk(StringView name, const VertexHandle& startVertex,
 					 std::size_t count, util::IByteReader& attrStream) {
 	mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData->n_vertices());
 	return m_vertexAttributes.restore(name, attrStream, static_cast<std::size_t>(startVertex.idx()), count);
 }
 
-std::size_t Polygons::add_bulk(std::string_view name, const FaceHandle& startFace,
+std::size_t Polygons::add_bulk(StringView name, const FaceHandle& startFace,
 							   std::size_t count, util::IByteReader& attrStream) {
 	return this->add_bulk(m_faceAttributes.get_attribute_handle(name), startFace,
 						  count, attrStream);

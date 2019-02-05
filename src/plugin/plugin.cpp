@@ -60,7 +60,7 @@ void Plugin::close() {
 	}
 }
 
-bool Plugin::has_function(std::string_view name) const {
+bool Plugin::has_function(StringView name) const {
 	if(is_loaded())
 		return load_procedure(&name[0u]) != nullptr;
 	return false;

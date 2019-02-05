@@ -1,11 +1,14 @@
 #include "json_helper.hpp"
+#include "util/string_view.hpp"
 #include <cstdint>
 
 namespace mff_loader::json {
 
+using namespace mufflon;
+
 namespace {
 
-std::string_view map_level_to_string(ParserState::Level lvl) {
+StringView map_level_to_string(ParserState::Level lvl) {
 	switch(lvl) {
 		case ParserState::Level::CAMERAS: return "cameras";
 		case ParserState::Level::LIGHTS: return "lights";
@@ -16,7 +19,7 @@ std::string_view map_level_to_string(ParserState::Level lvl) {
 	}
 }
 
-std::string_view map_type_to_string(ParserState::Value val) {
+StringView map_type_to_string(ParserState::Value val) {
 	switch(val) {
 		case ParserState::Value::ARRAY: return "array";
 		case ParserState::Value::BOOLEAN: return "boolean";

@@ -2,6 +2,7 @@
 
 #include "util/assert.hpp"
 #include "util/log.hpp"
+#include "util/string_view.hpp"
 #include "core/memory/dyntype_memory.hpp"
 #include <map>
 
@@ -23,41 +24,39 @@ public:
 	virtual int get_num_parameters() const noexcept = 0;
 	virtual ParamDesc get_param_desc(int idx) const noexcept = 0;
 
-#ifndef __CUDACC__
-	void set_param(std::string_view name, int value) {
+	void set_param(StringView name, int value) {
 		if(void* ref = const_cast<void*>(get(name, ParameterTypes::INT, "int", "set")))
 			*as<int>(ref) = value;
 	}
 
-	void set_param(std::string_view name, float value) {
+	void set_param(StringView name, float value) {
 		if(void* ref = const_cast<void*>(get(name, ParameterTypes::FLOAT, "float", "set")))
 			*as<float>(ref) = value;
 	}
 
-	void set_param(std::string_view name, bool value) {
+	void set_param(StringView name, bool value) {
 		if(void* ref = const_cast<void*>(get(name, ParameterTypes::BOOL, "bool", "set")))
 			*as<bool>(ref) = value;
 	}
 
-	int get_param_int(std::string_view name) const {
+	int get_param_int(StringView name) const {
 		if(const void* ref = get(name, ParameterTypes::INT, "int", "get"))
 			return *as<int>(ref);
 		return 0;
 	}
-	float get_param_float(std::string_view name) const {
+	float get_param_float(StringView name) const {
 		if(const void* ref = get(name, ParameterTypes::FLOAT, "float", "get"))
 			return *as<float>(ref);
 		return 0.0f;
 	}
-	bool get_param_bool(std::string_view name) const {
+	bool get_param_bool(StringView name) const {
 		if(const void* ref = get(name, ParameterTypes::BOOL, "bool", "get"))
 			return *as<bool>(ref);
 		return false;
 	}
 
 private:
-	virtual const void* get(std::string_view name, ParameterTypes expected, const char* expectedName, const char* action) const = 0;
-#endif
+	virtual const void* get(StringView name, ParameterTypes expected, const char* expectedName, const char* action) const = 0;
 };
 
 /*
@@ -99,8 +98,7 @@ private:
 	}
 
 	// Helper to shorten the implementation of setters and getters
-#ifndef __CUDACC__
-	const void* get(std::string_view name, ParameterTypes expected, const char* expectedName, const char* action) const final {
+	const void* get(StringView name, ParameterTypes expected, const char* expectedName, const char* action) const final {
 		auto it = m_paramMap.find(name);
 		if(it == m_paramMap.end()) {
 			logWarning("[ParameterHandler::", action, "_param] Trying to ", action, " an unknown parameter '", name, "'.");
@@ -112,7 +110,6 @@ private:
 		}
 		return as<char>(this) + it->second.offset;
 	}
-#endif
 };
 
 

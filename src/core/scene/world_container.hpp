@@ -44,17 +44,17 @@ public:
 	// Create a new object to be filled
 	ObjectHandle create_object(std::string name, ObjectFlags flags);
 	// Finds an object by its name
-	ObjectHandle get_object(const std::string_view& name);
+	ObjectHandle get_object(const StringView& name);
 	// Find an instance by name (for some objects with only one
 	// instance both names are equal, but do not need to be).
 	// The returned handle is valid over the entire lifetime of the instance.
-	InstanceHandle get_instance(const std::string_view& name);
+	InstanceHandle get_instance(const StringView& name);
 	// Creates a new instance.
 	InstanceHandle create_instance(std::string name, ObjectHandle hdl);
 	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name
-	ScenarioHandle get_scenario(const std::string_view& name);
+	ScenarioHandle get_scenario(const StringView& name);
 	// Get the scenario for which load_scene() was called last.
 	ConstScenarioHandle get_current_scenario() const noexcept { return m_scenario; }
 	// This is for interfacing - get the number of scenarios and the name of each
@@ -94,7 +94,7 @@ public:
 
 	// Find a camera dependent on its name.
 	std::size_t get_camera_count() const noexcept { return m_cameras.size(); }
-	CameraHandle get_camera(std::string_view name);
+	CameraHandle get_camera(StringView name);
 	CameraHandle get_camera(std::size_t index);
 
 	std::size_t get_point_light_count() const noexcept { return m_pointLights.size(); }
@@ -112,7 +112,7 @@ public:
 	void replace_envlight_texture(u32 index, TextureHandle replacement);
 
 	// Finds a light by name
-	std::optional<std::pair<u32, lights::LightType>> find_light(const std::string_view& name);
+	std::optional<std::pair<u32, lights::LightType>> find_light(const StringView& name);
 	// Access the lights properties
 	lights::PointLight* get_point_light(u32 index);
 	lights::SpotLight* get_spot_light(u32 index);
@@ -121,16 +121,16 @@ public:
 	// Delete a light using its handle
 	void remove_light(u32 index, lights::LightType type);
 	// Get the name of a light
-	std::string_view get_light_name(u32 index, lights::LightType type) const;
-	void set_light_name(u32 index, lights::LightType type, std::string_view name);
+	StringView get_light_name(u32 index, lights::LightType type) const;
+	void set_light_name(u32 index, lights::LightType type, StringView name);
 	// Functions for dirtying cameras and lights
 	void mark_camera_dirty(ConstCameraHandle cam);
 	void mark_light_dirty(u32 index, lights::LightType type);
 
 	// Add new textures to the scene
-	bool has_texture(std::string_view name) const;
-	TextureHandle find_texture(std::string_view name);
-	TextureHandle add_texture(std::string_view name, u16 width, u16 height, u16 numLayers,
+	bool has_texture(StringView name) const;
+	TextureHandle find_texture(StringView name);
+	TextureHandle add_texture(StringView name, u16 width, u16 height, u16 numLayers,
 							   textures::Format format, textures::SamplingMode mode,
 							   bool sRgb, std::unique_ptr<u8[]> data);
 	void ref_texture(TextureHandle hdl);
@@ -193,7 +193,7 @@ private:
 	// All objects of the world.
 	std::map<std::string, Object, std::less<>> m_objects;
 	// All instances of the world
-	std::unordered_map<std::string_view, std::unique_ptr<Instance>> m_instances;
+	std::unordered_map<StringView, std::unique_ptr<Instance>> m_instances;
 	// List of all scenarios available (mapped to their names)
 	std::map<std::string, Scenario, std::less<>> m_scenarios;
 	// All materials in the scene.
@@ -213,7 +213,7 @@ private:
 	bool m_lightsDirty = true;
 	bool m_envLightDirty = true;
 	// Texture cache
-	std::unordered_map<std::string_view, std::unique_ptr<textures::Texture>> m_textures;
+	std::unordered_map<StringView, std::unique_ptr<textures::Texture>> m_textures;
 	std::map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has
 
 	// Current scene

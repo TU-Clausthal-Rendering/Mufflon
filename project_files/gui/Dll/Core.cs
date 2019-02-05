@@ -39,13 +39,13 @@ namespace gui.Dll
 
         internal enum MaterialType
         {
-            LAMBERT
+            Lambert
         };
 
         public enum CameraType
         {
-            PINHOLE,
-            FOCUS
+            Pinhole,
+            Focus
         };
 
         public enum RendererType
@@ -56,19 +56,19 @@ namespace gui.Dll
 
         public enum RenderTarget
         {
-            RADIANCE,
-            POSITION,
-            ALBEDO,
-            NORMAL,
-            LIGHTNESS
+            Radiance,
+            Position,
+            Albedo,
+            Normal,
+            Lightness
         };
 
         public enum LightType
         {
-            POINT,
-            SPOT,
-            DIRECTIONAL,
-            ENVMAP
+            Point,
+            Spot,
+            Directional,
+            Envmap
         };
 
         public static LightType FromModelLightType(LightModel.LightType type)
@@ -76,13 +76,13 @@ namespace gui.Dll
             switch (type)
             {
                 case LightModel.LightType.Point:
-                    return LightType.POINT;
+                    return LightType.Point;
                 case LightModel.LightType.Directional:
-                    return LightType.DIRECTIONAL;
+                    return LightType.Directional;
                 case LightModel.LightType.Spot:
-                    return LightType.SPOT;
+                    return LightType.Spot;
                 case LightModel.LightType.Envmap:
-                    return LightType.ENVMAP;
+                    return LightType.Envmap;
                 case LightModel.LightType.Goniometric:
                     default:
                     throw new NotImplementedException();
@@ -99,9 +99,9 @@ namespace gui.Dll
 
         public enum ParameterType
         {
-            PARAM_INT,
-            PARAM_FLOAT,
-            PARAM_BOOL
+            Int,
+            Float,
+            Bool
         };
 
         public enum Severity
@@ -115,14 +115,25 @@ namespace gui.Dll
 
         public enum TextureSampling
         {
-            NEAREST,
-            LINEAR
+            Nearest,
+            Linear
+        };
+
+        public enum RenderDevice
+        {
+            None = 0,
+            Cpu = 1,
+            Cuda = 2,
+            OpenGL = 4
         };
 
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool copy_output_to_texture(UInt32 textureId, RenderTarget target, Boolean variance);
+        internal static extern bool core_get_target_format(RenderTarget target, out OpenGlDisplay.TextureFormat format);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool core_get_target_image(RenderTarget target, Boolean variance,
+            OpenGlDisplay.TextureFormat format, bool sRgb, out IntPtr ptr);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_dll_error")]
         private static extern IntPtr core_get_dll_error_();
@@ -383,30 +394,28 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_is_render_target_enabled(RenderTarget target, Boolean variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern UInt32 render_get_target_opengl_format(RenderTarget target, Boolean variance);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint renderer_get_num_parameters();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_desc")]
-        private static extern IntPtr renderer_get_parameter_desc_(uint idx, ref ParameterType type);
-        internal static string renderer_get_parameter_desc(uint idx, ref ParameterType type) { return StringUtil.FromNativeUTF8(renderer_get_parameter_desc_(idx, ref type)); }
+        private static extern IntPtr renderer_get_parameter_desc_(uint idx, out ParameterType type);
+        internal static string renderer_get_parameter_desc(uint idx, out ParameterType type) { return StringUtil.FromNativeUTF8(renderer_get_parameter_desc_(idx, out type)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_int")]
         private static extern bool renderer_set_parameter_int_(IntPtr name, int value);
         internal static bool renderer_set_parameter_int(string name, int value) { return renderer_set_parameter_int_(StringUtil.ToNativeUtf8(name), value); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_int")]
-        private static extern bool renderer_get_parameter_int_(IntPtr name, ref int value);
-        internal static bool renderer_get_parameter_int(string name, ref int value) { return renderer_get_parameter_int_(StringUtil.ToNativeUtf8(name), ref value); }
+        private static extern bool renderer_get_parameter_int_(IntPtr name, out int value);
+        internal static bool renderer_get_parameter_int(string name, out int value) { return renderer_get_parameter_int_(StringUtil.ToNativeUtf8(name), out value); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_float")]
         private static extern bool renderer_set_parameter_float_(IntPtr name, float value);
         internal static bool renderer_set_parameter_float(string name, float value) { return renderer_set_parameter_float_(StringUtil.ToNativeUtf8(name), value); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_float")]
-        private static extern bool renderer_get_parameter_float_(IntPtr name, ref float value);
-        internal static bool renderer_get_parameter_float(string name, ref float value) { return renderer_get_parameter_float_(StringUtil.ToNativeUtf8(name), ref value); }
+        private static extern bool renderer_get_parameter_float_(IntPtr name, out float value);
+        internal static bool renderer_get_parameter_float(string name, out float value) { return renderer_get_parameter_float_(StringUtil.ToNativeUtf8(name), out value); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_bool")]
         private static extern bool renderer_set_parameter_bool_(IntPtr name, uint value);
         internal static bool renderer_set_parameter_bool(string name, uint value) { return renderer_set_parameter_bool_(StringUtil.ToNativeUtf8(name), value); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_bool")]
-        private static extern bool renderer_get_parameter_bool_(IntPtr name, ref uint value);
-        internal static bool renderer_get_parameter_bool(string name, ref uint value) { return renderer_get_parameter_bool_(StringUtil.ToNativeUtf8(name), ref value); }
+        private static extern bool renderer_get_parameter_bool_(IntPtr name, out uint value);
+        internal static bool renderer_get_parameter_bool(string name, out uint value) { return renderer_get_parameter_bool_(StringUtil.ToNativeUtf8(name), out value); }
 
         // Interface for profiling
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -450,7 +459,9 @@ namespace gui.Dll
 
         // Interface for initialization and destruction
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool mufflon_initialize(LogCallback logCallback);
+        internal static extern bool mufflon_initialize();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool mufflon_set_logger(LogCallback logCallback);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int mufflon_get_cuda_device_index();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

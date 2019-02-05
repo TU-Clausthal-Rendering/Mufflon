@@ -135,16 +135,28 @@ Boolean opengldisplay_display(int left, int right, int bottom, int top, uint32_t
 	return true;
 }
 
-GLuint opengldisplay_get_screen_texture_handle() {
-	return s_screenTexture->get_handle();
-}
-
-Boolean opengldisplay_resize_screen(uint32_t width, uint32_t height, GLenum format) {
+Boolean opengldisplay_resize_screen(uint32_t width, uint32_t height, TextureFormat format) {
 	// TODO: check format?
 	try {
 		s_screenTexture = std::make_unique<Texture2D>();
+		Texture2D::InternalFormat internalFormat = Texture2D::InternalFormat::INVALID;
+		switch(format) {
+			case TextureFormat::FORMAT_R8U: internalFormat = Texture2D::InternalFormat::R8UI; break;
+			case TextureFormat::FORMAT_RG8U: internalFormat = Texture2D::InternalFormat::RG8UI; break;
+			case TextureFormat::FORMAT_RGBA8U: internalFormat = Texture2D::InternalFormat::RGBA8UI; break;
+			case TextureFormat::FORMAT_R16U: internalFormat = Texture2D::InternalFormat::R16UI; break;
+			case TextureFormat::FORMAT_RG16U: internalFormat = Texture2D::InternalFormat::RG16UI; break;
+			case TextureFormat::FORMAT_RGBA16U: internalFormat = Texture2D::InternalFormat::RGBA16UI; break;
+			case TextureFormat::FORMAT_R16F: internalFormat = Texture2D::InternalFormat::R16F; break;
+			case TextureFormat::FORMAT_RG16F: internalFormat = Texture2D::InternalFormat::RG16F; break;
+			case TextureFormat::FORMAT_RGBA16F: internalFormat = Texture2D::InternalFormat::RGBA16F; break;
+			case TextureFormat::FORMAT_R32F: internalFormat = Texture2D::InternalFormat::R32F; break;
+			case TextureFormat::FORMAT_RG32F: internalFormat = Texture2D::InternalFormat::RG32F; break;
+			case TextureFormat::FORMAT_RGBA32F: internalFormat = Texture2D::InternalFormat::RGBA32F; break;
+		};
+
 		s_screenTexture->allocate_storage(static_cast<GLsizei>(width), static_cast<GLsizei>(height),
-										static_cast<Texture2D::InternalFormat>(format));
+										  internalFormat);
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
 		return false;
@@ -152,15 +164,45 @@ Boolean opengldisplay_resize_screen(uint32_t width, uint32_t height, GLenum form
 	return true;
 }
 
-Boolean opengldisplay_initialize(void(*logCallback)(const char*, int)) {
+Boolean opengldisplay_write(const char* data) {
+	if(data == nullptr) {
+		logError("[", FUNCTION_NAME, "] Data is nullptr");
+	}
+	// Determine the pixel format for OpenGL
+	GLenum type = GL_INVALID_ENUM;
+	GLenum format = GL_INVALID_ENUM;
+
+	// Since we know what we came from, we can induce the pixel format from the internal format
+	switch(s_screenTexture->get_format()) {
+		case Texture2D::InternalFormat::R8UI: format = GL_RED; type = GL_UNSIGNED_BYTE; break;
+		case Texture2D::InternalFormat::RG8UI: format = GL_RG; type = GL_UNSIGNED_BYTE; break;
+		case Texture2D::InternalFormat::RGBA8UI: format = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		case Texture2D::InternalFormat::R16UI: format = GL_RED; type = GL_UNSIGNED_SHORT; break;
+		case Texture2D::InternalFormat::RG16UI: format = GL_RG; type = GL_UNSIGNED_SHORT; break;
+		case Texture2D::InternalFormat::RGBA16UI: format = GL_RGBA; type = GL_UNSIGNED_SHORT; break;
+		case Texture2D::InternalFormat::R16F: format = GL_RED; type = GL_HALF_FLOAT; break;
+		case Texture2D::InternalFormat::RG16F: format = GL_RG; type = GL_HALF_FLOAT; break;
+		case Texture2D::InternalFormat::RGBA16F: format = GL_RGBA; type = GL_HALF_FLOAT; break;
+		case Texture2D::InternalFormat::R32F: format = GL_RED; type = GL_FLOAT; break;
+		case Texture2D::InternalFormat::RG32F: format = GL_RG; type = GL_FLOAT; break;
+		case Texture2D::InternalFormat::RGBA32F: format = GL_RGBA; type = GL_FLOAT; break;
+		default:
+			logError("[", FUNCTION_NAME, "] Output buffer has unknown format!");
+			return false;
+	}
+
+	s_screenTexture->bind_as_texture(0u);
+	::glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(s_screenTexture->get_width()),
+					  static_cast<GLsizei>(s_screenTexture->get_height()), format, type, data);
+	return true;
+}
+
+
+Boolean opengldisplay_initialize() {
 	static bool initialized = false;
-	s_logCallback = logCallback;
 
 	if(!initialized) {
 		try {
-			registerMessageHandler(delegateLog);
-			disableStdHandler();
-
 			if(!gladLoadGL()) {
 				logError("[", FUNCTION_NAME, "] gladLoadGL failed");
 				return false;
@@ -216,6 +258,21 @@ Boolean opengldisplay_initialize(void(*logCallback)(const char*, int)) {
 	}
 
 	return true;
+}
+
+Boolean opengldisplay_set_logger(void(*logCallback)(const char*, int)) {
+	try {
+		if(s_logCallback == nullptr) {
+			registerMessageHandler(delegateLog);
+			disableStdHandler();
+		}
+		s_logCallback = logCallback;
+		return true;
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
+		s_screenProgram->detach_all();
+		return false;
+	}
 }
 
 void opengldisplay_destroy() {

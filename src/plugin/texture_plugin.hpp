@@ -14,8 +14,8 @@ public:
 	TextureLoaderPlugin& operator=(TextureLoaderPlugin&&) = delete;
 	~TextureLoaderPlugin() = default;
 
-	bool can_load_format(std::string_view extension) const;
-	bool load(std::string_view filePath, TextureData* texData) const;
+	bool can_load_format(StringView extension) const;
+	bool load(StringView filePath, TextureData* texData) const;
 	void set_logger(void(*logCallback)(const char*, int));
 	
 private:

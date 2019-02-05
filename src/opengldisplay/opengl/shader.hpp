@@ -2,7 +2,6 @@
 
 #include <glad/glad.h>
 #include <stdexcept>
-#include <string_view>
 #include <utility>
 
 namespace opengl {
@@ -51,12 +50,11 @@ public:
 		return result;
 	}
 
-	void attach_source(std::string_view code) {
+	void attach_source(const char* code) {
 		if(m_id == 0u)
 			throw std::runtime_error("Invalid shader object");
-		const char* ptr = &code[0u];
-		GLint length = static_cast<GLint>(code.size());
-		::glShaderSource(m_id, 1u, &ptr, &length);
+		GLint length = static_cast<GLint>(std::strlen(code));
+		::glShaderSource(m_id, 1u, &code, &length);
 	}
 
 	bool compile() {

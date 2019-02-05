@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <chrono>
-#include <string_view>
+#include "util/string_view.hpp"
 #include <unordered_map>
 #include <vector>
 

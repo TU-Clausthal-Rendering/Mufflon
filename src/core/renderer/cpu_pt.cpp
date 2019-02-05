@@ -133,7 +133,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 				emission *= mis;
 			}
 			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-				vertex->get_normal(), vertex->get_albedo());
+									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }

@@ -130,6 +130,7 @@ public:
 	void end_iteration();
 
 	void set_targets(OutputValue targets);
+	OutputValue get_target() const noexcept { return m_targets; }
 
 
 	// Get the formated output of one quantity for the purpose of exporting screenshots.
@@ -140,6 +141,8 @@ public:
 
 	// Get the actual texture data (read only) without converting to another format
 	scene::textures::ConstTextureDevHandle_t<Device::CPU> get_data(OutputValue which);
+
+	int get_current_iteration() const noexcept { return m_iteration; }
 
 	int get_width() const { return m_width; }
 	int get_height() const { return m_height; }

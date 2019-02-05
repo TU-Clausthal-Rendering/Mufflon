@@ -16,19 +16,19 @@ namespace gui.Model.Light
         {
             var numPointLights = Core.world_get_point_light_count();
             for (var i = 0u; i < numPointLights; ++i)
-                m_list.Add(new PointLightModel(Core.world_get_light_handle(i, Core.LightType.POINT)));
+                m_list.Add(new PointLightModel(Core.world_get_light_handle(i, Core.LightType.Point)));
 
             var numSpotLights = Core.world_get_spot_light_count();
             for (var i = 0u; i < numSpotLights; ++i)
-                m_list.Add(new SpotLightModel(Core.world_get_light_handle(i, Core.LightType.SPOT)));
+                m_list.Add(new SpotLightModel(Core.world_get_light_handle(i, Core.LightType.Spot)));
 
             var numDirLights = Core.world_get_dir_light_count();
             for (var i = 0u; i < numDirLights; ++i)
-                m_list.Add(new DirectionalLightModel(Core.world_get_light_handle(i, Core.LightType.DIRECTIONAL)));
+                m_list.Add(new DirectionalLightModel(Core.world_get_light_handle(i, Core.LightType.Directional)));
 
             var numEnvLights = Core.world_get_env_light_count();
             for (var i = 0u; i < numEnvLights; ++i)
-                m_list.Add(new EnvmapLightModel(Core.world_get_light_handle(i, Core.LightType.ENVMAP)));
+                m_list.Add(new EnvmapLightModel(Core.world_get_light_handle(i, Core.LightType.Envmap)));
         }
 
         public void AddLight(string name, LightModel.LightType type)

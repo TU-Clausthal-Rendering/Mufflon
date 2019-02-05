@@ -4,6 +4,7 @@
 #include "core/memory/residency.hpp"
 #include "core/math/sample_types.hpp"
 #include "util/assert.hpp"
+#include "util/string_view.hpp"
 #include <string>
 #include "core/scene/handles.hpp"
 
@@ -67,10 +68,10 @@ public:
 	virtual ~Camera() = default;
 
 	// The name of the camera as used by the scenario setup.
-#ifndef __CUDACC__
-	std::string_view get_name() const noexcept { return m_name; }
-	void set_name(std::string_view name) { m_name = name; }
-#endif
+	StringView get_name() const noexcept {
+		return m_name;
+	}
+	void set_name(StringView name) { m_name = std::string(name); }
 
 	const scene::Direction get_x_dir() const noexcept { return {m_viewSpace.m00, m_viewSpace.m01, m_viewSpace.m02}; }
 	// The y-axis is up

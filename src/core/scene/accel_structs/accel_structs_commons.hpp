@@ -106,7 +106,7 @@ template < Device dev >
 CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
 	i32 objIdx = scene.lodIndices[idx];
 
-	const ei::Mat3x3 scaleRot = scene.scales[idx] * ei::Mat3x3{ scene.transformations[idx] };
+	const ei::Mat3x3 scaleRot = ei::Mat3x3{ scene.transformations[idx] } * ei::diag(scene.scales[idx]);
 	const ei::Vec3 translation{
 		scene.transformations[idx][3],
 		scene.transformations[idx][7],

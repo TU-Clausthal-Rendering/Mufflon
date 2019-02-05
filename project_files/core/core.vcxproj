@@ -238,6 +238,7 @@
     <ClInclude Include="..\..\src\util\parallel.hpp" />
     <ClInclude Include="..\..\src\util\punning.hpp" />
     <ClInclude Include="..\..\src\util\range.hpp" />
+    <ClInclude Include="..\..\src\util\string_view.hpp" />
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />
   </ItemGroup>

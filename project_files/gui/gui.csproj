@@ -57,15 +57,6 @@
     <ApplicationIcon>Icons\logo1.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\core\core.vcxproj">
-      <Project>{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}</Project>
-      <Name>core</Name>
-      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
-      <OutputItemType>Content</OutputItemType>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
@@ -134,6 +125,7 @@
     <Compile Include="Model\Scene\ScenarioModel.cs" />
     <Compile Include="Model\Scene\WorldModel.cs" />
     <Compile Include="Model\SettingsModel.cs" />
+    <Compile Include="Model\StatusbarModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
     <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />
@@ -471,6 +463,8 @@
     <Resource Include="Icons\camera_nomove.png" />
     <Resource Include="Icons\logo1.ico" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Controller\Renderer\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

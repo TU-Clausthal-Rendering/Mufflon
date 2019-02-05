@@ -25,10 +25,9 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
-#include <glad/glad.h>
 
 #ifdef _WIN32
-#include <minwindef.h>
+#include <windows.h>
 #include <combaseapi.h>
 #else // _WIN32
 #include <dlfcn.h>
@@ -86,15 +85,17 @@ namespace {
 // static variables for interacting with the renderer
 std::unique_ptr<renderer::IRenderer> s_currentRenderer;
 // Current iteration counter
-std::uint32_t s_currentIteration = 0u;
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
+std::unique_ptr<textures::CpuTexture> s_screenTexture;
 WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
 // Holds the CUDA device index
 int s_cudaDevIndex = -1;
 // Holds the last error for the GUI to display
 std::string s_lastError;
+// Mutex for exclusive renderer access: during an iteration no other thread may change renderer properties
+std::mutex s_iterationMutex{};
 
 // Plugin container
 std::vector<TextureLoaderPlugin> s_plugins;
@@ -269,48 +270,45 @@ Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
 	CATCH_ALL(false)
 }
 
-Boolean copy_output_to_texture(uint32_t textureId, RenderTarget target, Boolean variance) {
+Boolean core_get_target_format(RenderTarget target, TextureFormat* format) {
 	TRY
-	CHECK(textureId != 0u, "invalid texture object", false);
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
-	const renderer::OutputValue targetFlags{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
-	if(!s_outputTargets.is_set(targetFlags)) {
-		logError("[", FUNCTION_NAME, "] Specified render target is not active");
-		return false;
+	if(format != nullptr) {
+		const renderer::OutputValue targetFlags{ static_cast<u32>(1u << target) };
+		*format = static_cast<TextureFormat>(s_imageOutput->get_target_format(targetFlags));
 	}
-
-	textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
-	mAssert(texPtr != nullptr);
-	// Determine the pixel format for OpenGL
-	GLenum format = GL_INVALID_ENUM;
-	GLenum type = GL_INVALID_ENUM;
-
-	switch(texPtr->get_format()) {
-		case textures::Format::R8U: format = GL_RED; type = GL_UNSIGNED_BYTE; break;
-		case textures::Format::RG8U: format = GL_RG; type = GL_UNSIGNED_BYTE; break;
-		case textures::Format::RGBA8U: format = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
-		case textures::Format::R16U: format = GL_RED; type = GL_UNSIGNED_SHORT; break;
-		case textures::Format::RG16U: format = GL_RG; type = GL_UNSIGNED_SHORT; break;
-		case textures::Format::RGBA16U: format = GL_RGBA; type = GL_UNSIGNED_SHORT; break;
-		case textures::Format::R16F: format = GL_RED; type = GL_HALF_FLOAT; break;
-		case textures::Format::RG16F: format = GL_RG; type = GL_HALF_FLOAT; break;
-		case textures::Format::RGBA16F: format = GL_RGBA; type = GL_HALF_FLOAT; break;
-		case textures::Format::R32F: format = GL_RED; type = GL_FLOAT; break;
-		case textures::Format::RG32F: format = GL_RG; type = GL_FLOAT; break;
-		case textures::Format::RGBA32F: format = GL_RGBA; type = GL_FLOAT; break;
-		default:
-			mAssertMsg(false, "Output buffer has unknown format!");
-			return false;
-	}
-
-	::glBindTexture(GL_TEXTURE_2D, textureId);
-	::glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(s_imageOutput->get_width()),
-					  static_cast<GLsizei>(s_imageOutput->get_height()), format, type,
-					  s_imageOutput->get_data(targetFlags, textures::Format::RGBA32F, false).data());
 	return true;
 	CATCH_ALL(false)
 }
+
+Boolean core_get_target_image(RenderTarget target, Boolean variance,
+							  TextureFormat format, bool sRgb, const char** ptr) {
+	TRY
+	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	if(ptr != nullptr) {
+		const renderer::OutputValue targetFlags{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
+		if(!s_outputTargets.is_set(targetFlags)) {
+			logError("[", FUNCTION_NAME, "] Specified render target is not active");
+			return false;
+		}
+		
+		// If there's no output yet, we "return" a nullptr
+		if(s_imageOutput != nullptr) {
+			if(format >= TextureFormat::FORMAT_NUM)
+				(void)core_get_target_format(target, &format);
+			s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+			textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
+			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
+		} else {
+			*ptr = nullptr;
+		}
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
 void execute_command(const char* command) {
 	TRY
 	// TODO
@@ -1160,7 +1158,7 @@ ScenarioHdl world_create_scenario(const char* name) {
 ScenarioHdl world_find_scenario(const char* name) {
 	TRY
 	CHECK_NULLPTR(name, "scenario name", nullptr);
-	std::string_view nameView{ name };
+	StringView nameView{ name };
 	ScenarioHandle hdl = s_world.get_scenario(nameView);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find scenario '",
@@ -1557,6 +1555,7 @@ CORE_API const char* CDECL world_get_light_name(LightHdl hdl) {
 SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
+	auto lock = std::scoped_lock(s_iterationMutex);
 	SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(scenario));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
@@ -1709,7 +1708,7 @@ CameraType world_get_camera_type(ConstCameraHdl cam) {
 const char* world_get_camera_name(ConstCameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", nullptr);
-	std::string_view name = static_cast<const cameras::Camera*>(cam)->get_name();
+	StringView name = static_cast<const cameras::Camera*>(cam)->get_name();
 	return &name[0];
 	CATCH_ALL(nullptr)
 }
@@ -2177,7 +2176,7 @@ MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
-	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
+	StringView nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
 	return static_cast<Scenario*>(scenario)->declare_material_slot(nameView);
 	CATCH_ALL(INVALID_MATERIAL)
 }
@@ -2187,7 +2186,7 @@ MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", INVALID_MATERIAL);
 	CHECK_NULLPTR(name, "material name", INVALID_MATERIAL);
-	std::string_view nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
+	StringView nameView(name, std::min<std::size_t>(nameLength, std::strlen(name)));
 	return static_cast<const Scenario*>(scenario)->get_material_slot_index(nameView);
 	CATCH_ALL(INVALID_MATERIAL)
 }
@@ -2576,6 +2575,7 @@ CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color) {
 
 Boolean render_enable_renderer(RendererType type) {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	switch(type) {
 		case RendererType::RENDERER_CPU_PT: {
 			s_currentRenderer = std::make_unique<renderer::CpuPathTracer>();
@@ -2591,14 +2591,14 @@ Boolean render_enable_renderer(RendererType type) {
 	if(s_world.get_current_scenario() != nullptr)
 		s_currentRenderer->load_scene(s_world.get_current_scene(),
 			s_world.get_current_scenario()->get_resolution());
-	if(!render_reset())
-		return false;
+	s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean render_iterate() {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -2612,31 +2612,31 @@ Boolean render_iterate() {
 		return false;
 	}
 	// Check if the scene needed a reload -> reset
-	if(s_world.reload_scene()) {
-		if(!render_reset())
-			return false;
-	}
+	if(s_world.reload_scene())
+		s_currentRenderer->reset();
 	s_currentRenderer->iterate(*s_imageOutput);
-	++s_currentIteration;
 	return true;
 	CATCH_ALL(false)
 }
 
 uint32_t render_get_current_iteration() {
-	return s_currentIteration;
+	if(s_imageOutput == nullptr)
+		return 0u;
+	return static_cast<uint32_t>(s_imageOutput->get_current_iteration() + 1);
 }
 
 Boolean render_reset() {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->reset();
-	s_currentIteration = 0u;
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean render_save_screenshot(const char* filename) {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
@@ -2684,11 +2684,14 @@ Boolean render_save_screenshot(const char* filename) {
 Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 	TRY
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	auto lock = std::scoped_lock(s_iterationMutex);
 	s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target)) });
 	if(variance)
 		s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
@@ -2696,6 +2699,7 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 	TRY
 	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(!variance)
 		s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>(1u << target) });
 	s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
@@ -2707,28 +2711,35 @@ Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
 
 Boolean render_enable_non_variance_render_targets() {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.set(target);
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean render_enable_all_render_targets() {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	for(u32 target : renderer::OutputValue::iterator) {
 		s_outputTargets.set(target);
 		s_outputTargets.set(target << 8u);
 	}
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean render_disable_variance_render_targets() {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	for(u32 target : renderer::OutputValue::iterator)
 		s_outputTargets.clear(target << 8u);
 	if(s_imageOutput != nullptr)
@@ -2739,6 +2750,7 @@ Boolean render_disable_variance_render_targets() {
 
 Boolean render_disable_all_render_targets() {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	s_outputTargets.clear_all();
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
@@ -2750,30 +2762,6 @@ Boolean render_is_render_target_enabled(RenderTarget target, Boolean variance) {
 	TRY
 	return s_outputTargets.is_set(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
 	CATCH_ALL(false)
-}
-
-uint32_t render_get_target_opengl_format(RenderTarget target, Boolean variance) {
-	TRY
-	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
-	renderer::OutputValue targetFlag{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
-	switch(renderer::OutputHandler::get_target_format(targetFlag)) {
-		case textures::Format::R8U: return GL_R8;
-		case textures::Format::RG8U: return GL_RG8;
-		case textures::Format::RGBA8U: return GL_RGBA8;
-		case textures::Format::R16U: return GL_R16;
-		case textures::Format::RG16U: return GL_RG16;
-		case textures::Format::RGBA16U: return GL_RGBA16;
-		case textures::Format::R16F: return GL_R16F;
-		case textures::Format::RG16F: return GL_RG16F;
-		case textures::Format::RGBA16F: return GL_RGBA16F;
-		case textures::Format::R32F: return GL_R32F;
-		case textures::Format::RG32F: return GL_RG32F;
-		case textures::Format::RGBA32F: return GL_RGBA32F;
-		default:
-			mAssertMsg(false, "Output buffer has unknown format!");
-			return false;
-	}
-	CATCH_ALL(GL_INVALID_ENUM)
 }
 
 uint32_t renderer_get_num_parameters() {
@@ -2802,6 +2790,7 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 
 Boolean renderer_set_parameter_int(const char* name, int32_t value) {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
@@ -2824,6 +2813,7 @@ Boolean renderer_get_parameter_int(const char* name, int32_t* value) {
 
 Boolean renderer_set_parameter_float(const char* name, float value) {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
@@ -2846,6 +2836,7 @@ Boolean renderer_get_parameter_float(const char* name, float* value) {
 
 Boolean renderer_set_parameter_bool(const char* name, Boolean value) {
 	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
@@ -2987,11 +2978,21 @@ size_t profiling_get_used_gpu_memory() {
 	CATCH_ALL(0u)
 }
 
-Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
+Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
+	TRY
+	if(s_logCallback == nullptr) {
+		registerMessageHandler(delegateLog);
+		disableStdHandler();
+	}
+	s_logCallback = logCallback;
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean mufflon_initialize() {
 	TRY
 	// Only once per process do we register/unregister the message handler
 	static bool initialized = false;
-	s_logCallback = logCallback;
 	if(!initialized) {
 		registerMessageHandler(delegateLog);
 		disableStdHandler();
@@ -3041,11 +3042,6 @@ Boolean mufflon_initialize(void(*logCallback)(const char*, int)) {
 					}
 				}
 			}
-		}
-
-		if(!gladLoadGL()) {
-			logError("[", FUNCTION_NAME, "] gladLoadGL failed");
-			return false;
 		}
 
 		// Set the CUDA device to initialize the context

@@ -119,7 +119,8 @@ public:
 		UNSIGNED_INT = GL_UNSIGNED_INT,
 		INT = GL_INT,
 		HALF_FLOAT = GL_HALF_FLOAT,
-		FLOAT = GL_FLOAT
+		FLOAT = GL_FLOAT,
+		INVALID = GL_INVALID_ENUM
 	};
 
 	Texture2D() :
@@ -197,6 +198,7 @@ public:
 	GLuint get_handle() const noexcept { return m_id; }
 	GLuint get_width() const noexcept { return m_width; }
 	GLuint get_height() const noexcept { return m_height; }
+	InternalFormat get_format() const noexcept { return m_format; }
 
 private:
 	GLuint m_id;

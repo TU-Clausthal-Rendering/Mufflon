@@ -100,6 +100,13 @@ namespace gui.Dll
             PFD_TYPE_COLORINDEX = 1
         }
 
+        internal enum WmMessages
+        {
+            SIZE = 0x0005,
+            PAINT = 0x000F,
+            ERASEBKGND = 0x0014
+        };
+
         [DllImport("gdi32.dll", CharSet = CharSet.Auto, SetLastError = true, ExactSpelling = true)]
         internal static extern int ChoosePixelFormat(IntPtr hDC, [In] ref PIXELFORMATDESCRIPTOR ppfd);
 
