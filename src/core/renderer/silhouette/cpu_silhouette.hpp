@@ -6,6 +6,7 @@
 #include "core/memory/residency.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/scene/descriptors.hpp"
+#include <atomic>
 #include <vector>
 
 namespace mufflon::renderer {
@@ -31,12 +32,12 @@ public:
 private:
 	// Create one sample path (actual PT algorithm)
 	void pt_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-				const scene::SceneDescriptor<Device::CPU>& scene);
+				   const scene::SceneDescriptor<Device::CPU>& scene);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
-	void importance_sample(const Pixel coord, const scene::SceneDescriptor<Device::CPU>& scene,
-						   int width);
+	void importance_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+						   const scene::SceneDescriptor<Device::CPU>& scene);
 
 	bool m_reset = true;
 	SilhouetteParameters m_params = {};

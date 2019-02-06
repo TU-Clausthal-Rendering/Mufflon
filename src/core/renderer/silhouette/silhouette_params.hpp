@@ -11,6 +11,13 @@ struct PImportanceIterations {
 	}
 };
 
-using SilhouetteParameters = ParameterHandler<PImportanceIterations, PMaxPathLength>;
+struct PShowSilhouette {
+	bool showSilhouette{ false };
+	static ParamDesc get_desc() noexcept {
+		return { "Render shadow silhouette", ParameterTypes::BOOL };
+	}
+};
+
+using SilhouetteParameters = ParameterHandler<PImportanceIterations, PShowSilhouette, PMaxPathLength>;
 
 }} // namespace mufflon::renderer

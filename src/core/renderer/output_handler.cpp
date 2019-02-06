@@ -13,21 +13,24 @@ OutputHandler::OutputHandler(u16 width, u16 height, OutputValue targets) :
 		Texture{"Output###Cum_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###Cum_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###Cum_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Cum_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+		Texture{"Output###Cum_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Cum_Importance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 	},
 	m_iterationTex{
 		Texture{"Output###Iter_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###Iter_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###Iter_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###Iter_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Iter_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+		Texture{"Output###Iter_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false},
+		Texture{"Output###Iter_Importance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 	},
 	m_cumulativeVarTex{
 		Texture{"Output###CumVar_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###CumVar_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###CumVar_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 		Texture{"Output###CumVar_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###CumVar_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+		Texture{"Output###CumVar_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false},
+		Texture{"Output###CumVar_Importance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
 	},
 	m_targets(targets),
 	m_iteration(-1), // if begin_iteration is called without reset=true, this will still work
@@ -138,6 +141,8 @@ scene::textures::Format OutputHandler::get_target_format(OutputValue which) {
 	switch(which) {
 		case OutputValue::LIGHTNESS:
 		case OutputValue::LIGHTNESS_VAR:
+		case OutputValue::IMPORTANCE:
+		case OutputValue::IMPORTANCE_VAR:
 			return Format::R32F;
 		default:
 			return Format::RGBA32F;

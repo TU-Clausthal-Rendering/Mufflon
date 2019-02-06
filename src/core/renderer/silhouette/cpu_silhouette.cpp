@@ -14,6 +14,18 @@
 
 namespace mufflon::renderer {
 
+namespace {
+
+void atomic_add(std::atomic<float>& af, const float diff) {
+	float expected = af.load();
+	float desired;
+	do {
+		desired = expected + diff;
+	} while(!af.compare_exchange_weak(expected, desired));
+}
+
+} // namespace
+
 using PtPathVertex = PathVertex<u8, 4>;
 
 CpuShadowSilhouettes::CpuShadowSilhouettes()
@@ -29,6 +41,7 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 	   || m_reset)
 		init_rngs(outputBuffer.get_num_pixels());
 
+	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	if(m_reset) {
 		// TODO: reset output buffer
 		// Reacquire scene descriptor (partially?)
@@ -43,36 +56,51 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 		// Allocate sufficient buffer
 		m_importanceMap = make_udevptr_array<Device::CPU, std::atomic<float>>(m_vertexCount);
 
-		// Perform importance iterations
+		if(!m_params.showSilhouette) {
+			// Perform importance iterations
+
+			const int iterations = m_params.iterations * outputBuffer.get_num_pixels();
+			logInfo("Starting importance gathering (", m_params.iterations, " iterations)");
 #pragma PARALLEL_FOR
-		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-			this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
-									m_sceneDesc, outputBuffer.get_width());
+			for(int i = 0; i < m_params.iterations * outputBuffer.get_num_pixels(); ++i) {
+				const int pixel = i / m_params.iterations;
+				this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
+										buffer, m_sceneDesc);
+			}
+			logInfo("Finished importance gathering");
 		}
 	}
-
-	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_reset = false;
 
 
-
-	// TODO: call sample in a parallel way for each output pixel
-	// TODO: better pixel order?
-	// TODO: different scheduling?
+	if(m_params.showSilhouette) {
+		// Perform importance iteration
 #pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-		this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
+		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
+			this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
+									buffer, m_sceneDesc);
+		}
+	} else {
+		// TODO: call sample in a parallel way for each output pixel
+		// TODO: better pixel order?
+		// TODO: different scheduling?
+#pragma PARALLEL_FOR
+		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
+			this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
+		}
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
 }
 
 
-void CpuShadowSilhouettes::importance_sample(const Pixel coord, const scene::SceneDescriptor<Device::CPU>& scene,
-											 int width) {
-	int pixel = coord.x + coord.y * width;
+void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+											 const scene::SceneDescriptor<Device::CPU>& scene) {
+	int pixel = coord.x + coord.y * outputBuffer.get_width();
 
-	//m_params.maxPathLength = 2;
+	constexpr ei::Vec3 silhouetteColor{ 1.f, 0.f, 0.f };
+	constexpr ei::Vec3 lightColor{ 1.f };
+	constexpr ei::Vec3 shadowColor{ 0.f };
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
@@ -160,17 +188,41 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, const scene::Sce
 																								 lightDist - firstHit.hitT - secondHit.hitT + DIST_EPSILON);
 						if(thirdHit.hitId == vertex->get_primitive_id()) {
 							for(i32 i = 0; i < sharedVertices; ++i) {
+								// x86_64 doesn't support atomic_fetch_add for floats FeelsBadMan
 								// TODO: proper amount of importance
-								m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxFirst[i]] = 1;
-								m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxSecond[i]] = 1;
+								atomic_add(m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxFirst[i]], 1.f);
+								atomic_add(m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxSecond[i]], 1.f);
 							}
+
+							if(m_params.showSilhouette)
+								outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, silhouetteColor,
+														vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 						} else {
 							mAssert(thirdHit.hitId.instanceId >= 0);
 							// TODO: store a shadow photon?
+							if(m_params.showSilhouette)
+								outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
+														vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 						}
+					} else {
+						if(m_params.showSilhouette)
+							outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
+													vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 					}
+				} else {
+					if(m_params.showSilhouette)
+						outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
+												vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 				}
+			} else {
+				if(m_params.showSilhouette)
+					outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
+											vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 			}
+		} else {
+			if(m_params.showSilhouette)
+				outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
+										vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 		}
 	}
 }
@@ -243,6 +295,21 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 			}
 			break;
 		}
+
+		if(pathLen == 0) {
+			const auto& hitId = vertex->get_primitive_id();
+			const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
+			const u32 vertexCount = ((u32)hitId.primId < lod.polygon.numTriangles) ? 3u : 4u;
+			const u32 vertexOffset = ((u32)hitId.primId < lod.polygon.numTriangles) ? 0u : 3u * lod.polygon.numTriangles;
+			float importance = 0.f;
+			for(u32 i = 0u; i < vertexCount; ++i) {
+				importance += m_importanceMap[m_vertexOffsets[hitId.instanceId]
+					+ lod.polygon.vertexIndices[vertexOffset + vertexCount * hitId.primId + i]];
+			}
+			importance /= static_cast<float>(vertexCount);
+			outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ importance });
+		}
+
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
@@ -256,18 +323,8 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				emission *= mis;
 			}
-			const auto& hitId = vertex->get_primitive_id();
-			const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
-			const u32 vertexCount = ((u32)hitId.primId < lod.polygon.numTriangles) ? 3u : 4u;
-			const u32 vertexOffset = ((u32)hitId.primId < lod.polygon.numTriangles) ? 0u : 3u * lod.polygon.numTriangles;
-			float importance = 0.f;
-			for(u32 i = 0u; i < vertexCount; ++i) {
-				importance += m_importanceMap[m_vertexOffsets[hitId.instanceId]
-					+ lod.polygon.vertexIndices[vertexOffset + vertexCount * hitId.primId + i]];
-			}
-			importance /= static_cast<float>(vertexCount);
 			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									vertex->get_normal(), ei::Vec3{ importance });
+									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }

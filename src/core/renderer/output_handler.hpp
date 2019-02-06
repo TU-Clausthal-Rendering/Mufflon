@@ -16,6 +16,7 @@ struct RenderTargets {
 	static constexpr u32 ALBEDO = 2u;
 	static constexpr u32 NORMAL = 3u;
 	static constexpr u32 LIGHTNESS = 4u;
+	static constexpr u32 IMPORTANCE = 5u;
 };
 
 struct OutputValue : util::Flags<u32> {
@@ -29,14 +30,16 @@ struct OutputValue : util::Flags<u32> {
 	static constexpr u32 ALBEDO = 0x0004;			// Output of albedo (customly integrated over paths)
 	static constexpr u32 NORMAL = 0x0008;			// Output of signed normals (customly integrated over paths)
 	static constexpr u32 LIGHTNESS = 0x0010;		// Output of multiplied paths weights (from the custom integration)
+	static constexpr u32 IMPORTANCE = 0x0020;
 
 	static constexpr u32 RADIANCE_VAR = RADIANCE << VARIANCE_OFFSET;		// Variance of radiance
 	static constexpr u32 POSITION_VAR = POSITION << VARIANCE_OFFSET;
 	static constexpr u32 ALBEDO_VAR = ALBEDO << VARIANCE_OFFSET;
 	static constexpr u32 NORMAL_VAR = NORMAL << VARIANCE_OFFSET;
 	static constexpr u32 LIGHTNESS_VAR = LIGHTNESS << VARIANCE_OFFSET;
+	static constexpr u32 IMPORTANCE_VAR = IMPORTANCE << VARIANCE_OFFSET;
 
-	static constexpr u32 iterator[] = { RADIANCE, POSITION, ALBEDO, NORMAL, LIGHTNESS };
+	static constexpr u32 iterator[] = { RADIANCE, POSITION, ALBEDO, NORMAL, LIGHTNESS, IMPORTANCE };
 	static constexpr std::size_t TARGET_COUNT = sizeof(iterator) / sizeof(*iterator);
 
 	bool is_variance() const { return (mask & VARIANCE_MASK) != 0; }
@@ -44,7 +47,7 @@ struct OutputValue : util::Flags<u32> {
 
 inline StringView get_render_target_name(u32 target) {
 	static StringView TARGET_NAMES[] = {
-		"Radiance", "Position", "Albedo", "Normal", "Lightness"
+		"Radiance", "Position", "Albedo", "Normal", "Lightness", "Importance"
 	};
 	static_assert(sizeof(TARGET_NAMES) / sizeof(*TARGET_NAMES) == OutputValue::TARGET_COUNT,
 				  "Inequal number of targets and target names");
