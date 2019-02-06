@@ -83,7 +83,7 @@
                               ItemsSource="{Binding Renderer.Renderers}"
                               SelectedItem="{Binding Renderer.SelectedRenderer}"
                               DisplayMemberPath="Name"
-                              SelectedValuePath="Type"
+                              SelectedValuePath="Index"
                               IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Left">
