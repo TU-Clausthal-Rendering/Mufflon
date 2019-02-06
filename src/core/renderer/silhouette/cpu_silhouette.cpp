@@ -102,47 +102,54 @@ void CpuShadowSilhouettes::sample(const Pixel coord, RenderBuffer<Device::CPU>& 
 		}
 
 		if(inLight) {
+			constexpr float DIST_EPSILON = 0.001f;
+
 			const ei::Ray shadowRay{ lightCenter, fromLight };
 
-			const auto firstHit = scene::accel_struct::first_intersection_scene_lbvh(scene, shadowRay, { -1, -1 }, lightDist);
+			const auto firstHit = scene::accel_struct::first_intersection_scene_lbvh(scene, shadowRay, vertex->get_primitive_id(), lightDist + DIST_EPSILON);
 			// TODO: worry about spheres?
 			if(firstHit.hitId.instanceId >= 0 && firstHit.hitId != vertex->get_primitive_id()) {
 				const ei::Ray backfaceRay{ lightCenter + fromLight * firstHit.hitT, fromLight };
 
-				const auto secondHit = scene::accel_struct::first_intersection_scene_lbvh(scene, backfaceRay, firstHit.hitId, lightDist - firstHit.hitT);
+				const auto secondHit = scene::accel_struct::first_intersection_scene_lbvh(scene, backfaceRay, firstHit.hitId,
+																						  lightDist - firstHit.hitT + DIST_EPSILON);
 				// We absolutely have to have a second hit - either us (since we weren't first hit) or something else
 				if(secondHit.hitId.instanceId >= 0 && secondHit.hitId != vertex->get_primitive_id()
 				   && secondHit.hitId.instanceId == firstHit.hitId.instanceId) {
 					// Check for silhouette - get the vertex indices of the primitives
-					const auto& firstObj = scene.lods[scene.lodIndices[firstHit.hitId.instanceId]];
-					const auto& secondObj = scene.lods[scene.lodIndices[secondHit.hitId.instanceId]];
-					const i32 firstNumVertices = firstHit.hitId.primId < (i32)firstObj.polygon.numTriangles ? 3 : 4;
-					const i32 secondNumVertices = secondHit.hitId.primId < (i32)secondObj.polygon.numTriangles ? 3 : 4;
-					const i32 firstPrimIndex = firstHit.hitId.primId - firstHit.hitId.primId < (i32)firstObj.polygon.numTriangles
-						? 0 : (i32)firstObj.polygon.numTriangles;
-					const i32 secondPrimIndex = secondHit.hitId.primId - secondHit.hitId.primId < (i32)secondObj.polygon.numTriangles
-						? 0 : (i32)secondObj.polygon.numTriangles;
-					const i32 firstVertOffset = firstHit.hitId.primId < (i32)firstObj.polygon.numTriangles ? 0 : 3 * (i32)firstObj.polygon.numTriangles;
-					const i32 secondVertOffset = secondHit.hitId.primId < (i32)secondObj.polygon.numTriangles ? 0 : 3 * (i32)secondObj.polygon.numTriangles;
+					const auto& obj = scene.lods[scene.lodIndices[firstHit.hitId.instanceId]];
+					const i32 firstNumVertices = firstHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
+					const i32 secondNumVertices = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
+					const i32 firstPrimIndex = firstHit.hitId.primId - (firstHit.hitId.primId < (i32)obj.polygon.numTriangles
+						? 0 : (i32)obj.polygon.numTriangles);
+					const i32 secondPrimIndex = secondHit.hitId.primId - (secondHit.hitId.primId < (i32)obj.polygon.numTriangles
+						? 0 : (i32)obj.polygon.numTriangles);
+					const i32 firstVertOffset = firstHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
+					const i32 secondVertOffset = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
 
+					// Check if we have "shared" vertices: cannot do it by index, since they might be
+					// split vertices, but instead need to go by proximity
 					i32 sharedVertices = 0;
 					for(i32 i0 = 0; i0 < firstNumVertices; ++i0) {
 						for(i32 i1 = 0; i1 < secondNumVertices; ++i1) {
-							if(firstObj.polygon.vertexIndices[firstVertOffset + firstNumVertices * (firstPrimIndex + i0)]
-							   == secondObj.polygon.vertexIndices[secondVertOffset + secondNumVertices * (secondPrimIndex + i1)])
+							const i32 idx0 = obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + i0];
+							const i32 idx1 = obj.polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
+							const ei::Vec3& p0 = obj.polygon.vertices[idx0];
+							const ei::Vec3& p1 = obj.polygon.vertices[idx1];
+							if(ei::lensq(p0 - p1) < DIST_EPSILON)
 								++sharedVertices;
-							if(sharedVertices >= 2)
+							if(sharedVertices >= 1)
 								break;
 						}
 					}
 
-					if(sharedVertices >= 2) {
+					if(sharedVertices >= 1) {
 						// Got a silhouette
 						// TODO: store shadow edge importance
 						const ei::Ray silhouetteRay{ lightCenter + fromLight * (firstHit.hitT + secondHit.hitT), fromLight };
 
 						const auto thirdHit = scene::accel_struct::first_intersection_scene_lbvh(scene, silhouetteRay, secondHit.hitId,
-																								 lightDist - firstHit.hitT - secondHit.hitT);
+																								 lightDist - firstHit.hitT - secondHit.hitT + DIST_EPSILON);
 						if(thirdHit.hitId == vertex->get_primitive_id()) {
 							outputBuffer.contribute(coord, throughput, ei::Vec3{ 1.f, 0.0f, 0.0f }, vertex->get_position(),
 													vertex->get_normal(), vertex->get_albedo());
