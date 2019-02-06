@@ -4,6 +4,13 @@
 
 namespace mufflon { namespace renderer {
 
-using SilhouetteParameters = ParameterHandler<PMaxPathLength>;
+struct PImportanceIterations {
+	int iterations{ 10 };
+	static ParamDesc get_desc() noexcept {
+		return { "Importance iterations", ParameterTypes::INT };
+	}
+};
+
+using SilhouetteParameters = ParameterHandler<PImportanceIterations>;
 
 }} // namespace mufflon::renderer

@@ -163,18 +163,4 @@ struct PProgressive {
 	}
 };
 
-struct PWireframeThickness {
-	float thickness { 0.025f };
-	static ParamDesc get_desc() noexcept {
-		return { "Border thickness", ParameterTypes::FLOAT };
-	}
-};
-
-struct PWireframeNormalize {
-	bool normalize = false;
-	static ParamDesc get_desc() noexcept {
-		return { "Normalize thickness", ParameterTypes::BOOL };
-	}
-};
-
 }} // namespace mufflon::renderer
