@@ -20,6 +20,7 @@
 #include "core/scene/materials/material.hpp"
 #include "mffloader/interface/interface.h"
 #include <cuda_runtime.h>
+#include <fstream>
 #include <type_traits>
 #include <mutex>
 #include <fstream>
@@ -95,6 +96,8 @@ int s_cudaDevIndex = -1;
 std::string s_lastError;
 // Mutex for exclusive renderer access: during an iteration no other thread may change renderer properties
 std::mutex s_iterationMutex{};
+// Log file
+std::ofstream s_logFile;
 
 // Plugin container
 std::vector<TextureLoaderPlugin> s_plugins;
@@ -239,6 +242,7 @@ inline void delegateLog(LogSeverity severity, const std::string& message) {
 	TRY
 	if(s_logCallback != nullptr)
 		s_logCallback(message.c_str(), static_cast<int>(severity));
+	s_logFile << message << std::endl;
 	if(severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
 		s_lastError = message;
 	}
@@ -3016,6 +3020,29 @@ Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
 	if(s_logCallback == nullptr) {
 		registerMessageHandler(delegateLog);
 		disableStdHandler();
+
+		s_logCallback = logCallback;
+		// Give the new logger a status report and set the plugin loggers
+		for(auto& plugin : s_plugins) {
+			logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
+					plugin.get_path().string(), "'");
+			plugin.set_logger(logCallback);
+		}
+		int count = 0;
+		cuda::check_error(cudaGetDeviceCount(&count));
+		if(count > 0) {
+			if(s_cudaDevIndex < 0) {
+				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none supports unified addressing; "
+						   "continuing without CUDA");
+			} else {
+				cudaDeviceProp deviceProp;
+				cuda::check_error(cudaGetDeviceProperties(&deviceProp, s_cudaDevIndex));
+				logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
+						"devices; initializing device ", s_cudaDevIndex, " (", deviceProp.name, ")");
+			}
+		} else {
+			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
+		}
 	}
 	s_logCallback = logCallback;
 	return true;
@@ -3027,9 +3054,8 @@ Boolean mufflon_initialize() {
 	// Only once per process do we register/unregister the message handler
 	static bool initialized = false;
 	if(!initialized) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
-
+		// Open the log file
+		s_logFile = std::ofstream("log.txt", std::ios_base::trunc);
 		// Load plugins from the DLLs directory
 		s_plugins.clear();
 		fs::path dllPath;
@@ -3088,7 +3114,7 @@ Boolean mufflon_initialize() {
 
 			cudaDeviceProp deviceProp;
 			for (int c = 0; c < count; ++c) {
-				cudaGetDeviceProperties(&deviceProp, c);
+				cuda::check_error(cudaGetDeviceProperties(&deviceProp, c));
 				if(deviceProp.unifiedAddressing) {
 					if(deviceProp.major > major ||
 						((deviceProp.major == major) && (deviceProp.minor > minor))) {
