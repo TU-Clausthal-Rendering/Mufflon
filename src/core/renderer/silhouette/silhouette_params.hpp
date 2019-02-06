@@ -11,6 +11,6 @@ struct PImportanceIterations {
 	}
 };
 
-using SilhouetteParameters = ParameterHandler<PImportanceIterations>;
+using SilhouetteParameters = ParameterHandler<PImportanceIterations, PMaxPathLength>;
 
 }} // namespace mufflon::renderer

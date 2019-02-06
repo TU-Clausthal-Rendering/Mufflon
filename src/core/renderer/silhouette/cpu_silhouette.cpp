@@ -29,32 +29,48 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 	   || m_reset)
 		init_rngs(outputBuffer.get_num_pixels());
 
-	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	if(m_reset) {
 		// TODO: reset output buffer
 		// Reacquire scene descriptor (partially?)
 		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
+		// Query how many vertices there are
+		m_vertexCount = 0u;
+		m_vertexOffsets = make_udevptr_array<Device::CPU, u32>(m_sceneDesc.numInstances);
+		for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
+			m_vertexOffsets[i] = m_vertexCount;
+			m_vertexCount += m_sceneDesc.lods[m_sceneDesc.lodIndices[0u]].polygon.numVertices;
+		}
+		// Allocate sufficient buffer
+		m_importanceMap = make_udevptr_array<Device::CPU, std::atomic<float>>(m_vertexCount);
+
+		// Perform importance iterations
+#pragma PARALLEL_FOR
+		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
+			this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
+									m_sceneDesc, outputBuffer.get_width());
+		}
 	}
+
+	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_reset = false;
+
+
 
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
+		this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
 }
 
-void CpuShadowSilhouettes::reset() {
-	this->m_reset = true;
-}
 
-void CpuShadowSilhouettes::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-						   const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuShadowSilhouettes::importance_sample(const Pixel coord, const scene::SceneDescriptor<Device::CPU>& scene,
+											 int width) {
+	int pixel = coord.x + coord.y * width;
 
 	//m_params.maxPathLength = 2;
 
@@ -69,19 +85,7 @@ void CpuShadowSilhouettes::sample(const Pixel coord, RenderBuffer<Device::CPU>& 
 	scene::Point lastPosition = vertex->get_position();
 	math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 	math::DirectionSample lastDir;
-	if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
-		/*if(throughput.weight != Spectrum{ 0.f }) {
-			// Missed scene - sample background
-			auto background = evaluate_background(scene.lightTree.background, lastDir.direction);
-			if(any(greater(background.value, 0.0f))) {
-				float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
-				background.value *= mis;
-				outputBuffer.contribute(coord, throughput, background.value,
-										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-										ei::Vec3{ 0, 0, 0 });
-			}
-		}*/
-	} else {
+	if(walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 		// TODO: multiple lights!
 		if(scene.lightTree.posLights.lightCount != 1)
 			throw std::runtime_error("Silhouettes for != 1 positional light are not implemented yet");
@@ -121,63 +125,74 @@ void CpuShadowSilhouettes::sample(const Pixel coord, RenderBuffer<Device::CPU>& 
 					const i32 firstNumVertices = firstHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
 					const i32 secondNumVertices = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
 					const i32 firstPrimIndex = firstHit.hitId.primId - (firstHit.hitId.primId < (i32)obj.polygon.numTriangles
-						? 0 : (i32)obj.polygon.numTriangles);
+																		? 0 : (i32)obj.polygon.numTriangles);
 					const i32 secondPrimIndex = secondHit.hitId.primId - (secondHit.hitId.primId < (i32)obj.polygon.numTriangles
-						? 0 : (i32)obj.polygon.numTriangles);
+																		  ? 0 : (i32)obj.polygon.numTriangles);
 					const i32 firstVertOffset = firstHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
 					const i32 secondVertOffset = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
 
 					// Check if we have "shared" vertices: cannot do it by index, since they might be
 					// split vertices, but instead need to go by proximity
 					i32 sharedVertices = 0;
+					i32 edgeIdxFirst[2];
+					i32 edgeIdxSecond[2];
 					for(i32 i0 = 0; i0 < firstNumVertices; ++i0) {
 						for(i32 i1 = 0; i1 < secondNumVertices; ++i1) {
 							const i32 idx0 = obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + i0];
 							const i32 idx1 = obj.polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
 							const ei::Vec3& p0 = obj.polygon.vertices[idx0];
 							const ei::Vec3& p1 = obj.polygon.vertices[idx1];
-							if(ei::lensq(p0 - p1) < DIST_EPSILON)
+							if(ei::lensq(p0 - p1) < DIST_EPSILON) {
+								edgeIdxFirst[sharedVertices] = idx0;
+								edgeIdxSecond[sharedVertices] = idx1;
 								++sharedVertices;
-							if(sharedVertices >= 1)
+							}
+							if(sharedVertices >= 2)
 								break;
 						}
 					}
 
 					if(sharedVertices >= 1) {
-						// Got a silhouette
-						// TODO: store shadow edge importance
+						// Got at least a silhouette point - now make sure we're seeing the silhouette
 						const ei::Ray silhouetteRay{ lightCenter + fromLight * (firstHit.hitT + secondHit.hitT), fromLight };
 
 						const auto thirdHit = scene::accel_struct::first_intersection_scene_lbvh(scene, silhouetteRay, secondHit.hitId,
 																								 lightDist - firstHit.hitT - secondHit.hitT + DIST_EPSILON);
 						if(thirdHit.hitId == vertex->get_primitive_id()) {
-							outputBuffer.contribute(coord, throughput, ei::Vec3{ 1.f, 0.0f, 0.0f }, vertex->get_position(),
-													vertex->get_normal(), vertex->get_albedo());
+							for(i32 i = 0; i < sharedVertices; ++i) {
+								// TODO: proper amount of importance
+								m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxFirst[i]] = 1;
+								m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxSecond[i]] = 1;
+							}
 						} else {
 							mAssert(thirdHit.hitId.instanceId >= 0);
-							// Shadow - silhouette blocked by other object
-							outputBuffer.contribute(coord, throughput, ei::Vec3{ 0.0f, 1.0f, 0.0f }, vertex->get_position(),
-													vertex->get_normal(), vertex->get_albedo());
+							// TODO: store a shadow photon?
 						}
-					} else {
-						// Not a silhouette - we don't care
-						outputBuffer.contribute(coord, throughput, ei::Vec3{ 0.f }, vertex->get_position(),
-												vertex->get_normal(), vertex->get_albedo());
 					}
 				}
-			} else {
-				// Not shadowed
-				outputBuffer.contribute(coord, throughput, ei::Vec3{ 1.f }, vertex->get_position(),
-										vertex->get_normal(), vertex->get_albedo());
 			}
-		} else {
-			// No light at all
-			outputBuffer.contribute(coord, throughput, ei::Vec3{ 0.f }, vertex->get_position(),
-									vertex->get_normal(), vertex->get_albedo());
 		}
 	}
+}
 
-#if 0
+void CpuShadowSilhouettes::reset() {
+	this->m_reset = true;
+}
+
+void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+						   const scene::SceneDescriptor<Device::CPU>& scene) {
+	int pixel = coord.x + coord.y * outputBuffer.get_width();
+
+	//m_params.maxPathLength = 2;
+
+	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
+	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	// Create a start for the path
+	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	mAssertMsg(s < 256, "vertexBuffer overflow.");
+
+
 	int pathLen = 0;
 	do {
 		if(pathLen > 0.0f && pathLen + 1 <= m_params.maxPathLength) {
@@ -241,11 +256,20 @@ void CpuShadowSilhouettes::sample(const Pixel coord, RenderBuffer<Device::CPU>& 
 					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				emission *= mis;
 			}
+			const auto& hitId = vertex->get_primitive_id();
+			const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
+			const u32 vertexCount = ((u32)hitId.primId < lod.polygon.numTriangles) ? 3u : 4u;
+			const u32 vertexOffset = ((u32)hitId.primId < lod.polygon.numTriangles) ? 0u : 3u * lod.polygon.numTriangles;
+			float importance = 0.f;
+			for(u32 i = 0u; i < vertexCount; ++i) {
+				importance += m_importanceMap[m_vertexOffsets[hitId.instanceId]
+					+ lod.polygon.vertexIndices[vertexOffset + vertexCount * hitId.primId + i]];
+			}
+			importance /= static_cast<float>(vertexCount);
 			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									vertex->get_normal(), vertex->get_albedo());
+									vertex->get_normal(), ei::Vec3{ importance });
 		}
 	} while(pathLen < m_params.maxPathLength);
-#endif // 0
 }
 
 void CpuShadowSilhouettes::init_rngs(int num) {

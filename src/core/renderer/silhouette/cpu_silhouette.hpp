@@ -2,6 +2,7 @@
 
 #include "silhouette_params.hpp"
 #include "core/math/rng.hpp"
+#include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/scene/descriptors.hpp"
@@ -26,18 +27,28 @@ public:
 	virtual StringView get_name() const noexcept { return "Shadow silhouettes"; }
 	virtual bool uses_device(Device dev) noexcept override { return may_use_device(dev); }
 	static bool may_use_device(Device dev) noexcept { return Device::CPU == dev; }
+
 private:
 	// Create one sample path (actual PT algorithm)
-	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
+	void pt_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
 				const scene::SceneDescriptor<Device::CPU>& scene);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
+
+	void importance_sample(const Pixel coord, const scene::SceneDescriptor<Device::CPU>& scene,
+						   int width);
 
 	bool m_reset = true;
 	SilhouetteParameters m_params = {};
 	scene::SceneHandle m_currentScene = nullptr;
 	std::vector<math::Rng> m_rngs;
 	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
+
+	// Data buffer for importance
+	unique_device_ptr<Device::CPU, std::atomic<float>[]> m_importanceMap;
+	// Data buffer for vertex offset per instance for quick lookup
+	unique_device_ptr<Device::CPU, u32[]> m_vertexOffsets;
+	u32 m_vertexCount = 0;
 };
 
 } // namespace mufflon::renderer
