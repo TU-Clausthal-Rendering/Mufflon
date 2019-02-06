@@ -52,7 +52,7 @@ namespace gui.Dll
         private int m_renderWidth = 0;
         private int m_renderHeight = 0;
 
-        private Core.RenderTarget m_renderTarget;
+        private RenderTarget m_renderTarget;
         private bool m_varianceTarget;
 
         // TODO: this is only for testing purposes
@@ -179,7 +179,7 @@ namespace gui.Dll
                     UInt32 height = (UInt32)m_viewport.DesiredHeight;
 
                     IntPtr imageData = IntPtr.Zero;
-                    if (!Core.core_get_target_image(m_renderTarget, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
+                    if (!Core.core_get_target_image(m_renderTarget.TargetIndex, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
                         false, out imageData))
                         throw new Exception(Core.core_get_dll_error());
                     if(imageData != IntPtr.Zero)
@@ -275,19 +275,19 @@ namespace gui.Dll
             // Check if we need to resize the screen texture
             int newWidth = m_viewport.RenderWidth;
             int newHeight = m_viewport.RenderHeight;
-            Core.RenderTarget newTarget = m_renderTargetModel.VisibleTarget;
+            RenderTarget newTarget = m_renderTargetModel.VisibleTarget;
             bool newVarianceTarget = m_renderTargetModel.IsVarianceVisible;
 
             // TODO: disable the old target?
             if(newTarget != m_renderTarget || newVarianceTarget != m_varianceTarget)
             {
-                if (!Core.render_is_render_target_enabled(m_renderTargetModel.VisibleTarget, m_renderTargetModel.IsVarianceVisible))
+                if (!Core.render_is_render_target_enabled(m_renderTargetModel.VisibleTarget.TargetIndex, m_renderTargetModel.IsVarianceVisible))
                 {
                     // Disable previous render target
                     // TODO: better solution since we might want multiple render targets at a time
-                    if(!Core.render_disable_render_target(m_renderTarget, m_varianceTarget ? 1u : 0u))
+                    if(!Core.render_disable_render_target(m_renderTarget.TargetIndex, m_varianceTarget ? 1u : 0u))
                         throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_enable_render_target(m_renderTargetModel.VisibleTarget, m_renderTargetModel.IsVarianceVisible ? 1u : 0u))
+                    if (!Core.render_enable_render_target(m_renderTargetModel.VisibleTarget.TargetIndex, m_renderTargetModel.IsVarianceVisible ? 1u : 0u))
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());
@@ -304,7 +304,7 @@ namespace gui.Dll
 
                 // TODO: let GUI select what render target we render
                 OpenGlDisplay.TextureFormat format;
-                if(!Core.core_get_target_format(m_renderTarget, out format))
+                if(!Core.core_get_target_format(m_renderTarget.TargetIndex, out format))
                     throw new Exception(Core.core_get_dll_error());
                 if (!OpenGlDisplay.opengldisplay_resize_screen((UInt32)m_renderWidth, (UInt32)m_renderHeight, format))
                     throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());

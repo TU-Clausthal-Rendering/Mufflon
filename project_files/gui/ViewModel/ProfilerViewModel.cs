@@ -53,7 +53,7 @@ namespace gui.ViewModel
 
         private void RendererOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
-            switch (args.PropertyName)
+            /*switch (args.PropertyName)
             {
                 case nameof(RendererModel.Iteration):
                     System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
@@ -66,7 +66,7 @@ namespace gui.ViewModel
                             updateRenderingData();
                         }));
                     break;
-            }
+            }*/
         }
 
         private void SceneOnPropertyChanged(object sender, PropertyChangedEventArgs args)

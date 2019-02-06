@@ -5,6 +5,7 @@
 #include "core/scene/textures/cputexture.hpp"
 #include "core/scene/textures/interface.hpp"
 #include "util/flag.hpp"
+#include "util/string_view.hpp"
 #include "core/math/sample_types.hpp"
 
 namespace mufflon { namespace renderer {
@@ -18,22 +19,36 @@ struct RenderTargets {
 };
 
 struct OutputValue : util::Flags<u32> {
+	static constexpr u32 VARIANCE_OFFSET = 8u;
+	static constexpr u32 VARIANCE_MASK = 0xFFFFFFFF << VARIANCE_OFFSET;
+	static constexpr u32 make_variance(u32 target) noexcept { return target << VARIANCE_OFFSET; }
+	static constexpr u32 remove_variance(u32 varianceTarget) noexcept { return varianceTarget >> VARIANCE_OFFSET; }
+
 	static constexpr u32 RADIANCE = 0x0001;			// Output of radiance (standard output of a renderer)
 	static constexpr u32 POSITION = 0x0002;			// Output of positions (customly integrated over paths)
 	static constexpr u32 ALBEDO = 0x0004;			// Output of albedo (customly integrated over paths)
 	static constexpr u32 NORMAL = 0x0008;			// Output of signed normals (customly integrated over paths)
 	static constexpr u32 LIGHTNESS = 0x0010;		// Output of multiplied paths weights (from the custom integration)
 
-	static constexpr u32 RADIANCE_VAR = 0x0100;		// Variance of radiance
-	static constexpr u32 POSITION_VAR = 0x0200;
-	static constexpr u32 ALBEDO_VAR = 0x0400;
-	static constexpr u32 NORMAL_VAR = 0x0800;
-	static constexpr u32 LIGHTNESS_VAR = 0x1000;
+	static constexpr u32 RADIANCE_VAR = RADIANCE << VARIANCE_OFFSET;		// Variance of radiance
+	static constexpr u32 POSITION_VAR = POSITION << VARIANCE_OFFSET;
+	static constexpr u32 ALBEDO_VAR = ALBEDO << VARIANCE_OFFSET;
+	static constexpr u32 NORMAL_VAR = NORMAL << VARIANCE_OFFSET;
+	static constexpr u32 LIGHTNESS_VAR = LIGHTNESS << VARIANCE_OFFSET;
 
-	static constexpr u32 iterator[5] = {RADIANCE, POSITION, ALBEDO, NORMAL, LIGHTNESS};
+	static constexpr u32 iterator[] = { RADIANCE, POSITION, ALBEDO, NORMAL, LIGHTNESS };
+	static constexpr std::size_t TARGET_COUNT = sizeof(iterator) / sizeof(*iterator);
 
-	bool is_variance() const { return (mask & 0xff00) != 0; }
+	bool is_variance() const { return (mask & VARIANCE_MASK) != 0; }
 };
+
+inline StringView get_render_target_name(u32 target) {
+	static StringView TARGET_NAMES[OutputValue::TARGET_COUNT] = {
+		"Radiance", "Position", "Albedo", "Normal", "Lightness"
+	};
+	mAssert(target < OutputValue::TARGET_COUNT);
+	return TARGET_NAMES[target];
+}
 
 template < Device dev >
 struct RenderBuffer {
@@ -41,7 +56,7 @@ struct RenderBuffer {
 	// information. The meaning of the variables is only known to the OutputHandler.
 	// The renderbuffer only needs to add values to all defined handles.
 
-	scene::textures::TextureDevHandle_t<dev> m_targets[5u] = {};
+	scene::textures::TextureDevHandle_t<dev> m_targets[OutputValue::TARGET_COUNT] = {};
 	ei::IVec2 m_resolution;
 
 	/*
@@ -111,6 +126,15 @@ struct RenderBuffer {
 		}
 	}
 
+	__host__ __device__ void contribute(Pixel pixel, u32 target, const ei::Vec4& value) {
+		using namespace scene::textures;
+		if(is_valid(m_targets[target])) {
+			mAssert(!isnan(value.x) && !isnan(value.y) && !isnan(value.z) && !isnan(value.w));
+			ei::Vec4 prev = read(m_targets[target], pixel);
+			write(m_targets[target], pixel, prev + value);
+		}
+	}
+
 	__host__ __device__ int get_width() const { return m_resolution.x; }
 	__host__ __device__ int get_height() const { return m_resolution.y; }
 	__host__ __device__ ei::IVec2 get_resolution() const { return m_resolution; }
@@ -154,9 +178,9 @@ private:
 	// In each block either none, m_iter... only, or all three are defined.
 	// If variances is required all three will be used and m_iter resets every iteration.
 	// Otherwise m_iter contains the cumulative (non-normalized) radiance.
-	scene::textures::Texture m_cumulativeTex[5];		// Accumulate the property (normalized by iteration count if variances are used)
-	scene::textures::Texture m_iterationTex[5];			// Gets reset to 0 at the begin of each iteration (only required for variance)
-	scene::textures::Texture m_cumulativeVarTex[5];		// Accumulate the variance
+	scene::textures::Texture m_cumulativeTex[OutputValue::TARGET_COUNT];	// Accumulate the property (normalized by iteration count if variances are used)
+	scene::textures::Texture m_iterationTex[OutputValue::TARGET_COUNT];		// Gets reset to 0 at the begin of each iteration (only required for variance)
+	scene::textures::Texture m_cumulativeVarTex[OutputValue::TARGET_COUNT];	// Accumulate the variance
 	OutputValue m_targets;
 	int m_iteration;			// Number of completed iterations / index of current one
 	int m_width;

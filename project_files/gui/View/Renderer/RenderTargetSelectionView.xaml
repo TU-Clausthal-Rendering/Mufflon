@@ -57,7 +57,7 @@
                                   Grid.Column="2"
                                   ToolTip="If enabled, the renderer will track the target's variance in a displayable texture"
                                   Margin="{StaticResource RightPropertyMargin}"
-                                  IsChecked="{Binding EnabledVariance}"
+                                  IsChecked="{Binding VarianceEnabled}"
                                   IsEnabled="{Binding VarianceVisible, Converter={StaticResource inverter}}"/>
                         <RadioButton Grid.Row="0"
                                      Grid.Column="3"

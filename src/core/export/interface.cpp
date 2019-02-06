@@ -284,26 +284,27 @@ Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
 	CATCH_ALL(false)
 }
 
-Boolean core_get_target_format(RenderTarget target, TextureFormat* format) {
+Boolean core_get_target_format(uint32_t index, TextureFormat* format) {
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
-	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	if(format != nullptr) {
-		const renderer::OutputValue targetFlags{ static_cast<u32>(1u << target) };
+		const renderer::OutputValue targetFlags{ 1u << index };
 		*format = static_cast<TextureFormat>(s_imageOutput->get_target_format(targetFlags));
 	}
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean core_get_target_image(RenderTarget target, Boolean variance,
+Boolean core_get_target_image(uint32_t index, Boolean variance,
 							  TextureFormat format, bool sRgb, const char** ptr) {
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
-	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	std::scoped_lock lock{ s_iterationMutex };
 	if(ptr != nullptr) {
-		const renderer::OutputValue targetFlags{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) };
+		const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
+		const renderer::OutputValue targetFlags{ flags };
 		if(!s_outputTargets.is_set(targetFlags)) {
 			logError("[", FUNCTION_NAME, "] Specified render target is not active");
 			return false;
@@ -312,7 +313,7 @@ Boolean core_get_target_image(RenderTarget target, Boolean variance,
 		// If there's no output yet, we "return" a nullptr
 		if(s_imageOutput != nullptr) {
 			if(format >= TextureFormat::FORMAT_NUM)
-				(void)core_get_target_format(target, &format);
+				(void)core_get_target_format(index, &format);
 			s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
 			textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
 			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
@@ -2704,13 +2705,21 @@ Boolean render_save_screenshot(const char* filename) {
 	CATCH_ALL(false)
 }
 
-Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
+uint32_t render_get_render_target_count() {
+	return renderer::OutputValue::TARGET_COUNT;
+}
+
+const char* render_get_render_target_name(uint32_t index) {
+	return renderer::get_render_target_name(index).data();
+}
+
+Boolean render_enable_render_target(uint32_t index, Boolean variance) {
 	TRY
-	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
-	s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target)) });
+	s_outputTargets.set(renderer::OutputValue{ 1u << index });
 	if(variance)
-		s_outputTargets.set(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
+		s_outputTargets.set(renderer::OutputValue{ renderer::OutputValue::make_variance(1u << index) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	if(s_currentRenderer != nullptr)
@@ -2719,13 +2728,13 @@ Boolean render_enable_render_target(RenderTarget target, Boolean variance) {
 	CATCH_ALL(false)
 }
 
-Boolean render_disable_render_target(RenderTarget target, Boolean variance) {
+Boolean render_disable_render_target(uint32_t index, Boolean variance) {
 	TRY
-	CHECK(target < RenderTarget::TARGET_COUNT, "unknown render target", false);
+	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(!variance)
-		s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>(1u << target) });
-	s_outputTargets.clear(renderer::OutputValue{ static_cast<u32>((1u << target) << 8u) });
+		s_outputTargets.clear(renderer::OutputValue{ 1u << index });
+	s_outputTargets.clear(renderer::OutputValue{ renderer::OutputValue::make_variance(1u << index) });
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
@@ -2750,7 +2759,7 @@ Boolean render_enable_all_render_targets() {
 	auto lock = std::scoped_lock(s_iterationMutex);
 	for(u32 target : renderer::OutputValue::iterator) {
 		s_outputTargets.set(target);
-		s_outputTargets.set(target << 8u);
+		s_outputTargets.set(renderer::OutputValue::make_variance(target));
 	}
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
@@ -2764,7 +2773,7 @@ Boolean render_disable_variance_render_targets() {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	for(u32 target : renderer::OutputValue::iterator)
-		s_outputTargets.clear(target << 8u);
+		s_outputTargets.clear(renderer::OutputValue::make_variance(target));
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
@@ -2781,9 +2790,10 @@ Boolean render_disable_all_render_targets() {
 	CATCH_ALL(false)
 }
 
-Boolean render_is_render_target_enabled(RenderTarget target, Boolean variance) {
+Boolean render_is_render_target_enabled(uint32_t index, Boolean variance) {
 	TRY
-	return s_outputTargets.is_set(renderer::OutputValue{ static_cast<u32>((1u << target) << (variance ? 8u : 0u)) });
+	u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
+	return s_outputTargets.is_set(renderer::OutputValue{ flags });
 	CATCH_ALL(false)
 }
 

@@ -48,15 +48,6 @@ namespace gui.Dll
             Focus
         };
 
-        public enum RenderTarget
-        {
-            Radiance,
-            Position,
-            Albedo,
-            Normal,
-            Lightness
-        };
-
         public enum LightType
         {
             Point,
@@ -124,9 +115,9 @@ namespace gui.Dll
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_format(RenderTarget target, out OpenGlDisplay.TextureFormat format);
+        internal static extern bool core_get_target_format(UInt32 index, out OpenGlDisplay.TextureFormat format);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_image(RenderTarget target, Boolean variance,
+        internal static extern bool core_get_target_image(UInt32 index, Boolean variance,
             OpenGlDisplay.TextureFormat format, bool sRgb, out IntPtr ptr);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_dll_error")]
@@ -381,9 +372,14 @@ namespace gui.Dll
         private static extern bool render_save_screenshot_(IntPtr filename);
         internal static bool render_save_screenshot(string filename) { return render_save_screenshot_(StringUtil.ToNativeUtf8(filename)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_render_target(RenderTarget target, uint variance);
+        internal static extern UInt32 render_get_render_target_count();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_render_target_name")]
+        internal static extern IntPtr render_get_render_target_name_(UInt32 index);
+        internal static string render_get_render_target_name(UInt32 index) { return StringUtil.FromNativeUTF8(render_get_render_target_name_(index)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_disable_render_target(RenderTarget target, uint variance);
+        internal static extern bool render_enable_render_target(UInt32 index, uint variance);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool render_disable_render_target(UInt32 inddex, uint variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_non_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -393,7 +389,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_all_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_is_render_target_enabled(RenderTarget target, Boolean variance);
+        internal static extern bool render_is_render_target_enabled(UInt32 index, Boolean variance);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint renderer_get_num_parameters();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_desc")]

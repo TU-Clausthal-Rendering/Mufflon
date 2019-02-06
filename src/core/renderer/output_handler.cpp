@@ -135,10 +135,13 @@ void OutputHandler::set_targets(OutputValue targets) {
 }
 
 scene::textures::Format OutputHandler::get_target_format(OutputValue which) {
-	if(which == OutputValue::LIGHTNESS || which == OutputValue::LIGHTNESS_VAR)
-		return Format::R32F;
-	else
-		return Format::RGBA32F;
+	switch(which) {
+		case OutputValue::LIGHTNESS:
+		case OutputValue::LIGHTNESS_VAR:
+			return Format::R32F;
+		default:
+			return Format::RGBA32F;
+	}
 }
 
 scene::textures::ConstTextureDevHandle_t<Device::CPU> OutputHandler::get_data(OutputValue which) {

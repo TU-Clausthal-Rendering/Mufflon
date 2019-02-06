@@ -89,15 +89,6 @@ typedef enum {
 } CameraType;
 
 typedef enum {
-	TARGET_RADIANCE,
-	TARGET_POSITION,
-	TARGET_ALBEDO,
-	TARGET_NORMAL,
-	TARGET_LIGHTNESS,
-	TARGET_COUNT
-} RenderTarget;
-
-typedef enum {
 	LIGHT_POINT,
 	LIGHT_SPOT,
 	LIGHT_DIRECTIONAL,
@@ -516,13 +507,15 @@ CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();
 // TODO: what do we pass to the GUI?
 CORE_API Boolean CDECL render_save_screenshot(const char* filename);
-CORE_API Boolean CDECL render_enable_render_target(RenderTarget target, Boolean variance);
-CORE_API Boolean CDECL render_disable_render_target(RenderTarget target, Boolean variance);
+CORE_API uint32_t render_get_render_target_count();
+CORE_API const char* render_get_render_target_name(uint32_t index);
+CORE_API Boolean CDECL render_enable_render_target(uint32_t index, Boolean variance);
+CORE_API Boolean CDECL render_disable_render_target(uint32_t index, Boolean variance);
 CORE_API Boolean CDECL render_enable_non_variance_render_targets();
 CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
-CORE_API Boolean CDECL render_is_render_target_enabled(RenderTarget target, Boolean variance);
+CORE_API Boolean CDECL render_is_render_target_enabled(uint32_t index, Boolean variance);
 CORE_API uint32_t CDECL renderer_get_num_parameters();
 CORE_API const char* CDECL renderer_get_parameter_desc(uint32_t idx, ParameterType* type);
 CORE_API Boolean CDECL renderer_set_parameter_int(const char* name, int32_t value);
@@ -558,8 +551,8 @@ CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API void CDECL mufflon_destroy();
 
 
-CORE_API Boolean CDECL core_get_target_format(RenderTarget target, TextureFormat* format);
-CORE_API Boolean CDECL core_get_target_image(RenderTarget target, Boolean variance, TextureFormat format,
+CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* format);
+CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, TextureFormat format,
 											 bool sRgb,const char** ptr);
 CORE_API const char* CDECL core_get_dll_error();
 CORE_API Boolean CDECL core_set_log_level(LogLevel level);
