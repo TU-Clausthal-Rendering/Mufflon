@@ -11,6 +11,13 @@ struct PImportanceIterations {
 	}
 };
 
+struct PTargetReduction {
+	float reduction{ 0.875f };
+	static ParamDesc get_desc() noexcept {
+		return { "Target reduction", ParameterTypes::FLOAT };
+	}
+};
+
 struct PShowSilhouette {
 	bool showSilhouette{ false };
 	static ParamDesc get_desc() noexcept {
@@ -18,6 +25,13 @@ struct PShowSilhouette {
 	}
 };
 
-using SilhouetteParameters = ParameterHandler<PImportanceIterations, PShowSilhouette, PMaxPathLength>;
+struct PVertexThreshold {
+	int threshold{ 100 };
+	static ParamDesc get_desc() noexcept {
+		return { "Decimation threshold", ParameterTypes::INT };
+	}
+};
+
+using SilhouetteParameters = ParameterHandler<PImportanceIterations, PTargetReduction, PVertexThreshold, PShowSilhouette, PMaxPathLength>;
 
 }} // namespace mufflon::renderer

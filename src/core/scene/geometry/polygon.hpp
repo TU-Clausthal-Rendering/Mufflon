@@ -166,6 +166,13 @@ public:
 		return m_faceAttributes.add_attribute<T>(std::move(name));
 	}
 
+	bool has_vertex_attribute(StringView name) {
+		return m_vertexAttributes.has_attribute(name);
+	}
+	bool has_face_attribute(StringView name) {
+		return m_faceAttributes.has_attribute(name);
+	}
+
 	void remove_attribute(StringView name) {
 		throw std::runtime_error("Operation not implemented yet");
 	}
@@ -369,6 +376,14 @@ public:
 	// Get a list of all materials which are referenced by any primitive
 	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
 		return m_uniqueMaterials;
+	}
+
+	PolygonMeshType& get_mesh() noexcept {
+		return *m_meshData;
+	}
+
+	const PolygonMeshType& get_mesh() const noexcept {
+		return *m_meshData;
 	}
 
 private:

@@ -6,6 +6,7 @@
 #include "core/memory/residency.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/scene/descriptors.hpp"
+#include <OpenMesh/Core/Utils/Property.hh>
 #include <atomic>
 #include <vector>
 

@@ -95,6 +95,10 @@ public:
 		return AttributeHandle{ m_attributes.size() - 1u };
 	}
 
+	bool has_attribute(StringView name) const {
+		return m_nameMap.find(name) != m_nameMap.cend();
+	}
+
 	// Adds an attribute that OpenMesh supposedly already has
 	template < class T >
 	AttributeHandle register_attribute(PropertyHandleType<T> propHdl) {
@@ -269,6 +273,10 @@ public:
 		m_nameMap.emplace(std::move(name), m_attributes.size());
 		m_attributes.push_back(std::move(info));
 		return AttributeHandle{ m_attributes.size() - 1u };
+	}
+
+	bool has_attribute(StringView name) const {
+		return m_nameMap.find(name) != m_nameMap.cend();
 	}
 
 	// Causes force-unload on actual reserve

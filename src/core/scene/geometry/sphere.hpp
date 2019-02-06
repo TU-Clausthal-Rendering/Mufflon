@@ -62,6 +62,10 @@ public:
 		return m_attributes.add_attribute<T>(std::move(name));
 	}
 
+	bool has_attribute(StringView name) {
+		return m_attributes.has_attribute(name);
+	}
+
 	void remove_attribute(StringView name) {
 		throw std::runtime_error("Operation not implemented yet");
 	}

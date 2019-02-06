@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cpu_silhouette.hpp"
+#include "decimater.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
@@ -10,9 +11,12 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/lights/light_sampling.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
+#include "core/scene/world_container.hpp"
 #include <random>
 
 namespace mufflon::renderer {
+
+using namespace silhouette;
 
 namespace {
 
@@ -36,6 +40,8 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 }
 
 void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
+	constexpr StringView importanceAttrName{ "importance" };
+
 	// (Re) create the random number generators
 	if(m_rngs.size() != outputBuffer.get_num_pixels()
 	   || m_reset)
@@ -43,20 +49,21 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	if(m_reset) {
-		// TODO: reset output buffer
 		// Reacquire scene descriptor (partially?)
 		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
+
 		// Query how many vertices there are
+		// TODO: how to deal with instancing
 		m_vertexCount = 0u;
 		m_vertexOffsets = make_udevptr_array<Device::CPU, u32>(m_sceneDesc.numInstances);
-		for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
+		for(u32 i = 0u; i < m_sceneDesc.numLods; ++i) {
 			m_vertexOffsets[i] = m_vertexCount;
-			m_vertexCount += m_sceneDesc.lods[m_sceneDesc.lodIndices[0u]].polygon.numVertices;
+			m_vertexCount += m_sceneDesc.lods[i].polygon.numVertices;
 		}
 		// Allocate sufficient buffer
 		m_importanceMap = make_udevptr_array<Device::CPU, std::atomic<float>>(m_vertexCount);
 
-		if(!m_params.showSilhouette) {
+		if(!m_params.showSilhouette && m_params.iterations > 0) {
 			// Perform importance iterations
 
 			const int iterations = m_params.iterations * outputBuffer.get_num_pixels();
@@ -67,7 +74,67 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 				this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
 										buffer, m_sceneDesc);
 			}
-			logInfo("Finished importance gathering");
+
+			logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
+			u32 vertexOffset = 0u;
+			for(auto object : m_currentScene->get_objects()) {
+				for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
+					if(object.first->has_lod_available(i)) {
+						auto& lod = object.first->get_lod(i);
+						auto& polygons = lod.get_geometry<scene::geometry::Polygons>();
+						const u32 vertexCount = static_cast<u32>(polygons.get_vertex_count());
+						if(static_cast<int>(vertexCount) < m_params.threshold) {
+							logInfo("Skipping object ", object.first->get_object_id(), ", LoD ", i,
+									" (too little vertices)");
+						} else {
+							const u32 targetVertexCount = static_cast<u32>(vertexCount * m_params.reduction);
+							logInfo("Decimating object ", object.first->get_object_id(), ", LoD ", i,
+									" (", vertexCount, " => ", targetVertexCount, ")");
+
+							auto& mesh = polygons.get_mesh();
+							OpenMesh::VPropHandleT<float> impHdl;
+							mesh.add_property(impHdl, std::string(importanceAttrName));
+
+							for(u32 v = 0u; v < polygons.get_vertex_count(); ++v)
+								mesh.property(impHdl, OpenMesh::VertexHandle {(int)v}) = m_importanceMap[vertexOffset + v];
+
+							// Create decimater and attach modules
+							OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater(mesh);
+							ImportanceModule<scene::geometry::PolygonMeshType>::Handle impModHdl;
+							ImportanceBinaryModule<scene::geometry::PolygonMeshType>::Handle impBinModHdl;
+							decimater.add(impModHdl);
+							decimater.add(impBinModHdl);
+							decimater.module(impModHdl).set_importance_property(impHdl);
+							decimater.module(impBinModHdl).set_importance_property(impHdl);
+							/*OpenMesh::Decimater::ModNormalFlippingT<mesh_data>::Handle normal_flipping;
+							decimater.add(normal_flipping);
+							decimater.module(normal_flipping).set_max_normal_deviation(max_normal_deviation);*/
+
+							// Perform actual decimation
+							// TODO: only create LoD
+							decimater.initialize();
+							auto numCollapses = decimater.decimate_to(targetVertexCount);
+
+							logInfo("Removed ", numCollapses, " vertices (target ", targetVertexCount, ")");
+
+							// Clean up
+							mesh.garbage_collection();
+
+							vertexOffset += vertexCount;
+							// TODO: remove
+						}
+					}
+				}
+			}
+
+			for(u32 i = 0u; i < m_sceneDesc.numLods; ++i) {
+				// Copy over the importance
+				const auto* importance = static_cast<const std::atomic<float>*>(m_sceneDesc.lods[i].polygon.vertexAttributes[0u]);
+				for(u32 v = 0u; v < m_sceneDesc.lods[v].polygon.numVertices; ++v) {
+
+				}
+				// TODO
+			}
 		}
 	}
 	m_reset = false;
