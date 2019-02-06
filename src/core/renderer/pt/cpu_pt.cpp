@@ -16,11 +16,7 @@ namespace mufflon::renderer {
 
 using PtPathVertex = PathVertex<u8, 4>;
 
-CpuPathTracer::CpuPathTracer()
-{
-	// TODO: init one RNG per thread?
-	m_rngs.emplace_back(static_cast<u32>(std::random_device()()));
-
+CpuPathTracer::CpuPathTracer() {
 	// The PT does not need additional memory resources like photon maps.
 }
 
@@ -39,7 +35,6 @@ void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
 	}
 	m_reset = false;
 
-	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 #pragma PARALLEL_FOR

@@ -667,7 +667,7 @@ RayIntersectionResult first_intersection_scene_lbvh(
 
 			const ei::Vec3 localN = transpose(rotation) * geoNormal;
 			uv.x = atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f;
-			uv.y = acosf(localN.z) / ei::PI;
+			uv.y = acosf(-localN.z) / ei::PI;
 			surfParams.st = uv;
 			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
 		} else {

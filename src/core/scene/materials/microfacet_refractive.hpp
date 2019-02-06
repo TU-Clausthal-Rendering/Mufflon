@@ -59,7 +59,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 
 	AngularPdf common = cavityTS.pdf * sdiv(iDotHabs * eDotHabs, ei::sq(n_i * iDotH + n_e * eDotH) * halfTS.z);
 	Spectrum throughput { sdiv(g, gi) };
-	if(!adjoint)
+	if(adjoint)
 		throughput *= etaSq;
 
 	return math::PathSample {
@@ -97,9 +97,6 @@ CUDA_FUNCTION math::EvalValue evaluate(const MatSampleWalter& params,
 	// Fresnel is done as layer blending...
 
 	float common = sdiv(ei::abs(d * iDotH * eDotH), ei::sq(n_i * iDotH + n_e * eDotH));
-	// To make the BSDF reciprocal, the n_i/n_e must be exchanged for the adjoint.
-	//float n_x = adjoint ? n_e : n_i;
-	// TODO: test if n_e is correct here....
 	float bsdf = g * common * sdiv(n_e * n_e, ei::abs(incidentTS.z * excidentTS.z));
 	return math::EvalValue {
 		Spectrum{bsdf},
