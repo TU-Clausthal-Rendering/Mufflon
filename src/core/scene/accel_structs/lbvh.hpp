@@ -39,6 +39,23 @@ struct LBVH {
  */
 class LBVHBuilder {
 public:
+	LBVHBuilder() = default;
+
+	LBVHBuilder(LBVHBuilder& lbvh) {
+		// Warning: the copy implicitly syncs!
+		m_primIds.resize(lbvh.m_primIds.size());
+		m_bvhNodes.resize(lbvh.m_bvhNodes.size());
+
+		const char* primMem = lbvh.m_primIds.template acquire_const<Device::CPU>();
+		const char* bvhMem = lbvh.m_primIds.template acquire_const<Device::CPU>();
+		if(lbvh.m_primIds.size() != 0u && primMem != nullptr) {
+			copy(m_primIds.template acquire<Device::CPU>(), primMem, lbvh.m_primIds.size());
+		}
+		if(lbvh.m_bvhNodes.size() != 0u && bvhMem != nullptr) {
+			copy(m_bvhNodes.template acquire<Device::CPU>(), bvhMem, lbvh.m_bvhNodes.size());
+		}
+	}
+
 	template < Device dev >
 	void build(LodDescriptor<dev>& obj, const ei::Box& sceneBB);
 
