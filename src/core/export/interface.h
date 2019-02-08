@@ -506,7 +506,7 @@ CORE_API Boolean CDECL render_iterate();
 CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();
 // TODO: what do we pass to the GUI?
-CORE_API Boolean CDECL render_save_screenshot(const char* filename);
+CORE_API Boolean CDECL render_save_screenshot(const char* filename, uint32_t targetIndex, Boolean variance);
 CORE_API uint32_t render_get_render_target_count();
 CORE_API const char* render_get_render_target_name(uint32_t index);
 CORE_API Boolean CDECL render_enable_render_target(uint32_t index, Boolean variance);

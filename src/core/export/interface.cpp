@@ -2662,7 +2662,7 @@ Boolean render_reset() {
 	CATCH_ALL(false)
 }
 
-Boolean render_save_screenshot(const char* filename) {
+Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boolean variance) {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
@@ -2670,38 +2670,53 @@ Boolean render_save_screenshot(const char* filename) {
 		return false;
 	}
 
-	// TODO: this is just for debugging! This should be done by an image library
-	auto dumpPfm = [](std::string fileName, const uint8_t* data) {
-		std::ofstream file(fileName, std::ofstream::binary | std::ofstream::out);
-		if(file.bad()) {
-			logError("[", FUNCTION_NAME, "] Failed to open screenshot file '",
-					 fileName, "'");
-			return;
-		}
-		file.write("PF\n", 3);
-		ei::IVec2 res = s_imageOutput->get_resolution();
-		auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
-		file.write(sizes.c_str(), sizes.length());
-		file.write("\n-1.000000\n", 11);
+	if(targetIndex >= renderer::OutputValue::TARGET_COUNT) {
+		logError("[", FUNCTION_NAME, "] Invalid target index (", targetIndex, ")");
+		return false;
+	}
 
-		const auto pixels = reinterpret_cast<const char *>(data);
+	fs::path fileName = std::string(filename) + ".pfm";
+	std::ofstream file(fileName, std::ofstream::binary | std::ofstream::out);
+	if(file.bad()) {
+		logError("[", FUNCTION_NAME, "] Failed to open screenshot file '",
+				 fileName.string(), "'");
+		return false;
+	}
+
+	// TODO: this is just for debugging! This should be done by an image library
+
+	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
+	scene::textures::ConstTextureDevHandle_t<Device::CPU> data = s_imageOutput->get_data(renderer::OutputValue{ flags });
+	const int numChannels = textures::NUM_CHANNELS(data->get_format());
+	if(numChannels == 1)
+		file.write("Pf\n", 3);
+	else
+		file.write("PF\n", 3);
+	ei::IVec2 res = s_imageOutput->get_resolution();
+	auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
+	file.write(sizes.c_str(), sizes.length());
+	file.write("\n-1.000000\n", 11);
+
+	const auto pixels = reinterpret_cast<const char *>(data->data());
+	if(data->get_format() == textures::Format::R32F || data->get_format() == textures::Format::RG32F
+	   || data->get_format() == textures::Format::RGBA32F) {
 		for(int y = 0; y < res.y; ++y) {
 			for(int x = 0; x < res.x; ++x) {
-				file.write(&pixels[(y * res.x + x) * 4u * sizeof(float)], 3u * sizeof(float));
+				switch(numChannels) {
+					case 1: file.write(&pixels[(y * res.x + x) * sizeof(float)], sizeof(float)); break;
+					case 2: {
+						const ei::Vec2& pixel = *reinterpret_cast<ei::Vec2*>(pixels[(y * res.x + x) * 2u * sizeof(float)]);
+						ei::Vec3 tranformed{ pixel };
+						file.write(reinterpret_cast<const char*>(&pixel), 3u * sizeof(float));
+					}	break;
+					default:
+						file.write(&pixels[(y * res.x + x) * numChannels * sizeof(float)], 3u * sizeof(float));
+				}
 			}
 		}
-
-	};
-	const std::string name(filename);
-	for(u32 target : renderer::OutputValue::iterator) {
-		if(s_outputTargets.is_set(target)) {
-			textures::CpuTexture data = s_imageOutput->get_data(renderer::OutputValue{ target }, textures::Format::RGBA32F, false);
-			dumpPfm(name + "_" + std::to_string(target) + ".pfm", data.data());
-		}
-		if(s_outputTargets.is_set(target << 8u)) {
-			textures::CpuTexture data = s_imageOutput->get_data(renderer::OutputValue{ target << 8u }, textures::Format::RGBA32F, false);
-			dumpPfm(name + "_" + std::to_string(target) + "_var.pfm", data.data());
-		}
+	} else {
+		logError("[", FUNCTION_NAME, "] Non-float formats are not supported yet");
+		return false;
 	}
 	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", filename, "'");
 

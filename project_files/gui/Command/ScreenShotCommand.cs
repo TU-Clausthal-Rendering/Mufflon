@@ -31,11 +31,20 @@ namespace gui.Command
             filename = filename.Replace("#scenario", m_models.World.CurrentScenario.Name);
             filename = filename.Replace("#renderer", Core.render_get_renderer_name(m_models.Renderer.RendererIndex));
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
-            string targetName = m_models.RenderTargetSelection.VisibleTarget.Name;
-            if (m_models.RenderTargetSelection.IsVarianceVisible)
-                targetName += "(Variance)";
-            filename = filename.Replace("#target", targetName);
-            Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, filename));
+
+            foreach(RenderTarget target in m_models.RenderTargetSelection.Targets)
+            {
+                if (target.Enabled)
+                {
+                    string file = filename.Replace("#target", target.Name);
+                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, file), target.TargetIndex, 0u);
+                }
+                if(target.VarianceEnabled)
+                {
+                    string file = filename.Replace("#target", target.Name + "(Variance)");
+                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, file), target.TargetIndex, 0u);
+                }
+            }
         }
 
         public event EventHandler CanExecuteChanged
