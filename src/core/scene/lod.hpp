@@ -24,7 +24,7 @@ public:
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
 
 	Lod() = default;
-	Lod(const Lod&) = delete;
+	Lod(const Lod&) = default;
 	Lod(Lod&& obj) = default;
 	Lod& operator=(const Lod&) = delete;
 	Lod& operator=(Lod&&) = delete;

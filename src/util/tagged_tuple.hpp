@@ -113,6 +113,11 @@ public:
 		ForEachHelper<Op, size - 1u>::for_each(*this, std::move(op));
 	}
 
+	template < class Op, std::size_t I = 0u >
+	void for_each(Op&& op) const {
+		ForEachHelper<Op, size - 1u>::for_each_const(*this, std::move(op));
+	}
+
 private:
 	// Helper class for finding the index of a type for tuple lookup
 	template < class... T >
@@ -133,10 +138,17 @@ private:
 			op(tuple.get<I>());
 			ForEachHelper<Op, I - 1u>::for_each(tuple, std::move(op));
 		}
+		static void for_each_const(const TaggedTuple<Args...>& tuple, Op&& op) {
+			op(tuple.get<I>());
+			ForEachHelper<Op, I - 1u>::for_each_const(tuple, std::move(op));
+		}
 	};
 	template < class Op >
 	struct ForEachHelper<Op, 0u> {
 		static void for_each(TaggedTuple<Args...>& tuple, Op&& op) {
+			op(tuple.get<0u>());
+		}
+		static void for_each_const(const TaggedTuple<Args...>& tuple, Op&& op) {
 			op(tuple.get<0u>());
 		}
 	};

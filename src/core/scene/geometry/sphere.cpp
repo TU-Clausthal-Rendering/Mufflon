@@ -21,11 +21,31 @@ Spheres::Spheres() :
 	};
 }
 
+Spheres::Spheres(const Spheres& sphere) :
+	m_attributes(),
+	m_spheresHdl(m_attributes.add_attribute<ei::Sphere>("spheres")),
+	m_matIndicesHdl(m_attributes.add_attribute<MaterialIndex>("materialIdx")),
+	m_boundingBox(sphere.m_boundingBox)
+{
+	sphere.m_attribBuffer.for_each([&](auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		auto& attribBuffer = m_attribBuffer.template get<ChangedBuffer>();
+		attribBuffer.size = buffer.size;
+		if(buffer.size == 0u || buffer.buffer == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
+			attribBuffer.buffer = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+		} else {
+			attribBuffer.buffer = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.size);
+			copy(attribBuffer.buffer, buffer.buffer, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.size);
+		}
+	});
+}
+
 Spheres::Spheres(Spheres&& sphere) :
 	m_attributes(std::move(sphere.m_attributes)),
 	m_spheresHdl(std::move(sphere.m_spheresHdl)),
 	m_matIndicesHdl(std::move(sphere.m_matIndicesHdl)),
-	m_boundingBox(std::move(sphere.m_boundingBox)){
+	m_boundingBox(std::move(sphere.m_boundingBox))
+{
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
 		m_attribBuffer.get<ChangedBuffer>() = buffer;

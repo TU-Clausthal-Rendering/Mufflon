@@ -64,6 +64,9 @@ public:
 	OpenMeshAttributePool(OpenMeshAttributePool&& pool);
 	~OpenMeshAttributePool();
 
+	// Copies over name maps etc.
+	void copy(const OpenMeshAttributePool<IsFace>& pool);
+
 	// Adds a new attribute; force-unload non-CPU pools
 	template < class T >
 	AttributeHandle add_attribute(std::string name) {
@@ -243,7 +246,7 @@ private:
 class AttributePool {
 public:
 	AttributePool() = default;
-	AttributePool(const AttributePool&) = delete;
+	AttributePool(const AttributePool& pool);
 	AttributePool& operator=(const AttributePool&) = delete;
 	AttributePool& operator=(AttributePool&&) = delete;
 	AttributePool(AttributePool&& pool);

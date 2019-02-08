@@ -149,7 +149,7 @@ public:
 	// Default construction, creates material-index attribute.
 	Polygons();
 
-	Polygons(const Polygons&) = delete;
+	Polygons(const Polygons&);
 	Polygons(Polygons&&);
 	Polygons& operator=(const Polygons&) = delete;
 	Polygons& operator=(Polygons&&) = delete;

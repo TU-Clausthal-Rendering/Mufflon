@@ -34,6 +34,53 @@ Polygons::Polygons() :
 	};
 }
 
+Polygons::Polygons(const Polygons& poly) :
+	m_meshData(std::make_unique<PolygonMeshType>(*poly.m_meshData)),
+	m_vertexAttributes(*poly.m_meshData),
+	m_faceAttributes(*poly.m_meshData),
+	m_pointsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec3f>(m_meshData->points_pph())),
+	m_normalsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec3f>(m_meshData->vertex_normals_pph())),
+	m_uvsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec2f>(m_meshData->vertex_texcoords2D_pph())),
+	m_matIndicesHdl(m_faceAttributes.add_attribute<u16>(MAT_INDICES_NAME)),
+	m_indexFlags(poly.m_indexFlags),
+	m_boundingBox(poly.m_boundingBox),
+	m_triangles(poly.m_triangles),
+	m_quads(poly.m_quads)
+{
+	m_vertexAttributes.copy(poly.m_vertexAttributes);
+	m_faceAttributes.copy(poly.m_faceAttributes);
+	// Copy the index and attribute buffers
+	poly.m_indexBuffer.for_each([&](const auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		auto& idxBuffer = m_indexBuffer.template get<ChangedBuffer>();
+		idxBuffer.reserved = buffer.reserved;
+		if(buffer.reserved == 0u || buffer.indices == ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{}) {
+			idxBuffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
+		} else {
+			idxBuffer.indices = Allocator<ChangedBuffer::DEVICE>::template alloc_array<u32>(buffer.reserved);
+			copy(idxBuffer.indices, buffer.indices, sizeof(u32) * buffer.reserved);
+		}
+	});
+	poly.m_attribBuffer.for_each([&](auto& buffer) {
+		using ChangedBuffer = std::decay_t<decltype(buffer)>;
+		auto& attribBuffer = m_attribBuffer.template get<ChangedBuffer>();
+		attribBuffer.vertSize = buffer.vertSize;
+		attribBuffer.faceSize = buffer.faceSize;
+		if(buffer.vertSize == 0u || buffer.vertex == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
+			attribBuffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+		} else {
+			attribBuffer.vertex = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.vertSize);
+			copy(attribBuffer.vertex, buffer.vertex, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
+		}
+		if(buffer.faceSize == 0u || buffer.face == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
+			attribBuffer.face = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+		} else {
+			attribBuffer.face = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.faceSize);
+			copy(attribBuffer.face, buffer.face, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
+		}
+	});
+}
+
 Polygons::Polygons(Polygons&& poly) :
 	m_meshData(std::move(poly.m_meshData)),
 	m_vertexAttributes(std::move(poly.m_vertexAttributes)),
@@ -49,13 +96,13 @@ Polygons::Polygons(Polygons&& poly) :
 	// Move the index and attribute buffers
 	poly.m_indexBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
-		m_indexBuffer.get<ChangedBuffer>() = buffer;
+		m_indexBuffer.template get<ChangedBuffer>() = buffer;
 		buffer.reserved = 0u;
 		buffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
 	});
 	poly.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
-		m_attribBuffer.get<ChangedBuffer>() = buffer;
+		m_attribBuffer.template get<ChangedBuffer>() = buffer;
 		buffer.vertSize = 0u;
 		buffer.faceSize = 0u;
 		buffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};

@@ -47,7 +47,7 @@ public:
 
 	// Default construction, creates material-index attribute.
 	Spheres();
-	Spheres(const Spheres&) = delete;
+	Spheres(const Spheres&);
 	Spheres(Spheres&&);
 	Spheres& operator=(const Spheres&) = delete;
 	Spheres& operator=(Spheres&&) = delete;
