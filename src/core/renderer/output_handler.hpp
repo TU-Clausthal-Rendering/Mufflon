@@ -64,6 +64,10 @@ struct RenderBuffer {
 	scene::textures::TextureDevHandle_t<dev> m_targets[OutputValue::TARGET_COUNT] = {};
 	ei::IVec2 m_resolution;
 
+	bool is_target_enabled(u32 target) const noexcept {
+		return (target < OutputValue::TARGET_COUNT) &&  scene::textures::is_valid(m_targets[target]);
+	}
+
 	/*
 	 * Handle contribution of connection and merge events
 	 * value: The radiance estimate from the event. This can be the BxDF (merge) or

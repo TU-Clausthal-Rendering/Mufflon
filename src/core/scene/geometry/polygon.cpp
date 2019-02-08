@@ -381,86 +381,27 @@ void Polygons::tessellate(tessellation::Tessellater& tessellater) {
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 	tessellater.tessellate(*m_meshData);
-
-	/*
-	tessellater(*m_meshData, divisions);*/
-	// TODO: change number of triangles/quads!
-
-	// Let our attribute pools know that we changed sizes
-	m_vertexAttributes.resize(m_meshData->n_vertices());
-	m_faceAttributes.resize(m_meshData->n_faces());
-
-	// Update the statistics we keep
-	// TODO: is there a better way?
-	m_triangles = 0u;
-	m_quads = 0u;
-	for(const auto& face : this->faces()) {
-		const std::size_t vertices = std::distance(face.begin(), face.end());
-		if(vertices == 3u)
-			++m_triangles;
-		else if(vertices == 4u)
-			++m_quads;
-		else
-			throw std::runtime_error("Tessellation added a non-quad/tri face (" + std::to_string(vertices) + " vertices)");
-	}
-
-	// Invalidate bounding box
-	m_boundingBox.min = {
-		std::numeric_limits<float>::max(),
-		std::numeric_limits<float>::max(),
-		std::numeric_limits<float>::max()
-	};
-	m_boundingBox.max = {
-		-std::numeric_limits<float>::max(),
-		-std::numeric_limits<float>::max(),
-		-std::numeric_limits<float>::max()
-	};
-
-	// Rebuild the index buffer
-	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
-	std::size_t currTri = 0u;
-	std::size_t currQuad = 0u;
-	u32* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices;
-	for(const auto& face : this->faces()) {
-		u32* currIndices = indexBuffer;
-		if(std::distance(face.begin(), face.end()) == 3u) {
-			currIndices += 3u * currTri++;
-		} else {
-			currIndices += 3u * m_triangles + 4u * currQuad++;
-		}
-		for(auto vertexIter = face.begin(); vertexIter != face.end(); ++vertexIter) {
-			*(currIndices++) = static_cast<u32>(vertexIter->idx());
-			ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
-			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) } };
-		}
-	}
-
-	// Flag the entire polygon as dirty
-	m_vertexAttributes.mark_changed(Device::CPU);
+	m_meshData->garbage_collection();
+	this->rebuild_index_buffer();
 	logInfo("Uniformly tessellated polygon mesh (", prevTri, "/", prevQuad,
 			" -> ", m_triangles, "/", m_quads, ")");
 }
-/*void Polygons::tessellate(OpenMesh::Subdivider::Adaptive::CompositeT<MeshType>& tessellater,
-				std::size_t divisions) {
-	// TODO
-	(void)tessellater;
-	throw std::runtime_error("Adaptive tessellation isn't implemented yet");
-	// TODO: change number of triangles/quads!
-	// Flag the entire polygon as dirty
-	m_vertexAttributes.mark_changed(Device::CPU);
-	logInfo("Adaptively tessellated polygon mesh with ", divisions, " subdivisions");
-}*/
 
-void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-				std::size_t target_vertices) {
-	decimater.mesh() = *m_meshData;
-	std::size_t targetDecimations = m_meshData->n_vertices() - target_vertices;
-	std::size_t actualDecimations = decimater.decimate_to(target_vertices);
-	// Flag the entire polygon as dirty
-	// TODO: change number of triangles/quads!
+// Creates a decimater 
+OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
+	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
+}
+
+void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+						std::size_t targetVertices) {
+	decimater.initialize();
+	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
+	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
+	decimater.mesh().garbage_collection();
+	this->rebuild_index_buffer();
 	m_vertexAttributes.mark_changed(Device::CPU);
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
-			" decimations performed");
+			" decimations performed)");
 	// TODO: this leaks mesh outside
 }
 
@@ -586,6 +527,60 @@ void Polygons::reserve_index_buffer(std::size_t capacity) {
 		buffer.reserved = capacity;
 		m_indexFlags.mark_changed(dev);
 	}
+}
+
+void Polygons::rebuild_index_buffer() {
+	// Update the statistics we keep
+	// TODO: is there a better way?
+	m_triangles = 0u;
+	m_quads = 0u;
+	for(const auto& face : this->faces()) {
+		const std::size_t vertices = std::distance(face.begin(), face.end());
+		if(vertices == 3u)
+			++m_triangles;
+		else if(vertices == 4u)
+			++m_quads;
+		else
+			throw std::runtime_error("Tessellation added a non-quad/tri face (" + std::to_string(vertices) + " vertices)");
+	}
+
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max()
+	};
+
+	// Rebuild the index buffer
+	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
+	std::size_t currTri = 0u;
+	std::size_t currQuad = 0u;
+	u32* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices;
+	for(const auto& face : this->faces()) {
+		u32* currIndices = indexBuffer;
+		if(std::distance(face.begin(), face.end()) == 3u) {
+			currIndices += 3u * currTri++;
+		} else {
+			currIndices += 3u * m_triangles + 4u * currQuad++;
+		}
+		for(auto vertexIter = face.begin(); vertexIter != face.end(); ++vertexIter) {
+			*(currIndices++) = static_cast<u32>(vertexIter->idx());
+			ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
+			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) } };
+		}
+	}
+
+	// Let our attribute pools know that we changed sizes
+	m_vertexAttributes.resize(m_meshData->n_vertices());
+	m_faceAttributes.resize(m_meshData->n_faces());
+
+	// Flag the entire polygon as dirty
+	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
 // Synchronizes two device index buffers

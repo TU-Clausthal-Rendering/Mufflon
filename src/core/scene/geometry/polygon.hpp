@@ -274,9 +274,11 @@ public:
 
 	// Implements tessellation for the mesh
 	void tessellate(tessellation::Tessellater& tessellater);
+	// Creates a decimater 
+	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
 	// Implements decimation.
-	void create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-					std::size_t target_vertices);
+	void decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+					std::size_t targetVertices);
 
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
@@ -427,6 +429,8 @@ private:
 	// Reserves more space for the index buffer
 	template < Device dev >
 	void reserve_index_buffer(std::size_t capacity);
+	// Rebuilds the index buffer from scratch
+	void rebuild_index_buffer();
 	// Synchronizes two device index buffers
 	template < Device changed, Device sync >
 	void synchronize_index_buffer();

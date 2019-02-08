@@ -14,6 +14,7 @@ bool Lod::is_emissive(const Scenario& scenario) const noexcept {
 }
 
 void Lod::clear_accel_structure() {
+	m_accelStruct.mark_invalid();
 	/*m_accelStruct[get_device_index<Device::CPU>()].type = accel_struct::AccelType::NONE;
 	m_accelStruct[get_device_index<Device::CUDA>()].type = accel_struct::AccelType::NONE;*/
 	// TODO memory

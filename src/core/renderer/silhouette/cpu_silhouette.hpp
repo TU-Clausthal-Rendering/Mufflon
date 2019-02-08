@@ -51,6 +51,10 @@ private:
 	// Data buffer for vertex offset per instance for quick lookup
 	unique_device_ptr<Device::CPU, u32[]> m_vertexOffsets;
 	u32 m_vertexCount = 0;
+
+	// Superfluous
+	bool m_gotImportance = false;
+	float m_maxImportance;
 };
 
 } // namespace mufflon::renderer
