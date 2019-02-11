@@ -286,6 +286,7 @@ public:
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
+		this->synchronize<dev>(hdl);
 		// Mark both the specific attribute flags and the flags that indicate a change is present
 		m_attributes[hdl.index].dirty.mark_changed(dev);
 		m_dirty.mark_changed(dev);

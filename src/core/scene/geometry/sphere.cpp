@@ -22,9 +22,9 @@ Spheres::Spheres() :
 }
 
 Spheres::Spheres(const Spheres& sphere) :
-	m_attributes(),
-	m_spheresHdl(m_attributes.add_attribute<ei::Sphere>("spheres")),
-	m_matIndicesHdl(m_attributes.add_attribute<MaterialIndex>("materialIdx")),
+	m_attributes(sphere.m_attributes),
+	m_spheresHdl(sphere.m_spheresHdl),
+	m_matIndicesHdl(sphere.m_matIndicesHdl),
 	m_boundingBox(sphere.m_boundingBox)
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {

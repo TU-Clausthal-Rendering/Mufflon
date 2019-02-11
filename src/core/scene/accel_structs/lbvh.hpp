@@ -47,7 +47,7 @@ public:
 		m_bvhNodes.resize(lbvh.m_bvhNodes.size());
 
 		const char* primMem = lbvh.m_primIds.template acquire_const<Device::CPU>();
-		const char* bvhMem = lbvh.m_primIds.template acquire_const<Device::CPU>();
+		const char* bvhMem = lbvh.m_bvhNodes.template acquire_const<Device::CPU>();
 		if(lbvh.m_primIds.size() != 0u && primMem != nullptr) {
 			copy(m_primIds.template acquire<Device::CPU>(), primMem, lbvh.m_primIds.size());
 		}
