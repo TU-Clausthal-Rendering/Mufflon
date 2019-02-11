@@ -13,6 +13,11 @@
               ItemsSource="{Binding Renderer.RendererProperties, UpdateSourceTrigger=PropertyChanged}"
               AutoGenerateColumns="False"
               CanUserAddRows="False"
+              CanUserDeleteRows="False"
+              CanUserReorderColumns="False"
+              CanUserResizeColumns="True"
+              CanUserResizeRows="False"
+              CanUserSortColumns="False"
               RowHeaderWidth="0"
               Width="Auto">
         <DataGrid.Resources>
