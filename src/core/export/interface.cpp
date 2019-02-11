@@ -319,7 +319,6 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 			if(format >= TextureFormat::FORMAT_NUM)
 				(void)core_get_target_format(index, &format);
 			s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
-			textures::ConstTextureDevHandle_t<Device::CPU> texPtr = s_imageOutput->get_data(targetFlags);
 			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
 		} else {
 			*ptr = nullptr;
@@ -2686,8 +2685,10 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	// TODO: this is just for debugging! This should be done by an image library
 
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
-	scene::textures::ConstTextureDevHandle_t<Device::CPU> data = s_imageOutput->get_data(renderer::OutputValue{ flags });
-	const int numChannels = textures::NUM_CHANNELS(data->get_format());
+	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags },
+										renderer::OutputHandler::get_target_format(renderer::OutputValue{ flags }),
+										false);
+	const int numChannels = textures::NUM_CHANNELS(data.get_format());
 	if(numChannels == 1)
 		file.write("Pf\n", 3);
 	else
@@ -2697,9 +2698,9 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	file.write(sizes.c_str(), sizes.length());
 	file.write("\n-1.000000\n", 11);
 
-	const auto pixels = reinterpret_cast<const char *>(data->data());
-	if(data->get_format() == textures::Format::R32F || data->get_format() == textures::Format::RG32F
-	   || data->get_format() == textures::Format::RGBA32F) {
+	const auto pixels = reinterpret_cast<const char *>(data.data());
+	if(data.get_format() == textures::Format::R32F || data.get_format() == textures::Format::RG32F
+	   || data.get_format() == textures::Format::RGBA32F) {
 		for(int y = 0; y < res.y; ++y) {
 			for(int x = 0; x < res.x; ++x) {
 				switch(numChannels) {

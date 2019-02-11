@@ -144,19 +144,6 @@ scene::textures::Format OutputHandler::get_target_format(OutputValue which) {
 	}
 }
 
-scene::textures::ConstTextureDevHandle_t<Device::CPU> OutputHandler::get_data(OutputValue which) {
-	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
-		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return nullptr;
-	}
-	const int quantity = which.is_variance() ? ei::ilog2(which >> 8) : ei::ilog2(int(which));
-
-	// Upload to CPU / synchronize if necessary
-	return which.is_variance() ?
-		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
-		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
-}
-
 CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool exportSRgb) {
 	// Is the current flag, and in case of variance its basic value, set?
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {

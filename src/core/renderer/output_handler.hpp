@@ -164,9 +164,6 @@ public:
 	// exportSRgb: Convert the values from linear to sRGB before packing the data into the exportFormat.
 	scene::textures::CpuTexture get_data(OutputValue which, scene::textures::Format exportFormat, bool exportSRgb);
 
-	// Get the actual texture data (read only) without converting to another format
-	scene::textures::ConstTextureDevHandle_t<Device::CPU> get_data(OutputValue which);
-
 	int get_current_iteration() const noexcept { return m_iteration; }
 
 	int get_width() const { return m_width; }
