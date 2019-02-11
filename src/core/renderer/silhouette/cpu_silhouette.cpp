@@ -266,6 +266,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 
 			if(inLight) {
 				constexpr float DIST_EPSILON = 0.001f;
+				const float VERTEX_DIST_EPSILON = 0.0000001f;
 
 				const ei::Ray shadowRay{ lightCenter, fromLight };
 
@@ -301,7 +302,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 								const i32 idx1 = obj.polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
 								const ei::Vec3& p0 = obj.polygon.vertices[idx0];
 								const ei::Vec3& p1 = obj.polygon.vertices[idx1];
-								if(ei::lensq(p0 - p1) < DIST_EPSILON) {
+								if(idx0 == idx1 || ei::lensq(p0 - p1) < VERTEX_DIST_EPSILON) {
 									edgeIdxFirst[sharedVertices] = idx0;
 									edgeIdxSecond[sharedVertices] = idx1;
 									++sharedVertices;
