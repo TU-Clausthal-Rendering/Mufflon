@@ -58,7 +58,7 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 
 		// Query how many vertices there are
 		// TODO: how to deal with instancing
-		if(!m_gotImportance) {
+		if(!m_params.keepImportance || !m_gotImportance) {
 			m_vertexCount = 0u;
 			m_vertexOffsets = make_udevptr_array<Device::CPU, u32>(m_sceneDesc.numInstances);
 			for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
@@ -133,6 +133,8 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 						}
 					}
 				}
+
+				m_gotImportance = true;
 
 				// We need to re-build the scene
 				m_currentScene->clear_accel_structure();

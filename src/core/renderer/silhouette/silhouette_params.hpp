@@ -60,8 +60,15 @@ struct PMaxNormalDeviation {
 	}
 };
 
+struct PKeepImportance {
+	bool keepImportance{ false };
+	static ParamDesc get_desc() noexcept {
+		return { "Keep importance across resets", ParameterTypes::BOOL};
+	}
+};
+
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PTargetReduction, PVertexThreshold,
 	PMaxNormalDeviation, PEnableDirectImportance, PEnableSilhouetteImportance, PDecimationEnabled,
-	PShowSilhouette, PMaxPathLength>;
+	PKeepImportance, PShowSilhouette, PMaxPathLength>;
 
 }} // namespace mufflon::renderer
