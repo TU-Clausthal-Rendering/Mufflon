@@ -36,8 +36,8 @@ Polygons::Polygons() :
 
 Polygons::Polygons(const Polygons& poly) :
 	m_meshData(std::make_unique<PolygonMeshType>(*poly.m_meshData)),
-	m_vertexAttributes(*poly.m_meshData),
-	m_faceAttributes(*poly.m_meshData),
+	m_vertexAttributes(*m_meshData),
+	m_faceAttributes(*m_meshData),
 	m_pointsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec3f>(m_meshData->points_pph())),
 	m_normalsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec3f>(m_meshData->vertex_normals_pph())),
 	m_uvsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec2f>(m_meshData->vertex_texcoords2D_pph())),
