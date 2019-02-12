@@ -393,6 +393,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	create_light_tree(dirLightOffsets, m_treeCpu->dirLights, scale);
 	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale);
 	fill_map(posLights, m_treeCpu->primToNodePath);
+	m_primToNodePath.mark_changed(Device::CPU);
 	m_dirty.mark_changed(Device::CPU);
 
 	m_lightCount = static_cast<u32>(posLights.size() + dirLights.size());

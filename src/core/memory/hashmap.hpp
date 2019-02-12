@@ -124,14 +124,12 @@ private:
 
 template < typename K, typename V >
 class HashMap<Device::CUDA, K, V> {
-	HashMap(u32 dataCapacity, u32 mapSize, char* map, char* data, std::atomic_uint32_t*) :
+	HashMap(u32 dataCapacity, u32 mapSize, char* map, char* data, std::atomic_uint32_t* counter) :
 		m_data(as<std::pair<K,V>>(data)),
 		m_map(as<u32>(map)),
 		m_mapSize(mapSize),
-		m_dataCount(0)
-	{
-		cuda::check_error(cudaMemset(m_map, ~0u, sizeof(u32) * m_mapSize));
-	}
+		m_dataCount(*counter)
+	{}
 public:
 	HashMap() : m_data(nullptr), m_map(nullptr), m_mapSize(0), m_dataCount(0) {}
 	HashMap(const HashMap&) = default;
@@ -141,7 +139,6 @@ public:
 	// See CPU implementation for documentation
 
 	__device__ void insert(K key, V value) {
-#ifdef __CUDACC__
 		u32 hash = generic_hash(key);
 		u32 dataIdx = atomicInc(&m_dataCount, 0);
 		m_data[dataIdx].first = key;
@@ -152,7 +149,6 @@ public:
 			++step;
 			idx = (idx + step * step) % m_mapSize;
 		}
-#endif // __CUDACC__
 	}
 
 	__device__ V* find(K key) {
