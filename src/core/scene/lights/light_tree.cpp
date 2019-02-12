@@ -345,6 +345,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	std::size_t treeMemSize = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
 		+ dirLightOffsets.mem_size() + posLightOffsets.mem_size();
 	m_treeMemory.resize(treeMemSize);
+	m_treeMemory.mark_changed(Device::CPU);
 	char* memory = m_treeMemory.acquire<Device::CPU>();
 	// Set up the node pointers
 	m_treeCpu->dirLights.memory = memory;
@@ -455,7 +456,7 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 
 		// Equalize bookkeeping of subtrees
 		m_treeCuda->dirLights = m_treeCpu->dirLights;
-		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA>(false);
+		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA>();
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
