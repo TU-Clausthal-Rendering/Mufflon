@@ -41,7 +41,7 @@ enum class Materials: u16 {
 
 // Base definition of material descriptors.
 // Each implementation of a material adds some additional information to this descriptor.
-struct MaterialDescriptorBase {
+struct alignas(8) MaterialDescriptorBase {
 	Materials type;
 	MaterialPropertyFlags flags;
 	MediumHandle innerMedium;

@@ -45,7 +45,7 @@ char* Material<M>::get_descriptor(Device device, char* outBuffer) const {
 			tex[i] = m_textures[i]->acquire_const<dev>();
 		char* subParams = as<char>(desc + 1) + sizeof(textures::ConstTextureDevHandle_t<dev>) * int(SubMaterial::TEX_COUNT);
 		*as<SubMaterial::NonTexParams>(subParams) = m_material.nonTexParams;
-		return subParams + sizeof(SubMaterial::NonTexParams);
+		return subParams + (std::is_empty<SubMaterial::NonTexParams>::value ? 0 : sizeof(SubMaterial::NonTexParams));
 	);
 	return as<char>(desc + 1);
 }

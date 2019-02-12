@@ -305,7 +305,7 @@ public:
 
 	// Get the address of the interaction specific descriptor (aligned)
 	// TODO: benchmark if internal alignment is worth it
-	CUDA_FUNCTION const void* desc() const { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+	CUDA_FUNCTION const void* desc() const { return as<u8>(this) + round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)); }
 
 	/*
 	* Compute the connection vector from path0 to path1 (non-normalized).
@@ -402,7 +402,7 @@ public:
 		vert->m_incident = incidentRay.direction;
 		vert->m_incidentPdf = AreaPdf { 0.0f };
 		vert->m_extension = ExtensionT{};
-		return round_to_align( sizeof(PathVertex) );
+		return round_to_align<VERTEX_ALIGNMENT>( sizeof(PathVertex) );
 	}
 
 	CUDA_FUNCTION static int create_camera(void* mem, const void* previous,
@@ -424,7 +424,7 @@ public:
 			auto position = pinholecam_sample_position(*desc, pixel, rndSet);
 			vert->m_position = position.position;
 			vert->m_incidentPdf = position.pdf;
-			return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
+			return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
 		}
 		else if(camera.type == cameras::CameraModel::FOCUS) {
 			vert->m_type = Interaction::CAMERA_FOCUS;
@@ -433,7 +433,7 @@ public:
 			auto position = focuscam_sample_position(*desc, rndSet);
 			vert->m_position = position.position;
 			vert->m_incidentPdf = position.pdf;
-			return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(cameras::FocusParams));
+			return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(cameras::FocusParams));
 		}
 		mAssertMsg(false, "Not implemented yet.");
 		return 0;
@@ -452,7 +452,7 @@ public:
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
-				return round_to_align(sizeof(PathVertex));
+				return round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex));
 			}
 			case scene::lights::LightType::SPOT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_SPOT;
@@ -460,7 +460,7 @@ public:
 				desc->direction = lightSample.source_param.spot.direction;
 				desc->cosThetaMax = lightSample.source_param.spot.cosThetaMax;
 				desc->cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
-				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(SpotLightDesc));
+				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(SpotLightDesc));
 			}
 			case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
 			case scene::lights::LightType::AREA_LIGHT_QUAD:
@@ -468,7 +468,7 @@ public:
 				vert->m_type = Interaction::LIGHT_AREA;
 				AreaLightDesc* desc = as<AreaLightDesc>(vert->desc());
 				desc->normal = lightSample.source_param.area.normal;
-				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(AreaLightDesc));
+				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(AreaLightDesc));
 			}
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
 				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
@@ -480,7 +480,7 @@ public:
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
 				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->m_incidentPdf = lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
-				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(DirLightDesc));
+				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(DirLightDesc));
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
 				vert->m_type = Interaction::LIGHT_ENVMAP;
@@ -488,7 +488,7 @@ public:
 				desc->direction = lightSample.source_param.dir.direction;
 				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->m_incidentPdf = lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
-				return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(DirLightDesc));
+				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(DirLightDesc));
 			}
 		}
 	}
@@ -512,7 +512,7 @@ public:
 		desc->primitiveId = hit.hitId;
 		desc->surfaceParams = hit.surfaceParams.st;
 		int size = scene::materials::fetch(material, hit.uv, &desc->params);
-		return round_to_align( round_to_align(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization) + size);
+		return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization) + size);
 	}
 
 private:
@@ -568,12 +568,8 @@ private:
 	// REMARK: currently 0 floats unused in 16-byte alignment
 	ExtensionT m_extension;
 
-	CUDA_FUNCTION static constexpr int round_to_align(int s) {
-		return (s + (VERTEX_ALIGNMENT-1)) & ~(VERTEX_ALIGNMENT-1);
-	}
-
 	// Private because the vertex is read-only by design (desc() is a helper for vertex creation only)
-	CUDA_FUNCTION void* desc() { return as<u8>(this) + round_to_align(sizeof(PathVertex)); }
+	CUDA_FUNCTION void* desc() { return as<u8>(this) + round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)); }
 
 	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
 		std::size_t s = as<u8>(previous) - as<u8>(mem);

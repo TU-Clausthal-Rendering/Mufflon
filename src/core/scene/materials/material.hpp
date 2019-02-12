@@ -2,6 +2,7 @@
 
 #include "util/types.hpp"
 #include "util/flag.hpp"
+#include "core/memory/dyntype_memory.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/handles.hpp"
@@ -124,8 +125,10 @@ public:
 	static constexpr std::size_t _get_descriptor_size(Device device) {
 		size_t texDescSize = device == Device::CPU ? sizeof(textures::ConstTextureDevHandle_t<Device::CPU>)
 												   : sizeof(textures::ConstTextureDevHandle_t<Device::CUDA>);
-		return sizeof(MaterialDescriptorBase) + sizeof(SubMaterial::NonTexParams)
-			+ int(SubMaterial::Textures::TEX_COUNT) * texDescSize;
+		const auto descSize = sizeof(MaterialDescriptorBase) + int(SubMaterial::Textures::TEX_COUNT) * texDescSize
+			+ (std::is_empty<SubMaterial::NonTexParams>::value ? 0 : sizeof(SubMaterial::NonTexParams));
+		// The descriptor size needs to be aligned at 8 bytes for the textures
+		return round_to_align<8u>(descSize);
 	}
 	std::size_t get_descriptor_size(Device device) const final { return _get_descriptor_size(device); }
 	std::size_t get_parameter_pack_size() const final;

@@ -35,4 +35,11 @@ CUDA_FUNCTION const TTarget* as(const T* t) {
 	return reinterpret_cast<const TTarget*>(t);
 }
 
+// Aligns up a given value (only for alignments of power of two)
+template < std::size_t ALIGNMENT, class T >
+CUDA_FUNCTION constexpr T round_to_align(T s) {
+	static_assert(!(ALIGNMENT & (ALIGNMENT - 1)), "Alignment only works for powers of 2");
+	return (s + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+}
+
 } // namespace mufflon
