@@ -45,7 +45,8 @@ Polygons::Polygons(const Polygons& poly) :
 	m_indexFlags(poly.m_indexFlags),
 	m_boundingBox(poly.m_boundingBox),
 	m_triangles(poly.m_triangles),
-	m_quads(poly.m_quads)
+	m_quads(poly.m_quads),
+	m_uniqueMaterials(poly.m_uniqueMaterials)
 {
 	m_vertexAttributes.copy(poly.m_vertexAttributes);
 	m_faceAttributes.copy(poly.m_faceAttributes);
@@ -92,7 +93,9 @@ Polygons::Polygons(Polygons&& poly) :
 	m_indexFlags(std::move(poly.m_indexFlags)),
 	m_boundingBox(std::move(poly.m_boundingBox)),
 	m_triangles(poly.m_triangles),
-	m_quads(poly.m_quads) {
+	m_quads(poly.m_quads),
+	m_uniqueMaterials(std::move(poly.m_uniqueMaterials))
+{
 	// Move the index and attribute buffers
 	poly.m_indexBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;

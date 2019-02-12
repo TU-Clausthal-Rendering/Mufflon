@@ -25,7 +25,8 @@ Spheres::Spheres(const Spheres& sphere) :
 	m_attributes(sphere.m_attributes),
 	m_spheresHdl(sphere.m_spheresHdl),
 	m_matIndicesHdl(sphere.m_matIndicesHdl),
-	m_boundingBox(sphere.m_boundingBox)
+	m_boundingBox(sphere.m_boundingBox),
+	m_uniqueMaterials(sphere.m_uniqueMaterials)
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -44,7 +45,8 @@ Spheres::Spheres(Spheres&& sphere) :
 	m_attributes(std::move(sphere.m_attributes)),
 	m_spheresHdl(std::move(sphere.m_spheresHdl)),
 	m_matIndicesHdl(std::move(sphere.m_matIndicesHdl)),
-	m_boundingBox(std::move(sphere.m_boundingBox))
+	m_boundingBox(std::move(sphere.m_boundingBox)),
+	m_uniqueMaterials(std::move(sphere.m_uniqueMaterials))
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
