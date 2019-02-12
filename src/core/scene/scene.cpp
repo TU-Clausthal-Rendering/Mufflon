@@ -259,12 +259,10 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	if(geometryChanged) {
 		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 		m_accelStruct.build(sceneDescriptor);
-		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
 		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
 		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
-	} else {
-		m_accelStruct.synchronize<dev>();
 	}
+	sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
 
 	// Camera doesn't get a media-changed flag because it's relatively cheap to determine?
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
