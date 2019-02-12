@@ -9,6 +9,7 @@
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <sstream>
+#include "util/assert.hpp"
 
 namespace mff_loader::exprt {
 
@@ -24,7 +25,7 @@ std::string read_file(fs::path path) {
 
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
-	if (file.gcount() != fileSize)
+	if(file.gcount() != fileSize)
 		mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
@@ -38,16 +39,16 @@ public:
 	{}
 	bool Double(double d) { Prefix(rapidjson::kNumberType); return EndValue(WriteDouble(d)); }
 	bool WriteDouble(double d) {
-		if (rapidjson::internal::Double(d).IsNanOrInf()) {
+		if(rapidjson::internal::Double(d).IsNanOrInf()) {
 			// Note: This code path can only be reached if (RAPIDJSON_WRITE_DEFAULT_FLAGS & kWriteNanAndInfFlag).
-			if (!(rapidjson::kWriteDefaultFlags & rapidjson::kWriteNanAndInfFlag))
+			if(!(rapidjson::kWriteDefaultFlags & rapidjson::kWriteNanAndInfFlag))
 				return false;
-			if (rapidjson::internal::Double(d).IsNan()) {
+			if(rapidjson::internal::Double(d).IsNan()) {
 				PutReserve(*os_, 3);
 				PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
 				return true;
 			}
-			if (rapidjson::internal::Double(d).Sign()) {
+			if(rapidjson::internal::Double(d).Sign()) {
 				PutReserve(*os_, 9);
 				PutUnsafe(*os_, '-');
 			}
@@ -79,13 +80,11 @@ public:
 };
 }
 
-bool SceneExporter::save_scene() const
-{
+bool SceneExporter::save_scene() const {
 	rapidjson::Document document;
 	document.SetObject();
 
-	if(fs::is_regular_file(m_fileDestinationPath))
-	{
+	if(fs::is_regular_file(m_fileDestinationPath)) {
 		std::string oldJson = read_file(m_fileDestinationPath);
 		//document.Parse(oldJson.c_str());
 		// TODO Load oldJson 
@@ -97,11 +96,11 @@ bool SceneExporter::save_scene() const
 	// JSON
 	if(!save_cameras(document))
 		return false;
-	if (!save_lights(document))
+	if(!save_lights(document))
 		return false;
-	if (!save_materials(document))
+	if(!save_materials(document))
 		return false;
-	if (!save_scenarios(document))
+	if(!save_scenarios(document))
 		return false;
 
 	rapidjson::StringBuffer strbuf;
@@ -117,53 +116,50 @@ bool SceneExporter::save_scene() const
 
 	ofs.close();
 
-
 	// Binary
-
 
 	return true;
 }
 
-bool SceneExporter::save_cameras(rapidjson::Document& document) const
-{
+bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 	rapidjson::Value cameras;
 	cameras.SetObject();
 	size_t cameraCount = world_get_camera_count();
 
-	for (size_t i = 0; i < cameraCount; i++)
-	{
+	for(size_t i = 0; i < cameraCount; i++) {
 		rapidjson::Value camera;
 		camera.SetObject();
 		CameraHdl cameraHandle = world_get_camera_by_index(i);
 		CameraType cameraType = world_get_camera_type(cameraHandle);
 
-		switch (cameraType)
-		{
-		case CAM_PINHOLE:
-			camera.AddMember("type", "pinhole", document.GetAllocator());
-			float vFov;
-			world_get_pinhole_camera_fov(cameraHandle, &vFov);
-			vFov = static_cast<float>(mufflon::Degrees(mufflon::Radians(vFov))); // Convert Radian to Degree
-			camera.AddMember("fov", vFov, document.GetAllocator());
-			break;
-		case CAM_FOCUS:
-			camera.AddMember("type", "focus", document.GetAllocator());
-			float focalLength;
-			world_get_focus_camera_focal_length(cameraHandle, &focalLength);
-			camera.AddMember("focalLength", focalLength, document.GetAllocator());
-			float chipHeight;
-			world_get_focus_camera_sensor_height(cameraHandle, &chipHeight);
-			camera.AddMember("chipHeight", chipHeight, document.GetAllocator());
-			float focusDistance;
-			world_get_focus_camera_focus_distance(cameraHandle, &focusDistance);
-			camera.AddMember("focusDistance", focusDistance, document.GetAllocator());
-			float aperture;
-			world_get_focus_camera_aperture(cameraHandle, &aperture);
-			camera.AddMember("focalLength", aperture, document.GetAllocator());
-			break;
+		switch(cameraType) {
+		case CAM_PINHOLE: {
+				camera.AddMember("type", "pinhole", document.GetAllocator());
+				float vFov;
+				world_get_pinhole_camera_fov(cameraHandle, &vFov);
+				vFov = static_cast<float>(mufflon::Degrees(mufflon::Radians(vFov))); // Convert Radian to Degree
+				camera.AddMember("fov", vFov, document.GetAllocator());
+				break;
+			}
+		case CAM_FOCUS: {
+				camera.AddMember("type", "focus", document.GetAllocator());
+				float focalLength;
+				world_get_focus_camera_focal_length(cameraHandle, &focalLength);
+				camera.AddMember("focalLength", focalLength, document.GetAllocator());
+				float chipHeight;
+				world_get_focus_camera_sensor_height(cameraHandle, &chipHeight);
+				camera.AddMember("chipHeight", chipHeight, document.GetAllocator());
+				float focusDistance;
+				world_get_focus_camera_focus_distance(cameraHandle, &focusDistance);
+				camera.AddMember("focusDistance", focusDistance, document.GetAllocator());
+				float aperture;
+				world_get_focus_camera_aperture(cameraHandle, &aperture);
+				camera.AddMember("focalLength", aperture, document.GetAllocator());
+				break;
+			}
 			// TODO ORTHO (not implemented yet)
 		default:
-			assert(false);
+			mAssert(false);
 			// TODO Exception?
 			break;
 		}
@@ -199,15 +195,13 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const
 	return true;
 }
 
-bool SceneExporter::save_lights(rapidjson::Document& document) const
-{
+bool SceneExporter::save_lights(rapidjson::Document& document) const {
 	rapidjson::Value lights;
 	lights.SetObject();
 
 	size_t pointLightCount = world_get_point_light_count();
 
-	for (size_t i = 0; i < pointLightCount; i++)
-	{
+	for(size_t i = 0; i < pointLightCount; i++) {
 		rapidjson::Value light;
 		light.SetObject();
 
@@ -232,8 +226,7 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 	size_t dirLightCount = world_get_dir_light_count();
 
-	for (size_t i = 0; i < dirLightCount; i++)
-	{
+	for(size_t i = 0; i < dirLightCount; i++) {
 		rapidjson::Value light;
 		light.SetObject();
 
@@ -258,8 +251,7 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 	size_t spotLightCount = world_get_spot_light_count();
 
-	for (size_t i = 0; i < spotLightCount; i++)
-	{
+	for(size_t i = 0; i < spotLightCount; i++) {
 		rapidjson::Value light;
 		light.SetObject();
 
@@ -296,8 +288,7 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 
 	size_t envLightCount = world_get_env_light_count();
 
-	for (size_t i = 0; i < envLightCount; i++)
-	{
+	for(size_t i = 0; i < envLightCount; i++) {
 		rapidjson::Value light;
 		light.SetObject();
 
@@ -325,15 +316,13 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const
 	return true;
 }
 
-bool SceneExporter::save_materials(rapidjson::Document& document) const
-{
+bool SceneExporter::save_materials(rapidjson::Document& document) const {
 	rapidjson::Value materials;
 	materials.SetObject();
 	size_t materialCount = world_get_material_count();
 
 	std::vector<std::byte> buffer;
-	for (size_t i = 0; i < materialCount; i++)
-	{
+	for(size_t i = 0; i < materialCount; i++) {
 		MaterialHdl materialHandle = world_get_material(IndexType(i));
 
 		buffer.resize(world_get_material_size(materialHandle));
@@ -352,18 +341,15 @@ bool SceneExporter::save_materials(rapidjson::Document& document) const
 	return true;
 }
 
-rapidjson::Value SceneExporter::save_material(const MaterialParams& materialParams, rapidjson::Document& document) const
-{
+rapidjson::Value SceneExporter::save_material(const MaterialParams& materialParams, rapidjson::Document& document) const {
 	MaterialParamType matType = materialParams.innerType;
 
 	rapidjson::Value material;
 	material.SetObject();
 
 
-	switch (matType)
-	{
-	case (MaterialParamType::MATERIAL_BLEND):
-		{
+	switch (matType) {
+	case MATERIAL_BLEND: {
 			material.AddMember("type", "blend", document.GetAllocator());
 			material.AddMember("layerA", save_material(*materialParams.inner.blend.a.mat, document), document.GetAllocator());
 			material.AddMember("layerB", save_material(*materialParams.inner.blend.b.mat, document), document.GetAllocator());
@@ -371,39 +357,34 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 			material.AddMember("factorB", materialParams.inner.blend.b.factor, document.GetAllocator());
 			break;
 		}
-	case (MaterialParamType::MATERIAL_EMISSIVE):
-		{
+	case MATERIAL_EMISSIVE: {
 			material.AddMember("type", "emissive", document.GetAllocator());
 			TextureHdl radianceTextureHandle = materialParams.inner.emissive.radiance;
 			add_member_from_texture_handle(radianceTextureHandle, "radiance", material, document);
 			material.AddMember("scale", store_in_array(materialParams.inner.emissive.scale, document), document.GetAllocator());
 			break;
 		}
-	case(MATERIAL_FRESNEL):
-		{
+	case MATERIAL_FRESNEL: {
 			material.AddMember("type", "fresnel", document.GetAllocator());
 			material.AddMember("layerReflection", save_material(*materialParams.inner.fresnel.a, document), document.GetAllocator());
 			material.AddMember("layerRefraction", save_material(*materialParams.inner.fresnel.b, document), document.GetAllocator());
 			material.AddMember("refractionIndex", store_in_array(materialParams.inner.fresnel.refractionIndex, document), document.GetAllocator());
 			break;
 		}
-	case(MATERIAL_LAMBERT):
-		{
+	case MATERIAL_LAMBERT: {
 			material.AddMember("type", "lambert", document.GetAllocator());
 			TextureHdl albedoTextureHandle = materialParams.inner.lambert.albedo;
 			add_member_from_texture_handle(albedoTextureHandle, "albedo", material, document);
 			break;
 		}
-	case(MATERIAL_ORENNAYAR):
-		{
+	case MATERIAL_ORENNAYAR: {
 			material.AddMember("type", "orennayar", document.GetAllocator());
 			TextureHdl albedoTextureHandle = materialParams.inner.orennayar.albedo;
 			add_member_from_texture_handle(albedoTextureHandle, "albedo", material, document);
 			material.AddMember("roughness", materialParams.inner.orennayar.roughness, document.GetAllocator());
 			break;
 		}
-	case(MATERIAL_TORRANCE):
-		{
+	case MATERIAL_TORRANCE: {
 			material.AddMember("type", "torrance", document.GetAllocator());
 			TextureHdl roughnessTextureHandle = materialParams.inner.torrance.roughness;
 			add_member_from_texture_handle(roughnessTextureHandle, "roughness", material, document);
@@ -413,8 +394,7 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 			material.AddMember("albedo", "C++ Scene Exporter: Not implemented yet :(", document.GetAllocator());
 			break;
 		}
-	case(MATERIAL_WALTER):
-		{
+	case MATERIAL_WALTER: {
 			material.AddMember("type", "walter", document.GetAllocator());
 			TextureHdl roughnessTextureHandle = materialParams.inner.walter.roughness;
 			add_member_from_texture_handle(roughnessTextureHandle, "roughness", material, document);
@@ -424,7 +404,7 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 			break;
 		}
 	default:
-		assert(false);
+		mAssert(false);
 		// TODO Exception?
 		break;
 	}
@@ -432,13 +412,11 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 	return material;
 }
 
-	bool SceneExporter::save_scenarios(rapidjson::Document& document) const
-{
+	bool SceneExporter::save_scenarios(rapidjson::Document& document) const {
 	rapidjson::Value scenarios;
 	scenarios.SetObject();
 	size_t scenarioCount = world_get_scenario_count();
-	for (size_t i = 0; i < scenarioCount; i++)
-	{
+	for(size_t i = 0; i < scenarioCount; i++) {
 		rapidjson::Value scenario;
 		scenario.SetObject();
 		ScenarioHdl scenarioHandle = world_get_scenario_by_index(uint32_t(i));
@@ -459,30 +437,26 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 
 		rapidjson::Value lights;
 		lights.SetArray();
-		if (scenario_has_envmap_light(scenarioHandle))
-		{
+		if(scenario_has_envmap_light(scenarioHandle)) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, 0, LIGHT_ENVMAP);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
 		}
 		size_t pointLightCount = scenario_get_point_light_count(scenarioHandle);
 
-		for (size_t j = 0; j < pointLightCount; j++)
-		{
+		for(size_t j = 0; j < pointLightCount; j++) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, IndexType(j), LIGHT_POINT);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
 		}
 
 		size_t dirLightCount = scenario_get_dir_light_count(scenarioHandle);
 
-		for (size_t j = 0; j < dirLightCount; j++)
-		{
+		for(size_t j = 0; j < dirLightCount; j++) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, IndexType(j), LIGHT_DIRECTIONAL);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
 		}
 		size_t spotLightCount = scenario_get_spot_light_count(scenarioHandle);
 
-		for (size_t j = 0; j < spotLightCount; j++)
-		{
+		for (size_t j = 0; j < spotLightCount; j++) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, IndexType(j), LIGHT_SPOT);
 			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
 		}
@@ -498,8 +472,7 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 		materialAssignments.SetObject();
 
 		size_t materialSlotCount = scenario_get_material_slot_count(scenarioHandle);
-		for(size_t j = 0; j < materialSlotCount; j++)
-		{
+		for(size_t j = 0; j < materialSlotCount; j++) {
 			const char* materialSlotName = scenario_get_material_slot_name(scenarioHandle, MatIdx(j));
 			MaterialHdl materialHandle = scenario_get_assigned_material(scenarioHandle, MatIdx(j));
 			const char* materialName = world_get_material_name(materialHandle);
@@ -531,12 +504,10 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 }
 
 bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl, const std::string& memberName, rapidjson::Value& saveIn,
-	rapidjson::Document& document) const
-{
+	rapidjson::Document& document) const {
 	if (textureHdl == nullptr)
 		return false;
-	try
-	{
+	try	{
 		std::string textureName = world_get_texture_name(textureHdl);
 		rapidjson::Value textureNameRj;
 		textureNameRj.SetString(textureName.c_str(), rapidjson::SizeType(textureName.length()), document.GetAllocator());
@@ -549,24 +520,18 @@ bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl,
 		name.SetString(memberName.c_str(), rapidjson::SizeType(memberName.length()), document.GetAllocator());
 
 		if (texSize.x == 1 && texSize.y == 1)
-		{
 			saveIn.AddMember(name, store_in_array_from_float_string(textureName, document), document.GetAllocator());
-		}
 		else
-		{
 			saveIn.AddMember(name, textureNameRj, document.GetAllocator());
-		}
 	}
-	catch(std::ios_base::failure&)
-	{
+	catch(std::ios_base::failure&) {
 		return false;
 	}
 	return true;
 }
 
 
-	rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& document) const
-{
+	rapidjson::Value SceneExporter::store_in_array(Vec3 value, rapidjson::Document& document) const {
 	rapidjson::Value out;
 	out.SetArray();
 	out.PushBack(value.x, document.GetAllocator());
@@ -577,8 +542,7 @@ bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl,
 }
 
 template<typename T>
-rapidjson::Value SceneExporter::store_in_array(std::vector<T> value, rapidjson::Document& document) const
-{
+rapidjson::Value SceneExporter::store_in_array(std::vector<T> value, rapidjson::Document& document) const {
 	rapidjson::Value out;
 	out.SetArray();
 	for (auto& v : value)
@@ -586,8 +550,7 @@ rapidjson::Value SceneExporter::store_in_array(std::vector<T> value, rapidjson::
 	return out;
 }
 
-rapidjson::Value SceneExporter::store_in_array(Vec2 value, rapidjson::Document& document) const
-{
+rapidjson::Value SceneExporter::store_in_array(Vec2 value, rapidjson::Document& document) const {
 	rapidjson::Value out;
 	out.SetArray();
 	out.PushBack(value.x, document.GetAllocator());
@@ -595,15 +558,11 @@ rapidjson::Value SceneExporter::store_in_array(Vec2 value, rapidjson::Document& 
 
 	return out;
 }
-rapidjson::Value SceneExporter::store_in_array_from_float_string(std::string floatString, rapidjson::Document & document) const
-{
+rapidjson::Value SceneExporter::store_in_array_from_float_string(std::string floatString, rapidjson::Document & document) const {
 	std::vector<float> values;
 	std::stringstream ss(floatString);
-	int i = 0;
-	try
-	{
-		for (i = 0; i < 4; i++)
-		{
+	try {
+		for (int i = 0; i < 4; i++) {
 			float f;
 			ss >> f;
 			values.push_back(f);
@@ -611,14 +570,12 @@ rapidjson::Value SceneExporter::store_in_array_from_float_string(std::string flo
 				break;
 		}
 	}
-	catch (std::ios_base::failure&)
-	{
+	catch (std::ios_base::failure&) {
 		throw;
 	}
 	return store_in_array(values, document);
 }
-	rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const
-{
+	rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const {
 	fs::path copy = m_fileDestinationPath;
 	rapidjson::Value out;
 	std::string s = fs::relative(path, copy.remove_filename()).string();
