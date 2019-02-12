@@ -26,7 +26,8 @@ public:
 	 */
 	bool load_file(fs::path file, const mufflon::u32 globalLod,
 				   const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-				   const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
+				   const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods,
+				   bool deinstance);
 
 	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
 
@@ -162,6 +163,7 @@ private:
 	bool read_instances(const mufflon::u32 globalLod,
 						const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
 						const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
+	void deinstance();
 	void read_object();
 	void read_lod(const ObjectState& object, mufflon::u32 lod);
 

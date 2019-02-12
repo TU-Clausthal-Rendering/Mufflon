@@ -712,9 +712,12 @@ bool JsonLoader::load_file() {
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
 	}
-
+	bool deinstance = false;
+	if(auto deinstanceIter = get(m_state, document, "deinstance", false); deinstanceIter != document.MemberEnd()) {
+		deinstance = deinstanceIter->value.GetBool();
+	}
 	// Load the binary file before we load the rest of the JSON
-	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods))
+	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods, deinstance))
 		return false;
 
 	try {

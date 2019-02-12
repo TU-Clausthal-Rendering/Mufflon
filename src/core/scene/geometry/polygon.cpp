@@ -464,6 +464,40 @@ void Polygons::create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& deci
 	// TODO: this leaks mesh outside
 }
 
+void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
+	if(this->get_vertex_count() == 0) return;
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max()
+	};
+	// Transform mesh
+	ei::Mat3x3 rotation(transMat);
+	ei::Vec3 translation(transMat[3], transMat[7], transMat[11]);
+	ei::Vec3* vertices = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_pointsHdl);
+	for(size_t i = 0; i < this->get_vertex_count(); i++) {
+		vertices[i] *= scale;
+		vertices[i] = rotation * vertices[i];
+		vertices[i] += translation;
+		m_boundingBox.max = ei::max(vertices[i], m_boundingBox.max);
+		m_boundingBox.min = ei::min(vertices[i], m_boundingBox.min);
+	}
+	m_vertexAttributes.mark_changed(Device::CPU, m_pointsHdl);
+	// Transform normals
+	ei::Vec3* normals = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_normalsHdl);
+	for(size_t i = 0; i < this->get_vertex_count(); i++) { // one normal per vertex
+		normals[i] /= scale;
+		normals[i] = rotation * normals[i];
+	}
+	m_vertexAttributes.mark_changed(Device::CPU, m_normalsHdl);
+}
+
 template < Device dev >
 void Polygons::synchronize() {
 	m_vertexAttributes.synchronize<dev>();

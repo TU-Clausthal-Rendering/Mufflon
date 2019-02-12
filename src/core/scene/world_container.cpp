@@ -99,6 +99,35 @@ ObjectHandle WorldContainer::get_object(const StringView& name) {
 	return nullptr;
 }
 
+ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, std::string newName) {
+	ObjectHandle newHdl = create_object(std::move(newName), hdl->get_flags());
+	newHdl->copy_lods_from(*hdl);
+	return newHdl;
+}
+
+void WorldContainer::apply_transformation(InstanceHandle hdl) {
+	const ei::Mat3x4&  transMat = hdl->get_transformation_matrix();
+	const ei::Vec3& scale = hdl->get_scale();
+	ObjectHandle objectHandle = &hdl->get_object();
+	if(hdl->get_object().get_instance_counter() > 1) {
+		std::string newName(objectHandle->get_name().data());
+		newName.append("###");
+		newName.append(hdl->get_name().data());
+		objectHandle = duplicate_object(objectHandle, std::move(newName));
+		hdl->set_object(*objectHandle);
+	}
+	for(size_t i = 0; i < objectHandle->get_lod_slot_count(); i++) {
+		if(objectHandle->has_lod_available(u32(i))) {
+			Lod& lod = objectHandle->get_lod(u32(i));
+			auto& polygons = lod.get_geometry<geometry::Polygons>();
+			polygons.transform(transMat, scale);
+			auto& spheres = lod.get_geometry<geometry::Spheres>();
+			spheres.transform(transMat, scale);
+		}
+	}
+	hdl->set_transformation_matrix(ei::Mat3x4{ ei::identity4x4() });
+}
+
 InstanceHandle WorldContainer::get_instance(const StringView& name) {
 	auto iter = m_instances.find(name);
 	if(iter != m_instances.end())
@@ -114,6 +143,16 @@ InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle ob
 	auto instance = std::make_unique<Instance>(move(name), *obj);
 	StringView nameRef = instance->get_name();
 	return m_instances.emplace(nameRef, std::move(instance)).first->second.get();
+}
+
+InstanceHandle WorldContainer::get_instance(std::size_t index)
+{
+	mAssert(index < m_instances.size());
+	// TODO: use index string map?
+	auto iter = m_instances.begin();
+	for (std::size_t i = 0; i < index; ++i)
+		++iter;
+	return iter->second.get();
 }
 
 ScenarioHandle WorldContainer::create_scenario(std::string name) {

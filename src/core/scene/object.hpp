@@ -49,7 +49,9 @@ public:
 	void set_flags(ObjectFlags flags) noexcept {
 		m_flags = flags;
 	}
-
+	ObjectFlags get_flags() const noexcept {
+		return m_flags;
+	}
 	// Returns the object's animation frame.
 	u32 get_animation_frame() const noexcept {
 		return m_animationFrame;
@@ -73,6 +75,12 @@ public:
 	// Returns the number of LoD slots
 	std::size_t get_lod_slot_count() const noexcept {
 		return m_lods.size();
+	}
+
+	void copy_lods_from(Object& object) {
+		m_lods.clear();
+		for(auto& lod : object.m_lods)
+			m_lods.emplace_back(std::make_unique<Lod>(*lod));
 	}
 
 	// Adds a new (or overwrites, if already existing) LoD
@@ -101,6 +109,17 @@ public:
 	template < Device dev >
 	void unload();
 
+	void increase_instance_counter() noexcept {
+		m_instanceCounter++;
+		mAssertMsg(m_instanceCounter != 0, "Object instance counter overflow");
+	}
+	void decrease_instance_counter() noexcept {
+		mAssertMsg(m_instanceCounter != 0, "Object instance counter underflow");
+		m_instanceCounter--;
+	}
+	u32 get_instance_counter() const noexcept {
+		return m_instanceCounter;
+	}
 private:
 	StringView m_name;
 	std::vector<std::unique_ptr<Lod>> m_lods;
@@ -109,7 +128,7 @@ private:
 	u32 m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	ObjectFlags m_flags;
 
-	// TODO: how to handle the LoDs?
+	u32 m_instanceCounter = 0;
 };
 
 } // namespace mufflon::scene

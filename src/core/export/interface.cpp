@@ -1166,6 +1166,34 @@ InstanceHdl world_create_instance(const char* name, ObjectHdl obj) {
 	CATCH_ALL(nullptr)
 }
 
+Boolean world_apply_instance_transformation(InstanceHdl inst) {
+	TRY
+	CHECK_NULLPTR(inst, "instance handle", false);
+	s_world.apply_transformation(static_cast<Instance*>(inst));
+	return true;
+	CATCH_ALL(false)
+}
+
+uint32_t world_get_instance_count() {
+	TRY
+	return static_cast<uint32_t>(s_world.get_instance_count());
+	CATCH_ALL(0u)
+}
+
+InstanceHdl world_get_instance_by_index(uint32_t index)
+{
+	TRY
+	const uint32_t MAX_INDEX = static_cast<uint32_t>(s_world.get_instance_count());
+	if (index >= MAX_INDEX) {
+		logError("[", FUNCTION_NAME, "] Instance index '", index, "' out of bounds (",
+			MAX_INDEX, ')');
+		return nullptr;
+	}
+	return s_world.get_instance(index);
+	CATCH_ALL(nullptr)
+}
+
+
 ScenarioHdl world_create_scenario(const char* name) {
 	TRY
 	CHECK_NULLPTR(name, "scenario name", nullptr);

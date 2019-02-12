@@ -45,12 +45,21 @@ public:
 	ObjectHandle create_object(std::string name, ObjectFlags flags);
 	// Finds an object by its name
 	ObjectHandle get_object(const StringView& name);
+	// Duplicates an object returns handle to the new duplicated object
+	ObjectHandle duplicate_object(ObjectHandle hdl, std::string newName);
+	// Applies transformation matrix to the object from the instance.
+	// Changes the object from the handle.
+	void apply_transformation(InstanceHandle hdl);
 	// Find an instance by name (for some objects with only one
 	// instance both names are equal, but do not need to be).
 	// The returned handle is valid over the entire lifetime of the instance.
 	InstanceHandle get_instance(const StringView& name);
 	// Creates a new instance.
 	InstanceHandle create_instance(std::string name, ObjectHandle hdl);
+	// This is for interfacing - get the number of instances and the name of each
+	std::size_t get_instance_count() const noexcept{ return m_instances.size(); };
+	// Gets the instance name - this reference invalidates when new instances are added!
+	InstanceHandle get_instance(std::size_t index);
 	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name

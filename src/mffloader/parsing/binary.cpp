@@ -800,6 +800,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		hasInstance[objId] = true;
 	}
 
+	// Create identity instances for objects not having one yet
 	for(u32 i = 0u; i < static_cast<u32>(hasInstance.size()); ++i) {
 		if(m_abort)
 			return false;
@@ -831,9 +832,17 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			m_aabb = ei::Box(m_aabb, instanceAabb);
 		}
 	}
-
+	
 	return true;
-	// Create identity instances for objects not having one yet
+}
+
+void BinaryLoader::deinstance()
+{
+	const u32 numInstances = world_get_instance_count();
+	for(u32 i = 0u; i < numInstances; ++i) {
+		InstanceHdl hdl = world_get_instance_by_index(i);
+		world_apply_instance_transformation(hdl);
+	}
 }
 
 void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
@@ -904,7 +913,8 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const std::unordered_map<StringView, mufflon::u32>& objectLods,
-							 const std::unordered_map<StringView, mufflon::u32>& instanceLods) {
+							 const std::unordered_map<StringView, mufflon::u32>& instanceLods,
+							 bool deinstance) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
@@ -972,7 +982,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			throw std::runtime_error("Invalid instance magic constant");
 		if(!read_instances(globalLod, objectLods, instanceLods))
 			return false;
-
+		if(deinstance)
+			this->deinstance();
 		this->clear_state();
 	} catch(const std::exception&) {
 		// Clean up before leaving throwing

@@ -54,15 +54,16 @@ public:
 	ei::Box get_bounding_box(u32 lod) const noexcept;
 
 	Object& get_object() noexcept {
-		return m_objRef;
+		return *m_objRef;
 	}
 	const Object& get_object() const noexcept {
-		return m_objRef;
+		return *m_objRef;
 	}
+	void set_object(Object& object) noexcept;
 
 private:
 	std::string m_name;
-	Object& m_objRef;
+	Object* m_objRef;
 	ei::Mat3x4 m_transMat;
 	ei::Vec3 m_scale;
 };

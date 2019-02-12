@@ -505,7 +505,7 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 
 bool SceneExporter::add_member_from_texture_handle(const TextureHdl& textureHdl, const std::string& memberName, rapidjson::Value& saveIn,
 	rapidjson::Document& document) const {
-	if (textureHdl == nullptr)
+	if(textureHdl == nullptr)
 		return false;
 	try	{
 		std::string textureName = world_get_texture_name(textureHdl);

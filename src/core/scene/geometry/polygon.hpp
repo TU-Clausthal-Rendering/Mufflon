@@ -156,7 +156,7 @@ public:
 	~Polygons();
 
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
-
+	
 	template < class T >
 	VertexAttributeHandle add_vertex_attribute(std::string name) {
 		return m_vertexAttributes.add_attribute<T>(std::move(name));
@@ -270,6 +270,9 @@ public:
 	// Implements decimation.
 	void create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 					std::size_t target_vertices);
+
+	// Transforms polygon data
+	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
 
 	// Gets a constant handle to the underlying mesh data.
 	const PolygonMeshType& native() const {

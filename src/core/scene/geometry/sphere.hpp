@@ -139,6 +139,8 @@ public:
 	SphereAttributeHandle get_material_indices_hdl() const noexcept {
 		return m_matIndicesHdl;
 	}
+	// Transforms sphere data
+	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
 
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
