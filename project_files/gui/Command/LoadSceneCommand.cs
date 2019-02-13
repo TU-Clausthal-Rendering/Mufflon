@@ -18,7 +18,6 @@ namespace gui.Command
     {
         private readonly Models m_models;
         private string m_lastDirectory;
-        private KeyBinding m_keyBind;
 
         public LoadSceneCommand(Models models)
         {
@@ -26,9 +25,6 @@ namespace gui.Command
             m_lastDirectory = models.Settings.LastWorldPath;
             if(m_lastDirectory.Length == 0)
                 m_lastDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            // TODO remove this or move it to another place?
-            m_keyBind = new KeyBinding(this, new KeyGesture(Key.O, ModifierKeys.Control));
-            System.Windows.Application.Current.MainWindow.InputBindings.Add(m_keyBind);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
         }

@@ -23,6 +23,7 @@ namespace gui.ViewModel
         private readonly ICommand m_resetCommand;
         private readonly ICommand m_toggleCameraMovementCommand;
         private readonly ICommand m_screenshotCommand;
+        private readonly ICommand m_loadSceneCommand;
 
         public KeyGestureViewModel(Models models)
         {
@@ -31,12 +32,14 @@ namespace gui.ViewModel
             m_playPauseCommand = new PlayPauseCommand(models);
             m_resetCommand = new ResetCommand(models);
             m_screenshotCommand = new ScreenShotCommand(models);
+            m_loadSceneCommand = new LoadSceneCommand(m_models);
             m_toggleCameraMovementCommand = new ActionCommand(() =>
                 models.Settings.AllowCameraMovement = !models.Settings.AllowCameraMovement);
 
             RefreshCommand(models.Settings.PlayPauseGesture, m_playPauseCommand);
             RefreshCommand(models.Settings.ResetGesture, m_resetCommand);
             RefreshCommand(models.Settings.ScreenshotGesture, m_screenshotCommand);
+            RefreshCommand(new KeyGesture(Key.O, ModifierKeys.Control), m_loadSceneCommand);
             RefreshCommand(models.Settings.ToggleCameraMovementGesture, m_toggleCameraMovementCommand);
 
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
