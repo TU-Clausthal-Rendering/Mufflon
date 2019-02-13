@@ -15,6 +15,9 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
+template < typename T, int A >
+class PathVertex;
+
 class CpuShadowSilhouettes : public IRenderer {
 public:
 	// Initialize all resources required by this renderer.
@@ -31,6 +34,8 @@ public:
 	static bool may_use_device(Device dev) noexcept { return Device::CPU == dev; }
 
 private:
+	using PtPathVertex = PathVertex<u8, 4>;
+
 	// Create one sample path (actual PT algorithm)
 	void pt_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
 				   const scene::SceneDescriptor<Device::CPU>& scene);
@@ -42,8 +47,11 @@ private:
 
 	void initialize_importance_map();
 	void gather_importance(RenderBuffer<Device::CPU>& buffer);
-	void decimate(RenderBuffer<Device::CPU>& buffer);
+	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const PtPathVertex& vertex, const float lightDist);
+	void decimate(const ei::IVec2& resolution);
 	void compute_max_importance();
+	void display_importance(RenderBuffer<Device::CPU>& buffer);
+	float compute_importance(const scene::PrimitiveHandle& hitId);
 
 	bool m_reset = true;
 	SilhouetteParameters m_params = {};
@@ -59,6 +67,8 @@ private:
 
 	// Superfluous
 	bool m_gotImportance = false;
+	bool m_finishedDecimation = false;
+	u32 m_currentDecimationIteration = 0u;
 	float m_maxImportance;
 };
 

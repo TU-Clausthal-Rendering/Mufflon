@@ -5,9 +5,16 @@
 namespace mufflon { namespace renderer {
 
 struct PImportanceIterations {
-	int iterations{ 1 };
+	int importanceIterations{ 1 };
 	static ParamDesc get_desc() noexcept {
 		return { "Importance iterations", ParameterTypes::INT };
+	}
+};
+
+struct PDecimationIterations {
+	int decimationIterations{ 1 };
+	static ParamDesc get_desc() noexcept {
+		return { "Decimation iterations", ParameterTypes::INT };
 	}
 };
 
@@ -32,10 +39,10 @@ struct PDecimationEnabled {
 	}
 };
 
-struct PEnableDirectImportance {
-	bool enableDirectImportance{ true };
+struct PEnableIndirectImportance {
+	bool enableIndirectImportance{ false };
 	static ParamDesc get_desc() noexcept {
-		return { "Enable direct importance", ParameterTypes::BOOL};
+		return { "Enable indirect importance", ParameterTypes::BOOL};
 	}
 };
 
@@ -53,7 +60,7 @@ struct PKeepImportance {
 	}
 };
 
-using SilhouetteParameters = ParameterHandler<PImportanceIterations, PTargetReduction, PVertexThreshold,
-	PEnableDirectImportance, PEnableSilhouetteImportance, PDecimationEnabled, PKeepImportance, PMaxPathLength>;
+using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PVertexThreshold,
+	PEnableIndirectImportance, PEnableSilhouetteImportance, PDecimationEnabled, PKeepImportance, PMaxPathLength>;
 
 }} // namespace mufflon::renderer
