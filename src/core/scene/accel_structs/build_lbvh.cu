@@ -22,7 +22,7 @@ namespace accel_struct {
 
 
 static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH),
-	"Descriptor parameter block to small for this acceleration structure.");
+			  "Descriptor parameter block to small for this acceleration structure.");
 
 
 // Sentinel to detect end of parents[] pointer hierarchy
@@ -43,7 +43,7 @@ template<Device dev> struct desc_info<SceneDescriptor<dev>> {
 	using PrimCount = ei::Vec<i32, 1>;
 	using CostFactor = ei::Vec2;
 	static constexpr float NODE_TRAVERSAL_COST = 1.0f;
-	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST { 200000.0f };// TODO: find value for this.
+	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST{ 200000.0f };// TODO: find value for this.
 };
 template<typename Desc>
 using MortonCode_t = typename desc_info<Desc>::MortonCode;
@@ -69,11 +69,11 @@ __forceinline__ __host__ __device__ u32 calculate_morton_code<u32>(const ei::Vec
 template<>
 __forceinline__ __host__ __device__ u64 calculate_morton_code<u64>(const ei::Vec3& point) {
 	// Discretize the unit cube into a 21 bit integer
-	ei::UVec3 discretized { ei::clamp(point * 2097152.0f, 0.0f, 2097151.0f) };
+	ei::UVec3 discretized{ ei::clamp(point * 2097152.0f, 0.0f, 2097151.0f) };
 
 	return math::part_by_two21(discretized[0]) * 4
-		 + math::part_by_two21(discretized[1]) * 2
-		 + math::part_by_two21(discretized[2]);
+		+ math::part_by_two21(discretized[1]) * 2
+		+ math::part_by_two21(discretized[2]);
 }
 // ----
 
@@ -102,7 +102,7 @@ __global__ void calculate_morton_codesD(
 	i32* sortIndices) {
 	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (idx >= numPrimitives)
+	if(idx >= numPrimitives)
 		return;
 
 	mortonCodes[idx] = calculate_morton_code(*desc, idx, sceneBB);
@@ -111,10 +111,9 @@ __global__ void calculate_morton_codesD(
 
 
 // TODO --- cleanup and move to some CUDA header
-template<typename T> 
-void get_maximum_occupancy(i32 &gridSize, i32 &blockSize, i32 totalThreads, T func, 
-						   i32 dynamicSMemSize = 0)
-{
+template<typename T>
+void get_maximum_occupancy(i32 &gridSize, i32 &blockSize, i32 totalThreads, T func,
+						   i32 dynamicSMemSize = 0) {
 	//blockSize;   // The launch configurator returned block size 
 	i32 minGridSize; // The minimum grid size needed to achieve the 
 	// maximum occupancy for a full device launch 
@@ -122,22 +121,16 @@ void get_maximum_occupancy(i32 &gridSize, i32 &blockSize, i32 totalThreads, T fu
 
 	cuda::check_error(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, func, dynamicSMemSize, 0));
 
-	if (blockSize != 0)
+	if(blockSize != 0)
 		// Round up according to array size 
 		gridSize = (totalThreads + blockSize - 1) / blockSize;
 	else
 		gridSize = minGridSize;
 }
 
-struct BoundingBoxFunctor {
-	__host__ __device__
-	i32 operator()(i32 i) const { return sizeof(ei::Vec4) * 2 * i; }
-};
-
 template<typename UnaryFunction, typename T>
 void get_maximum_occupancy_variable_smem(i32 &gridSize, i32 &blockSize, i32 totalThreads, T func,
-	UnaryFunction blockSizeToDynamicSMemSize)
-{
+										 UnaryFunction blockSizeToDynamicSMemSize) {
 	//blockSize;   // The launch configurator returned block size 
 	i32 minGridSize; // The minimum grid size needed to achieve the 
 	// maximum occupancy for a full device launch 
@@ -145,7 +138,7 @@ void get_maximum_occupancy_variable_smem(i32 &gridSize, i32 &blockSize, i32 tota
 
 	cuda::check_error(cudaOccupancyMaxPotentialBlockSizeVariableSMem(&minGridSize, &blockSize, func, blockSizeToDynamicSMemSize, 0));
 
-	if (blockSize != 0)
+	if(blockSize != 0)
 		// Round up according to array size 
 		gridSize = (totalThreads + blockSize - 1) / blockSize;
 	else
@@ -155,16 +148,15 @@ void get_maximum_occupancy_variable_smem(i32 &gridSize, i32 &blockSize, i32 tota
 
 template<typename Key>
 CUDA_FUNCTION i32 longestCommonPrefix(Key* sortedKeys,
-	i32 numberOfElements, i32 index1, i32 index2, Key key1)
-{
+									  i32 numberOfElements, i32 index1, i32 index2, Key key1) {
 	// No need to check the upper bound, since i+1 will be at most numberOfElements - 1 (one 
 	// thread per internal node)
-	if (index2 < 0 || index2 >= numberOfElements)
+	if(index2 < 0 || index2 >= numberOfElements)
 		return 0;
 
 	Key key2 = sortedKeys[index2];
 
-	if (key1 == key2)
+	if(key1 == key2)
 		return 64 + (i32)cuda::clz(u32(index1 ^ index2));
 
 	return (i32)cuda::clz(key1 ^ key2);
@@ -186,18 +178,18 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 	// Compute upper bound for the length of the range.
 	const i32 minLcp = longestCommonPrefix(sortedKeys, numPrimitives, idx, idx - direction, key1);
 	i32 lMax = 128;
-	while (longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + lMax * direction, key1) >
-		minLcp) {
+	while(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + lMax * direction, key1) >
+		  minLcp) {
 		lMax *= 4;
 	}
 
 	// Find other end using binary search.
 	i32 l = 0;
 	i32 t = lMax;
-	while (t > 1) {
+	while(t > 1) {
 		t = t / 2;
 		if(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (l + t) * direction, key1) >
-			minLcp) {
+		   minLcp) {
 			l += t;
 		}
 	}
@@ -209,7 +201,7 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 	i32 divisor = 2;
 	t = l;
 	const i32 maxDivisor = 1 << (32 - cuda::clz(u32(l)));
-	while (divisor <= maxDivisor) {
+	while(divisor <= maxDivisor) {
 		t = (l + divisor - 1) / divisor;
 		if(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (s + t) * direction, key1)
 			> nodeLcp) {
@@ -220,14 +212,14 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 	const i32 splitPosition = idx + s * direction + min(direction, 0);
 
 	i32 leftIndex = (min(idx, j) == splitPosition) ?
-		  splitPosition + numPrimitives - 1
+		splitPosition + numPrimitives - 1
 		: splitPosition;
 	i32 rightIndex = (max(idx, j) == (splitPosition + 1)) ?
-		  splitPosition + numPrimitives
+		splitPosition + numPrimitives
 		: splitPosition + 1;
 
-	mAssert(leftIndex < 2*numPrimitives-1);
-	mAssert(rightIndex < 2*numPrimitives-1);
+	mAssert(leftIndex < 2 * numPrimitives - 1);
+	mAssert(rightIndex < 2 * numPrimitives - 1);
 
 	// Set parent nodes.
 	parents[leftIndex] = ~idx;
@@ -241,14 +233,13 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 // Note: dataIndices is of length numPrimitives.
 template <typename T> __global__ void build_lbvh_treeD(
 	u32 numPrimitives,
-	T* sortedKeys, 
+	T* sortedKeys,
 	i32 *parents
-)
-{
+) {
 	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
 
 	// Check for valid threads.
-	if (idx >= (numPrimitives - 1))
+	if(idx >= (numPrimitives - 1))
 		return;
 
 	build_lbvh_tree<T>(numPrimitives, sortedKeys, parents, idx);
@@ -257,21 +248,25 @@ template <typename T> __global__ void build_lbvh_treeD(
 struct BBCache {
 	BBCache() = default;
 	CUDA_FUNCTION __forceinline__ BBCache(const ei::Vec4& a, const ei::Vec4& b) :
-		boxMin{a}, primCount{float_bits_as_int(a.w)},
-		boxMax{b}, cost{b.w}
+		boxMin{ a }, primCount{ float_bits_as_int(a.w) },
+		boxMax{ b }, cost{ b.w }
 	{}
 	CUDA_FUNCTION __forceinline__ BBCache(const ei::Vec3& boxMin,
-							float cost,
-							const ei::Vec3& boxMax,
-							i32 primCount) :
-		boxMin(boxMin), cost(cost), boxMax(boxMax), primCount(primCount)
-	{}
+										  float cost,
+										  const ei::Vec3& boxMax,
+										  i32 primCount) :
+		boxMin(boxMin), cost(cost), boxMax(boxMax), primCount(primCount) {}
 	ei::Vec3 boxMin;
 	i32 primCount;
 	ei::Vec3 boxMax;
 	float cost;
 };
-static_assert(sizeof(BBCache) == 8*sizeof(float), "Alignment of BBCache is broken.");
+static_assert(sizeof(BBCache) == 8 * sizeof(float), "Alignment of BBCache is broken.");
+
+struct BoundingBoxFunctor {
+	__host__ __device__
+		i32 operator()(i32 i) const { return sizeof(BBCache) * i; }
+};
 
 
 template < typename DescType > CUDA_FUNCTION
@@ -279,10 +274,10 @@ PrimCount_t<DescType> get_count(const DescType&, i32 primIdx) { return PrimCount
 template < Device dev > CUDA_FUNCTION
 PrimCount_t<LodDescriptor<dev>> get_count(const LodDescriptor<dev>& obj, i32 primIdx) {
 	if(primIdx >= i32(obj.polygon.numTriangles + obj.polygon.numQuads))
-		return {0, 0, 1};
-	if(primIdx >=  i32(obj.polygon.numTriangles))
-		return {0, 1, 0};
-	return {1, 0, 0};
+		return { 0, 0, 1 };
+	if(primIdx >= i32(obj.polygon.numTriangles))
+		return { 0, 1, 0 };
+	return { 1, 0, 0 };
 }
 
 template< typename PrimCount > CUDA_FUNCTION
@@ -292,19 +287,19 @@ i32 encode_prim_counts(const PrimCount& primCount) {
 template<> CUDA_FUNCTION
 i32 encode_prim_counts(const ei::IVec3& primCount) {
 	return (ei::min(primCount.x, 0x3FF) << 20)
-		 | (ei::min(primCount.y, 0x3FF) << 10)
-		 | (ei::min(primCount.z, 0x3FF));
+		| (ei::min(primCount.y, 0x3FF) << 10)
+		| (ei::min(primCount.z, 0x3FF));
 }
 
 template< typename PrimCount > CUDA_FUNCTION
 PrimCount extract_prim_counts(i32 primCount) {
-	return PrimCount{primCount};
+	return PrimCount{ primCount };
 }
 template<> CUDA_FUNCTION
 ei::IVec3 extract_prim_counts(i32 primCount) {
-	return ei::IVec3{(primCount & 0x3FF00000) >> 20,
+	return ei::IVec3{ (primCount & 0x3FF00000) >> 20,
 					 (primCount & 0x000FFC00) >> 10,
-					 (primCount & 0x000003FF)};
+					 (primCount & 0x000003FF) };
 }
 
 template < typename DescType >
@@ -328,6 +323,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	const i32 lastThreadInBlock = 0,
 	BBCache* sharedBb = nullptr
 ) {
+
 	ei::Box currentBb = get_bounding_box(desc, primIdx);
 	float currentSA = ei::surface(currentBb);
 
@@ -388,14 +384,14 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 			childInfo = sharedBb[otherChildThreadIdx - firstThreadInBlock];
 		else {
 			i32 boxId = otherChildNode * 2;
-			childInfo = BBCache{boundingBoxes[boxId], boundingBoxes[boxId+1]};
+			childInfo = BBCache{ boundingBoxes[boxId], boundingBoxes[boxId + 1] };
 		}
 #else
 		// The children were processed in different blocks, so we have to find out if the one
 		// that was not processed by this thread was the left or right one.
 		{
 			i32 boxId = otherChildNode * 2;
-			childInfo = BBCache{boundingBoxes[boxId], boundingBoxes[boxId+1]};
+			childInfo = BBCache{ boundingBoxes[boxId], boundingBoxes[boxId + 1] };
 		}
 #endif
 
@@ -405,7 +401,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 		currentBb.min = ei::min(currentBb.min, childInfo.boxMin);
 		currentBb.max = ei::max(currentBb.max, childInfo.boxMax);
 		float newSA = ei::surface(currentBb);
-		float otherSA = ei::surface(ei::Box{childInfo.boxMin, childInfo.boxMax});
+		float otherSA = ei::surface(ei::Box{ childInfo.boxMin, childInfo.boxMax });
 		auto primitiveCountOther = extract_prim_counts<PrimCount_t<DescType>>(childInfo.primCount);
 		cost = desc_info<DescType>::NODE_TRAVERSAL_COST
 			+ currentSA / newSA * get_cost<DescType>(primitiveCount)
@@ -425,7 +421,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 #ifdef __CUDA_ARCH__
 		otherChildThreadIdx = atomicExch(&counters[currentNode], idx);
 #else
-		otherChildThreadIdx = counters[currentNode]; 
+		otherChildThreadIdx = counters[currentNode];
 		counters[currentNode] = idx;
 		//otherChildNode = counters[currentNode]; 
 		//counters[currentNode] = lastNode;
@@ -433,7 +429,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	}
 
 	// Initialize nodeMarks for the next kernel.
-	if(idx < numPrimitives-1) // Only for internal nodes
+	if(idx < numPrimitives - 1) // Only for internal nodes
 		nodeMarks[idx] = 1;
 }
 
@@ -505,15 +501,15 @@ __global__ void calculate_bounding_boxesD(
 	const i32 lastThreadInBlock = firstThreadInBlock + blockDim.x - 1;
 
 	// Initialize cache of bounding boxes in shared memory.
-	extern __shared__ BBCache sharedBb[]; 
+	extern __shared__ BBCache sharedBb[];
 
 	// Check for valid threads.
-	if (idx >= numPrimitives)
+	if(idx >= numPrimitives)
 		return;
 
 	calculate_bounding_boxes<DescType>(*desc, idx, sortedIndices[idx],
-		numPrimitives, parents, boundingBoxes, counters, nodeMarks,
-		firstThreadInBlock, lastThreadInBlock, sharedBb);
+									   numPrimitives, parents, boundingBoxes, counters, nodeMarks,
+									   firstThreadInBlock, lastThreadInBlock, sharedBb);
 }
 
 template< typename DescType >
@@ -529,7 +525,7 @@ __global__ void mark_nodesD(
 		return;
 
 	mark_collapsed_nodes<DescType>(boundingBoxes, parents,
-		idx + numInternalNodes, nodeMarks);
+								   idx + numInternalNodes, nodeMarks);
 }
 
 
@@ -537,7 +533,7 @@ CUDA_FUNCTION bool is_collapsed(const i32* offsets, const i32 numInternalNodes, 
 	bool isCollapsed = false;
 	if(node > 0 && node < numInternalNodes) // Root and leaf nodes cannot be collapsed.
 		// Revert the inclusive scan to check wether this node had a mark '1' or '0'
-		isCollapsed = (offsets[node] - offsets[node-1]) == 0; // 0 means collapse
+		isCollapsed = (offsets[node] - offsets[node - 1]) == 0; // 0 means collapse
 	return isCollapsed;
 }
 
@@ -588,14 +584,14 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 
 		const i32 outIdx = (offsets[parent] - 1) * 4;
 		const i32 outNode = (node >= numInternalNodes) ?
-			  node - numInternalNodes + numInternalNodesAfterCollapse // Leaf. Offset address by number of collapsed nodes.
-			: offsets[node]-1;	// Internal node. Get the new position from offset array.
+			node - numInternalNodes + numInternalNodesAfterCollapse // Leaf. Offset address by number of collapsed nodes.
+			: offsets[node] - 1;	// Internal node. Get the new position from offset array.
 		// Enlarge the bounding box to avoid numerical issues in the tracing
-		const ei::Vec3 center = (ei::Vec3{boxMin_primCount} + ei::Vec3{boxMax_primCost}) * 0.5f;
-		const ei::Vec3 bbMin = (ei::Vec3{boxMin_primCount} - center) * 1.0001f + center;
-		const ei::Vec3 bbMax = (ei::Vec3{boxMax_primCost} - center) * 1.0001f + center;
-		collapsedBVH[outIdx+offset  ] = ei::Vec4{bbMin, int_bits_as_float(outNode)};
-		collapsedBVH[outIdx+offset+1] = ei::Vec4{bbMax, int_bits_as_float(primCount)};
+		const ei::Vec3 center = (ei::Vec3{ boxMin_primCount } +ei::Vec3{ boxMax_primCost }) * 0.5f;
+		const ei::Vec3 bbMin = (ei::Vec3{ boxMin_primCount } -center) * 1.0001f + center;
+		const ei::Vec3 bbMax = (ei::Vec3{ boxMax_primCost } -center) * 1.0001f + center;
+		collapsedBVH[outIdx + offset] = ei::Vec4{ bbMin, int_bits_as_float(outNode) };
+		collapsedBVH[outIdx + offset + 1] = ei::Vec4{ bbMax, int_bits_as_float(primCount) };
 	}
 }
 
@@ -641,8 +637,6 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		copy(deviceDesc.get(), &desc, sizeof(DescType));
 	}
 
-	i32 numBlocks, numThreads; // TODO: move to local scopes
-
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
 	// cannot allocate the other parts in bvh.
 	m_primIds.resize(numPrimitives * sizeof(i32));
@@ -651,9 +645,9 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 	// Allocate a block of temporary memory for several build purposes
 	auto tmpMem = make_udevptr_array<DescType::DEVICE, u8>(ei::max(
-		  numPrimitives * sizeof(MortonCode_t<DescType>) // For unsorted morton codes and
+		numPrimitives * sizeof(MortonCode_t<DescType>) // For unsorted morton codes and
 		+ numPrimitives * sizeof(i32),					 // primIds at the same time
-		  numInternalNodes * sizeof(i32)				 // OR deviceCountes later
+		numInternalNodes * sizeof(i32)				 // OR deviceCountes later
 	));
 
 	// Calculate Morton codes.
@@ -665,6 +659,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			// Satisfy the compiler (this brach is never reached without having the correct type,
 			// so the cast is effectless. However, the cleaner 'if constexpr' is not supported in cuda.
 			//auto dobj = reinterpret_cast<const LodDescriptor<Device::CUDA>&>(obj);
+			i32 numBlocks, numThreads;
 			get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codesD<DescType>);
 			calculate_morton_codesD <<< numBlocks, numThreads >>> (
 				deviceDesc.get(), sceneBB, numPrimitives, mortonCodes, primIdsUnsorted);
@@ -672,11 +667,10 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 			// Sort based on Morton codes.
 			CuLib::DeviceSort(numPrimitives, mortonCodes, sortedMortonCodes.get(),
-				primIdsUnsorted, primIds);
+							  primIdsUnsorted, primIds);
 			cuda::check_error(cudaGetLastError());
 		} else {
-			for(i32 idx = 0; idx < numPrimitives; idx++)
-			{
+			for(i32 idx = 0; idx < numPrimitives; idx++) {
 				sortedMortonCodes[idx] = calculate_morton_code<DescType>(desc, idx, sceneBB);
 				primIds[idx] = idx;
 			}
@@ -689,6 +683,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		// Layout: first internal nodes, then leves.
 		if(DescType::DEVICE == Device::CUDA) {
 			cudaFuncSetCacheConfig(build_lbvh_treeD<MortonCode_t<DescType>>, cudaFuncCachePreferL1);
+			i32 numBlocks, numThreads;
 			get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<MortonCode_t<DescType>>);
 			build_lbvh_treeD<MortonCode_t<DescType>> <<< numBlocks, numThreads >>> (
 				numPrimitives,
@@ -696,9 +691,9 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 				parents.get());
 			cuda::check_error(cudaGetLastError());
 		} else {
-			for (i32 idx = 0; idx < numInternalNodes; idx++)
+			for(i32 idx = 0; idx < numInternalNodes; idx++)
 				build_lbvh_tree<MortonCode_t<DescType>>(numPrimitives,
-					sortedMortonCodes.get(), parents.get(), idx);
+														sortedMortonCodes.get(), parents.get(), idx);
 		}
 	}
 
@@ -713,37 +708,39 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	auto collapseOffsets = make_udevptr_array<DescType::DEVICE, i32>(numInternalNodes);
 	if(DescType::DEVICE == Device::CUDA) {
 		// Calculate BVH bounding boxes.
-		i32 bboxCacheSize = numThreads * sizeof(ei::Vec4) * 2; // TODO: numThreads is that of the last kernel launch, not of the comming one...
 		cudaFuncSetCacheConfig(calculate_bounding_boxesD<DescType>, cudaFuncCachePreferShared);
 		BoundingBoxFunctor functor;
+		i32 numBlocks, numThreads;
 		get_maximum_occupancy_variable_smem(numBlocks, numThreads, numPrimitives,
-			calculate_bounding_boxesD<DescType>, functor);
-		calculate_bounding_boxesD<<< numBlocks, numThreads, bboxCacheSize >>>(
+											calculate_bounding_boxesD<DescType>, functor);
+		const i32 bboxCacheSize = numThreads * sizeof(BBCache);
+		calculate_bounding_boxesD <<< numBlocks, numThreads, bboxCacheSize >>> (
 			deviceDesc.get(), numPrimitives, primIds, parents.get(),
 			boundingBoxes.get(), deviceCounters,
 			collapseOffsets.get()
-		);
+			);
 		cuda::check_error(cudaGetLastError());
 	} else {
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			calculate_bounding_boxes(desc, idx, primIds[idx],
-				numPrimitives, parents.get(), boundingBoxes.get(),
-				deviceCounters, collapseOffsets.get());
+									 numPrimitives, parents.get(), boundingBoxes.get(),
+									 deviceCounters, collapseOffsets.get());
 		}
 	}
 
 	// Find out which nodes can be collapsed according to SAH.
 	if(DescType::DEVICE == Device::CUDA) {
+		i32 numBlocks, numThreads;
 		get_maximum_occupancy(numBlocks, numThreads, numPrimitives, mark_nodesD<DescType>);
-		mark_nodesD<DescType> <<< numBlocks, numThreads >>>(numInternalNodes,
-			boundingBoxes.get(), parents.get(),
-			collapseOffsets.get()
-		);
+		mark_nodesD<DescType> <<< numBlocks, numThreads >>> (numInternalNodes,
+															   boundingBoxes.get(), parents.get(),
+															   collapseOffsets.get()
+															   );
 		cuda::check_error(cudaGetLastError());
 	} else {
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
-				idx + numInternalNodes, collapseOffsets.get());
+										   idx + numInternalNodes, collapseOffsets.get());
 		}
 	}
 
@@ -755,7 +752,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		numRemovedInternalNodes = numInternalNodes - numRemovedInternalNodes;
 	} else {
 		// Scan to get values for offsets.
-		thrust::inclusive_scan(collapseOffsets.get(), collapseOffsets.get()+numInternalNodes, collapseOffsets.get());
+		thrust::inclusive_scan(collapseOffsets.get(), collapseOffsets.get() + numInternalNodes, collapseOffsets.get());
 		numRemovedInternalNodes = numInternalNodes - collapseOffsets[numInternalNodes - 1];
 	}
 
@@ -766,8 +763,9 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	m_bvhNodes.resize(numNodesInCollapsedBVH * sizeof(ei::Vec4) * 4);
 	ei::Vec4* collapsedBVH = as<ei::Vec4>(m_bvhNodes.acquire<DescType::DEVICE>());
 	if(DescType::DEVICE == Device::CUDA) {
+		i32 numBlocks, numThreads;
 		get_maximum_occupancy(numBlocks, numThreads, numNodes, copy_to_collapsed_bvhD<DescType>);
-		copy_to_collapsed_bvhD<DescType> <<< numBlocks, numThreads >>>(
+		copy_to_collapsed_bvhD<DescType> <<< numBlocks, numThreads >>> (
 			numNodes, numInternalNodes, numNodesInCollapsedBVH, boundingBoxes.get(), parents.get(),
 			collapseOffsets.get(), collapsedBVH);
 		cuda::check_error(cudaGetLastError());
@@ -777,9 +775,6 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 				boundingBoxes.get(), parents.get(), collapseOffsets.get(),
 				idx, numInternalNodes, numNodesInCollapsedBVH, collapsedBVH);
 	}
-
-//	for(int i = 0; i < numNodesInCollapsedBVH; ++i) {
-	//}
 }
 
 template < Device dev >
@@ -806,4 +801,6 @@ void LBVHBuilder::build(
 template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&);
 template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&);
 
-}}} // namespace mufflon
+}
+}
+} // namespace mufflon

@@ -8,11 +8,10 @@
 
 namespace mufflon { namespace CuLib {
 
-
 // In and out buffers may be swaped.
 // Original data is not kept.
 template < typename KeyT, typename ValueT >
-float DeviceSort(u32 numElements, 
+float DeviceSort(u32 numElements,
 				 const KeyT* keysIn, KeyT* keysOut,
 				 const ValueT* valuesIn, ValueT* valuesOut) {
 	mAssert(keysIn != keysOut);
@@ -20,9 +19,8 @@ float DeviceSort(u32 numElements,
 
 	// Check how much temporary memory will be required.
 	size_t storageSize = 0;
-	cub::DeviceRadixSort::SortPairs(nullptr, storageSize,
-		keysIn, keysOut, valuesIn, valuesOut, numElements);
-	cuda::check_error(cudaGetLastError());
+	cuda::check_error(cub::DeviceRadixSort::SortPairs(nullptr, storageSize,
+													  keysIn, keysOut, valuesIn, valuesOut, numElements));
 
 	// Allocate temporary memory.
 	void* tempStorage = nullptr;
@@ -37,9 +35,8 @@ float DeviceSort(u32 numElements,
 #endif
 
 	// Sort
-	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize,
-		keysIn, keysOut, valuesIn, valuesOut, numElements);
-	cuda::check_error(cudaGetLastError());
+	cuda::check_error(cub::DeviceRadixSort::SortPairs(tempStorage, storageSize,
+													  keysIn, keysOut, valuesIn, valuesOut, numElements));
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -62,21 +59,18 @@ template float DeviceSort<u64, i32>(u32, const u64* keysIn, u64* keysOut,
 // In and out buffers may be swaped.
 // Original data is not kept.
 template <typename T> float DeviceSort(u32 numElements, T** keysIn, T** keysOut,
-	u32** valuesIn, u32** valuesOut)
-{
+									   u32** valuesIn, u32** valuesOut) {
 	T* tmpKeysOut;
 	u32 *tmpValuesOut;
-	if (keysIn == keysOut) {
+	if(keysIn == keysOut) {
 		cudaMalloc((void **)&tmpKeysOut, numElements * sizeof(T));
-	}
-	else {
+	} else {
 		tmpKeysOut = *keysOut;
 	}
 
-	if (valuesIn == valuesOut) {
+	if(valuesIn == valuesOut) {
 		cudaMalloc((void **)&tmpValuesOut, numElements * sizeof(u32));
-	}
-	else {
+	} else {
 		tmpValuesOut = *valuesOut;
 	}
 
@@ -86,11 +80,11 @@ template <typename T> float DeviceSort(u32 numElements, T** keysIn, T** keysOut,
 	// Check how much temporary memory will be required.
 	void* tempStorage = nullptr;
 	size_t storageSize = 0;
-	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
-		numElements);
+	cuda::check_error(cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
+													  numElements));
 
 	// Allocate temporary memory.
-	cudaMalloc(&tempStorage, storageSize);
+	cuda::check_error(cudaMalloc(&tempStorage, storageSize));
 
 	float elapsedTime = 0.0f;
 #ifdef MEASURE_EXECUTION_TIMES
@@ -101,8 +95,8 @@ template <typename T> float DeviceSort(u32 numElements, T** keysIn, T** keysOut,
 #endif
 
 	// Sort
-	cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
-		numElements);
+	cuda::check_error(cub::DeviceRadixSort::SortPairs(tempStorage, storageSize, keysBuffer, valuesBuffer,
+													  numElements));
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -111,22 +105,20 @@ template <typename T> float DeviceSort(u32 numElements, T** keysIn, T** keysOut,
 #endif
 
 	// Free temporary memory.
-	cudaFree(tempStorage);
+	cuda::check_error(cudaFree(tempStorage));
 
 	// Update in buffers.
 	T* current = keysBuffer.d_buffers[1 - keysBuffer.selector];
-	if (keysIn != keysOut) {
+	if(keysIn != keysOut) {
 		*keysIn = current;
-	}
-	else {
-		cudaFree(current);
+	} else {
+		cuda::check_error(cudaFree(current));
 	}
 	u32* current2 = valuesBuffer.d_buffers[1 - valuesBuffer.selector];
-	if (valuesIn != valuesOut) {
+	if(valuesIn != valuesOut) {
 		*valuesIn = current2;
-	}
-	else {
-		cudaFree(current2);
+	} else {
+		cuda::check_error(cudaFree(current2));
 	}
 
 	// Update out buffers.
@@ -332,17 +324,16 @@ int DeviceMax(u32 numElements, int* elements)
 }*/
 
 // ref. https://nvlabs.github.io/cub/structcub_1_1_device_scan.html#a83236fc272c0b573a2bb2c5b47e0867d
-template <typename T> float DeviceExclusiveSum(int numItems, const T* valuesIn, T* valuesOut)
-{
+template <typename T> float DeviceExclusiveSum(int numItems, const T* valuesIn, T* valuesOut) {
 	//mAssert(valuesIn != valuesOut);
 
 	// Check how much temporary memory will be required
 	void* tempStorage = nullptr;
 	size_t storageSize = 0;
-	cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
+	cuda::check_error(cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems));
 
 	// Allocate temporary memory
-	cudaMalloc(&tempStorage, storageSize);
+	cuda::check_error(cudaMalloc(&tempStorage, storageSize));
 
 	float elapsedTime = 0.0f;
 #ifdef MEASURE_EXECUTION_TIMES
@@ -353,7 +344,7 @@ template <typename T> float DeviceExclusiveSum(int numItems, const T* valuesIn, 
 #endif
 
 	// Scan
-	cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
+	cuda::check_error(cub::DeviceScan::ExclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems));
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -362,23 +353,22 @@ template <typename T> float DeviceExclusiveSum(int numItems, const T* valuesIn, 
 #endif
 
 	// Free temporary memory
-	cudaFree(tempStorage);
+	cuda::check_error(cudaFree(tempStorage));
 
 	return elapsedTime;
 }
 
 // ref. https://nvlabs.github.io/cub/structcub_1_1_device_scan.html#a83236fc272c0b573a2bb2c5b47e0867d
-template <typename T> float DeviceInclusiveSum(int numItems, const T* valuesIn, T* valuesOut)
-{
+template <typename T> float DeviceInclusiveSum(int numItems, const T* valuesIn, T* valuesOut) {
 	//mAssert(valuesIn != valuesOut);
 
 	// Check how much temporary memory will be required
 	void* tempStorage = nullptr; // TODO: use a permanent temporary cache for this purpose (resize only if necessary)
 	size_t storageSize = 0;
-	cub::DeviceScan::InclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
+	cuda::check_error(cub::DeviceScan::InclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems));
 
 	// Allocate temporary memory
-	cudaMalloc(&tempStorage, storageSize);
+	cuda::check_error(cudaMalloc(&tempStorage, storageSize));
 
 	float elapsedTime = 0.0f;
 #ifdef MEASURE_EXECUTION_TIMES
@@ -389,7 +379,7 @@ template <typename T> float DeviceInclusiveSum(int numItems, const T* valuesIn, 
 #endif
 
 	// Scan
-	cub::DeviceScan::InclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems);
+	cuda::check_error(cub::DeviceScan::InclusiveSum(tempStorage, storageSize, valuesIn, valuesOut, numItems));
 
 #ifdef MEASURE_EXECUTION_TIMES
 	cudaEventRecord(stop, 0);
@@ -398,20 +388,18 @@ template <typename T> float DeviceInclusiveSum(int numItems, const T* valuesIn, 
 #endif
 
 	// Free temporary memory
-	cudaFree(tempStorage);
+	cuda::check_error(cudaFree(tempStorage));
 
 	return elapsedTime;
 }
 
 
-float DeviceExclusiveSum(int numElements, const int* valuesIn, int* valuesOut)
-{
+float DeviceExclusiveSum(int numElements, const int* valuesIn, int* valuesOut) {
 	return DeviceExclusiveSum<int>(numElements, valuesIn, valuesOut);
 }
 
-float DeviceInclusiveSum(int numElements, const int* valuesIn, int* valuesOut)
-{
+float DeviceInclusiveSum(int numElements, const int* valuesIn, int* valuesOut) {
 	return DeviceInclusiveSum<int>(numElements, valuesIn, valuesOut);
 }
 
-}}
+}} // namespace mufflon::CuLib
