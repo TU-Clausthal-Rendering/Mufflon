@@ -366,8 +366,6 @@ namespace gui.Dll
         internal static extern bool render_reset();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt32 render_get_current_iteration();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_get_screenshot();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_screenshot")]
         private static extern bool render_save_screenshot_(IntPtr filename, UInt32 targetIndex, UInt32 variance);
         internal static bool render_save_screenshot(string filename, UInt32 targetIndex, UInt32 variance) { return render_save_screenshot_(StringUtil.ToNativeUtf8(filename), targetIndex, variance); }
