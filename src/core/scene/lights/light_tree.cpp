@@ -455,10 +455,11 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		m_treeCuda->primToNodePath = m_primToNodePath.acquire<Device::CUDA>(); // Includes synchronization
 
 		// Equalize bookkeeping of subtrees
+		char* lightMem = m_treeMemory.template is_resident<Device::CPU>() ? m_treeMemory.template acquire<Device::CUDA>() : nullptr;
 		m_treeCuda->dirLights = m_treeCpu->dirLights;
-		m_treeCuda->dirLights.memory = m_treeMemory.acquire<Device::CUDA>();
+		m_treeCuda->dirLights.memory = lightMem;
 		m_treeCuda->posLights = m_treeCpu->posLights;
-		m_treeCuda->posLights.memory = m_treeCuda->dirLights.memory + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
+		m_treeCuda->posLights.memory = lightMem + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
 
 		// Replace all texture handles inside the tree's data and
 		// synchronize all the remaining tree memory.
