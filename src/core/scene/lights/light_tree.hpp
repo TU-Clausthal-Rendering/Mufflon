@@ -98,7 +98,8 @@ struct LightSubTree {
 		float flux{ 0.0f };
 		u16 type;
 	} root;
-	std::size_t lightCount{ 0 };
+	u32 internalNodeCount{ 0u };
+	std::size_t lightCount{ 0u };
 	char* memory{ nullptr };
 
 	CUDA_FUNCTION __forceinline__ Node* get_node(u32 offset) { return as<Node>(memory + offset); }

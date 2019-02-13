@@ -47,7 +47,7 @@ __global__ void cuda_set_medium(SceneDescriptor<Device::CUDA> scene, LightSubTre
 namespace lighttree_detail {
 
 void update_media_cuda(const SceneDescriptor<Device::CUDA>& scene, const LightSubTree& posLights) {
-	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(posLights.lightCount));
+	const u32 NODE_COUNT = static_cast<u32>(posLights.internalNodeCount);
 
 	int blockSize = 256;
 	int gridSize;

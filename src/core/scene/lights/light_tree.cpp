@@ -145,7 +145,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		// Create the internal nodes putting together two lights
 		for(std::size_t i = 0u; i < extraNodes; ++i) {
 			mAssert(startLight + 2u * i + 1u < lightOffsets.light_count());
-			mAssert(startNode + i < get_num_internal_nodes(lightOffsets.light_count()));
+			mAssert(startNode + i < tree.internalNodeCount);
 			const std::size_t left = startLight + 2u * i;
 			const std::size_t right = startLight + 2u * i + 1u;
 			Node& interiorNode = as<Node>(tree.memory)[startNode + i];
@@ -159,7 +159,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		// and I4, of which there will at most be one kind)
 		const std::size_t startInnerNode = (1lu << (height - 1u)) - 1u;
 		for(std::size_t i = 0u; i < extraNodes / 2u; ++i) {
-			mAssert(startNode + 2u*i + 1u < get_num_internal_nodes(lightOffsets.light_count()));
+			mAssert(startNode + 2u*i + 1u < tree.internalNodeCount);
 			const std::size_t left = startNode + 2u * i;
 			const std::size_t right = startNode + 2u * i + 1u;
 			Node& node = as<Node>(tree.memory)[startInnerNode + i];
@@ -172,7 +172,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		// and a light source as right child (I4)
 		if(extraNodes % 2 != 0u) {
 			// One interior leftover; must be first light and last internal node
-			mAssert(startNode + extraNodes - 1u < get_num_internal_nodes(lightOffsets.light_count()));
+			mAssert(startNode + extraNodes - 1u < tree.internalNodeCount);
 			const std::size_t left = startNode + extraNodes - 1u;
 			const std::size_t right = 0;
 			Node& node = as<Node>(tree.memory)[startInnerNode + extraNodes / 2u];
@@ -196,7 +196,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 	const std::size_t startNodeIndex = (1ull << height) - nodeCount - 1u;
 	for(std::size_t i = 0u; i < nodeCount; ++i) {
 		mAssert(startLight + 2u * i + 1u < lightOffsets.light_count());
-		mAssert(startNodeIndex + i < get_num_internal_nodes(lightOffsets.light_count()));
+		mAssert(startNodeIndex + i < tree.internalNodeCount);
 		const std::size_t left = startLight + 2u * i;
 		const std::size_t right = startLight + 2u * i + 1u;
 		Node& node = as<Node>(tree.memory)[startNodeIndex + i];
@@ -213,8 +213,8 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 			const std::size_t innerNode = nodes / 2u - 1u;
 			// Accumulate for higher-up node
 			for(std::size_t i = 0u; i < nodes / 2u; ++i) {
-				mAssert(innerNode + i < get_num_internal_nodes(lightOffsets.light_count()));
-				mAssert(nodes + 2u * i < get_num_internal_nodes(lightOffsets.light_count()));
+				mAssert(innerNode + i < tree.internalNodeCount);
+				mAssert(nodes + 2u * i < tree.internalNodeCount);
 				const std::size_t left = nodes - 1u + 2u * i;
 				const std::size_t right = nodes - 1u + 2u * i + 1u;
 				Node& node = as<Node>(tree.memory)[innerNode + i];
@@ -334,15 +334,15 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Allocate enough space to fit all lights - this assumes that the tree will be balanced!
 	// Node memory is easy since fixed size
-	std::size_t dirNodes = get_num_internal_nodes(dirLights.size());
-	std::size_t posNodes = get_num_internal_nodes(posLights.size());
+	m_treeCpu->dirLights.internalNodeCount = static_cast<u32>(get_num_internal_nodes(dirLights.size()));
+	m_treeCpu->posLights.internalNodeCount = static_cast<u32>(get_num_internal_nodes(posLights.size()));
 
 	// Compute a sum table for the light offsets for positional lights,
 	// nothing for directional ones (just create a compatible interface).
-	LightOffset<DirectionalLight> dirLightOffsets(dirLights, dirNodes * sizeof(LightSubTree::Node));
-	LightOffset<PositionalLights> posLightOffsets(posLights, posNodes * sizeof(LightSubTree::Node));
+	LightOffset<DirectionalLight> dirLightOffsets(dirLights, m_treeCpu->dirLights.internalNodeCount * sizeof(LightSubTree::Node));
+	LightOffset<PositionalLights> posLightOffsets(posLights, m_treeCpu->posLights.internalNodeCount * sizeof(LightSubTree::Node));
 
-	std::size_t treeMemSize = sizeof(LightSubTree::Node) * (dirNodes + posNodes)
+	std::size_t treeMemSize = sizeof(LightSubTree::Node) * (m_treeCpu->dirLights.internalNodeCount + m_treeCpu->posLights.internalNodeCount)
 		+ dirLightOffsets.mem_size() + posLightOffsets.mem_size();
 	m_treeMemory.resize(treeMemSize);
 	m_treeMemory.mark_changed(Device::CPU);
@@ -490,7 +490,7 @@ void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scen
 		return;
 	}
 	// TODO: do we need to determine the medium for area lights (given by the geometry)
-	const u32 NODE_COUNT = static_cast<u32>(get_num_internal_nodes(m_treeCpu->posLights.lightCount));
+	const u32 NODE_COUNT = static_cast<u32>(m_treeCpu->posLights.internalNodeCount);
 	// Walk backwards in the nodes to iterate over lights, but leave out the odd one (if it exists)
 	const u32 exclusiveLightNodes = static_cast<u32>(m_treeCpu->posLights.lightCount / 2u);
 	for(u32 i = 1u; i <= exclusiveLightNodes; ++i) {
