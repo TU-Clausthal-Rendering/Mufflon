@@ -41,8 +41,6 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 }
 
 void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
-	constexpr StringView importanceAttrName{ "importance" };
-
 	// (Re) create the random number generators
 	if(m_rngs.size() != outputBuffer.get_num_pixels()
 	   || m_reset)
@@ -50,172 +48,117 @@ void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
 
 	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	if(m_reset) {
-		// Reacquire scene descriptor (partially?)
+		// Reacquire scene descriptor
 		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
 
 		if(m_sceneDesc.numInstances != m_sceneDesc.numLods)
 			throw std::runtime_error("We do not support instancing yet");
 
-		// Query how many vertices there are
+		// Initialize the importance map
 		// TODO: how to deal with instancing
-		if(!m_params.keepImportance || !m_gotImportance) {
-			m_vertexCount = 0u;
-			m_vertexOffsets = make_udevptr_array<Device::CPU, u32>(m_sceneDesc.numInstances);
-			for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
-				m_vertexOffsets[i] = m_vertexCount;
-				m_vertexCount += m_sceneDesc.lods[m_sceneDesc.lodIndices[i]].polygon.numVertices;
-			}
-			// Allocate sufficient buffer
-			m_importanceMap = make_udevptr_array<Device::CPU, std::atomic<float>>(m_vertexCount);
-		}
+		if(!m_params.keepImportance || !m_gotImportance)
+			initialize_importance_map();
 
-		if(!m_params.showSilhouette && m_params.iterations > 0 && !m_gotImportance) {
-			// Perform importance iterations
+		if(m_params.iterations > 0 && !m_gotImportance) {
+			gather_importance(buffer);
 
-			const int iterations = m_params.iterations * outputBuffer.get_num_pixels();
-			logInfo("Starting importance gathering (", m_params.iterations, " iterations)");
-#pragma PARALLEL_FOR
-			for(int i = 0; i < m_params.iterations * outputBuffer.get_num_pixels(); ++i) {
-				const int pixel = i / m_params.iterations;
-				this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
-										buffer, m_sceneDesc);
-			}
-			// TODO: allow for this with proper reset "events"
-			//m_gotImportance = true;
-
-			if(!m_params.decimationEnabled) {
+			if(!m_params.decimationEnabled)
 				logInfo("Finished importance gathering");
-			} else {
-				logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
-				u32 vertexOffset = 0u;
-				for(auto object : m_currentScene->get_objects()) {
-					for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
-						if(object.first->has_lod_available(i)) {
-							auto& lod = object.first->get_lod(i);
-							auto& polygons = lod.get_geometry<scene::geometry::Polygons>();
-							const u32 vertexCount = static_cast<u32>(polygons.get_vertex_count());
-
-							if(static_cast<int>(vertexCount) < m_params.threshold) {
-								logInfo("Skipping object ", object.first->get_object_id(), ", LoD ", i,
-										" (too little vertices)");
-							} else {
-								const u32 targetVertexCount = static_cast<u32>(vertexCount * (1.f - m_params.reduction));
-								logInfo("Decimating object ", object.first->get_object_id(), ", LoD ", i,
-										" (", vertexCount, " => ", targetVertexCount, ")");
-
-								auto& mesh = polygons.get_mesh();
-								OpenMesh::VPropHandleT<float> impHdl;
-								mesh.add_property(impHdl, std::string(importanceAttrName));
-
-								for(u32 v = 0u; v < vertexCount; ++v) 
-									mesh.property(impHdl, OpenMesh::VertexHandle {(int)v}) = m_importanceMap[vertexOffset + v].load();
-
-								// Create decimater and attach modules
-								auto decimater = polygons.create_decimater();
-
-								ImportanceModule<scene::geometry::PolygonMeshType>::Handle impModHdl;
-								ImportanceBinaryModule<scene::geometry::PolygonMeshType>::Handle impBinModHdl;
-								decimater.add(impModHdl);
-								decimater.add(impBinModHdl);
-								decimater.module(impModHdl).set_importance_property(impHdl);
-								decimater.module(impBinModHdl).set_importance_property(impHdl);
-								//OpenMesh::Decimater::ModNormalFlippingT<scene::geometry::PolygonMeshType>::Handle normal_flipping;
-								//decimater.add(normal_flipping);
-								//decimater.module(normal_flipping).set_max_normal_deviation(m_params.maxNormalDeviation);
-
-								// Perform actual decimation
-								// TODO: only create LoD
-								polygons.decimate(decimater, targetVertexCount);
-
-								lod.clear_accel_structure();
-							}
-							vertexOffset += vertexCount;
-						}
-					}
-				}
-
-				m_gotImportance = true;
-
-				// We need to re-build the scene
-				m_currentScene->clear_accel_structure();
-				m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
-			}
+			else
+				decimate(buffer);
 		}
 	}
 	m_reset = false;
 
 
-	if(m_params.showSilhouette) {
-		// Perform importance iteration
+	if(m_params.iterations > 0 && outputBuffer.get_target().is_set(1 << RenderTargets::IMPORTANCE))
+		compute_max_importance();
+
+	// TODO: call sample in a parallel way for each output pixel
+	// TODO: better pixel order?
+	// TODO: different scheduling?
 #pragma PARALLEL_FOR
-		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-			this->importance_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() },
-									buffer, m_sceneDesc);
-		}
-	} else {
-		if(m_params.iterations > 0) {
-			m_maxImportance = 0.f;
-
-			if(outputBuffer.get_target().is_set(1 << RenderTargets::IMPORTANCE)) {
-				// Compute the maximum normalized importance for visualization
-				for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
-					const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[i]];
-					// First triangles, then quads
-					for(u32 t = 0u; t < lod.polygon.numTriangles; ++t) {
-						const u32 A = lod.polygon.vertexIndices[3u * t + 0u];
-						const u32 B = lod.polygon.vertexIndices[3u * t + 1u];
-						const u32 C = lod.polygon.vertexIndices[3u * t + 2u];
-						const float area = ei::surface(ei::Triangle{
-							lod.polygon.vertices[A], lod.polygon.vertices[B],
-							lod.polygon.vertices[C] });
-						const float importance = (m_importanceMap[m_vertexOffsets[i] + A]
-							+ m_importanceMap[m_vertexOffsets[i] + B]
-							+ m_importanceMap[m_vertexOffsets[i] + C]) / 3.f;
-
-						m_maxImportance = std::max(importance / area, m_maxImportance);
-					}
-
-					for(u32 q = 0u; q < lod.polygon.numQuads; ++q) {
-						const u32 A = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 0u];
-						const u32 B = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 1u];
-						const u32 C = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 2u];
-						const u32 D = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 3u];
-						const float area = ei::surface(ei::Triangle{
-							lod.polygon.vertices[A], lod.polygon.vertices[B],
-							lod.polygon.vertices[C] }) + ei::surface(ei::Triangle{
-							lod.polygon.vertices[A], lod.polygon.vertices[C],
-							lod.polygon.vertices[D] });
-						const float importance = (m_importanceMap[m_vertexOffsets[i] + A]
-							+ m_importanceMap[m_vertexOffsets[i] + B]
-							+ m_importanceMap[m_vertexOffsets[i] + C]
-							+ m_importanceMap[m_vertexOffsets[i] + D]) / 4.f;
-
-						m_maxImportance = std::max(importance / area, m_maxImportance);
-					}
-				}
-			}
-		}
-
-		// TODO: call sample in a parallel way for each output pixel
-		// TODO: better pixel order?
-		// TODO: different scheduling?
-#pragma PARALLEL_FOR
-		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-			this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
-		}
+	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
+		this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
 	}
 
 	outputBuffer.end_iteration<Device::CPU>();
 }
 
 
+void CpuShadowSilhouettes::gather_importance(RenderBuffer<Device::CPU>& buffer) {
+	const u32 NUM_PIXELS = buffer.get_height() * buffer.get_width();
+	const int iterations = m_params.iterations * NUM_PIXELS;
+	logInfo("Starting importance gathering (", m_params.iterations, " iterations)");
+#pragma PARALLEL_FOR
+	for(int i = 0; i < (u32)m_params.iterations * NUM_PIXELS; ++i) {
+		const int pixel = i / m_params.iterations;
+		this->importance_sample(Pixel{ pixel % buffer.get_width(), pixel / buffer.get_width() },
+								buffer, m_sceneDesc);
+	}
+	// TODO: allow for this with proper reset "events"
+	m_gotImportance = true;
+}
+
+void CpuShadowSilhouettes::decimate(RenderBuffer<Device::CPU>& buffer) {
+	constexpr StringView importanceAttrName{ "importance" };
+
+	logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
+	u32 vertexOffset = 0u;
+	for(auto object : m_currentScene->get_objects()) {
+		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
+			if(object.first->has_lod_available(i)) {
+				auto& lod = object.first->get_lod(i);
+				auto& polygons = lod.get_geometry<scene::geometry::Polygons>();
+				const u32 vertexCount = static_cast<u32>(polygons.get_vertex_count());
+
+				if(static_cast<int>(vertexCount) < m_params.threshold) {
+					logInfo("Skipping object ", object.first->get_object_id(), ", LoD ", i,
+							" (too little vertices)");
+				} else {
+					const u32 targetVertexCount = static_cast<u32>(vertexCount * (1.f - m_params.reduction));
+					logInfo("Decimating object ", object.first->get_object_id(), ", LoD ", i,
+							" (", vertexCount, " => ", targetVertexCount, ")");
+
+					auto& mesh = polygons.get_mesh();
+					OpenMesh::VPropHandleT<float> impHdl;
+					mesh.add_property(impHdl, std::string(importanceAttrName));
+
+					for(u32 v = 0u; v < vertexCount; ++v)
+						mesh.property(impHdl, OpenMesh::VertexHandle {(int)v}) = m_importanceMap[vertexOffset + v].load();
+
+					// Create decimater and attach modules
+					auto decimater = polygons.create_decimater();
+
+					ImportanceModule<scene::geometry::PolygonMeshType>::Handle impModHdl;
+					ImportanceBinaryModule<scene::geometry::PolygonMeshType>::Handle impBinModHdl;
+					decimater.add(impModHdl);
+					decimater.add(impBinModHdl);
+					decimater.module(impModHdl).set_importance_property(impHdl);
+					decimater.module(impBinModHdl).set_importance_property(impHdl);
+					//OpenMesh::Decimater::ModNormalFlippingT<scene::geometry::PolygonMeshType>::Handle normal_flipping;
+					//decimater.add(normal_flipping);
+					//decimater.module(normal_flipping).set_max_normal_deviation(m_params.maxNormalDeviation);
+
+					// Perform actual decimation
+					// TODO: only create LoD
+					polygons.decimate(decimater, targetVertexCount);
+
+					lod.clear_accel_structure();
+				}
+				vertexOffset += vertexCount;
+			}
+		}
+	}
+
+	// We need to re-build the scene
+	m_currentScene->clear_accel_structure();
+	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, buffer.get_resolution());
+}
+
 void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
 											 const scene::SceneDescriptor<Device::CPU>& scene) {
 	int pixel = coord.x + coord.y * outputBuffer.get_width();
-
-	constexpr ei::Vec3 silhouetteColor{ 1.f, 0.f, 0.f };
-	constexpr ei::Vec3 lightColor{ 1.f };
-	constexpr ei::Vec3 shadowColor{ 0.f };
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
@@ -328,35 +271,14 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 									atomic_add(m_importanceMap[m_vertexOffsets[firstHit.hitId.instanceId] + edgeIdxSecond[i]], 1.f);
 								}
 
-								if(m_params.showSilhouette)
-									outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, silhouetteColor,
-															vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
+								outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
 							} else {
 								mAssert(thirdHit.hitId.instanceId >= 0);
 								// TODO: store a shadow photon?
-								if(m_params.showSilhouette)
-									outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
-															vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 							}
-						} else {
-							if(m_params.showSilhouette)
-								outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
-														vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 						}
-					} else {
-						if(m_params.showSilhouette)
-							outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
-													vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 					}
-				} else {
-					if(m_params.showSilhouette)
-						outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
-												vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 				}
-			} else {
-				if(m_params.showSilhouette)
-					outputBuffer.contribute(coord, math::Throughput{ Spectrum{1.f}, 1.f }, shadowColor,
-											vertex->get_position(), vertex->get_normal(), vertex->get_albedo());
 			}
 		}
 	}
@@ -487,6 +409,61 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
+}
+
+void CpuShadowSilhouettes::compute_max_importance() {
+	m_maxImportance = 0.f;
+
+	// Compute the maximum normalized importance for visualization
+	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
+		const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[i]];
+		// First triangles, then quads
+		for(u32 t = 0u; t < lod.polygon.numTriangles; ++t) {
+			const u32 A = lod.polygon.vertexIndices[3u * t + 0u];
+			const u32 B = lod.polygon.vertexIndices[3u * t + 1u];
+			const u32 C = lod.polygon.vertexIndices[3u * t + 2u];
+			const float area = ei::surface(ei::Triangle{
+				lod.polygon.vertices[A], lod.polygon.vertices[B],
+				lod.polygon.vertices[C] });
+			const float importance = (m_importanceMap[m_vertexOffsets[i] + A]
+										+ m_importanceMap[m_vertexOffsets[i] + B]
+										+ m_importanceMap[m_vertexOffsets[i] + C]) / 3.f;
+
+			m_maxImportance = std::max(importance / area, m_maxImportance);
+		}
+
+		for(u32 q = 0u; q < lod.polygon.numQuads; ++q) {
+			const u32 A = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 0u];
+			const u32 B = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 1u];
+			const u32 C = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 2u];
+			const u32 D = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 3u];
+			const float area = ei::surface(ei::Triangle{
+				lod.polygon.vertices[A], lod.polygon.vertices[B],
+				lod.polygon.vertices[C] }) + ei::surface(ei::Triangle{
+				lod.polygon.vertices[A], lod.polygon.vertices[C],
+				lod.polygon.vertices[D] });
+			const float importance = (m_importanceMap[m_vertexOffsets[i] + A]
+										+ m_importanceMap[m_vertexOffsets[i] + B]
+										+ m_importanceMap[m_vertexOffsets[i] + C]
+										+ m_importanceMap[m_vertexOffsets[i] + D]) / 4.f;
+
+			m_maxImportance = std::max(importance / area, m_maxImportance);
+		}
+	}
+}
+
+void CpuShadowSilhouettes::initialize_importance_map() {
+	m_vertexCount = 0u;
+	m_vertexOffsets = make_udevptr_array<Device::CPU, u32>(m_sceneDesc.numInstances);
+	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
+		m_vertexOffsets[i] = m_vertexCount;
+		m_vertexCount += m_sceneDesc.lods[m_sceneDesc.lodIndices[i]].polygon.numVertices;
+	}
+	// Allocate sufficient buffer
+	m_importanceMap = make_udevptr_array<Device::CPU, std::atomic<float>>(m_vertexCount);
+	// Initilaize importance with zero
+	for(u32 i = 0u; i < m_vertexCount; ++i)
+		m_importanceMap[i].store(1.f);
 }
 
 void CpuShadowSilhouettes::init_rngs(int num) {

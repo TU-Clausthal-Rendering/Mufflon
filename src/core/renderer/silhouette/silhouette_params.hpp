@@ -18,13 +18,6 @@ struct PTargetReduction {
 	}
 };
 
-struct PShowSilhouette {
-	bool showSilhouette{ false };
-	static ParamDesc get_desc() noexcept {
-		return { "Render shadow silhouette", ParameterTypes::BOOL };
-	}
-};
-
 struct PVertexThreshold {
 	int threshold{ 100 };
 	static ParamDesc get_desc() noexcept {
@@ -53,22 +46,14 @@ struct PEnableSilhouetteImportance {
 	}
 };
 
-struct PMaxNormalDeviation {
-	float maxNormalDeviation{ 60.f };
-	static ParamDesc get_desc() noexcept {
-		return { "Maximum normal deviation", ParameterTypes::FLOAT};
-	}
-};
-
 struct PKeepImportance {
 	bool keepImportance{ false };
 	static ParamDesc get_desc() noexcept {
-		return { "Keep importance across resets", ParameterTypes::BOOL};
+		return { "Keep importance across resets", ParameterTypes::BOOL };
 	}
 };
 
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PTargetReduction, PVertexThreshold,
-	PMaxNormalDeviation, PEnableDirectImportance, PEnableSilhouetteImportance, PDecimationEnabled,
-	PKeepImportance, PShowSilhouette, PMaxPathLength>;
+	PEnableDirectImportance, PEnableSilhouetteImportance, PDecimationEnabled, PKeepImportance, PMaxPathLength>;
 
 }} // namespace mufflon::renderer

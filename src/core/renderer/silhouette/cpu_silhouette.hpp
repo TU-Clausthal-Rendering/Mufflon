@@ -40,6 +40,11 @@ private:
 	void importance_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
 						   const scene::SceneDescriptor<Device::CPU>& scene);
 
+	void initialize_importance_map();
+	void gather_importance(RenderBuffer<Device::CPU>& buffer);
+	void decimate(RenderBuffer<Device::CPU>& buffer);
+	void compute_max_importance();
+
 	bool m_reset = true;
 	SilhouetteParameters m_params = {};
 	scene::SceneHandle m_currentScene = nullptr;
