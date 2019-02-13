@@ -43,9 +43,11 @@ struct OutputValue : util::Flags<u32> {
 };
 
 inline StringView get_render_target_name(u32 target) {
-	static StringView TARGET_NAMES[OutputValue::TARGET_COUNT] = {
+	static StringView TARGET_NAMES[] = {
 		"Radiance", "Position", "Albedo", "Normal", "Lightness"
 	};
+	static_assert(sizeof(TARGET_NAMES) / sizeof(*TARGET_NAMES) == OutputValue::TARGET_COUNT,
+				  "Inequal number of targets and target names");
 	mAssert(target < OutputValue::TARGET_COUNT);
 	return TARGET_NAMES[target];
 }
