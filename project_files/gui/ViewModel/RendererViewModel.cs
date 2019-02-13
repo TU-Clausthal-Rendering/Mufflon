@@ -249,7 +249,7 @@ namespace gui.ViewModel
                     OnPropertyChanged(nameof(IsRendering));
                     break;
                 case nameof(Models.Renderer.Iteration):
-                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
                         OnPropertyChanged(nameof(Iteration));
                     }));
                     break;

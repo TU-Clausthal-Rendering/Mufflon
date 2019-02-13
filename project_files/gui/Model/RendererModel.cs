@@ -53,12 +53,23 @@ namespace gui.Model
            UpdateIterationCount();
         }
 
+        public void UpdateDisplayTexture()
+        {
+            // TODO: this belongs somewhere else for sure
+            if(!IsRendering)
+            {
+                RenderLock.Release();
+                RenderLock.WaitOne();
+            }
+        }
+
         public void Iterate(uint times)
         {
             for(uint i = 0u; i < times; ++i)
             {
-                RenderLock.Release();
-                RenderLock.WaitOne();
+                IsRendering = true;
+                IsRendering = false;
+                UpdateIterationCount();
             }
         }
 

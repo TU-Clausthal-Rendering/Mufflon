@@ -22,6 +22,9 @@ namespace gui.ViewModel
             SaveScreenShotCommand = new ScreenShotCommand(models);
             ToggleCameraMovementCommand = new ActionCommand(() =>
                 models.Settings.AllowCameraMovement = !models.Settings.AllowCameraMovement);
+            OneIterationCommand = new PerformIterationsCommand(m_models, 1u);
+            TenIterationsCommand = new PerformIterationsCommand(m_models, 10u);
+            HundredIterationsCommand = new PerformIterationsCommand(m_models, 100u);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
@@ -61,6 +64,9 @@ namespace gui.ViewModel
         public ICommand ResetCommand { get; }
         public ICommand SaveScreenShotCommand { get; }
         public ICommand ToggleCameraMovementCommand { get; }
+        public ICommand OneIterationCommand { get; }
+        public ICommand TenIterationsCommand { get; }
+        public ICommand HundredIterationsCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

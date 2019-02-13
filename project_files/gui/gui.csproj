@@ -46,7 +46,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>x64</PlatformTarget>
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>..\..\build\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -84,6 +84,7 @@
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AdjustGammaCommand.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
+    <Compile Include="Command\PerformIterationsCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
     <Compile Include="Command\ScreenShotCommand.cs" />
     <Compile Include="Command\SelectRendererCommand.cs" />
@@ -465,6 +466,13 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Controller\Renderer\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\iterate_ten.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\iterate_hundred.png" />
+    <Resource Include="Icons\iterate_one.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

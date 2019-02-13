@@ -356,7 +356,7 @@ namespace gui.Dll
             {
                 m_backgroundCleared = false;
                 // Iterate once to update the background
-                m_rendererModel.Iterate(1u);
+                m_rendererModel.UpdateDisplayTexture();
                 handled = true;
             }
             return base.WndProc(hwnd, msg, wParam, lParam, ref handled);

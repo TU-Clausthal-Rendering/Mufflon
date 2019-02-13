@@ -146,13 +146,11 @@ namespace gui.ViewModel
                     }
                     TargetData[(int)m_models.RenderTargetSelection.VisibleTarget.TargetIndex].Visible = true;
                     TargetData[(int)m_models.RenderTargetSelection.VisibleTarget.TargetIndex].VarianceVisible = m_models.RenderTargetSelection.IsVarianceVisible;
-                    if (!m_models.Renderer.IsRendering)
-                        m_models.Renderer.Iterate(1u);
+                    m_models.Renderer.UpdateDisplayTexture();
                     break;
                 case nameof(RenderTargetSelectionModel.IsVarianceVisible):
                     TargetData[(int)m_models.RenderTargetSelection.VisibleTarget.TargetIndex].VarianceVisible = m_models.RenderTargetSelection.IsVarianceVisible;
-                    if(!m_models.Renderer.IsRendering)
-                        m_models.Renderer.Iterate(1u);
+                    m_models.Renderer.UpdateDisplayTexture();
                     break;
                 case nameof(RenderTarget.Enabled):
                 {

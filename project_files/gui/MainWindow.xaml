@@ -190,6 +190,40 @@
                         </StackPanel>
                     </Button>
                 </StatusBarItem>
+                <Separator HorizontalAlignment="Center"/>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button Command="{Binding Toolbar.OneIterationCommand}"
+                            ToolTip="Advance rendering by one iteration"
+                            SnapsToDevicePixels="True">
+                        <Image Source="Icons/iterate_one.png"
+                               RenderOptions.BitmapScalingMode="LowQuality"
+                               SnapsToDevicePixels="True"
+                               Width="16"
+                               Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button Command="{Binding Toolbar.TenIterationsCommand}"
+                            ToolTip="Advance rendering by ten iterations"
+                            SnapsToDevicePixels="True">
+                        <Image Source="Icons/iterate_ten.png"
+                               RenderOptions.BitmapScalingMode="LowQuality"
+                               SnapsToDevicePixels="True"
+                               Width="16"
+                               Height="16"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <Button Command="{Binding Toolbar.HundredIterationsCommand}"
+                            ToolTip="Advance rendering by one hundred iterations"
+                            SnapsToDevicePixels="True">
+                        <Image Source="Icons/iterate_hundred.png"
+                               RenderOptions.BitmapScalingMode="LowQuality"
+                               SnapsToDevicePixels="True"
+                               Width="16"
+                               Height="16"/>
+                    </Button>
+                </StatusBarItem>
             </StatusBar>
 
             <Border
