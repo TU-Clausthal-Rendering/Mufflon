@@ -38,6 +38,9 @@ class DllInterface:
     def render_iterate(self):
         return self.dllHolder.core.render_iterate()
 
+    def render_reset(self):
+        return self.dllHolder.core.render_reset()
+
     def render_get_current_iteration(self):
         return self.dllHolder.core.render_get_current_iteration()
 
@@ -128,3 +131,15 @@ class RenderActions:
             self.dllInterface.render_iterate()
             curTime = process_time()
         self.take_screenshot(self.dllInterface.render_get_current_iteration())
+
+    def render_reset(self):
+        self.dllInterface.render_reset()
+
+    def renderer_set_parameter_bool(self, parameterName, value):
+        return self.dllInterface.renderer_set_parameter_bool(parameterName, value)
+
+    def renderer_set_parameter_float(self, parameterName, value):
+        return self.dllInterface.renderer_set_parameter_float(parameterName, value)
+
+    def renderer_set_parameter_int(self, parameterName, value):
+        return self.dllInterface.renderer_set_parameter_int(parameterName, value)
