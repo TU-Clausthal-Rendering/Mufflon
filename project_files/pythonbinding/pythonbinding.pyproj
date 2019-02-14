@@ -1,29 +1,43 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Configuration Condition=" '$(Configuration)' == 'Debug' ">Debug</Configuration>
+    <Configuration Condition=" '$(Configuration)' == 'Release' ">Release</Configuration>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{a55ed0aa-5b4e-48c6-bfb0-5e46551a1c32}</ProjectGuid>
     <ProjectHome>..\..\src\pythonbinding\</ProjectHome>
     <StartupFile>example.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>..\..\build\release\</WorkingDirectory>
-    <OutputPath>.</OutputPath>
+    <OutputPath>$(SolutionDir)build\$(Configuration)</OutputPath>
     <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <InterpreterId>Global|PythonCore|3.7</InterpreterId>
+	<ProjectName>pythonbinding</ProjectName>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
   <PropertyGroup>
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+	<OutDir>$(SolutionDir)build\$(Configuration)</OutDir>
+	<IntDir>$(SolutionDir)build\temp\$(ProjectName)</IntDir>
+	<BaseIntermediateOutputPath>$(IntDir)</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="bindings.py" />
     <Compile Include="example.py" />
+    <Bindings Include="..\..\src\pythonbinding\bindings.py" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|PythonCore|3.7" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+  <Target Name="CoreCompile">
+  <Copy SourceFiles="%(Bindings.FullPath)"
+        DestinationFiles="$(OutDir)%(Bindings.Filename)%(Bindings.Extension)"
+        Condition="!Exists('$(OutDir)%(Bindings.Filename)%(Bindings.Extension)') OR $([System.DateTime]::Parse('%(Bindings.ModifiedTime)').Ticks) &gt; $([System.IO.File]::GetLastWriteTime('$(OutDir)%(Bindings.Filename)%(Bindings.Extension)').Ticks)"/>
+  </Target>
+  <Target Name="BeforeBuild">
+	<MakeDir Directories="$(BaseIntermediateOutputPath)$(Configuration)"/>
+  </Target>
 </Project>
