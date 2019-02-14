@@ -1,6 +1,6 @@
 from ctypes import *
 from time import *
-
+import ntpath
 
 class DllHolder:
     def __init__(self):
@@ -14,6 +14,10 @@ class DllInterface:
         self.dllHolder = DllHolder()
         self.dllHolder.core.mufflon_initialize()
         self.disable_profiling()
+        self.dllHolder.core.render_get_renderer_name.restype = c_char_p
+        self.dllHolder.core.render_get_render_target_name.restype = c_char_p
+        self.dllHolder.core.scenario_get_name.restype = c_char_p
+        self.dllHolder.core.world_get_current_scenario.restype = POINTER(c_int)
 
     def disable_profiling(self):
         self.dllHolder.core.profiling_disable()
@@ -43,6 +47,9 @@ class DllInterface:
     def render_get_render_target_count(self):
         return self.dllHolder.core.render_get_render_target_count()
 
+    def render_get_render_target_name(self, index):
+        return self.dllHolder.core.render_get_render_target_name(c_uint32(index)).decode()
+
     def render_is_render_target_enabled(self, targetIndex, variance):
         return self.dllHolder.core.render_is_render_target_enabled(c_uint32(targetIndex), c_bool(variance))
 
@@ -52,52 +59,61 @@ class DllInterface:
     def render_enable_renderer(self, rendererIndex):
         return self.dllHolder.core.render_enable_renderer(c_uint32(rendererIndex))
 
-    def render_is_render_target_variance_enabled(self, targetIndex):
-        return False
+    def render_get_renderer_count(self):
+        return self.dllHolder.core.render_get_renderer_count()
 
-    def render_get_active_scene_name(self):
-        return "scene_name"
+    def render_get_renderer_name(self, rendererIndex):
+        return self.dllHolder.core.render_get_renderer_name(c_uint32(rendererIndex)).decode()
 
     def render_get_active_scenario_name(self):
-        return "scenario_name"
+        return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
 
-    def render_get_active_renderer_name(self):
-        return "renderer_name"
 
-    def render_get_target_name(self, index):
-        return "target_name"
+def path_leaf(path):
+    head, tail = ntpath.split(path)
+    return tail or ntpath.basename(head)
 
 
 class RenderActions:
     screenshotPattern = "#scene-#scenario-#renderer-#iteration"
+    sceneName = ""
+    activeRendererName = ""
 
     def __init__(self):
         self.dllInterface = DllInterface()
 
-    def load_json(self, szeneJson):
-        returnValue = self.dllInterface.loader_load_json(szeneJson)
+    def load_json(self, sceneJson):
+        fileName = path_leaf(sceneJson)
+        self.sceneName = fileName.split(".")[0]
+        returnValue = self.dllInterface.loader_load_json(sceneJson)
         self.dllInterface.render_enable_render_target(0, False)
         return returnValue
 
-    def enable_renderer(self, rendererIndex):  # TODO: enable by string
-        self.dllInterface.render_enable_renderer(rendererIndex)
+    def enable_renderer(self, rendererString):
+        for i in range(self.dllInterface.render_get_renderer_count()):
+            name = self.dllInterface.render_get_renderer_name(i)
+            if name == rendererString:
+                self.activeRendererName = rendererString
+                self.dllInterface.render_enable_renderer(i)
+                return True
+        return False
 
     def enable_render_target(self, targetIndex, variance):
         self.dllInterface.render_enable_render_target(targetIndex, variance)
 
     def take_screenshot(self, iterationNr):
         filename = self.screenshotPattern
-        filename = filename.replace("#scene", self.dllInterface.render_get_active_scene_name(), 1)
+        filename = filename.replace("#scene", self.sceneName, 1)
         filename = filename.replace("#scenario", self.dllInterface.render_get_active_scenario_name(), 1)
-        filename = filename.replace("#renderer", self.dllInterface.render_get_active_renderer_name(), 1)
+        filename = filename.replace("#renderer", self.activeRendererName, 1)
         filename = filename.replace("#iteration", str(iterationNr), 1)
 
         for targetIndex in range(self.dllInterface.render_get_render_target_count()):
             if self.dllInterface.render_is_render_target_enabled(targetIndex, False):
-                fName = filename.replace("#target", str(self.dllInterface.render_get_target_name(targetIndex)), 1)
+                fName = filename.replace("#target", self.dllInterface.render_get_render_target_name(targetIndex), 1)
                 self.dllInterface.render_save_screenshot(fName, targetIndex, False)
             if self.dllInterface.render_is_render_target_enabled(targetIndex, True):
-                fName = filename.replace("#target", str(self.dllInterface.render_get_target_name(targetIndex)) + "(Variance)", 1)
+                fName = filename.replace("#target", self.dllInterface.render_get_render_target_name(targetIndex) + "(Variance)", 1)
                 self.dllInterface.render_save_screenshot(fName, targetIndex, True)
 
     def render_for_iterations(self, iterationCount):
