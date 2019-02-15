@@ -2703,49 +2703,32 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	}
 
 	fs::path fileName = std::string(filename) + ".pfm";
-	std::ofstream file(fileName, std::ofstream::binary | std::ofstream::out);
-	if(file.bad()) {
-		logError("[", FUNCTION_NAME, "] Failed to open screenshot file '",
-				 fileName.string(), "'");
-		return false;
-	}
-
-	// TODO: this is just for debugging! This should be done by an image library
 
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
 	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags },
 										renderer::OutputHandler::get_target_format(renderer::OutputValue{ flags }),
 										false);
 	const int numChannels = textures::NUM_CHANNELS(data.get_format());
-	if(numChannels == 1)
-		file.write("Pf\n", 3);
-	else
-		file.write("PF\n", 3);
 	ei::IVec2 res = s_imageOutput->get_resolution();
-	auto sizes = std::to_string(res.x) + " " + std::to_string(res.y);
-	file.write(sizes.c_str(), sizes.length());
-	file.write("\n-1.000000\n", 11);
 
-	const auto pixels = reinterpret_cast<const char *>(data.data());
-	if(data.get_format() == textures::Format::R32F || data.get_format() == textures::Format::RG32F
-	   || data.get_format() == textures::Format::RGBA32F) {
-		for(int y = 0; y < res.y; ++y) {
-			for(int x = 0; x < res.x; ++x) {
-				switch(numChannels) {
-					case 1: file.write(&pixels[(y * res.x + x) * sizeof(float)], sizeof(float)); break;
-					case 2: {
-						const ei::Vec2& pixel = *reinterpret_cast<ei::Vec2*>(pixels[(y * res.x + x) * 2u * sizeof(float)]);
-						ei::Vec3 tranformed{ pixel };
-						file.write(reinterpret_cast<const char*>(&pixel), 3u * sizeof(float));
-					}	break;
-					default:
-						file.write(&pixels[(y * res.x + x) * numChannels * sizeof(float)], 3u * sizeof(float));
-				}
+	TextureData texData;
+	texData.data = data.data();
+	texData.components = numChannels;
+	texData.format = TextureFormat(data.get_format());
+	texData.width = res.x;
+	texData.height = res.y;
+	texData.sRgb = false;
+	texData.layers = data.get_num_layers();
+
+	fs::path filePath(filename);
+	filePath.replace_extension(".pfm");
+	for(auto& plugin : s_plugins) {
+		if(plugin.is_loaded()) {
+			if(plugin.can_store_format(filePath.extension().string())) {
+				if(plugin.store(filePath.string(), &texData))
+					break;
 			}
 		}
-	} else {
-		logError("[", FUNCTION_NAME, "] Non-float formats are not supported yet");
-		return false;
 	}
 	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", filename, "'");
 

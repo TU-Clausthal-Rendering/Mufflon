@@ -230,6 +230,7 @@ public:
 	template < Device dev >
 	void clear();
 
+	constexpr bool is_sRgb() const noexcept { return m_sRgb; }
 	constexpr i32 get_width() const noexcept { return m_width; }
 	constexpr i32 get_height() const noexcept { return m_height; }
 	constexpr i32 get_num_layers() const noexcept { return m_numLayers; }

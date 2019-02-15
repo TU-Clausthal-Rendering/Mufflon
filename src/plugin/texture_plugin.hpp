@@ -15,12 +15,16 @@ public:
 	~TextureLoaderPlugin() = default;
 
 	bool can_load_format(StringView extension) const;
+	bool can_store_format(StringView extension) const;
 	bool load(StringView filePath, TextureData* texData) const;
+	bool store(StringView filePath, const TextureData* texData) const;
 	void set_logger(void(*logCallback)(const char*, int));
 	
 private:
 	bool(*m_canLoadFunc)(const char*) = nullptr;
+	bool(*m_canStoreFunc)(const char*) = nullptr;
 	bool(*m_loadFunc)(const char*, TextureData* texData) = nullptr;
+	bool(*m_storeFunc)(const char*, const TextureData* texData) = nullptr;
 	void(*m_setLogger)(void(*logCallback)(const char*, int)) = nullptr;
 };
 

@@ -196,9 +196,6 @@
     <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\plugin\texture_interface.h">
-      <Filter>Source Files\plugin</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\deps\epsilon\include\ei\2dintersection.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
@@ -231,6 +228,9 @@
     </ClInclude>
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h">
+      <Filter>Source Files\plugin</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

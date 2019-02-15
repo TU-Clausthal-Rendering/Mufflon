@@ -1,6 +1,7 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
 #include <stbi/stb_image.h>
+#include <stbi/stb_image_write.h>
 #include <mutex>
 
 // Helper macros for error checking and logging
@@ -74,9 +75,19 @@ Boolean set_logger(void(*logCallback)(const char*, int)) {
 }
 
 Boolean can_load_texture_format(const char* ext) {
-	(void)ext;
-	// Per default, stb_image pretends like it can read everything
-	return true;
+	return std::strncmp(ext, ".hdr", 4u) == 0
+		|| std::strncmp(ext, ".bmp", 4u) == 0
+		|| std::strncmp(ext, ".tga", 4u) == 0
+		|| std::strncmp(ext, ".jpeg", 5u) == 0
+		|| std::strncmp(ext, ".png", 4u) == 0;
+}
+
+Boolean can_store_texture_format(const char* ext) {
+	return std::strncmp(ext, ".hdr", 4u) == 0
+		/*|| std::strncmp(ext, ".bmp", 4u) == 0
+		|| std::strncmp(ext, ".tga", 4u) == 0
+		|| std::strncmp(ext, ".jpeg", 5u) == 0
+		|| std::strncmp(ext, ".png", 4u) == 0*/;
 }
 
 Boolean load_texture(const char* path, TextureData* texData) {
@@ -141,6 +152,28 @@ Boolean load_texture(const char* path, TextureData* texData) {
 				 path, "' caught exception: ", e.what());
 		if(texData->data)
 			delete[] texData->data;
+		return false;
+	}
+}
+Boolean store_texture(const char* path, const TextureData* texData) {
+	try {
+		CHECK_NULLPTR(path, "texture path", false);
+		CHECK_NULLPTR(path, "texture return data", false);
+
+		const int numChannels = texData->components;
+
+		if(texData->format == TextureFormat::FORMAT_R32F || texData->format == TextureFormat::FORMAT_RG32F
+			|| texData->format == TextureFormat::FORMAT_RGBA32F) {
+			const float* data = reinterpret_cast<const float*>(texData->data);
+			stbi_flip_vertically_on_write(true);
+			stbi_write_hdr(path, texData->width, texData->height, texData->components, data);
+		} else {
+			throw std::runtime_error("Non-float formats are not supported yet");
+		}
+		return true;
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Texture store for '",
+			path, "' caught exception: ", e.what());
 		return false;
 	}
 }

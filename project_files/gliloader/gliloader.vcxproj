@@ -85,7 +85,7 @@
     <ClInclude Include="..\..\deps\gli\gli\transform.hpp" />
     <ClInclude Include="..\..\deps\gli\gli\type.hpp" />
     <ClInclude Include="..\..\deps\gli\gli\view.hpp" />
-    <ClInclude Include="..\..\src\plugin\texture_interface.h" />
+    <ClInclude Include="..\..\src\plugin\texture_plugin_interface.h" />
     <ClInclude Include="..\..\src\util\log.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -69,6 +69,24 @@ unsigned char get_format(gli::format format, TextureData& texData) {
 	}
 }
 
+gli::format get_format(const TextureData& texData) {
+	switch(texData.format) {
+	case TextureFormat::FORMAT_R8U: return texData.sRgb ? gli::format::FORMAT_R8_SRGB_PACK8 : gli::format::FORMAT_R8_UINT_PACK8;
+	case TextureFormat::FORMAT_RG8U: return texData.sRgb ? gli::format::FORMAT_RG8_SRGB_PACK8 : gli::format::FORMAT_RG8_UINT_PACK8;
+	case TextureFormat::FORMAT_RGBA8U: return texData.sRgb ? gli::format::FORMAT_RGBA8_SRGB_PACK8 : gli::format::FORMAT_RGBA8_UINT_PACK8;
+	case TextureFormat::FORMAT_R16U: return gli::format::FORMAT_R16_UINT_PACK16;
+	case TextureFormat::FORMAT_RG16U: return gli::format::FORMAT_RG16_UINT_PACK16;
+	case TextureFormat::FORMAT_RGBA16U: return gli::format::FORMAT_RGBA16_UINT_PACK16;
+	case TextureFormat::FORMAT_R32F: return gli::format::FORMAT_R32_SFLOAT_PACK32;
+	case TextureFormat::FORMAT_RG32F: return gli::format::FORMAT_RG32_SFLOAT_PACK32;
+	case TextureFormat::FORMAT_RGBA32F: return gli::format::FORMAT_RGBA32_SFLOAT_PACK32;
+	case TextureFormat::FORMAT_RGBA16F: return gli::format::FORMAT_RGBA16_SFLOAT_PACK16;
+	default:
+		throw std::runtime_error("Unsupported texture format");
+	}
+}
+
+
 std::size_t get_component_size(TextureFormat format) {
 	switch(format) {
 		case TextureFormat::FORMAT_R8U:
@@ -131,14 +149,19 @@ Boolean set_logger(void(*logCallback)(const char*, int)) {
 
 Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".dds", 4u) == 0
-		|| std::strncmp(ext, ".ktx", 4u) == 0
-		|| std::strncmp(ext, ".exr", 4u) == 0;
+		|| std::strncmp(ext, ".ktx", 4u) == 0;
 }
+
+Boolean can_store_texture_format(const char* ext) {
+	return std::strncmp(ext, ".dds", 4u) == 0
+		|| std::strncmp(ext, ".ktx", 4u) == 0;
+}
+
 
 Boolean load_texture(const char* path, TextureData* texData) {
 	try {
 		CHECK_NULLPTR(path, "texture path", false);
-		CHECK_NULLPTR(path, "texture return data", false);
+		CHECK_NULLPTR(texData, "texture return data", false);
 
 		StringView pathView = path;
 		if(!fs::exists(path)) {
@@ -246,6 +269,47 @@ Boolean load_texture(const char* path, TextureData* texData) {
 				 path, "' caught exception: ", e.what());
 		if(texData->data)
 			delete[] texData->data;
+		return false;
+	}
+}
+
+Boolean store_texture(const char* path, const TextureData* texData) {
+	try {
+		CHECK_NULLPTR(path, "texture path", false);
+		CHECK_NULLPTR(texData, "texture return data", false);
+
+		constexpr std::size_t mipmap = 0u;
+
+		gli::texture::extent_type extent(texData->width, texData->height, 1);
+		gli::texture tex;
+		if(texData->layers == 6) {
+			tex = gli::texture(gli::TARGET_CUBE, get_format(*texData), extent, 1, texData->layers, 1);
+		} else {
+			tex = gli::texture(gli::TARGET_2D, get_format(*texData), extent, 1, texData->layers, 1);
+		}
+		const std::size_t channels = get_channels(texData->format);
+		const std::size_t componentSize = get_component_size(texData->format);
+		const std::size_t texelSize = channels * componentSize;
+		const std::size_t layerSize = texData->width * texData->height * texelSize;
+		for(std::size_t layer = 0u; layer < tex.layers(); ++layer) {
+			for(std::size_t face = 0u; face < tex.faces(); ++face) {
+				const uint8_t* layerData = &texData->data[(face + layer * tex.faces()) * layerSize];
+				char* data = reinterpret_cast<char*>(tex.data(layer, face, mipmap));
+				for(std::size_t y = 0u; y < texData->height; ++y) {
+					for(std::size_t x = 0u; x < texData->width; ++x) {
+						// Swap image vertically
+						const std::size_t origPixel = texelSize * (y * texData->width + x);
+						const std::size_t pixel = texelSize * ((texData->height - y - 1u)* texData->width + x);
+						std::memcpy(&data[origPixel], &layerData[pixel], texelSize);
+					}
+				}
+			}
+		}
+		gli::save(tex, path);
+		return true;
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Texture store for '",
+			path, "' caught exception: ", e.what());
 		return false;
 	}
 }

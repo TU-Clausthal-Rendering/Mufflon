@@ -22,9 +22,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\deps\stbi\stb_image.h">
-      <Filter>Source Files\deps\stbi</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\log.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -33,6 +30,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\string_view.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\stbi\stbi\stb_image.h">
+      <Filter>Source Files\deps\stbi</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\deps\stbi\stbi\stb_image_write.h">
+      <Filter>Source Files\deps\stbi</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

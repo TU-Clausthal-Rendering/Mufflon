@@ -3,6 +3,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <mutex>
+#include <ei/vector.hpp>
 
 // Helper macros for error checking and logging
 #define FUNCTION_NAME __func__
@@ -88,10 +89,14 @@ Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".pfm", 4u) == 0u;
 }
 
+Boolean can_store_texture_format(const char* ext) {
+	return std::strncmp(ext, ".pfm", 4u) == 0u;
+}
+
 Boolean load_texture(const char* path, TextureData* texData) {
 	try {
 		CHECK_NULLPTR(path, "texture path", false);
-		CHECK_NULLPTR(path, "texture return data", false);
+		CHECK_NULLPTR(texData, "texture return data", false);
 
 		// Code taken from ImageViewer
 		std::ifstream stream(path, std::ios::binary);
@@ -175,4 +180,52 @@ Boolean load_texture(const char* path, TextureData* texData) {
 			delete[] texData->data;
 		return false;
 	}
+}
+
+Boolean store_texture(const char* path, const TextureData* texData) {
+	try {
+		CHECK_NULLPTR(path, "texture path", false);
+		CHECK_NULLPTR(texData, "texture return data", false);
+
+		const int numChannels = texData->components;
+
+		std::ofstream file(path, std::ofstream::binary | std::ofstream::out);
+		if(file.bad()) {
+			throw std::runtime_error(" Failed to open screenshot file '" + std::string(path) + "'");
+		}
+		if(numChannels == 1)
+			file.write("Pf\n", 3);
+		else
+			file.write("PF\n", 3);
+
+		auto sizes = std::to_string(texData->width) + " " + std::to_string(texData->height);
+		file.write(sizes.c_str(), sizes.length());
+		file.write("\n-1.000000\n", 11);
+
+		const auto pixels = reinterpret_cast<const char *>(texData->data);
+		if(texData->format == TextureFormat::FORMAT_R32F || texData->format == TextureFormat::FORMAT_RG32F
+			|| texData->format == TextureFormat::FORMAT_RGBA32F) {
+			for(uint32_t y = 0; y < texData->height; ++y) {
+				for(uint32_t x = 0; x < texData->width; ++x) {
+					switch(numChannels) {
+					case 1: file.write(&pixels[(y * texData->width + x) * sizeof(float)], sizeof(float)); break;
+					case 2: {
+						const ei::Vec2& pixel = *reinterpret_cast<ei::Vec2*>(pixels[(y * texData->width + x) * 2u * sizeof(float)]);
+						file.write(reinterpret_cast<const char*>(&pixel), 3u * sizeof(float));
+					}	break;
+					default:
+						file.write(&pixels[(y * texData->width + x) * numChannels * sizeof(float)], 3u * sizeof(float));
+					}
+				}
+			}
+		} else {
+			throw std::runtime_error("Non-float formats are not supported yet");
+		}
+		return true;
+	} catch(const std::exception& e) {
+		logError("[", FUNCTION_NAME, "] Texture store for '",
+			path, "' caught exception: ", e.what());
+		return false;
+	}
+
 }
