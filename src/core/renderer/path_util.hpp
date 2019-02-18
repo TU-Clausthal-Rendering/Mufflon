@@ -541,7 +541,7 @@ private:
 	scene::Point m_position;
 
 	// Byte offset to the beginning of a path.
-	u16 m_offsetToPath;
+	i16 m_offsetToPath;
 
 	// Interaction type of this vertex (the descriptor at the end of the vertex depends on this).
 	Interaction m_type;
@@ -572,9 +572,9 @@ private:
 	CUDA_FUNCTION void* desc() { return as<u8>(this) + round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)); }
 
 	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
-		std::size_t s = as<u8>(previous) - as<u8>(mem);
+		std::ptrdiff_t s = as<u8>(previous) - as<u8>(mem);
 		mAssert(s <= 0xffff);
-		m_offsetToPath = static_cast<u16>(s);
+		m_offsetToPath = static_cast<i16>(s);
 	}
 
 	template<typename T, int A> 
