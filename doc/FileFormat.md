@@ -17,7 +17,7 @@ Curly brackets are used to declare a choice of different possible strings (e.g. 
 In the case of multiple type choices, details on further mandatory properties will be given below.
 
     {
-        "version": "1.0",
+        "version": "1.1",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
@@ -55,6 +55,8 @@ In the case of multiple type choices, details on further mandatory properties wi
         },
         "scenarios": {
             "<name1>: {
+                "parentScenario": "<scenario name (from json.scenarios)>"    // OPTIONAL copy all keys from the parent Scenario 
+                                                                             // Further keys will override parent keys (since 1.1)
                 "camera": "<camera name (from json.cameras)>",
                 "resolution": [int,int],        // Target image resolution
                 "lights": ["<light name (from json.lights)>", ...]  // List of light sources
@@ -72,12 +74,12 @@ In the case of multiple type choices, details on further mandatory properties wi
                         // More meta information
                     },
                 },
-                "instanceProperties": {}
+                "instanceProperties": {
                      "<instance name (from binary)>": { // OPTIONAL per object properties
                         "mask": bool,                   // Do not render this object (true=blacklisted)
                         "lod": int,                     // Use a specific LOD different/independent from global LOD
                         // More meta information
-                    }
+                    },
                 }
             }
             ...
