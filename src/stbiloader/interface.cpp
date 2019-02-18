@@ -78,6 +78,7 @@ Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".hdr", 4u) == 0
 		|| std::strncmp(ext, ".bmp", 4u) == 0
 		|| std::strncmp(ext, ".tga", 4u) == 0
+		|| std::strncmp(ext, ".jpg", 4u) == 0
 		|| std::strncmp(ext, ".jpeg", 5u) == 0
 		|| std::strncmp(ext, ".png", 4u) == 0;
 }
