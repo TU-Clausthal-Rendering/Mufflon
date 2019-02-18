@@ -90,8 +90,8 @@ namespace gui.ViewModel
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(m_models);
-            AdjustGammaUp = new AdjustGammaUpCommand();
-            AdjustGammaDown = new AdjustGammaDownCommand();
+            AdjustGammaUp = new AdjustGammaUpCommand(m_models);
+            AdjustGammaDown = new AdjustGammaDownCommand(m_models);
 
             KeyGestures = new KeyGestureViewModel(models);
 
