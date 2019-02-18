@@ -212,5 +212,16 @@ namespace gui.Properties {
                 this["LastSelectedRenderTarget"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        public global::System.Collections.Specialized.StringCollection RendererParameters {
+            get {
+                return ((global::System.Collections.Specialized.StringCollection)(this["RendererParameters"]));
+            }
+            set {
+                this["RendererParameters"] = value;
+            }
+        }
     }
 }

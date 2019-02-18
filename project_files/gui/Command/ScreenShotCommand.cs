@@ -29,7 +29,7 @@ namespace gui.Command
             string filename = m_models.Settings.ScreenshotNamePattern;
             filename = filename.Replace("#scene", Path.GetFileNameWithoutExtension(m_models.World.Filename));
             filename = filename.Replace("#scenario", m_models.World.CurrentScenario.Name);
-            filename = filename.Replace("#renderer", Core.render_get_renderer_name(m_models.Renderer.RendererIndex));
+            filename = filename.Replace("#renderer", m_models.Renderer.Name);
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
 
             foreach(RenderTarget target in m_models.RenderTargetSelection.Targets)

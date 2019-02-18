@@ -14,19 +14,18 @@ namespace gui.ViewModel
     // Classes for the different renderer properties
     public class RendererPropertyBool : INotifyPropertyChanged
     {
-        private string m_name;
-        private bool m_value = false;
+        private RendererParameter m_param;
 
-        public RendererPropertyBool(string name) { m_name = name; }
+        public RendererPropertyBool(RendererParameter param) { m_param = param; }
 
-        public string Name { get => m_name; }
+        public string Name { get => m_param.Name; }
         public bool Value
         {
-            get => m_value;
+            get => (bool) m_param.Value;
             set
             {
-                if (value == m_value) return;
-                m_value = value;
+                if (value == (bool)m_param.Value) return;
+                m_param.Value = value;
                 OnPropertyChanged(nameof(Value));
             }
         }
@@ -45,19 +44,18 @@ namespace gui.ViewModel
     }
     public class RendererPropertyInt : INotifyPropertyChanged
     {
-        private string m_name;
-        private int m_value = 0;
+        private RendererParameter m_param;
 
-        public RendererPropertyInt(string name) { m_name = name; }
+        public RendererPropertyInt(RendererParameter param) { m_param = param; }
 
-        public string Name { get => m_name; }
+        public string Name { get => m_param.Name; }
         public int Value
         {
-            get => m_value;
+            get => (int)m_param.Value;
             set
             {
-                if (value == m_value) return;
-                m_value = value;
+                if (value == (int)m_param.Value) return;
+                m_param.Value = value;
                 OnPropertyChanged(nameof(Value));
             }
         }
@@ -76,19 +74,18 @@ namespace gui.ViewModel
     }
     public class RendererPropertyFloat : INotifyPropertyChanged
     {
-        private string m_name;
-        private float m_value = 0f;
+        private RendererParameter m_param;
 
-        public RendererPropertyFloat(string name) { m_name = name; }
+        public RendererPropertyFloat(RendererParameter param) { m_param = param; }
 
-        public string Name { get => m_name; }
+        public string Name { get => m_param.Name; }
         public float Value
         {
-            get => m_value;
+            get => (float)m_param.Value;
             set
             {
-                if (value == m_value) return;
-                m_value = value;
+                if (value == (float)m_param.Value) return;
+                m_param.Value = value;
                 OnPropertyChanged(nameof(Value));
             }
         }
@@ -173,7 +170,7 @@ namespace gui.ViewModel
         }
 
         public ObservableCollection<RendererItem> Renderers { get; } = new ObservableCollection<RendererItem>();
-        public ObservableCollection<object> RendererProperties { get; } = new ObservableCollection<object>();
+        public ObservableCollection<INotifyPropertyChanged> RendererProperties { get; } = new ObservableCollection<INotifyPropertyChanged>();
 
         public RendererViewModel(Models models, ICommand playPause, ICommand reset)
         {
@@ -238,11 +235,15 @@ namespace gui.ViewModel
                         lastSelected = 0;
                         m_models.Settings.LastSelectedRenderer = 0;
                     }
-                        SelectedRenderer = Renderers[(int)m_models.Settings.LastSelectedRenderer];
+                    SelectedRenderer = Renderers[(int)m_models.Settings.LastSelectedRenderer];
                     if (m_models.Renderer.RendererIndex == SelectedRenderer.Index)
                         rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.RendererIndex)));
                     else
                         m_models.Renderer.RendererIndex = SelectedRenderer.Index;
+
+                    // Load the parameter values from settings
+                    
+
                     OnPropertyChanged(nameof(Renderers));
                     }   break;
                 case nameof(Models.Renderer.IsRendering):
@@ -263,86 +264,42 @@ namespace gui.ViewModel
 
         private void rendererTypeChanged()
         {
-            if (m_reset.CanExecute(null))
-                m_reset.Execute(null);
-            if (!Core.render_enable_renderer(m_models.Renderer.RendererIndex))
-                throw new Exception(Core.core_get_dll_error());
-
             // Change the properties
             RendererProperties.Clear();
-            uint numParams = Core.renderer_get_num_parameters();
-            for (uint i = 0; i < numParams; ++i)
-            {
-                Core.ParameterType type;
-                string name = Core.renderer_get_parameter_desc(i, out type);
-                if (name.Length <= 0)
-                    continue;
 
-                switch (type)
+            foreach(RendererParameter param in m_models.Renderer.Parameters)
+            {
+                switch(param.Type)
                 {
                     case Core.ParameterType.Bool:
-                        {
-                            uint value;
-                            if (Core.renderer_get_parameter_bool(name, out value))
-                            {
-                                var prop = new RendererPropertyBool(name) { Value = value != 0u };
-                                prop.PropertyChanged += OnRenderPropertyChanged;
-                                RendererProperties.Add(prop);
-                            }
-                        }
+                        RendererProperties.Add(new RendererPropertyBool(param));
                         break;
                     case Core.ParameterType.Int:
-                        {
-                            int value;
-                            if (Core.renderer_get_parameter_int(name, out value))
-                            {
-                                var prop = new RendererPropertyInt(name) { Value = value };
-                                prop.PropertyChanged += OnRenderPropertyChanged;
-                                RendererProperties.Add(prop);
-                            }
-                        }
+                        RendererProperties.Add(new RendererPropertyInt(param));
                         break;
                     case Core.ParameterType.Float:
-                        {
-                            float value;
-                            if (Core.renderer_get_parameter_float(name, out value))
-                            {
-                                var prop = new RendererPropertyFloat(name) { Value = value };
-                                prop.PropertyChanged += OnRenderPropertyChanged;
-                                RendererProperties.Add(prop);
-                            }
-                        }
+                        RendererProperties.Add(new RendererPropertyFloat(param));
                         break;
                     default:
-                        break;
+                        throw new Exception("Invalid renderer parameter type!");
                 }
+                param.PropertyChanged += OnRenderParameterChanged;
             }
+
             OnPropertyChanged(nameof(RendererProperties));
         }
 
-        private void OnRenderPropertyChanged(object sender, PropertyChangedEventArgs args)
+        private void OnRenderParameterChanged(object sender, PropertyChangedEventArgs args)
         {
-            if (sender is RendererPropertyBool)
-            {
-                if (!Core.renderer_set_parameter_bool((sender as RendererPropertyBool).Name,
-                    Convert.ToUInt32((sender as RendererPropertyBool).Value)))
-                    throw new Exception("Failed to set renderer parameter");
-            }
-            else if (sender is RendererPropertyInt)
-            {
-                if (!Core.renderer_set_parameter_int((sender as RendererPropertyInt).Name,
-                    (sender as RendererPropertyInt).Value))
-                    throw new Exception("Failed to set renderer parameter");
-            }
-            else if (sender is RendererPropertyFloat)
-            {
-                if (!Core.renderer_set_parameter_float((sender as RendererPropertyFloat).Name,
-                    (sender as RendererPropertyFloat).Value))
-                    throw new Exception("Failed to set renderer parameter");
-            }
+            var param = sender as RendererParameter;
+            var prop = RendererProperties[(int)param.Index];
 
-            if (m_reset.CanExecute(null))
-                m_reset.Execute(null);
+            if (prop is RendererPropertyBool)
+                (prop as RendererPropertyBool).Value = (bool)param.Value;
+            else if (prop is RendererPropertyInt)
+                (prop as RendererPropertyInt).Value = (int)param.Value;
+            else if (prop is RendererPropertyFloat)
+                (prop as RendererPropertyFloat).Value = (float)param.Value;
         }
 
         #region PropertyChanged
