@@ -474,9 +474,9 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		if(m_abort)
 			return false;
-		const Value& scenario = scenarioIter->value;
-		assertObject(m_state, scenario);
 		m_state.objectNames.push_back(scenarioIter->name.GetString());
+		const Value& scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
+		assertObject(m_state, scenario);
 
 		const char* camera = read<const char*>(m_state, get(m_state, scenario, "camera"));
 		ei::IVec2 resolution = read<ei::IVec2>(m_state, get(m_state, scenario, "resolution"));
@@ -603,9 +603,50 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(!scenario_is_sane(scenarioHdl, &sanityMsg))
 			throw std::runtime_error("Scenario '" + std::string(scenarioIter->name.GetString())
 									 + "' did not pass sanity check: " + std::string(sanityMsg));
+		m_state.objectNames.pop_back();
 	}
 	return true;
 }
+
+rapidjson::Value JsonLoader::load_scenario(const rapidjson::GenericMemberIterator<true, rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>>& scenarioIter,
+	int maxRecursionDepth) {
+	if(maxRecursionDepth < 1)
+		throw std::runtime_error("Loop in scenario inheritance");
+	using namespace rapidjson;
+	const Value& scenarios = m_scenarios->value;
+
+	const Value& scenario = scenarioIter->value;
+	assertObject(m_state, scenario);
+
+	Value returnValue;
+	returnValue.SetObject();
+
+
+	if(auto parentIter = get(m_state, scenario, "parentScenario", false); parentIter != scenario.MemberEnd()) {
+		const char* parentScenario = read<const char*>(m_state, parentIter);
+		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd())
+			returnValue = load_scenario(parent, maxRecursionDepth-1);
+		else
+			throw std::runtime_error("Failed to find parent scenario: " + std::string(parentScenario));
+	}
+	selective_replace_keys(scenario, returnValue);
+	return returnValue;
+}
+
+void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& target) {
+	using namespace rapidjson;
+	for(Value::ConstMemberIterator iter = objectToCopy.MemberBegin(); iter != objectToCopy.MemberEnd(); ++iter) {
+		auto member = target.FindMember(iter->name);
+		if(member != target.MemberEnd()) {
+			if(iter->value.IsObject())
+				selective_replace_keys(iter->value, member->value);
+			else
+				target.EraseMember(member);
+		}
+		target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
+	}
+}
+
 
 bool JsonLoader::load_file() {
 	using namespace rapidjson;
@@ -631,7 +672,7 @@ bool JsonLoader::load_file() {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
-		if(m_version.compare(FILE_VERSION) != 0)
+		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");

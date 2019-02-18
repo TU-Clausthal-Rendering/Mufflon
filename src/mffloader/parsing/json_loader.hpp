@@ -27,7 +27,7 @@ private:
 
 class JsonLoader {
 public:
-	static constexpr const char FILE_VERSION[] = "1.0";
+	static constexpr const char FILE_VERSION[] = "1.1";
 	static constexpr float DEFAULT_NEAR_PLANE = 1.e-4f;
 	static constexpr float DEFAULT_FAR_PLANE = 2.f;
 
@@ -57,6 +57,10 @@ private:
 	bool load_lights();
 	bool load_materials();
 	bool load_scenarios(const std::vector<std::string>& binMatNames);
+	rapidjson::Value load_scenario(const rapidjson::GenericMemberIterator<true, rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>>& scenarioIter, int maxRecursionDepth);
+
+	void selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& objectToCopyIn);
+
 
 	const fs::path m_filePath;
 	std::string m_jsonString;
