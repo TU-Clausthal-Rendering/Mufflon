@@ -474,5 +474,8 @@
     <Resource Include="Icons\iterate_hundred.png" />
     <Resource Include="Icons\iterate_one.png" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\cross_arrow.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

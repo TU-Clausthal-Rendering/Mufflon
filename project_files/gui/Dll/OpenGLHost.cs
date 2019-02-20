@@ -76,6 +76,8 @@ namespace gui.Dll
             m_settings = settings;
             m_window.MouseWheel += OnMouseWheel;
             m_window.SnapsToDevicePixels = true;
+
+            m_window.MouseMove += OnMouseMove;
             // TODO: set the initial height here, but put a listener for window(!) size
             // TODO: On scenario change, also update the renderwith/height
         }
@@ -331,6 +333,13 @@ namespace gui.Dll
                 m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
             if (oldMaxOffsetY != 0)
                 m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
+        }
+
+        private void OnMouseMove(object sender, MouseEventArgs args)
+        {
+            var point = args.GetPosition(m_parent);
+            m_viewport.CursorPosX = m_viewport.OffsetX + (int)(point.X / m_viewport.Zoom);
+            m_viewport.CursorPosY = m_viewport.OffsetY + (int)(point.Y / m_viewport.Zoom);
         }
 
         /// <summary>

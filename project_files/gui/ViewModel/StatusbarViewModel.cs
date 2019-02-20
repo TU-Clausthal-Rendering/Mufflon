@@ -15,10 +15,13 @@ namespace gui.ViewModel
         public string CpuMemory { get; private set; } = "CPU: NaN/NaN/NaN MB";
         public string CudaMemory { get; private set; } = "CUDA: NaN/NaN/NaN MB";
 
+        public string CursorPos { get; private set; } = "0, 0";
+
         public StatusbarViewModel(Models models)
         {
             m_models = models;
             m_models.Statusbar.PropertyChanged += OnMemoryChanged;
+            m_models.Viewport.PropertyChanged += OnCursorChanged;
         }
 
         private void OnMemoryChanged(object sender, PropertyChangedEventArgs args)
@@ -31,6 +34,18 @@ namespace gui.ViewModel
                 + m_models.Statusbar.CudaFreeMemory + " MB";
             OnPropertyChanged(nameof(CpuMemory));
             OnPropertyChanged(nameof(CudaMemory));
+        }
+
+        private void OnCursorChanged(object sender, PropertyChangedEventArgs args)
+        {
+            switch(args.PropertyName)
+            {
+                case nameof(ViewportModel.CursorPosX):
+                case nameof(ViewportModel.CursorPosY):
+                    CursorPos = m_models.Viewport.CursorPosX.ToString() + ", " + m_models.Viewport.CursorPosY.ToString();
+                    OnPropertyChanged(nameof(CursorPos));
+                    break;
+            }
         }
 
         #region PropertyChanged

@@ -483,6 +483,16 @@
                     VerticalContentAlignment="Stretch"
                     ToolTip="Total/Used/Free"
                     Content="{Binding Statusbar.CudaMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <StatusBarItem HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal">
+                        <Image Source="Icons/cross_arrow.png"
+                               SnapsToDevicePixels="True"
+                               RenderOptions.BitmapScalingMode="LowQuality"
+                               Width="16"
+                               Height="16"/>
+                        <TextBlock Text="{Binding Statusbar.CursorPos}"/>
+                    </StackPanel>
+                </StatusBarItem> 
                 <StatusBarItem
                     Width="110"
                     HorizontalAlignment="Right"

@@ -122,6 +122,31 @@ namespace gui.Model
         // effective maximum size including zoom
         public int DesiredHeight => (int)(RenderHeight * Zoom);
 
+        // Cursor position relative to the viewport (pixel-aligned)
+        private int m_cursorPosX = 0;
+        public int CursorPosX
+        {
+            get => m_cursorPosX;
+            set
+            {
+                if (value == m_cursorPosX) return;
+                m_cursorPosX = Math.Min(Math.Max(0, value), RenderWidth - 1);
+                OnPropertyChanged(nameof(CursorPosX));
+            }
+        }
+
+        private int m_cursorPosY = 0;
+        public int CursorPosY
+        {
+            get => m_cursorPosY;
+            set
+            {
+                if (value == m_cursorPosY) return;
+                m_cursorPosY = Math.Min(Math.Max(0, value), RenderHeight - 1);
+                OnPropertyChanged(nameof(CursorPosY));
+            }
+        }
+
         #region PropertyChanged
 
         public event PropertyChangedEventHandler PropertyChanged;
