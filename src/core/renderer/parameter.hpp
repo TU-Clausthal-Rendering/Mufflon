@@ -163,4 +163,42 @@ struct PProgressive {
 	}
 };
 
+
+
+struct PImportanceIterations {
+	int importanceIterations{ 1 };
+	static ParamDesc get_desc() noexcept {
+		return { "Importance iterations", ParameterTypes::INT };
+	}
+};
+
+struct PTargetReduction {
+	float reduction{ 0.875f };
+	static ParamDesc get_desc() noexcept {
+		return { "Target reduction", ParameterTypes::FLOAT };
+	}
+};
+
+struct PVertexThreshold {
+	int threshold{ 100 };
+	static ParamDesc get_desc() noexcept {
+		return { "Decimation threshold", ParameterTypes::INT };
+	}
+};
+
+struct PDecimationEnabled {
+	bool decimationEnabled{ true };
+	static ParamDesc get_desc() noexcept {
+		return { "Enable decimation", ParameterTypes::BOOL };
+	}
+};
+
+struct PKeepImportance {
+	bool keepImportance{ false };
+	static ParamDesc get_desc() noexcept {
+		return { "Keep importance across resets", ParameterTypes::BOOL };
+	}
+};
+
+
 }} // namespace mufflon::renderer

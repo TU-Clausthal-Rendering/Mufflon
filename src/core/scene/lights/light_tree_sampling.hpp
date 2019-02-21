@@ -2,6 +2,7 @@
 
 #include "light_sampling.hpp"
 #include "light_tree.hpp"
+#include "core/cuda/cuda_utils.hpp"
 
 namespace mufflon { namespace scene { namespace lights {
 
@@ -160,7 +161,7 @@ template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u64 right,
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const ei::Box& bounds, const math::RndSet2& rnd,
-										  Guide&& guide) {
+										  Guide&& guide, u32* lightIndex = nullptr) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -170,6 +171,8 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 	u64 intervalLeft = left;
 	u64 intervalRight = right;
 	float lightProb = treeProb;
+	u32 nodeIndex = 0u;
+	u32 nodeLevel = 0u;
 
 	// Iterate until we hit a leaf
 	while(type == LightSubTree::Node::INTERNAL_NODE_TYPE) {
@@ -185,20 +188,25 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		// Compute the integer bounds
 		u64 intervalBoundary = intervalLeft + math::percentage_of(intervalRight - intervalLeft, probLeft);
 		if(rndChoice < intervalBoundary) {
+			nodeIndex += (1u << (nodeLevel++));
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
 			intervalRight = intervalBoundary;
 			lightProb *= probLeft;
 		} else {
+			nodeIndex += (1u << (nodeLevel++)) + 1u;
 			type = currentNode->right.type;
 			offset = currentNode->right.offset;
 			intervalLeft = intervalBoundary;
 			lightProb *= (1.0f-probLeft);
 		}
+
 		currentNode = tree.get_node(offset);
 	}
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
+	if(lightIndex != nullptr)
+		*lightIndex = nodeIndex - tree.internalNodeCount;
 	// We got a light source! Sample it
 	return adjustPdf(connect_light(static_cast<LightType>(type), tree.memory + offset,
 							 position, bounds, rnd), lightProb);
@@ -225,7 +233,7 @@ template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
 										  const ei::Box& bounds, const math::RndSet2& rnd,
-										  Guide&& guide) {
+										  Guide&& guide, u32* lightIndex = nullptr) {
 	using namespace lighttree_detail;
 	// Scale the indices such that they sample the u64-intervall equally.
 	// The (modulu) addition with the seed randomizes the choice.
@@ -262,7 +270,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 		subTree = &tree.posLights;
 		p = posProb;
 	}
-	return connect(*subTree, left, right, rndChoice, p, position, bounds, rnd, guide);
+	return connect(*subTree, left, right, rndChoice, p, position, bounds, rnd, guide, lightIndex);
 }
 
 /*

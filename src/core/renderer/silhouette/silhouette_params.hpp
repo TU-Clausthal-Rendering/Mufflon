@@ -4,43 +4,22 @@
 
 namespace mufflon { namespace renderer {
 
-struct PImportanceIterations {
-	int importanceIterations{ 1 };
-	static ParamDesc get_desc() noexcept {
-		return { "Importance iterations", ParameterTypes::INT };
-	}
-};
-
 struct PDecimationIterations {
-	int decimationIterations{ 1 };
+	int decimationIterations{ 10 };
 	static ParamDesc get_desc() noexcept {
 		return { "Decimation iterations", ParameterTypes::INT };
 	}
 };
 
-struct PTargetReduction {
-	float reduction{ 0.875f };
+struct PEnableViewImportance {
+	bool enableViewImportance{ true };
 	static ParamDesc get_desc() noexcept {
-		return { "Target reduction", ParameterTypes::FLOAT };
-	}
-};
-
-struct PVertexThreshold {
-	int threshold{ 100 };
-	static ParamDesc get_desc() noexcept {
-		return { "Decimation threshold", ParameterTypes::INT };
-	}
-};
-
-struct PDecimationEnabled {
-	bool decimationEnabled{ true };
-	static ParamDesc get_desc() noexcept {
-		return { "Enable decimation", ParameterTypes::BOOL };
+		return { "Enable view importance", ParameterTypes::BOOL };
 	}
 };
 
 struct PEnableIndirectImportance {
-	bool enableIndirectImportance{ false };
+	bool enableIndirectImportance{ true };
 	static ParamDesc get_desc() noexcept {
 		return { "Enable indirect importance", ParameterTypes::BOOL};
 	}
@@ -53,14 +32,22 @@ struct PEnableSilhouetteImportance {
 	}
 };
 
-struct PKeepImportance {
-	bool keepImportance{ false };
+struct PUseRadianceWeightedImportance {
+	bool useRadianceWeightedImportance{ true };
 	static ParamDesc get_desc() noexcept {
-		return { "Keep importance across resets", ParameterTypes::BOOL };
+		return { "Use radiance-weighted importance", ParameterTypes::BOOL };
+	}
+};
+
+struct PDirectIndirectRatio {
+	float directIndirectRatio{ 0.02f };
+	static ParamDesc get_desc() noexcept {
+		return { "Ratio threshold for direct/indirect illumination", ParameterTypes::FLOAT };
 	}
 };
 
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PVertexThreshold,
-	PEnableIndirectImportance, PEnableSilhouetteImportance, PDecimationEnabled, PKeepImportance, PMaxPathLength>;
+	PEnableViewImportance, PEnableIndirectImportance, PEnableSilhouetteImportance, PUseRadianceWeightedImportance,
+	PDirectIndirectRatio, PDecimationEnabled, PKeepImportance, PMaxPathLength>;
 
 }} // namespace mufflon::renderer

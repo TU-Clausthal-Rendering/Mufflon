@@ -279,6 +279,8 @@ public:
 	// Implements decimation.
 	void decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 					std::size_t targetVertices);
+	// Garbage-collects the mesh and the index buffer
+	void garbage_collect();
 
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);

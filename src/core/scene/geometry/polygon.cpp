@@ -397,12 +397,18 @@ void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decima
 	decimater.initialize();
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
-	decimater.mesh().garbage_collection();
+
+	// Do not garbage-collect the mesh yet - only rebuild the index buffer
 	this->rebuild_index_buffer();
+
 	m_vertexAttributes.mark_changed(Device::CPU);
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
 			" decimations performed)");
 	// TODO: this leaks mesh outside
+}
+
+void Polygons::garbage_collect() {
+	m_meshData->garbage_collection();
 }
 
 void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
@@ -561,14 +567,19 @@ void Polygons::rebuild_index_buffer() {
 	std::size_t currTri = 0u;
 	std::size_t currQuad = 0u;
 	u32* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices;
-	for(const auto& face : this->faces()) {
+
+	for(auto face : m_meshData->faces()) {
+		const auto startVertex = m_meshData->cfv_ccwbegin(face);
+		const auto endVertex = m_meshData->cfv_ccwend(face);
+		const auto vertexCount = std::distance(startVertex, endVertex);
+
 		u32* currIndices = indexBuffer;
-		if(std::distance(face.begin(), face.end()) == 3u) {
+		if(vertexCount == 3u) {
 			currIndices += 3u * currTri++;
 		} else {
 			currIndices += 3u * m_triangles + 4u * currQuad++;
 		}
-		for(auto vertexIter = face.begin(); vertexIter != face.end(); ++vertexIter) {
+		for(auto vertexIter = startVertex; vertexIter != endVertex; ++vertexIter) {
 			*(currIndices++) = static_cast<u32>(vertexIter->idx());
 			ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
 			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) } };
