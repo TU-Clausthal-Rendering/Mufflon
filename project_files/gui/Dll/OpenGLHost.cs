@@ -60,6 +60,7 @@ namespace gui.Dll
 
         // Tracks whether the background was cleared in a window message
         private bool m_backgroundCleared = true;
+        private int m_updatePixelColor = 0;
 
         // this is required to prevent the callback from getting garbage collected
         private Core.LogCallback m_logCallbackPointer = null;
@@ -77,7 +78,6 @@ namespace gui.Dll
             m_window.MouseWheel += OnMouseWheel;
             m_window.SnapsToDevicePixels = true;
 
-            m_window.MouseMove += OnMouseMove;
             // TODO: set the initial height here, but put a listener for window(!) size
             // TODO: On scenario change, also update the renderwith/height
         }
@@ -112,6 +112,8 @@ namespace gui.Dll
                     throw new Exception(Core.core_get_dll_error());
                 if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)m_settings.LoaderProfileLevel))
                     throw new Exception(Loader.loader_get_dll_error());
+                
+                m_window.MouseMove += OnMouseMove;
 
                 while (m_isRunning)
                 {
@@ -169,28 +171,13 @@ namespace gui.Dll
                         Application.Current.Dispatcher.BeginInvoke(new Action(() => m_rendererModel.UpdateIterationCount()));
                     }
 
-                    // Refresh the display
-                    // Border always keeps aspect ratio
-                    // Compute the offsets and dimensions of the viewport
-                    int left = m_viewport.OffsetX;
-                    int right = m_viewport.Width + m_viewport.OffsetX;
-                    int invertedOffsetY = (m_viewport.DesiredHeight - m_viewport.Height) - m_viewport.OffsetY;
-                    int bottom = invertedOffsetY;
-                    int top = m_viewport.Height + invertedOffsetY;
-                    UInt32 width = (UInt32)m_viewport.DesiredWidth;
-                    UInt32 height = (UInt32)m_viewport.DesiredHeight;
-
-                    IntPtr imageData = IntPtr.Zero;
-                    if (!Core.core_get_target_image(m_renderTarget.TargetIndex, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
-                        false, out imageData))
-                        throw new Exception(Core.core_get_dll_error());
-                    if(imageData != IntPtr.Zero)
-                        if (!OpenGlDisplay.opengldisplay_write(imageData))
-                            throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
-                    if (!OpenGlDisplay.opengldisplay_display(left, right, bottom, top, width, height))
-                        throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
-                    if (!Gdi32.SwapBuffers(m_deviceContext))
-                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                    if(Interlocked.CompareExchange(ref m_updatePixelColor, 0, 1) != 0)
+                    {
+                        UpdatePixelColor();
+                    } else
+                    {
+                        RefreshDisplay();
+                    }
 
                     // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
                     m_rendererModel.RenderLock.Release();
@@ -204,6 +191,41 @@ namespace gui.Dll
             // Clean up
             OpenGlDisplay.opengldisplay_destroy();
             Core.mufflon_destroy();
+        }
+
+        private void RefreshDisplay()
+        {
+            // Refresh the display
+            // Border always keeps aspect ratio
+            // Compute the offsets and dimensions of the viewport
+            int left = m_viewport.OffsetX;
+            int right = m_viewport.Width + m_viewport.OffsetX;
+            int invertedOffsetY = (m_viewport.DesiredHeight - m_viewport.Height) - m_viewport.OffsetY;
+            int bottom = invertedOffsetY;
+            int top = m_viewport.Height + invertedOffsetY;
+            UInt32 width = (UInt32)m_viewport.DesiredWidth;
+            UInt32 height = (UInt32)m_viewport.DesiredHeight;
+
+            IntPtr imageData = IntPtr.Zero;
+            if (!Core.core_get_target_image(m_renderTarget.TargetIndex, m_varianceTarget, OpenGlDisplay.TextureFormat.Invalid,
+                false, out imageData))
+                throw new Exception(Core.core_get_dll_error());
+            if (imageData != IntPtr.Zero)
+                if (!OpenGlDisplay.opengldisplay_write(imageData))
+                    throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+            if (!OpenGlDisplay.opengldisplay_display(left, right, bottom, top, width, height))
+                throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+            if (!Gdi32.SwapBuffers(m_deviceContext))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        private void UpdatePixelColor()
+        {
+            float r, g, b, a;
+            if (!OpenGlDisplay.opengldisplay_get_pixel_value((UInt32)m_viewport.CursorPosX, (UInt32)m_viewport.CursorPosY,
+                out r, out g, out b, out a))
+                throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+            m_viewport.CurrentPixelColor = new Vec4<float>(r, g, b, a);
         }
 
 
@@ -340,6 +362,12 @@ namespace gui.Dll
             var point = args.GetPosition(m_parent);
             m_viewport.CursorPosX = m_viewport.OffsetX + (int)(point.X / m_viewport.Zoom);
             m_viewport.CursorPosY = m_viewport.OffsetY + (int)(point.Y / m_viewport.Zoom);
+
+            if(!m_rendererModel.IsRendering)
+            {
+                m_updatePixelColor = 1;
+                m_rendererModel.UpdateDisplayTexture();
+            }
         }
 
         /// <summary>

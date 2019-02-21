@@ -477,5 +477,8 @@
   <ItemGroup>
     <Resource Include="Icons\cross_arrow.png" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\eyedropper.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

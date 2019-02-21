@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using gui.Annotations;
 using gui.Properties;
+using gui.Utility;
 
 namespace gui.Model
 {
@@ -144,6 +145,18 @@ namespace gui.Model
                 if (value == m_cursorPosY) return;
                 m_cursorPosY = Math.Min(Math.Max(0, value), RenderHeight - 1);
                 OnPropertyChanged(nameof(CursorPosY));
+            }
+        }
+
+        private Vec4<float> m_pixelColor;
+        public Vec4<float> CurrentPixelColor
+        {
+            get => m_pixelColor;
+            set
+            {
+                if (value == m_pixelColor) return;
+                m_pixelColor = value;
+                OnPropertyChanged(nameof(CurrentPixelColor));
             }
         }
 

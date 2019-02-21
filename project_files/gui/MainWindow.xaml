@@ -483,7 +483,9 @@
                     VerticalContentAlignment="Stretch"
                     ToolTip="Total/Used/Free"
                     Content="{Binding Statusbar.CudaMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <StatusBarItem HorizontalAlignment="Right">
+                <Separator/>
+                <StatusBarItem HorizontalAlignment="Left"
+                               Width="85">
                     <StackPanel Orientation="Horizontal">
                         <Image Source="Icons/cross_arrow.png"
                                SnapsToDevicePixels="True"
@@ -492,7 +494,22 @@
                                Height="16"/>
                         <TextBlock Text="{Binding Statusbar.CursorPos}"/>
                     </StackPanel>
-                </StatusBarItem> 
+                </StatusBarItem>
+                <Separator/>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <Image Source="Icons/eyedropper.png"
+                               SnapsToDevicePixels="True"
+                               RenderOptions.BitmapScalingMode="LowQuality"
+                               Width="16"
+                               Height="16"/>
+                        <TextBlock Text="{Binding Statusbar.PixelColorRed}" Width="45"/>
+                        <TextBlock Text="{Binding Statusbar.PixelColorGreen}" Width="45"/>
+                        <TextBlock Text="{Binding Statusbar.PixelColorBlue}" Width="45"/>
+                        <TextBlock Text="{Binding Statusbar.PixelColorAlpha}" Width="45"/>
+                    </StackPanel>
+                </StatusBarItem>
+                <Separator/>
                 <StatusBarItem
                     Width="110"
                     HorizontalAlignment="Right"

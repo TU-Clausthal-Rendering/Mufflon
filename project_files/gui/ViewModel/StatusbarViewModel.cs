@@ -17,6 +17,11 @@ namespace gui.ViewModel
 
         public string CursorPos { get; private set; } = "0, 0";
 
+        public string PixelColorRed { get => m_models.Viewport.CurrentPixelColor.X.ToString("0.####"); }
+        public string PixelColorGreen { get => m_models.Viewport.CurrentPixelColor.Y.ToString("0.####"); }
+        public string PixelColorBlue { get => m_models.Viewport.CurrentPixelColor.Z.ToString("0.####"); }
+        public string PixelColorAlpha { get => m_models.Viewport.CurrentPixelColor.W.ToString("0.####"); }
+
         public StatusbarViewModel(Models models)
         {
             m_models = models;
@@ -44,6 +49,12 @@ namespace gui.ViewModel
                 case nameof(ViewportModel.CursorPosY):
                     CursorPos = m_models.Viewport.CursorPosX.ToString() + ", " + m_models.Viewport.CursorPosY.ToString();
                     OnPropertyChanged(nameof(CursorPos));
+                    break;
+                case nameof(ViewportModel.CurrentPixelColor):
+                    OnPropertyChanged(nameof(PixelColorRed));
+                    OnPropertyChanged(nameof(PixelColorGreen));
+                    OnPropertyChanged(nameof(PixelColorBlue));
+                    OnPropertyChanged(nameof(PixelColorAlpha));
                     break;
             }
         }

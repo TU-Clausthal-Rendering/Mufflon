@@ -275,6 +275,20 @@ Boolean opengldisplay_set_logger(void(*logCallback)(const char*, int)) {
 	}
 }
 
+Boolean opengldisplay_get_pixel_value(uint32_t x, uint32_t y, float* r, float* g, float* b, float* a) {
+	float color[4];
+	glReadPixels(static_cast<GLint>(x), static_cast<GLint>(y), 1u, 1u, GL_RGBA, GL_FLOAT, color);
+	if(r != nullptr)
+		*r = color[0];
+	if(g != nullptr)
+		*g = color[1];
+	if(b != nullptr)
+		*b = color[2];
+	if(a != nullptr)
+		*a = color[3];
+	return true;
+}
+
 void opengldisplay_destroy() {
 	s_screenProgram.reset();
 	s_vao.reset();

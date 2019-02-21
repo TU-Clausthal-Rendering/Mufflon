@@ -138,6 +138,7 @@
     <ClInclude Include="..\..\deps\glad\KHR\khrplatform.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
     <ClInclude Include="..\..\src\opengldisplay\interface\interface.h" />
+    <ClInclude Include="..\..\src\opengldisplay\opengl\buffer_object.hpp" />
     <ClInclude Include="..\..\src\opengldisplay\opengl\program.hpp" />
     <ClInclude Include="..\..\src\opengldisplay\opengl\shader.hpp" />
     <ClInclude Include="..\..\src\opengldisplay\opengl\texture.hpp" />

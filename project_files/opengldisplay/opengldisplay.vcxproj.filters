@@ -67,6 +67,9 @@
     <ClInclude Include="..\..\src\core\export\texture_data.h">
       <Filter>Source Files\core\export</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\opengldisplay\opengl\buffer_object.hpp">
+      <Filter>Source Files\opengldisplay\opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\glad\glad.c">

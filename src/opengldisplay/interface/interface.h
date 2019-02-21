@@ -34,5 +34,6 @@ OPENGLDISPLAY_API Boolean CDECL opengldisplay_initialize();
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_set_logger(void(*logCallback)(const char*, int));
 OPENGLDISPLAY_API void CDECL opengldisplay_destroy();
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_set_log_level(LogLevel level);
+OPENGLDISPLAY_API Boolean CDECL opengldisplay_get_pixel_value(uint32_t x, uint32_t y, float* r, float* g, float* b, float* a);
 
 } // extern "C"

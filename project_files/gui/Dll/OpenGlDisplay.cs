@@ -54,6 +54,7 @@ namespace gui.Dll
         internal static extern Boolean opengldisplay_set_logger(Core.LogCallback callback);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void opengldisplay_destroy();
-
+        [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool opengldisplay_get_pixel_value(UInt32 x, UInt32 y, out float r, out float g, out float b, out float a);
     }
 }
