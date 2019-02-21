@@ -131,7 +131,7 @@ namespace gui.Model
             set
             {
                 if (value == m_cursorPosX) return;
-                m_cursorPosX = Math.Min(Math.Max(0, value), RenderWidth - 1);
+                m_cursorPosX = Math.Min((int)((OffsetX + Math.Max(0, value)) / Zoom), RenderWidth - 1);
                 OnPropertyChanged(nameof(CursorPosX));
             }
         }
@@ -143,7 +143,7 @@ namespace gui.Model
             set
             {
                 if (value == m_cursorPosY) return;
-                m_cursorPosY = Math.Min(Math.Max(0, value), RenderHeight - 1);
+                m_cursorPosY = RenderHeight - Math.Min((int)((OffsetY + Math.Max(0, value)) / Zoom), RenderHeight - 1) - 1;
                 OnPropertyChanged(nameof(CursorPosY));
             }
         }

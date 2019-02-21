@@ -360,8 +360,8 @@ namespace gui.Dll
         private void OnMouseMove(object sender, MouseEventArgs args)
         {
             var point = args.GetPosition(m_parent);
-            m_viewport.CursorPosX = m_viewport.OffsetX + (int)(point.X / m_viewport.Zoom);
-            m_viewport.CursorPosY = m_viewport.OffsetY + (int)(point.Y / m_viewport.Zoom);
+            m_viewport.CursorPosX = (int)point.X;
+            m_viewport.CursorPosY = (int)point.Y;
 
             if(!m_rendererModel.IsRendering)
             {
