@@ -34,84 +34,45 @@ CpuImportanceDecimater::CpuImportanceDecimater() {
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
-void CpuImportanceDecimater::iterate(OutputHandler& outputBuffer) {
-	// (Re) create the random number generators
-	if(m_rngs.size() != outputBuffer.get_num_pixels()
-	   || m_reset)
-		init_rngs(outputBuffer.get_num_pixels());
+void CpuImportanceDecimater::on_descriptor_requery() {
+	init_rngs(m_outputBuffer.get_num_pixels());
 
-	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
-	if(m_reset) {
-		// Reacquire scene descriptor
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
+	if(m_sceneDesc.numInstances != m_sceneDesc.numLods)
+		throw std::runtime_error("We do not support instancing yet");
 
-		if(m_sceneDesc.numInstances != m_sceneDesc.numLods)
-			throw std::runtime_error("We do not support instancing yet");
-
-		// Initialize the importance map
-		// TODO: how to deal with instancing
-		if(!m_params.keepImportance || !m_gotImportance) {
-			initialize_importance_map();
-			m_currentImportanceIteration = 0u;
-			m_gotImportance = false;
-		}
+	// Initialize the importance map
+	// TODO: how to deal with instancing
+	if(!m_params.keepImportance || !m_gotImportance) {
+		initialize_importance_map();
+		m_gotImportance = false;
 	}
+}
 
-	if(m_currentImportanceIteration < (u32)m_params.importanceIterations && (!m_params.keepImportance || !m_gotImportance)) {
-		logInfo("Importance iteration (", m_currentImportanceIteration + 1, " of ", m_params.importanceIterations, ")");
-		gather_importance(buffer);
-		++m_currentImportanceIteration;
+void CpuImportanceDecimater::iterate() {
+	// TODO: enable decimation
+	logInfo("Importance iteration (", m_currentImportanceIteration + 1, " of ", m_params.importanceIterations, ")");
+	gather_importance();
+	++m_currentImportanceIteration;
 
-		// TODO: visualize importance
-		if(m_params.importanceIterations > 0 && outputBuffer.get_target().is_set(1 << RenderTargets::IMPORTANCE)) {
-			compute_max_importance();
-			logWarning("Max importance: ", m_maxImportance);
-			display_importance(buffer);
-		}
-	} else {
-		m_gotImportance = true;
-
-		// Make sure we compute the maximum importance for visualization at least once
-		if((m_reset || !m_finishedDecimation) && m_params.importanceIterations > 0 && outputBuffer.get_target().is_set(1 << RenderTargets::IMPORTANCE)) {
-			compute_max_importance();
-		}
-
-		if(!m_finishedDecimation) {
-			buffer = outputBuffer.begin_iteration<Device::CPU>(true);
-			// TODO: finalize decimation
-			if(m_params.decimationEnabled)
-				decimate(buffer.get_resolution());
-
-			m_finishedDecimation = true;
-			logInfo("Finished decimating, beginning normal rendering...");
-		}
-
-		// TODO: call sample in a parallel way for each output pixel
-		// TODO: better pixel order?
-		// TODO: different scheduling?
-#pragma PARALLEL_FOR
-		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-			this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
-		}
+	// TODO: visualize importance
+	if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+		compute_max_importance();
+		logWarning("Max importance: ", m_maxImportance);
+		display_importance();
 	}
-
-	m_reset = false;
-
-	outputBuffer.end_iteration<Device::CPU>();
 }
 
 
-void CpuImportanceDecimater::gather_importance(RenderBuffer<Device::CPU>& buffer) {
-	const u32 NUM_PIXELS = buffer.get_height() * buffer.get_width();
+void CpuImportanceDecimater::gather_importance() {
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int i = 0; i < (int)NUM_PIXELS; ++i) {
-		this->importance_sample(Pixel{ i % buffer.get_width(), i / buffer.get_width() },
-								buffer, m_sceneDesc);
+		this->importance_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
 	}
 	// TODO: allow for this with proper reset "events"
 }
 
-void CpuImportanceDecimater::decimate(const ei::IVec2& resolution) {
+void CpuImportanceDecimater::decimate() {
 	constexpr StringView importanceAttrName{ "importance" };
 
 	logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
@@ -164,18 +125,17 @@ void CpuImportanceDecimater::decimate(const ei::IVec2& resolution) {
 
 	// We need to re-build the scene
 	m_currentScene->clear_accel_structure();
-	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
+	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
 }
 
-void CpuImportanceDecimater::importance_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-											 const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuImportanceDecimater::importance_sample(const Pixel coord) {
+	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 	// TODO: depends on path length
@@ -210,15 +170,15 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord, RenderBuffer<D
 		if(pathLen > 0 && pathLen + 1 <= m_params.maxPathLength) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
+			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertex->get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, scene.media);
+			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					scene, { vertex->get_position() , nee.direction },
+					m_sceneDesc, { vertex->get_position() , nee.direction },
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
@@ -246,7 +206,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord, RenderBuffer<D
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
 
-		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir, &vertexThroughput[pathLen]))
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir, &vertexThroughput[pathLen]))
 			break;
 
 		hitIds[pathLen] = vertex->get_primitive_id();
@@ -256,7 +216,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord, RenderBuffer<D
 		bxdfPdf[pathLen] = vertexThroughput[pathLen] / outCos[pathLen];
 		const ei::Vec3 bxdf = bxdfPdf[pathLen] * (float)lastDir.pdf;
 
-		lod = &scene.lods[scene.lodIndices[hitIds[pathLen].instanceId]];
+		lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitIds[pathLen].instanceId]];
 		numVertices = hitIds[pathLen].primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
 		vertexOffset = hitIds[pathLen].primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 
@@ -286,7 +246,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord, RenderBuffer<D
 		accumRadiance = vertexThroughput[p] * accumRadiance + pathRadiance[p + 1];
 		const ei::Vec3 irradiance = vertexAccumThroughput[p] * outCos[p] * accumRadiance;
 
-		const auto& lod = &scene.lods[scene.lodIndices[hitIds[p].instanceId]];
+		const auto& lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitIds[p].instanceId]];
 		const u32 numVertices = hitIds[p].primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = hitIds[p].primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 		for(u32 i = 0u; i < numVertices; ++i) {
@@ -298,13 +258,8 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord, RenderBuffer<D
 	}
 }
 
-void CpuImportanceDecimater::reset() {
-	this->m_reset = true;
-}
-
-void CpuImportanceDecimater::pt_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-									 const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuImportanceDecimater::pt_sample(const Pixel coord) {
+	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	//m_params.maxPathLength = 2;
 
@@ -312,7 +267,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord, RenderBuffer<Device::C
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 
@@ -328,21 +283,21 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord, RenderBuffer<Device::C
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
+			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertex->get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, scene.media);
+			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					scene, { vertex->get_position() , nee.direction },
+					m_sceneDesc, { vertex->get_position() , nee.direction },
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 					mAssert(!isnan(mis));
-					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
+					m_outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 											value.cosOut, radiance * mis);
 				}
 			}
@@ -352,14 +307,14 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord, RenderBuffer<Device::C
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
-		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(scene.lightTree.background, lastDir.direction);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
 				if(any(greater(background.value, 0.0f))) {
 					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
 					background.value *= mis;
-					outputBuffer.contribute(coord, throughput, background.value,
+					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
 				}
@@ -367,8 +322,8 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord, RenderBuffer<Device::C
 			break;
 		}
 
-		if(pathLen == 0 && m_params.importanceIterations > 0 && outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
+		if(pathLen == 0 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
 		}
 
 		++pathLen;
@@ -377,14 +332,14 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord, RenderBuffer<Device::C
 		if(pathLen <= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex->get_primitive_id(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
 					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				emission *= mis;
 			}
-			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
+			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
@@ -431,11 +386,11 @@ void CpuImportanceDecimater::compute_max_importance() {
 	}
 }
 
-void CpuImportanceDecimater::display_importance(RenderBuffer<Device::CPU>& buffer) {
-	const u32 NUM_PIXELS = buffer.get_height() * buffer.get_width();
+void CpuImportanceDecimater::display_importance() {
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
-		const ei::IVec2 coord{ pixel % buffer.get_width(), pixel / buffer.get_width() };
+		const ei::IVec2 coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		//m_params.maxPathLength = 2;
 
 		math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
@@ -451,7 +406,7 @@ void CpuImportanceDecimater::display_importance(RenderBuffer<Device::CPU>& buffe
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
 		if(walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
-			buffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
 	}
 
 }
@@ -512,14 +467,6 @@ void CpuImportanceDecimater::init_rngs(int num) {
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i);
-}
-
-void CpuImportanceDecimater::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
-	if(scene != m_currentScene) {
-		m_currentScene = scene;
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
-		m_reset = true;
-	}
 }
 
 } // namespace mufflon::renderer

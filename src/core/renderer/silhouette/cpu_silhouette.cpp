@@ -86,94 +86,86 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
-void CpuShadowSilhouettes::iterate(OutputHandler& outputBuffer) {
-	// (Re) create the random number generators
-	if(m_rngs.size() != outputBuffer.get_num_pixels()
-	   || m_reset)
-		init_rngs(outputBuffer.get_num_pixels());
+void CpuShadowSilhouettes::on_descriptor_requery() {
+	init_rngs(m_outputBuffer.get_num_pixels());
 
-	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
-	if(m_reset) {
-		// Reacquire scene descriptor
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
+	if(m_sceneDesc.numInstances != m_sceneDesc.numLods)
+		throw std::runtime_error("We do not support instancing yet");
 
-		if(m_sceneDesc.numInstances != m_sceneDesc.numLods)
-			throw std::runtime_error("We do not support instancing yet");
-
-		// Initialize the importance map
-		// TODO: how to deal with instancing
-		if(!m_params.keepImportance || !m_gotImportance) {
-			initialize_importance_map();
-			m_currentDecimationIteration = 0u;
-			m_gotImportance = false;
-		}
+	// Initialize the importance map
+	// TODO: how to deal with instancing
+	if(!m_params.keepImportance || !m_gotImportance) {
+		initialize_importance_map();
+		m_currentDecimationIteration = 0u;
+		m_gotImportance = false;
 	}
+}
 
-	decimate(buffer.get_resolution());
-
-	if(m_currentDecimationIteration < (u32)m_params.decimationIterations && (!m_params.keepImportance || !m_gotImportance)) {
-		gather_importance(buffer);
-		++m_currentDecimationIteration;
-		logInfo("Finished importance gathering (iteration ", m_currentDecimationIteration, " of ", m_params.decimationIterations, ")");
-
-		// TODO: visualize importance
-		if(m_params.importanceIterations > 0 && outputBuffer.get_target().is_set(1 << RenderTargets::IMPORTANCE)) {
-			compute_max_importance();
-			display_importance(buffer);
-		}
-
-		// TODO: decimate
-		//decimate(buffer.get_resolution());
-		undecimate(buffer.get_resolution());
-	} else {
+bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
+	if(!m_reset && (m_currentDecimationIteration >= (u32)m_params.decimationIterations || (m_params.keepImportance && m_gotImportance))) {
 		m_gotImportance = true;
 
 		// Make sure we compute the maximum importance for visualization at least once
-		if((m_reset || !m_finishedDecimation) && m_params.importanceIterations > 0 && outputBuffer.get_target().is_set(1 << RenderTargets::IMPORTANCE))
+		if((m_reset || !m_finishedDecimation) && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE))
 			compute_max_importance();
 
 		if(!m_finishedDecimation) {
-			buffer = outputBuffer.begin_iteration<Device::CPU>(true);
-			// TODO: finalize decimation
+			m_outputBuffer = outputBuffer.begin_iteration<Device::CPU>(true);
+			// TODO: decimate
 			m_finishedDecimation = true;
 			logInfo("Finished decimating, beginning normal rendering...");
 		}
 
 		logWarning("Maximum importance: ", m_maxImportance);
+		return false;
+	} else {
+		return RendererBase<Device::CPU>::pre_iteration(outputBuffer);
+	}
+}
 
+void CpuShadowSilhouettes::iterate() {
+	if(m_currentDecimationIteration < (u32)m_params.decimationIterations && (!m_params.keepImportance || !m_gotImportance)) {
+		gather_importance();
+		++m_currentDecimationIteration;
+		logInfo("Finished importance gathering (iteration ", m_currentDecimationIteration, " of ", m_params.decimationIterations, ")");
+
+		// TODO: visualize importance
+		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+			compute_max_importance();
+			display_importance();
+		}
+
+		// TODO: decimate
+		//decimate(buffer.get_resolution());
+		undecimate();
+	} else {
 		// TODO: call sample in a parallel way for each output pixel
 		// TODO: better pixel order?
 		// TODO: different scheduling?
 #pragma PARALLEL_FOR
-		for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-			this->pt_sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
+		for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+			this->pt_sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
 		}
 	}
-
-	m_reset = false;
-
-	outputBuffer.end_iteration<Device::CPU>();
 }
 
 
-void CpuShadowSilhouettes::gather_importance(RenderBuffer<Device::CPU>& buffer) {
-	const u32 NUM_PIXELS = buffer.get_height() * buffer.get_width();
+void CpuShadowSilhouettes::gather_importance() {
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 	const int importanceIterations = m_params.importanceIterations * NUM_PIXELS;
 	logInfo("Starting importance gathering (", m_params.importanceIterations, " iterations)");
 #pragma PARALLEL_FOR
 	for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
 		const int pixel = i / m_params.importanceIterations;
 		if(m_params.useRadianceWeightedImportance)
-			this->importance_sample_weighted(Pixel{ pixel % buffer.get_width(), pixel / buffer.get_width() },
-											 buffer, m_sceneDesc);
+			this->importance_sample_weighted(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
 		else
-			this->importance_sample(Pixel{ pixel % buffer.get_width(), pixel / buffer.get_width() },
-									buffer, m_sceneDesc);
+			this->importance_sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
 	}
 	// TODO: allow for this with proper reset "events"
 }
 
-void CpuShadowSilhouettes::decimate(const ei::IVec2& resolution) {
+void CpuShadowSilhouettes::decimate() {
 	constexpr StringView importanceAttrName{ "importance" };
 
 	logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
@@ -226,10 +218,10 @@ void CpuShadowSilhouettes::decimate(const ei::IVec2& resolution) {
 
 	// We need to re-build the scene
 	m_currentScene->clear_accel_structure();
-	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
+	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
 }
 
-void CpuShadowSilhouettes::undecimate(const ei::IVec2& resolution) {
+void CpuShadowSilhouettes::undecimate() {
 	constexpr StringView importanceAttrName{ "importance" };
 
 	u32 vertexOffset = 0u;
@@ -299,18 +291,17 @@ void CpuShadowSilhouettes::undecimate(const ei::IVec2& resolution) {
 
 	// We need to re-build the scene
 	m_currentScene->clear_accel_structure();
-	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
+	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
 }
 
-void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-											 const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
+	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 
@@ -322,7 +313,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
-		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
 			break;
 
 		// View ray importance
@@ -346,9 +337,9 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 		if(pathLen == 0) {
 			// Check silhouettes for all lights
 			// TODO: improve upon this?
-			for(u32 lightIdx = 0u; lightIdx < scene.lightTree.posLights.lightCount; ++lightIdx) {
-				auto lightData = get_light_data(lightIdx, scene.lightTree.posLights);
-				const char* lightMem = scene.lightTree.posLights.memory + lightData.offset;
+			for(u32 lightIdx = 0u; lightIdx < m_sceneDesc.lightTree.posLights.lightCount; ++lightIdx) {
+				auto lightData = get_light_data(lightIdx, m_sceneDesc.lightTree.posLights);
+				const char* lightMem = m_sceneDesc.lightTree.posLights.memory + lightData.offset;
 				const ei::Vec3 lightCenter = scene::lights::lighttree_detail::get_center(lightMem, static_cast<u16>(lightData.type));
 
 				// What happens depends on the light type
@@ -360,7 +351,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 						fromLight /= lightDist;
 
 						if(trace_shadow_silhouette(ei::Ray{ lightCenter, fromLight }, *vertex, lightDist, 1.f))
-							outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
+							m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
 					}	break;
 					case scene::lights::LightType::SPOT_LIGHT: {
 						// Gotta check first if the vertex is illuminated
@@ -371,15 +362,15 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 						const auto dot = ei::dot(fromLight, spotLight->direction);
 						if(ei::abs(ei::dot(fromLight, spotLight->direction)) >= __half2float(spotLight->cosThetaMax)) {
 							if(trace_shadow_silhouette(ei::Ray{ lightCenter, fromLight }, *vertex, lightDist, 1.f))
-								outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
+								m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
 						}
 					}	break;
 				}
 			}
 
-			for(u32 lightIdx = 0u; lightIdx < scene.lightTree.dirLights.lightCount; ++lightIdx) {
-				auto lightData = get_light_data(lightIdx, scene.lightTree.dirLights);
-				const char* lightMem = scene.lightTree.dirLights.memory + lightData.offset;
+			for(u32 lightIdx = 0u; lightIdx < m_sceneDesc.lightTree.dirLights.lightCount; ++lightIdx) {
+				auto lightData = get_light_data(lightIdx, m_sceneDesc.lightTree.dirLights);
+				const char* lightMem = m_sceneDesc.lightTree.dirLights.memory + lightData.offset;
 				const ei::Vec3 lightCenter = scene::lights::lighttree_detail::get_center(lightMem, static_cast<u16>(lightData.type));
 
 				// What happens depends on the light type
@@ -388,7 +379,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord, RenderBuffer<Dev
 						// We have the reverse problem here - no position, but instead a direction is given
 						const ei::Vec3 lightPos = vertex->get_position() - scene::MAX_SCENE_SIZE * lightCenter;
 						if(trace_shadow_silhouette(ei::Ray{ lightPos, lightCenter }, *vertex, scene::MAX_SCENE_SIZE, 1.f))
-							outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
+							m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ 1.f });
 					}	break;
 				}
 			}
@@ -468,13 +459,8 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 	return false;
 }
 
-void CpuShadowSilhouettes::reset() {
-	this->m_reset = true;
-}
-
-void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-						   const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
+	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	//m_params.maxPathLength = 2;
 
@@ -482,7 +468,7 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 
@@ -498,21 +484,21 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
+			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertex->get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, scene.media);
+			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					scene, { vertex->get_position() , nee.direction },
+					m_sceneDesc, { vertex->get_position() , nee.direction },
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 					mAssert(!isnan(mis));
-					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
+					m_outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 											value.cosOut, radiance * mis);
 				}
 			}
@@ -522,14 +508,14 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
-		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(scene.lightTree.background, lastDir.direction);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
 				if(any(greater(background.value, 0.0f))) {
 					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
 					background.value *= mis;
-					outputBuffer.contribute(coord, throughput, background.value,
+					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
 				}
@@ -537,8 +523,8 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 			break;
 		}
 
-		if(pathLen == 0 && m_params.importanceIterations > 0 && outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
+		if(pathLen == 0 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
 		}
 
 		++pathLen;
@@ -547,15 +533,15 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord, RenderBuffer<Device::CPU
 		if(pathLen <= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex->get_primitive_id(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
 					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				emission *= mis;
 			}
-			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									vertex->get_normal(), vertex->get_albedo());
+			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
+									  vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }
@@ -601,11 +587,11 @@ void CpuShadowSilhouettes::compute_max_importance() {
 	}
 }
 
-void CpuShadowSilhouettes::display_importance(RenderBuffer<Device::CPU>& buffer) {
-	const u32 NUM_PIXELS = buffer.get_height() * buffer.get_width();
+void CpuShadowSilhouettes::display_importance() {
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
-		const ei::IVec2 coord{ pixel % buffer.get_width(), pixel / buffer.get_width() };
+		const ei::IVec2 coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		//m_params.maxPathLength = 2;
 
 		math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
@@ -621,7 +607,7 @@ void CpuShadowSilhouettes::display_importance(RenderBuffer<Device::CPU>& buffer)
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
 		if(walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
-			buffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
 	}
 
 }
@@ -682,14 +668,6 @@ void CpuShadowSilhouettes::init_rngs(int num) {
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i);
-}
-
-void CpuShadowSilhouettes::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
-	if(scene != m_currentScene) {
-		m_currentScene = scene;
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
-		m_reset = true;
-	}
 }
 
 } // namespace mufflon::renderer

@@ -88,9 +88,8 @@ struct ShadowCandidate {
  * We then trace the path backwards to evaluate how "sharp" the feature of the path is via the BRDF.
  * When the BRDF is suitably sharp, the possibility of shadow silhouettes 
  */
-void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-													  const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord) {
+	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	// We gotta remember all vertices unfortunately...
 	u8 allVertexBuffer[256u*16u];// TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
@@ -98,7 +97,7 @@ void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord, RenderB
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	PtPathVertex* vertex = as<PtPathVertex>(allVertexBuffer);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 	// Remember the direct illumination of each path segment
@@ -119,16 +118,16 @@ void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord, RenderB
 		if(pathLen > 0 && pathLen + 1 <= m_params.maxPathLength) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
+			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertex->get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux,
 							   &connectedLightIndices[pathLen]);
-			auto value = vertex->evaluate(nee.direction, scene.media);
+			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				auto shadowHit = scene::accel_struct::first_intersection_scene_lbvh<Device::CPU>(
-					scene, ei::Ray{ nee.lightPoint, -nee.direction }, vertex->get_primitive_id(), nee.dist);
+					m_sceneDesc, ei::Ray{ nee.lightPoint, -nee.direction }, vertex->get_primitive_id(), nee.dist);
 				shadowCandidates[pathLen] = { ei::Ray{ nee.lightPoint, -nee.direction }, shadowHit.hitId, shadowHit.hitT };
 
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
@@ -145,10 +144,10 @@ void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord, RenderB
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		PtPathVertex* outVertex = as<PtPathVertex>(&allVertexBuffer[256*(pathLen+1)]);
 		math::DirectionSample lastDir;
-		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, outVertex, lastDir)) {
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, outVertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
-				// Missed scene - sample background
-				auto background = evaluate_background(scene.lightTree.background, lastDir.direction);
+				// Missed m_sceneDesc - sample background
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
 				if(any(greater(background.value, 0.0f))) {
 					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
 					background.value *= mis;
@@ -166,7 +165,7 @@ void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord, RenderB
 		if(pathLen <= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex->get_primitive_id(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
@@ -214,7 +213,7 @@ void CpuShadowSilhouettes::importance_sample_weighted(const Pixel coord, RenderB
 		if(m_params.enableViewImportance) {
 			// Add importance: what is this vertex' contribution to the sensor's perception
 			const auto& hitId = currentVertex->get_primitive_id();
-			const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
+			const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
 			const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 			const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
 			for(u32 i = 0u; i < numVertices; ++i) {
@@ -278,7 +277,7 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette_shadow(const ei::Ray& shadowR
 			const ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (firstHitT + secondHit.hitT), shadowRay.direction };
 
 			const auto thirdHit = scene::accel_struct::first_intersection_scene_lbvh(m_sceneDesc, silhouetteRay, secondHit.hitId,
-																						lightDist - firstHitT - secondHit.hitT + DIST_EPSILON);
+																					 lightDist - firstHitT - secondHit.hitT + DIST_EPSILON);
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
 				for(i32 i = 0; i < sharedVertices; ++i) {
 					// x86_64 doesn't support atomic_fetch_add for floats FeelsBadMan
