@@ -15,7 +15,7 @@ namespace renderer {
 template < Device >
 struct RenderBuffer;
 
-class GpuPathTracer : public RendererBase<Device::CUDA> {
+class GpuPathTracer final : public RendererBase<Device::CUDA> {
 public:
 	GpuPathTracer();
 	~GpuPathTracer() = default;

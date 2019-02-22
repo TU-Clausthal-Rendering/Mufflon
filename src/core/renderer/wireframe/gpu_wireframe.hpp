@@ -15,7 +15,7 @@ namespace renderer {
 template < Device >
 struct RenderBuffer;
 
-class GpuWireframe : public RendererBase<Device::CUDA> {
+class GpuWireframe final : public RendererBase<Device::CUDA> {
 public:
 	GpuWireframe();
 	~GpuWireframe() = default;

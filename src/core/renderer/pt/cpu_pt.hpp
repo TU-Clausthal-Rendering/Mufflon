@@ -16,7 +16,7 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
-class CpuPathTracer : public RendererBase<Device::CPU> {
+class CpuPathTracer final : public RendererBase<Device::CPU> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuPathTracer();
