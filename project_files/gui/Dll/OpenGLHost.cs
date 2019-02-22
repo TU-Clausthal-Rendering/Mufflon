@@ -164,11 +164,7 @@ namespace gui.Dll
                             }
                         }
 
-                        if (!Core.render_iterate())
-                            throw new Exception(Core.core_get_dll_error());
-
-                        // We also let the GUI know that an iteration has taken place
-                        Application.Current.Dispatcher.BeginInvoke(new Action(() => m_rendererModel.UpdateIterationCount()));
+                        m_rendererModel.Iterate();
                     }
 
                     if(Interlocked.CompareExchange(ref m_updatePixelColor, 0, 1) != 0)

@@ -2658,7 +2658,7 @@ Boolean render_enable_renderer(uint32_t index) {
 	CATCH_ALL(false)
 }
 
-Boolean render_iterate() {
+Boolean render_iterate(ProcessTime* time) {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
@@ -2677,7 +2677,15 @@ Boolean render_iterate() {
 	if(s_world.reload_scene())
 		s_currentRenderer->reset();
 	s_currentRenderer->pre_iteration(*s_imageOutput);
+	if(time != nullptr) {
+		time->cycles = CpuProfileState::get_cpu_cycle();
+		time->microseconds = CpuProfileState::get_process_time().count();
+	}
 	s_currentRenderer->iterate();
+	if(time != nullptr) {
+		time->cycles = CpuProfileState::get_cpu_cycle() - time->cycles;
+		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
+	}
 	s_currentRenderer->post_iteration(*s_imageOutput);
 	return true;
 	CATCH_ALL(false)

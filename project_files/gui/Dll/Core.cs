@@ -37,6 +37,20 @@ namespace gui.Dll
             }
         };
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ProcessTime
+        {
+            public UInt64 cycles;
+            public UInt64 microseconds;
+
+            public static ProcessTime operator+(ProcessTime t1, ProcessTime t2)
+            {
+                t1.cycles += t2.cycles;
+                t1.microseconds += t2.microseconds;
+                return t1;
+            }
+        };
+
         internal enum MaterialType
         {
             Lambert
@@ -364,7 +378,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_renderer(UInt32 index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_iterate();
+        internal static extern bool render_iterate(out ProcessTime time);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_reset();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

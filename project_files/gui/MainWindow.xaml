@@ -60,7 +60,7 @@
                             </Style>
                         </MenuItem.ItemContainerStyle>
                     </MenuItem>
-                    <Separator/>
+                    <Separator Background="{StaticResource BorderBrush}"/>
                     <MenuItem Header="Auto-start on load"
                               IsCheckable="True"
                               IsChecked="{Binding Renderer.AutoStartOnLoad}"/>
@@ -483,7 +483,7 @@
                     VerticalContentAlignment="Stretch"
                     ToolTip="Total/Used/Free"
                     Content="{Binding Statusbar.CudaMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <Separator/>
+                <Separator Background="{StaticResource BorderBrush}"/>
                 <StatusBarItem HorizontalAlignment="Left"
                                Width="85">
                     <StackPanel Orientation="Horizontal">
@@ -495,7 +495,7 @@
                         <TextBlock Text="{Binding Statusbar.CursorPos}"/>
                     </StackPanel>
                 </StatusBarItem>
-                <Separator/>
+                <Separator Background="{StaticResource BorderBrush}"/>
                 <StatusBarItem HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal">
                         <Image Source="Icons/eyedropper.png"
@@ -509,21 +509,48 @@
                         <TextBlock Text="{Binding Statusbar.PixelColorAlpha}" Width="45"/>
                     </StackPanel>
                 </StatusBarItem>
-                <Separator/>
+                <Separator Background="{StaticResource BorderBrush}"/>
                 <StatusBarItem
-                    Width="110"
                     HorizontalAlignment="Right"
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="40"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="150"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="Iteration: "/>
                         <TextBlock Grid.Column="1"
                                    Text="{Binding Renderer.Iteration, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Rectangle Grid.Column="2"
+                                       VerticalAlignment="Stretch"
+                                       Width="1"
+                                       Margin="2"
+                                       Stroke="{StaticResource BorderBrush}"/>
+                        <TextBlock Grid.Column="3"
+                                   Text="{Binding Renderer.CurrentIterationTime, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ToolTip="Current iteration's time/gigacycles (process time)"/>
+                        <Rectangle Grid.Column="2"
+                                       VerticalAlignment="Stretch"
+                                       Width="1"
+                                       Margin="2"
+                                       Stroke="{StaticResource BorderBrush}"/>
+                        <TextBlock Grid.Column="4"
+                                   Text="{Binding Renderer.AverageIterationTime, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ToolTip="Average iteration time/gigacycles (process time)"/>
+                        <Rectangle Grid.Column="2"
+                                       VerticalAlignment="Stretch"
+                                       Width="1"
+                                       Margin="2"
+                                       Stroke="{StaticResource BorderBrush}"/>
+                        <TextBlock Grid.Column="5"
+                                   Text="{Binding Renderer.TotalIterationTime, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ToolTip="Total iteration time/gigacycles (process time)"/>
                     </Grid>
                 </StatusBarItem>
             </StatusBar>

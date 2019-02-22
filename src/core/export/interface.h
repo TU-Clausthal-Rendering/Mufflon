@@ -63,6 +63,11 @@ typedef struct {
 	Vec3 max;
 } AABB;
 
+typedef struct {
+	uint64_t cycles;
+	uint64_t microseconds;
+} ProcessTime;
+
 typedef enum {
 	ATTR_CHAR,
 	ATTR_UCHAR,
@@ -506,7 +511,7 @@ CORE_API const char* CDECL render_get_renderer_name(uint32_t index);
 CORE_API const char* CDECL render_get_renderer_short_name(uint32_t index);
 CORE_API Boolean CDECL render_renderer_uses_device(uint32_t index, RenderDevice dev);
 CORE_API Boolean CDECL render_enable_renderer(uint32_t index);
-CORE_API Boolean CDECL render_iterate();
+CORE_API Boolean CDECL render_iterate(ProcessTime* time);
 CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();
 // TODO: what do we pass to the GUI?

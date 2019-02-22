@@ -163,6 +163,10 @@ namespace gui.ViewModel
 
         public uint Iteration => m_models.Renderer.Iteration;
 
+        public string CurrentIterationTime { get; private set; } = "0s / 0Gcyc";
+        public string AverageIterationTime { get; private set; } = "0s / 0Gcyc";
+        public string TotalIterationTime { get; private set; } = "0s / 0Gcyc";
+
         public bool AutoStartOnLoad
         {
             get => m_models.Settings.AutoStartOnLoad;
@@ -253,6 +257,21 @@ namespace gui.ViewModel
                     System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
                         OnPropertyChanged(nameof(Iteration));
                     }));
+                    break;
+                case nameof(Models.Renderer.CurrentIterationTime):
+                    CurrentIterationTime = (m_models.Renderer.CurrentIterationTime.microseconds / 10000000f).ToString("0.###")
+                        + "s / " + (m_models.Renderer.CurrentIterationTime.cycles / 10000000000f).ToString("0.###") + "Gcyc";
+                    OnPropertyChanged(nameof(CurrentIterationTime));
+                    break;
+                case nameof(Models.Renderer.AverageIterationTime):
+                    AverageIterationTime = (m_models.Renderer.AverageIterationTime.microseconds / 10000000f).ToString("0.###")
+                        + "s / " + (m_models.Renderer.AverageIterationTime.cycles / 10000000000f).ToString("0.###") + "Gcyc";
+                    OnPropertyChanged(nameof(AverageIterationTime));
+                    break;
+                case nameof(Models.Renderer.TotalIterationTime):
+                    TotalIterationTime = (m_models.Renderer.TotalIterationTime.microseconds / 10000000f).ToString("0.###")
+                        + "s / " + (m_models.Renderer.TotalIterationTime.cycles / 10000000000f).ToString("0.###") + "Gcyc";
+                    OnPropertyChanged(nameof(TotalIterationTime));
                     break;
                 case nameof(Models.RenderTargetSelection.VisibleTarget):
                 case nameof(Models.RenderTargetSelection.IsVarianceVisible):

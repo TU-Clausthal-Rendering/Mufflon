@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using gui.Annotations;
 using gui.Dll;
 
@@ -140,11 +141,21 @@ namespace gui.Model
 
         public uint Iteration => Core.render_get_current_iteration();
 
+        public Core.ProcessTime CurrentIterationTime { get; private set; }
+        public Core.ProcessTime AverageIterationTime => new Core.ProcessTime()
+        {
+            cycles = TotalIterationTime.cycles / (Iteration == 0 ? 1 : Iteration),
+            microseconds = TotalIterationTime.microseconds / (Iteration == 0 ? 1 : Iteration)
+        };
+        public Core.ProcessTime TotalIterationTime { get; private set; }
+
         public void Reset()
         {
             if (!Core.render_reset())
                 throw new Exception(Core.core_get_dll_error());
-           UpdateIterationCount();
+            CurrentIterationTime = new Core.ProcessTime();
+            OnPropertyChanged(nameof(CurrentIterationTime));
+            UpdateIterationData();
         }
 
         public void UpdateDisplayTexture()
@@ -157,18 +168,38 @@ namespace gui.Model
             }
         }
 
+        // This iterates by leveraging the GUI and includes texture updates etc
         public void Iterate(uint times)
         {
             for(uint i = 0u; i < times; ++i)
             {
                 IsRendering = true;
                 IsRendering = false;
-                UpdateIterationCount();
             }
         }
 
-        public void UpdateIterationCount()
+        // This iterates ONLY the renderer (and updates some data like times and iteration count), so this
+        // really should only be called from exactly ONE place: the main render loop
+        public void Iterate()
         {
+            Core.ProcessTime time;
+            if (!Core.render_iterate(out time))
+                throw new Exception(Core.core_get_dll_error());
+
+            CurrentIterationTime = time;
+            OnPropertyChanged(nameof(CurrentIterationTime));
+
+            // We also let the GUI know that an iteration has taken place
+            Application.Current.Dispatcher.BeginInvoke(new Action(() => UpdateIterationData()));
+        }
+
+        private void UpdateIterationData()
+        {
+            if(Iteration <= 1)
+                TotalIterationTime = new Core.ProcessTime();
+            TotalIterationTime += CurrentIterationTime;
+            OnPropertyChanged(nameof(AverageIterationTime));
+            OnPropertyChanged(nameof(TotalIterationTime));
             OnPropertyChanged(nameof(Iteration));
         }
 

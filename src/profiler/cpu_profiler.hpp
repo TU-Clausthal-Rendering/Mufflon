@@ -67,6 +67,11 @@ public:
 	static std::size_t get_total_memory();
 	static std::size_t get_free_memory();
 	static std::size_t get_used_memory();
+	// Abstractions from OS APIs
+	static u64 get_cpu_cycle();
+	static Microsecond get_thread_time();
+	static Microsecond get_process_time();
+	static WallTimePoint get_wall_timepoint();
 
 protected:
 	virtual void start_sample() override;
@@ -78,12 +83,6 @@ protected:
 	virtual std::ostream& save_profiler_total_and_snapshots(std::ostream& stream) const override;
 
 private:
-	// Abstractions from OS APIs
-	static u64 get_cpu_cycle();
-	static Microsecond get_thread_time();
-	static Microsecond get_process_time();
-	static WallTimePoint get_wall_timepoint();
-
 	// Sample data
 	struct SampleData {
 		u64 totalCpuCycles = 0u;
