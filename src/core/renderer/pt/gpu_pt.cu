@@ -115,12 +115,13 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 
 namespace gpupt_detail {
 
-void call_kernel(const dim3& gridDims, const dim3& blockDims,
-				 RenderBuffer<Device::CUDA>&& outputBuffer,
-				 scene::SceneDescriptor<Device::CUDA>* scene,
-				 const u32* seeds, const PtParameters& params) {
+cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
+						RenderBuffer<Device::CUDA>&& outputBuffer,
+						scene::SceneDescriptor<Device::CUDA>* scene,
+						const u32* seeds, const PtParameters& params) {
 	sample<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
 									seeds, params);
+	return cudaGetLastError();
 }
 
 } // namespace gpupt_detail

@@ -9,83 +9,42 @@ namespace mufflon::renderer {
 
 namespace gpupt_detail {
 
-void call_kernel(const dim3& gridDims, const dim3& blockDims,
-				 RenderBuffer<Device::CUDA>&& outputBuffer,
-				 scene::SceneDescriptor<Device::CUDA>* scene,
-				 const u32* seeds, const PtParameters& params);
+cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
+						RenderBuffer<Device::CUDA>&& outputBuffer,
+						scene::SceneDescriptor<Device::CUDA>* scene,
+						const u32* seeds, const PtParameters& params);
 
 } // namespace gpupt_detail
 
-GpuPathTracer::GpuPathTracer() : m_params{} {}
+GpuPathTracer::GpuPathTracer() :
+	m_params{}
+	//m_rng{ static_cast<u32>(std::random_device{}()) }
+{}
 
-GpuPathTracer::~GpuPathTracer() {
-	if(m_scenePtr != nullptr)
-		cuda::check_error(cudaFree(m_scenePtr));
+void GpuPathTracer::on_descriptor_requery() {
+	m_seeds = std::make_unique<u32[]>(m_outputBuffer.get_num_pixels());
+	m_seedsPtr = make_udevptr_array<Device::CUDA, u32>(m_outputBuffer.get_num_pixels());
 }
 
-void GpuPathTracer::iterate(OutputHandler& outputBuffer) {
-	// TODO: call sample in a parallel way for each output pixel
-	// TODO: pass scene data to kernel!
-	auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
+void GpuPathTracer::iterate() {
+	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 
-	if(m_reset) {
-		// TODO: reset output buffer
-		// Reacquire scene descriptor (partially?)
-		scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {}, outputBuffer.get_resolution());
-		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
-	}
-
-	this->iterate(outputBuffer.get_resolution(),
-				  std::move(outputBuffer.begin_iteration<Device::CUDA>(m_reset)));
-	m_reset = false;
-
-	outputBuffer.end_iteration<Device::CUDA>();
-	Profiler::instance().create_snapshot_all();
-}
-
-void GpuPathTracer::reset() {
-	m_reset = true;
-}
-
-void GpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
-	if(scene != m_currentScene) {
-		m_currentScene = scene;
-		// Make sure the scene is loaded completely for the use on CPU side
-		m_currentScene->synchronize<Device::CUDA>();
-		scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {}, resolution);
-		if(m_scenePtr == nullptr)
-			cuda::check_error(cudaMalloc(&m_scenePtr, sizeof(*m_scenePtr)));
-		cuda::check_error(cudaMemcpy(m_scenePtr, &sceneDesc, sizeof(*m_scenePtr), cudaMemcpyDefault));
-		m_reset = true;
-	}
-}
-
-void GpuPathTracer::iterate(Pixel imageDims,
-							RenderBuffer<Device::CUDA> outputBuffer) const {
-
-	std::unique_ptr<u32[]> rnds = std::make_unique<u32[]>(imageDims.x * imageDims.y);
-	math::Rng rng{ static_cast<u32>(std::random_device()()) };
-	for(int i = 0; i < imageDims.x*imageDims.y; ++i)
-		rnds[i] = static_cast<u32>(rng.next());
-	u32* devRnds = nullptr;
-	cuda::check_error(cudaMalloc(&devRnds, sizeof(u32) * imageDims.x * imageDims.y));
-	cuda::check_error(cudaMemcpy(devRnds, rnds.get(), sizeof(u32) * imageDims.x * imageDims.y,
-					  cudaMemcpyDefault));
+	for(int i = 0; i < m_outputBuffer.get_num_pixels(); ++i)
+		m_seeds[i] = static_cast<u32>(m_rng.next());
+	copy(m_seedsPtr.get(), m_seeds.get(), sizeof(u32) * m_outputBuffer.get_num_pixels());
 
 	// TODO: pass scene data to kernel!
 	dim3 blockDims{ 16u, 16u, 1u };
 	dim3 gridDims{
-		1u + static_cast<u32>(imageDims.x - 1) / blockDims.x,
-		1u + static_cast<u32>(imageDims.y - 1) / blockDims.y,
+		1u + static_cast<u32>(m_outputBuffer.get_width() - 1) / blockDims.x,
+		1u + static_cast<u32>(m_outputBuffer.get_height() - 1) / blockDims.y,
 		1u
 	};
 
-	// TODO
-	cuda::check_error(cudaGetLastError());
-	gpupt_detail::call_kernel(gridDims, blockDims, std::move(outputBuffer),
-							  m_scenePtr, devRnds, m_params);
-	cuda::check_error(cudaGetLastError());
-	cuda::check_error(cudaFree(devRnds));
+	cuda::check_error(gpupt_detail::call_kernel(gridDims, blockDims, std::move(m_outputBuffer),
+												m_sceneDesc.get(), m_seedsPtr.get(), m_params));
+
+	//Profiler::instance().create_snapshot_all();
 }
 
 } // namespace mufflon::renderer

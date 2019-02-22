@@ -129,11 +129,12 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 
 namespace gpuwireframe_detail {
 
-void call_kernel(const dim3& gridDims, const dim3& blockDims,
-				 RenderBuffer<Device::CUDA>&& outputBuffer,
-				 scene::SceneDescriptor<Device::CUDA>* scene,
-				 const u32* seeds, const WireframeParameters& params) {
+cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
+						RenderBuffer<Device::CUDA>&& outputBuffer,
+						scene::SceneDescriptor<Device::CUDA>* scene,
+						const u32* seeds, const WireframeParameters& params) {
 	sample<<<gridDims, blockDims>>>(std::move(outputBuffer), scene, seeds, params);
+	return cudaGetLastError();
 }
 
 } // namespace gpuwireframe_detail

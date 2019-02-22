@@ -2669,7 +2669,9 @@ Boolean render_iterate() {
 	// Check if the scene needed a reload -> reset
 	if(s_world.reload_scene())
 		s_currentRenderer->reset();
-	s_currentRenderer->iterate(*s_imageOutput);
+	s_currentRenderer->pre_iteration(*s_imageOutput);
+	s_currentRenderer->iterate();
+	s_currentRenderer->post_iteration(*s_imageOutput);
 	return true;
 	CATCH_ALL(false)
 }

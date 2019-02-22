@@ -20,40 +20,25 @@ CpuPathTracer::CpuPathTracer() {
 	// The PT does not need additional memory resources like photon maps.
 }
 
-void CpuPathTracer::iterate(OutputHandler& outputBuffer) {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU PT iteration", ProfileLevel::LOW);
-	// (Re) create the random number generators
-	if(m_rngs.size() != outputBuffer.get_num_pixels()
-	   || m_reset)
-		init_rngs(outputBuffer.get_num_pixels());
+void CpuPathTracer::on_descriptor_requery() {
+	init_rngs(m_outputBuffer.get_num_pixels());
+}
 
-	RenderBuffer<Device::CPU> buffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
-	if(m_reset) {
-		// TODO: reset output buffer
-		// Reacquire scene descriptor (partially?)
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, outputBuffer.get_resolution());
-	}
-	m_reset = false;
+void CpuPathTracer::iterate() {
+	auto scope = Profiler::instance().start<CpuProfileState>("CPU PT iteration", ProfileLevel::HIGH);
 
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 #pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < outputBuffer.get_num_pixels(); ++pixel) {
-		this->sample(Pixel{ pixel % outputBuffer.get_width(), pixel / outputBuffer.get_width() }, buffer, m_sceneDesc);
+	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
 	}
-
-	outputBuffer.end_iteration<Device::CPU>();
 
 	Profiler::instance().create_snapshot_all();
 }
 
-void CpuPathTracer::reset() {
-	this->m_reset = true;
-}
-
-void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-						   const scene::SceneDescriptor<Device::CPU>& scene) {
-	int pixel = coord.x + coord.y * outputBuffer.get_width();
+void CpuPathTracer::sample(const Pixel coord) {
+	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	//m_params.maxPathLength = 2;
 
@@ -61,7 +46,7 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
 	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene.camera.get(), coord, m_rngs[pixel].next());
+	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 	mAssertMsg(s < 256, "vertexBuffer overflow.");
 
 
@@ -77,21 +62,21 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
+			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 				vertex->get_position(), m_currentScene->get_bounding_box(),
 				neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, scene.media);
+			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					scene, { vertex->get_position() , nee.direction },
+					m_sceneDesc, { vertex->get_position() , nee.direction },
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 					mAssert(!isnan(mis));
-					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
+					m_outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 						value.cosOut, radiance * mis);
 				}
 			}
@@ -101,14 +86,14 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
-		if(!walk(scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(scene.lightTree.background, lastDir.direction);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
 				if(any(greater(background.value, 0.0f))) {
 					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
 					background.value *= mis;
-					outputBuffer.contribute(coord, throughput, background.value,
+					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
 				}
@@ -121,14 +106,14 @@ void CpuPathTracer::sample(const Pixel coord, RenderBuffer<Device::CPU>& outputB
 		if(pathLen <= m_params.maxPathLength) {
 			Spectrum emission = vertex->get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex->get_primitive_id(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
 					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
 				emission *= mis;
 			}
-			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
+			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
@@ -139,14 +124,6 @@ void CpuPathTracer::init_rngs(int num) {
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i);
-}
-
-void CpuPathTracer::load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) {
-	if(scene != m_currentScene) {
-		m_currentScene = scene;
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, resolution);
-		m_reset = true;
-	}
 }
 
 } // namespace mufflon::renderer

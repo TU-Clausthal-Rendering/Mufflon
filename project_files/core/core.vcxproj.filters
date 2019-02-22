@@ -119,9 +119,6 @@
     <Filter Include="Source Files\core\renderer\wireframe">
       <UniqueIdentifier>{074bee21-e7ed-49eb-978d-358d1185538a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\core\renderer\silhouette">
-      <UniqueIdentifier>{106d2a6f-3e42-44e5-bc0c-6c48b9713311}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -240,6 +237,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -816,9 +816,6 @@
     <ClInclude Include="..\..\src\core\renderer\renderers.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\silhouette.hpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp">
       <Filter>Source Files\core\renderer\pt</Filter>
     </ClInclude>
@@ -839,6 +836,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\gpu_wireframe.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

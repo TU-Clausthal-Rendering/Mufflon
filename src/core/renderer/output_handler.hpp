@@ -140,6 +140,7 @@ struct RenderBuffer {
 	__host__ __device__ int get_width() const { return m_resolution.x; }
 	__host__ __device__ int get_height() const { return m_resolution.y; }
 	__host__ __device__ ei::IVec2 get_resolution() const { return m_resolution; }
+	__host__ __device__ int get_num_pixels() const { return m_resolution.x * m_resolution.y; }
 };
 
 // Kind of a multiple-platform multiple-render-target.

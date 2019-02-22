@@ -2,10 +2,7 @@
 
 #include "wireframe_params.hpp"
 #include "core/math/rng.hpp"
-#include "core/memory/residency.hpp"
-#include "core/renderer/renderer.hpp"
-#include "core/renderer/renderer.hpp"
-#include "core/scene/descriptors.hpp"
+#include "core/renderer/renderer_base.hpp"
 #include <vector>
 
 namespace mufflon::renderer {
@@ -13,33 +10,27 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
-class CpuWireframe : public IRenderer {
+class CpuWireframe : public RendererBase<Device::CPU> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuWireframe();
 	~CpuWireframe() = default;
 
-	virtual void iterate(OutputHandler& outputBuffer) override;
-	virtual void reset() override;
-	virtual IParameterHandler& get_parameters() final { return m_params; }
-	virtual bool has_scene() const noexcept override { return m_currentScene != nullptr; }
-	virtual void load_scene(scene::SceneHandle scene, const ei::IVec2& resolution) override;
-	virtual StringView get_name() const noexcept { return "Wireframe"; }
-	virtual bool uses_device(Device dev) noexcept override { return may_use_device(dev); }
-	static bool may_use_device(Device dev) noexcept { return Device::CPU == dev; }
+	void iterate() final;
+	IParameterHandler& get_parameters() final { return m_params; }
+	StringView get_name() const noexcept final { return "Wireframe"; }
+	StringView get_short_name() const noexcept final { return "WF"; }
+
+	void on_descriptor_requery() final;
 
 private:
 	// Create one sample path (actual PT algorithm)
-	void sample(const Pixel coord, RenderBuffer<Device::CPU>& outputBuffer,
-				const scene::SceneDescriptor<Device::CPU>& scene);
+	void sample(const Pixel coord);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
-	bool m_reset = true;
 	WireframeParameters m_params = {};
-	scene::SceneHandle m_currentScene = nullptr;
 	std::vector<math::Rng> m_rngs;
-	scene::SceneDescriptor<Device::CPU> m_sceneDesc;
 };
 
 } // namespace mufflon::renderer
