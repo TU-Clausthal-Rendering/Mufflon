@@ -2631,6 +2631,13 @@ const char* render_get_renderer_name(uint32_t index) {
 	CATCH_ALL(nullptr)
 }
 
+const char* render_get_renderer_short_name(uint32_t index) {
+	TRY
+		CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
+	return &s_renderers[index]->get_short_name()[0u];
+	CATCH_ALL(nullptr)
+}
+
 Boolean render_renderer_uses_device(uint32_t index, RenderDevice dev) {
 	TRY
 	CHECK(index < s_renderers.size(), "renderer index out of bounds", false);

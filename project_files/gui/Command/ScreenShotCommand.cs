@@ -30,9 +30,21 @@ namespace gui.Command
             filename = filename.Replace("#scene", Path.GetFileNameWithoutExtension(m_models.World.Filename));
             filename = filename.Replace("#scenario", m_models.World.CurrentScenario.Name);
             filename = filename.Replace("#renderer", m_models.Renderer.Name);
+            filename = filename.Replace("#shortrenderer", m_models.Renderer.ShortName);
             filename = filename.Replace("#iteration", m_models.Renderer.Iteration.ToString());
 
-            foreach(RenderTarget target in m_models.RenderTargetSelection.Targets)
+            // Enumerate devices
+            string devs = "";
+            foreach(Core.RenderDevice dev in Enum.GetValues(typeof(Core.RenderDevice)))
+            {
+                if (m_models.Renderer.UsesDevice(dev))
+                    devs += Enum.GetName(typeof(Core.RenderDevice), dev) + ",";
+            }
+            if (devs.Length > 0)
+                devs = devs.Substring(0, devs.Length - 1);
+            filename = filename.Replace("#devices", devs);
+
+            foreach (RenderTarget target in m_models.RenderTargetSelection.Targets)
             {
                 if (target.Enabled)
                 {

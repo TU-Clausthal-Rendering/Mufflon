@@ -66,9 +66,11 @@ namespace gui.ViewModel.Settings
             "Specifies the pattern by which screenshots taken will be named\n" +
             "Valid tags are:\n" +
             "\t#scene - the name of the scene\n" +
-            "\t#renderer - the name of the active renderer" +
-            "\t#scenario - the name of the active scenario" +
-            "\t#iteration - the iteration at which the screenshot was taken" +
+            "\t#renderer - the name of the active renderer\n" +
+            "\t#shortrenderer - the short name of the active renderer\n" +
+            "\t#devices - the device names the renderer is using\n" +
+            "\t#scenario - the name of the active scenario\n" +
+            "\t#iteration - the iteration at which the screenshot was taken\n" +
             "\t#target - the render target used";
 
         public ObservableCollection<EnumBoxItem<Core.Severity>> LogLevels { get; } = 

@@ -209,6 +209,12 @@ namespace gui.Model
             get => m_name;
         }
 
+        private string m_shortName;
+        public string ShortName
+        {
+            get => m_shortName;
+        }
+
         public IReadOnlyList<RendererParameter> Parameters { get; private set; }
 
         private void OnRendererChanged(object sender, PropertyChangedEventArgs args)
@@ -229,8 +235,10 @@ namespace gui.Model
 
                     Parameters = paramList;
                     m_name = Core.render_get_renderer_name(RendererIndex);
+                    m_shortName = Core.render_get_renderer_short_name(RendererIndex);
                     LoadRendererParameters();
                     OnPropertyChanged(nameof(Name));
+                    OnPropertyChanged(nameof(ShortName));
                 }   break;
             }
         }
