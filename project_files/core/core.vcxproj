@@ -335,12 +335,12 @@
       <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>xcopy /D/Y "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
-xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCored.dll" "$(OutDir)"
-xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToolsd.dll" "$(OutDir)"</Command>
+      <Command>xcopy /DQY "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCored.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToolsd.dll" "$(OutDir)" &gt; nul</Command>
     </PostBuildEvent>
     <PostBuildEvent>
-      <Message>Copies the necessary .dll's into the execution directory</Message>
+      <Message>Copied the necessary .dll's into the execution directory</Message>
     </PostBuildEvent>
     <Link>
       <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -401,10 +401,10 @@ xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Message>Copies the necessary .dll's into the execution directory</Message>
-      <Command>xcopy /D/Y "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)"
-xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCore.dll" "$(OutDir)"
-xcopy /D/Y "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)"</Command>
+      <Message>Copied the necessary .dll's into the execution directory</Message>
+      <Command>xcopy /DQY "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshCore.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)" &gt; nul</Command>
     </PostBuildEvent>
     <CudaLink>
       <PerformDeviceLink>true</PerformDeviceLink>
