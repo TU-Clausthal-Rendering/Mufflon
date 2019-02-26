@@ -22,6 +22,8 @@
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\importance\cpu_importance.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\importance\decimater.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\importance\importance_map.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\silhouette\cpu_silhouette.cpp" />
@@ -182,6 +184,7 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\importance\cpu_importance.hpp" />
     <ClInclude Include="..\..\src\core\renderer\importance\decimater.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\importance\importance_map.hpp" />
     <ClInclude Include="..\..\src\core\renderer\importance\importance_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />

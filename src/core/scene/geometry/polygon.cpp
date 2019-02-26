@@ -393,13 +393,16 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 }
 
 void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-						std::size_t targetVertices) {
+						std::size_t targetVertices, bool garbageCollect) {
 	decimater.initialize();
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
 
+	if(garbageCollect)
+		this->garbage_collect();
+	else
+		this->rebuild_index_buffer();
 	// Do not garbage-collect the mesh yet - only rebuild the index buffer
-	this->rebuild_index_buffer();
 
 	m_vertexAttributes.mark_changed(Device::CPU);
 	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
@@ -409,6 +412,7 @@ void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decima
 
 void Polygons::garbage_collect() {
 	m_meshData->garbage_collection();
+	this->rebuild_index_buffer();
 }
 
 void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {

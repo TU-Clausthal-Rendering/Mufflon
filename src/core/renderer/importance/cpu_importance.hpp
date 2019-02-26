@@ -1,6 +1,7 @@
 #pragma once
 
 #include "importance_params.hpp"
+#include "importance_map.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -45,22 +46,18 @@ private:
 	void decimate();
 	void compute_max_importance();
 	void display_importance();
-	float compute_importance(const scene::PrimitiveHandle& hitId);
+	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 
-	bool m_reset = true;
 	ImportanceParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
 	// Data buffer for importance
-	unique_device_ptr<Device::CPU, std::atomic<float>[]> m_importanceMap;
-	// Data buffer for vertex offset per instance for quick lookup
-	unique_device_ptr<Device::CPU, u32[]> m_vertexOffsets;
-	u32 m_vertexCount = 0;
+	ImportanceMap m_importanceMap;
 
 	// Superfluous
 	bool m_gotImportance = false;
 	bool m_finishedDecimation = false;
-	u32 m_currentImportanceIteration = 0u;
+	int m_currentImportanceIteration = 0;
 	float m_maxImportance;
 };
 

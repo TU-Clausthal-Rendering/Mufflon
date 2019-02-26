@@ -278,7 +278,7 @@ public:
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
 	// Implements decimation.
 	void decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-					std::size_t targetVertices);
+				  std::size_t targetVertices, bool garbageCollect);
 	// Garbage-collects the mesh and the index buffer
 	void garbage_collect();
 

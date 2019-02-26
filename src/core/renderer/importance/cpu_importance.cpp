@@ -15,18 +15,14 @@
 
 namespace mufflon::renderer {
 
-inline void atomic_add(std::atomic<float>& af, const float diff) {
-	float expected = af.load();
-	float desired;
-	do {
-		desired = expected + diff;
-	} while(!af.compare_exchange_weak(expected, desired));
-}
+namespace {
 
-inline float get_luminance(const ei::Vec3& vec) {
+float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
 }
+
+} // namespace
 
 CpuImportanceDecimater::CpuImportanceDecimater() {
 	// TODO: init one RNG per thread?
@@ -49,16 +45,33 @@ void CpuImportanceDecimater::on_descriptor_requery() {
 }
 
 void CpuImportanceDecimater::iterate() {
-	// TODO: enable decimation
-	logInfo("Importance iteration (", m_currentImportanceIteration + 1, " of ", m_params.importanceIterations, ")");
-	gather_importance();
-	++m_currentImportanceIteration;
+	if(m_currentImportanceIteration >= m_params.importanceIterations) {
+		if(!m_finishedDecimation) {
+			if(m_params.decimationEnabled)
+				this->decimate();
+			m_finishedDecimation = true;
+			m_gotImportance = true;
+			m_reset = true;
+		} else {
+			const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+#pragma PARALLEL_FOR
+			for(int i = 0; i < (int)NUM_PIXELS; ++i) {
+				this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
+			}
+		}
+	} else {
+		if(!m_params.keepImportance || !m_gotImportance) {
+			// TODO: enable decimation
+			logInfo("Importance iteration (", m_currentImportanceIteration + 1, " of ", m_params.importanceIterations, ")");
+			gather_importance();
+			++m_currentImportanceIteration;
+		}
 
-	// TODO: visualize importance
-	if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-		compute_max_importance();
-		logWarning("Max importance: ", m_maxImportance);
-		display_importance();
+		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+			compute_max_importance();
+			logInfo("Max. importance: ", m_maxImportance);
+			display_importance();
+		}
 	}
 }
 
@@ -70,13 +83,13 @@ void CpuImportanceDecimater::gather_importance() {
 		this->importance_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
 	}
 	// TODO: allow for this with proper reset "events"
+	m_importanceMap.update_normalized();
 }
 
 void CpuImportanceDecimater::decimate() {
-	constexpr StringView importanceAttrName{ "importance" };
-
 	logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
 	u32 vertexOffset = 0u;
+	u32 meshIndex = 0u;
 	for(auto object : m_currentScene->get_objects()) {
 		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
 			if(object.first->has_lod_available(i)) {
@@ -94,38 +107,29 @@ void CpuImportanceDecimater::decimate() {
 
 					auto& mesh = polygons.get_mesh();
 					OpenMesh::VPropHandleT<float> impHdl;
-					mesh.add_property(impHdl, std::string(importanceAttrName));
-
-					for(u32 v = 0u; v < vertexCount; ++v)
-						mesh.property(impHdl, OpenMesh::VertexHandle {(int)v}) = m_importanceMap[vertexOffset + v].load();
 
 					// Create decimater and attach modules
-					/*auto decimater = polygons.create_decimater();
+					auto decimater = polygons.create_decimater();
 
-					ImportanceModule<scene::geometry::PolygonMeshType>::Handle impModHdl;
-					ImportanceBinaryModule<scene::geometry::PolygonMeshType>::Handle impBinModHdl;
+					ModImportance<>::Handle impModHdl;
 					decimater.add(impModHdl);
-					decimater.add(impBinModHdl);
-					decimater.module(impModHdl).set_importance_property(impHdl);
-					decimater.module(impBinModHdl).set_importance_property(impHdl);
-					//OpenMesh::Decimater::ModNormalFlippingT<scene::geometry::PolygonMeshType>::Handle normal_flipping;
-					//decimater.add(normal_flipping);
-					//decimater.module(normal_flipping).set_max_normal_deviation(m_params.maxNormalDeviation);
-
-					// Perform actual decimation
-					// TODO: only create LoD
-					polygons.decimate(decimater, targetVertexCount);*/
+					decimater.module(impModHdl).set_importance_map(m_importanceMap, meshIndex);
+					//MaxNormalDeviation<>::Handle normModHdl;
+					//decimater.add(normModHdl);
+					//decimater.module(normModHdl).set_max_deviation(60.0);
+					polygons.decimate(decimater, targetVertexCount, true);
 
 					lod.clear_accel_structure();
 				}
 				vertexOffset += vertexCount;
+				++meshIndex;
 			}
 		}
 	}
 
 	// We need to re-build the scene
 	m_currentScene->clear_accel_structure();
-	m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
+	m_reset = true;
 }
 
 void CpuImportanceDecimater::importance_sample(const Pixel coord) {
@@ -166,6 +170,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 
 	int pathLen = 0;
 	do {
+		pathRadiance[pathLen] = ei::Vec3{ 0.f };
 		// Add direct contribution as importance as well
 		if(pathLen > 0 && pathLen + 1 <= m_params.maxPathLength) {
 			u64 neeSeed = m_rngs[pixel].next();
@@ -190,12 +195,11 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 					pathRadiance[pathLen] = vertexThroughput[pathLen - 1] * mis * radiance * value.cosOut;
 					// Add the importance
 					const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
-					const float weightedIrradianceLuminance = mis * get_luminance(throughput.weight * irradiance);
+					const float weightedIrradianceLuminance = mis * get_luminance(throughput.weight * irradiance) * (1.f - ei::abs(outCos[pathLen - 1]));
 					mAssert(lod != nullptr);
 					for(u32 i = 0u; i < numVertices; ++i) {
 						const u32 vertexIndex = lod->polygon.vertexIndices[vertexOffset + numVertices * hitIds[pathLen - 1].primId + i];
-						const u32 index = m_vertexOffsets[hitIds[pathLen - 1].instanceId] + vertexIndex;
-						atomic_add(m_importanceMap[index], 1.f);
+						m_importanceMap.add(hitIds[pathLen - 1].instanceId, vertexIndex, weightedIrradianceLuminance);
 					}
 				}
 			}
@@ -222,38 +226,34 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 
 		if(pathLen > 0) {
 			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
+			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertex->get_normal(), vertex->get_incident_direction())));
 			for(u32 i = 0u; i < numVertices; ++i) {
 				const u32 vertexIndex = lod->polygon.vertexIndices[vertexOffset + numVertices * hitIds[pathLen].primId + i];
-				const u32 index = m_vertexOffsets[hitIds[pathLen].instanceId] + vertexIndex;
-
-				atomic_add(m_importanceMap[index], sharpness);
+				m_importanceMap.add(hitIds[pathLen].instanceId, vertexIndex, importance);
 			}
 
 			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf))) - 1.f;
-			if(isnan(sharpness))
-				__debugbreak();
 
 		}
 
 		++pathLen;
-		pathRadiance[pathLen] = ei::Vec3{ 0.f };
 	} while(pathLen < m_params.maxPathLength);
 
 	// Go back over the path and add up the irradiance from indirect illumination
 	ei::Vec3 accumRadiance{0.f};
 	float accumThroughout = 1.f;
-	for(int p = pathLen - 1; p >= 1; --p) {
+	for(int p = pathLen - 2; p >= 1; --p) {
 		accumRadiance = vertexThroughput[p] * accumRadiance + pathRadiance[p + 1];
 		const ei::Vec3 irradiance = vertexAccumThroughput[p] * outCos[p] * accumRadiance;
 
 		const auto& lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitIds[p].instanceId]];
 		const u32 numVertices = hitIds[p].primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = hitIds[p].primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
+
+		const float importance = get_luminance(irradiance) * (1.f - ei::abs(outCos[p]));
 		for(u32 i = 0u; i < numVertices; ++i) {
 			const u32 vertexIndex = lod->polygon.vertexIndices[vertexOffset + numVertices * hitIds[p].primId + i];
-			const u32 index = m_vertexOffsets[hitIds[p].instanceId] + vertexIndex;
-
-			atomic_add(m_importanceMap[index], get_luminance(irradiance));
+			m_importanceMap.add(hitIds[p].instanceId, vertexIndex, importance);
 		}
 	}
 }
@@ -323,7 +323,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 		}
 
 		if(pathLen == 0 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex->get_position(), vertex->get_primitive_id()) });
 		}
 
 		++pathLen;
@@ -349,39 +349,10 @@ void CpuImportanceDecimater::compute_max_importance() {
 	m_maxImportance = 0.f;
 
 	// Compute the maximum normalized importance for visualization
+//#pragma omp parallel for reduction(max:m_maxImportance)
 	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
-		const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[i]];
-		// First triangles, then quads
-		for(u32 t = 0u; t < lod.polygon.numTriangles; ++t) {
-			const u32 A = lod.polygon.vertexIndices[3u * t + 0u];
-			const u32 B = lod.polygon.vertexIndices[3u * t + 1u];
-			const u32 C = lod.polygon.vertexIndices[3u * t + 2u];
-			const float area = ei::surface(ei::Triangle{
-				lod.polygon.vertices[A], lod.polygon.vertices[B],
-				lod.polygon.vertices[C] });
-			const float importance = (m_importanceMap[m_vertexOffsets[i] + A]
-									  + m_importanceMap[m_vertexOffsets[i] + B]
-									  + m_importanceMap[m_vertexOffsets[i] + C]) / 3.f;
-
-			m_maxImportance = std::max(importance / area, m_maxImportance);
-		}
-
-		for(u32 q = 0u; q < lod.polygon.numQuads; ++q) {
-			const u32 A = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 0u];
-			const u32 B = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 1u];
-			const u32 C = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 2u];
-			const u32 D = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * q + 3u];
-			const float area = ei::surface(ei::Triangle{
-				lod.polygon.vertices[A], lod.polygon.vertices[B],
-				lod.polygon.vertices[C] }) + ei::surface(ei::Triangle{
-				lod.polygon.vertices[A], lod.polygon.vertices[C],
-				lod.polygon.vertices[D] });
-			const float importance = (m_importanceMap[m_vertexOffsets[i] + A]
-									  + m_importanceMap[m_vertexOffsets[i] + B]
-									  + m_importanceMap[m_vertexOffsets[i] + C]
-									  + m_importanceMap[m_vertexOffsets[i] + D]) / 4.f;
-
-			m_maxImportance = std::max(importance / area, m_maxImportance);
+		for(u32 v = 0u; v < m_importanceMap.get_vertex_count(i); ++v) {
+			m_maxImportance = std::max(m_maxImportance, m_importanceMap.normalized(i, v));
 		}
 	}
 }
@@ -406,60 +377,91 @@ void CpuImportanceDecimater::display_importance() {
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
 		if(walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ compute_importance(vertex->get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex->get_position(), vertex->get_primitive_id()) });
 	}
 
 }
 
-float CpuImportanceDecimater::compute_importance(const scene::PrimitiveHandle& hitId) {
+float CpuImportanceDecimater::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
 	const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
+
+	float importance = 0.f;
+
+	// Compute the closest vertex
 	const u32 vertexCount = ((u32)hitId.primId < lod.polygon.numTriangles) ? 3u : 4u;
-	const u32 vertexOffset = m_vertexOffsets[hitId.instanceId];
-
-	// Normalize the importance by the primitive's area
-	float importance;
 	if(vertexCount == 3u) {
-		const u32 A = lod.polygon.vertexIndices[3u * hitId.primId + 0u];
-		const u32 B = lod.polygon.vertexIndices[3u * hitId.primId + 1u];
-		const u32 C = lod.polygon.vertexIndices[3u * hitId.primId + 2u];
-		const float area = ei::surface(ei::Triangle{
-			lod.polygon.vertices[A], lod.polygon.vertices[B],
-			lod.polygon.vertices[C] });
-		importance = (m_importanceMap[vertexOffset + A]
-					  + m_importanceMap[vertexOffset + B]
-					  + m_importanceMap[vertexOffset + C]) / (area * 3.f);
-	} else {
-		const u32 quadId = hitId.primId - lod.polygon.numTriangles;
-		const u32 A = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * quadId + 0u];
-		const u32 B = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * quadId + 1u];
-		const u32 C = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * quadId + 2u];
-		const u32 D = lod.polygon.vertexIndices[3u * lod.polygon.numTriangles + 4u * quadId + 3u];
-		const float area = ei::surface(ei::Triangle{
-			lod.polygon.vertices[A], lod.polygon.vertices[B],
-			lod.polygon.vertices[C] }) + ei::surface(ei::Triangle{
-			lod.polygon.vertices[A], lod.polygon.vertices[C],
-			lod.polygon.vertices[D] });
-		importance = (m_importanceMap[vertexOffset + A]
-					  + m_importanceMap[vertexOffset + B]
-					  + m_importanceMap[vertexOffset + C]
-					  + m_importanceMap[vertexOffset + D]) / (area * 3.f);
-	}
+		// Triangle
+		const u32 i0 = lod.polygon.vertexIndices[3u * hitId.primId + 0u];
+		const u32 i1 = lod.polygon.vertexIndices[3u * hitId.primId + 1u];
+		const u32 i2 = lod.polygon.vertexIndices[3u * hitId.primId + 2u];
+		const float d0 = ei::lensq(hitPoint - lod.polygon.vertices[i0]);
+		const float d1 = ei::lensq(hitPoint - lod.polygon.vertices[i1]);
+		const float d2 = ei::lensq(hitPoint - lod.polygon.vertices[i2]);
+		if(d0 < d1) {
+			if(d0 < d2)
+				importance = m_importanceMap.normalized(hitId.instanceId, i0);
+			else
+				importance = m_importanceMap.normalized(hitId.instanceId, i2);
+		} else {
+			if(d1 < d2)
+				importance = m_importanceMap.normalized(hitId.instanceId, i1);
+			else
+				importance = m_importanceMap.normalized(hitId.instanceId, i2);
+		}
 
+	} else {
+		mAssert(vertexCount == 4u);
+		// Quad
+		const u32 vertexOffset = 3u * static_cast<u32>(lod.polygon.numTriangles);
+		const u32 i0 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 0u];
+		const u32 i1 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 1u];
+		const u32 i2 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 2u];
+		const u32 i3 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 3u];
+		const float d0 = ei::lensq(hitPoint - lod.polygon.vertices[i0]);
+		const float d1 = ei::lensq(hitPoint - lod.polygon.vertices[i1]);
+		const float d2 = ei::lensq(hitPoint - lod.polygon.vertices[i2]);
+		const float d3 = ei::lensq(hitPoint - lod.polygon.vertices[i3]);
+
+		if(d0 < d1) {
+			if(d0 < d2) {
+				if(d0 < d3)
+					importance = m_importanceMap.normalized(hitId.instanceId, i0);
+				else
+					importance = m_importanceMap.normalized(hitId.instanceId, i3);
+			} else {
+				if(d2 < d3)
+					importance = m_importanceMap.normalized(hitId.instanceId, i2);
+				else
+					importance = m_importanceMap.normalized(hitId.instanceId, i3);
+			}
+		} else {
+			if(d1 < d2) {
+				if(d1 < d3)
+					importance = m_importanceMap.normalized(hitId.instanceId, i1);
+				else
+					importance = m_importanceMap.normalized(hitId.instanceId, i3);
+			} else {
+				if(d2 < d3)
+					importance = m_importanceMap.normalized(hitId.instanceId, i2);
+				else
+					importance = m_importanceMap.normalized(hitId.instanceId, i3);
+			}
+		}
+	}
 	return importance / m_maxImportance;
 }
 
 void CpuImportanceDecimater::initialize_importance_map() {
-	m_vertexCount = 0u;
-	m_vertexOffsets = make_udevptr_array<Device::CPU, u32>(m_sceneDesc.numInstances);
-	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
-		m_vertexOffsets[i] = m_vertexCount;
-		m_vertexCount += m_sceneDesc.lods[m_sceneDesc.lodIndices[i]].polygon.numVertices;
+	std::vector<scene::geometry::PolygonMeshType*> meshes;
+
+	for(auto object : m_currentScene->get_objects()) {
+		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
+			if(object.first->has_lod_available(i)) {
+				meshes.push_back(&object.first->get_lod(i).template get_geometry<scene::geometry::Polygons>().get_mesh());
+			}
+		}
 	}
-	// Allocate sufficient buffer
-	m_importanceMap = make_udevptr_array<Device::CPU, std::atomic<float>>(m_vertexCount);
-	// Initilaize importance with zero
-	for(u32 i = 0u; i < m_vertexCount; ++i)
-		m_importanceMap[i].store(0.f);
+	m_importanceMap = ImportanceMap(std::move(meshes));
 }
 
 void CpuImportanceDecimater::init_rngs(int num) {
