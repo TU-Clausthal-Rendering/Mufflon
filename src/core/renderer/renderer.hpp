@@ -16,6 +16,8 @@ class IParameterHandler;
 
 class IRenderer {
 public:
+	virtual ~IRenderer() = default;
+
 	virtual void iterate() = 0;
 	virtual IParameterHandler& get_parameters() = 0;
 	virtual StringView get_name() const noexcept = 0u;

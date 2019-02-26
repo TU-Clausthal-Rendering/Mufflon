@@ -349,7 +349,7 @@ namespace gui.Model
                 string parameters = gui.Properties.Settings.Default.RendererParameters[idx];
 
                 var splitParams = parameters.Split('\n');
-                for (int i = 0; i < splitParams.Length; ++i)
+                for (int i = 0; i < Math.Min(splitParams.Length, Parameters.Count); ++i)
                 {
                     var paramVals = splitParams[i].Split(';');
                     if (paramVals.Length == 3 && Parameters[i].Name == paramVals[0])
