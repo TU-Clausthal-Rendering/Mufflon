@@ -47,8 +47,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
 						math::Throughput& throughput,
-						VertexType* outVertex,
-						math::DirectionSample& sampledDir
+						VertexType& outVertex
 ) {
 	// Sample the vertex's outgoing direction
 	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
@@ -59,7 +58,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
 		&& !isnan(sample.origin.x) && !isnan(sample.origin.y) && !isnan(sample.origin.z)
 		&& !isnan(float(sample.pdfF)) && !isnan(float(sample.pdfB)));
-	sampledDir = {sample.excident, sample.pdfF};
+	vertex.ext().update(vertex, sample);
 
 	// Update throughputs
 	throughput.weight *= sample.throughput;
@@ -108,9 +107,9 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	else
 		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
 	const float incidentCos = dot(nextHit.normal, sample.excident);
-	VertexType::create_surface(outVertex, &vertex, nextHit, scene.get_material(matIdx),
-				{ position, sample.pdfF.to_area_pdf(incidentCos,ei::sq(nextHit.hitT)) },
-				tangentSpace, sample.excident);
+	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
+				position, tangentSpace, sample.excident, nextHit.hitT,
+				incidentCos, sample.pdfF);
 	return true;
 }
 

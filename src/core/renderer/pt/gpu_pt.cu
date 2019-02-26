@@ -1,4 +1,5 @@
 #include "pt_params.hpp"
+#include "pt_common.hpp"
 #include "core/cuda/error.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/output_handler.hpp"
@@ -16,8 +17,6 @@
 using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
-
-using PtPathVertex = PathVertex<u8, 4>;
 
 __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 							  scene::SceneDescriptor<Device::CUDA>* scene,
@@ -78,13 +77,12 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 		// Walk
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
-		math::DirectionSample lastDir;
-		if(!walk(*scene, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(*scene, *vertex, rnd, -1.0f, false, throughput, *vertex)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(scene->lightTree.background, lastDir.direction);
+				auto background = evaluate_background(scene->lightTree.background, vertex->ext().excident);
 				if(any(greater(background.value, 0.0f))) {
-					const float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
+					const float mis = 1.0f / (1.0f + background.pdfB / vertex->ext().pdf);
 					background.value *= mis;
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -103,7 +101,7 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+					: 1.0f / (1.0f + backwardPdf / vertex->ext().incidentPdf);
 				emission *= mis;
 			}
 			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),

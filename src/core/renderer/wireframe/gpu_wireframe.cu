@@ -16,7 +16,7 @@ using namespace mufflon::scene::lights;
 namespace mufflon {
 namespace renderer {
 
-using PtPathVertex = PathVertex<u8, 4>;
+using PtPathVertex = PathVertex<VertexExtension<4>, 4>;
 
 __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 							  scene::SceneDescriptor<Device::CUDA>* scene,

@@ -1,4 +1,5 @@
 #include "cpu_pt.hpp"
+#include "pt_common.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
@@ -14,14 +15,8 @@
 
 namespace mufflon::renderer {
 
-using PtPathVertex = PathVertex<u8, 4>;
-
 CpuPathTracer::CpuPathTracer() {
 	// The PT does not need additional memory resources like photon maps.
-}
-
-void CpuPathTracer::on_descriptor_requery() {
-	init_rngs(m_outputBuffer.get_num_pixels());
 }
 
 void CpuPathTracer::iterate() {
@@ -52,7 +47,7 @@ void CpuPathTracer::sample(const Pixel coord) {
 
 	int pathLen = 0;
 	do {
-		if(pathLen > 0.0f && pathLen+1 <= m_params.maxPathLength) {
+		if(pathLen > 0 && pathLen+1 <= m_params.maxPathLength) {
 			// Call NEE member function for recursive vertices.
 			// Do not connect to the camera, because this makes the renderer much more
 			// complicated. Our decision: The PT should be as simple as possible!
@@ -70,7 +65,7 @@ void CpuPathTracer::sample(const Pixel coord) {
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					m_sceneDesc, { vertex->get_position() , nee.direction },
+					m_sceneDesc, { vertex->get_position(), nee.direction },
 					vertex->get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
@@ -85,13 +80,12 @@ void CpuPathTracer::sample(const Pixel coord) {
 		// Walk
 		scene::Point lastPosition = vertex->get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-		math::DirectionSample lastDir;
-		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, *vertex)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex->ext().excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
+					float mis = 1.0f / (1.0f + background.pdfB / vertex->ext().pdf);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -110,13 +104,17 @@ void CpuPathTracer::sample(const Pixel coord) {
 												  vertex->get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+					: 1.0f / (1.0f + backwardPdf / vertex->ext().incidentPdf);
 				emission *= mis;
 			}
 			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
 									vertex->get_normal(), vertex->get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
+}
+
+void CpuPathTracer::on_reset() {
+	init_rngs(m_outputBuffer.get_num_pixels());
 }
 
 void CpuPathTracer::init_rngs(int num) {

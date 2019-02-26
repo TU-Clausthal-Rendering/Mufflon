@@ -8,7 +8,7 @@
 
 namespace mufflon::renderer {
 
-using PtPathVertex = PathVertex<u8, 4>;
+using PtPathVertex = PathVertex<VertexExtension<4>, 4>;
 
 CpuWireframe::CpuWireframe() {
 	// TODO: init one RNG per thread?

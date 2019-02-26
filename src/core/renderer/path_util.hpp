@@ -40,6 +40,14 @@ struct VertexSample : public math::PathSample {
 	scene::materials::MediumHandle medium;	// TODO: fill this with life in the vertex itself
 };
 
+// Return value helper
+struct Connection {
+	scene::Point v0;			// Origin / reference location of the first vertex
+	float distance;				// Distance between v0 and v1
+	scene::Direction dir;		// Vector v1 - v0, normalized
+	float distanceSq;			// Squared distance
+};
+
 /*
  * The vertex is an abstraction layer between light/camera/material implementation
  * and a general rendering routine.
@@ -97,9 +105,6 @@ public:
 		mAssertMsg(!is_end_point(), "Incident direction for end points is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
-
-	// The per area PDF of the previous segment which generated this vertex
-	CUDA_FUNCTION AreaPdf get_incident_pdf() const { return m_incidentPdf; }
 
 	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
 	// This method ensures compatibility with any kind of interaction.
@@ -286,22 +291,21 @@ public:
 	}
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
-	CUDA_FUNCTION float get_incident_dist_sq(const void* pathMem) const {
+	CUDA_FUNCTION float get_incident_dist_sq() const {
 		if(m_offsetToPath == 0xffff) return 0.0f;
-		const PathVertex* prev = as<PathVertex>(as<u8>(pathMem) + m_offsetToPath);
+		const PathVertex* prev = as<PathVertex>(as<u8>(this) + m_offsetToPath);
 		// The m_position is always a true position (the 'this' vertex is not an
 		// end-point and can thus not be an orthogonal source).
 		return lensq(prev->get_position(m_position) - m_position);
 	}
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
-	CUDA_FUNCTION const PathVertex* previous(const void* pathMem) const {
-		return m_offsetToPath == 0xffff ? nullptr : as<PathVertex>(as<u8>(pathMem) + m_offsetToPath);
+	CUDA_FUNCTION const PathVertex* previous() const {
+		return m_offsetToPath == 0xffff ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPath);
 	}
 
 	// Access to the renderer dependent extension
-	CUDA_FUNCTION const ExtensionT& ext() const { return m_extension; }
-	CUDA_FUNCTION ExtensionT& ext()			  { return m_extension; }
+	CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
 
 	// Get the address of the interaction specific descriptor (aligned)
 	// TODO: benchmark if internal alignment is worth it
@@ -312,13 +316,24 @@ public:
 	* This is a non-trivial operation because of special cases like directional lights and
 	* orthographic cammeras.
 	*/
-	CUDA_FUNCTION static ei::Vec3 get_connection(const PathVertex& path0, const PathVertex& path1) {
+	CUDA_FUNCTION static Connection get_connection(const PathVertex& path0, const PathVertex& path1) {
 		mAssert(is_connection_possible(path0, path1));
-		if(path0.is_orthographic())
-			return path0.m_position * scene::MAX_SCENE_SIZE;
-		if(path1.is_orthographic())
-			return -path1.m_position * scene::MAX_SCENE_SIZE;
-		return path1.m_position - path0.m_position;
+		// Special cases
+		if(path0.is_orthographic()) {	// p0 has no position
+			mAssert(approx(len(path0.m_position), 1.0f));
+			return { path1.m_position - path0.m_position * scene::MAX_SCENE_SIZE, scene::MAX_SCENE_SIZE,
+					 path0.m_position, ei::sq(scene::MAX_SCENE_SIZE) };
+		}
+		if(path1.is_orthographic()) {	// p1 has no position
+			mAssert(approx(len(path1.m_position), 1.0f));
+			return { path0.m_position, scene::MAX_SCENE_SIZE,
+					-path1.m_position, ei::sq(scene::MAX_SCENE_SIZE) };
+		}
+		// A normal connection (both vertices have a position)
+		ei::Vec3 connection = path1.m_position - path0.m_position;
+		float distSq = lensq(connection);
+		float dist = sqrtf(distSq);
+		return { path0.m_position, dist, sdiv(connection, dist), distSq };
 	}
 
 	CUDA_FUNCTION static bool is_connection_possible(const PathVertex& path0, const PathVertex& path1) {
@@ -400,8 +415,8 @@ public:
 		vert->init_prev_offset(mem, previous);
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incidentRay.direction;
-		vert->m_incidentPdf = AreaPdf { 0.0f };
 		vert->m_extension = ExtensionT{};
+		vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, AreaPdf { 0.0f });
 		return round_to_align<VERTEX_ALIGNMENT>( sizeof(PathVertex) );
 	}
 
@@ -423,7 +438,7 @@ public:
 			*desc = static_cast<const cameras::PinholeParams&>(camera);
 			auto position = pinholecam_sample_position(*desc, pixel, rndSet);
 			vert->m_position = position.position;
-			vert->m_incidentPdf = position.pdf;
+			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf);
 			return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
 		}
 		else if(camera.type == cameras::CameraModel::FOCUS) {
@@ -432,7 +447,7 @@ public:
 			*desc = static_cast<const cameras::FocusParams&>(camera);
 			auto position = focuscam_sample_position(*desc, rndSet);
 			vert->m_position = position.position;
-			vert->m_incidentPdf = position.pdf;
+			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf);
 			return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(cameras::FocusParams));
 		}
 		mAssertMsg(false, "Not implemented yet.");
@@ -447,11 +462,11 @@ public:
 		vert->m_position = lightSample.pos.position;
 		vert->init_prev_offset(mem, previous);
 		vert->m_intensity = lightSample.intensity;
-		vert->m_incidentPdf = lightSample.pos.pdf;
 		vert->m_extension = ExtensionT{};
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
 				return round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex));
 			}
 			case scene::lights::LightType::SPOT_LIGHT: {
@@ -460,6 +475,7 @@ public:
 				desc->direction = lightSample.source_param.spot.direction;
 				desc->cosThetaMax = lightSample.source_param.spot.cosThetaMax;
 				desc->cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
 				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(SpotLightDesc));
 			}
 			case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
@@ -468,6 +484,7 @@ public:
 				vert->m_type = Interaction::LIGHT_AREA;
 				AreaLightDesc* desc = as<AreaLightDesc>(vert->desc());
 				desc->normal = lightSample.source_param.area.normal;
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
 				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(AreaLightDesc));
 			}
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
@@ -479,7 +496,8 @@ public:
 				// the view for MIS computation where the usage order is reverted.
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
 				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
-				vert->m_incidentPdf = lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
+					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)));
 				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(DirLightDesc));
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
@@ -487,7 +505,8 @@ public:
 				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
 				desc->direction = lightSample.source_param.dir.direction;
 				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
-				vert->m_incidentPdf = lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
+					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)));
 				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(DirLightDesc));
 			}
 		}
@@ -496,21 +515,26 @@ public:
 	CUDA_FUNCTION static int create_surface(void* mem, const void* previous,
 		const scene::accel_struct::RayIntersectionResult& hit,
 		const scene::materials::MaterialDescriptorBase& material,
-		const math::PositionSample& position,
+		const scene::Point& position,
 		const scene::TangentSpace& tangentSpace,
-		const scene::Direction& incident
+		const scene::Direction& incident,
+		const float incidentDistance,
+		const float incidentCosine,
+		const AngularPdf prevPdf
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		vert->m_position = position.position;
+		vert->m_position = position;
 		vert->init_prev_offset(mem, previous);
 		vert->m_type = Interaction::SURFACE;
 		vert->m_incident = incident;
-		vert->m_incidentPdf = position.pdf;
 		vert->m_extension = ExtensionT{};
 		SurfaceDesc* desc = as<SurfaceDesc>(vert->desc());
 		desc->tangentSpace = tangentSpace;
 		desc->primitiveId = hit.hitId;
 		desc->surfaceParams = hit.surfaceParams.st;
+		vert->ext().init(*vert, incident, incidentDistance, incidentCosine,
+			prevPdf.to_area_pdf(incidentCosine, incidentDistance * incidentDistance));
+	{}
 		int size = scene::materials::fetch(material, hit.uv, &desc->params);
 		return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization) + size);
 	}
@@ -562,11 +586,8 @@ private:
 	// on a surface will have a value of zero anyway.
 	//AngularPdf m_pdfB;
 
-	// Area PDF of whatever created this vertex
-	AreaPdf m_incidentPdf;
-
-	// REMARK: currently 0 floats unused in 16-byte alignment
-	ExtensionT m_extension;
+	// REMARK: currently 1 floats unused in 16-byte alignment
+	mutable ExtensionT m_extension;
 
 	// Private because the vertex is read-only by design (desc() is a helper for vertex creation only)
 	CUDA_FUNCTION void* desc() { return as<u8>(this) + round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)); }
@@ -579,6 +600,26 @@ private:
 
 	template<typename T, int A> 
 	friend class PathVertexFactory;
+};
+
+
+
+// Interface example and dummy implementation for the vertex ExtensionT
+template < int VERTEX_ALIGNMENT >
+struct VertexExtension {
+	// The init function gets called at the end of vertex creation.
+	CUDA_FUNCTION void init(const PathVertex<VertexExtension, VERTEX_ALIGNMENT>& thisVertex,
+							const scene::Direction& incident, const float incidentDistance,
+							const float incidentCosine, const AreaPdf incidentPdf)
+	{}
+
+	// The update function gets called whenever the vertex was sampled.
+	// thisVertex: Access to the vertex, for which 'this' is the payload
+	//		hint: if you need information about the previous vertex use thisVertex.previous().
+	// sample: The throughput, pdf and more of the current sampling event.
+	CUDA_FUNCTION void update(const PathVertex<VertexExtension, VERTEX_ALIGNMENT>& thisVertex,
+							  const math::PathSample& sample) // TODO: ex cosine in path sample
+	{}
 };
 
 }} // namespace mufflon::renderer

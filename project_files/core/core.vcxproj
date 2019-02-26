@@ -175,11 +175,14 @@
     <ClInclude Include="..\..\src\core\memory\hashmap.hpp" />
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\pt\pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
