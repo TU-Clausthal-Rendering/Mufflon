@@ -85,12 +85,36 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 }
 
 bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
-	if(!m_reset && (int)m_currentDecimationIteration < m_params.decimationIterations) {
-		if(m_params.decimationEnabled)
-			this->decimate();
-		m_finishedDecimation = true;
-		m_reset = true;
+	if(!m_reset) {
+		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
+			// Finalize the decimation process
+
+			logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
+			for(auto object : m_currentScene->get_objects()) {
+				for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
+					if(object.first->has_lod_available(i)) {
+						auto& lod = object.first->get_lod(i);
+						auto& polygons = lod.get_geometry<scene::geometry::Polygons>();
+						const u32 vertexCount = static_cast<u32>(polygons.get_vertex_count());
+
+						if(static_cast<int>(vertexCount) >= m_params.threshold) {
+							polygons.garbage_collect();
+							lod.clear_accel_structure();
+						}
+					}
+				}
+			}
+			m_currentScene->clear_accel_structure();
+			m_reset = true;
+
+		} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
+			if(m_params.decimationEnabled)
+				this->decimate();
+			m_finishedDecimation = true;
+			m_reset = true;
+		}
 	}
+	
 	return RendererBase<Device::CPU>::pre_iteration(outputBuffer);
 }
 
@@ -103,13 +127,15 @@ void CpuShadowSilhouettes::on_descriptor_requery() {
 	// Initialize the importance map
 	// TODO: how to deal with instancing
 	initialize_importance_map();
-	m_currentDecimationIteration = 0u;
+	// TODO
+	//m_currentDecimationIteration = 0u;
 }
 
 void CpuShadowSilhouettes::iterate() {
 	// TODO: incorporate decimation/undecimation loop!
 
 	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
+		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
 		gather_importance();
 
 		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
@@ -117,6 +143,7 @@ void CpuShadowSilhouettes::iterate() {
 			logInfo("Max. importance: ", m_maxImportance);
 			display_importance();
 		}
+		++m_currentDecimationIteration;
 	} else {
 		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
@@ -139,11 +166,7 @@ void CpuShadowSilhouettes::gather_importance() {
 }
 
 void CpuShadowSilhouettes::decimate() {
-	constexpr StringView importanceAttrName{ "importance" };
-
-
 	logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
-	u32 vertexOffset = 0u;
 	u32 meshIndex = 0u;
 	for(auto object : m_currentScene->get_objects()) {
 		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
@@ -173,11 +196,10 @@ void CpuShadowSilhouettes::decimate() {
 					/*MaxNormalDeviation<>::Handle normModHdl;
 					decimater.add(normModHdl);
 					decimater.module(normModHdl).set_max_deviation(60.0);*/
-					polygons.decimate(decimater, targetVertexCount, true);
+					polygons.decimate(decimater, targetVertexCount, false);
 
 					lod.clear_accel_structure();
 				}
-				vertexOffset += vertexCount;
 				++meshIndex;
 			}
 		}
@@ -189,6 +211,8 @@ void CpuShadowSilhouettes::decimate() {
 }
 
 void CpuShadowSilhouettes::undecimate() {
+
+
 	/*constexpr StringView importanceAttrName{ "importance" };
 
 	u32 vertexOffset = 0u;
