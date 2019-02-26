@@ -247,9 +247,6 @@
     <ClCompile Include="..\..\src\core\renderer\silhouette\cpu_silhouette.cpp">
       <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\silhouette\silhouette_importance.cpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\importance\cpu_importance.cpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClCompile>
@@ -264,6 +261,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\importance\decimater.cpp">
       <Filter>Source Files\core\renderer\importance</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\silhouette\sil_decimater.cpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -890,6 +890,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\importance\importance_map.hpp">
       <Filter>Source Files\core\renderer\importance</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\silhouette\sil_decimater.hpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

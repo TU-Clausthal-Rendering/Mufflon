@@ -11,34 +11,6 @@ struct PDecimationIterations {
 	}
 };
 
-struct PEnableViewImportance {
-	bool enableViewImportance{ true };
-	static ParamDesc get_desc() noexcept {
-		return { "Enable view importance", ParameterTypes::BOOL };
-	}
-};
-
-struct PEnableIndirectImportance {
-	bool enableIndirectImportance{ true };
-	static ParamDesc get_desc() noexcept {
-		return { "Enable indirect importance", ParameterTypes::BOOL};
-	}
-};
-
-struct PEnableSilhouetteImportance {
-	bool enableSilhouetteImportance{ true };
-	static ParamDesc get_desc() noexcept {
-		return { "Enable silhouette importance", ParameterTypes::BOOL };
-	}
-};
-
-struct PUseRadianceWeightedImportance {
-	bool useRadianceWeightedImportance{ true };
-	static ParamDesc get_desc() noexcept {
-		return { "Use radiance-weighted importance", ParameterTypes::BOOL };
-	}
-};
-
 struct PDirectIndirectRatio {
 	float directIndirectRatio{ 0.02f };
 	static ParamDesc get_desc() noexcept {
@@ -47,7 +19,6 @@ struct PDirectIndirectRatio {
 };
 
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PVertexThreshold,
-	PEnableViewImportance, PEnableIndirectImportance, PEnableSilhouetteImportance, PUseRadianceWeightedImportance,
-	PDirectIndirectRatio, PDecimationEnabled, PKeepImportance, PMaxPathLength>;
+	PDirectIndirectRatio, PDecimationEnabled, PMaxPathLength>;
 
 }} // namespace mufflon::renderer

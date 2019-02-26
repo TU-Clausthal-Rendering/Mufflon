@@ -3,6 +3,7 @@
 #include "silhouette_params.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
+#include "core/renderer/importance/importance_map.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <atomic>
 #include <vector>
@@ -38,33 +39,25 @@ private:
 	void init_rngs(int num);
 
 	void importance_sample(const Pixel coord);
-	void importance_sample_weighted(const Pixel coord);
 
 	void initialize_importance_map();
 	void gather_importance();
 	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const PtPathVertex& vertex,
-								 const float lightDist, const float importance);
-	bool trace_shadow_silhouette_shadow(const ei::Ray& shadowRay, const PtPathVertex& vertex,
-										const scene::PrimitiveHandle& firstHit,
-										const float lightDist, const float firstHitT,
-										const float importance);
+								 const scene::PrimitiveHandle& firstHit,
+								 const float lightDist, const float firstHitT,
+								 const float importance);
 	void decimate();
 	void undecimate();
 	void compute_max_importance();
 	void display_importance();
-	float compute_importance(const scene::PrimitiveHandle& hitId);
+	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 
 	SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	// Data buffer for importance
-	unique_device_ptr<Device::CPU, std::atomic<float>[]> m_importanceMap;
-	// Data buffer for vertex offset per instance for quick lookup
-	unique_device_ptr<Device::CPU, u32[]> m_vertexOffsets;
-	u32 m_vertexCount = 0;
+	ImportanceMap m_importanceMap;
 
 	// Superfluous
-	bool m_gotImportance = false;
 	bool m_finishedDecimation = false;
 	u32 m_currentDecimationIteration = 0u;
 	float m_maxImportance;
