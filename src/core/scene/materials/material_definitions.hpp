@@ -284,8 +284,16 @@ template<> struct mat_info<Materials::TORRANCE_LAMBERT> { using type = MatBlend<
 template<Materials M>
 using mat_type = typename mat_info<M>::type;
 
-// Automatic creation of a constant array of the number of required
-// textures for each material.
+
+// Get the full descriptor size of a material
+template < Device dev, Materials M >
+constexpr std::size_t get_material_descriptor_size() {
+	return round_to_align<8u>(sizeof(MaterialDescriptorBase)
+		+ int(mat_type<M>::Textures::TEX_COUNT) * sizeof(textures::ConstTextureDevHandle_t<dev>)
+		+ (std::is_empty<typename mat_type<M>::NonTexParams>::value ? 0 : sizeof(typename mat_type<M>::NonTexParams)));
+}
+
+
 namespace details {
 	template<typename T, int N>
 	struct Array { // As CUDA replacement for std::array
@@ -294,10 +302,20 @@ namespace details {
 			return a[i];
 		}
 	};
+	// Automatic creation of a constant array of the number of required
+	// textures for each material.
 	template<int... Is>
 	constexpr Array<i16, sizeof...(Is)> enumerate_tex_counts(
 		std::integer_sequence<int, Is...>) {
 		return {{mat_type<Materials(Is)>::Textures::TEX_COUNT...}};
+	}
+
+	// Automatic detection of the maximum possible descriptor size
+	template<std::size_t... Is>
+	constexpr Array<std::size_t, sizeof...(Is)> enumerate_desc_sizes(
+		std::integer_sequence<std::size_t, Is...>) {
+		return {{ei::max(get_material_descriptor_size<Device::CPU, Materials(Is)>(),
+						 get_material_descriptor_size<Device::CUDA, Materials(Is)>())...}};
 	}
 }
 //constexpr auto MAT_TEX_COUNT = details::enumerate_tex_counts( std::make_integer_sequence<int, int(Materials::NUM)>{} );*/
@@ -309,6 +327,15 @@ constexpr int MAT_MAX_TEX_COUNT() { // Must be a function for CUDA C++14 compati
 		if(MAT_TEX_COUNT[i] > maxCount) maxCount = MAT_TEX_COUNT[i];
 	return maxCount;
 };
+
+
+constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
+	auto DESC_SIZES = details::enumerate_desc_sizes( std::make_integer_sequence<std::size_t, int(Materials::NUM)>{} );
+	std::size_t maxSize = 0;
+	for(int i = 0; i < int(Materials::NUM); ++i)
+		if(DESC_SIZES[i] > maxSize) maxSize = DESC_SIZES[i];
+	return maxSize;
+}
 
 // Conversion of a runtime parameter 'mat' into a consexpr 'MatType'.
 // WARNING: this is a switch -> need to return or to break; at the end

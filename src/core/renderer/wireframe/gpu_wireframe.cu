@@ -16,7 +16,7 @@ using namespace mufflon::scene::lights;
 namespace mufflon {
 namespace renderer {
 
-using PtPathVertex = PathVertex<VertexExtension<4>, 4>;
+using PtPathVertex = PathVertex<VertexExtension>;
 
 __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 							  scene::SceneDescriptor<Device::CUDA>* scene,
@@ -33,19 +33,17 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 	constexpr ei::Vec3 borderColor{ 1.f };
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	PtPathVertex vertex;
 	math::Rng rng(seeds[pixel]);
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene->camera.get(), coord, rng.next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
-	VertexSample sample = vertex->sample(scene->media, math::RndSet2_1{ rng.next(), rng.next() }, false);
+	PtPathVertex::create_camera(&vertex, &vertex, scene->camera.get(), coord, rng.next());
+	VertexSample sample = vertex.sample(scene->media, math::RndSet2_1{ rng.next(), rng.next() }, false);
 	ei::Ray ray{ sample.origin, sample.excident };
 
 #ifdef __CUDA_ARCH__
 	while(true) {
 		scene::accel_struct::RayIntersectionResult nextHit =
-			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(*scene, ray, vertex->get_primitive_id(), scene::MAX_SCENE_SIZE);
+			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(*scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
 			auto background = evaluate_background(scene->lightTree.background, ray.direction);
 			if(any(greater(background.value, 0.0f))) {

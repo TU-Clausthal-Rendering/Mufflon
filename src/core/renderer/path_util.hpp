@@ -61,10 +61,8 @@ struct Connection {
  *		like vec3/vec4.
  *		Automatic padding via alignas() will not run, because the compiler cannot see
  *		Vertex+ExtensionT as one type.
- * VERTEX_ALIGNMENT Number of bytes to which the vertices should be aligned (different
- *		for CPU and GPU).
  */
-template < typename ExtensionT, int VERTEX_ALIGNMENT >
+template < typename ExtensionT >
 class PathVertex {
 public:
 	CUDA_FUNCTION PathVertex() : m_type(Interaction::VOID) {}
@@ -128,12 +126,10 @@ public:
 				// comparison.
 				return 1.0f;
 			case Interaction::LIGHT_AREA: {
-				auto* alDesc = as<AreaLightDesc>(desc());
-				return dot(connection, alDesc->normal);
+				return dot(connection, m_desc.areaLight.normal);
 			}
 			case Interaction::SURFACE: {
-				auto* surfDesc = as<SurfaceDesc>(desc());
-				return dot(connection, surfDesc->tangentSpace.shadingN);
+				return dot(connection, m_desc.surface.tangentSpace.shadingN);
 			}
 		}
 		return 0.0f;
@@ -142,12 +138,10 @@ public:
 	// Get a normal if there is any. Otherwise returns a 0-vector.
 	CUDA_FUNCTION scene::Direction get_normal() const {
 		if(m_type == Interaction::LIGHT_AREA) {
-			auto* alDesc = as<AreaLightDesc>(desc());
-			return alDesc->normal;
+			return m_desc.areaLight.normal;
 		}
 		if(m_type == Interaction::SURFACE) {
-			auto* surfDesc = as<SurfaceDesc>(desc());
-			return surfDesc->tangentSpace.shadingN;
+			return m_desc.surface.tangentSpace.shadingN;
 		}
 		return scene::Direction{0.0f};
 	}
@@ -175,35 +169,29 @@ public:
 			}
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
-				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
 				return lights::evaluate_dir(m_intensity, m_type==Interaction::LIGHT_ENVMAP,
-									desc->dirPdf);
+									m_desc.dirLight.dirPdf);
 			}
 			case Interaction::LIGHT_SPOT: {
-				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
-				return lights::evaluate_spot(excident, m_intensity, desc->direction,
-									desc->cosThetaMax, desc->cosFalloffStart);
+				return lights::evaluate_spot(excident, m_intensity, m_desc.spotLight.direction,
+									m_desc.spotLight.cosThetaMax, m_desc.spotLight.cosFalloffStart);
 			}
 			case Interaction::LIGHT_AREA: {
-				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
-				return lights::evaluate_area(excident, m_intensity, desc->normal);
+				return lights::evaluate_area(excident, m_intensity, m_desc.areaLight.normal);
 			}
 			case Interaction::CAMERA_PINHOLE: {
-				const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
-				cameras::ProjectionResult proj = pinholecam_project(*desc, excident);
+				cameras::ProjectionResult proj = pinholecam_project(m_desc.pinholeCam, excident);
 				return math::EvalValue{ Spectrum{ proj.w }, 0.0f,
 										proj.pdf, AngularPdf{ 0.0f } };
 			}
 			case Interaction::CAMERA_FOCUS: {
-				const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
-				cameras::ProjectionResult proj = focuscam_project(*desc, m_position, excident);
+				cameras::ProjectionResult proj = focuscam_project(m_desc.focusCam, m_position, excident);
 				return math::EvalValue{ Spectrum{proj.w}, 0.f,
 										proj.pdf, AngularPdf{0.f} };
 			}
 			case Interaction::SURFACE: {
-				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-				return materials::evaluate(desc->tangentSpace, desc->params, m_incident,
-										   excident, media, adjoint, merge);
+				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.mat(),
+										   m_incident, excident, media, adjoint, merge);
 			}
 		}
 		return math::EvalValue{};
@@ -246,43 +234,37 @@ public:
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
 				// TODO: sample new positions on a boundary?
-				const DirLightDesc* desc = as<DirLightDesc>(this->desc());
 				return VertexSample{ math::PathSample{ m_intensity, math::PathEventType::REFLECTED,
-									   desc->direction, desc->dirPdf, AngularPdf{0.0f} },
+									   m_desc.dirLight.direction, m_desc.dirLight.dirPdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_SPOT: {
-				const SpotLightDesc* desc = as<SpotLightDesc>(this->desc());
-				auto lout = sample_light_dir_spot(m_intensity, desc->direction, desc->cosThetaMax, desc->cosFalloffStart, rndSet);
+				auto lout = sample_light_dir_spot(m_intensity, m_desc.spotLight.direction, m_desc.spotLight.cosThetaMax, m_desc.spotLight.cosFalloffStart, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, lout.dir.pdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_AREA: {
-				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
-				auto lout = sample_light_dir_area(m_intensity, desc->normal, rndSet);
+				auto lout = sample_light_dir_area(m_intensity, m_desc.areaLight.normal, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, lout.dir.pdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::CAMERA_PINHOLE: {
-				const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
-				cameras::Importon importon = pinholecam_sample_ray(*desc, m_position);
+				cameras::Importon importon = pinholecam_sample_ray(m_desc.pinholeCam, m_position);
 				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::CAMERA_FOCUS: {
-				const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
-				cameras::Importon importon = focuscam_sample_ray(*desc, m_position, Pixel{ m_incident }, rndSet);
+				cameras::Importon importon = focuscam_sample_ray(m_desc.focusCam, m_position, Pixel{ m_incident }, rndSet);
 				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::SURFACE: {
-				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
 				return VertexSample{ scene::materials::sample(
-										desc->tangentSpace, desc->params,
+										m_desc.surface.tangentSpace, m_desc.surface.mat(),
 										m_incident, media, rndSet, adjoint),
 									 m_position, scene::materials::MediumHandle{} };
 			}
@@ -306,10 +288,6 @@ public:
 
 	// Access to the renderer dependent extension
 	CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
-
-	// Get the address of the interaction specific descriptor (aligned)
-	// TODO: benchmark if internal alignment is worth it
-	CUDA_FUNCTION const void* desc() const { return as<u8>(this) + round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)); }
 
 	/*
 	* Compute the connection vector from path0 to path1 (non-normalized).
@@ -357,12 +335,10 @@ public:
 			case Interaction::CAMERA_FOCUS:
 				return Spectrum{0.0f};
 			case Interaction::LIGHT_AREA: {
-				const AreaLightDesc* desc = as<AreaLightDesc>(this->desc());
 				return m_intensity; // TODO: / area?
 			}
 			case Interaction::SURFACE: {
-				const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-				return scene::materials::emission(desc->params, desc->tangentSpace.geoN, -m_incident);
+				return scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
 			}
 		}
 		return Spectrum{0.0f};
@@ -370,8 +346,7 @@ public:
 
 	CUDA_FUNCTION Spectrum get_albedo() const {
 		if(m_type == Interaction::SURFACE) {
-			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-			return scene::materials::albedo(desc->params);
+			return scene::materials::albedo(m_desc.surface.mat());
 		}
 		// Area light source vertices are on surfaces with an albedo too.
 		// However, it is likely that they are never asked for their albedo().
@@ -381,8 +356,7 @@ public:
 
 	CUDA_FUNCTION scene::PrimitiveHandle get_primitive_id() const {
 		if(m_type == Interaction::SURFACE) {
-			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-			return desc->primitiveId;
+			return m_desc.surface.primitiveId;
 		}
 		// TODO id for area lights too
 		return {-1, -1};
@@ -392,8 +366,7 @@ public:
 	// surface vertices
 	CUDA_FUNCTION ei::Vec2 get_surface_params() const {
 		if(m_type == Interaction::SURFACE) {
-			const SurfaceDesc* desc = as<SurfaceDesc>(this->desc());
-			return desc->surfaceParams;
+			return m_desc.surface.surfaceParams;
 		}
 		return {0.0f, 0.0f};
 	}
@@ -434,21 +407,19 @@ public:
 		vert->m_extension = ExtensionT{};
 		if(camera.type == cameras::CameraModel::PINHOLE) {
 			vert->m_type = Interaction::CAMERA_PINHOLE;
-			cameras::PinholeParams* desc = as<cameras::PinholeParams>(vert->desc());
-			*desc = static_cast<const cameras::PinholeParams&>(camera);
-			auto position = pinholecam_sample_position(*desc, pixel, rndSet);
+			vert->m_desc.pinholeCam = static_cast<const cameras::PinholeParams&>(camera);
+			auto position = pinholecam_sample_position(vert->m_desc.pinholeCam, pixel, rndSet);
 			vert->m_position = position.position;
 			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf);
-			return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(cameras::PinholeParams));
+			return (int)round_to_align<8u>( this_size() + sizeof(cameras::PinholeParams));
 		}
 		else if(camera.type == cameras::CameraModel::FOCUS) {
 			vert->m_type = Interaction::CAMERA_FOCUS;
-			cameras::FocusParams* desc = as<cameras::FocusParams>(vert->desc());
-			*desc = static_cast<const cameras::FocusParams&>(camera);
-			auto position = focuscam_sample_position(*desc, rndSet);
+			vert->m_desc.focusCam = static_cast<const cameras::FocusParams&>(camera);
+			auto position = focuscam_sample_position(vert->m_desc.focusCam, rndSet);
 			vert->m_position = position.position;
 			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf);
-			return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(cameras::FocusParams));
+			return (int)round_to_align<8u>( this_size() + sizeof(cameras::FocusParams));
 		}
 		mAssertMsg(false, "Not implemented yet.");
 		return 0;
@@ -467,47 +438,43 @@ public:
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
-				return round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex));
+				return this_size();
 			}
 			case scene::lights::LightType::SPOT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_SPOT;
-				SpotLightDesc* desc = as<SpotLightDesc>(vert->desc());
-				desc->direction = lightSample.source_param.spot.direction;
-				desc->cosThetaMax = lightSample.source_param.spot.cosThetaMax;
-				desc->cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
+				vert->m_desc.spotLight.direction = lightSample.source_param.spot.direction;
+				vert->m_desc.spotLight.cosThetaMax = lightSample.source_param.spot.cosThetaMax;
+				vert->m_desc.spotLight.cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
-				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(SpotLightDesc));
+				return round_to_align<8u>( this_size() + sizeof(SpotLightDesc) );
 			}
 			case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
 			case scene::lights::LightType::AREA_LIGHT_QUAD:
 			case scene::lights::LightType::AREA_LIGHT_SPHERE: {
 				vert->m_type = Interaction::LIGHT_AREA;
-				AreaLightDesc* desc = as<AreaLightDesc>(vert->desc());
-				desc->normal = lightSample.source_param.area.normal;
+				vert->m_desc.areaLight.normal = lightSample.source_param.area.normal;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
-				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(AreaLightDesc));
+				return round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
 			}
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
 				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
-				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
-				desc->direction = lightSample.source_param.dir.direction;
+				vert->m_desc.dirLight.direction = lightSample.source_param.dir.direction;
 				// Swap PDFs. The rules of sampling are reverted in directional
 				// lights (first dir then pos is sampled). The vertex unifies
 				// the view for MIS computation where the usage order is reverted.
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
-				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
 					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)));
-				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(DirLightDesc));
+				return round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
 				vert->m_type = Interaction::LIGHT_ENVMAP;
-				DirLightDesc* desc = as<DirLightDesc>(vert->desc());
-				desc->direction = lightSample.source_param.dir.direction;
-				desc->dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->m_desc.dirLight.direction = lightSample.source_param.dir.direction;
+				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
 					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)));
-				return round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(DirLightDesc));
+				return round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 		}
 	}
@@ -528,15 +495,15 @@ public:
 		vert->m_type = Interaction::SURFACE;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
-		SurfaceDesc* desc = as<SurfaceDesc>(vert->desc());
-		desc->tangentSpace = tangentSpace;
-		desc->primitiveId = hit.hitId;
-		desc->surfaceParams = hit.surfaceParams.st;
+		vert->m_desc.surface.tangentSpace = tangentSpace;
+		vert->m_desc.surface.primitiveId = hit.hitId;
+		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
 		vert->ext().init(*vert, incident, incidentDistance, incidentCosine,
 			prevPdf.to_area_pdf(incidentCosine, incidentDistance * incidentDistance));
-	{}
-		int size = scene::materials::fetch(material, hit.uv, &desc->params);
-		return (int)round_to_align<VERTEX_ALIGNMENT>( round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)) + sizeof(tangentSpace) + sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization) + size);
+		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.mat());
+		return (int)round_to_align<8u>( round_to_align<8u>(this_size() + sizeof(scene::TangentSpace)
+			+ sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization))
+			+ size);
 	}
 
 private:
@@ -556,7 +523,10 @@ private:
 		scene::TangentSpace tangentSpace; // TODO: use packing?
 		scene::PrimitiveHandle primitiveId;
 		ei::Vec2 surfaceParams;
-		scene::materials::ParameterPack params;
+		//scene::materials::ParameterPack params;
+		alignas(8) u8 matParams[scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
+		CUDA_FUNCTION const scene::materials::ParameterPack& mat() const { return *as<scene::materials::ParameterPack>(matParams); }
+		CUDA_FUNCTION scene::materials::ParameterPack& mat() { return *as<scene::materials::ParameterPack>(matParams); }
 	};
 
 
@@ -589,8 +559,16 @@ private:
 	// REMARK: currently 1 floats unused in 16-byte alignment
 	mutable ExtensionT m_extension;
 
-	// Private because the vertex is read-only by design (desc() is a helper for vertex creation only)
-	CUDA_FUNCTION void* desc() { return as<u8>(this) + round_to_align<VERTEX_ALIGNMENT>(sizeof(PathVertex)); }
+	// Dynamic sized descriptor. Must be the last member!
+	union Desc {
+		CUDA_FUNCTION Desc() {}
+		AreaLightDesc areaLight;
+		SpotLightDesc spotLight;
+		DirLightDesc dirLight;
+		SurfaceDesc surface;
+		cameras::PinholeParams pinholeCam;
+		cameras::FocusParams focusCam;
+	} m_desc;
 
 	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
 		std::ptrdiff_t s = as<u8>(previous) - as<u8>(mem);
@@ -598,17 +576,19 @@ private:
 		m_offsetToPath = static_cast<i16>(s);
 	}
 
-	template<typename T, int A> 
-	friend class PathVertexFactory;
+	// Vertex size without the descriptor, the descriptor is 8byte aligned...
+	static constexpr int this_size() {
+		//return round_to_align<8u>(int(&m_desc - this));
+		return (int)round_to_align<8u>( reinterpret_cast<std::ptrdiff_t>(&static_cast<PathVertex*>(nullptr)->m_desc) );
+	}
 };
 
 
 
 // Interface example and dummy implementation for the vertex ExtensionT
-template < int VERTEX_ALIGNMENT >
 struct VertexExtension {
 	// The init function gets called at the end of vertex creation.
-	CUDA_FUNCTION void init(const PathVertex<VertexExtension, VERTEX_ALIGNMENT>& thisVertex,
+	CUDA_FUNCTION void init(const PathVertex<VertexExtension>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
 							const float incidentCosine, const AreaPdf incidentPdf)
 	{}
@@ -617,7 +597,7 @@ struct VertexExtension {
 	// thisVertex: Access to the vertex, for which 'this' is the payload
 	//		hint: if you need information about the previous vertex use thisVertex.previous().
 	// sample: The throughput, pdf and more of the current sampling event.
-	CUDA_FUNCTION void update(const PathVertex<VertexExtension, VERTEX_ALIGNMENT>& thisVertex,
+	CUDA_FUNCTION void update(const PathVertex<VertexExtension>& thisVertex,
 							  const math::PathSample& sample) // TODO: ex cosine in path sample
 	{}
 };

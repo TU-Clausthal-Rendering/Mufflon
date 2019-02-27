@@ -122,15 +122,10 @@ public:
 	{}
 
 	MaterialPropertyFlags get_properties() const noexcept final;
-	static constexpr std::size_t _get_descriptor_size(Device device) {
-		size_t texDescSize = device == Device::CPU ? sizeof(textures::ConstTextureDevHandle_t<Device::CPU>)
-												   : sizeof(textures::ConstTextureDevHandle_t<Device::CUDA>);
-		const auto descSize = sizeof(MaterialDescriptorBase) + int(SubMaterial::Textures::TEX_COUNT) * texDescSize
-			+ (std::is_empty<SubMaterial::NonTexParams>::value ? 0 : sizeof(SubMaterial::NonTexParams));
-		// The descriptor size needs to be aligned at 8 bytes for the textures
-		return round_to_align<8u>(descSize);
+	std::size_t get_descriptor_size(Device device) const final {
+		return (device == Device::CPU) ? get_material_descriptor_size<Device::CPU, M>()
+									   : get_material_descriptor_size<Device::CUDA, M>();
 	}
-	std::size_t get_descriptor_size(Device device) const final { return _get_descriptor_size(device); }
 	std::size_t get_parameter_pack_size() const final;
 	char* get_descriptor(Device device, char* outBuffer) const final;
 	Emission get_emission() const final;
@@ -140,20 +135,6 @@ private:
 	TextureHandle m_textures[int(SubMaterial::Textures::TEX_COUNT)];
 	SubMaterial m_material;
 };
-
-// Automatic detection of the maximum possible descriptor size
-template<int... Is>
-constexpr std::array<int, sizeof...(Is)> enumerate_desc_sizes(
-    std::integer_sequence<int, Is...>) {
-	return {{int(ei::max(Material<Materials(Is)>::_get_descriptor_size(Device::CPU),
-						 Material<Materials(Is)>::_get_descriptor_size(Device::CUDA)))...}};
-}
-constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
-	int maxSize = 0;
-	for(int size : enumerate_desc_sizes(std::make_integer_sequence<int, int(Materials::NUM)>{}))
-		if(size > maxSize) maxSize = size;
-	return sizeof(MaterialDescriptorBase) + maxSize;
-}
 
 
 } // namespace mufflon::scene::materials

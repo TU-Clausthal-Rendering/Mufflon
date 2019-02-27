@@ -12,7 +12,7 @@ namespace mufflon::renderer {
 
 namespace {
 
-using BptPathVertex = PathVertex<struct BptVertexExt, 4>;
+using BptPathVertex = PathVertex<struct BptVertexExt>;
 
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct BptVertexExt {
@@ -26,13 +26,13 @@ struct BptVertexExt {
 	// only valid after update().
 	float prevRelativeProbabilitySum{ 0.0f };
 
-	CUDA_FUNCTION void init(const PathVertex<BptVertexExt, 4>& thisVertex,
+	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
 			  const scene::Direction& incident, const float incidentDistance,
 			  const float incidentCosine, const AreaPdf incidentPdf) {
 		this->incidentPdf = incidentPdf;
 	}
 
-	CUDA_FUNCTION void update(const PathVertex<BptVertexExt, 4>& thisVertex,
+	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
 				const math::PathSample& sample) {
 		excident = sample.excident;
 		pdf = sample.pdfF;

@@ -17,6 +17,7 @@ namespace mufflon::renderer {
 
 CpuPathTracer::CpuPathTracer() {
 	// The PT does not need additional memory resources like photon maps.
+	logInfo("[CpuPathTracer] Size of a vertex is ", sizeof(PtPathVertex));
 }
 
 void CpuPathTracer::iterate() {
@@ -38,12 +39,9 @@ void CpuPathTracer::sample(const Pixel coord) {
 	//m_params.maxPathLength = 2;
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	PtPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
-
+	PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 	int pathLen = 0;
 	do {
@@ -58,15 +56,15 @@ void CpuPathTracer::sample(const Pixel coord) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-				vertex->get_position(), m_currentScene->get_bounding_box(),
+				vertex.get_position(), m_currentScene->get_bounding_box(),
 				neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					m_sceneDesc, { vertex->get_position(), nee.direction },
-					vertex->get_primitive_id(), nee.dist);
+					m_sceneDesc, { vertex.get_position(), nee.direction },
+					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -78,14 +76,14 @@ void CpuPathTracer::sample(const Pixel coord) {
 		}
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, *vertex)) {
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex->ext().excident);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex.ext().excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / vertex->ext().pdf);
+					float mis = 1.0f / (1.0f + background.pdfB / vertex.ext().pdf);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -98,17 +96,17 @@ void CpuPathTracer::sample(const Pixel coord) {
 
 		// Evaluate direct hit of area ligths
 		if(pathLen <= m_params.maxPathLength) {
-			Spectrum emission = vertex->get_emission();
+			Spectrum emission = vertex.get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
-												  vertex->get_surface_params(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
+												  vertex.get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex->ext().incidentPdf);
+					: 1.0f / (1.0f + backwardPdf / vertex.ext().incidentPdf);
 				emission *= mis;
 			}
-			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									vertex->get_normal(), vertex->get_albedo());
+			m_outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+									vertex.get_normal(), vertex.get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }

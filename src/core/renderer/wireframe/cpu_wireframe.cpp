@@ -8,7 +8,7 @@
 
 namespace mufflon::renderer {
 
-using PtPathVertex = PathVertex<VertexExtension<4>, 4>;
+using PtPathVertex = PathVertex<VertexExtension>;
 
 CpuWireframe::CpuWireframe() {
 	// TODO: init one RNG per thread?
@@ -37,19 +37,17 @@ void CpuWireframe::sample(const Pixel coord) {
 	constexpr ei::Vec3 borderColor{ 1.f };
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	PtPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
+	PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 	math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-	VertexSample sample = vertex->sample(m_sceneDesc.media, rnd, false);
+	VertexSample sample = vertex.sample(m_sceneDesc.media, rnd, false);
 	ei::Ray ray{ sample.origin, sample.excident };
 
 	while(true) {
 		scene::accel_struct::RayIntersectionResult nextHit =
-			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(m_sceneDesc, ray, vertex->get_primitive_id(), scene::MAX_SCENE_SIZE);
+			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(m_sceneDesc, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
 			auto background = evaluate_background(m_sceneDesc.lightTree.background, ray.direction);
 			if(any(greater(background.value, 0.0f))) {

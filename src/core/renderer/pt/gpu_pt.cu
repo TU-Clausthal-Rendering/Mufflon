@@ -33,12 +33,9 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 	math::Rng rng(seeds[pixel]);
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	PtPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, scene->camera.get(), coord, rng.next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
-
+	PtPathVertex::create_camera(&vertex, &vertex, scene->camera.get(), coord, rng.next());
 
 #ifdef __CUDA_ARCH__
 	int pathLen = 0;
@@ -55,15 +52,15 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 			u64 neeSeed = rng.next();
 			math::RndSet2 neeRnd = rng.next();
 			auto nee = connect(scene->lightTree, 0, 1, neeSeed,
-							   vertex->get_position(), scene->aabb,
+							   vertex.get_position(), scene->aabb,
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, scene->media);
+			auto value = vertex.evaluate(nee.direction, scene->media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CUDA>(
-					*scene, { vertex->get_position() , nee.direction },
-					vertex->get_primitive_id(), nee.dist);
+					*scene, { vertex.get_position() , nee.direction },
+					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					const float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -75,14 +72,14 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 		}
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
-		if(!walk(*scene, *vertex, rnd, -1.0f, false, throughput, *vertex)) {
+		if(!walk(*scene, vertex, rnd, -1.0f, false, throughput, vertex)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(scene->lightTree.background, vertex->ext().excident);
+				auto background = evaluate_background(scene->lightTree.background, vertex.ext().excident);
 				if(any(greater(background.value, 0.0f))) {
-					const float mis = 1.0f / (1.0f + background.pdfB / vertex->ext().pdf);
+					const float mis = 1.0f / (1.0f + background.pdfB / vertex.ext().pdf);
 					background.value *= mis;
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -95,17 +92,17 @@ __global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
 
 		// Evaluate direct hit of area ligths
 		if(pathLen <= params.maxPathLength) {
-			Spectrum emission = vertex->get_emission();
+			Spectrum emission = vertex.get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene->lightTree, vertex->get_primitive_id(),
-												  vertex->get_surface_params(),
+				AreaPdf backwardPdf = connect_pdf(scene->lightTree, vertex.get_primitive_id(),
+												  vertex.get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex->ext().incidentPdf);
+					: 1.0f / (1.0f + backwardPdf / vertex.ext().incidentPdf);
 				emission *= mis;
 			}
-			outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									vertex->get_normal(), vertex->get_albedo());
+			outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+									vertex.get_normal(), vertex.get_albedo());
 		}
 	} while(pathLen < params.maxPathLength);
 #endif // __CUDA_ARCH__
