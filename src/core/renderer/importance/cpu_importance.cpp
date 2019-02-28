@@ -1,9 +1,11 @@
 ﻿#include "cpu_importance.hpp"
 #include "decimater.hpp"
+#include "imp_common.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
+#include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/lights/lights.hpp"
@@ -136,11 +138,9 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	ImpPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
+	(void)ImpPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 	// TODO: depends on path length
 	scene::PrimitiveHandle hitIds[16];
@@ -176,15 +176,15 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertex->get_position(), m_currentScene->get_bounding_box(),
+							   vertex.get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					m_sceneDesc, { vertex->get_position() , nee.direction },
-					vertex->get_primitive_id(), nee.dist);
+					m_sceneDesc, { vertex.get_position() , nee.direction },
+					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -206,19 +206,20 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		}
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		math::DirectionSample lastDir;
 
-		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir, &vertexThroughput[pathLen]))
+		//if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir, &vertexThroughput[pathLen]))
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex))
 			break;
 
-		hitIds[pathLen] = vertex->get_primitive_id();
+		vertexThroughput[pathLen] = vertex.ext().throughput;
+		hitIds[pathLen] = vertex.get_primitive_id();
 		// Compute BRDF
 		vertexAccumThroughput[pathLen] = throughput.weight;
-		outCos[pathLen] = -ei::dot(vertex->get_normal(), lastDir.direction);
+		outCos[pathLen] = -ei::dot(vertex.get_normal(), vertex.ext().excident);
 		bxdfPdf[pathLen] = vertexThroughput[pathLen] / outCos[pathLen];
-		const ei::Vec3 bxdf = bxdfPdf[pathLen] * (float)lastDir.pdf;
+		const ei::Vec3 bxdf = bxdfPdf[pathLen] * (float)vertex.ext().pdf;
 
 		lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitIds[pathLen].instanceId]];
 		numVertices = hitIds[pathLen].primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
@@ -226,7 +227,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 
 		if(pathLen > 0) {
 			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
-			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertex->get_normal(), vertex->get_incident_direction())));
+			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertex.get_normal(), vertex.get_incident_direction())));
 			for(u32 i = 0u; i < numVertices; ++i) {
 				const u32 vertexIndex = lod->polygon.vertexIndices[vertexOffset + numVertices * hitIds[pathLen].primId + i];
 				m_importanceMap.add(hitIds[pathLen].instanceId, vertexIndex, importance);
@@ -264,11 +265,9 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 	//m_params.maxPathLength = 2;
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	PtPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
+	(void)PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 
 	int pathLen = 0;
@@ -284,15 +283,15 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertex->get_position(), m_currentScene->get_bounding_box(),
+							   vertex.get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					m_sceneDesc, { vertex->get_position() , nee.direction },
-					vertex->get_primitive_id(), nee.dist);
+					m_sceneDesc, { vertex.get_position() , nee.direction },
+					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -304,43 +303,42 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 		}
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		math::DirectionSample lastDir;
-		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex.ext().excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
+					float mis = 1.0f / (1.0f + background.pdfB / vertex.ext().pdf);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
+											  ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
+											  ei::Vec3{ 0, 0, 0 });
 				}
 			}
 			break;
 		}
 
 		if(pathLen == 0 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex->get_position(), vertex->get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex.get_position(), vertex.get_primitive_id()) });
 		}
 
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
 		if(pathLen <= m_params.maxPathLength) {
-			Spectrum emission = vertex->get_emission();
+			Spectrum emission = vertex.get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
-												  vertex->get_surface_params(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
+												  vertex.get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+					: 1.0f / (1.0f + backwardPdf / vertex.ext().incidentPdf);
 				emission *= mis;
 			}
-			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									vertex->get_normal(), vertex->get_albedo());
+			m_outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+									vertex.get_normal(), vertex.get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }
@@ -365,19 +363,16 @@ void CpuImportanceDecimater::display_importance() {
 		//m_params.maxPathLength = 2;
 
 		math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-		u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-		PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+		PtPathVertex vertex;
 		// Create a start for the path
-		int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-		mAssertMsg(s < 256, "vertexBuffer overflow.");
-
+		(void)PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
-		if(walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex->get_position(), vertex->get_primitive_id()) });
+		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex))
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex.get_position(), vertex.get_primitive_id()) });
 	}
 
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "silhouette_params.hpp"
+#include "sil_common.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/renderer/importance/importance_map.hpp"
@@ -12,9 +13,6 @@ namespace mufflon::renderer {
 
 template < Device >
 struct RenderBuffer;
-
-template < typename T, int A >
-class PathVertex;
 
 class CpuShadowSilhouettes final : public RendererBase<Device::CPU> {
 public:
@@ -32,8 +30,6 @@ public:
 	void on_scene_load() final;
 
 private:
-	using PtPathVertex = PathVertex<u8, 4>;
-
 	// Create one sample path (actual PT algorithm)
 	void pt_sample(const Pixel coord);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
@@ -43,7 +39,7 @@ private:
 
 	void initialize_importance_map();
 	void gather_importance();
-	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const PtPathVertex& vertex,
+	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex,
 								 const scene::PrimitiveHandle& firstHit,
 								 const float lightDist, const float firstHitT,
 								 const float importance);

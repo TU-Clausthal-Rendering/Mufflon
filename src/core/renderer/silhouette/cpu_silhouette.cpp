@@ -6,6 +6,7 @@
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
+#include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/world_container.hpp"
@@ -14,6 +15,7 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/scene/world_container.hpp"
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
+#include <cstdio>
 #include <random>
 #include <stdexcept>
 
@@ -69,12 +71,30 @@ inline float get_luminance(const ei::Vec3& vec) {
 	return ei::dot(LUM_WEIGHT, vec);
 }
 
-inline void atomic_add(std::atomic<float>& af, const float diff) {
-	float expected = af.load();
-	float desired;
-	do {
-		desired = expected + diff;
-	} while(!af.compare_exchange_weak(expected, desired));
+inline std::string pretty_print_size(u32 bytes) {
+	std::string str;
+
+	const u32 decimals = 1u + static_cast<u32>(std::log10(bytes));
+	const u32 sizeBox = decimals / 3u;
+	const float val = static_cast<float>(bytes) / std::pow(10.f, static_cast<float>(sizeBox) * 3.f);
+	StringView suffix;
+
+
+	switch(sizeBox) {
+		case 0u: suffix = "bytes"; break;
+		case 1u: suffix = "KBytes"; break;
+		case 2u: suffix = "MBytes"; break;
+		case 3u: suffix = "GBytes"; break;
+		case 4u: suffix = "TBytes"; break;
+		default: suffix = "?Bytes"; break;
+	}
+	const u32 numberSize = (decimals - sizeBox * 3u) + 4u;
+	str.resize(numberSize + suffix.size());
+
+	std::snprintf(str.data(), str.size(), "%.2f ", val);
+	// Gotta print the suffix separately to overwrite the terminating '\0'
+	std::strncpy(str.data() + numberSize, suffix.data(), suffix.size());
+	return str;
 }
 
 } // namespace
@@ -149,47 +169,51 @@ bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
 			}
 		}
 
-		logInfo("Required memory for scene: ", memory);
+		logInfo("Required memory for scene: ", pretty_print_size(memory), " (available: ", pretty_print_size(m_params.memoryConstraint), ")");
 
-		// Compute the memory shares for each LoD
-		const float reduction = 1.f - std::min(1.f, static_cast<float>(m_params.memoryConstraint) / std::max(1.f, static_cast<float>(memory)));
-		for(auto& mem : reducible)
-			mem = static_cast<u32>(mem * reduction);
-		
-		u32 index = 0u;
-		for(auto& obj : m_currentScene->get_objects()) {
-			for(scene::InstanceHandle inst : obj.second) {
-				const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
-				auto& lod = obj.first->get_lod(instanceLod);
-				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+		if(static_cast<u32>(m_params.memoryConstraint) < memory) {
+			// Compute the memory shares for each LoD
+			const float reduction = 1.f - std::min(1.f, static_cast<float>(m_params.memoryConstraint) / std::max(1.f, static_cast<float>(memory)));
+			for(auto& mem : reducible)
+				mem = static_cast<u32>(mem * reduction);
 
-				if(polygons.get_vertex_count() >= m_params.threshold) {
-					// Figure out how many edges we need to collapse - for a manifold, every collapse removes one vertex and two triangles
-					constexpr u32 MEM_PER_COLLAPSE = 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2) + 2u * 3u * sizeof(u32);
-					const u32 collapses = static_cast<u32>(std::ceil(static_cast<float>(reducible[index]) / static_cast<float>(MEM_PER_COLLAPSE)));
+			u32 index = 0u;
+			for(auto& obj : m_currentScene->get_objects()) {
+				for(scene::InstanceHandle inst : obj.second) {
+					const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
+					auto& lod = obj.first->get_lod(instanceLod);
+					const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
 
-					// Copy the LoD and decimate it!
-					const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-					auto& newLod = obj.first->add_lod(newLodLevel, lod);
-					auto& newPolygons = newLod.template get_geometry<scene::geometry::Polygons>();
-					auto decimater = newPolygons.create_decimater();
-					OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-					decimater.add(modQuadricHandle);
+					if(polygons.get_vertex_count() >= m_params.threshold) {
+						// Figure out how many edges we need to collapse - for a manifold, every collapse removes one vertex and two triangles
+						constexpr u32 MEM_PER_COLLAPSE = 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2) + 2u * 3u * sizeof(u32);
+						const u32 collapses = static_cast<u32>(std::ceil(static_cast<float>(reducible[index]) / static_cast<float>(MEM_PER_COLLAPSE)));
 
-					u32 performedCollapses;
-					do {
-						newPolygons.decimate(decimater, polygons.get_vertex_count() - collapses, true);
-						performedCollapses = static_cast<u32>(polygons.get_vertex_count() - newPolygons.get_vertex_count());
-					} while(performedCollapses < collapses);
+						// Copy the LoD and decimate it!
+						const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
+						auto& newLod = obj.first->add_lod(newLodLevel, lod);
+						auto& newPolygons = newLod.template get_geometry<scene::geometry::Polygons>();
+						auto decimater = newPolygons.create_decimater();
+						OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+						decimater.add(modQuadricHandle);
 
-					// Modify the scenario to use this lod instead
-					scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+						logInfo("Reducing LoD ", instanceLod, " of object '", obj.first->get_name(), "', instance '",
+								inst->get_name(), "' by ", pretty_print_size(reducible[index]), "/", collapses, " vertices");
 
-					logInfo("Reduced LoD by ", reducible[index], " bytes");
+						u32 performedCollapses;
+						do {
+							newPolygons.decimate(decimater, polygons.get_vertex_count() - collapses, true);
+							performedCollapses = static_cast<u32>(polygons.get_vertex_count() - newPolygons.get_vertex_count());
+						} while(performedCollapses < collapses);
+
+						// Modify the scenario to use this lod instead
+						scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+					}
+					++index;
 				}
-				++index;
 			}
 		}
+		logInfo("Finished scene reduction");
 	}
 	
 	return RendererBase<Device::CPU>::pre_iteration(outputBuffer);
@@ -366,11 +390,9 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	SilPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
+	(void)SilPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 	// TODO: depends on path length
 	scene::PrimitiveHandle hitIds[16];
@@ -406,15 +428,15 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertex->get_position(), m_currentScene->get_bounding_box(),
+							   vertex.get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					m_sceneDesc, { vertex->get_position() , nee.direction },
-					vertex->get_primitive_id(), nee.dist);
+					m_sceneDesc, { vertex.get_position() , nee.direction },
+					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -436,19 +458,19 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 		}
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		math::DirectionSample lastDir;
 
-		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir, &vertexThroughput[pathLen]))
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex))
 			break;
 
-		hitIds[pathLen] = vertex->get_primitive_id();
+		vertexThroughput[pathLen] = vertex.ext().throughput;
+		hitIds[pathLen] = vertex.get_primitive_id();
 		// Compute BRDF
 		vertexAccumThroughput[pathLen] = throughput.weight;
-		outCos[pathLen] = -ei::dot(vertex->get_normal(), lastDir.direction);
+		outCos[pathLen] = -ei::dot(vertex.get_normal(), vertex.ext().excident);
 		bxdfPdf[pathLen] = vertexThroughput[pathLen] / outCos[pathLen];
-		const ei::Vec3 bxdf = bxdfPdf[pathLen] * (float)lastDir.pdf;
+		const ei::Vec3 bxdf = bxdfPdf[pathLen] * (float)vertex.ext().pdf;
 
 		lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitIds[pathLen].instanceId]];
 		numVertices = hitIds[pathLen].primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
@@ -456,7 +478,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 
 		if(pathLen > 0) {
 			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
-			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertex->get_normal(), vertex->get_incident_direction())));
+			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertex.get_normal(), vertex.get_incident_direction())));
 			for(u32 i = 0u; i < numVertices; ++i) {
 				const u32 vertexIndex = lod->polygon.vertexIndices[vertexOffset + numVertices * hitIds[pathLen].primId + i];
 				m_importanceMap.add(hitIds[pathLen].instanceId, vertexIndex, importance);
@@ -494,12 +516,9 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 	//m_params.maxPathLength = 2;
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-	u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-	PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+	PtPathVertex vertex;
 	// Create a start for the path
-	int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-	mAssertMsg(s < 256, "vertexBuffer overflow.");
-
+	(void)PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 	int pathLen = 0;
 	do {
@@ -514,15 +533,15 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertex->get_position(), m_currentScene->get_bounding_box(),
+							   vertex.get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex->evaluate(nee.direction, m_sceneDesc.media);
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
-					m_sceneDesc, { vertex->get_position() , nee.direction },
-					vertex->get_primitive_id(), nee.dist);
+					m_sceneDesc, { vertex.get_position() , nee.direction },
+					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
 					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -534,15 +553,14 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		}
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		math::DirectionSample lastDir;
-		if(!walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir)) {
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, lastDir.direction);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex.ext().excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / lastDir.pdf);
+					float mis = 1.0f / (1.0f + background.pdfB / vertex.ext().pdf);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -553,24 +571,24 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		}
 
 		if(pathLen == 0 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex->get_position(), vertex->get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
 		}
 
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
 		if(pathLen <= m_params.maxPathLength) {
-			Spectrum emission = vertex->get_emission();
+			Spectrum emission = vertex.get_emission();
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex->get_primitive_id(),
-												  vertex->get_surface_params(),
+				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
+												  vertex.get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex->get_incident_pdf());
+					: 1.0f / (1.0f + backwardPdf / vertex.ext().incidentPdf);
 				emission *= mis;
 			}
-			m_outputBuffer.contribute(coord, throughput, emission, vertex->get_position(),
-									  vertex->get_normal(), vertex->get_albedo());
+			m_outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+									  vertex.get_normal(), vertex.get_albedo());
 		}
 	} while(pathLen < m_params.maxPathLength);
 }
@@ -595,19 +613,15 @@ void CpuShadowSilhouettes::display_importance() {
 		//m_params.maxPathLength = 2;
 
 		math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-		u8 vertexBuffer[256]; // TODO: depends on materials::MAX_MATERIAL_PARAMETER_SIZE
-		PtPathVertex* vertex = as<PtPathVertex>(vertexBuffer);
+		PtPathVertex vertex;
 		// Create a start for the path
-		int s = PtPathVertex::create_camera(vertex, vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-		mAssertMsg(s < 256, "vertexBuffer overflow.");
-
+		(void)PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
 		// Walk
-		scene::Point lastPosition = vertex->get_position();
+		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		math::DirectionSample lastDir;
-		if(walk(m_sceneDesc, *vertex, rnd, -1.0f, false, throughput, vertex, lastDir))
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex->get_position(), vertex->get_primitive_id()) });
+		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex))
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
 	}
 
 }
@@ -683,7 +697,7 @@ float CpuShadowSilhouettes::query_importance(const ei::Vec3& hitPoint, const sce
 	return importance / m_maxImportance;
 }
 
-bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, const PtPathVertex& vertex,
+bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex,
 												   const scene::PrimitiveHandle& firstHit,
 												   const float firstHitT, const float lightDist, const float importance) {
 	constexpr float DIST_EPSILON = 0.001f;

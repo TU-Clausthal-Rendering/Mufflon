@@ -15,9 +15,6 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
-template < typename T, int A >
-class PathVertex;
-
 class CpuImportanceDecimater final : public RendererBase<Device::CPU> {
 public:
 	// Initialize all resources required by this renderer.
@@ -32,8 +29,6 @@ public:
 	void on_descriptor_requery() final;
 
 private:
-	using PtPathVertex = PathVertex<u8, 4>;
-
 	// Create one sample path (actual PT algorithm)
 	void pt_sample(const Pixel coord);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
