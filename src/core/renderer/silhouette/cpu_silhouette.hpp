@@ -40,8 +40,6 @@ private:
 	void initialize_importance_map();
 	void gather_importance();
 	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex,
-								 const scene::PrimitiveHandle& firstHit,
-								 const float lightDist, const float firstHitT,
 								 const float importance);
 	void decimate();
 	void undecimate();

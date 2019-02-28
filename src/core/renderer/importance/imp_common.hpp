@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/path_util.hpp"
+#include <ei/vector.hpp>
 
 namespace mufflon::renderer {
 
@@ -9,6 +10,10 @@ struct ImpVertexExt {
 	AngularPdf pdf;
 	AreaPdf incidentPdf;
 	ei::Vec3 throughput;
+	ei::Vec3 accumThroughput;
+	float outCos;
+	ei::Vec3 bxdfPdf;
+	ei::Vec3 pathRadiance;
 
 	CUDA_FUNCTION void init(const PathVertex<ImpVertexExt>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
@@ -21,6 +26,8 @@ struct ImpVertexExt {
 		excident = sample.excident;
 		pdf = sample.pdfF;
 		throughput = sample.throughput;
+		outCos = -ei::dot(thisVertex.get_normal(), sample.excident);
+		bxdfPdf = sample.throughput / outCos;
 	}
 };
 

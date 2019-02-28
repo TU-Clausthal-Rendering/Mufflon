@@ -42,6 +42,7 @@ void CpuPathTracer::sample(const Pixel coord) {
 	PtPathVertex vertex;
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
+	scene::PrimitiveHandle firstHitId;
 
 	int pathLen = 0;
 	do {
@@ -92,6 +93,8 @@ void CpuPathTracer::sample(const Pixel coord) {
 			}
 			break;
 		}
+		if(pathLen == 0)
+			firstHitId = vertex.get_primitive_id();
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
