@@ -8,10 +8,12 @@
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scene.hpp"
+#include "core/scene/world_container.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/lights/light_sampling.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/scene/world_container.hpp"
+#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 #include <random>
 #include <stdexcept>
 
@@ -84,6 +86,10 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
+void CpuShadowSilhouettes::on_scene_load() {
+	m_addedLods = false;
+}
+
 bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
 	if(!m_reset) {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
@@ -112,6 +118,77 @@ bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
 				this->decimate();
 			m_finishedDecimation = true;
 			m_reset = true;
+		}
+	} else {
+		u32 memory = 0u;
+		std::vector<u32> reducible;
+
+		// TODO: this doesn't work with instancing
+		for(auto& obj : m_currentScene->get_objects()) {
+			mAssert(obj.first != nullptr);
+			mAssert(obj.second.size() != 0u);
+
+			if(obj.second.size() != 1u)
+				throw std::runtime_error("We cannot deal with instancing yet");
+
+			for(scene::InstanceHandle inst : obj.second) {
+				mAssert(inst != nullptr);
+				const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
+				mAssert(obj.first->has_lod_available(instanceLod));
+				const auto& lod = obj.first->get_lod(instanceLod);
+				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+
+				const u32 lodMemory = static_cast<u32>(polygons.get_triangle_count() * 3u * sizeof(u32)
+					+ polygons.get_quad_count() * 3u * sizeof(u32)
+					+ polygons.get_vertex_count() * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2)));
+				if(polygons.get_vertex_count() >= m_params.threshold)
+					reducible.push_back(lodMemory);
+				else
+					reducible.push_back(0u);
+				memory += lodMemory;
+			}
+		}
+
+		logInfo("Required memory for scene: ", memory);
+
+		// Compute the memory shares for each LoD
+		const float reduction = 1.f - std::min(1.f, static_cast<float>(m_params.memoryConstraint) / std::max(1.f, static_cast<float>(memory)));
+		for(auto& mem : reducible)
+			mem = static_cast<u32>(mem * reduction);
+		
+		u32 index = 0u;
+		for(auto& obj : m_currentScene->get_objects()) {
+			for(scene::InstanceHandle inst : obj.second) {
+				const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
+				auto& lod = obj.first->get_lod(instanceLod);
+				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+
+				if(polygons.get_vertex_count() >= m_params.threshold) {
+					// Figure out how many edges we need to collapse - for a manifold, every collapse removes one vertex and two triangles
+					constexpr u32 MEM_PER_COLLAPSE = 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2) + 2u * 3u * sizeof(u32);
+					const u32 collapses = static_cast<u32>(std::ceil(static_cast<float>(reducible[index]) / static_cast<float>(MEM_PER_COLLAPSE)));
+
+					// Copy the LoD and decimate it!
+					const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
+					auto& newLod = obj.first->add_lod(newLodLevel, lod);
+					auto& newPolygons = newLod.template get_geometry<scene::geometry::Polygons>();
+					auto decimater = newPolygons.create_decimater();
+					OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+					decimater.add(modQuadricHandle);
+
+					u32 performedCollapses;
+					do {
+						newPolygons.decimate(decimater, polygons.get_vertex_count() - collapses, true);
+						performedCollapses = static_cast<u32>(polygons.get_vertex_count() - newPolygons.get_vertex_count());
+					} while(performedCollapses < collapses);
+
+					// Modify the scenario to use this lod instead
+					scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+
+					logInfo("Reduced LoD by ", reducible[index], " bytes");
+				}
+				++index;
+			}
 		}
 	}
 	

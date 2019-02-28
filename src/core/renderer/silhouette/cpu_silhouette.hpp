@@ -29,6 +29,7 @@ public:
 
 	void on_descriptor_requery() final;
 	bool pre_iteration(OutputHandler& outputBuffer) final;
+	void on_scene_load() final;
 
 private:
 	using PtPathVertex = PathVertex<u8, 4>;
@@ -58,6 +59,7 @@ private:
 	ImportanceMap m_importanceMap;
 
 	// Superfluous
+	bool m_addedLods = false;
 	bool m_finishedDecimation = false;
 	u32 m_currentDecimationIteration = 0u;
 	float m_maxImportance;

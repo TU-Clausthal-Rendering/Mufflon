@@ -65,7 +65,7 @@ public:
 	// Finds a scenario by its name
 	ScenarioHandle get_scenario(const StringView& name);
 	// Get the scenario for which load_scene() was called last.
-	ConstScenarioHandle get_current_scenario() const noexcept { return m_scenario; }
+	ScenarioHandle get_current_scenario() const noexcept { return m_scenario; }
 	// This is for interfacing - get the number of scenarios and the name of each
 	std::size_t get_scenario_count() const noexcept { return m_scenarios.size(); }
 	// Gets the scenario name - this reference invalidates when new scenarios are added!

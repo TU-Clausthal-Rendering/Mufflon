@@ -84,10 +84,11 @@ public:
 	}
 
 	// Adds a new (or overwrites, if already existing) LoD
-	Lod& add_lod(u32 level) {
+	template < class... Args >
+	Lod& add_lod(u32 level, Args&& ...args) {
 		if(m_lods.size() <= level)
 			m_lods.resize(level + 1u);
-		m_lods[level] = std::make_unique<Lod>();
+		m_lods[level] = std::make_unique<Lod>(std::forward<Args>(args)...);
 		return *m_lods[level];
 	}
 
