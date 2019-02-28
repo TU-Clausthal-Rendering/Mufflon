@@ -18,9 +18,9 @@ using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
 
-__global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
-							  scene::SceneDescriptor<Device::CUDA>* scene,
-							  const u32* seeds, PtParameters params) {
+__global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
+								 scene::SceneDescriptor<Device::CUDA>* scene,
+								 const u32* seeds, PtParameters params) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
@@ -114,8 +114,9 @@ cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
 						RenderBuffer<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						const u32* seeds, const PtParameters& params) {
-	sample<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
-									seeds, params);
+	sample_pt<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
+									   seeds, params);
+	cudaDeviceSynchronize();
 	return cudaGetLastError();
 }
 

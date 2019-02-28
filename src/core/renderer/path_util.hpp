@@ -298,12 +298,12 @@ public:
 		mAssert(is_connection_possible(path0, path1));
 		// Special cases
 		if(path0.is_orthographic()) {	// p0 has no position
-			mAssert(approx(len(path0.m_position), 1.0f));
+			mAssert(ei::approx(len(path0.m_position), 1.0f));
 			return { path1.m_position - path0.m_position * scene::MAX_SCENE_SIZE, scene::MAX_SCENE_SIZE,
 					 path0.m_position, ei::sq(scene::MAX_SCENE_SIZE) };
 		}
 		if(path1.is_orthographic()) {	// p1 has no position
-			mAssert(approx(len(path1.m_position), 1.0f));
+			mAssert(ei::approx(len(path1.m_position), 1.0f));
 			return { path0.m_position, scene::MAX_SCENE_SIZE,
 					-path1.m_position, ei::sq(scene::MAX_SCENE_SIZE) };
 		}

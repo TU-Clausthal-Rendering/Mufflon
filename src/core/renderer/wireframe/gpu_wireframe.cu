@@ -18,9 +18,9 @@ namespace renderer {
 
 using PtPathVertex = PathVertex<VertexExtension>;
 
-__global__ static void sample(RenderBuffer<Device::CUDA> outputBuffer,
-							  scene::SceneDescriptor<Device::CUDA>* scene,
-							  const u32* seeds, WireframeParameters params) {
+__global__ static void sample_wireframe(RenderBuffer<Device::CUDA> outputBuffer,
+										scene::SceneDescriptor<Device::CUDA>* scene,
+										const u32* seeds, WireframeParameters params) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
@@ -131,7 +131,7 @@ cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
 						RenderBuffer<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						const u32* seeds, const WireframeParameters& params) {
-	sample<<<gridDims, blockDims>>>(std::move(outputBuffer), scene, seeds, params);
+	sample_wireframe <<<gridDims, blockDims>>>(std::move(outputBuffer), scene, seeds, params);
 	return cudaGetLastError();
 }
 
