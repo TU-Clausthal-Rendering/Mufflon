@@ -259,18 +259,18 @@ namespace gui.ViewModel
                     }));
                     break;
                 case nameof(Models.Renderer.CurrentIterationTime):
-                    CurrentIterationTime = (m_models.Renderer.CurrentIterationTime.microseconds / 10000000f).ToString("0.###")
-                        + "s / " + (m_models.Renderer.CurrentIterationTime.cycles / 10000000000f).ToString("0.###") + "Gcyc";
+                    CurrentIterationTime = (m_models.Renderer.CurrentIterationTime.microseconds / 1_000_000f).ToString("0.###")
+                        + "s / " + (m_models.Renderer.CurrentIterationTime.cycles / 1_000_000_000f).ToString("0.###") + "Gcyc";
                     OnPropertyChanged(nameof(CurrentIterationTime));
                     break;
                 case nameof(Models.Renderer.AverageIterationTime):
-                    AverageIterationTime = (m_models.Renderer.AverageIterationTime.microseconds / 10000000f).ToString("0.###")
-                        + "s / " + (m_models.Renderer.AverageIterationTime.cycles / 10000000000f).ToString("0.###") + "Gcyc";
+                    AverageIterationTime = (m_models.Renderer.AverageIterationTime.microseconds / 1_000_000f).ToString("0.###")
+                        + "s / " + (m_models.Renderer.AverageIterationTime.cycles / 1_000_000_000f).ToString("0.###") + "Gcyc";
                     OnPropertyChanged(nameof(AverageIterationTime));
                     break;
                 case nameof(Models.Renderer.TotalIterationTime):
-                    TotalIterationTime = (m_models.Renderer.TotalIterationTime.microseconds / 10000000f).ToString("0.###")
-                        + "s / " + (m_models.Renderer.TotalIterationTime.cycles / 10000000000f).ToString("0.###") + "Gcyc";
+                    TotalIterationTime = (m_models.Renderer.TotalIterationTime.microseconds / 1_000_000f).ToString("0.###")
+                        + "s / " + (m_models.Renderer.TotalIterationTime.cycles / 1_000_000_000f).ToString("0.###") + "Gcyc";
                     OnPropertyChanged(nameof(TotalIterationTime));
                     break;
                 case nameof(Models.RenderTargetSelection.VisibleTarget):
