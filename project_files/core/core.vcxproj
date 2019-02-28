@@ -327,7 +327,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
@@ -375,7 +375,7 @@ xcopy /DQY "$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\bin\OpenMeshToo
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-7.1\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SuppressStartupBanner>true</SuppressStartupBanner>

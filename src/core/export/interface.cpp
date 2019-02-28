@@ -3214,11 +3214,11 @@ Boolean mufflon_is_cuda_available() {
 
 void mufflon_destroy() {
 	TRY
-	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_renderers.clear();
 	s_plugins.clear();
 	s_screenTexture.reset();
+	WorldContainer::clear_instance();
 	cuda::check_error(cudaDeviceReset());
 	CATCH_ALL(;)
 }
