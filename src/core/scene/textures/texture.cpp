@@ -162,7 +162,13 @@ void Texture::clear() {
 					s_zeroMem.resize(texMemSize);
 					memset(s_zeroMem.data(), 0, texMemSize);
 				}
-				cuda::check_error(cudaMemcpyToArray(m_cudaTexture, 0, 0, s_zeroMem.data(), texMemSize, cudaMemcpyDefault));
+
+				cudaMemcpy3DParms copyParams{ 0u };
+				copyParams.srcPtr = make_cudaPitchedPtr(s_zeroMem.data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
+				copyParams.dstArray = m_cudaTexture;
+				copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
+				copyParams.kind = cudaMemcpyDefault;
+				cuda::check_error(cudaMemcpy3D(&copyParams));
 			}
 		} break;
 		case Device::OPENGL: {
