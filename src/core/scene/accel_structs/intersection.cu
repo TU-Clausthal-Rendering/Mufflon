@@ -477,16 +477,15 @@ void first_intersection_scene_obj_lbvh(
 	i32& hitPrimId,
 	SurfaceParametrization& surfParams
 ) {
-	const ei::Vec3& scale = scene.scales[instanceId];
-	const ei::Mat3x3 rotScale = ei::Mat3x3{ scene.transformations[instanceId] } * ei::diag(scale);
-	const ei::Mat3x3 invScaleRot = ei::invert(rotScale);
-	const ei::Vec3 invTranslation { -scene.transformations[instanceId][3],
+	const ei::Vec3& invScale = 1.0f / scene.scales[instanceId];
+	const ei::Mat3x3 invRot = ei::transpose(ei::Mat3x3{ scene.transformations[instanceId] });
+	const ei::Vec3 invTranslation{ -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
 									-scene.transformations[instanceId][11] };
-	const ei::Vec3 rayDir = invScaleRot * ray.direction;
+	const ei::Vec3 rayDir = invScale * (invRot * ray.direction);
 	const float rayScale = ei::len(rayDir);
 	const float invRayScale = 1.f / rayScale;
-	const ei::Ray transRay = { invScaleRot * (ray.origin + invTranslation),
+	const ei::Ray transRay = { invScale * (invRot * (ray.origin + invTranslation)),
 							   invRayScale * rayDir };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
@@ -759,16 +758,15 @@ bool any_intersection_scene_obj_lbvh(
 	float tmax,
 	i32* traversalStack
 ) {
-	const ei::Vec3& scale = scene.scales[instanceId];
-	const ei::Mat3x3 rotScale = ei::Mat3x3{ scene.transformations[instanceId] } * ei::diag(scale);
-	const ei::Mat3x3 invScaleRot = ei::invert(rotScale);
+	const ei::Vec3& invScale = 1.0f / scene.scales[instanceId];
+	const ei::Mat3x3 invRot = ei::transpose(ei::Mat3x3{ scene.transformations[instanceId] });
 	const ei::Vec3 invTranslation{ -scene.transformations[instanceId][3],
 									-scene.transformations[instanceId][7],
 									-scene.transformations[instanceId][11] };
-	const ei::Vec3 rayDir = invScaleRot * ray.direction;
+	const ei::Vec3 rayDir = invScale * (invRot * ray.direction);
 	const float rayScale = ei::len(rayDir);
 	const float invRayScale = 1.f / rayScale;
-	const ei::Ray transRay = { invScaleRot * (ray.origin + invTranslation),
+	const ei::Ray transRay = { invScale * (invRot * (ray.origin + invTranslation)),
 							   invRayScale * rayDir };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
