@@ -47,6 +47,8 @@ private:
 	void display_importance();
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 
+	u32 get_memory_requirement() const;
+
 	SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 

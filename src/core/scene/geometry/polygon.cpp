@@ -405,8 +405,12 @@ void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decima
 	// Do not garbage-collect the mesh yet - only rebuild the index buffer
 
 	m_vertexAttributes.mark_changed(Device::CPU);
-	logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
-			" decimations performed)");
+	if(targetVertices == 0) {
+		logInfo("Decimated polygon mesh (", actualDecimations, " decimations performed)");
+	} else {
+		logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
+				" decimations performed)");
+	}
 	// TODO: this leaks mesh outside
 }
 
@@ -546,6 +550,8 @@ void Polygons::rebuild_index_buffer() {
 	m_quads = 0u;
 	for(const auto& face : this->faces()) {
 		const std::size_t vertices = std::distance(face.begin(), face.end());
+		if(vertices == 0)
+			continue;
 		if(vertices == 3u)
 			++m_triangles;
 		else if(vertices == 4u)

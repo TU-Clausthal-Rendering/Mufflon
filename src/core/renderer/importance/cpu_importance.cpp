@@ -32,6 +32,10 @@ CpuImportanceDecimater::CpuImportanceDecimater() {
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
+void CpuImportanceDecimater::on_scene_load() {
+	m_importanceMap.clear();
+}
+
 void CpuImportanceDecimater::on_descriptor_requery() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 
@@ -442,7 +446,9 @@ void CpuImportanceDecimater::initialize_importance_map() {
 			}
 		}
 	}
-	m_importanceMap = ImportanceMap(std::move(meshes));
+	// We do it in this ugly fashion because create -> move -> destroy-old doesn't work due to how OpenMesh treats properties
+	m_importanceMap.~ImportanceMap();
+	new(&m_importanceMap) ImportanceMap(std::move(meshes));
 }
 
 void CpuImportanceDecimater::init_rngs(int num) {

@@ -10,16 +10,37 @@ ImportanceMap::ImportanceMap(std::vector<scene::geometry::PolygonMeshType*> mesh
 	m_normalizedImportance.reserve(m_meshes.size());
 	m_collapseHistory.reserve(m_meshes.size());
 	m_vertexOffsets.reserve(m_meshes.size());
+	m_meshAreas.reserve(m_meshes.size());
 
 	for(auto* mesh : m_meshes) {
 		m_normalizedImportance.emplace_back();
 		m_collapseHistory.emplace_back();
 		m_vertexOffsets.push_back(m_totalVertexCount);
+		m_meshAreas.emplace_back();
 
 		if(mesh != nullptr) {
-			mesh->add_property(m_normalizedImportance.back(), std::string(NORMALIZED_IMPORTANCE_PROP_NAME));
-			mesh->add_property(m_collapseHistory.back(), std::string(COLLAPSE_HISTORY_PROP_NAME));
+			if(!mesh->get_property_handle(m_normalizedImportance.back(), std::string(NORMALIZED_IMPORTANCE_PROP_NAME)))
+				mesh->add_property(m_normalizedImportance.back(), std::string(NORMALIZED_IMPORTANCE_PROP_NAME));
+			if (!mesh->get_property_handle(m_collapseHistory.back(), std::string(COLLAPSE_HISTORY_PROP_NAME)))
+				mesh->add_property(m_collapseHistory.back(), std::string(COLLAPSE_HISTORY_PROP_NAME));
 			m_totalVertexCount += static_cast<u32>(mesh->n_vertices());
+
+			// Compute mesh area
+			double area = 0.0;
+			for (auto face : mesh->faces()) {
+				if(face.is_valid()) {
+					auto circIter = mesh->cfv_ccwbegin(face);
+					if(circIter.is_valid()) {
+						mAssertMsg(std::distance(circIter, mesh->cfv_ccwend(face)) == 3u,
+								   "Area formula only valid for triangles");
+						OpenMesh::Vec3f a = mesh->point(*circIter);
+						OpenMesh::Vec3f b = mesh->point(*(++circIter));
+						OpenMesh::Vec3f c = mesh->point(*(++circIter));
+						area += ((a - b) % (c - b)).length();
+					}
+				}
+			}
+			m_meshAreas.back() = 0.5 * area;
 		}
 	}
 
@@ -29,37 +50,15 @@ ImportanceMap::ImportanceMap(std::vector<scene::geometry::PolygonMeshType*> mesh
 }
 
 ImportanceMap::~ImportanceMap() {
-	for(std::size_t i = 0u; i < m_meshes.size(); ++i) {
-		if(m_meshes[i] != nullptr) {
-			auto& mesh = *m_meshes[i];
-
-			if(m_normalizedImportance[i].is_valid())
-				mesh.remove_property(m_normalizedImportance[i]);
-			if(m_collapseHistory[i].is_valid())
-				mesh.remove_property(m_collapseHistory[i]);
-		}
-	}
+	this->clear();
 }
 
-ImportanceMap::ImportanceMap(ImportanceMap&& map) :
-	m_meshes(std::move(map.m_meshes)),
-	m_normalizedImportance(std::move(map.m_normalizedImportance)),
-	m_collapseHistory(std::move(map.m_collapseHistory)),
-	m_vertexOffsets(std::move(map.m_vertexOffsets)),
-	m_totalVertexCount(map.m_totalVertexCount),
-	m_importance(std::move(map.m_importance)),
-	m_importanceSums(std::move(map.m_importanceSums))
-{}
-
-ImportanceMap& ImportanceMap::operator=(ImportanceMap&& map) {
-	std::swap(m_meshes, map.m_meshes);
-	std::swap(m_normalizedImportance, map.m_normalizedImportance);
-	std::swap(m_collapseHistory, map.m_collapseHistory);
-	std::swap(m_vertexOffsets, map.m_vertexOffsets);
-	std::swap(m_totalVertexCount, map.m_totalVertexCount);
-	std::swap(m_importance, map.m_importance);
-	std::swap(m_importanceSums, map.m_importanceSums);
-	return *this;
+void ImportanceMap::clear() {
+	for (std::size_t i = 0u; i < m_meshes.size(); ++i) {
+		m_normalizedImportance[i].invalidate();
+		m_collapseHistory[i].invalidate();
+	}
+	m_meshes.clear();
 }
 
 void ImportanceMap::reset() {
@@ -90,6 +89,9 @@ void ImportanceMap::update_normalized() {
 
 		auto& mesh = *m_meshes[i];
 		for(u32 v = 0u; v < mesh.n_vertices(); ++v) {
+			if(mesh.has_vertex_status() && mesh.status(mesh.vertex_handle(v)).deleted())
+				continue;
+
 			const float importance = m_importance[vertexIndex].load();
 			mAssert(!isnan(importance));
 
@@ -102,6 +104,7 @@ void ImportanceMap::update_normalized() {
 				const OpenMesh::Vec3f center = mesh.point(vh);
 				OpenMesh::Vec3f a = mesh.point(*circIter);
 				OpenMesh::Vec3f b;
+				// We assume that we only have triangles!
 				for(; circIter != mesh.cvv_ccwend(vh); ++circIter) {
 					b = a;
 					a = mesh.point(*circIter);
@@ -109,7 +112,7 @@ void ImportanceMap::update_normalized() {
 				}
 
 				mAssertMsg(area != 0.f, "Degenerated vertex");
-				mesh.property(m_normalizedImportance[i], vh) = importance / area;
+				mesh.property(m_normalizedImportance[i], vh) = 2.f * importance / area;
 			} else {
 				//logWarning("Invalid circular iterator for mesh ", i, ", vertex ", v);
 				mesh.property(m_normalizedImportance[i], vh) = 0.f;
@@ -117,6 +120,28 @@ void ImportanceMap::update_normalized() {
 			++vertexIndex;
 		}
 	}
+}
+
+double ImportanceMap::get_importance_density_sum() const noexcept {
+	double sum = 0.0;
+	for(std::size_t i = 0u; i < m_meshes.size(); ++i) {
+		if(m_meshes[i] != nullptr)
+			sum += (m_meshAreas[i] != 0.0) ? m_importanceSums[i] / m_meshAreas[i] : 0.0;
+	}
+	return sum;
+}
+
+u32 ImportanceMap::get_not_deleted_vertex_count() const noexcept {
+	u32 count = 0u;
+	for(std::size_t i = 0u; i < m_meshes.size(); ++i) {
+		if(m_meshes[i] != nullptr) {
+			for(u32 v = 0u; v < m_meshes[i]->n_vertices(); ++v) {
+				if(!m_meshes[i]->has_vertex_status() || !m_meshes[i]->status(m_meshes[i]->vertex_handle(v)).deleted())
+					++count;
+			}
+		}
+	}
+	return count;
 }
 
 void ImportanceMap::add(u32 meshIndex, u32 localIndex, float val) {
@@ -129,6 +154,20 @@ void ImportanceMap::add(u32 meshIndex, u32 localIndex, float val) {
 	do {
 		desired = expected + val;
 	} while(!m_importance[vertexIndex].compare_exchange_weak(expected, desired));
+}
+
+void ImportanceMap::collapse(u32 meshIndex, u32 localFrom, u32 localTo) {
+	mAssert(meshIndex < static_cast<u32>(m_meshes.size()));
+	mAssert(localFrom < static_cast<u32>(m_meshes[meshIndex]->n_vertices()));
+	mAssert(localTo < static_cast<u32>(m_meshes[meshIndex]->n_vertices()));
+	const u32 vertexFrom = m_vertexOffsets[meshIndex] + localFrom;
+	const u32 vertexTo = m_vertexOffsets[meshIndex] + localTo;
+
+	float expected = m_importance[vertexTo].load();
+	float desired;
+	do {
+		desired = expected + m_importance[vertexFrom].load();
+	} while(!m_importance[vertexTo].compare_exchange_weak(expected, desired));
 }
 
 } // namespace mufflon::renderer

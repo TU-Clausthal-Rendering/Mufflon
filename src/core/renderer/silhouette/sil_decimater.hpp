@@ -25,14 +25,15 @@ public:
 	void initialize() final;
 	float collapse_priority(const CollapseInfo& ci) final;
 	void use_collapse_history(bool val);
-	void set_importance_map(const ImportanceMap& importanceMap, const u32 meshIndex);
+	void set_importance_map(ImportanceMap& importanceMap, const u32 meshIndex, const float threshold);
 	void postprocess_collapse(const CollapseInfo& ci) final;
 
 private:
-	OpenMesh::VPropHandleT<float> m_importancePropHandle;
 	bool m_useCollapseHistory;
-	const ImportanceMap* m_importanceMap;
+	ImportanceMap* m_importanceMap;
 	u32 m_meshIndex;
+
+	float m_threshold;
 };
 
 } // namespace mufflon::renderer
