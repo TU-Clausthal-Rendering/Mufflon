@@ -1,10 +1,10 @@
 #pragma once
 
 #include "silhouette_params.hpp"
+#include "sil_imp_map.hpp"
 #include "sil_common.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
-#include "core/renderer/importance/importance_map.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <atomic>
 #include <vector>
@@ -39,10 +39,10 @@ private:
 
 	void initialize_importance_map();
 	void gather_importance();
-	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex,
+	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
 								 const float importance);
-	void decimate();
-	void undecimate();
+	void decimate(const float impVertDensThreshold);
+	void undecimate(const float impVertDensThreshold);
 	void compute_max_importance();
 	void display_importance();
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
@@ -52,7 +52,7 @@ private:
 	SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	ImportanceMap m_importanceMap;
+	silhouette::ImportanceMap m_importanceMap;
 
 	// Superfluous
 	bool m_addedLods = false;

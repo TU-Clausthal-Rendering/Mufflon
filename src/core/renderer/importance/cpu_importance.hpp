@@ -48,7 +48,7 @@ private:
 	std::vector<math::Rng> m_rngs;
 
 	// Data buffer for importance
-	ImportanceMap m_importanceMap;
+	importance::ImportanceMap m_importanceMap;
 
 	// Superfluous
 	bool m_gotImportance = false;

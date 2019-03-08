@@ -1,5 +1,5 @@
 ﻿#include "cpu_importance.hpp"
-#include "decimater.hpp"
+#include "imp_decimater.hpp"
 #include "imp_common.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
@@ -16,6 +16,8 @@
 #include <stdexcept>
 
 namespace mufflon::renderer {
+
+using namespace importance;
 
 namespace {
 

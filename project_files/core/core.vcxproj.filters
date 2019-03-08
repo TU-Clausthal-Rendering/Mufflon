@@ -256,11 +256,14 @@
     <ClCompile Include="..\..\src\core\renderer\importance\importance_map.cpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\importance\decimater.cpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\silhouette\sil_decimater.cpp">
       <Filter>Source Files\core\renderer\silhouette</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\silhouette\sil_imp_map.cpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\importance\imp_decimater.cpp">
+      <Filter>Source Files\core\renderer\importance</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -882,9 +885,6 @@
     <ClInclude Include="..\..\src\core\renderer\importance\importance_params.hpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\decimater.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
@@ -898,6 +898,12 @@
       <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\importance\imp_common.hpp">
+      <Filter>Source Files\core\renderer\importance</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\silhouette\sil_imp_map.hpp">
+      <Filter>Source Files\core\renderer\silhouette</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\importance\imp_decimater.hpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClInclude>
   </ItemGroup>

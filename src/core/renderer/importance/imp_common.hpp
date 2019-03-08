@@ -3,7 +3,7 @@
 #include "core/renderer/path_util.hpp"
 #include <ei/vector.hpp>
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::importance {
 
 struct ImpVertexExt {
 	scene::Direction excident;
@@ -33,4 +33,4 @@ struct ImpVertexExt {
 
 using ImpPathVertex = PathVertex<ImpVertexExt>;
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::importance

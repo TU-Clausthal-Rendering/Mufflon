@@ -1,6 +1,6 @@
 #include "sil_decimater.hpp"
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::silhouette {
 
 template < class MeshT >
 ImportanceModule<MeshT>::ImportanceModule(MeshT &mesh) :
@@ -47,4 +47,4 @@ void ImportanceModule<MeshT>::postprocess_collapse(const CollapseInfo& ci) {
 
 template class ImportanceModule<scene::geometry::PolygonMeshType>;
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::silhouette

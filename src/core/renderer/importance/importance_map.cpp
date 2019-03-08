@@ -1,7 +1,7 @@
 #include "importance_map.hpp"
 #include "util/log.hpp"
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::importance {
 
 ImportanceMap::ImportanceMap(std::vector<scene::geometry::PolygonMeshType*> meshes) :
 	m_meshes(std::move(meshes)),
@@ -122,28 +122,6 @@ void ImportanceMap::update_normalized() {
 	}
 }
 
-double ImportanceMap::get_importance_density_sum() const noexcept {
-	double sum = 0.0;
-	for(std::size_t i = 0u; i < m_meshes.size(); ++i) {
-		if(m_meshes[i] != nullptr)
-			sum += (m_meshAreas[i] != 0.0) ? m_importanceSums[i] / m_meshAreas[i] : 0.0;
-	}
-	return sum;
-}
-
-u32 ImportanceMap::get_not_deleted_vertex_count() const noexcept {
-	u32 count = 0u;
-	for(std::size_t i = 0u; i < m_meshes.size(); ++i) {
-		if(m_meshes[i] != nullptr) {
-			for(u32 v = 0u; v < m_meshes[i]->n_vertices(); ++v) {
-				if(!m_meshes[i]->has_vertex_status() || !m_meshes[i]->status(m_meshes[i]->vertex_handle(v)).deleted())
-					++count;
-			}
-		}
-	}
-	return count;
-}
-
 void ImportanceMap::add(u32 meshIndex, u32 localIndex, float val) {
 	mAssert(meshIndex < static_cast<u32>(m_meshes.size()));
 	mAssert(localIndex < static_cast<u32>(m_meshes[meshIndex]->n_vertices()));
@@ -170,4 +148,4 @@ void ImportanceMap::collapse(u32 meshIndex, u32 localFrom, u32 localTo) {
 	} while(!m_importance[vertexTo].compare_exchange_weak(expected, desired));
 }
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::importance

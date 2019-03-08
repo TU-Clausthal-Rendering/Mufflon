@@ -2,7 +2,7 @@
 
 #include "core/renderer/path_util.hpp"
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::silhouette {
 
 struct SilVertexExt {
 	scene::Direction excident;
@@ -36,4 +36,4 @@ struct SilVertexExt {
 
 using SilPathVertex = PathVertex<SilVertexExt>;
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::silhouette

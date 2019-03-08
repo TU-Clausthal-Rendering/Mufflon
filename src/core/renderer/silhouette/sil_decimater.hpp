@@ -1,14 +1,14 @@
 #pragma once
 
+#include "sil_imp_map.hpp"
 #include "util/assert.hpp"
 #include "util/int_types.hpp"
-#include "core/renderer/importance/importance_map.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::silhouette {
 
 template < typename MeshT = scene::geometry::PolygonMeshType >
 class ImportanceModule : public OpenMesh::Decimater::ModBaseT<MeshT> {
@@ -36,4 +36,4 @@ private:
 	float m_threshold;
 };
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::silhouette

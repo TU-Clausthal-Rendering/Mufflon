@@ -8,7 +8,7 @@
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::importance {
 
 // Decimater solely based on importance.
 template < typename MeshT = scene::geometry::PolygonMeshType >
@@ -26,18 +26,16 @@ public:
 	void initialize() final;
 	float collapse_priority(const CollapseInfo& ci) final;
 	void use_collapse_history(bool val);
-	void set_importance_map(const ImportanceMap& importanceMap, const u32 meshIndex);
+	void set_importance_map(ImportanceMap& importanceMap, const u32 meshIndex);
 	// Post-process halfedge collapse (accumulate importance)
 	void postprocess_collapse(const CollapseInfo& ci) final;
 
 private:
-	OpenMesh::VPropHandleT<float> m_importancePropHandle;
-	
 	//const std::vector<unsigned int>* m_meshDataCollapseHistory;
 	//const MeshT* m_importanceMapCreationMesh;
 	//OpenMesh::VPropHandleT<unsigned int> m_indexMapHandle;
 	bool m_useCollapseHistory;
-	const ImportanceMap* m_importanceMap;
+	ImportanceMap* m_importanceMap;
 	u32 m_meshIndex;
 };
 
@@ -65,4 +63,4 @@ private:
 	double m_minCos;
 };
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::importance
