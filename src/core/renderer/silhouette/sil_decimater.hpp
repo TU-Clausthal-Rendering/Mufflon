@@ -26,6 +26,7 @@ public:
 	float collapse_priority(const CollapseInfo& ci) final;
 	void use_collapse_history(bool val);
 	void set_importance_map(ImportanceMap& importanceMap, const u32 meshIndex, const float threshold);
+	void preprocess_collapse(const CollapseInfo& ci) final;
 	void postprocess_collapse(const CollapseInfo& ci) final;
 
 private:

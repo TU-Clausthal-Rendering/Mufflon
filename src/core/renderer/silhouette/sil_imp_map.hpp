@@ -21,8 +21,8 @@ public:
 	// as well as the other two vertices involved to restore topology
 	struct CollapseEvent {
 		OpenMesh::VertexHandle collapsedTo;
-		OpenMesh::VertexHandle left;
-		OpenMesh::VertexHandle right;
+		OpenMesh::HalfedgeHandle vlv1; // From the left vertex to the remaining vertex
+		OpenMesh::HalfedgeHandle v1vr; // From the remaining vertex to the right vertex
 	};
 
 	// The importance map only adds properties, doesn't remove them!

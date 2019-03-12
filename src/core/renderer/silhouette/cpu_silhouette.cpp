@@ -112,6 +112,139 @@ u32 get_vertices_for_memory(const u32 memory) {
 	return memory / (2u * 3u * sizeof(u32) + 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2));
 }
 
+void restore_vertex(scene::geometry::PolygonMeshType& mesh, const OpenMesh::VertexHandle v0,
+					const OpenMesh::HalfedgeHandle v0v1, const OpenMesh::HalfedgeHandle v1v0) {
+
+	const OpenMesh::VertexHandle v1 = mesh.to_vertex_handle(v0v1);
+	const OpenMesh::FaceHandle fl = mesh.face_handle(v0v1);
+	const OpenMesh::FaceHandle fr = mesh.face_handle(v1v0);
+}
+
+// Taken from OpenMesh TriConnectivity
+OpenMesh::HalfedgeHandle insert_loop(scene::geometry::PolygonMeshType& mesh, OpenMesh::HalfedgeHandle hh) {
+	using namespace OpenMesh;
+	HalfedgeHandle  h0(hh);
+	HalfedgeHandle  o0(mesh.opposite_halfedge_handle(h0));
+
+	VertexHandle    v0(mesh.to_vertex_handle(o0));
+	VertexHandle    v1(mesh.to_vertex_handle(h0));
+
+	HalfedgeHandle  h1 = mesh.new_edge(v1, v0);
+	HalfedgeHandle  o1 = mesh.opposite_halfedge_handle(h1);
+
+	FaceHandle      f0 = mesh.face_handle(h0);
+	FaceHandle      f1 = mesh.new_face();
+
+	// halfedge -> halfedge
+	mesh.set_next_halfedge_handle(mesh.prev_halfedge_handle(h0), o1);
+	mesh.set_next_halfedge_handle(o1, mesh.next_halfedge_handle(h0));
+	mesh.set_next_halfedge_handle(h1, h0);
+	mesh.set_next_halfedge_handle(h0, h1);
+
+	// halfedge -> face
+	mesh.set_face_handle(o1, f0);
+	mesh.set_face_handle(h0, f1);
+	mesh.set_face_handle(h1, f1);
+
+	// face -> halfedge
+	mesh.set_halfedge_handle(f1, h0);
+	if(f0.is_valid())
+		mesh.set_halfedge_handle(f0, o1);
+
+
+	// vertex -> halfedge
+	mesh.adjust_outgoing_halfedge(v0);
+	mesh.adjust_outgoing_halfedge(v1);
+
+	return h1;
+}
+
+// Taken from OpenMesh TriConnectivity
+OpenMesh::HalfedgeHandle insert_edge(scene::geometry::PolygonMeshType& mesh, OpenMesh::VertexHandle vh,
+									 OpenMesh::HalfedgeHandle h0, OpenMesh::HalfedgeHandle h1) {
+	using namespace OpenMesh;
+	mAssert(h0.is_valid() && h1.is_valid());
+
+	VertexHandle  v0 = vh;
+	VertexHandle  v1 = mesh.to_vertex_handle(h0);
+
+	mAssert(v1 == mesh.to_vertex_handle(h1));
+
+	HalfedgeHandle v0v1 = mesh.new_edge(v0, v1);
+	HalfedgeHandle v1v0 = mesh.opposite_halfedge_handle(v0v1);
+
+
+
+	// vertex -> halfedge
+	mesh.set_halfedge_handle(v0, v0v1);
+	mesh.set_halfedge_handle(v1, v1v0);
+
+
+	// halfedge -> halfedge
+	mesh.set_next_halfedge_handle(v0v1, mesh.next_halfedge_handle(h0));
+	mesh.set_next_halfedge_handle(h0, v0v1);
+	mesh.set_next_halfedge_handle(v1v0, mesh.next_halfedge_handle(h1));
+	mesh.set_next_halfedge_handle(h1, v1v0);
+
+
+	// halfedge -> vertex
+	for(auto vih_it = mesh.vih_iter(v0); vih_it.is_valid(); ++vih_it)
+		mesh.set_vertex_handle(*vih_it, v0);
+
+
+	// halfedge -> face
+	mesh.set_face_handle(v0v1, mesh.face_handle(h0));
+	mesh.set_face_handle(v1v0, mesh.face_handle(h1));
+
+
+	// face -> halfedge
+	if(mesh.face_handle(v0v1).is_valid())
+		mesh.set_halfedge_handle(mesh.face_handle(v0v1), v0v1);
+	if(mesh.face_handle(v1v0).is_valid())
+		mesh.set_halfedge_handle(mesh.face_handle(v1v0), v1v0);
+
+
+	// vertex -> halfedge
+	mesh.adjust_outgoing_halfedge(v0);
+	mesh.adjust_outgoing_halfedge(v1);
+
+	return v0v1;
+}
+
+// Taken from OpenMesh TriConnectivity
+OpenMesh::HalfedgeHandle vertex_split(scene::geometry::PolygonMeshType& mesh, OpenMesh::VertexHandle v0,
+									  OpenMesh::VertexHandle v1, OpenMesh::VertexHandle vl,
+									  OpenMesh::VertexHandle vr) {
+	using namespace OpenMesh;
+	HalfedgeHandle v1vl, vlv1, vrv1, v0v1;
+
+	// build loop from halfedge v1->vl
+	if(vl.is_valid()) {
+		v1vl = mesh.find_halfedge(v1, vl);
+		mAssert(v1vl.is_valid());
+		vlv1 = insert_loop(mesh, v1vl);
+	}
+
+	// build loop from halfedge vr->v1
+	if(vr.is_valid()) {
+		vrv1 = mesh.find_halfedge(vr, v1);
+		mAssert(vrv1.is_valid());
+		insert_loop(mesh, vrv1);
+	}
+
+	// handle boundary cases
+	if(!vl.is_valid())
+		vlv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
+	if(!vr.is_valid())
+		vrv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
+
+
+	// split vertex v1 into edge v0v1
+	v0v1 = insert_edge(mesh, v0, vlv1, vrv1);
+	
+	return v0v1;
+}
+
 } // namespace
 
 CpuShadowSilhouettes::CpuShadowSilhouettes()
@@ -327,7 +460,7 @@ void CpuShadowSilhouettes::decimate(const float impVertDensThreshold) {
 					/*MaxNormalDeviation<>::Handle normModHdl;
 					decimater.add(normModHdl);
 					decimater.module(normModHdl).set_max_deviation(60.0);*/
-					polygons.decimate(decimater, 0u, false);
+					polygons.decimate(decimater, vertexCount - 1u, false);
 
 					//polygons.garbage_collect();
 					lod.clear_accel_structure();
@@ -351,34 +484,34 @@ void CpuShadowSilhouettes::undecimate(const float impVertDensThreshold) {
 					auto& mesh = polygons.get_mesh();
 
 					// First create a queue for all vertices which could be undecimated
-					std::queue<OpenMesh::VertexHandle> vertices;
+					std::queue<std::pair<OpenMesh::VertexHandle, OpenMesh::VertexHandle>> vertices;
 
-					// Iterate over all non-deleted vertices
-					for(auto vertex : mesh.vertices()) {
-						// Check for the local density
-						//if(m_importanceMap.normalized(meshIndex, vertex.idx()) > impVertDensThreshold)
-							vertices.push(vertex);
-					}
-
-					/*for(auto vertex : mesh.all_vertices()) {
+					// Iterate over all deleted vertices, check if they're directly uncollapsible, and
+					// add them to the queue if the importance is high enough
+					for(auto vertex : mesh.all_vertices()) {
 						if(mesh.status(vertex).deleted()) {
 							const auto& ce = m_importanceMap.get_collapse_event(meshIndex, vertex);
+							const OpenMesh::VertexHandle collapsedTo = mesh.to_vertex_handle(ce.vlv1);
+							// Check if this is a recent collapse or only a chain of collapses
+							if(mesh.status(ce.collapsedTo).deleted()) {
+								// TODO; enqueue this or smth
+								continue;
+							}
+							mAssert(collapsedTo == ce.collapsedTo);
 
-							// First remove all illicit faces formed post-collapse
-							auto circIter = mesh.cvv_ccwbegin(ce.collapsedTo);
-							while(*circIter != ce.right)
-								++circIter;
+							// We need to make assumptions about the topology here: for now that means triangles only
+							// TODO: add quad support
 
 							// Restore the collapsed topology
 							mesh.status(ce.collapsedTo).set_deleted(false);
-
-							auto he = mesh.halfedge_handle(vertex);
+							auto heh = vertex_split(mesh, vertex, collapsedTo, mesh.to_vertex_handle(mesh.opposite_halfedge_handle(ce.vlv1)),
+													mesh.to_vertex_handle(ce.v1vr));
 							const int aewrl = 0;
 						}
-					}*/
+					}
 					
 					// Actual undecimation loop
-					while(!vertices.empty()) {
+					/*while(!vertices.empty()) {
 						const auto& vertex = vertices.front();
 						// Check around in a ring for deleted vertices and choose 
 						
@@ -396,7 +529,7 @@ void CpuShadowSilhouettes::undecimate(const float impVertDensThreshold) {
 
 						// TODO: only remove if we're below threshold now
 						vertices.pop();
-					}
+					}*/
 				}
 				++meshIndex;
 			}

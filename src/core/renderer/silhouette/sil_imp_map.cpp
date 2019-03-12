@@ -245,8 +245,8 @@ void ImportanceMap::collapse(const u32 meshIndex, const OpenMesh::Decimater::Col
 	}
 
 	// Save the collapse in the vertex's history
-	// Since we cannot reconstruct the halfedge from a vertex handle, we instead store the halfedge handle
-	mesh.property(m_collapseHistory[meshIndex], ci.v0) = CollapseEvent{ ci.v1, ci.vl, ci.vr };
+	// Since we cannot reconstruct the halfedge from a vertex handle, we instead store the halfedge handles
+	mesh.property(m_collapseHistory[meshIndex], ci.v0) = CollapseEvent{ ci.v1, ci.vlv1, ci.v1vr };
 }
 
 void ImportanceMap::uncollapse(const u32 meshIndex, const OpenMesh::VertexHandle& vertex) {
