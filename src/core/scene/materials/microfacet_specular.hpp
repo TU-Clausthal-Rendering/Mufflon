@@ -60,12 +60,12 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::EvalValue evaluate(const MatSampleTorrance& params,
-									   const Direction& incidentTS,
-									   const Direction& excidentTS,
-									   Boundary& boundary) {
+CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
+											  const Direction& incidentTS,
+											  const Direction& excidentTS,
+											  Boundary& boundary) {
 	// No transmission
-	if(incidentTS.z * excidentTS.z < 0.0f) return math::EvalValue{};
+	if(incidentTS.z * excidentTS.z < 0.0f) return math::BidirSampleValue{};
 
 	// Geometry Term
 	Direction halfTS = boundary.get_halfTS(incidentTS, excidentTS);
@@ -81,9 +81,8 @@ CUDA_FUNCTION math::EvalValue evaluate(const MatSampleTorrance& params,
 
 	// Fresnel is done as layer blending...
 
-	return math::EvalValue {
+	return math::BidirSampleValue {
 		params.albedo * sdiv(g * d, ei::abs(4.0f * incidentTS.z * excidentTS.z)),
-		ei::abs(excidentTS.z),
 		AngularPdf(sdiv(gi * d, ei::abs(4.0f * incidentTS.z))),
 		AngularPdf(sdiv(ge * d, ei::abs(4.0f * excidentTS.z)))
 	};
@@ -94,8 +93,8 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION math::EvalValue emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return math::EvalValue{};
+CUDA_FUNCTION math::SampleValue emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return math::SampleValue{};
 }
 
 template MaterialSampleConcept<MatSampleTorrance>;

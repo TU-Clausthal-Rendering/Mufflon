@@ -183,7 +183,7 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Call material implementation
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	math::EvalValue res;
+	math::BidirSampleValue res;
 	material_switch(params.type,
 		res = evaluate(*as<typename MatType::SampleType>(subParams),
 			incidentTS, excidentTS, boundary);
@@ -191,16 +191,8 @@ evaluate(const TangentSpace& tangentSpace,
 	);
 
 	// Early out if result is discarded anyway
-	if(res.value == 0.0f) return res;
+	if(res.value == 0.0f) return math::EvalValue{};
 	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)) && !isnan(res.cosOut));
-
-	// Swap back output values if we swapped the directions before
-	if(adjoint) {
-		AngularPdf tmp = res.pdfF;
-		res.pdfF = res.pdfB;
-		res.pdfB = tmp;
-		res.cosOut = ei::abs(eDotN);
-	}
 
 	// Shading normal caused density correction.
 	if(merge) {
@@ -215,7 +207,12 @@ evaluate(const TangentSpace& tangentSpace,
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
-	return res;
+	return math::EvalValue{
+		res.value, ei::abs(eDotN),
+		// Swap back output values if we swapped the directions before
+		adjoint ? res.pdfB : res.pdfF,
+		adjoint ? res.pdfF : res.pdfB
+	};
 }
 
 /*
@@ -235,13 +232,13 @@ albedo(const ParameterPack& params) {
 /*
  * Get the self emission into some direction.
  */
-CUDA_FUNCTION math::EvalValue
+CUDA_FUNCTION math::SampleValue
 emission(const ParameterPack& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	material_switch(params.type,
 		return emission(*as<typename MatType::SampleType>(subParams), geoN, excident);
 	);
-	return math::EvalValue{};
+	return math::SampleValue{};
 }
 
 }}} // namespace mufflon::scene::materials

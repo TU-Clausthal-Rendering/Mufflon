@@ -32,16 +32,15 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleLambert& params,
 	};
 }
 
-CUDA_FUNCTION math::EvalValue evaluate(const MatSampleLambert& params,
-									   const Direction& incidentTS,
-									   const Direction& excidentTS ,
-									   Boundary& boundary) {
+CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleLambert& params,
+											  const Direction& incidentTS,
+											  const Direction& excidentTS ,
+											  Boundary& boundary) {
 	// No transmission - already checked by material, but in a combined model we might get a call
-	if(incidentTS.z * excidentTS.z < 0.0f) return math::EvalValue{};
+	if(incidentTS.z * excidentTS.z < 0.0f) return math::BidirSampleValue{};
 	// Two sided diffuse (therefore the abs())
-	return math::EvalValue {
+	return math::BidirSampleValue {
 		params.albedo / ei::PI,
-		ei::abs(excidentTS.z),
 		AngularPdf(ei::abs(excidentTS.z) / ei::PI),
 		AngularPdf(ei::abs(incidentTS.z) / ei::PI)
 	};
@@ -51,8 +50,8 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleLambert& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION math::EvalValue emission(const MatSampleLambert& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return math::EvalValue{};
+CUDA_FUNCTION math::SampleValue emission(const MatSampleLambert& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return math::SampleValue{};
 }
 
 template MaterialSampleConcept<MatSampleLambert>;

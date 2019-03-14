@@ -333,7 +333,7 @@ public:
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
-	CUDA_FUNCTION math::EvalValue get_emission() const {
+	CUDA_FUNCTION math::SampleValue get_emission() const {
 		switch(m_type) {
 			case Interaction::VOID:
 			case Interaction::LIGHT_POINT:
@@ -342,16 +342,16 @@ public:
 			case Interaction::LIGHT_SPOT:
 			case Interaction::CAMERA_PINHOLE:
 			case Interaction::CAMERA_FOCUS:
-				return math::EvalValue{};
+				return math::SampleValue{};
 			case Interaction::LIGHT_AREA: {
 				float cosIn = ei::abs(dot(m_incident, m_desc.areaLight.normal));
-				return math::EvalValue{m_intensity, cosIn, AngularPdf{cosIn / ei::PI}, AngularPdf{0.0f}}; // TODO: / area?
+				return math::SampleValue{m_intensity, AngularPdf{cosIn / ei::PI}}; // TODO: / area?
 			}
 			case Interaction::SURFACE: {
 				return scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
 			}
 		}
-		return math::EvalValue{};
+		return math::SampleValue{};
 	}
 
 	CUDA_FUNCTION Spectrum get_albedo() const {

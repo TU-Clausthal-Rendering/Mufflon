@@ -24,11 +24,11 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleEmissive& params,
 	return math::PathSample{};
 }
 
-CUDA_FUNCTION math::EvalValue evaluate(const MatSampleEmissive& params,
-									   const Direction& incidentTS,
-									   const Direction& excidentTS ,
-									   Boundary& boundary) {
-	return math::EvalValue{};
+CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleEmissive& params,
+											  const Direction& incidentTS,
+											  const Direction& excidentTS ,
+											  Boundary& boundary) {
+	return math::BidirSampleValue{};
 }
 
 // The albedo routine
@@ -37,10 +37,10 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleEmissive& params) {
 	return Spectrum{0.0f};
 }
 
-CUDA_FUNCTION math::EvalValue emission(const MatSampleEmissive& params, const scene::Direction& geoN, const scene::Direction& excident) {
+CUDA_FUNCTION math::SampleValue emission(const MatSampleEmissive& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	float cosOut = dot(geoN, excident);
-	if(cosOut <= 0.0f) return math::EvalValue{};
-	return { params.radiance, cosOut, AngularPdf{cosOut / ei::PI}, AngularPdf{0.0f} };
+	if(cosOut <= 0.0f) return math::SampleValue{};
+	return { params.radiance, AngularPdf{cosOut / ei::PI} };
 }
 
 template MaterialSampleConcept<MatSampleEmissive>;

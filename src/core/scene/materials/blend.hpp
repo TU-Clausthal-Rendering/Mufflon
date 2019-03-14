@@ -35,7 +35,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 
 	// Sample and get the pdfs of the second layer.
 	math::PathSample sampleVal;
-	math::EvalValue otherVal;
+	math::BidirSampleValue otherVal;
 	float scaleS, scaleE;
 	if(rndSet.i0 < probLayerA) {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, 0, probLayerA-1);
@@ -43,14 +43,14 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 		if(sampleVal.pdfF.is_zero()) return sampleVal; // Discard
 		otherVal = evaluate(params.b, incidentTS, sampleVal.excident, boundary);
 		scaleS = float(sampleVal.pdfF) * params.factorA;
-		scaleE = otherVal.cosOut * params.factorB;
+		scaleE = ei::abs(sampleVal.excident.z) * params.factorB;
 	} else {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, probLayerA, std::numeric_limits<u64>::max());
 		sampleVal = sample(params.b, incidentTS, boundary, rndSet, adjoint);
 		if(sampleVal.pdfF.is_zero()) return sampleVal; // Discard
 		otherVal = evaluate(params.a, incidentTS, sampleVal.excident, boundary);
 		scaleS = float(sampleVal.pdfF) * params.factorB;
-		scaleE = otherVal.cosOut * params.factorA;
+		scaleE = ei::abs(sampleVal.excident.z) * params.factorA;
 		p = 1.0f - p;
 	}
 
@@ -65,10 +65,10 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 
 // The evaluation routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::EvalValue evaluate(const MatSampleBlend<LayerASample, LayerBSample>& params,
-									   const Direction& incidentTS,
-									   const Direction& excidentTS,
-									   Boundary& boundary) {
+CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlend<LayerASample, LayerBSample>& params,
+											  const Direction& incidentTS,
+											  const Direction& excidentTS,
+											  Boundary& boundary) {
 	// Evaluate both sub-layers
 	auto valA = evaluate(params.a, incidentTS, excidentTS, boundary);
 	auto valB = evaluate(params.b, incidentTS, excidentTS, boundary);
@@ -91,16 +91,15 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleBlend<LayerASample, LayerBSample>& 
 }
 
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::EvalValue emission(const MatSampleBlend<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
+CUDA_FUNCTION math::SampleValue emission(const MatSampleBlend<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	// Evaluate both sub-layers
 	auto valA = emission(params.a, geoN, excident);
 	auto valB = emission(params.b, geoN, excident);
 	// Assume that at most one layer is emissive
-	mAssert(valA.pdfF.is_zero() || valB.pdfB.is_zero());
+	mAssert(valA.pdf.is_zero() || valB.pdf.is_zero());
 	// TODO: blending and (blended) sampling of emissive models (independent of the other reflection properties)
 	valA.value = valA.value * params.factorA + valB.value * params.factorB;
-	valA.pdfF += valB.pdfF;
-	mAssert(valA.pdfB.is_zero() && valB.pdfB.is_zero());
+	valA.pdf += valB.pdf;
 	return valA;
 }
 

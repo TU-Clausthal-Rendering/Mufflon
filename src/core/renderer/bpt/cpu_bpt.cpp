@@ -219,9 +219,9 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 
 		// Evaluate direct hit of area ligths
 		if(viewPathLen >= m_params.minPathLength) {
-			math::EvalValue emission = vertex[currentV].get_emission();
+			math::SampleValue emission = vertex[currentV].get_emission();
 			if(emission.value != 0.0f) {
-				vertex[currentV].ext().update(vertex[currentV], scene::Direction{0.0f}, AngularPdf{0.0f}, emission.pdfF);
+				vertex[currentV].ext().update(vertex[currentV], scene::Direction{0.0f}, AngularPdf{0.0f}, emission.pdf);
 				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
 											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
 											scene::lights::guide_flux);
