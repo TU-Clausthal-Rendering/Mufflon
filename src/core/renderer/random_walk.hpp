@@ -83,7 +83,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Go to the next intersection
 	ei::Ray ray {outSample.origin, outSample.excident};
 	scene::accel_struct::RayIntersectionResult nextHit =
-		scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
+		scene::accel_struct::first_intersection(scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
 
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[outSample.medium];

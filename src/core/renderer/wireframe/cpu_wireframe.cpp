@@ -47,7 +47,7 @@ void CpuWireframe::sample(const Pixel coord) {
 
 	while(true) {
 		scene::accel_struct::RayIntersectionResult nextHit =
-			scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(m_sceneDesc, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
+			scene::accel_struct::first_intersection(m_sceneDesc, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
 			auto background = evaluate_background(m_sceneDesc.lightTree.background, ray.direction);
 			if(any(greater(background.value, 0.0f))) {

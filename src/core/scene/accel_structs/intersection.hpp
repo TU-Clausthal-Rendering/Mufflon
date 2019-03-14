@@ -9,9 +9,7 @@
 
 // TODO: use u32 for primiIds.
 
-namespace mufflon {
-namespace scene {
-namespace accel_struct {
+namespace mufflon { namespace scene { namespace accel_struct {
 
 // The surface coordinates of the hitpoint, depending on primitive type
 union SurfaceParametrization {
@@ -39,24 +37,22 @@ struct RayInfo {
 	float tmax;
 };
 
-template < Device dev >
+template < Device dev = CURRENT_DEV >
 __host__ __device__
-bool any_intersection_scene_lbvh(
+bool any_intersection(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
 	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
-template < Device dev >
+template < Device dev = CURRENT_DEV >
 __host__ __device__
-RayIntersectionResult first_intersection_scene_lbvh(
+RayIntersectionResult first_intersection(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
 	const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
-}
-}
-}
+}}} // namespace mufflon::scene::accel_struct

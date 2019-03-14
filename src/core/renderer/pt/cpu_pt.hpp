@@ -30,8 +30,6 @@ public:
 	void on_reset() final;
 
 private:
-	// Create one sample path (actual PT algorithm)
-	void sample(const Pixel coord);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 

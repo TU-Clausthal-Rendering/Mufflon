@@ -119,7 +119,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	// cheaper than the any-hit test).
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
 		// Shadow test
-		if(!scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
+		if(!scene::accel_struct::any_intersection(
 				scene, { connection.v0, connection.dir },
 				path0.get_primitive_id(), connection.distance)) {
 			auto ext0Copy = path0.ext();
