@@ -1,0 +1,484 @@
+#pragma once
+
+#include "importance_decimater.hpp"
+#include "util/punning.hpp"
+
+namespace mufflon::scene::decimation {
+
+namespace {
+
+template < class T >
+inline void atomic_add(std::atomic<T>& atom, const T& val) {
+	float expected = atom.load();
+	float desired;
+	do {
+		desired = expected + val;
+	} while(!atom.compare_exchange_weak(expected, desired));
+}
+
+inline float compute_area(const geometry::PolygonMeshType& mesh, const OpenMesh::VertexHandle vertex) {
+	// Important: only works for triangles!
+	float area = 0.f;
+	const auto center = mesh.point(vertex);
+	auto circIter = mesh.cvv_ccwbegin(vertex);
+	OpenMesh::Vec3f a = mesh.point(*circIter);
+	OpenMesh::Vec3f b;
+	++circIter;
+	for(; circIter.is_valid(); ++circIter) {
+		b = a;
+		a = mesh.point(*circIter);
+		area += ((a - center) % (b - center)).length();
+	}
+	return 0.5f * area;
+}
+
+} // namespace
+
+ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated) :
+	m_original(original),
+	m_decimated(decimated),
+	m_originalPoly(m_original.template get_geometry<geometry::Polygons>()),
+	m_decimatedPoly(m_decimated.template get_geometry<geometry::Polygons>()),
+	m_originalMesh(m_originalPoly.get_mesh()),
+	m_decimatedMesh(m_decimatedPoly.get_mesh()),
+	m_importance(std::make_unique<std::atomic<float>[]>(m_originalPoly.get_vertex_count()))
+{
+	// Add necessary properties
+	m_decimatedMesh.add_property(m_originalVertex);
+	m_decimatedMesh.add_property(m_importanceDensity);
+	m_originalMesh.add_property(m_collapsedTo);
+	m_originalMesh.add_property(m_collapsed);
+}
+
+ImportanceDecimater::~ImportanceDecimater() {
+	// TODO: remove properties
+}
+
+void ImportanceDecimater::update(const float threshold) {
+	// First we update our statistics: the importance density of each vertex
+	// TODO: I think we don't actually compute the correct density
+
+	double importanceSum = 0.0;
+	for(const auto vertex : m_decimatedMesh.vertices()) {
+		const auto oh = get_original_vertex_handle(vertex);
+		const float importance = m_importance[oh.idx()].load();
+		mAssert(!isnan(importance));
+		importanceSum += importance;
+
+		// Important: only works for triangles!
+		const float area = compute_area(m_decimatedMesh, vertex);
+
+		mAssertMsg(area != 0.f, "Degenerated vertex");
+		m_decimatedMesh.property(m_importanceDensity, vertex) = importance / area;
+	}
+
+	// First we decimate...
+	this->collapse(threshold);
+	// ....then we undecimate (although the order shouldn't play a role)
+	this->uncollapse(threshold);
+
+	// TODO: call garbage collection, rebuild index buffer!
+}
+
+void ImportanceDecimater::collapse(const float threshold) {
+#if 0
+	std::vector<typename Mesh::VertexHandle> support(15u);
+	std::size_t currCollapses = 0u;
+
+	// initialize heap
+	m_collapses.clear();
+	m_collapses.reserve(m_decimatedMesh.n_vertices());
+
+	for(auto vertex : m_decimatedMesh.vertices()) {
+		// Check if the collapse is legal
+		if(!m_decimatedMesh.status(vertex).deleted()) {
+
+		}
+			this->heap_vertex(vertex);
+	}
+
+	const bool updateNormals = m_mesh.has_face_normals();
+
+	// process heap
+	while((!m_heap->empty()) && (currCollapses < desiredCollapses)) {
+		// get 1st heap entry
+		const auto vp = m_heap->front();
+		const auto v0v1 = m_mesh.property(m_collapseTarget, vp);
+		m_heap->pop_front();
+
+		// Check if the collapse has been invalidated
+		if(!v0v1.is_valid())
+			continue;
+
+		// setup collapse info
+		CollapseInfo ci(m_mesh, v0v1);
+
+		// check topological correctness AGAIN !
+		if(!this->is_collapse_legal(ci))
+			continue;
+
+		// store support (= one ring of *vp)
+		support.clear();
+		for(auto vvIter = m_mesh.vv_iter(ci.v0); vvIter.is_valid(); ++vvIter)
+			support.push_back(*vvIter);
+
+		// pre-processing
+		this->preprocess_collapse(ci);
+
+		// perform collapse
+		m_mesh.collapse(v0v1);
+		++currCollapses;
+
+		if(updateNormals) {
+			// update triangle normals
+			for(auto vfIter = m_mesh.vf_iter(ci.v1); vfIter.is_valid(); ++vfIter) {
+				if(!m_mesh.status(*vfIter).deleted())
+					m_mesh.set_normal(*vfIter, m_mesh.calc_face_normal(*vfIter));
+			}
+		}
+
+		// post-process collapse
+		this->postprocess_collapse(ci);
+
+		// update heap (former one ring of decimated vertex)
+		for(auto supportVertex : support) {
+			mAssert(!m_mesh.status(supportVertex).deleted());
+			this->heap_vertex(supportVertex);
+		}
+
+		// Effectively remove the vertex we collapsed to (since we only want vertices to move by one collapse per decimation call)
+		m_mesh.property(m_collapseTarget, ci.v1).invalidate();
+
+		// notify observer and stop if the observer requests it
+		if(!this->notify_observer(currCollapses))
+			return currCollapses;
+	}
+
+	// delete heap
+	m_heap.reset();
+
+	// DON'T do garbage collection here! It's up to the application.
+	return currCollapses;
+#endif //0
+}
+
+void ImportanceDecimater::uncollapse(const float threshold) {
+	// Cache for new importance + densities for the participating vertices
+	// Order: vl -> ... -> vr -> v1
+	static thread_local std::vector<std::pair<float, float>> newDensities;
+
+	// Go through all vertices and check those that got collapsed somewhere
+	for(const auto vertex : m_originalMesh.vertices()) {
+		// Weed out vertices that are not collapsed
+		// TODO: integrate in collapse
+		if(!m_originalMesh.property(m_collapsed, vertex))
+			continue;
+
+		// Check if the collapsed-to vertex is also collapsed
+		const auto v1 = m_originalMesh.property(m_collapsedTo, vertex);
+		if(m_originalMesh.property(m_collapsed, v1))
+			continue;
+
+		// Query the vertex handle of the collapse target in the decimated mesh
+		const auto decimatedV1 = m_originalMesh.property(m_collapsedTo, v1);
+		mAssert(decimatedV1.is_valid());
+
+		// Determine the left and right vertices from the collapse (only works for triangles!)
+		const auto v0v1 = m_originalMesh.find_halfedge(vertex, v1);
+		const auto v1v0 = m_originalMesh.opposite_halfedge_handle(v0v1);
+		auto vl = m_originalMesh.to_vertex_handle(m_originalMesh.next_halfedge_handle(v0v1));
+		auto vr = m_originalMesh.to_vertex_handle(m_originalMesh.next_halfedge_handle(v1v0));
+		// Check if the vertices got collapsed and, if yes, find the currently still existing ones
+		while(m_originalMesh.property(m_collapsed, vl))
+			vl = m_originalMesh.property(m_collapsedTo, vl);
+		while(m_originalMesh.property(m_collapsed, vr))
+			vr = m_originalMesh.property(m_collapsedTo, vr);
+		// Get the vertex handles for left-right in the decimated mesh
+		const auto decimatedVl = m_originalMesh.property(m_collapsedTo, vl);
+		const auto decimatedVr = m_originalMesh.property(m_collapsedTo, vr);
+
+		// Check if one of the three cornerstones for the collapse are fused together
+		if(decimatedVl == decimatedVr && decimatedVl == decimatedV1)
+			continue;
+
+		if(float v0Imp = compute_new_importance_densities(newDensities, vertex, decimatedV1, decimatedVl, decimatedVr, threshold); v0Imp >= 0.f) {
+			// Adjust the importance of the vertices
+			std::size_t i = 0u;
+			for(auto heh = m_decimatedMesh.find_halfedge(decimatedV1, decimatedVl); m_decimatedMesh.to_vertex_handle(heh) != vr;
+				heh = m_decimatedMesh.opposite_halfedge_handle(m_decimatedMesh.prev_halfedge_handle(heh))) {
+				const auto vb = m_decimatedMesh.to_vertex_handle(heh);
+				m_importance[get_original_vertex_handle(vb).idx()].store(newDensities[i].first);
+				m_decimatedMesh.property(m_importanceDensity, vb) = newDensities[i].second;
+				++i;
+			}
+			// VR and V1 need special treatment...
+			m_importance[vr.idx()].store(newDensities[i].first);
+			m_decimatedMesh.property(m_importanceDensity, decimatedVr) = newDensities[i].second;
+			m_importance[v1.idx()].store(newDensities.back().first);
+			m_decimatedMesh.property(m_importanceDensity, decimatedV1) = newDensities.back().second;
+
+			// Insert V0 into the decimated LoD
+			const auto point = m_originalPoly.template acquire_const<Device::CPU, ei::Vec3>(m_originalPoly.get_points_hdl())[vertex.idx()];
+			const auto normal = m_originalPoly.template acquire_const<Device::CPU, ei::Vec3>(m_originalPoly.get_normals_hdl())[vertex.idx()];
+			const auto uv = m_originalPoly.template acquire_const<Device::CPU, ei::Vec2>(m_originalPoly.get_uvs_hdl())[vertex.idx()];
+			const auto* matIndices = m_decimatedPoly.template acquire_const<Device::CPU, MaterialIndex>(m_decimatedPoly.get_material_indices_hdl());
+			const auto v0Hdl = m_decimatedPoly.add(point, normal, uv);
+			// TODO: how to retain materials?
+			const auto matIdx = matIndices[m_decimatedMesh.face_handle(m_decimatedMesh.halfedge_handle(decimatedV1)).idx()];
+			m_decimatedPoly.add(std::array<Mesh::VertexHandle, 3u>{ {v0Hdl, decimatedV1, decimatedVl} }, matIdx);
+			// TODO: instead of adding a single face, vertex_split!
+
+			// Adjust collapsed sequence
+			m_originalMesh.property(m_collapsed, vertex) = false;
+			m_originalMesh.property(m_collapsedTo, vertex) = v0Hdl;
+			m_decimatedMesh.property(m_originalVertex, v0Hdl) = vertex;
+		}
+	}
+}
+
+bool ImportanceDecimater::is_collapse_legal(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const {
+	//   std::clog << "McDecimaterT<>::is_collapse_legal()\n";
+
+	// locked ?
+	if(m_decimatedMesh.status(ci.v0).locked())
+		return false;
+
+	// this test checks:
+	// is v0v1 deleted?
+	// is v0 deleted?
+	// is v1 deleted?
+	// are both vlv0 and v1vl boundary edges?
+	// are both v0vr and vrv1 boundary edges?
+	// are vl and vr equal or both invalid?
+	// one ring intersection test
+	// edge between two boundary vertices should be a boundary edge
+	if(!m_decimatedMesh.is_collapse_ok(ci.v0v1))
+		return false;
+
+	if(ci.vl.is_valid() && ci.vr.is_valid()
+	   && m_decimatedMesh.find_halfedge(ci.vl, ci.vr).is_valid()
+	   && m_decimatedMesh.valence(ci.vl) == 3u && m_decimatedMesh.valence(ci.vr) == 3u) {
+		return false;
+	}
+	//--- feature test ---
+
+	if(m_decimatedMesh.status(ci.v0).feature()
+	   && !m_decimatedMesh.status(m_decimatedMesh.edge_handle(ci.v0v1)).feature())
+		return false;
+
+	//--- test boundary cases ---
+	if(m_decimatedMesh.is_boundary(ci.v0)) {
+
+		// don't collapse a boundary vertex to an inner one
+		if(!m_decimatedMesh.is_boundary(ci.v1))
+			return false;
+
+		// only one one ring intersection
+		if(ci.vl.is_valid() && ci.vr.is_valid())
+			return false;
+	}
+
+	// there have to be at least 2 incident faces at v0
+	if(m_decimatedMesh.cw_rotated_halfedge_handle(
+		m_decimatedMesh.cw_rotated_halfedge_handle(ci.v0v1)) == ci.v0v1)
+		return false;
+
+	// collapse passed all tests -> ok
+	return true;
+}
+
+float ImportanceDecimater::collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const {
+	float importance = m_decimatedMesh.property(m_importanceDensity, ci.v0);
+	u32 count = 0u;
+	for(auto ringVertexHandle = m_decimatedMesh.vv_iter(ci.v0); ringVertexHandle.is_valid(); ++ringVertexHandle) {
+		importance += m_decimatedMesh.property(m_importanceDensity, *ringVertexHandle);
+		++count;
+	}
+	importance /= static_cast<float>(count);
+	return importance;
+}
+
+void ImportanceDecimater::add_vertex_collapse(const Mesh::VertexHandle vh, const float threshold) {
+	float bestPriority = std::numeric_limits<float>::max();
+	typename Mesh::HalfedgeHandle collapseTarget;
+
+	// find best target in one ring
+	for(auto vohIter = m_decimatedMesh.voh_begin(vh); vohIter.is_valid(); ++vohIter) {
+		const auto heh = *vohIter;
+		CollapseInfo ci(m_decimatedMesh, heh);
+
+		if(this->is_collapse_legal(ci)) {
+			const float priority = this->collapse_priority(ci);
+			if(priority >= 0.f && priority < bestPriority) {
+				bestPriority = priority;
+				collapseTarget = heh;
+			}
+		}
+	}
+
+	if(collapseTarget.is_valid() && bestPriority < threshold) {
+		m_collapses.push_back(std::make_pair(vh, collapseTarget));
+	}
+}
+
+float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pair<float, float>>& newDensities,
+														   const Mesh::VertexHandle v0, const Mesh::VertexHandle v1,
+														   const Mesh::VertexHandle vl, const Mesh::VertexHandle vr,
+														   const float threshold) const {
+	newDensities.clear();
+	float distSqrSum = 0.f;
+	const auto v0Pos = util::pun<ei::Vec3>(m_originalMesh.point(v0));
+	const auto v1Pos = util::pun<ei::Vec3>(m_decimatedMesh.point(v1));
+	const auto vlPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vl));
+	const auto vrPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vr));
+	const auto v1vl = m_decimatedMesh.find_halfedge(v1, vl);
+
+	float v0Importance = 0.f;
+
+	for(auto heh = v1vl; m_decimatedMesh.to_vertex_handle(heh) != vr;
+		heh = m_decimatedMesh.opposite_halfedge_handle(m_decimatedMesh.prev_halfedge_handle(heh))) {
+		const auto vb = m_decimatedMesh.to_vertex_handle(heh);
+		distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vb)) - v0Pos);
+	}
+	distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vr)) - v0Pos);
+	distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(v1)) - v0Pos);
+
+	
+	// Track the current area for v1
+	float v1InnerArea = 0.f;
+	const auto v0vlv1Area = ei::len(ei::cross(vlPos - v0Pos, v1Pos - v0Pos));
+	const auto v0vrv1Area = ei::len(ei::cross(vrPos - v0Pos, v1Pos - v0Pos));
+		
+	Mesh::HalfedgeHandle leftHeh = m_decimatedMesh.next_halfedge_handle(v1vl);
+	auto middleVertex = vl;
+	auto rightVertex = m_decimatedMesh.to_vertex_handle(leftHeh);
+	auto middlePos = util::pun<ei::Vec3>(m_decimatedMesh.point(middleVertex));
+	auto rightPos = util::pun<ei::Vec3>(m_decimatedMesh.point(rightVertex));
+	float rightV0Area = ei::len(ei::cross(middlePos - v0Pos, rightPos - v0Pos));
+	float rightV1Area = ei::len(ei::cross(middlePos - v1Pos, rightPos - v1Pos));
+
+	// Interjection: check vl
+	const float vlImp = m_importance[get_original_vertex_handle(vl).idx()].load();
+	const float vlArea = vlImp / m_decimatedMesh.property(m_importanceDensity, vl);
+	const float vlImpLoss = ei::lensq(vlPos - v0Pos) / distSqrSum;
+	v0Importance += vlImpLoss;
+	const float vlNewImp = vlImp * (1.f - vlImpLoss);
+	const float vlNewDensity = vlNewImp / (vlArea - rightV1Area + rightV0Area + v0vlv1Area);
+	newDensities.push_back(std::make_pair(vlNewImp, vlNewDensity));
+	if(newDensities.back().second < threshold)
+		return -1.f;
+	v1InnerArea += rightV1Area;
+
+	// It's annoying to express the condition in the loop header, thus we break once condition is reached
+	while(rightVertex != vr) {
+		// Move over data
+		const float leftV0Area = rightV0Area;
+		const float leftV1Area = rightV1Area;
+		middleVertex = rightVertex;
+		middlePos = rightPos;
+
+		const auto rightHeh = m_decimatedMesh.next_halfedge_handle(m_decimatedMesh.opposite_halfedge_handle(m_decimatedMesh.next_halfedge_handle(leftHeh)));
+		rightVertex = m_decimatedMesh.to_vertex_handle(rightHeh);
+		rightPos = util::pun<ei::Vec3>(m_decimatedMesh.point(rightVertex));
+
+		// Compute the new triangle area
+		rightV0Area = ei::len(ei::cross(middlePos - v0Pos, rightPos - v0Pos));
+		rightV1Area = ei::len(ei::cross(middlePos - v1Pos, rightPos - v1Pos));
+		// Compare importance
+		const float middleImp = m_importance[get_original_vertex_handle(middleVertex).idx()].load();
+		const float middleArea = middleImp / m_decimatedMesh.property(m_importanceDensity, middleVertex);
+		const float middleImpLoss = ei::lensq(middlePos - v0Pos) / distSqrSum;
+		v0Importance += middleImpLoss;
+		const float middleNewImp = middleImp * (1.f - middleImpLoss);
+		const float middleNewDensity = middleNewImp / (middleArea - leftV1Area - rightV1Area + leftV0Area + rightV0Area);
+		newDensities.push_back(std::make_pair(middleNewImp, middleNewDensity));
+		if(newDensities.back().second < threshold)
+			return -1.f;
+		v1InnerArea += rightV1Area;
+	}
+
+	// Check vr
+	const float vrImp = m_importance[get_original_vertex_handle(vr).idx()].load();
+	const float vrArea = vrImp / m_decimatedMesh.property(m_importanceDensity, vr);
+	const float vrImpLoss = ei::lensq(vrPos - v0Pos) / distSqrSum;
+	v0Importance += vrImpLoss;
+	const float vrNewImp = vrImp * (1.f - vrImpLoss);
+	const float vrNewDensity = vrNewImp / (vrArea - rightV1Area + rightV0Area + v0vrv1Area);
+	newDensities.push_back(std::make_pair(vlNewImp, vlNewDensity));
+	if(newDensities.back().second < threshold)
+		return -1.f;
+
+	// Now check v1
+	const float v1Imp = m_importance[get_original_vertex_handle(v1).idx()].load();
+	const float v1Area = v1Imp / m_decimatedMesh.property(m_importanceDensity, v1);
+	const float v1ImpLoss = ei::lensq(v1Pos - v0Pos) / distSqrSum;
+	v0Importance += v1ImpLoss;
+	const float v1NewImp = v1Imp * (1.f - v1ImpLoss);
+	const float v1NewDensity = v1NewImp / (v1Area - v1InnerArea + v0vlv1Area + v0vrv1Area);
+	newDensities.push_back(std::make_pair(vlNewImp, vlNewDensity));
+	if(newDensities.back().second < threshold)
+		return -1.f;
+
+	return v0Importance;
+}
+
+float ImportanceDecimater::compute_new_importance_density(const Mesh::VertexHandle vb, const Mesh::VertexHandle vn,
+														  const ei::Vec3& v0Pos, const ei::Vec3& vcPos,
+														  const float distSqrSum) {
+	const auto vbPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vb));
+	const auto vNextPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vn));
+
+	const float distSqr = ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vb)) - v0Pos);;
+	// Compute the current shared area with v1
+	const float v1SharedArea = ei::len(ei::cross(vbPos - vcPos, vNextPos - vcPos));
+	// Compute the future shared area with v0
+	const float v0SharedArea = ei::len(ei::cross(vbPos - v0Pos, vNextPos - v0Pos));
+	// Recompute the area around the vertex from the density
+	const float importance = m_importance[get_original_vertex_handle(vb).idx()].load();
+	const float newImportance = importance * (1.f - distSqr / distSqrSum);
+	const float area = importance / m_decimatedMesh.property(m_importanceDensity, vb);
+	// Compute the new density by substituting the areas
+	const float newDensity = newImportance / (area - v1SharedArea + v0SharedArea);
+	return newDensity;
+}
+
+void ImportanceDecimater::record_vertex_contribution(const u32 localIndex, const float importance) {
+	// Reminder: local index will refer to the decimated mesh
+	mAssert(localIndex < m_decimated.template get_geometry<geometry::Polygons>().get_vertex_count());
+
+	const auto vh = get_original_vertex_handle(m_decimatedMesh.vertex_handle(localIndex));
+	atomic_add(m_importance[vh.idx()], importance);
+}
+
+void ImportanceDecimater::record_face_contribution(const u32* vertexIndices, const u32 vertexCount,
+												   const ei::Vec3& hitpoint, const float importance) {
+	mAssert(vertexIndices != nullptr);
+
+	float distSqrSum = 0.f;
+	for(u32 v = 0u; v < vertexCount; ++v) {
+		const auto vh = m_decimatedMesh.vertex_handle(vertexIndices[v]);
+		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh.point(vh)));
+	}
+	const float distSqrSumInv = 1.f / distSqrSum;
+
+	// Now do the actual attribution
+	for(u32 v = 0u; v < vertexCount; ++v) {
+		const auto vh = m_decimatedMesh.vertex_handle(vertexIndices[v]);
+		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh.point(vh)));
+		const float weightedImportance = importance * distSqr * distSqrSumInv;
+
+		const auto oh = get_original_vertex_handle(vh);
+		atomic_add(m_importance[vh.idx()], weightedImportance);
+	}
+}
+
+// Utility only
+ImportanceDecimater::Mesh::VertexHandle ImportanceDecimater::get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const {
+	mAssert(decimatedHandle.is_valid());
+	const auto originalHandle = m_decimatedMesh.property(m_originalVertex, decimatedHandle);
+	mAssert(originalHandle.is_valid());
+	mAssert(static_cast<std::size_t>(originalHandle.idx()) < m_original.template get_geometry<geometry::Polygons>().get_vertex_count());
+	return originalHandle;
+}
+
+} // namespace mufflon::scene::decimation

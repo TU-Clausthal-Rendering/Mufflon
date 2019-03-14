@@ -112,139 +112,6 @@ u32 get_vertices_for_memory(const u32 memory) {
 	return memory / (2u * 3u * sizeof(u32) + 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2));
 }
 
-void restore_vertex(scene::geometry::PolygonMeshType& mesh, const OpenMesh::VertexHandle v0,
-					const OpenMesh::HalfedgeHandle v0v1, const OpenMesh::HalfedgeHandle v1v0) {
-
-	const OpenMesh::VertexHandle v1 = mesh.to_vertex_handle(v0v1);
-	const OpenMesh::FaceHandle fl = mesh.face_handle(v0v1);
-	const OpenMesh::FaceHandle fr = mesh.face_handle(v1v0);
-}
-
-// Taken from OpenMesh TriConnectivity
-OpenMesh::HalfedgeHandle insert_loop(scene::geometry::PolygonMeshType& mesh, OpenMesh::HalfedgeHandle hh) {
-	using namespace OpenMesh;
-	HalfedgeHandle  h0(hh);
-	HalfedgeHandle  o0(mesh.opposite_halfedge_handle(h0));
-
-	VertexHandle    v0(mesh.to_vertex_handle(o0));
-	VertexHandle    v1(mesh.to_vertex_handle(h0));
-
-	HalfedgeHandle  h1 = mesh.new_edge(v1, v0);
-	HalfedgeHandle  o1 = mesh.opposite_halfedge_handle(h1);
-
-	FaceHandle      f0 = mesh.face_handle(h0);
-	FaceHandle      f1 = mesh.new_face();
-
-	// halfedge -> halfedge
-	mesh.set_next_halfedge_handle(mesh.prev_halfedge_handle(h0), o1);
-	mesh.set_next_halfedge_handle(o1, mesh.next_halfedge_handle(h0));
-	mesh.set_next_halfedge_handle(h1, h0);
-	mesh.set_next_halfedge_handle(h0, h1);
-
-	// halfedge -> face
-	mesh.set_face_handle(o1, f0);
-	mesh.set_face_handle(h0, f1);
-	mesh.set_face_handle(h1, f1);
-
-	// face -> halfedge
-	mesh.set_halfedge_handle(f1, h0);
-	if(f0.is_valid())
-		mesh.set_halfedge_handle(f0, o1);
-
-
-	// vertex -> halfedge
-	mesh.adjust_outgoing_halfedge(v0);
-	mesh.adjust_outgoing_halfedge(v1);
-
-	return h1;
-}
-
-// Taken from OpenMesh TriConnectivity
-OpenMesh::HalfedgeHandle insert_edge(scene::geometry::PolygonMeshType& mesh, OpenMesh::VertexHandle vh,
-									 OpenMesh::HalfedgeHandle h0, OpenMesh::HalfedgeHandle h1) {
-	using namespace OpenMesh;
-	mAssert(h0.is_valid() && h1.is_valid());
-
-	VertexHandle  v0 = vh;
-	VertexHandle  v1 = mesh.to_vertex_handle(h0);
-
-	mAssert(v1 == mesh.to_vertex_handle(h1));
-
-	HalfedgeHandle v0v1 = mesh.new_edge(v0, v1);
-	HalfedgeHandle v1v0 = mesh.opposite_halfedge_handle(v0v1);
-
-
-
-	// vertex -> halfedge
-	mesh.set_halfedge_handle(v0, v0v1);
-	mesh.set_halfedge_handle(v1, v1v0);
-
-
-	// halfedge -> halfedge
-	mesh.set_next_halfedge_handle(v0v1, mesh.next_halfedge_handle(h0));
-	mesh.set_next_halfedge_handle(h0, v0v1);
-	mesh.set_next_halfedge_handle(v1v0, mesh.next_halfedge_handle(h1));
-	mesh.set_next_halfedge_handle(h1, v1v0);
-
-
-	// halfedge -> vertex
-	for(auto vih_it = mesh.vih_iter(v0); vih_it.is_valid(); ++vih_it)
-		mesh.set_vertex_handle(*vih_it, v0);
-
-
-	// halfedge -> face
-	mesh.set_face_handle(v0v1, mesh.face_handle(h0));
-	mesh.set_face_handle(v1v0, mesh.face_handle(h1));
-
-
-	// face -> halfedge
-	if(mesh.face_handle(v0v1).is_valid())
-		mesh.set_halfedge_handle(mesh.face_handle(v0v1), v0v1);
-	if(mesh.face_handle(v1v0).is_valid())
-		mesh.set_halfedge_handle(mesh.face_handle(v1v0), v1v0);
-
-
-	// vertex -> halfedge
-	mesh.adjust_outgoing_halfedge(v0);
-	mesh.adjust_outgoing_halfedge(v1);
-
-	return v0v1;
-}
-
-// Taken from OpenMesh TriConnectivity
-OpenMesh::HalfedgeHandle vertex_split(scene::geometry::PolygonMeshType& mesh, OpenMesh::VertexHandle v0,
-									  OpenMesh::VertexHandle v1, OpenMesh::VertexHandle vl,
-									  OpenMesh::VertexHandle vr) {
-	using namespace OpenMesh;
-	HalfedgeHandle v1vl, vlv1, vrv1, v0v1;
-
-	// build loop from halfedge v1->vl
-	if(vl.is_valid()) {
-		v1vl = mesh.find_halfedge(v1, vl);
-		mAssert(v1vl.is_valid());
-		vlv1 = insert_loop(mesh, v1vl);
-	}
-
-	// build loop from halfedge vr->v1
-	if(vr.is_valid()) {
-		vrv1 = mesh.find_halfedge(vr, v1);
-		mAssert(vrv1.is_valid());
-		insert_loop(mesh, vrv1);
-	}
-
-	// handle boundary cases
-	if(!vl.is_valid())
-		vlv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
-	if(!vr.is_valid())
-		vrv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
-
-
-	// split vertex v1 into edge v0v1
-	v0v1 = insert_edge(mesh, v0, vlv1, vrv1);
-	
-	return v0v1;
-}
-
 } // namespace
 
 CpuShadowSilhouettes::CpuShadowSilhouettes()
@@ -385,6 +252,23 @@ bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
 			}
 		}
 		logInfo("Finished scene reduction");
+	} else {
+		// Create copies to play around with
+		for(auto& obj : m_currentScene->get_objects()) {
+			for(scene::InstanceHandle inst : obj.second) {
+				const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
+				auto& lod = obj.first->get_lod(instanceLod);
+				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+
+				if(polygons.get_vertex_count() >= m_params.threshold) {
+					// Copy the LoD
+					const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
+					auto& newLod = obj.first->add_lod(newLodLevel, lod);
+					// Modify the scenario to use this lod instead
+					scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+				}
+			}
+		}
 	}
 	
 	return RendererBase<Device::CPU>::pre_iteration(outputBuffer);
@@ -502,11 +386,7 @@ void CpuShadowSilhouettes::undecimate(const float impVertDensThreshold) {
 							// We need to make assumptions about the topology here: for now that means triangles only
 							// TODO: add quad support
 
-							// Restore the collapsed topology
-							mesh.status(ce.collapsedTo).set_deleted(false);
-							auto heh = vertex_split(mesh, vertex, collapsedTo, mesh.to_vertex_handle(mesh.opposite_halfedge_handle(ce.vlv1)),
-													mesh.to_vertex_handle(ce.v1vr));
-							const int aewrl = 0;
+							// TODO: restore the collapsed topology
 						}
 					}
 					

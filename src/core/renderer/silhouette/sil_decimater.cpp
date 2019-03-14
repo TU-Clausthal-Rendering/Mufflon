@@ -45,51 +45,17 @@ void ImportanceModule<MeshT>::preprocess_collapse(const CollapseInfo& ci) {
 // Post-process halfedge collapse (accumulate importance)
 template < class MeshT >
 void ImportanceModule<MeshT>::postprocess_collapse(const CollapseInfo& ci) {
+	vertex_split(Base::mesh(), ci.v0, ci.v1, ci.vl, ci.vr);
 	m_importanceMap->collapse(m_meshIndex, ci);
 }
 
-OpenMesh::HalfedgeHandle vertex_split(scene::geometry::PolygonMeshType& mesh,
-									  const OpenMesh::VertexHandle v0, const OpenMesh::VertexHandle v1,
-									  const OpenMesh::VertexHandle vl, const OpenMesh::VertexHandle vr) {
-	using namespace OpenMesh;
-	HalfedgeHandle v1vl, vlv1, vrv1, v0v1;
-
-	// build loop from halfedge v1->vl
-	if(vl.is_valid()) {
-		v1vl = mesh.find_halfedge(v1, vl);
-		mAssert(v1vl.is_valid());
-		vlv1 = insert_loop(mesh, v1vl);
-	}
-
-	// build loop from halfedge vr->v1
-	if(vr.is_valid()) {
-		vrv1 = mesh.find_halfedge(vr, v1);
-		mAssert(vrv1.is_valid());
-		insert_loop(mesh, vrv1);
-	}
-
-	// handle boundary cases
-	if(!vl.is_valid())
-		vlv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
-	if(!vr.is_valid())
-		vrv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
-
-
-	// split vertex v1 into edge v0v1
-	v0v1 = insert_edge(mesh, v0, vlv1, vrv1);
-
-
-	return v0v1;
-}
-
-//-----------------------------------------------------------------------------
 OpenMesh::HalfedgeHandle insert_loop(scene::geometry::PolygonMeshType& mesh, const OpenMesh::HalfedgeHandle hh) {
 	using namespace OpenMesh;
 	HalfedgeHandle  h0(hh);
 	HalfedgeHandle  o0(mesh.opposite_halfedge_handle(h0));
 
 	VertexHandle    v0(mesh.to_vertex_handle(o0));
-	VertexHandle    v1(mesh.to_vertex_handle(h0)); 
+	VertexHandle    v1(mesh.to_vertex_handle(h0));
 
 	HalfedgeHandle  h1 = mesh.new_edge(v1, v0);
 	HalfedgeHandle  o1 = mesh.opposite_halfedge_handle(h1);
@@ -121,7 +87,6 @@ OpenMesh::HalfedgeHandle insert_loop(scene::geometry::PolygonMeshType& mesh, con
 	return h1;
 }
 
-//-----------------------------------------------------------------------------
 OpenMesh::HalfedgeHandle insert_edge(scene::geometry::PolygonMeshType& mesh, const OpenMesh::VertexHandle _vh,
 									 const OpenMesh::HalfedgeHandle _h0, const OpenMesh::HalfedgeHandle _h1) {
 	using namespace OpenMesh;
@@ -169,6 +134,40 @@ OpenMesh::HalfedgeHandle insert_edge(scene::geometry::PolygonMeshType& mesh, con
 	// vertex -> halfedge
 	mesh.adjust_outgoing_halfedge(v0);
 	mesh.adjust_outgoing_halfedge(v1);
+
+
+	return v0v1;
+}
+
+OpenMesh::HalfedgeHandle vertex_split(scene::geometry::PolygonMeshType& mesh,
+									  const OpenMesh::VertexHandle v0, const OpenMesh::VertexHandle v1,
+									  const OpenMesh::VertexHandle vl, const OpenMesh::VertexHandle vr) {
+	using namespace OpenMesh;
+	HalfedgeHandle v1vl, vlv1, vrv1, v0v1;
+
+	// build loop from halfedge v1->vl
+	if(vl.is_valid()) {
+		v1vl = mesh.find_halfedge(v1, vl);
+		mAssert(v1vl.is_valid());
+		vlv1 = insert_loop(mesh, v1vl);
+	}
+
+	// build loop from halfedge vr->v1
+	if(vr.is_valid()) {
+		vrv1 = mesh.find_halfedge(vr, v1);
+		mAssert(vrv1.is_valid());
+		insert_loop(mesh, vrv1);
+	}
+
+	// handle boundary cases
+	if(!vl.is_valid())
+		vlv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
+	if(!vr.is_valid())
+		vrv1 = mesh.prev_halfedge_handle(mesh.halfedge_handle(v1));
+
+
+	// split vertex v1 into edge v0v1
+	v0v1 = insert_edge(mesh, v0, vlv1, vrv1);
 
 
 	return v0v1;

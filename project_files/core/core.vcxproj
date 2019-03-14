@@ -33,6 +33,9 @@
     <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
+    <ClCompile Include="..\..\src\core\scene\decimation\importance_decimater.cpp" />
+    <ClCompile Include="..\..\src\core\scene\decimation\max_one_decimater.cpp" />
+    <ClCompile Include="..\..\src\core\scene\decimation\max_one_undecimater.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
@@ -213,6 +216,9 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\tangent_space.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
+    <ClInclude Include="..\..\src\core\scene\decimation\importance_decimater.hpp" />
+    <ClInclude Include="..\..\src\core\scene\decimation\max_one_decimater.hpp" />
+    <ClInclude Include="..\..\src\core\scene\decimation\max_one_undecimater.hpp" />
     <ClInclude Include="..\..\src\core\scene\descriptors.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp" />
