@@ -210,7 +210,7 @@ CUDA_FUNCTION bool intersects_primitve(
 
 		float t;
 		ei::Vec3 barycentric;
-		if(ei::intersects(ray, tri, t, barycentric) && t < hitT) {
+		if(ei::intersects(ray, tri, t, barycentric) && t < hitT && t > tmin) {
 			hitT = t;
 			surfParams.barycentric = ei::Vec2{ barycentric.x, barycentric.y };
 			hitPrimId = primId;

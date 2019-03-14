@@ -75,7 +75,7 @@ CUDA_FUNCTION math::EvalValue evaluate(const MatSampleBlend<LayerASample, LayerB
 	// Determine the probability choice probability to blend the pdfs correctly.
 	float fa = params.factorA * sum(albedo(params.a));
 	float fb = params.factorB * sum(albedo(params.b));
-	float p = fa / (fa + fb);
+	float p = fa / (fa + fb);// TODO: precompute in fetch?
 	// Blend their results
 	valA.value = valA.value * params.factorA + valB.value * params.factorB;
 	valA.pdfF = AngularPdf{ ei::lerp(float(valB.pdfF), float(valA.pdfF), p) };
@@ -91,9 +91,17 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleBlend<LayerASample, LayerBSample>& 
 }
 
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION Spectrum emission(const MatSampleBlend<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return emission(params.a, geoN, excident) * params.factorA
-		 + emission(params.b, geoN, excident) * params.factorB;
+CUDA_FUNCTION math::EvalValue emission(const MatSampleBlend<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	// Evaluate both sub-layers
+	auto valA = emission(params.a, geoN, excident);
+	auto valB = emission(params.b, geoN, excident);
+	// Assume that at most one layer is emissive
+	mAssert(valA.pdfF.is_zero() || valB.pdfB.is_zero());
+	// TODO: blending and (blended) sampling of emissive models (independent of the other reflection properties)
+	valA.value = valA.value * params.factorA + valB.value * params.factorB;
+	valA.pdfF += valB.pdfF;
+	mAssert(valA.pdfB.is_zero() && valB.pdfB.is_zero());
+	return valA;
 }
 
 template MaterialSampleConcept<MatSampleBlend<MatSampleLambert, MatSampleLambert>>;

@@ -241,6 +241,9 @@
     <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\parallel.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">

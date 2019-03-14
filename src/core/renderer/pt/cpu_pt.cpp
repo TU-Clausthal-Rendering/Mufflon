@@ -40,6 +40,7 @@ void CpuPathTracer::sample(const Pixel coord) {
 
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	PtPathVertex vertex;
+	VertexSample sample;
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
@@ -58,7 +59,9 @@ void CpuPathTracer::sample(const Pixel coord) {
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 				vertex.get_position(), m_currentScene->get_bounding_box(),
 				neeRnd, scene::lights::guide_flux);
-			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
+			Pixel outCoord;
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media, outCoord);
+			if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
@@ -78,12 +81,12 @@ void CpuPathTracer::sample(const Pixel coord) {
 		// Walk
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { m_rngs[pixel].next(), m_rngs[pixel].next() };
-		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex)) {
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex.ext().excident);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / vertex.ext().pdf);
+					float mis = 1.0f / (1.0f + background.pdfB / sample.pdfF);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -95,8 +98,8 @@ void CpuPathTracer::sample(const Pixel coord) {
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
-		if(pathLen <= m_params.maxPathLength) {
-			Spectrum emission = vertex.get_emission();
+		if(pathLen >= m_params.minPathLength) {
+			Spectrum emission = vertex.get_emission().value;
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
 												  vertex.get_surface_params(),

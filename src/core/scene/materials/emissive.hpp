@@ -37,8 +37,10 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleEmissive& params) {
 	return Spectrum{0.0f};
 }
 
-CUDA_FUNCTION Spectrum emission(const MatSampleEmissive& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return dot(geoN, excident) > 0.0f ? params.radiance : Spectrum{0.0f};
+CUDA_FUNCTION math::EvalValue emission(const MatSampleEmissive& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	float cosOut = dot(geoN, excident);
+	if(cosOut <= 0.0f) return math::EvalValue{};
+	return { params.radiance, cosOut, AngularPdf{cosOut / ei::PI}, AngularPdf{0.0f} };
 }
 
 template MaterialSampleConcept<MatSampleEmissive>;

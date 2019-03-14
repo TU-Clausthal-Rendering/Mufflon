@@ -94,8 +94,8 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION Spectrum emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return Spectrum{0.0f};
+CUDA_FUNCTION math::EvalValue emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return math::EvalValue{};
 }
 
 template MaterialSampleConcept<MatSampleTorrance>;

@@ -45,8 +45,8 @@ static_assert(sizeof(EvalValue) == 24, "Unexpected packing.");
 
 // Monte Carlo f/p value
 struct Throughput {
-	Spectrum weight;
-	float guideWeight;	// Custom heuristic to render filtering guides (normals...)
+	Spectrum weight {1.0f};
+	float guideWeight {1.0f};	// Custom heuristic to render filtering guides (normals...)
 };
 
 }} // namespace mufflon::math

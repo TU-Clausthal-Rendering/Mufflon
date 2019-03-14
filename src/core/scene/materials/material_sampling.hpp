@@ -107,7 +107,7 @@ sample(const TangentSpace& tangentSpace,
 	Direction globalDir = res.excident.x * tangentSpace.shadingTX
 						+ res.excident.y * tangentSpace.shadingTY
 						+ res.excident.z * tangentSpace.shadingN;
-	mAssert(ei::approx(len(globalDir), 1.0f));
+	mAssert(ei::approx(len(globalDir), 1.0f, 1e-4f));
 
 	// Cancel the path if shadowed shading normal (excident)
 	float eDotG = dot(globalDir, tangentSpace.geoN);
@@ -169,6 +169,7 @@ evaluate(const TangentSpace& tangentSpace,
 		dot(excident, tangentSpace.shadingTY),
 		eDotN
 	);
+	// Swap directions to guarentee symmetry between light and view path
 	if(adjoint) {
 		Direction tmp = incidentTS;
 		incidentTS = excidentTS;
@@ -192,6 +193,14 @@ evaluate(const TangentSpace& tangentSpace,
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return res;
 	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)) && !isnan(res.cosOut));
+
+	// Swap back output values if we swapped the directions before
+	if(adjoint) {
+		AngularPdf tmp = res.pdfF;
+		res.pdfF = res.pdfB;
+		res.pdfB = tmp;
+		res.cosOut = ei::abs(eDotN);
+	}
 
 	// Shading normal caused density correction.
 	if(merge) {
@@ -226,13 +235,13 @@ albedo(const ParameterPack& params) {
 /*
  * Get the self emission into some direction.
  */
-CUDA_FUNCTION Spectrum
+CUDA_FUNCTION math::EvalValue
 emission(const ParameterPack& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	material_switch(params.type,
 		return emission(*as<typename MatType::SampleType>(subParams), geoN, excident);
 	);
-	return Spectrum{0.0f};
+	return math::EvalValue{};
 }
 
 }}} // namespace mufflon::scene::materials

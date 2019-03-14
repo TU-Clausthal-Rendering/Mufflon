@@ -51,8 +51,8 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleLambert& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION Spectrum emission(const MatSampleLambert& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return Spectrum{0.0f};
+CUDA_FUNCTION math::EvalValue emission(const MatSampleLambert& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return math::EvalValue{};
 }
 
 template MaterialSampleConcept<MatSampleLambert>;
