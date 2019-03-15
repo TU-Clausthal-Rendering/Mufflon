@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sil_imp_map.hpp"
+#include "../sil_imp_map.hpp"
 #include "util/assert.hpp"
 #include "util/int_types.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"

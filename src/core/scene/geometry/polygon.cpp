@@ -392,8 +392,8 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
 }
 
-void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-						std::size_t targetVertices, bool garbageCollect) {
+std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+							   std::size_t targetVertices, bool garbageCollect) {
 	decimater.initialize();
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
@@ -404,6 +404,10 @@ void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decima
 		this->rebuild_index_buffer();
 	// Do not garbage-collect the mesh yet - only rebuild the index buffer
 
+	// Adjust vertex and face attribute sizes
+	m_vertexAttributes.resize(m_meshData->n_vertices());
+	m_faceAttributes.resize(m_meshData->n_faces());
+
 	m_vertexAttributes.mark_changed(Device::CPU);
 	if(targetVertices == 0) {
 		logInfo("Decimated polygon mesh (", actualDecimations, " decimations performed)");
@@ -412,6 +416,8 @@ void Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decima
 				" decimations performed)");
 	}
 	// TODO: this leaks mesh outside
+
+	return actualDecimations;
 }
 
 std::pair<Polygons::FaceHandle, Polygons::FaceHandle> Polygons::vertex_split(const VertexHandle v0, const VertexHandle v1,
@@ -520,7 +526,7 @@ OpenMesh::HalfedgeHandle Polygons::insert_edge(const OpenMesh::VertexHandle vh, 
 	VertexHandle  v0 = vh;
 	VertexHandle  v1 = m_meshData->to_vertex_handle(h0);
 
-	mAssert(v1 == to_vertex_handle(h1));
+	mAssert(v1 == m_meshData->to_vertex_handle(h1));
 
 	OpenMesh::HalfedgeHandle v0v1 = m_meshData->new_edge(v0, v1);
 	OpenMesh::HalfedgeHandle v1v0 = m_meshData->opposite_halfedge_handle(v0v1);

@@ -26,7 +26,7 @@ public:
 	StringView get_name() const noexcept { return "Pathtracer"; }
 	StringView get_short_name() const noexcept final { return "PT"; }
 
-	void on_descriptor_requery() final;
+	void post_descriptor_requery() final;
 
 private:
 	PtParameters m_params;

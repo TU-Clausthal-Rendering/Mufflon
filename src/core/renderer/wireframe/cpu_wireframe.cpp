@@ -17,7 +17,7 @@ CpuWireframe::CpuWireframe() {
 	// The PT does not need additional memory resources like photon maps.
 }
 
-void CpuWireframe::on_descriptor_requery() {
+void CpuWireframe::post_descriptor_requery() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 }
 

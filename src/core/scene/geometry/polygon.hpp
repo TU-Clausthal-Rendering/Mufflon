@@ -277,8 +277,8 @@ public:
 	// Creates a decimater 
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
 	// Implements decimation.
-	void decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-				  std::size_t targetVertices, bool garbageCollect);
+	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+						 std::size_t targetVertices, bool garbageCollect);
 
 	// Splits a vertex
 	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,

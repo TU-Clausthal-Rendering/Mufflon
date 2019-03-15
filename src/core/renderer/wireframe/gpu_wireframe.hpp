@@ -26,7 +26,7 @@ public:
 	StringView get_name() const noexcept final { return "Wireframe"; }
 	StringView get_short_name() const noexcept final { return "WF"; }
 
-	void on_descriptor_requery() final;
+	void post_descriptor_requery() final;
 
 private:
 	WireframeParameters m_params = {};

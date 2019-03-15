@@ -42,7 +42,8 @@ public:
 
 	// Customizable operations for each renderer to react to events
 	virtual void on_reset() {}
-	virtual void on_descriptor_requery() {}
+	virtual void pre_descriptor_requery() {}
+	virtual void post_descriptor_requery() {}
 	virtual void on_scene_load() {}
 	// Returns whether the scene was reset
 	virtual bool pre_iteration(OutputHandler& outputBuffer) = 0;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "silhouette_params.hpp"
-#include "sil_imp_map.hpp"
 #include "sil_common.hpp"
+#include "decimation/importance_decimater.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -25,34 +25,33 @@ public:
 	StringView get_name() const noexcept final { return "Shadow silhouettes"; }
 	StringView get_short_name() const noexcept final { return "SS"; }
 
-	void on_descriptor_requery() final;
+	void pre_descriptor_requery() final;
 	bool pre_iteration(OutputHandler& outputBuffer) final;
+	void post_iteration(OutputHandler& outputBuffer) final;
 	void on_scene_load() final;
 
 private:
-	// Create one sample path (actual PT algorithm)
-	void pt_sample(const Pixel coord);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
 	void importance_sample(const Pixel coord);
+	void pt_sample(const Pixel coord);
 
-	void initialize_importance_map();
 	void gather_importance();
-	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
-								 const float importance);
-	void decimate(const float impVertDensThreshold);
-	void undecimate(const float impVertDensThreshold);
 	void compute_max_importance();
 	void display_importance();
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
+	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
+								 const float importance);
 
 	u32 get_memory_requirement() const;
+
+	void initialize_decimaters();
 
 	SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	silhouette::ImportanceMap m_importanceMap;
+	std::vector<silhouette::decimation::ImportanceDecimater> m_decimaters;
 
 	// Superfluous
 	bool m_addedLods = false;

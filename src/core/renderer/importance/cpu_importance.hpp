@@ -26,7 +26,7 @@ public:
 	StringView get_name() const noexcept final { return "Importance decimation"; }
 	StringView get_short_name() const noexcept final { return "ImpD"; }
 
-	void on_descriptor_requery() final;
+	void post_descriptor_requery() final;
 	void on_scene_load() final;
 
 private:

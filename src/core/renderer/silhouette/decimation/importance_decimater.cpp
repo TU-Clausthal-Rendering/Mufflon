@@ -2,8 +2,13 @@
 
 #include "importance_decimater.hpp"
 #include "util/punning.hpp"
+#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
-namespace mufflon::scene::decimation {
+namespace mufflon::renderer::silhouette::decimation {
+
+using namespace scene;
+using namespace scene::geometry;
 
 namespace {
 
@@ -16,7 +21,7 @@ inline void atomic_add(std::atomic<T>& atom, const T& val) {
 	} while(!atom.compare_exchange_weak(expected, desired));
 }
 
-inline float compute_area(const geometry::PolygonMeshType& mesh, const OpenMesh::VertexHandle vertex) {
+inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHandle vertex) {
 	// Important: only works for triangles!
 	float area = 0.f;
 	const auto center = mesh.point(vertex);
@@ -34,11 +39,12 @@ inline float compute_area(const geometry::PolygonMeshType& mesh, const OpenMesh:
 
 } // namespace
 
-ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated) :
+ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
+										 const std::size_t initialCollapses) :
 	m_original(original),
 	m_decimated(decimated),
-	m_originalPoly(m_original.template get_geometry<geometry::Polygons>()),
-	m_decimatedPoly(m_decimated.template get_geometry<geometry::Polygons>()),
+	m_originalPoly(m_original.template get_geometry<Polygons>()),
+	m_decimatedPoly(m_decimated.template get_geometry<Polygons>()),
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(m_decimatedPoly.get_mesh()),
 	m_importance(std::make_unique<std::atomic<float>[]>(m_originalPoly.get_vertex_count()))
@@ -48,14 +54,83 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated) :
 	m_decimatedMesh.add_property(m_importanceDensity);
 	m_originalMesh.add_property(m_collapsedTo);
 	m_originalMesh.add_property(m_collapsed);
+	m_decimatedMesh.request_vertex_status();
+	m_decimatedMesh.request_edge_status();
+	m_decimatedMesh.request_halfedge_status();
+	m_decimatedMesh.request_face_status();
+
+	// Set the original vertices for the (to be) decimated mesh
+	for(auto vertex : m_decimatedMesh.vertices())
+		m_decimatedMesh.property(m_originalVertex, vertex) = vertex;
+
+	// Perform initial decimation
+	if(initialCollapses > 0u) {
+		auto decimater = m_decimatedPoly.create_decimater();
+		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+		DecimationTrackerModule<>::Handle trackerHandle;
+		decimater.add(modQuadricHandle);
+		decimater.add(trackerHandle);
+		decimater.module(trackerHandle).set_properties(m_originalMesh, m_originalVertex, m_collapsedTo, m_collapsed);
+		// Possibly repeat until we reached the desired count
+		const std::size_t targetCollapses = std::min(initialCollapses, m_originalPoly.get_vertex_count());
+		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
+		std::size_t performedCollapses = 0u;
+		do {
+			performedCollapses += m_decimatedPoly.decimate(decimater, targetVertexCount, false);
+		} while(performedCollapses < targetCollapses);
+		m_decimatedPoly.garbage_collect();
+
+		logPedantic("Initial mesh decimation (", m_decimatedPoly.get_vertex_count(), "/", m_originalPoly.get_vertex_count(), ")");
+	}
+
+	// Initialize importance map
+	for(std::size_t i = 0u; i < m_originalPoly.get_vertex_count(); ++i)
+		m_importance[i].store(0.f);
+}
+
+ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
+	m_original(dec.m_original),
+	m_decimated(dec.m_decimated),
+	m_originalPoly(dec.m_originalPoly),
+	m_decimatedPoly(dec.m_decimatedPoly),
+	m_originalMesh(dec.m_originalMesh),
+	m_decimatedMesh(dec.m_decimatedMesh),
+	m_importance(std::move(dec.m_importance)),
+	m_originalVertex(dec.m_originalVertex),
+	m_importanceDensity(dec.m_importanceDensity),
+	m_collapsedTo(dec.m_collapsedTo),
+	m_collapsed(dec.m_collapsed),
+	m_heap(std::move(dec.m_heap)),
+	m_collapseTarget(dec.m_collapseTarget),
+	m_priority(dec.m_priority),
+	m_heapPosition(dec.m_heapPosition)
+{
+	// Request the status again since it will get removed once in the destructor
+	m_decimatedMesh.request_vertex_status();
+	m_decimatedMesh.request_edge_status();
+	m_decimatedMesh.request_halfedge_status();
+	m_decimatedMesh.request_face_status();
+	// Invalidate the handles here so we know not to remove them in the destructor
+	dec.m_originalVertex.invalidate();
+	dec.m_importanceDensity.invalidate();
+	dec.m_collapsedTo.invalidate();
+	dec.m_collapsed.invalidate();
+	dec.m_collapseTarget.invalidate();
+	dec.m_priority.invalidate();
+	dec.m_heapPosition.invalidate();
 }
 
 ImportanceDecimater::~ImportanceDecimater() {
 	// TODO: remove properties
+
+	m_decimatedMesh.release_vertex_status();
+	m_decimatedMesh.release_edge_status();
+	m_decimatedMesh.release_halfedge_status();
+	m_decimatedMesh.release_face_status();
 }
 
-void ImportanceDecimater::update(const float threshold) {
-	// First we update our statistics: the importance density of each vertex
+void ImportanceDecimater::udpate_importance_density() {
+	// Update our statistics: the importance density of each vertex
 	// TODO: I think we don't actually compute the correct density
 
 	double importanceSum = 0.0;
@@ -71,14 +146,18 @@ void ImportanceDecimater::update(const float threshold) {
 		mAssertMsg(area != 0.f, "Degenerated vertex");
 		m_decimatedMesh.property(m_importanceDensity, vertex) = importance / area;
 	}
+}
 
+void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float threshold) {
 	// First we decimate...
-	this->collapse(threshold);
+	std::size_t collapses = 0u;
+	if(m_decimatedMesh.n_vertices() > minVertexCount) {
+		collapses = this->collapse(threshold);
+	}
 	// ....then we undecimate (although the order shouldn't play a role)
-	this->uncollapse(threshold);
-
-	// TODO: call garbage collection, rebuild index buffer!
-
+	const std::size_t uncollapses = this->uncollapse(threshold);
+	logPedantic("Performed ", collapses, " collapses, ", uncollapses, " uncollapses");
+	logPedantic("Remaining vertices: ", m_decimatedMesh.n_vertices());
 }
 
 std::size_t ImportanceDecimater::collapse(const float threshold) {
@@ -126,9 +205,11 @@ std::size_t ImportanceDecimater::collapse(const float threshold) {
 		m_decimatedMesh.collapse(v0v1);
 		++currCollapses;
 
+		// TODO: track collapse properties
+
 		// update heap (former one ring of decimated vertex)
 		for(auto supportVertex : support) {
-			mAssert(!m_mesh.status(supportVertex).deleted());
+			mAssert(!m_decimatedMesh.status(supportVertex).deleted());
 			this->add_vertex_collapse(supportVertex, threshold);
 		}
 
@@ -139,7 +220,13 @@ std::size_t ImportanceDecimater::collapse(const float threshold) {
 	// delete heap
 	m_heap.reset();
 
-	// DON'T do garbage collection here! It's up to the application.
+	// Rebuild the index buffer and perform garbage collection
+	m_decimatedMesh.remove_property(m_collapseTarget);
+	m_decimatedMesh.remove_property(m_priority);
+	m_decimatedMesh.remove_property(m_heapPosition);
+	m_decimatedPoly.garbage_collect();
+	m_decimated.clear_accel_structure();
+
 	return currCollapses;
 }
 
@@ -149,6 +236,7 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 	static thread_local std::vector<std::pair<float, float>> newDensities;
 
 	std::size_t uncollapses = 0u;
+	// TODO: buggy somehow
 
 	// Go through all vertices and check those that got collapsed somewhere
 	for(const auto vertex : m_originalMesh.vertices()) {
@@ -168,6 +256,7 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 
 		// Determine the left and right vertices from the collapse (only works for triangles!)
 		const auto v0v1 = m_originalMesh.find_halfedge(vertex, v1);
+		mAssert(v0v1.is_valid());
 		const auto v1v0 = m_originalMesh.opposite_halfedge_handle(v0v1);
 		auto vl = m_originalMesh.to_vertex_handle(m_originalMesh.next_halfedge_handle(v0v1));
 		auto vr = m_originalMesh.to_vertex_handle(m_originalMesh.next_halfedge_handle(v1v0));
@@ -179,6 +268,8 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 		// Get the vertex handles for left-right in the decimated mesh
 		const auto decimatedVl = m_originalMesh.property(m_collapsedTo, vl);
 		const auto decimatedVr = m_originalMesh.property(m_collapsedTo, vr);
+		mAssert(decimatedVl.is_valid());
+		mAssert(decimatedVr.is_valid());
 
 		// Check if one of the three cornerstones for the collapse are fused together
 		if(decimatedVl == decimatedVr && decimatedVl == decimatedV1)
@@ -230,6 +321,9 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 
 bool ImportanceDecimater::is_collapse_legal(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const {
 	// locked ?
+	mAssert(static_cast<std::size_t>(ci.v0.idx()) < m_decimatedMesh.n_vertices());
+	mAssert(static_cast<std::size_t>(ci.v1.idx()) < m_decimatedMesh.n_vertices());
+
 	if(m_decimatedMesh.status(ci.v0).locked())
 		return false;
 
@@ -429,7 +523,7 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 
 void ImportanceDecimater::record_vertex_contribution(const u32 localIndex, const float importance) {
 	// Reminder: local index will refer to the decimated mesh
-	mAssert(localIndex < m_decimated.template get_geometry<geometry::Polygons>().get_vertex_count());
+	mAssert(localIndex < m_decimatedPoly.get_vertex_count());
 
 	const auto vh = get_original_vertex_handle(m_decimatedMesh.vertex_handle(localIndex));
 	atomic_add(m_importance[vh.idx()], importance);
@@ -460,10 +554,92 @@ void ImportanceDecimater::record_face_contribution(const u32* vertexIndices, con
 // Utility only
 ImportanceDecimater::Mesh::VertexHandle ImportanceDecimater::get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const {
 	mAssert(decimatedHandle.is_valid());
+	mAssert(static_cast<std::size_t>(decimatedHandle.idx()) < m_decimatedMesh.n_vertices());
 	const auto originalHandle = m_decimatedMesh.property(m_originalVertex, decimatedHandle);
 	mAssert(originalHandle.is_valid());
-	mAssert(static_cast<std::size_t>(originalHandle.idx()) < m_original.template get_geometry<geometry::Polygons>().get_vertex_count());
+	mAssert(static_cast<std::size_t>(originalHandle.idx()) < m_originalPoly.get_vertex_count());
 	return originalHandle;
 }
 
-} // namespace mufflon::scene::decimation
+float ImportanceDecimater::get_max_importance() const {
+	float maxImp = 0.f;
+	for(auto vertex : m_decimatedMesh.vertices())
+		maxImp = std::max(maxImp, m_importance[get_original_vertex_handle(vertex).idx()].load());
+	return maxImp;
+}
+
+float ImportanceDecimater::get_max_importance_density() const {
+	float maxImpDensity = 0.f;
+	for(auto vertex : m_decimatedMesh.vertices())
+		maxImpDensity = std::max(maxImpDensity, m_decimatedMesh.property(m_importanceDensity, vertex));
+	return maxImpDensity;
+}
+
+float ImportanceDecimater::get_importance(const u32 localFaceIndex, const ei::Vec3& hitpoint) const {
+	const auto faceHandle = m_decimatedMesh.face_handle(localFaceIndex);
+
+	float importance = 0.f;
+	float distSqrSum = 0.f;
+	for(auto circIter = m_decimatedMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter)
+		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)));
+
+	for(auto circIter = m_decimatedMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
+		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)));
+		importance += m_importance[get_original_vertex_handle(*circIter).idx()].load() * distSqr / distSqrSum;
+	}
+
+	return importance;
+}
+
+float ImportanceDecimater::get_importance_density(const u32 localFaceIndex, const ei::Vec3& hitpoint) const {
+	const auto faceHandle = m_decimatedMesh.face_handle(localFaceIndex);
+
+	float importance = 0.f;
+	float distSqrSum = 0.f;
+	for(auto circIter = m_decimatedMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter)
+		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)));
+
+	for(auto circIter = m_decimatedMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
+		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)));
+		importance += m_decimatedMesh.property(m_importanceDensity, *circIter) * distSqr / distSqrSum;
+	}
+
+	return importance;
+}
+
+std::size_t ImportanceDecimater::get_original_vertex_count() const noexcept {
+	return m_originalMesh.n_vertices();
+}
+
+std::size_t ImportanceDecimater::get_decimated_vertex_count() const noexcept {
+	return m_decimatedMesh.n_vertices();
+}
+
+template < class MeshT >
+DecimationTrackerModule<MeshT>::DecimationTrackerModule(MeshT& mesh) :
+	Base(mesh, true) {}
+
+template < class MeshT >
+void DecimationTrackerModule<MeshT>::set_properties(MeshT& originalMesh, OpenMesh::VPropHandleT<typename MeshT::VertexHandle> originalVertex,
+													OpenMesh::VPropHandleT<typename MeshT::VertexHandle> collapsedTo,
+													OpenMesh::VPropHandleT<bool> collapsed) {
+	m_originalMesh = &originalMesh;
+	m_originalVertex = originalVertex;
+	m_collapsedTo = collapsedTo;
+	m_collapsed = collapsed;
+}
+
+template < class MeshT >
+float DecimationTrackerModule<MeshT>::collapse_priority(const CollapseInfo& ci) {
+	return Base::LEGAL_COLLAPSE;
+}
+
+template < class MeshT >
+void DecimationTrackerModule<MeshT>::postprocess_collapse(const CollapseInfo& ci) {
+	// Track the properties
+	// This should work because the indices should still be the same as in the original mesh
+	m_originalMesh->property(m_collapsed, ci.v0) = true;
+	m_originalMesh->property(m_collapsedTo, ci.v0) = ci.v1;
+}
+
+} // namespace mufflon::renderer::silhouette::decimation

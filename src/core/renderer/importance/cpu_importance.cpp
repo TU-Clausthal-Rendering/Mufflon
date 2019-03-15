@@ -38,7 +38,7 @@ void CpuImportanceDecimater::on_scene_load() {
 	m_importanceMap.clear();
 }
 
-void CpuImportanceDecimater::on_descriptor_requery() {
+void CpuImportanceDecimater::post_descriptor_requery() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 
 	if(m_sceneDesc.numInstances != m_sceneDesc.numLods)

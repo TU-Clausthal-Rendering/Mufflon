@@ -125,8 +125,8 @@
     <Filter Include="Source Files\core\renderer\importance">
       <UniqueIdentifier>{d181a66b-62b9-4969-b20c-4ff066c4c62f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\core\scene\decimation">
-      <UniqueIdentifier>{8f09c628-d05a-4eeb-a6d8-fc01c0c723dc}</UniqueIdentifier>
+    <Filter Include="Source Files\core\renderer\silhouette\decimation">
+      <UniqueIdentifier>{2aa840cd-77a6-4cc7-a3e8-6b915e6ba211}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -259,23 +259,17 @@
     <ClCompile Include="..\..\src\core\renderer\importance\importance_map.cpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\silhouette\sil_decimater.cpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\silhouette\sil_imp_map.cpp">
       <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\importance\imp_decimater.cpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\decimation\max_one_decimater.cpp">
-      <Filter>Source Files\core\scene\decimation</Filter>
+    <ClCompile Include="..\..\src\core\renderer\silhouette\decimation\importance_decimater.cpp">
+      <Filter>Source Files\core\renderer\silhouette\decimation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\decimation\max_one_undecimater.cpp">
-      <Filter>Source Files\core\scene\decimation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\decimation\importance_decimater.cpp">
-      <Filter>Source Files\core\scene\decimation</Filter>
+    <ClCompile Include="..\..\src\core\renderer\silhouette\decimation\sil_decimater.cpp">
+      <Filter>Source Files\core\renderer\silhouette\decimation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -903,9 +897,6 @@
     <ClInclude Include="..\..\src\core\renderer\importance\importance_map.hpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\sil_decimater.hpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\silhouette\sil_common.hpp">
       <Filter>Source Files\core\renderer\silhouette</Filter>
     </ClInclude>
@@ -918,14 +909,11 @@
     <ClInclude Include="..\..\src\core\renderer\importance\imp_decimater.hpp">
       <Filter>Source Files\core\renderer\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\decimation\max_one_decimater.hpp">
-      <Filter>Source Files\core\scene\decimation</Filter>
+    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\importance_decimater.hpp">
+      <Filter>Source Files\core\renderer\silhouette\decimation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\decimation\max_one_undecimater.hpp">
-      <Filter>Source Files\core\scene\decimation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\decimation\importance_decimater.hpp">
-      <Filter>Source Files\core\scene\decimation</Filter>
+    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\sil_decimater.hpp">
+      <Filter>Source Files\core\renderer\silhouette\decimation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

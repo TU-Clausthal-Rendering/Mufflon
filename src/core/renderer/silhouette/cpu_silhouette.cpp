@@ -1,7 +1,6 @@
 #pragma once
 
 #include "cpu_silhouette.hpp"
-#include "sil_decimater.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
@@ -123,176 +122,52 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 
 void CpuShadowSilhouettes::on_scene_load() {
 	m_addedLods = false;
-	m_importanceMap.clear();
-	// Request stati once to remember which vertices we deleted
-
-	for(auto object : m_currentScene->get_objects()) {
-		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
-			if(object.first->has_lod_available(i)) {
-				object.first->get_lod(i).template get_geometry<scene::geometry::Polygons>().get_mesh().request_vertex_status();
-				object.first->get_lod(i).template get_geometry<scene::geometry::Polygons>().get_mesh().request_edge_status();
-				object.first->get_lod(i).template get_geometry<scene::geometry::Polygons>().get_mesh().request_halfedge_status();
-			}
-		}
-	}
+	m_currentDecimationIteration = 0u;
 }
 
-bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {
-	if(!m_reset) {
-		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
-			// Finalize the decimation process
-
-			logInfo("Finished importance gathering; starting decimation (target reduction of ", m_params.reduction, ")");
-
-			const double averageDensity = m_importanceMap.get_importance_density_sum();
-			const double currentAvImpDenVert = averageDensity / static_cast<double>(m_importanceMap.get_not_deleted_vertex_count());
-			const u32 currentMemory = this->get_memory_requirement();
-
-			const u32 allowedVertices = get_vertices_for_memory(m_params.memoryConstraint);
-			const double threshold = 10.f;//averageDensity / static_cast<double>(allowedVertices);
-
-			logInfo("Total average importance density: ", averageDensity);
-			logInfo("Total average importance density per vertex: ", currentAvImpDenVert);
-			logInfo("Threshold: ", threshold);
-
-			this->decimate(threshold);
-			this->undecimate(threshold);
-
-			m_importanceMap.update_normalized();
-			const double postAverageDensity = m_importanceMap.get_importance_density_sum();
-			const double postAvImpDenVert = postAverageDensity / static_cast<double>(m_importanceMap.get_not_deleted_vertex_count());
-
-			logInfo("Post total average importance density: ", postAverageDensity);
-			logInfo("Post total average importance density per vertex: ", postAvImpDenVert);
-
-
-			m_currentScene->clear_accel_structure();
-			m_reset = true;
-			++m_currentDecimationIteration;
-
-		} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-			/*if(m_params.decimationEnabled)
-				this->decimate();
-			m_finishedDecimation = true;
-			m_reset = true;*/
-		}
-	} else if(m_params.isConstraintInitial) {
-		u32 memory = 0u;
-		std::vector<u32> reducible;
-
-		// TODO: this doesn't work with instancing
-		for(auto& obj : m_currentScene->get_objects()) {
-			mAssert(obj.first != nullptr);
-			mAssert(obj.second.size() != 0u);
-
-			if(obj.second.size() != 1u)
-				throw std::runtime_error("We cannot deal with instancing yet");
-
-			for(scene::InstanceHandle inst : obj.second) {
-				mAssert(inst != nullptr);
-				const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
-				mAssert(obj.first->has_lod_available(instanceLod));
-				const auto& lod = obj.first->get_lod(instanceLod);
-				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-
-				const u32 lodMemory = static_cast<u32>(polygons.get_triangle_count() * 3u * sizeof(u32)
-					+ polygons.get_quad_count() * 3u * sizeof(u32)
-					+ polygons.get_vertex_count() * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2)));
-				if(polygons.get_vertex_count() >= m_params.threshold)
-					reducible.push_back(lodMemory);
-				else
-					reducible.push_back(0u);
-				memory += lodMemory;
-			}
-		}
-
-		logInfo("Required memory for scene: ", pretty_print_size(memory), " (available: ", pretty_print_size(m_params.memoryConstraint), ")");
-
-		if(static_cast<u32>(m_params.memoryConstraint) < memory) {
-			// Compute the memory shares for each LoD
-			const float reduction = 1.f - std::min(1.f, static_cast<float>(m_params.memoryConstraint) / std::max(1.f, static_cast<float>(memory)));
-			for(auto& mem : reducible)
-				mem = static_cast<u32>(mem * reduction);
-
-			u32 index = 0u;
-			for(auto& obj : m_currentScene->get_objects()) {
-				for(scene::InstanceHandle inst : obj.second) {
-					const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
-					auto& lod = obj.first->get_lod(instanceLod);
-					const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-
-					if(polygons.get_vertex_count() >= m_params.threshold) {
-						// Figure out how many edges we need to collapse - for a manifold, every collapse removes one vertex and two triangles
-						constexpr u32 MEM_PER_COLLAPSE = 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2) + 2u * 3u * sizeof(u32);
-						const u32 collapses = static_cast<u32>(std::ceil(static_cast<float>(reducible[index]) / static_cast<float>(MEM_PER_COLLAPSE)));
-
-						// Copy the LoD and decimate it!
-						const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-						auto& newLod = obj.first->add_lod(newLodLevel, lod);
-						auto& newPolygons = newLod.template get_geometry<scene::geometry::Polygons>();
-						newPolygons.get_mesh().request_vertex_status();
-						auto decimater = newPolygons.create_decimater();
-						OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-						decimater.add(modQuadricHandle);
-
-						logInfo("Reducing LoD ", instanceLod, " of object '", obj.first->get_name(), "', instance '",
-								inst->get_name(), "' by ", pretty_print_size(reducible[index]), "/", collapses, " vertices");
-
-						u32 performedCollapses;
-						do {
-							newPolygons.decimate(decimater, polygons.get_vertex_count() - collapses, true);
-							performedCollapses = static_cast<u32>(polygons.get_vertex_count() - newPolygons.get_vertex_count());
-						} while(performedCollapses < collapses);
-
-						// Modify the scenario to use this lod instead
-						scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
-					}
-					++index;
-				}
-			}
-		}
-		logInfo("Finished scene reduction");
-	} else {
-		// Create copies to play around with
-		for(auto& obj : m_currentScene->get_objects()) {
-			for(scene::InstanceHandle inst : obj.second) {
-				const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
-				auto& lod = obj.first->get_lod(instanceLod);
-				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-
-				if(polygons.get_vertex_count() >= m_params.threshold) {
-					// Copy the LoD
-					const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-					auto& newLod = obj.first->add_lod(newLodLevel, lod);
-					// Modify the scenario to use this lod instead
-					scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
-				}
-			}
-		}
-	}
-	
+bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {	
 	return RendererBase<Device::CPU>::pre_iteration(outputBuffer);
 }
 
-void CpuShadowSilhouettes::on_descriptor_requery() {
+void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
+	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
+		// Finalize the decimation process
+		logInfo("Finished decimation process");
+		++m_currentDecimationIteration;
+		m_reset = true;
+		// TODO
+	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
+		// TODO: compute threshold!
+		constexpr float threshold = 10.f;
+
+		logInfo("Performing decimation/undecimation iteration");
+		for(auto& decimater : m_decimaters) {
+			decimater.iterate(static_cast<std::size_t>(m_params.threshold), threshold);
+		}
+
+		m_currentScene->clear_accel_structure();
+		m_reset = true;
+	}
+	RendererBase<Device::CPU>::post_iteration(outputBuffer);
+}
+
+void CpuShadowSilhouettes::pre_descriptor_requery() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 
-	if(m_sceneDesc.numInstances != m_sceneDesc.numLods)
-		throw std::runtime_error("We do not support instancing yet");
-
-	// Initialize the importance map
+	// Initialize the decimaters
 	// TODO: how to deal with instancing
-	initialize_importance_map();
-	// TODO
-	//m_currentDecimationIteration = 0u;
+	if(m_currentDecimationIteration == 0u)
+		this->initialize_decimaters();
 }
 
 void CpuShadowSilhouettes::iterate() {
-	// TODO: incorporate decimation/undecimation loop!
-
 	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
 		gather_importance();
+
+		// We need to update the importance density
+		for(auto& decimater : m_decimaters)
+			decimater.udpate_importance_density();
 
 		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
 			compute_max_importance();
@@ -318,103 +193,6 @@ void CpuShadowSilhouettes::gather_importance() {
 		this->importance_sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
 	}
 	// TODO: allow for this with proper reset "events"
-	m_importanceMap.update_normalized();
-}
-
-void CpuShadowSilhouettes::decimate(const float impVertDensThreshold) {
-	u32 meshIndex = 0u;
-	for(auto object : m_currentScene->get_objects()) {
-		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
-			if(object.first->has_lod_available(i)) {
-				auto& lod = object.first->get_lod(i);
-				auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-				const u32 vertexCount = static_cast<u32>(polygons.get_vertex_count());
-
-				if(static_cast<int>(vertexCount) >= m_params.threshold) {
-					// TODO: decimate with given bounds! (importance density threshold or memory constraint)
-
-
-					// Create decimater and attach modules
-					auto& mesh = polygons.get_mesh();
-					auto decimater = polygons.create_decimater();
-
-					ImportanceModule<>::Handle impModHdl;
-					decimater.add(impModHdl);
-					decimater.module(impModHdl).set_importance_map(m_importanceMap, meshIndex, impVertDensThreshold);
-					/*MaxNormalDeviation<>::Handle normModHdl;
-					decimater.add(normModHdl);
-					decimater.module(normModHdl).set_max_deviation(60.0);*/
-					polygons.decimate(decimater, vertexCount - 1u, false);
-
-					//polygons.garbage_collect();
-					lod.clear_accel_structure();
-				}
-				++meshIndex;
-			}
-		}
-	}
-}
-
-void CpuShadowSilhouettes::undecimate(const float impVertDensThreshold) {
-	u32 meshIndex = 0u;
-	for(auto object : m_currentScene->get_objects()) {
-		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
-			if(object.first->has_lod_available(i)) {
-				auto& lod = object.first->get_lod(i);
-				auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-				const u32 vertexCount = static_cast<u32>(polygons.get_vertex_count());
-
-				if(static_cast<int>(vertexCount) >= m_params.threshold) {
-					auto& mesh = polygons.get_mesh();
-
-					// First create a queue for all vertices which could be undecimated
-					std::queue<std::pair<OpenMesh::VertexHandle, OpenMesh::VertexHandle>> vertices;
-
-					// Iterate over all deleted vertices, check if they're directly uncollapsible, and
-					// add them to the queue if the importance is high enough
-					for(auto vertex : mesh.all_vertices()) {
-						if(mesh.status(vertex).deleted()) {
-							const auto& ce = m_importanceMap.get_collapse_event(meshIndex, vertex);
-							const OpenMesh::VertexHandle collapsedTo = mesh.to_vertex_handle(ce.vlv1);
-							// Check if this is a recent collapse or only a chain of collapses
-							if(mesh.status(ce.collapsedTo).deleted()) {
-								// TODO; enqueue this or smth
-								continue;
-							}
-							mAssert(collapsedTo == ce.collapsedTo);
-
-							// We need to make assumptions about the topology here: for now that means triangles only
-							// TODO: add quad support
-
-							// TODO: restore the collapsed topology
-						}
-					}
-					
-					// Actual undecimation loop
-					/*while(!vertices.empty()) {
-						const auto& vertex = vertices.front();
-						// Check around in a ring for deleted vertices and choose 
-						
-						OpenMesh::VertexHandle best;
-						float bestImpDensity = -1.f;
-						for(auto circIter = mesh.cvv_ccwbegin(vertex); circIter != mesh.cvv_ccwend(vertex); ++circIter) {
-							if(!circIter.is_valid()) {
-								const int asd = 0;
-								// Found our deleted vertex!
-							}
-							if(mesh.status(*circIter).deleted()) {
-								const int asdf = 0;
-							}
-						}
-
-						// TODO: only remove if we're below threshold now
-						vertices.pop();
-					}*/
-				}
-				++meshIndex;
-			}
-		}
-	}
 }
 
 void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
@@ -471,8 +249,9 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 					const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
 					const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 					const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
-					m_importanceMap.record_face_contribution(hitId.instanceId, lod.polygon.vertexIndices, numVertices,
-														vertexOffset, hitId.primId, vertices[pathLen].get_position(), weightedIrradianceLuminance);
+					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																									numVertices, vertices[pathLen].get_position(),
+																									weightedIrradianceLuminance);
 				}
 			}
 		}
@@ -496,9 +275,8 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 		if(pathLen > 0 && m_params.enableEyeImportance) {
 			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
 			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertices[pathLen].get_normal(), vertices[pathLen].get_incident_direction())));
-
-			m_importanceMap.record_face_contribution(hitId.instanceId, lod.polygon.vertexIndices, numVertices,
-												vertexOffset, hitId.primId, vertices[pathLen + 1].get_position(), importance);
+			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																							numVertices, vertices[pathLen + 1].get_position(), importance);
 
 			const ei::Vec3 bxdf = vertices[pathLen].ext().bxdfPdf * (float)vertices[pathLen].ext().pdf;
 			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf))) - 1.f;
@@ -522,8 +300,8 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 			const u32 vertexOffset = hitId.primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 
 			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
-			m_importanceMap.record_face_contribution(hitId.instanceId, lod->polygon.vertexIndices, numVertices,
-												vertexOffset, hitId.primId, vertices[p].get_position(), importance);
+			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																							numVertices, vertices[p].get_position(), importance);
 
 			// TODO: store accumulated sharpness
 			// Check if it is sensible to keep shadow silhouettes intact
@@ -630,11 +408,8 @@ void CpuShadowSilhouettes::compute_max_importance() {
 
 	// Compute the maximum normalized importance for visualization
 //#pragma omp parallel for reduction(max:m_maxImportance)
-	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
-		for(u32 v = 0u; v < m_importanceMap.get_vertex_count(i); ++v) {
-			m_maxImportance = std::max(m_maxImportance, m_importanceMap.density(i, v));
-		}
-	}
+	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i)
+		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_max_importance_density());
 }
 
 void CpuShadowSilhouettes::display_importance() {
@@ -661,40 +436,8 @@ void CpuShadowSilhouettes::display_importance() {
 
 
 float CpuShadowSilhouettes::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
-	const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
-
-	float importance = 0.f;
-
-	// Compute the closest vertex
-	const u32 vertexCount = ((u32)hitId.primId < lod.polygon.numTriangles) ? 3u : 4u;
-	if(vertexCount == 3u) {
-		// Triangle
-		const u32 i0 = lod.polygon.vertexIndices[3u * hitId.primId + 0u];
-		const u32 i1 = lod.polygon.vertexIndices[3u * hitId.primId + 1u];
-		const u32 i2 = lod.polygon.vertexIndices[3u * hitId.primId + 2u];
-		const float d0 = ei::lensq(hitPoint - lod.polygon.vertices[i0]);
-		const float d1 = ei::lensq(hitPoint - lod.polygon.vertices[i1]);
-		const float d2 = ei::lensq(hitPoint - lod.polygon.vertices[i2]);
-		const float distSqrSum = d0 + d1 + d2;
-		importance = (d0 * m_importanceMap.density(hitId.instanceId, i0) + d1 * m_importanceMap.density(hitId.instanceId, i1)
-					  + d2 * m_importanceMap.density(hitId.instanceId, i2)) / distSqrSum;
-	} else {
-		mAssert(vertexCount == 4u);
-		// Quad
-		const u32 vertexOffset = 3u * static_cast<u32>(lod.polygon.numTriangles);
-		const u32 i0 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 0u];
-		const u32 i1 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 1u];
-		const u32 i2 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 2u];
-		const u32 i3 = lod.polygon.vertexIndices[vertexOffset + 4u * hitId.primId + 3u];
-		const float d0 = ei::lensq(hitPoint - lod.polygon.vertices[i0]);
-		const float d1 = ei::lensq(hitPoint - lod.polygon.vertices[i1]);
-		const float d2 = ei::lensq(hitPoint - lod.polygon.vertices[i2]);
-		const float d3 = ei::lensq(hitPoint - lod.polygon.vertices[i3]);
-		const float distSqrSum = d0 + d1 + d2 + d3;
-		importance = (d0 * m_importanceMap.density(hitId.instanceId, i0) + d1 * m_importanceMap.density(hitId.instanceId, i1)
-					  + d2 * m_importanceMap.density(hitId.instanceId, i2) + d3 * m_importanceMap.density(hitId.instanceId, i3)) / distSqrSum;
-	}
-	return importance / m_maxImportance;
+	// TODO: density or importance?
+	return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_importance_density(hitId.primId, hitPoint)/ m_maxImportance;
 }
 
 bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex,const float importance) {
@@ -749,8 +492,9 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
 				for(i32 i = 0; i < sharedVertices; ++i) {
 					// x86_64 doesn't support atomic_fetch_add for floats FeelsBadMan
-					m_importanceMap.record_vertex_contribution(vertex.ext().shadowHit.instanceId, edgeIdxFirst[i], importance);
-					m_importanceMap.record_vertex_contribution(vertex.ext().shadowHit.instanceId, edgeIdxSecond[i], importance);
+					const auto lodIdx = m_sceneDesc.lodIndices[vertex.ext().shadowHit.instanceId];
+					m_decimaters[lodIdx].record_vertex_contribution(edgeIdxFirst[i], importance);
+					m_decimaters[lodIdx].record_vertex_contribution(edgeIdxSecond[i], importance);
 				}
 				return true;
 			} else {
@@ -786,19 +530,101 @@ u32 CpuShadowSilhouettes::get_memory_requirement() const {
 	return memory;
 }
 
-void CpuShadowSilhouettes::initialize_importance_map() {
-	std::vector<scene::geometry::PolygonMeshType*> meshes;
+void CpuShadowSilhouettes::initialize_decimaters() {
+	m_decimaters.clear();
+	// Request status once to remember which vertices we deleted
 
-	for(auto object : m_currentScene->get_objects()) {
-		for(u32 i = 0u; i < object.first->get_lod_slot_count(); ++i) {
-			if(object.first->has_lod_available(i)) {
-				meshes.push_back(&object.first->get_lod(i).template get_geometry<scene::geometry::Polygons>().get_mesh());
+	// TODO: clean temporary LoDs!
+
+	if(m_params.isConstraintInitial) {
+		u32 memory = 0u;
+		std::vector<u32> reducible;
+
+		// TODO: this doesn't work with instancing
+		// TODO: find a way to make this work more elegantly with instancing
+		for(auto& obj : m_currentScene->get_objects()) {
+			mAssert(obj.first != nullptr);
+			mAssert(obj.second.size() != 0u);
+
+			if(obj.second.size() != 1u)
+				throw std::runtime_error("We cannot deal with instancing yet");
+
+			// Only care about highest-level LoD
+
+			mAssert(obj.first->has_lod_available(0u));
+			const auto& lod = obj.first->get_lod(0u);
+			const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+
+			const u32 lodMemory = static_cast<u32>(polygons.get_triangle_count() * 3u * sizeof(u32)
+												   + polygons.get_quad_count() * 3u * sizeof(u32)
+												   + polygons.get_vertex_count() * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2)));
+			if(polygons.get_vertex_count() >= m_params.threshold)
+				reducible.push_back(lodMemory);
+			else
+				reducible.push_back(0u);
+			memory += lodMemory;
+		}
+
+		logInfo("Required memory for scene: ", pretty_print_size(memory), " (available: ", pretty_print_size(m_params.memoryConstraint), ")");
+
+		if(static_cast<u32>(m_params.memoryConstraint) < memory) {
+			// Compute the memory shares for each LoD
+			const float reduction = 1.f - std::min(1.f, static_cast<float>(m_params.memoryConstraint) / std::max(1.f, static_cast<float>(memory)));
+			for(auto& mem : reducible)
+				mem = static_cast<u32>(mem * reduction);
+
+			u32 index = 0u;
+			for(auto& obj : m_currentScene->get_objects()) {
+				auto& lod = obj.first->get_lod(0u);
+				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+
+				// Copy the LoD
+				const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
+				auto& newLod = obj.first->add_lod(newLodLevel, lod);
+				std::size_t collapses = 0u;
+
+				if(polygons.get_vertex_count() >= m_params.threshold) {
+					// Figure out how many edges we need to collapse - for a manifold, every collapse removes one vertex and two triangles
+					constexpr std::size_t MEM_PER_COLLAPSE = 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2) + 2u * 3u * sizeof(u32);
+					collapses = static_cast<std::size_t>(std::ceil(static_cast<float>(reducible[index]) / static_cast<float>(MEM_PER_COLLAPSE)));
+
+					logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ",
+							pretty_print_size(reducible[index]), "/", collapses, " vertices");
+
+				}
+
+				// Initialize the decimater with a possible initial decimation
+				m_decimaters.emplace_back(lod, newLod, collapses);
+				// TODO: this reeeeally breaks instancing
+				for(scene::InstanceHandle inst : obj.second) {
+					// Modify the scenario to use this lod instead
+					scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+				}
+
+				++index;
+			}
+		}
+		logInfo("Finished scene reduction");
+	} else {
+		for(auto& obj : m_currentScene->get_objects()) {
+			if(obj.second.size() != 1u)
+				throw std::runtime_error("We cannot deal with instancing yet");
+
+			auto& lod = obj.first->get_lod(0u);
+			const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+
+			// No initial decimation
+			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
+			auto& newLod = obj.first->add_lod(newLodLevel, lod);
+			m_decimaters.emplace_back(lod, newLod, 0u);
+
+			// TODO: this reeeeally breaks instancing
+			for(scene::InstanceHandle inst : obj.second) {
+				// Modify the scenario to use this lod instead
+				scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
 			}
 		}
 	}
-	// We do it in this ugly fashion because create -> move -> destroy-old doesn't work due to how OpenMesh treats properties
-	m_importanceMap.~ImportanceMap();
-	new(&m_importanceMap) ImportanceMap(std::move(meshes));
 }
 
 void CpuShadowSilhouettes::init_rngs(int num) {
