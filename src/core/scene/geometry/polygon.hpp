@@ -279,6 +279,10 @@ public:
 	// Implements decimation.
 	void decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 				  std::size_t targetVertices, bool garbageCollect);
+
+	// Splits a vertex
+	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,
+												   const VertexHandle vl, const VertexHandle vr);
 	// Garbage-collects the mesh and the index buffer
 	void garbage_collect();
 
@@ -439,6 +443,12 @@ private:
 	// Resizes the attribute buffer to hold v vertex and f face attribute pointers
 	template < Device dev >
 	void resizeAttribBuffer(std::size_t v, std::size_t f);
+
+	// Inserts loop (for vertex split)
+	OpenMesh::HalfedgeHandle insert_loop(const OpenMesh::HalfedgeHandle hh);
+	// Inserts edge (for vertex split)
+	OpenMesh::HalfedgeHandle insert_edge(const OpenMesh::VertexHandle vh, const OpenMesh::HalfedgeHandle h0,
+										 const OpenMesh::HalfedgeHandle h1);
 
 	// It's a unique pointer so we have one fixed address we can reference in OmAttributePool
 	// TODO: does that degrade performance? probably not, since attributes aren't aquired often

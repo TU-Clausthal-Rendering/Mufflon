@@ -78,32 +78,32 @@ void ImportanceDecimater::update(const float threshold) {
 	this->uncollapse(threshold);
 
 	// TODO: call garbage collection, rebuild index buffer!
+
 }
 
-void ImportanceDecimater::collapse(const float threshold) {
-#if 0
+std::size_t ImportanceDecimater::collapse(const float threshold) {
+	// Setup - we don't need these to persist
+	m_decimatedMesh.add_property(m_collapseTarget);
+	m_decimatedMesh.add_property(m_priority);
+	m_decimatedMesh.add_property(m_heapPosition);
+
 	std::vector<typename Mesh::VertexHandle> support(15u);
 	std::size_t currCollapses = 0u;
 
 	// initialize heap
-	m_collapses.clear();
-	m_collapses.reserve(m_decimatedMesh.n_vertices());
+	m_heap = std::make_unique<OpenMesh::Utils::HeapT<Mesh::VertexHandle, HeapInterface>>(HeapInterface(m_decimatedMesh, m_priority, m_heapPosition));
 
 	for(auto vertex : m_decimatedMesh.vertices()) {
-		// Check if the collapse is legal
-		if(!m_decimatedMesh.status(vertex).deleted()) {
-
-		}
-			this->heap_vertex(vertex);
+		m_heap->reset_heap_position(vertex);
+		if(!m_decimatedMesh.status(vertex).deleted())
+			this->add_vertex_collapse(vertex, threshold);
 	}
 
-	const bool updateNormals = m_mesh.has_face_normals();
-
 	// process heap
-	while((!m_heap->empty()) && (currCollapses < desiredCollapses)) {
+	while((!m_heap->empty())) {
 		// get 1st heap entry
 		const auto vp = m_heap->front();
-		const auto v0v1 = m_mesh.property(m_collapseTarget, vp);
+		const auto v0v1 = m_decimatedMesh.property(m_collapseTarget, vp);
 		m_heap->pop_front();
 
 		// Check if the collapse has been invalidated
@@ -111,7 +111,7 @@ void ImportanceDecimater::collapse(const float threshold) {
 			continue;
 
 		// setup collapse info
-		CollapseInfo ci(m_mesh, v0v1);
+		CollapseInfo ci(m_decimatedMesh, v0v1);
 
 		// check topological correctness AGAIN !
 		if(!this->is_collapse_legal(ci))
@@ -119,39 +119,21 @@ void ImportanceDecimater::collapse(const float threshold) {
 
 		// store support (= one ring of *vp)
 		support.clear();
-		for(auto vvIter = m_mesh.vv_iter(ci.v0); vvIter.is_valid(); ++vvIter)
+		for(auto vvIter = m_decimatedMesh.vv_iter(ci.v0); vvIter.is_valid(); ++vvIter)
 			support.push_back(*vvIter);
 
-		// pre-processing
-		this->preprocess_collapse(ci);
-
 		// perform collapse
-		m_mesh.collapse(v0v1);
+		m_decimatedMesh.collapse(v0v1);
 		++currCollapses;
-
-		if(updateNormals) {
-			// update triangle normals
-			for(auto vfIter = m_mesh.vf_iter(ci.v1); vfIter.is_valid(); ++vfIter) {
-				if(!m_mesh.status(*vfIter).deleted())
-					m_mesh.set_normal(*vfIter, m_mesh.calc_face_normal(*vfIter));
-			}
-		}
-
-		// post-process collapse
-		this->postprocess_collapse(ci);
 
 		// update heap (former one ring of decimated vertex)
 		for(auto supportVertex : support) {
 			mAssert(!m_mesh.status(supportVertex).deleted());
-			this->heap_vertex(supportVertex);
+			this->add_vertex_collapse(supportVertex, threshold);
 		}
 
 		// Effectively remove the vertex we collapsed to (since we only want vertices to move by one collapse per decimation call)
-		m_mesh.property(m_collapseTarget, ci.v1).invalidate();
-
-		// notify observer and stop if the observer requests it
-		if(!this->notify_observer(currCollapses))
-			return currCollapses;
+		m_decimatedMesh.property(m_collapseTarget, ci.v1).invalidate();
 	}
 
 	// delete heap
@@ -159,13 +141,14 @@ void ImportanceDecimater::collapse(const float threshold) {
 
 	// DON'T do garbage collection here! It's up to the application.
 	return currCollapses;
-#endif //0
 }
 
-void ImportanceDecimater::uncollapse(const float threshold) {
+std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 	// Cache for new importance + densities for the participating vertices
 	// Order: vl -> ... -> vr -> v1
 	static thread_local std::vector<std::pair<float, float>> newDensities;
+
+	std::size_t uncollapses = 0u;
 
 	// Go through all vertices and check those that got collapsed somewhere
 	for(const auto vertex : m_originalMesh.vertices()) {
@@ -221,24 +204,31 @@ void ImportanceDecimater::uncollapse(const float threshold) {
 			const auto point = m_originalPoly.template acquire_const<Device::CPU, ei::Vec3>(m_originalPoly.get_points_hdl())[vertex.idx()];
 			const auto normal = m_originalPoly.template acquire_const<Device::CPU, ei::Vec3>(m_originalPoly.get_normals_hdl())[vertex.idx()];
 			const auto uv = m_originalPoly.template acquire_const<Device::CPU, ei::Vec2>(m_originalPoly.get_uvs_hdl())[vertex.idx()];
-			const auto* matIndices = m_decimatedPoly.template acquire_const<Device::CPU, MaterialIndex>(m_decimatedPoly.get_material_indices_hdl());
 			const auto v0Hdl = m_decimatedPoly.add(point, normal, uv);
-			// TODO: how to retain materials?
+			// Split the vertex
+			auto faces = m_decimatedPoly.vertex_split(v0Hdl, decimatedV1, decimatedVl, decimatedVr);
+			// Set the material indices of the two recreated faces
+			auto* matIndices = m_decimatedPoly.template acquire<Device::CPU, MaterialIndex>(m_decimatedPoly.get_material_indices_hdl());
 			const auto matIdx = matIndices[m_decimatedMesh.face_handle(m_decimatedMesh.halfedge_handle(decimatedV1)).idx()];
-			m_decimatedPoly.add(std::array<Mesh::VertexHandle, 3u>{ {v0Hdl, decimatedV1, decimatedVl} }, matIdx);
-			// TODO: instead of adding a single face, vertex_split!
+			if(faces.first.is_valid())
+				matIndices[faces.first.idx()] = matIdx;
+			if(faces.second.is_valid())
+				matIndices[faces.first.idx()] = matIdx;
+			m_decimatedPoly.mark_changed(Device::CPU, m_decimatedPoly.get_material_indices_hdl());
 
 			// Adjust collapsed sequence
 			m_originalMesh.property(m_collapsed, vertex) = false;
 			m_originalMesh.property(m_collapsedTo, vertex) = v0Hdl;
 			m_decimatedMesh.property(m_originalVertex, v0Hdl) = vertex;
+
+			++uncollapses;
 		}
 	}
+
+	return uncollapses;
 }
 
 bool ImportanceDecimater::is_collapse_legal(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const {
-	//   std::clog << "McDecimaterT<>::is_collapse_legal()\n";
-
 	// locked ?
 	if(m_decimatedMesh.status(ci.v0).locked())
 		return false;
@@ -316,8 +306,23 @@ void ImportanceDecimater::add_vertex_collapse(const Mesh::VertexHandle vh, const
 		}
 	}
 
+
 	if(collapseTarget.is_valid() && bestPriority < threshold) {
-		m_collapses.push_back(std::make_pair(vh, collapseTarget));
+		// target found -> put vertex on heap
+		m_decimatedMesh.property(m_collapseTarget, vh) = collapseTarget;
+		m_decimatedMesh.property(m_priority, vh) = bestPriority;
+
+		if(m_heap->is_stored(vh))
+			m_heap->update(vh);
+		else
+			m_heap->insert(vh);
+	} else {
+		// not valid -> remove from heap
+		if(m_heap->is_stored(vh))
+			m_heap->remove(vh);
+
+		m_decimatedMesh.property(m_collapseTarget, vh) = collapseTarget;
+		m_decimatedMesh.property(m_priority, vh) = -1.f;
 	}
 }
 
@@ -420,26 +425,6 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 		return -1.f;
 
 	return v0Importance;
-}
-
-float ImportanceDecimater::compute_new_importance_density(const Mesh::VertexHandle vb, const Mesh::VertexHandle vn,
-														  const ei::Vec3& v0Pos, const ei::Vec3& vcPos,
-														  const float distSqrSum) {
-	const auto vbPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vb));
-	const auto vNextPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vn));
-
-	const float distSqr = ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vb)) - v0Pos);;
-	// Compute the current shared area with v1
-	const float v1SharedArea = ei::len(ei::cross(vbPos - vcPos, vNextPos - vcPos));
-	// Compute the future shared area with v0
-	const float v0SharedArea = ei::len(ei::cross(vbPos - v0Pos, vNextPos - v0Pos));
-	// Recompute the area around the vertex from the density
-	const float importance = m_importance[get_original_vertex_handle(vb).idx()].load();
-	const float newImportance = importance * (1.f - distSqr / distSqrSum);
-	const float area = importance / m_decimatedMesh.property(m_importanceDensity, vb);
-	// Compute the new density by substituting the areas
-	const float newDensity = newImportance / (area - v1SharedArea + v0SharedArea);
-	return newDensity;
 }
 
 void ImportanceDecimater::record_vertex_contribution(const u32 localIndex, const float importance) {

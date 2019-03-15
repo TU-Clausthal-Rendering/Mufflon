@@ -74,14 +74,10 @@ private:
 	// Returns the vertex handle in the original mesh
 	Mesh::VertexHandle get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const;
 
-	void collapse(const float threshold);
-	void uncollapse(const float threshold);
+	std::size_t collapse(const float threshold);
+	std::size_t uncollapse(const float threshold);
 
-	// Computes the new importance density
-	float compute_new_importance_density(const Mesh::VertexHandle vb, const Mesh::VertexHandle vn,
-										 const ei::Vec3& v0Pos, const ei::Vec3& vcPos,
-										 const float distSqrSum);
-
+	// Computes the new importance densities
 	float compute_new_importance_densities(std::vector<std::pair<float, float>>& newDensities,
 										   const Mesh::VertexHandle v0, const Mesh::VertexHandle v1,
 										   const Mesh::VertexHandle vl, const Mesh::VertexHandle vr,
@@ -89,14 +85,6 @@ private:
 	void add_vertex_collapse(const Mesh::VertexHandle vertex, const float threshold);
 	bool is_collapse_legal(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const;
 	float collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const;
-
-
-	// Perform a collapse event
-	void collapse(const CollapseInfo& info);
-	// Uncollapse a vertex
-	void uncollapse(const Mesh::VertexHandle vh);
-	// Add a vertex to the heap
-	void heap_vertex(const Mesh::VertexHandle vh);
 
 	Lod& m_original;
 	Lod& m_decimated;
@@ -114,11 +102,10 @@ private:
 	OpenMesh::VPropHandleT<bool> m_collapsed;						// Whether collapsedTo refers to original or decimated mesh
 
 	// Stuff for decimation
-	std::vector<std::pair<Mesh::VertexHandle, Mesh::HalfedgeHandle>> m_collapses;
-	/*OpenMesh::Utils::HeapT<Mesh::VertexHandle, HeapInterface> m_heap;
+	std::unique_ptr<OpenMesh::Utils::HeapT<Mesh::VertexHandle, HeapInterface>> m_heap;
 	OpenMesh::VPropHandleT<Mesh::HalfedgeHandle> m_collapseTarget;	// Stores the collapse target halfedge for a vertex
 	OpenMesh::VPropHandleT<float> m_priority;						// Stores the collapse priority for a vertex and its target
-	OpenMesh::VPropHandleT<int> m_heapPosition;						// Position of vertex in the heap*/
+	OpenMesh::VPropHandleT<int> m_heapPosition;						// Position of vertex in the heap
 };
 
 } // namespace mufflon::scene::decimation
