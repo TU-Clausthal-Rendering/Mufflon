@@ -210,7 +210,7 @@ CUDA_FUNCTION bool intersects_primitve(
 
 		float t;
 		ei::Vec3 barycentric;
-		if(ei::intersects(ray, tri, t, barycentric) && t < hitT) {
+		if(ei::intersects(ray, tri, t, barycentric) && t < hitT && t > tmin) {
 			hitT = t;
 			surfParams.barycentric = ei::Vec2{ barycentric.x, barycentric.y };
 			hitPrimId = primId;
@@ -516,7 +516,7 @@ void first_intersection_scene_obj_lbvh(
 }
 
 template < Device dev > __host__ __device__
-RayIntersectionResult first_intersection_scene_lbvh(
+RayIntersectionResult first_intersection(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
 	const PrimitiveHandle& startInsPrimId,
@@ -794,7 +794,7 @@ bool any_intersection_scene_obj_lbvh(
 }
 
 template < Device dev > __host__ __device__
-bool any_intersection_scene_lbvh(
+bool any_intersection(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
 	const PrimitiveHandle& startInsPrimId,
@@ -894,26 +894,26 @@ bool any_intersection_scene_lbvh(
 }
 
 
-template __host__ __device__ bool any_intersection_scene_lbvh(
+template __host__ __device__ bool any_intersection(
 	const SceneDescriptor<Device::CUDA>& scene,
 	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
-template __host__ __device__ bool any_intersection_scene_lbvh(
+template __host__ __device__ bool any_intersection(
 	const SceneDescriptor<Device::CPU>& scene,
 	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
 	const float tmax
 );
 
-template __host__ __device__ RayIntersectionResult first_intersection_scene_lbvh(
+template __host__ __device__ RayIntersectionResult first_intersection(
 	const SceneDescriptor<Device::CUDA>&,
 	const ei::Ray&,
 	const PrimitiveHandle&,
 	const float
 );
 
-template __host__ __device__ RayIntersectionResult first_intersection_scene_lbvh(
+template __host__ __device__ RayIntersectionResult first_intersection(
 	const SceneDescriptor<Device::CPU>& ,
 	const ei::Ray&,
 	const PrimitiveHandle&,

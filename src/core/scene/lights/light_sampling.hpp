@@ -60,6 +60,9 @@ struct NextEventEstimation {
 	//LightType type; // Not required ATM
 };
 
+// NEE distance will not go below this threshold (avoid infinity peaks
+constexpr float DISTANCESQ_EPSILON = 1e-10f;
+
 
 // Transform a direction from tangent into world space (convention Z-up vs. Y-up)
 CUDA_FUNCTION __forceinline__ ei::Vec3 tangent2world(const ei::Vec3& dir,
@@ -162,12 +165,14 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const AreaLightSphere<CURR
 	// We don't need to convert the "normal" due to sphere symmetry
 	const math::DirectionSample normal = math::sample_dir_sphere_uniform(rnd.u0, rnd.u1);
 	UvCoordinate uvDummy;
+	const Spectrum radiance = Spectrum{ sample(light.radianceTex, normal.direction, uvDummy) } * light.scale;
+	const float area = 4 * ei::PI * light.radius * light.radius;
 	return Photon{
 		math::PositionSample{ light.position + normal.direction * light.radius,
 							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		Spectrum{sample(light.radianceTex, normal.direction, uvDummy)} * light.scale,
+		radiance * area,
 		LightType::AREA_LIGHT_SPHERE,
-		{normal.direction, 4*ei::PI*ei::sq(light.radius)}
+		{normal.direction, area}
 	};
 }
 
@@ -181,7 +186,8 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_area(const Spectrum& in
 	const ei::Vec3 tangentX = normalize(perpendicular(normal));
 	const ei::Vec3 tangentY = cross(normal, tangentX);
 	const ei::Vec3 globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * normal;
-	return { {globalDir, dir.pdf}, intensity * dir.direction.z};
+	// flux = intensity * cosθ / pdf = intensity * π
+	return { {globalDir, dir.pdf}, intensity * ei::PI };
 }
 
 // *** DIRECTIONAL LIGHT ***
@@ -272,7 +278,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const PointLight
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	ei::Vec3 direction = light.position - pos;
-	const float distSq = lensq(direction) + 1e-16f;
+	const float distSq = lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	// Compute the contribution
@@ -285,7 +291,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	ei::Vec3 direction = light.position - pos;
-	const float distSq = lensq(direction) + 1e-16f;
+	const float distSq = lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	const math::EvalValue value = evaluate_spot(-direction, light.intensity,
@@ -302,7 +308,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightT
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
-	const float distSq = ei::lensq(direction) + 1e-16f;
+	const float distSq = ei::lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	// Compute the contribution
@@ -318,7 +324,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightQ
 																const math::RndSet2& rnd) {
 	Photon posSample = sample_light_pos(light, rnd);
 	ei::Vec3 direction = posSample.pos.position - pos;
-	const float distSq = ei::lensq(direction) + 1e-16f;
+	const float distSq = ei::lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
 	// Compute the contribution
@@ -348,7 +354,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 	// Now, connect to the point on the surface
 	const scene::Point surfPos = light.position + light.radius * globalDir;
 	scene::Direction connectionDir = surfPos - pos;
-	const float cDistSq = lensq(connectionDir) + 1e-16f;
+	const float cDistSq = lensq(connectionDir) + DISTANCESQ_EPSILON;
 	const float cDist = sqrtf(cDistSq);
 	connectionDir /= cDist;
 	// Compute the contribution (diffIrradiance)
@@ -357,7 +363,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightS
 	Spectrum radiance { sample(light.radianceTex, globalDir, uvDummy) };
 	const float sampleArea = light.radius * light.radius / float(dir.pdf);
 	const float cosOut = ei::max(0.0f, -dot(globalDir, connectionDir));
-	radiance *= cosOut * sampleArea / cDistSq;
+	radiance *= sampleArea / cDistSq;
 	return NextEventEstimation{
 		connectionDir, surfPos, cosOut,
 		radiance * light.scale,

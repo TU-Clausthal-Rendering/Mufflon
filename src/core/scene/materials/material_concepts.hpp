@@ -22,7 +22,7 @@ struct Boundary;
 template<class T>
 class MaterialSampleConcept {
 private:
-	template<class T, typename = typename std::is_same< math::EvalValue,
+	template<class T, typename = typename std::is_same< math::BidirSampleValue,
 		decltype(evaluate(std::declval<const T>(),
 						  std::declval<Direction>(),
 						  std::declval<Direction>(),

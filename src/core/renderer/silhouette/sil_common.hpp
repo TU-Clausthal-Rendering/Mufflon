@@ -20,17 +20,23 @@ struct SilVertexExt {
 
 	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const float incidentCosine, const AreaPdf incidentPdf) {
+							const float incidentCosine, const AreaPdf incidentPdf,
+							const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<SilVertexExt>& thisVertex,
-							  const math::PathSample& sample) {
-		excident = sample.excident;
-		pdf = sample.pdfF;
-		throughput = sample.throughput;
-		outCos = -ei::dot(thisVertex.get_normal(), sample.excident);
-		bxdfPdf = sample.throughput / outCos;
+							  const scene::Direction& excident,
+							  const AngularPdf pdfF, const AngularPdf pdfB) {
+		this->excident = excident;
+		this->pdf = pdfF;
+		this->outCos = -ei::dot(thisVertex.get_normal(), excident);
+	}
+
+	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
+		this->throughput = sample.throughput;
+		this->bxdfPdf = this->throughput / this->outCos;
+		this->accumThroughput = accum.weight;
 	}
 };
 

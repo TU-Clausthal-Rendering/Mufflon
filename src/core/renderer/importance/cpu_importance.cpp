@@ -168,11 +168,12 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertices[pathLen].get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media);
+			Pixel projCoord;
+			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
+				bool anyhit = scene::accel_struct::any_intersection(
 					m_sceneDesc, { vertices[pathLen].get_position() , nee.direction },
 					vertices[pathLen].get_primitive_id(), nee.dist);
 				if(!anyhit) {
@@ -202,12 +203,13 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		// Walk
 		scene::Point lastPosition = vertices[pathLen].get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
+		VertexSample sample;
 
-		if(!walk(m_sceneDesc, vertices[pathLen], rnd, -1.0f, false, throughput, vertices[pathLen + 1]))
+		if(!walk(m_sceneDesc, vertices[pathLen], rnd, -1.0f, false, throughput, vertices[pathLen + 1], sample))
 			break;
 
 		// Update old vertex with accumulated throughput
-		vertices[pathLen].ext().accumThroughput = throughput.weight;
+		vertices[pathLen].ext().updateBxdf(sample, throughput);
 
 		// Fetch the relevant information for attributing the instance to the correct vertices
 		const auto& hitId = vertices[pathLen + 1].get_primitive_id();
@@ -277,11 +279,12 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertex.get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media);
+			Pixel projCoord;
+			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				bool anyhit = scene::accel_struct::any_intersection_scene_lbvh<Device::CPU>(
+				bool anyhit = scene::accel_struct::any_intersection(
 					m_sceneDesc, { vertex.get_position() , nee.direction },
 					vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
@@ -297,12 +300,13 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 		// Walk
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex)) {
+		VertexSample sample;
+		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, vertex.ext().excident);
+				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / vertex.ext().pdf);
+					float mis = 1.0f / (1.0f + background.pdfB / sample.pdfF);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											  ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -320,7 +324,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 
 		// Evaluate direct hit of area ligths
 		if(pathLen <= m_params.maxPathLength) {
-			Spectrum emission = vertex.get_emission();
+			Spectrum emission = vertex.get_emission().value;
 			if(emission != 0.0f) {
 				AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
 												  vertex.get_surface_params(),
@@ -363,7 +367,8 @@ void CpuImportanceDecimater::display_importance() {
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		math::DirectionSample lastDir;
-		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex))
+		VertexSample sample;
+		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample))
 			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ this->query_importance(vertex.get_position(), vertex.get_primitive_id()) });
 	}
 

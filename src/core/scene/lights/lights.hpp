@@ -272,7 +272,7 @@ evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 	const float cosOut = dot(normal, excident);
 	// Early out (wrong hemisphere)
 	if(cosOut <= 0.0f) return math::EvalValue{};
-	return { intensity * cosOut, cosOut, AngularPdf{ cosOut / ei::PI },
+	return { intensity, cosOut, AngularPdf{ cosOut / ei::PI },
 			 AngularPdf{ 0.0f } };
 }
 

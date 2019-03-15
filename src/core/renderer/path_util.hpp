@@ -70,6 +70,10 @@ public:
 	CUDA_FUNCTION bool is_end_point() const {
 		return m_type != Interaction::SURFACE;
 	}
+	CUDA_FUNCTION bool is_surface() const {
+		return m_type == Interaction::SURFACE
+			|| m_type == Interaction::LIGHT_AREA;
+	}
 	CUDA_FUNCTION bool is_orthographic() const {
 		return m_type == Interaction::LIGHT_DIRECTIONAL
 			|| m_type == Interaction::LIGHT_ENVMAP
@@ -155,10 +159,13 @@ public:
 	// exident direction.
 	// excident: direction pointing away from this vertex.
 	// media: buffer with all media in the scene
+	// coord: [out] Pixel coordinate if a projection was done.
+	//		Otherwise the input value will be preserved.
 	// adjoint: Is this a vertex on a light sub-path?
 	// merge: Evaluation takes place in a merge?
 	CUDA_FUNCTION math::EvalValue evaluate(const scene::Direction & excident,
 							 const scene::materials::Medium* media,
+							 Pixel& coord,
 							 bool adjoint = false, bool merge = false
 	) const {
 		using namespace scene;
@@ -170,7 +177,7 @@ public:
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
 				return lights::evaluate_dir(m_intensity, m_type==Interaction::LIGHT_ENVMAP,
-									m_desc.dirLight.dirPdf);
+											m_desc.dirLight.dirPdf);
 			}
 			case Interaction::LIGHT_SPOT: {
 				return lights::evaluate_spot(excident, m_intensity, m_desc.spotLight.direction,
@@ -181,13 +188,15 @@ public:
 			}
 			case Interaction::CAMERA_PINHOLE: {
 				cameras::ProjectionResult proj = pinholecam_project(m_desc.pinholeCam, excident);
+				coord = proj.coord;
 				return math::EvalValue{ Spectrum{ proj.w }, 0.0f,
 										proj.pdf, AngularPdf{ 0.0f } };
 			}
 			case Interaction::CAMERA_FOCUS: {
 				cameras::ProjectionResult proj = focuscam_project(m_desc.focusCam, m_position, excident);
-				return math::EvalValue{ Spectrum{proj.w}, 0.f,
-										proj.pdf, AngularPdf{0.f} };
+				coord = proj.coord;
+				return math::EvalValue{ Spectrum{ proj.w }, 0.0f,
+										proj.pdf, AngularPdf{ 0.0f } };
 			}
 			case Interaction::SURFACE: {
 				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.mat(),
@@ -251,7 +260,7 @@ public:
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::CAMERA_PINHOLE: {
-				cameras::Importon importon = pinholecam_sample_ray(m_desc.pinholeCam, m_position);
+				cameras::Importon importon = pinholecam_sample_ray(m_desc.pinholeCam, Pixel{ m_incident }, rndSet);
 				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, importon.dir.pdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
@@ -274,7 +283,7 @@ public:
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
 	CUDA_FUNCTION float get_incident_dist_sq() const {
-		if(m_offsetToPath == 0xffff) return 0.0f;
+		if(m_offsetToPath == 0) return 0.0f;
 		const PathVertex* prev = as<PathVertex>(as<u8>(this) + m_offsetToPath);
 		// The m_position is always a true position (the 'this' vertex is not an
 		// end-point and can thus not be an orthogonal source).
@@ -283,7 +292,7 @@ public:
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
 	CUDA_FUNCTION const PathVertex* previous() const {
-		return m_offsetToPath == 0xffff ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPath);
+		return m_offsetToPath == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPath);
 	}
 
 	// Access to the renderer dependent extension
@@ -324,7 +333,7 @@ public:
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
-	CUDA_FUNCTION Spectrum get_emission() const {
+	CUDA_FUNCTION math::SampleValue get_emission() const {
 		switch(m_type) {
 			case Interaction::VOID:
 			case Interaction::LIGHT_POINT:
@@ -333,15 +342,16 @@ public:
 			case Interaction::LIGHT_SPOT:
 			case Interaction::CAMERA_PINHOLE:
 			case Interaction::CAMERA_FOCUS:
-				return Spectrum{0.0f};
+				return math::SampleValue{};
 			case Interaction::LIGHT_AREA: {
-				return m_intensity; // TODO: / area?
+				float cosIn = ei::abs(dot(m_incident, m_desc.areaLight.normal));
+				return math::SampleValue{m_intensity, AngularPdf{cosIn / ei::PI}}; // TODO: / area?
 			}
 			case Interaction::SURFACE: {
 				return scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
 			}
 		}
-		return Spectrum{0.0f};
+		return math::SampleValue{};
 	}
 
 	CUDA_FUNCTION Spectrum get_albedo() const {
@@ -408,9 +418,9 @@ public:
 		if(camera.type == cameras::CameraModel::PINHOLE) {
 			vert->m_type = Interaction::CAMERA_PINHOLE;
 			vert->m_desc.pinholeCam = static_cast<const cameras::PinholeParams&>(camera);
-			auto position = pinholecam_sample_position(vert->m_desc.pinholeCam, pixel, rndSet);
+			auto position = pinholecam_sample_position(vert->m_desc.pinholeCam);
 			vert->m_position = position.position;
-			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf);
+			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf, math::Throughput{});
 			return (int)round_to_align<8u>( this_size() + sizeof(cameras::PinholeParams));
 		}
 		else if(camera.type == cameras::CameraModel::FOCUS) {
@@ -418,7 +428,7 @@ public:
 			vert->m_desc.focusCam = static_cast<const cameras::FocusParams&>(camera);
 			auto position = focuscam_sample_position(vert->m_desc.focusCam, rndSet);
 			vert->m_position = position.position;
-			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf);
+			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, position.pdf, math::Throughput{});
 			return (int)round_to_align<8u>( this_size() + sizeof(cameras::FocusParams));
 		}
 		mAssertMsg(false, "Not implemented yet.");
@@ -437,7 +447,7 @@ public:
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
-				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf, math::Throughput{});
 				return this_size();
 			}
 			case scene::lights::LightType::SPOT_LIGHT: {
@@ -445,16 +455,16 @@ public:
 				vert->m_desc.spotLight.direction = lightSample.source_param.spot.direction;
 				vert->m_desc.spotLight.cosThetaMax = lightSample.source_param.spot.cosThetaMax;
 				vert->m_desc.spotLight.cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
-				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
-				return round_to_align<8u>( this_size() + sizeof(SpotLightDesc) );
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf, math::Throughput{});
+				return (int)round_to_align<8u>( this_size() + sizeof(SpotLightDesc) );
 			}
 			case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
 			case scene::lights::LightType::AREA_LIGHT_QUAD:
 			case scene::lights::LightType::AREA_LIGHT_SPHERE: {
 				vert->m_type = Interaction::LIGHT_AREA;
 				vert->m_desc.areaLight.normal = lightSample.source_param.area.normal;
-				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf);
-				return round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf, math::Throughput{});
+				return (int)round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
 			}
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
 				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
@@ -465,18 +475,19 @@ public:
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
 				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
-					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)));
-				return round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
+					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)), math::Throughput{});
+				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
 				vert->m_type = Interaction::LIGHT_ENVMAP;
 				vert->m_desc.dirLight.direction = lightSample.source_param.dir.direction;
 				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
-					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)));
-				return round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
+					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)), math::Throughput{});
+				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 		}
+		return 0;
 	}
 
 	CUDA_FUNCTION static int create_surface(void* mem, const void* previous,
@@ -487,7 +498,8 @@ public:
 		const scene::Direction& incident,
 		const float incidentDistance,
 		const float incidentCosine,
-		const AngularPdf prevPdf
+		const AngularPdf prevPdf,
+		const math::Throughput& incidentThrougput
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
@@ -499,7 +511,8 @@ public:
 		vert->m_desc.surface.primitiveId = hit.hitId;
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
 		vert->ext().init(*vert, incident, incidentDistance, incidentCosine,
-			prevPdf.to_area_pdf(incidentCosine, incidentDistance * incidentDistance));
+			prevPdf.to_area_pdf(incidentCosine, incidentDistance * incidentDistance),
+			incidentThrougput);
 		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.mat());
 		return (int)round_to_align<8u>( round_to_align<8u>(this_size() + sizeof(scene::TangentSpace)
 			+ sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization))
@@ -572,7 +585,7 @@ private:
 
 	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
 		std::ptrdiff_t s = as<u8>(previous) - as<u8>(mem);
-		mAssert(s <= 0xffff);
+		mAssert(ei::abs(s) < 0x1000);
 		m_offsetToPath = static_cast<i16>(s);
 	}
 
@@ -590,15 +603,20 @@ struct VertexExtension {
 	// The init function gets called at the end of vertex creation.
 	CUDA_FUNCTION void init(const PathVertex<VertexExtension>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const float incidentCosine, const AreaPdf incidentPdf)
+							const float incidentCosine, const AreaPdf incidentPdf,
+							const math::Throughput& incidentThrougput)
 	{}
 
-	// The update function gets called whenever the vertex was sampled.
+	// The update function gets called whenever the excident direction changes.
+	// This happens after a sampling event and after an evaluation.
 	// thisVertex: Access to the vertex, for which 'this' is the payload
 	//		hint: if you need information about the previous vertex use thisVertex.previous().
-	// sample: The throughput, pdf and more of the current sampling event.
+	// excident: The new outgoing direction (normalized)
+	// pdfF: Sampling PDF in forward direction (producing the excident vector)
+	// pdfB: Sampling PDF in backward direction (producing the incident vector)
 	CUDA_FUNCTION void update(const PathVertex<VertexExtension>& thisVertex,
-							  const math::PathSample& sample) // TODO: ex cosine in path sample
+							  const scene::Direction& excident,
+							  const AngularPdf pdfF, const AngularPdf pdfB) // TODO: ex cosine?, BRDF?
 	{}
 };
 

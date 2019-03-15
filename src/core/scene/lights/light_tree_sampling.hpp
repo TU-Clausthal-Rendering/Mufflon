@@ -277,11 +277,15 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
  * Hitable light source (area lights) must provide MIS helpers which are
  * called if a surface is hit randomly. This method computes the area pdf
  * which would be produced by the above connect_light() samplers.
+ *
+ * connect: Get the pdf of connect() [true] or that of emit() [false].
+ *		For both variants there is an alias function called connect_pdf()
+ *		and emit_pdf() respectively.
  */
-template < class Guide >
-CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
-								  PrimitiveHandle primitive, ei::Vec2 surfaceParams,
-								  const ei::Vec3& refPosition, Guide&& guide) {
+template < bool connect, class Guide >
+CUDA_FUNCTION AreaPdf light_pdf(const LightTree<CURRENT_DEV>& tree,
+								PrimitiveHandle primitive, ei::Vec2 surfaceParams,
+								const ei::Vec3& refPosition, Guide&& guide) {
 	mAssert(primitive.instanceId != -1);
 	using namespace lighttree_detail;
 
@@ -328,18 +332,35 @@ CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
 		}
 		case LightType::AREA_LIGHT_SPHERE: {
 			auto& a = *as<AreaLightSphere<CURRENT_DEV>>(tree.posLights.memory + offset);
-			// Only the visible part of the sphere is sample. Therefore, the area depends
-			// on the distance between reference and sphere.
-			float cosSphere = a.radius / len(refPosition - a.position);
-			mAssert(cosSphere >= 0.0f && cosSphere <= 1.0f);
-			float solidAngle = 2 * ei::PI * (1.0f - cosSphere);
-			float area = solidAngle * ei::sq(a.radius);
-			return AreaPdf{ p / area };
+			if(connect) {
+				// Only the visible part of the sphere is sampled. Therefore, the area depends
+				// on the distance between reference and sphere.
+				float cosSphere = a.radius / len(refPosition - a.position);
+				mAssert(cosSphere >= 0.0f && cosSphere <= 1.0f);
+				float solidAngle = 2 * ei::PI * (1.0f - cosSphere);
+				float area = solidAngle * ei::sq(a.radius);
+				return AreaPdf{ p / area };
+			} else {
+				float area = 4 * ei::PI * ei::sq(a.radius);
+				return AreaPdf{ p / area };
+			}
 		}
 		default:
 			mAssertMsg(false, "Decoded node must be some hitable area light.");
 	}
 	return AreaPdf{0.0f};
+}
+template < class Guide >
+CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
+								  PrimitiveHandle primitive, ei::Vec2 surfaceParams,
+								  const ei::Vec3& refPosition, Guide&& guide) {
+	return light_pdf<true>(tree, primitive, surfaceParams, refPosition, guide);
+}
+template < class Guide >
+CUDA_FUNCTION AreaPdf emit_pdf(const LightTree<CURRENT_DEV>& tree,
+							   PrimitiveHandle primitive, ei::Vec2 surfaceParams,
+							   const ei::Vec3& refPosition, Guide&& guide) {
+	return light_pdf<false>(tree, primitive, surfaceParams, refPosition, guide);
 }
 
 // Guide the light tree traversal based on flux only

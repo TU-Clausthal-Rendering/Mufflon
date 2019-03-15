@@ -107,7 +107,7 @@ sample(const TangentSpace& tangentSpace,
 	Direction globalDir = res.excident.x * tangentSpace.shadingTX
 						+ res.excident.y * tangentSpace.shadingTY
 						+ res.excident.z * tangentSpace.shadingN;
-	mAssert(ei::approx(len(globalDir), 1.0f));
+	mAssert(ei::approx(len(globalDir), 1.0f, 1e-4f));
 
 	// Cancel the path if shadowed shading normal (excident)
 	float eDotG = dot(globalDir, tangentSpace.geoN);
@@ -169,6 +169,7 @@ evaluate(const TangentSpace& tangentSpace,
 		dot(excident, tangentSpace.shadingTY),
 		eDotN
 	);
+	// Swap directions to guarentee symmetry between light and view path
 	if(adjoint) {
 		Direction tmp = incidentTS;
 		incidentTS = excidentTS;
@@ -182,7 +183,7 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Call material implementation
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
-	math::EvalValue res;
+	math::BidirSampleValue res;
 	material_switch(params.type,
 		res = evaluate(*as<typename MatType::SampleType>(subParams),
 			incidentTS, excidentTS, boundary);
@@ -190,7 +191,7 @@ evaluate(const TangentSpace& tangentSpace,
 	);
 
 	// Early out if result is discarded anyway
-	if(res.value == 0.0f) return res;
+	if(res.value == 0.0f) return math::EvalValue{};
 	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)) && !isnan(res.cosOut));
 
 	// Shading normal caused density correction.
@@ -206,7 +207,12 @@ evaluate(const TangentSpace& tangentSpace,
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
-	return res;
+	return math::EvalValue{
+		res.value, ei::abs(eDotN),
+		// Swap back output values if we swapped the directions before
+		adjoint ? res.pdfB : res.pdfF,
+		adjoint ? res.pdfF : res.pdfB
+	};
 }
 
 /*
@@ -226,13 +232,13 @@ albedo(const ParameterPack& params) {
 /*
  * Get the self emission into some direction.
  */
-CUDA_FUNCTION Spectrum
+CUDA_FUNCTION math::SampleValue
 emission(const ParameterPack& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	material_switch(params.type,
 		return emission(*as<typename MatType::SampleType>(subParams), geoN, excident);
 	);
-	return Spectrum{0.0f};
+	return math::SampleValue{};
 }
 
 }}} // namespace mufflon::scene::materials

@@ -47,26 +47,27 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
 						math::Throughput& throughput,
-						VertexType& outVertex
+						VertexType& outVertex,
+						VertexSample& outSample
 ) {
 	// Sample the vertex's outgoing direction
-	VertexSample sample = vertex.sample(scene.media, rndSet, adjoint);
-	if(sample.type == math::PathEventType::INVALID) {
+	outSample = vertex.sample(scene.media, rndSet, adjoint);
+	if(outSample.type == math::PathEventType::INVALID) {
 		throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
 		return false;
 	}
-	mAssert(!isnan(sample.excident.x) && !isnan(sample.excident.y) && !isnan(sample.excident.z)
-		&& !isnan(sample.origin.x) && !isnan(sample.origin.y) && !isnan(sample.origin.z)
-		&& !isnan(float(sample.pdfF)) && !isnan(float(sample.pdfB)));
-	vertex.ext().update(vertex, sample);
+	mAssert(!isnan(outSample.excident.x) && !isnan(outSample.excident.y) && !isnan(outSample.excident.z)
+		&& !isnan(outSample.origin.x) && !isnan(outSample.origin.y) && !isnan(outSample.origin.z)
+		&& !isnan(float(outSample.pdfF)) && !isnan(float(outSample.pdfB)));
+	vertex.ext().update(vertex, outSample.excident, outSample.pdfF, outSample.pdfB);
 
 	// Update throughputs
-	throughput.weight *= sample.throughput;
-	throughput.guideWeight *= 1.0f - expf(-(sample.pdfF * sample.pdfF) / 5.0f);
+	throughput.weight *= outSample.throughput;
+	throughput.guideWeight *= 1.0f - expf(-(outSample.pdfF * outSample.pdfF) / 5.0f);
 
 	// Russian roulette
 	if(u0 >= 0.0f) {
-		float continuationPropability = ei::min(max(sample.throughput) + 0.05f, 1.0f);
+		float continuationPropability = ei::min(max(outSample.throughput) + 0.05f, 1.0f);
 		if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
 			throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
 			return false;
@@ -80,12 +81,12 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// TODO: optional energy clamping
 
 	// Go to the next intersection
-	ei::Ray ray {sample.origin, sample.excident};
+	ei::Ray ray {outSample.origin, outSample.excident};
 	scene::accel_struct::RayIntersectionResult nextHit =
-		scene::accel_struct::first_intersection_scene_lbvh<CURRENT_DEV>(scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
+		scene::accel_struct::first_intersection(scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
 
 	// Compute attenuation
-	const scene::materials::Medium& currentMedium = scene.media[sample.medium];
+	const scene::materials::Medium& currentMedium = scene.media[outSample.medium];
 	Spectrum transmission = currentMedium.get_transmission( nextHit.hitT );
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
@@ -96,7 +97,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		return false;
 
 	// Create the new surface vertex
-	ei::Vec3 position = vertex.get_position() + sample.excident * nextHit.hitT;
+	ei::Vec3 position = vertex.get_position() + outSample.excident * nextHit.hitT;
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// TODO: get tangent space and parameter pack from nextHit
 	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
@@ -106,10 +107,10 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		matIdx = object.polygon.matIndices[nextHit.hitId.primId];
 	else
 		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
-	const float incidentCos = dot(nextHit.normal, sample.excident);
+	const float incidentCos = dot(nextHit.normal, outSample.excident);
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
-				position, tangentSpace, sample.excident, nextHit.hitT,
-				incidentCos, sample.pdfF);
+				position, tangentSpace, outSample.excident, nextHit.hitT,
+				incidentCos, outSample.pdfF, throughput);
 	return true;
 }
 

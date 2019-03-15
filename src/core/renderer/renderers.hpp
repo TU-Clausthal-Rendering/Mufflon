@@ -7,10 +7,15 @@
 #include "core/renderer/silhouette/cpu_silhouette.hpp"
 #include "core/renderer/wireframe/cpu_wireframe.hpp"
 #include "core/renderer/wireframe/gpu_wireframe.hpp"
+#include "core/renderer/bpt/cpu_bpt.hpp"
 
 namespace mufflon::renderer {
 
-using Renderers = util::TaggedTuple<CpuPathTracer, GpuPathTracer, CpuWireframe, GpuWireframe, CpuShadowSilhouettes,
-	CpuImportanceDecimater>;
+using Renderers = util::TaggedTuple<
+	CpuPathTracer, GpuPathTracer,
+	CpuWireframe, GpuWireframe,
+	CpuBidirPathTracer,
+	CpuShadowSilhouettes, CpuImportanceDecimater
+>;
 
 } // namespace mufflon::renderer

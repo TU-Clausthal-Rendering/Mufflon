@@ -72,12 +72,12 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::EvalValue evaluate(const MatSampleWalter& params,
-									   const Direction& incidentTS,
-									   const Direction& excidentTS,
-									   Boundary& boundary) {
+CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
+											  const Direction& incidentTS,
+											  const Direction& excidentTS,
+											  Boundary& boundary) {
 	// No reflection
-	if(incidentTS.z * excidentTS.z > 0.0f) return math::EvalValue{};
+	if(incidentTS.z * excidentTS.z > 0.0f) return math::BidirSampleValue{};
 
 	// General terms. For refraction iDotH != eDotH!
 	Direction halfTS = boundary.get_halfTS(incidentTS, excidentTS);
@@ -98,9 +98,8 @@ CUDA_FUNCTION math::EvalValue evaluate(const MatSampleWalter& params,
 
 	float common = sdiv(ei::abs(d * iDotH * eDotH), ei::sq(n_i * iDotH + n_e * eDotH));
 	float bsdf = g * common * sdiv(n_e * n_e, ei::abs(incidentTS.z * excidentTS.z));
-	return math::EvalValue {
+	return math::BidirSampleValue {
 		Spectrum{bsdf},
-		ei::abs(excidentTS.z),
 		AngularPdf(gi * common * sdiv(n_e * n_e, ei::abs(incidentTS.z))),
 		AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z)))
 	};
@@ -113,8 +112,8 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleWalter& params) {
 	return 1.0f / (Spectrum{1.0f} + params.absorption);
 }
 
-CUDA_FUNCTION Spectrum emission(const MatSampleWalter& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	return Spectrum{0.0f};
+CUDA_FUNCTION math::SampleValue emission(const MatSampleWalter& params, const scene::Direction& geoN, const scene::Direction& excident) {
+	return math::SampleValue{};
 }
 
 template MaterialSampleConcept<MatSampleWalter>;

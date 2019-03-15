@@ -31,6 +31,17 @@ struct PathSample {
 };
 
 
+// Return value of a sampler
+struct SampleValue {
+	Spectrum value {0.0f};			// Flux, Importance, BRDF or BTDF value
+	AngularPdf pdf {0.0f};			// Sampling PDF in forward direction 
+};
+struct BidirSampleValue {
+	Spectrum value {0.0f};			// Flux, Importance, BRDF or BTDF value
+	AngularPdf pdfF {0.0f};			// Sampling PDF in forward direction 
+	AngularPdf pdfB {0.0f};			// Sampling PDF with reversed incident and excident directions
+};
+
 // Return value of a BxDF evaluation function
 struct EvalValue {
 	Spectrum value {0.0f};			// Flux, Importance, BRDF or BTDF value
@@ -45,8 +56,8 @@ static_assert(sizeof(EvalValue) == 24, "Unexpected packing.");
 
 // Monte Carlo f/p value
 struct Throughput {
-	Spectrum weight;
-	float guideWeight;	// Custom heuristic to render filtering guides (normals...)
+	Spectrum weight {1.0f};
+	float guideWeight {1.0f};	// Custom heuristic to render filtering guides (normals...)
 };
 
 }} // namespace mufflon::math
