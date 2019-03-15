@@ -192,7 +192,7 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return math::EvalValue{};
-	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)) && !isnan(res.cosOut));
+	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)));
 
 	// Shading normal caused density correction.
 	if(merge) {
