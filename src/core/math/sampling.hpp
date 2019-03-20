@@ -120,7 +120,7 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 		x = rescale_sample(x, projAx, projAx + projAy);
 		position = ei::Vec3{ u1, (dir.y < 0.f) ? 1.f : 0.f, x };
 	} else {
-		x = rescale_sample(x, projAx + projAy, 1.0f);
+		x = rescale_sample(x, projAx + projAy, area);
 		position = ei::Vec3{ u1, x, (dir.z < 0.f) ? 1.f : 0.f };
 	}
 	return PositionSample{ bounds.min + position * sides, AreaPdf{ 1.f / area } };

@@ -59,7 +59,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(outSample.excident.x) && !isnan(outSample.excident.y) && !isnan(outSample.excident.z)
 		&& !isnan(outSample.origin.x) && !isnan(outSample.origin.y) && !isnan(outSample.origin.z)
 		&& !isnan(float(outSample.pdfF)) && !isnan(float(outSample.pdfB)));
-	vertex.ext().update(vertex, outSample.excident, outSample.pdfF, outSample.pdfB);
+	vertex.update_ext(outSample.excident, outSample.pdfF, outSample.pdfB);
 
 	// Update throughputs
 	throughput.weight *= outSample.throughput;
@@ -93,13 +93,17 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
 
 	// If we missed the scene, terminate the ray
-	if(nextHit.hitId.instanceId < 0)
+	if(nextHit.hitId.instanceId < 0) {
+		VertexType::create_void(&outVertex, &vertex, outSample.excident, outSample.pdfF,
+								throughput);
 		return false;
+	}
 
 	// Create the new surface vertex
 	ei::Vec3 position = outSample.origin + outSample.excident * nextHit.hitT;
+	// Get tangent space and parameter pack from nextHit
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
-	// TODO: get tangent space and parameter pack from nextHit
+	// Find material
 	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
 	scene::MaterialIndex matIdx;
 	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
@@ -107,6 +111,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		matIdx = object.polygon.matIndices[nextHit.hitId.primId];
 	else
 		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
+	// Finalize
 	const float incidentCos = dot(nextHit.normal, outSample.excident);
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
 				position, tangentSpace, outSample.excident, nextHit.hitT,

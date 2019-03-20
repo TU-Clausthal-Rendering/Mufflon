@@ -122,7 +122,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	if(rndChoice == ~0ull) --rndChoice;
 
 	float fluxSum = ei::sum(tree.background.flux) + tree.dirLights.root.flux + tree.posLights.root.flux;
-	float envProb = ei::sum(tree.background.flux) / fluxSum;;
+	float envProb = ei::sum(tree.background.flux) / fluxSum;
 	float dirProb = tree.dirLights.root.flux / fluxSum;
 	float posProb = tree.posLights.root.flux / fluxSum;
 

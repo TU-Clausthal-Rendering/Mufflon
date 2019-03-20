@@ -176,9 +176,9 @@ public:
 			}
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
-				return lights::evaluate_dir(m_desc.dirLight.radiance,
+				return lights::evaluate_dir(m_desc.dirLight.flux,
 											m_type==Interaction::LIGHT_ENVMAP,
-											m_desc.dirLight.dirPdf);
+											m_desc.dirLight.areaPdfConverted);
 			}
 			case Interaction::LIGHT_SPOT: {
 				return lights::evaluate_spot(excident, m_desc.spotLight.intensity, m_incident,
@@ -244,8 +244,8 @@ public:
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
 				// TODO: sample new positions on a boundary?
-				return VertexSample{ math::PathSample{ m_desc.dirLight.radiance, math::PathEventType::REFLECTED,
-									   m_incident, m_desc.dirLight.dirPdf, AngularPdf{0.0f} },
+				return VertexSample{ math::PathSample{ m_desc.dirLight.flux, math::PathEventType::REFLECTED,
+									   m_incident, m_desc.dirLight.areaPdfConverted, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_SPOT: {
@@ -285,6 +285,7 @@ public:
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
 	CUDA_FUNCTION float get_incident_dist_sq() const {
 		if(m_offsetToPath == 0) return 0.0f;
+		if(m_type == Interaction::VOID) return scene::MAX_SCENE_SIZE_SQ;
 		const PathVertex* prev = as<PathVertex>(as<u8>(this) + m_offsetToPath);
 		// The m_position is always a true position (the 'this' vertex is not an
 		// end-point and can thus not be an orthogonal source).
@@ -299,6 +300,12 @@ public:
 	// Access to the renderer dependent extension
 	CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
 
+	// Call the vertex-extension's update function for this vertex (see extension for more details).
+	CUDA_FUNCTION void update_ext(const scene::Direction& excident,
+								  const AngularPdf pdfF, const AngularPdf pdfB) const {
+		m_extension.update(*this, excident, pdfF, pdfB);
+	}
+
 	/*
 	* Compute the connection vector from path0 to path1 (non-normalized).
 	* This is a non-trivial operation because of special cases like directional lights and
@@ -309,11 +316,11 @@ public:
 		// Special cases
 		if(path0.is_orthographic()) {	// p0 has no position
 			return { path1.m_position - path0.m_incident * scene::MAX_SCENE_SIZE, scene::MAX_SCENE_SIZE,
-					 path0.m_incident, ei::sq(scene::MAX_SCENE_SIZE) };
+					 path0.m_incident, scene::MAX_SCENE_SIZE_SQ };
 		}
 		if(path1.is_orthographic()) {	// p1 has no position
 			return { path0.m_position, scene::MAX_SCENE_SIZE,
-					-path1.m_incident, ei::sq(scene::MAX_SCENE_SIZE) };
+					-path1.m_incident, scene::MAX_SCENE_SIZE_SQ };
 		}
 		// A normal connection (both vertices have a position)
 		ei::Vec3 connection = path1.m_position - path0.m_position;
@@ -473,23 +480,23 @@ public:
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
 				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
 				vert->m_incident = lightSample.source_param.dir.direction;
-				vert->m_desc.dirLight.radiance = lightSample.intensity;
+				vert->m_desc.dirLight.flux = lightSample.intensity;
 				// Swap PDFs. The rules of sampling are reverted in directional
 				// lights (first dir then pos is sampled). The vertex unifies
 				// the view for MIS computation where the usage order is reverted.
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
-				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->m_desc.dirLight.areaPdfConverted = lightSample.pos.pdf.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ);
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
-					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)), math::Throughput{});
+					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ), math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
 				vert->m_type = Interaction::LIGHT_ENVMAP;
 				vert->m_incident = lightSample.source_param.dir.direction;
-				vert->m_desc.dirLight.radiance = lightSample.intensity;
-				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
+				vert->m_desc.dirLight.flux = lightSample.intensity;
+				vert->m_desc.dirLight.areaPdfConverted = lightSample.pos.pdf.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ);
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
-					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)), math::Throughput{});
+					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ), math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 		}
@@ -525,6 +532,23 @@ public:
 			+ size);
 	}
 
+	CUDA_FUNCTION static int create_void(void* mem, const void* previous,
+										 const scene::Direction& incident,
+										 const AngularPdf prevPdf,
+										 const math::Throughput& incidentThrougput
+	) {
+		PathVertex* vert = as<PathVertex>(mem);
+		vert->m_position = scene::Point{0.0f};
+		vert->init_prev_offset(mem, previous);
+		vert->m_type = Interaction::VOID;
+		vert->m_incident = incident;
+		vert->m_extension = ExtensionT{};
+		vert->ext().init(*vert, incident, scene::MAX_SCENE_SIZE, 1.0f,
+						 prevPdf.to_area_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ),
+						 incidentThrougput);
+		return (int)round_to_align<8u>( this_size() );
+	}
+
 private:
 	struct AreaLightDesc {
 		scene::Direction intensity;
@@ -535,8 +559,8 @@ private:
 		half cosFalloffStart;
 	};
 	struct DirLightDesc {
-		ei::Vec3 radiance;
-		AngularPdf dirPdf;
+		Spectrum flux;
+		AngularPdf areaPdfConverted;
 	};
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace; // TODO: use packing?
@@ -550,7 +574,7 @@ private:
 
 
 	// The vertex position in world space. For orthographic end vertices
-	// this is the main direction and not a position.
+	// this is the start point on the boundary or any other artificial point outside the boundary.
 	scene::Point m_position;
 
 	// Byte offset to the beginning of a path.
@@ -566,6 +590,7 @@ private:
 	//		Spot light: center direction
 	//		Area light: normal
 	//		Env/Dir light: the (sampled) direction
+	//		Void: incident direction
 	scene::Direction m_incident;
 
 	// PDF at this vertex in forward direction.

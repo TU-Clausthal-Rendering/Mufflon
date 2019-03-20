@@ -8,7 +8,6 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include <array>
 
-// THIS FILE IS ONLY A PROTOTYPE OF MIS FOR TESTING THE VERTEX LAYOUT
 
 namespace mufflon::renderer {
 
@@ -174,7 +173,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	math::Throughput throughput;
 	VertexSample sample;
 
-	if(coord == Pixel{240,599-24}) __debugbreak();
+	//if(coord == Pixel{240,599-24}) __debugbreak();
 
 	int lightPathLen = 0;
 	do {
@@ -210,8 +209,14 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
+					// Update MIS for the last connection and that before
+					// Each direct hit must be compared to a connection to the current
+					// vertex and a backward tracing.
+					AngularPdf backtracePdf = AreaPdf{ 1.0f / math::projected_area(sample.excident, m_sceneDesc.aabb) }
+												.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ);
+					vertex[otherV].update_ext(scene::Direction{ 0.0f }, AngularPdf{ 0.0f }, backtracePdf);
 					float relPdf = background.pdfB / sample.pdfF;
-					float mis = 1.0f / (1.0f + vertex[currentV].ext().prevRelativeProbabilitySum * relPdf + relPdf);
+					float mis = 1.0f / (1.0f + vertex[otherV].ext().prevRelativeProbabilitySum * relPdf + relPdf);
 					mAssert(!isnan(mis));
 					background.value *= mis;
 					mAssert(!isnan(background.value.x));
@@ -229,7 +234,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		if(viewPathLen >= m_params.minPathLength) {
 			math::SampleValue emission = vertex[currentV].get_emission();
 			if(emission.value != 0.0f) {
-				vertex[currentV].ext().update(vertex[currentV], scene::Direction{0.0f}, AngularPdf{0.0f}, emission.pdf);
+				vertex[currentV].update_ext(scene::Direction{0.0f}, AngularPdf{0.0f}, emission.pdf);
 				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
 											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
 											scene::lights::guide_flux);
