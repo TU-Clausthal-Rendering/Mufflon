@@ -128,11 +128,10 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 
 	// Now split up based on flux
 	// First is envmap...
-	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
+	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
-		// TODO: sample background, if there is one
-		return {};
-		//return adjustPdf(sample_light_pos(tree.background, bounds, rnd), envProb);
+		// Sample background
+		return adjustPdf(sample_light_pos(tree.background, bounds, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = math::percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);

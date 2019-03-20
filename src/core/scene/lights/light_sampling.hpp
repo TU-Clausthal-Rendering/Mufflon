@@ -262,13 +262,13 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const BackgroundDesc<CURRE
 
 	// Sample a start position on the bounding box
 	math::RndSet2 rnd2{ rnd.i0 };
-	auto pos = math::sample_position(sample.dir.direction, bounds, rnd2.u0, rnd2.u1);;
+	auto pos = math::sample_position(-sample.dir.direction, bounds, rnd2.u0, rnd2.u1);;
 
 	// Convert radiance to flux (applies division from Monte-Carlo)
 	Spectrum flux = sample.radiance / float(pos.pdf) / float(sample.dir.pdf);
 
 	return Photon { pos, flux, LightType::ENVMAP_LIGHT,
-					Photon::SourceParam{sample.dir.direction, sample.dir.pdf} };
+					Photon::SourceParam{-sample.dir.direction, sample.dir.pdf} };
 }
 
 

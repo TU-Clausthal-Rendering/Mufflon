@@ -90,7 +90,7 @@ public:
 	CUDA_FUNCTION scene::Point get_position(const scene::Point& referencePosition) const {
 		if(m_type == Interaction::LIGHT_DIRECTIONAL
 			|| m_type == Interaction::LIGHT_ENVMAP)
-			return referencePosition - m_position * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
+			return referencePosition - m_incident * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
 		if(m_type == Interaction::CAMERA_ORTHO)
 			return referencePosition; // TODO project to near plane
 		return m_position;
@@ -104,7 +104,7 @@ public:
 
 	// The incident direction, or undefined for end vertices (may be abused by end vertices.
 	CUDA_FUNCTION scene::Direction get_incident_direction() const {
-		mAssertMsg(!is_end_point(), "Incident direction for end points is not defined. Hope your code did not expect a meaningful value.");
+		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
 
@@ -130,7 +130,7 @@ public:
 				// comparison.
 				return 1.0f;
 			case Interaction::LIGHT_AREA: {
-				return dot(connection, m_desc.areaLight.normal);
+				return dot(connection, m_incident);
 			}
 			case Interaction::SURFACE: {
 				return dot(connection, m_desc.surface.tangentSpace.shadingN);
@@ -142,7 +142,7 @@ public:
 	// Get a normal if there is any. Otherwise returns a 0-vector.
 	CUDA_FUNCTION scene::Direction get_normal() const {
 		if(m_type == Interaction::LIGHT_AREA) {
-			return m_desc.areaLight.normal;
+			return m_incident;
 		}
 		if(m_type == Interaction::SURFACE) {
 			return m_desc.surface.tangentSpace.shadingN;
@@ -172,19 +172,20 @@ public:
 		switch(m_type) {
 			case Interaction::VOID: return math::EvalValue{};
 			case Interaction::LIGHT_POINT: {
-				return lights::evaluate_point(m_intensity);
+				return lights::evaluate_point(m_incident);
 			}
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
-				return lights::evaluate_dir(m_intensity, m_type==Interaction::LIGHT_ENVMAP,
+				return lights::evaluate_dir(m_desc.dirLight.radiance,
+											m_type==Interaction::LIGHT_ENVMAP,
 											m_desc.dirLight.dirPdf);
 			}
 			case Interaction::LIGHT_SPOT: {
-				return lights::evaluate_spot(excident, m_intensity, m_desc.spotLight.direction,
+				return lights::evaluate_spot(excident, m_desc.spotLight.intensity, m_incident,
 									m_desc.spotLight.cosThetaMax, m_desc.spotLight.cosFalloffStart);
 			}
 			case Interaction::LIGHT_AREA: {
-				return lights::evaluate_area(excident, m_intensity, m_desc.areaLight.normal);
+				return lights::evaluate_area(excident, m_desc.areaLight.intensity, m_incident);
 			}
 			case Interaction::CAMERA_PINHOLE: {
 				cameras::ProjectionResult proj = pinholecam_project(m_desc.pinholeCam, excident);
@@ -234,7 +235,7 @@ public:
 		switch(m_type) {
 			case Interaction::VOID: return VertexSample{};
 			case Interaction::LIGHT_POINT: {
-				auto lout = sample_light_dir_point(m_intensity, rndSet);
+				auto lout = sample_light_dir_point(m_incident, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction,
 									   lout.dir.pdf, AngularPdf{0.0f} },
@@ -243,18 +244,18 @@ public:
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
 				// TODO: sample new positions on a boundary?
-				return VertexSample{ math::PathSample{ m_intensity, math::PathEventType::REFLECTED,
-									   m_desc.dirLight.direction, m_desc.dirLight.dirPdf, AngularPdf{0.0f} },
+				return VertexSample{ math::PathSample{ m_desc.dirLight.radiance, math::PathEventType::REFLECTED,
+									   m_incident, m_desc.dirLight.dirPdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_SPOT: {
-				auto lout = sample_light_dir_spot(m_intensity, m_desc.spotLight.direction, m_desc.spotLight.cosThetaMax, m_desc.spotLight.cosFalloffStart, rndSet);
+				auto lout = sample_light_dir_spot(m_desc.spotLight.intensity, m_incident, m_desc.spotLight.cosThetaMax, m_desc.spotLight.cosFalloffStart, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, lout.dir.pdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
 			}
 			case Interaction::LIGHT_AREA: {
-				auto lout = sample_light_dir_area(m_intensity, m_desc.areaLight.normal, rndSet);
+				auto lout = sample_light_dir_area(m_desc.areaLight.intensity, m_incident, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, lout.dir.pdf, AngularPdf{0.0f} },
 									 m_position, scene::materials::MediumHandle{} };
@@ -307,14 +308,12 @@ public:
 		mAssert(is_connection_possible(path0, path1));
 		// Special cases
 		if(path0.is_orthographic()) {	// p0 has no position
-			mAssert(ei::approx(len(path0.m_position), 1.0f));
-			return { path1.m_position - path0.m_position * scene::MAX_SCENE_SIZE, scene::MAX_SCENE_SIZE,
-					 path0.m_position, ei::sq(scene::MAX_SCENE_SIZE) };
+			return { path1.m_position - path0.m_incident * scene::MAX_SCENE_SIZE, scene::MAX_SCENE_SIZE,
+					 path0.m_incident, ei::sq(scene::MAX_SCENE_SIZE) };
 		}
 		if(path1.is_orthographic()) {	// p1 has no position
-			mAssert(ei::approx(len(path1.m_position), 1.0f));
 			return { path0.m_position, scene::MAX_SCENE_SIZE,
-					-path1.m_position, ei::sq(scene::MAX_SCENE_SIZE) };
+					-path1.m_incident, ei::sq(scene::MAX_SCENE_SIZE) };
 		}
 		// A normal connection (both vertices have a position)
 		ei::Vec3 connection = path1.m_position - path0.m_position;
@@ -344,8 +343,11 @@ public:
 			case Interaction::CAMERA_FOCUS:
 				return math::SampleValue{};
 			case Interaction::LIGHT_AREA: {
-				float cosIn = ei::abs(dot(m_incident, m_desc.areaLight.normal));
-				return math::SampleValue{m_intensity, AngularPdf{cosIn / ei::PI}}; // TODO: / area?
+				// If an area light is hit, a surface vertex should be created.
+				// Area light vertices do not store the incident direction (they are
+				// start points).
+				mAssert(false);
+				return math::SampleValue{};
 			}
 			case Interaction::SURFACE: {
 				return scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
@@ -442,17 +444,18 @@ public:
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = lightSample.pos.position;
 		vert->init_prev_offset(mem, previous);
-		vert->m_intensity = lightSample.intensity;
 		vert->m_extension = ExtensionT{};
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
+				vert->m_incident = lightSample.intensity;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf, math::Throughput{});
 				return this_size();
 			}
 			case scene::lights::LightType::SPOT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_SPOT;
-				vert->m_desc.spotLight.direction = lightSample.source_param.spot.direction;
+				vert->m_incident = lightSample.source_param.spot.direction;
+				vert->m_desc.spotLight.intensity = lightSample.intensity;
 				vert->m_desc.spotLight.cosThetaMax = lightSample.source_param.spot.cosThetaMax;
 				vert->m_desc.spotLight.cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf, math::Throughput{});
@@ -462,13 +465,15 @@ public:
 			case scene::lights::LightType::AREA_LIGHT_QUAD:
 			case scene::lights::LightType::AREA_LIGHT_SPHERE: {
 				vert->m_type = Interaction::LIGHT_AREA;
-				vert->m_desc.areaLight.normal = lightSample.source_param.area.normal;
+				vert->m_incident = lightSample.source_param.area.normal;
+				vert->m_desc.areaLight.intensity = lightSample.intensity;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, 1.0f, lightSample.pos.pdf, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
 			}
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
 				vert->m_type = Interaction::LIGHT_DIRECTIONAL;
-				vert->m_desc.dirLight.direction = lightSample.source_param.dir.direction;
+				vert->m_incident = lightSample.source_param.dir.direction;
+				vert->m_desc.dirLight.radiance = lightSample.intensity;
 				// Swap PDFs. The rules of sampling are reverted in directional
 				// lights (first dir then pos is sampled). The vertex unifies
 				// the view for MIS computation where the usage order is reverted.
@@ -480,7 +485,8 @@ public:
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
 				vert->m_type = Interaction::LIGHT_ENVMAP;
-				vert->m_desc.dirLight.direction = lightSample.source_param.dir.direction;
+				vert->m_incident = lightSample.source_param.dir.direction;
+				vert->m_desc.dirLight.radiance = lightSample.intensity;
 				vert->m_desc.dirLight.dirPdf = lightSample.pos.pdf.to_angular_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE));
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, scene::MAX_SCENE_SIZE, 1.0f,
 					lightSample.source_param.dir.dirPdf.to_area_pdf(1.0f, ei::sq(scene::MAX_SCENE_SIZE)), math::Throughput{});
@@ -521,15 +527,15 @@ public:
 
 private:
 	struct AreaLightDesc {
-		scene::Direction normal;
+		scene::Direction intensity;
 	};
 	struct SpotLightDesc {
-		ei::Vec3 direction;
+		ei::Vec3 intensity;
 		half cosThetaMax;
 		half cosFalloffStart;
 	};
 	struct DirLightDesc {
-		ei::Vec3 direction;
+		ei::Vec3 radiance;
 		AngularPdf dirPdf;
 	};
 	struct SurfaceDesc {
@@ -554,11 +560,13 @@ private:
 	Interaction m_type;
 
 	// Direction from which this vertex was reached.
-	// May be zero-vector for start points or used otherwise.
-	union {
-		scene::Direction m_incident;		// For surface vertices
-		Spectrum m_intensity;				// For light vertices
-	};
+	// For end points the following values are stored:
+	//		Cameras: view direction
+	//		Point light: THE INTENSITY
+	//		Spot light: center direction
+	//		Area light: normal
+	//		Env/Dir light: the (sampled) direction
+	scene::Direction m_incident;
 
 	// PDF at this vertex in forward direction.
 	// Non-zero for start points and zero for end points.

@@ -277,9 +277,11 @@ evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
-evaluate_dir(const Spectrum& intensity, bool isEnvMap, AngularPdf pdf) {
+evaluate_dir(const Spectrum& radiance, bool isEnvMap, AngularPdf pdf) {
 	// Special case: the incindent area PDF is directly projected.
-	// To avoid the wrong conversion later we need to do its reversal here.
+	// To avoid the wrong contribution values later we need to do its reversal here
+	// which is scaling by the connection distance squared.
+	Spectrum intensity = radiance * ei::sq(scene::MAX_SCENE_SIZE);
 	return { intensity, isEnvMap ? 1.0f : 0.0f, pdf, AngularPdf{0.0f} };
 }
 

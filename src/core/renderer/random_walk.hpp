@@ -97,7 +97,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		return false;
 
 	// Create the new surface vertex
-	ei::Vec3 position = vertex.get_position() + outSample.excident * nextHit.hitT;
+	ei::Vec3 position = outSample.origin + outSample.excident * nextHit.hitT;
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// TODO: get tangent space and parameter pack from nextHit
 	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];

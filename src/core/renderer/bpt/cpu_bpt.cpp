@@ -115,6 +115,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	float cosProd = path0.is_surface() ? val0.cosOut : 1.0f;//TODO: abs?
 	if(path1.is_surface()) cosProd *= val1.cosOut;
 	mAssert(cosProd >= 0.0f);
+	mAssert(!isnan(bxdfProd.x));
 	// Early out if there would not be a contribution (estimating the materials is usually
 	// cheaper than the any-hit test).
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
@@ -127,6 +128,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 			ext0Copy.update(path0, connection.dir, val0.pdfF, val0.pdfB);
 			ext1Copy.update(path1, connection.dir, val1.pdfF, val1.pdfB);
 			float mis = get_mis_weight(ext0Copy, val0, ext1Copy, val1, connection.distanceSq);
+			mAssert(!isnan(mis));
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}
 	}
@@ -165,11 +167,14 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 								std::vector<BptPathVertex>& path) {
 	// Trace a light path
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	u64 lightTreeSeed = m_rngs[idx].next();
 	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, outputBuffer.get_num_pixels(),
-		m_rngs[idx].next(), m_sceneDesc.aabb, rndStart);
+		lightTreeSeed, m_sceneDesc.aabb, rndStart);
 	BptPathVertex::create_light(&path[0], &path[0], p, m_rngs[idx]);
 	math::Throughput throughput;
 	VertexSample sample;
+
+	if(coord == Pixel{240,599-24}) __debugbreak();
 
 	int lightPathLen = 0;
 	do {
@@ -193,6 +198,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		for(int l = ei::max(0, m_params.minPathLength-viewPathLen-1); l < maxL; ++l) {
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
+			mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
 			outputBuffer.contribute(outCoord, throughput, path[l].ext().throughput, conVal.cosines, conVal.bxdfs);
 		}
 
@@ -206,7 +212,9 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 				if(any(greater(background.value, 0.0f))) {
 					float relPdf = background.pdfB / sample.pdfF;
 					float mis = 1.0f / (1.0f + vertex[currentV].ext().prevRelativeProbabilitySum * relPdf + relPdf);
+					mAssert(!isnan(mis));
 					background.value *= mis;
+					mAssert(!isnan(background.value.x));
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
@@ -227,8 +235,10 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 											scene::lights::guide_flux);
 				float relPdf = startPdf / vertex[currentV].ext().incidentPdf;
 				float mis = 1.0f / (1.0f + vertex[currentV].ext().prevRelativeProbabilitySum * relPdf + relPdf);
+				mAssert(!isnan(mis));
 				emission.value *= mis;
 			}
+			mAssert(!isnan(emission.value.x));
 			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
 									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
 		}
