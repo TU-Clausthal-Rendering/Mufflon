@@ -106,7 +106,8 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_spot(const Spectrum& in
 	const scene::Direction globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * direction;
 	// Compute falloff for cone
 	const float falloff = scene::lights::get_falloff(dir.direction.z, cosThetaMax, cosFalloffStart);
-	return { {globalDir, dir.pdf}, intensity * falloff }; // TODO flux likely wrong (misses the pdf?)
+	const Spectrum flux = intensity * falloff / float(dir.pdf);
+	return { {globalDir, dir.pdf}, flux };
 }
 
 // *** AREA LIGHT : TRIANGLE ***
