@@ -39,16 +39,15 @@ struct BptVertexExt {
 
 	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
 							  const scene::Direction& excident,
-							  const AngularPdf pdfF, const AngularPdf pdfB) {
+							  const math::PdfPair pdf) {
 	//	this->excident = excident;
 	//	this->pdf = pdfF;
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
 		const BptPathVertex* prev = thisVertex.previous();
 		if(prev) { // !prev: Current one is a start vertex. There is no previous sum
-			float geoFactor = prev->get_geometrical_factor(thisVertex.get_incident_direction());
-			AreaPdf prevReversePdf = pdfB.to_area_pdf(
-				geoFactor, thisVertex.get_incident_dist_sq());
+			AreaPdf prevReversePdf = prev->convert_pdf(thisVertex.get_type(), pdf.back,
+				{thisVertex.get_incident_direction(), thisVertex.get_incident_dist_sq()});
 			// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
 			float relToPrev = prevReversePdf / prev->ext().incidentPdf;
 			prevRelativeProbabilitySum = relToPrev + relToPrev * prev->ext().prevRelativeProbabilitySum;
@@ -56,51 +55,65 @@ struct BptVertexExt {
 	}
 };
 
-// Recursive implementation for demonstration purposes
-/*float get_mis_part_rec(const BptPathVertex & path0, AngularPdf pdfBack, const scene::Direction& connection, float distSq) {
-	AreaPdf reversePdf = pdfBack.to_area_pdf(path0.get_geometrical_factor(connection), distSq);
-	// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
-	float relPdf = reversePdf / path0.get_incident_pdf();
-	// Go into recursion (or not)
-	const BptPathVertex* prev = path0.previous();
-	if(!prev) return relPdf;	// Current one is a start vertex. There is no previous sum
-	float prevRelProbabilitySum = get_mis_part_rec(*prev, path0.get_backward_pdf(), path0.get_incident_direction(), path0.get_incident_dist_sq());
-	return prevRelProbabilitySum * relPdf + relPdf;
-}*/
 
-float get_mis_part(const BptVertexExt& pathExt,
-	const math::EvalValue& value,
-	AngularPdf pdfBack,
-	float distSq
-) {
-	AreaPdf reversePdf = pdfBack.to_area_pdf(value.cosOut, distSq);
-	// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
-	float relPdf = reversePdf / pathExt.incidentPdf;
-	// Sum up all previous relative probability (cached recursion).
-	// Also see PBRT p.1015.
-//	const BptPathVertex* prev = path.previous();
-//	if(!prev) return relPdf;	// Current one is a start vertex. There is no previous sum
-	return pathExt.prevRelativeProbabilitySum * relPdf + relPdf; 
+// Get the sum of relative sampling probabilities for all events (connections/random hit)
+// up to the current vertex.
+// vertex: The vertex for which we want to compute the sum of previous sampling events.
+// vertexPdfs: Newly evaluated pdfs for the current connection.
+// pdfBack: The backward pdf of the next event.
+// connection: Direction and distance needed to convert pdfs.
+float get_mis_part(const BptPathVertex& vertex, const AngularPdf& vertexPdfBack,
+				   AngularPdf nextPdfBack, Interaction nextEventType,
+				   const ConnectionDir& connection) {
+	// 1. Prev connection probability: got to the current vertex from the next one instead
+	// of from the previous one.
+	AreaPdf reversePdf = vertex.convert_pdf(nextEventType, nextPdfBack, connection);
+	float relPdf = reversePdf / vertex.ext().incidentPdf;
+	// 2. Prev-prev connection probability: only now that we have a connection we
+	// know 'vertexPdfs' which is necessary to do the same computation at the previous vertex.
+	const BptPathVertex* prev = vertex.previous();
+	if(prev) {
+		reversePdf = prev->convert_pdf(vertex.get_type(), vertexPdfBack,
+			{ vertex.get_incident_direction(), vertex.get_incident_dist_sq() });
+		float prevRelPdf = reversePdf / prev->ext().incidentPdf;
+		// For older events we have a result in ext().prevRelativeProbabilitySum
+		// (cached recursion). Also see PBRT p.1015.
+		return relPdf + relPdf * (prevRelPdf + prevRelPdf * prev->ext().prevRelativeProbabilitySum);
+	} else
+		return relPdf;
 }
 
-// Assumes that path0 and path1 are fully evaluated vertices of the end points of
-// the two sub-paths.
-float get_mis_weight(const BptVertexExt& path0Ext, const math::EvalValue& value0,
-					 const BptVertexExt& path1Ext, const math::EvalValue& value1,
-					 float distSq
+// Get the final mis weight for a connection between two vertices.
+float get_mis_weight(const BptPathVertex& vertex0, math::PdfPair pdf0,
+					 const BptPathVertex& vertex1, math::PdfPair pdf1,
+					 const ConnectionDir& connection
 ) {
 	// Compute a weight with the balance heuristic.
 	// See PBRT p.1015 for details on recursive evaluation.
-	float rpSum0 = get_mis_part(path0Ext, value0, value1.pdfF, distSq);
-	float rpSum1 = get_mis_part(path1Ext, value1, value0.pdfF, distSq);
+	float rpSum0 = get_mis_part(vertex0, pdf0.back, pdf1.forw, vertex1.get_type(), connection);
+	float rpSum1 = get_mis_part(vertex1, pdf1.back, pdf0.forw, vertex0.get_type(), connection);
 	// The current event has p=1 and the sum of relative probabilities (to p) is
 	// given by the get_mis_part() method. => The following line is the balance
 	// heuristic: how likely is this event compared to all other possibilities?
-	return 1.0f / (1.0f + rpSum0 + rpSum1);
+	float weight = 1.0f / (1.0f + rpSum0 + rpSum1);
+	mAssert(!isnan(weight));
+	return weight;
+}
+
+// Get the final mis weight for a random hit
+float get_mis_weight(const BptPathVertex& vertex,
+					 AngularPdf vertexPdfBack,
+					 AreaPdf startPdf
+) {
+	// Compute a weight with the balance heuristic.
+	// See PBRT p.1015 for details on recursive evaluation.
+	float prevRelativeProbabilitySum = get_mis_part(vertex, vertexPdfBack, AngularPdf{float(startPdf)}, Interaction::VOID, {});
+	float weight = 1.0f / (1.0f + prevRelativeProbabilitySum);
+	mAssert(!isnan(weight));
+	return weight;
 }
 
 struct ConnectionValue { Spectrum bxdfs; float cosines; };
-
 ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 						const scene::SceneDescriptor<Device::CPU>& scene,
 						Pixel& coord
@@ -111,8 +124,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	auto val0 = path0.evaluate( connection.dir, scene.media, coord, false);
 	auto val1 = path1.evaluate(-connection.dir, scene.media, coord, true);
 	Spectrum bxdfProd = val0.value * val1.value;
-	float cosProd = path0.is_surface() ? val0.cosOut : 1.0f;//TODO: abs?
-	if(path1.is_surface()) cosProd *= val1.cosOut;
+	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
 	mAssert(!isnan(bxdfProd.x));
 	// Early out if there would not be a contribution (estimating the materials is usually
@@ -122,12 +134,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 		if(!scene::accel_struct::any_intersection(
 				scene, { connection.v0, connection.dir },
 				path0.get_primitive_id(), connection.distance)) {
-			auto ext0Copy = path0.ext();
-			auto ext1Copy = path1.ext();
-			ext0Copy.update(path0, connection.dir, val0.pdfF, val0.pdfB);
-			ext1Copy.update(path1, connection.dir, val1.pdfF, val1.pdfB);
-			float mis = get_mis_weight(ext0Copy, val0, ext1Copy, val1, connection.distanceSq);
-			mAssert(!isnan(mis));
+			float mis = get_mis_weight(path0, val0.pdf, path1, val1.pdf, connection);
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}
 	}
@@ -209,17 +216,12 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					// Update MIS for the last connection and that before
-					// Each direct hit must be compared to a connection to the current
-					// vertex and a backward tracing.
-					AngularPdf backtracePdf = AreaPdf{ 1.0f / math::projected_area(sample.excident, m_sceneDesc.aabb) }
-												.to_angular_pdf(1.0f, scene::MAX_SCENE_SIZE_SQ);
-					vertex[otherV].update_ext(scene::Direction{ 0.0f }, AngularPdf{ 0.0f }, backtracePdf);
-					float relPdf = background.pdfB / sample.pdfF;
-					float mis = 1.0f / (1.0f + vertex[otherV].ext().prevRelativeProbabilitySum * relPdf + relPdf);
-					mAssert(!isnan(mis));
+					// Update MIS for the last connection and that before.
+					// For direction/envmap sources the sampling of position and direction is
+					// reverted, so we need to cast the swapped pdfs to fit the expected order of events.
+					AngularPdf backtracePdf = AngularPdf{ 1.0f / math::projected_area(sample.excident, m_sceneDesc.aabb) };
+					float mis = get_mis_weight(vertex[otherV], backtracePdf, AreaPdf{float(background.pdf.forw)});
 					background.value *= mis;
-					mAssert(!isnan(background.value.x));
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
@@ -234,13 +236,10 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		if(viewPathLen >= m_params.minPathLength) {
 			math::SampleValue emission = vertex[currentV].get_emission();
 			if(emission.value != 0.0f) {
-				vertex[currentV].update_ext(scene::Direction{0.0f}, AngularPdf{0.0f}, emission.pdf);
 				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
 											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
 											scene::lights::guide_flux);
-				float relPdf = startPdf / vertex[currentV].ext().incidentPdf;
-				float mis = 1.0f / (1.0f + vertex[currentV].ext().prevRelativeProbabilitySum * relPdf + relPdf);
-				mAssert(!isnan(mis));
+				float mis = get_mis_weight(vertex[currentV], emission.pdf, startPdf);
 				emission.value *= mis;
 			}
 			mAssert(!isnan(emission.value.x));

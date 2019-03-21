@@ -23,7 +23,7 @@ struct PtVertexExt {
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const AngularPdf pdfF, const AngularPdf pdfB) {
+							  const math::PdfPair& pdf) {
 		//excident = sample.excident;
 		//pdf = sample.pdfF;
 	}
@@ -71,7 +71,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 								scene, { vertex.get_position(), nee.direction },
 								vertex.get_primitive_id(), nee.dist);
 				if(!anyhit) {
-					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
+					AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 					mAssert(!isnan(mis));
 					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
@@ -88,7 +88,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				// Missed scene - sample background
 				auto background = evaluate_background(scene.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / sample.pdfF);
+					float mis = 1.0f / (1.0f + background.pdf.back / sample.pdf.forw);
 					background.value *= mis;
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },

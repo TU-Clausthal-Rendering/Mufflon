@@ -40,26 +40,26 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 	if(rndSet.i0 < probLayerA) {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, 0, probLayerA-1);
 		sampleVal = sample(params.a, incidentTS, boundary, rndSet, adjoint);
-		if(sampleVal.pdfF.is_zero()) return sampleVal; // Discard
+		if(sampleVal.pdf.forw.is_zero()) return sampleVal; // Discard
 		otherVal = evaluate(params.b, incidentTS, sampleVal.excident, boundary);
-		scaleS = float(sampleVal.pdfF) * params.factorA;
+		scaleS = float(sampleVal.pdf.forw) * params.factorA;
 		scaleE = ei::abs(sampleVal.excident.z) * params.factorB;
 	} else {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, probLayerA, std::numeric_limits<u64>::max());
 		sampleVal = sample(params.b, incidentTS, boundary, rndSet, adjoint);
-		if(sampleVal.pdfF.is_zero()) return sampleVal; // Discard
+		if(sampleVal.pdf.forw.is_zero()) return sampleVal; // Discard
 		otherVal = evaluate(params.a, incidentTS, sampleVal.excident, boundary);
-		scaleS = float(sampleVal.pdfF) * params.factorB;
+		scaleS = float(sampleVal.pdf.forw) * params.factorB;
 		scaleE = ei::abs(sampleVal.excident.z) * params.factorA;
 		p = 1.0f - p;
 	}
 
 	// Blend values and pdfs.
-	float origPdf = float(sampleVal.pdfF);
-	sampleVal.pdfF = AngularPdf{ ei::lerp(float(otherVal.pdfF), float(sampleVal.pdfF), p) };
-	sampleVal.pdfB = AngularPdf{ ei::lerp(float(otherVal.pdfB), float(sampleVal.pdfB), p) };
+	float origPdf = float(sampleVal.pdf.forw);
+	sampleVal.pdf.forw = AngularPdf{ ei::lerp(float(otherVal.pdf.forw), float(sampleVal.pdf.forw), p) };
+	sampleVal.pdf.back = AngularPdf{ ei::lerp(float(otherVal.pdf.back), float(sampleVal.pdf.back), p) };
 	sampleVal.throughput = (sampleVal.throughput * scaleS + otherVal.value * scaleE)
-						  / float(sampleVal.pdfF);
+						  / float(sampleVal.pdf.forw);
 	return sampleVal;
 }
 
@@ -78,8 +78,8 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlend<LayerASample,
 	float p = fa / (fa + fb);// TODO: precompute in fetch?
 	// Blend their results
 	valA.value = valA.value * params.factorA + valB.value * params.factorB;
-	valA.pdfF = AngularPdf{ ei::lerp(float(valB.pdfF), float(valA.pdfF), p) };
-	valA.pdfB = AngularPdf{ ei::lerp(float(valB.pdfB), float(valA.pdfB), p) };
+	valA.pdf.forw = AngularPdf{ ei::lerp(float(valB.pdf.forw), float(valA.pdf.forw), p) };
+	valA.pdf.back = AngularPdf{ ei::lerp(float(valB.pdf.back), float(valA.pdf.back), p) };
 	return valA;
 }
 

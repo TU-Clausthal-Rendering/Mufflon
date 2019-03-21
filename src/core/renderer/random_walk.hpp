@@ -58,12 +58,12 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	}
 	mAssert(!isnan(outSample.excident.x) && !isnan(outSample.excident.y) && !isnan(outSample.excident.z)
 		&& !isnan(outSample.origin.x) && !isnan(outSample.origin.y) && !isnan(outSample.origin.z)
-		&& !isnan(float(outSample.pdfF)) && !isnan(float(outSample.pdfB)));
-	vertex.update_ext(outSample.excident, outSample.pdfF, outSample.pdfB);
+		&& !isnan(float(outSample.pdf.forw)) && !isnan(float(outSample.pdf.back)));
+	vertex.update_ext(outSample.excident, outSample.pdf);
 
 	// Update throughputs
 	throughput.weight *= outSample.throughput;
-	throughput.guideWeight *= 1.0f - expf(-(outSample.pdfF * outSample.pdfF) / 5.0f);
+	throughput.guideWeight *= 1.0f - expf(-(outSample.pdf.forw * outSample.pdf.forw) / 5.0f);
 
 	// Russian roulette
 	if(u0 >= 0.0f) {
@@ -94,7 +94,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 
 	// If we missed the scene, terminate the ray
 	if(nextHit.hitId.instanceId < 0) {
-		VertexType::create_void(&outVertex, &vertex, outSample.excident, outSample.pdfF,
+		VertexType::create_void(&outVertex, &vertex, outSample.excident, outSample.pdf.forw,
 								throughput);
 		return false;
 	}
@@ -115,7 +115,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	const float incidentCos = dot(nextHit.normal, outSample.excident);
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
 				position, tangentSpace, outSample.excident, nextHit.hitT,
-				incidentCos, outSample.pdfF, throughput);
+				incidentCos, outSample.pdf.forw, throughput);
 	return true;
 }
 

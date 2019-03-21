@@ -260,7 +260,7 @@ evaluate_spot(const scene::Direction& excident,
 	// OK, there will be some contribution
 	const float cosFalloffStartf = __half2float(cosFalloffStart);
 	const float falloff = get_falloff(cosOut, cosThetaMaxf, cosFalloffStartf);
-	return { intensity * falloff, 0.0f,
+	return { intensity * falloff, 1.0f,
 			 AngularPdf{ math::get_uniform_cone_pdf(cosThetaMaxf) },
 			 AngularPdf{ 0.0f } };
 }
@@ -280,9 +280,9 @@ CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_dir(const Spectrum& flux, bool isEnvMap, AngularPdf pdf) {
 	// Special case: the incindent area PDF is directly projected.
 	// To avoid the wrong contribution values later we need to do its reversal here.
-	// 'pdf' contains MAX_SCENE_SIZE_SQ / projectedSceneArea
+	// 'pdf' contains 1 / projectedSceneArea
 	Spectrum intensity = flux * float(pdf);
-	return { intensity, isEnvMap ? 1.0f : 0.0f, pdf, AngularPdf{0.0f} };
+	return { intensity, 1.0f, pdf, AngularPdf{0.0f} };
 }
 
 }}} // namespace mufflon::scene::lights

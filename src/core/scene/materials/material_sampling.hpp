@@ -121,7 +121,7 @@ sample(const TangentSpace& tangentSpace,
 						/ (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
-	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)));
+	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	return res;
 }
@@ -192,7 +192,7 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return math::EvalValue{};
-	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)));
+	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	// Shading normal caused density correction.
 	if(merge) {
@@ -210,8 +210,8 @@ evaluate(const TangentSpace& tangentSpace,
 	return math::EvalValue{
 		res.value, ei::abs(eDotN),
 		// Swap back output values if we swapped the directions before
-		adjoint ? res.pdfB : res.pdfF,
-		adjoint ? res.pdfF : res.pdfB
+		adjoint ? res.pdf.back : res.pdf.forw,
+		adjoint ? res.pdf.forw : res.pdf.back
 	};
 }
 
