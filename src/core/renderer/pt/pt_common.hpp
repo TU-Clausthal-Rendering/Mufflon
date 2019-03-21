@@ -16,8 +16,7 @@ struct PtVertexExt {
 
 	CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
 			  const scene::Direction& incident, const float incidentDistance,
-			  const float incidentCosine, const AreaPdf incidentPdf,
-			  const math::Throughput& incidentThrougput) {
+			  const AreaPdf incidentPdf, const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 	}
 
@@ -55,7 +54,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			// What means more complicated?
 			// A connnection to the camera results in a different pixel. In a multithreaded
 			// environment this means that we need a write mutex for each pixel.
-			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
+			// TODO: test/parametrize multievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = rng.next();
 			math::RndSet2 neeRnd = rng.next();
 			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
@@ -88,7 +87,8 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				// Missed scene - sample background
 				auto background = evaluate_background(scene.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdf.back / sample.pdf.forw);
+					AreaPdf startPdf = background_pdf(scene.lightTree, background);
+					float mis = 1.0f / (1.0f + float(startPdf) / float(sample.pdf.forw));
 					background.value *= mis;
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -103,11 +103,11 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 		if(pathLen >= params.minPathLength) {
 			Spectrum emission = vertex.get_emission().value;
 			if(emission != 0.0f) {
-				AreaPdf backwardPdf = connect_pdf(scene.lightTree, vertex.get_primitive_id(),
+				AreaPdf startPdf = connect_pdf(scene.lightTree, vertex.get_primitive_id(),
 												  vertex.get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + backwardPdf / vertex.ext().incidentPdf);
+					: 1.0f / (1.0f + startPdf / vertex.ext().incidentPdf);
 				emission *= mis;
 			}
 			outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),

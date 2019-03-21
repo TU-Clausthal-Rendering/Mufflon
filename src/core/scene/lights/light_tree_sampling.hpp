@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "light_sampling.hpp"
 #include "light_tree.hpp"
@@ -352,6 +352,16 @@ CUDA_FUNCTION AreaPdf emit_pdf(const LightTree<CURRENT_DEV>& tree,
 							   PrimitiveHandle primitive, ei::Vec2 surfaceParams,
 							   const ei::Vec3& refPosition, Guide&& guide) {
 	return light_pdf<false>(tree, primitive, surfaceParams, refPosition, guide);
+}
+
+/*
+ * Analogous to the area light hit-pdf there is an environment hit-pdf.
+ * While the pdf is an AngularPdf it is reinterpreted as AreaPdf for compatibility reasons.
+ */
+CUDA_FUNCTION AreaPdf background_pdf(const LightTree<CURRENT_DEV>& tree, const math::EvalValue& value) {
+	float backgroundFlux = ei::sum(tree.background.flux);
+	float p = backgroundFlux / (tree.dirLights.root.flux + tree.posLights.root.flux + backgroundFlux);
+	return AreaPdf{ float(value.pdf.back) * p };
 }
 
 // Guide the light tree traversal based on flux only

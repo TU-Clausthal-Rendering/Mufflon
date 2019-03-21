@@ -28,6 +28,13 @@ enum class LightType : u16 {
 	NUM_LIGHTS
 };
 
+CUDA_FUNCTION bool is_hitable(LightType type) {
+	return type == LightType::AREA_LIGHT_TRIANGLE
+		|| type == LightType::AREA_LIGHT_QUAD
+		|| type == LightType::AREA_LIGHT_SPHERE
+		|| type == LightType::ENVMAP_LIGHT;
+}
+
 // Important: light structs need to be packed to save storage space on the GPU
 #pragma pack(push, 1)
 
@@ -245,7 +252,7 @@ CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_point(const Spectrum& intensity) {
-	return { intensity, 0.0f, AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } };
+	return { intensity, 1.0f, AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } };
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue

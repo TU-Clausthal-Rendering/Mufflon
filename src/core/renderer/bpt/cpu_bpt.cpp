@@ -31,8 +31,7 @@ struct BptVertexExt {
 
 	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const float incidentCosine, const AreaPdf incidentPdf,
-							const math::Throughput& incidentThrougput) {
+							const AreaPdf incidentPdf, const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 		this->throughput = incidentThrougput;
 	}
@@ -107,7 +106,8 @@ float get_mis_weight(const BptPathVertex& vertex,
 ) {
 	// Compute a weight with the balance heuristic.
 	// See PBRT p.1015 for details on recursive evaluation.
-	float prevRelativeProbabilitySum = get_mis_part(vertex, vertexPdfBack, AngularPdf{float(startPdf)}, Interaction::VOID, {});
+	float prevRelativeProbabilitySum = get_mis_part(vertex, vertexPdfBack, AngularPdf{float(startPdf)},
+		Interaction::VIRTUAL, {scene::Direction{0.0f}, 0.0f});
 	float weight = 1.0f / (1.0f + prevRelativeProbabilitySum);
 	mAssert(!isnan(weight));
 	return weight;
@@ -202,11 +202,13 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		// Make a connection to any event on the light path
 		int maxL = ei::min(lightPathLen+1, m_params.maxPathLength-viewPathLen);
 		for(int l = ei::max(0, m_params.minPathLength-viewPathLen-1); l < maxL; ++l) {
+		//int l = 0; {
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
 			mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
 			outputBuffer.contribute(outCoord, throughput, path[l].ext().throughput, conVal.cosines, conVal.bxdfs);
 		}
+		//break;
 
 		// Walk
 		int otherV = 1 - currentV;
@@ -220,7 +222,8 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 					// For direction/envmap sources the sampling of position and direction is
 					// reverted, so we need to cast the swapped pdfs to fit the expected order of events.
 					AngularPdf backtracePdf = AngularPdf{ 1.0f / math::projected_area(sample.excident, m_sceneDesc.aabb) };
-					float mis = get_mis_weight(vertex[otherV], backtracePdf, AreaPdf{float(background.pdf.forw)});
+					AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
+					float mis = get_mis_weight(vertex[otherV], backtracePdf, startPdf);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },

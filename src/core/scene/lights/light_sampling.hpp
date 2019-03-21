@@ -55,7 +55,7 @@ struct NextEventEstimation {
 	Spectrum diffIrradiance {0.0f};		// Unit: W/m²sr²
 	float dist {0.0f};
 	float distSq {0.0f};
-	AreaPdf creationPdf;			// Pdf to create this connection event (depends on light choice probability and positional sampling)
+	AreaPdf creationPdf;				// Pdf to create this connection event (depends on light choice probability and positional sampling)
 	//LightType type; // Not required ATM
 };
 
@@ -195,9 +195,10 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const DirectionalLight& li
 													  const ei::Box& bounds,
 													  const math::RndSet2& rnd) {
 	// TODO: invalid unit? irradiance != intensity != flux, photons should have flux...
+	auto pos = math::sample_position(light.direction, bounds, rnd.u0, rnd.u1);
+	Spectrum flux = light.irradiance / float(pos.pdf);
 	return Photon{
-		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1),
-		light.irradiance, LightType::DIRECTIONAL_LIGHT,
+		pos, flux, LightType::DIRECTIONAL_LIGHT,
 		{light.direction, AngularPdf::infinite()}
 	};
 }
@@ -300,7 +301,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SpotLight&
 	// Compute the contribution
 	Spectrum diffIrradiance = value.value / distSq;
 	return NextEventEstimation{
-		direction, value.cosOut, diffIrradiance, dist, distSq, AreaPdf::infinite()
+		direction, 0.0f, diffIrradiance, dist, distSq, AreaPdf::infinite()
 	};
 }
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const AreaLightTriangle<CURRENT_DEV>& light,
@@ -402,8 +403,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Background
 // Evaluate a directional hit of the background.
 // This function would be more logical in lights.hpp. But it requires textures
 // and would increase header dependencies.
-template < Device dev >
-CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<dev>& background,
+CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_DEV>& background,
 												  const ei::Vec3& direction) {
 	switch(background.type) {
 		case BackgroundType::COLORED: return { background.color, 1.0f, AngularPdf{0.0f}, 

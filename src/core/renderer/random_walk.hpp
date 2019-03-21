@@ -112,10 +112,9 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	else
 		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
 	// Finalize
-	const float incidentCos = dot(nextHit.normal, outSample.excident);
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
 				position, tangentSpace, outSample.excident, nextHit.hitT,
-				incidentCos, outSample.pdf.forw, throughput);
+				vertex.get_type(), outSample.pdf.forw, throughput);
 	return true;
 }
 
