@@ -53,8 +53,22 @@ struct PEyeImportance {
 	}
 };
 
+struct PNormalDeviation {
+	float maxNormalDeviation = 60.f;
+	static ParamDesc get_desc() noexcept {
+		return { "Max. normal deviation from collapse", ParameterTypes::FLOAT};
+	}
+};
+
+struct PCollapseMode {
+	int collapseMode = 0;
+	static ParamDesc get_desc() noexcept {
+		return { "Collapse mode (0 = none, 1 = no concave, 2 = concave only once, 3 = concave dampened)", ParameterTypes::INT };
+	}
+};
+
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PVertexThreshold,
-	PDirectIndirectRatio, PDecimationEnabled, PMemoryConstraint, PInitialConstraint, PMaxPathLength,
+	PDirectIndirectRatio, PDecimationEnabled, PMemoryConstraint, PInitialConstraint, PNormalDeviation, PCollapseMode, PMaxPathLength,
 	PDirectImportance, PIndirectImportance, PEyeImportance>;
 
 }} // namespace mufflon::renderer

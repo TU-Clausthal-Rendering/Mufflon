@@ -22,7 +22,7 @@ public:
 	explicit Degrees() = default;
 	explicit Degrees(float a) : a(a) {}
 	explicit Degrees(Radians a) : a(a / ei::PI * 180.0f) {}
-	operator Radians() { return a * ei::PI / 180.0f; }
+	operator Radians() const { return a * ei::PI / 180.0f; }
 	explicit operator float() const { return a; }
 };
 

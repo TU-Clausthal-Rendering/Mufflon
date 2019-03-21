@@ -592,7 +592,9 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 				}
 
 				// Initialize the decimater with a possible initial decimation
-				m_decimaters.emplace_back(lod, newLod, collapses);
+				m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
+										  static_cast<decimation::CollapseMode>(m_params.collapseMode),
+										  collapses);
 				// TODO: this reeeeally breaks instancing
 				for(scene::InstanceHandle inst : obj.second) {
 					// Modify the scenario to use this lod instead
@@ -614,7 +616,9 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 			// No initial decimation
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 			auto& newLod = obj.first->add_lod(newLodLevel, lod);
-			m_decimaters.emplace_back(lod, newLod, 0u);
+			m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
+									  static_cast<decimation::CollapseMode>(m_params.collapseMode),
+									  0u);
 
 			// TODO: this reeeeally breaks instancing
 			for(scene::InstanceHandle inst : obj.second) {

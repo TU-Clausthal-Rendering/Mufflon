@@ -11,11 +11,29 @@
 
 namespace mufflon::renderer::silhouette::decimation {
 
+// Specify what the collapse mode should be
+enum class CollapseMode {
+	DEFAULT,						// Default: no restriction
+	NO_CONCAVE,						// Disallow concave collapses altogether
+	NO_CONCAVE_AFTER_UNCOLLAPSE,	// Allows concave collapses if they haven't been reversed yet
+	DAMPENED_CONCAVE				// Dampens concave collapses by increasing the requirements for the threshold
+};
+
 class ImportanceDecimater {
 public:
 	using Mesh = scene::geometry::PolygonMeshType;
 
-	ImportanceDecimater(scene::Lod& original, scene::Lod& decimated, const std::size_t initialCollapses);
+	// Necessary history to store per-vertex to reinsert
+	struct CollapseHistory {
+		Mesh::VertexHandle v1;
+		Mesh::VertexHandle vl;
+		Mesh::VertexHandle vr;
+	};
+
+	ImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
+						const Degrees maxNormalDeviation,
+						const CollapseMode mode,
+						const std::size_t initialCollapses);
 	ImportanceDecimater(const ImportanceDecimater&) = delete;
 	ImportanceDecimater(ImportanceDecimater&&);
 	ImportanceDecimater& operator=(const ImportanceDecimater&) = delete;
@@ -79,13 +97,6 @@ private:
 		OpenMesh::VPropHandleT<int> m_heapPosition;
 	};
 
-	// Necessary history to store per-vertex to reinsert
-	struct CollapseHistory {
-		Mesh::VertexHandle v1;
-		Mesh::VertexHandle vl;
-		Mesh::VertexHandle vr;
-	};
-
 	// Returns the vertex handle in the original mesh
 	Mesh::VertexHandle get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const;
 
@@ -99,7 +110,12 @@ private:
 										   const float threshold) const;
 	void add_vertex_collapse(const Mesh::VertexHandle vertex, const float threshold);
 	bool is_collapse_legal(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const;
-	float collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const;
+	float collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci);
+
+	// Check if a collapse is concave
+	bool is_concave_collapse(const CollapseInfo& ci) const;
+	// Checks if the changed face normals are within reasonable limits
+	bool check_normal_deviation(const CollapseInfo& ci);
 
 	scene::Lod& m_original;
 	scene::Lod& m_decimated;
@@ -114,14 +130,19 @@ private:
 	OpenMesh::VPropHandleT<Mesh::VertexHandle> m_originalVertex;	// Vertex handle in the original mesh
 	OpenMesh::VPropHandleT<float> m_importanceDensity;				// Importance per m² for the decimated mesh
 	// Original mesh properties
-	OpenMesh::VPropHandleT<Mesh::VertexHandle> m_collapsedTo;		// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
+	OpenMesh::VPropHandleT<CollapseHistory> m_collapsedTo;			// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
 	OpenMesh::VPropHandleT<bool> m_collapsed;						// Whether collapsedTo refers to original or decimated mesh
+	OpenMesh::HPropHandleT<bool> m_uncollapsed;						// Whether a given halfedge has been uncollapsed before
+	OpenMesh::HPropHandleT<char> m_uncollapsedCount;				// Number of times a halfedge has been restored
 
 	// Stuff for decimation
 	std::unique_ptr<OpenMesh::Utils::HeapT<Mesh::VertexHandle, HeapInterface>> m_heap;
 	OpenMesh::VPropHandleT<Mesh::HalfedgeHandle> m_collapseTarget;	// Stores the collapse target halfedge for a vertex
 	OpenMesh::VPropHandleT<float> m_priority;						// Stores the collapse priority for a vertex and its target
 	OpenMesh::VPropHandleT<int> m_heapPosition;						// Position of vertex in the heap
+
+	const float m_minNormalCos;										// The cosine of the maximum normal deviation permitted
+	const CollapseMode m_collapseMode;								// Specify how to deal with concave collapses
 };
 
 // Used in initial decimation
@@ -138,18 +159,24 @@ public:
 	DecimationTrackerModule& operator=(DecimationTrackerModule&&) = delete;
 
 	void set_properties(MeshT& originalMesh, OpenMesh::VPropHandleT<typename MeshT::VertexHandle> originalVertex,
-						OpenMesh::VPropHandleT<typename MeshT::VertexHandle> collapsedTo,
-						OpenMesh::VPropHandleT<bool> collapsed);
+						OpenMesh::VPropHandleT<ImportanceDecimater::CollapseHistory> collapsedTo,
+						OpenMesh::VPropHandleT<bool> collapsed, const float minNormalCos,
+						const CollapseMode collapseMode);
 	float collapse_priority(const CollapseInfo& ci) final;
 	void postprocess_collapse(const CollapseInfo& ci) final;
+	bool is_concave_collapse(const CollapseInfo& ci);
+	bool check_normal_deviation(const CollapseInfo& ci);
 
 private:
 	MeshT* m_originalMesh;
 
-	OpenMesh::VPropHandleT<typename MeshT::VertexHandle> m_originalVertex;	// Vertex handle in the original mesh
+	OpenMesh::VPropHandleT<typename MeshT::VertexHandle> m_originalVertex;			// Vertex handle in the original mesh
 	// Original mesh properties
-	OpenMesh::VPropHandleT<typename MeshT::VertexHandle> m_collapsedTo;		// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
-	OpenMesh::VPropHandleT<bool> m_collapsed;								// Whether collapsedTo refers to original or decimated mesh
+	OpenMesh::VPropHandleT<ImportanceDecimater::CollapseHistory> m_collapsedTo;		// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
+	OpenMesh::VPropHandleT<bool> m_collapsed;										// Whether collapsedTo refers to original or decimated mesh
+
+	float m_minNormalCos;															// The cosine of the maximum normal deviation permitted
+	CollapseMode m_collapseMode;													// Specify how to deal with concave collapses
 };
 
 } // namespace mufflon::renderer::silhouette::decimation

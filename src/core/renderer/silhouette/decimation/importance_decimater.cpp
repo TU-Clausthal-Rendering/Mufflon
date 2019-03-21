@@ -40,6 +40,8 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 } // namespace
 
 ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
+										 const Degrees maxNormalDeviation,
+										 const CollapseMode mode,
 										 const std::size_t initialCollapses) :
 	m_original(original),
 	m_decimated(decimated),
@@ -47,7 +49,9 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 	m_decimatedPoly(m_decimated.template get_geometry<Polygons>()),
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(m_decimatedPoly.get_mesh()),
-	m_importance(std::make_unique<std::atomic<float>[]>(m_originalPoly.get_vertex_count()))
+	m_importance(std::make_unique<std::atomic<float>[]>(m_originalPoly.get_vertex_count())),
+	m_minNormalCos(std::cos(static_cast<Radians>(maxNormalDeviation))),
+	m_collapseMode(mode)
 {
 	// Add necessary properties
 	m_decimatedMesh.add_property(m_originalVertex);
@@ -58,10 +62,31 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 	m_decimatedMesh.request_edge_status();
 	m_decimatedMesh.request_halfedge_status();
 	m_decimatedMesh.request_face_status();
+	// Add optional properties
+	if(m_collapseMode == CollapseMode::NO_CONCAVE_AFTER_UNCOLLAPSE)
+		m_originalMesh.add_property(m_uncollapsed);
+	else if(m_collapseMode == CollapseMode::DAMPENED_CONCAVE)
+		m_originalMesh.add_property(m_uncollapsedCount);
 
 	// Set the original vertices for the (to be) decimated mesh
 	for(auto vertex : m_decimatedMesh.vertices())
 		m_decimatedMesh.property(m_originalVertex, vertex) = vertex;
+	for(auto vertex : m_originalMesh.vertices()) {
+		m_originalMesh.property(m_collapsed, vertex) = false;
+		// Valid, since no decimation has been performed yet
+		m_originalMesh.property(m_collapsedTo, vertex).v1 = vertex;
+	}
+
+	if(m_originalMesh.n_vertices() > 20) {
+		for(auto iter = m_originalMesh.cvv_ccwbegin(m_originalMesh.vertex_handle(0)); iter.is_valid(); ++iter) {
+			const auto vh = *iter;
+			const auto iasdf = 0;
+		}
+		for(auto iter = m_decimatedMesh.cvv_ccwbegin(m_decimatedMesh.vertex_handle(0)); iter.is_valid(); ++iter) {
+			const auto vh = *iter;
+			const auto iasdf = 0;
+		}
+	}
 
 	// Perform initial decimation
 	if(initialCollapses > 0u) {
@@ -70,7 +95,8 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 		DecimationTrackerModule<>::Handle trackerHandle;
 		decimater.add(modQuadricHandle);
 		decimater.add(trackerHandle);
-		decimater.module(trackerHandle).set_properties(m_originalMesh, m_originalVertex, m_collapsedTo, m_collapsed);
+		decimater.module(trackerHandle).set_properties(m_originalMesh, m_originalVertex, m_collapsedTo, m_collapsed,
+													   m_minNormalCos, m_collapseMode);
 		// Possibly repeat until we reached the desired count
 		const std::size_t targetCollapses = std::min(initialCollapses, m_originalPoly.get_vertex_count());
 		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
@@ -103,7 +129,9 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	m_heap(std::move(dec.m_heap)),
 	m_collapseTarget(dec.m_collapseTarget),
 	m_priority(dec.m_priority),
-	m_heapPosition(dec.m_heapPosition)
+	m_heapPosition(dec.m_heapPosition),
+	m_minNormalCos(dec.m_minNormalCos),
+	m_collapseMode(dec.m_collapseMode)
 {
 	// Request the status again since it will get removed once in the destructor
 	m_decimatedMesh.request_vertex_status();
@@ -118,10 +146,23 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	dec.m_collapseTarget.invalidate();
 	dec.m_priority.invalidate();
 	dec.m_heapPosition.invalidate();
+	dec.m_uncollapsed.invalidate();
+	dec.m_uncollapsedCount.invalidate();
 }
 
 ImportanceDecimater::~ImportanceDecimater() {
-	// TODO: remove properties
+	if(m_originalVertex.is_valid())
+		m_decimatedMesh.remove_property(m_originalVertex);
+	if(m_importanceDensity.is_valid())
+		m_decimatedMesh.remove_property(m_importanceDensity);
+	if(m_collapsedTo.is_valid())
+		m_originalMesh.remove_property(m_collapsedTo);
+	if(m_collapsed.is_valid())
+		m_originalMesh.remove_property(m_collapsed);
+	if(m_uncollapsed.is_valid())
+		m_originalMesh.remove_property(m_uncollapsed);
+	if(m_uncollapsedCount.is_valid())
+		m_originalMesh.remove_property(m_uncollapsedCount);
 
 	m_decimatedMesh.release_vertex_status();
 	m_decimatedMesh.release_edge_status();
@@ -205,7 +246,13 @@ std::size_t ImportanceDecimater::collapse(const float threshold) {
 		m_decimatedMesh.collapse(v0v1);
 		++currCollapses;
 
-		// TODO: track collapse properties
+		// Update the collapse properties
+		const auto originalV0 = get_original_vertex_handle(ci.v0);
+		const auto originalV1 = get_original_vertex_handle(ci.v1);
+		m_originalMesh.property(m_collapsed, originalV0) = true;
+		m_originalMesh.property(m_collapsedTo, originalV0) = CollapseHistory{
+			originalV1, get_original_vertex_handle(ci.vl), get_original_vertex_handle(ci.vr)
+		};
 
 		// update heap (former one ring of decimated vertex)
 		for(auto supportVertex : support) {
@@ -241,33 +288,36 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 	// Go through all vertices and check those that got collapsed somewhere
 	for(const auto vertex : m_originalMesh.vertices()) {
 		// Weed out vertices that are not collapsed
-		// TODO: integrate in collapse
 		if(!m_originalMesh.property(m_collapsed, vertex))
 			continue;
 
 		// Check if the collapsed-to vertex is also collapsed
-		const auto v1 = m_originalMesh.property(m_collapsedTo, vertex);
-		if(m_originalMesh.property(m_collapsed, v1))
+		const auto history = m_originalMesh.property(m_collapsedTo, vertex);
+		if(m_originalMesh.property(m_collapsed, history.v1))
+			continue;
+
+		// Check if a connection exists in the original mesh
+		const auto v0v1 = m_originalMesh.find_halfedge(vertex, history.v1);
+		if(!v0v1.is_valid())
 			continue;
 
 		// Query the vertex handle of the collapse target in the decimated mesh
-		const auto decimatedV1 = m_originalMesh.property(m_collapsedTo, v1);
+		const auto decimatedV1 = m_originalMesh.property(m_collapsedTo, history.v1).v1;
 		mAssert(decimatedV1.is_valid());
 
 		// Determine the left and right vertices from the collapse (only works for triangles!)
-		const auto v0v1 = m_originalMesh.find_halfedge(vertex, v1);
 		mAssert(v0v1.is_valid());
 		const auto v1v0 = m_originalMesh.opposite_halfedge_handle(v0v1);
-		auto vl = m_originalMesh.to_vertex_handle(m_originalMesh.next_halfedge_handle(v0v1));
-		auto vr = m_originalMesh.to_vertex_handle(m_originalMesh.next_halfedge_handle(v1v0));
+		auto vl = history.vl;
+		auto vr = history.vr;
 		// Check if the vertices got collapsed and, if yes, find the currently still existing ones
 		while(m_originalMesh.property(m_collapsed, vl))
-			vl = m_originalMesh.property(m_collapsedTo, vl);
+			vl = m_originalMesh.property(m_collapsedTo, vl).v1;
 		while(m_originalMesh.property(m_collapsed, vr))
-			vr = m_originalMesh.property(m_collapsedTo, vr);
+			vr = m_originalMesh.property(m_collapsedTo, vr).v1;
 		// Get the vertex handles for left-right in the decimated mesh
-		const auto decimatedVl = m_originalMesh.property(m_collapsedTo, vl);
-		const auto decimatedVr = m_originalMesh.property(m_collapsedTo, vr);
+		const auto decimatedVl = m_originalMesh.property(m_collapsedTo, vl).v1;
+		const auto decimatedVr = m_originalMesh.property(m_collapsedTo, vr).v1;
 		mAssert(decimatedVl.is_valid());
 		mAssert(decimatedVr.is_valid());
 
@@ -288,7 +338,7 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 			// VR and V1 need special treatment...
 			m_importance[vr.idx()].store(newDensities[i].first);
 			m_decimatedMesh.property(m_importanceDensity, decimatedVr) = newDensities[i].second;
-			m_importance[v1.idx()].store(newDensities.back().first);
+			m_importance[history.v1.idx()].store(newDensities.back().first);
 			m_decimatedMesh.property(m_importanceDensity, decimatedV1) = newDensities.back().second;
 
 			// Insert V0 into the decimated LoD
@@ -309,8 +359,16 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 
 			// Adjust collapsed sequence
 			m_originalMesh.property(m_collapsed, vertex) = false;
-			m_originalMesh.property(m_collapsedTo, vertex) = v0Hdl;
+			m_originalMesh.property(m_collapsedTo, vertex) = CollapseHistory{ v0Hdl, Mesh::VertexHandle(), Mesh::VertexHandle() };
 			m_decimatedMesh.property(m_originalVertex, v0Hdl) = vertex;
+
+			// Count up the uncollapse, if necessary
+			if(m_collapseMode == CollapseMode::NO_CONCAVE_AFTER_UNCOLLAPSE) {
+				m_originalMesh.property(m_uncollapsed, v0v1) = true;
+			} else if(m_collapseMode == CollapseMode::DAMPENED_CONCAVE) {
+				mAssert(m_originalMesh.property(m_uncollapsedCount, v0v1) < std::numeric_limits<char>::max());
+				m_originalMesh.property(m_uncollapsedCount, v0v1) += 1u;
+			}
 
 			++uncollapses;
 		}
@@ -371,7 +429,20 @@ bool ImportanceDecimater::is_collapse_legal(const OpenMesh::Decimater::CollapseI
 	return true;
 }
 
-float ImportanceDecimater::collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) const {
+float ImportanceDecimater::collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci) {
+	// Check normal, concavity
+	if(!check_normal_deviation(ci))
+		return -1.f;
+
+
+	if(m_collapseMode == CollapseMode::NO_CONCAVE && is_concave_collapse(ci))
+		return -1.f;
+
+	if(m_collapseMode == CollapseMode::NO_CONCAVE_AFTER_UNCOLLAPSE) {
+		// Find the original halfedge and check if it has been collapsed before
+		// TODO: check flag
+	}
+
 	float importance = m_decimatedMesh.property(m_importanceDensity, ci.v0);
 	u32 count = 0u;
 	for(auto ringVertexHandle = m_decimatedMesh.vv_iter(ci.v0); ringVertexHandle.is_valid(); ++ringVertexHandle) {
@@ -379,6 +450,11 @@ float ImportanceDecimater::collapse_priority(const OpenMesh::Decimater::Collapse
 		++count;
 	}
 	importance /= static_cast<float>(count);
+
+	if(m_collapseMode == CollapseMode::DAMPENED_CONCAVE) {
+		// TODO: modify importance
+	}
+
 	return importance;
 }
 
@@ -420,6 +496,105 @@ void ImportanceDecimater::add_vertex_collapse(const Mesh::VertexHandle vh, const
 	}
 }
 
+bool ImportanceDecimater::is_concave_collapse(const CollapseInfo& ci) const {
+	const auto p0 = util::pun<ei::Vec3>(ci.p0);
+	const auto p1 = util::pun<ei::Vec3>(ci.p1);
+	const auto p0p1 = p1 - p0;
+	const auto pl = util::pun<ei::Vec3>(m_decimatedMesh.point(ci.vl));
+	const auto pr = util::pun<ei::Vec3>(m_decimatedMesh.point(ci.vr));
+	const auto flNormal = ei::cross(p0p1, pl - p0);
+	const auto frNormal = ei::cross(pr - p0, p0p1);
+	const auto p0p1Normal = 0.5f * (flNormal + frNormal); // Not normalized because not needed
+	// First condition is a "saddle edge": if we're either all convex or all concave then we're a-okay
+	bool isSaddle = false;
+	{
+		int sgn = 0;
+		// First for v0: vx -> v0
+		for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v0); circIter.is_valid() && !isSaddle; ++circIter) {
+			const auto pxp0 = util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)) - p0;
+			const auto dot = ei::dot(p0p1Normal, pxp0);
+			const auto currSgn = (dot > 0) ? 1 : -1;
+			if(sgn == 0) {
+				sgn = currSgn;
+			} else if(sgn != currSgn)
+				isSaddle = true;
+		}
+		// Then for v1: vx -> v1
+		for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v1); circIter.is_valid() && !isSaddle; ++circIter) {
+			const auto pxp1 = util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)) - p1;
+			const auto dot = ei::dot(p0p1Normal, pxp1);
+			const auto currSgn = (dot > 0) ? 1 : -1;
+			if(sgn != currSgn)
+				isSaddle = true;
+		}
+	}
+
+	// TODO
+	return isSaddle;
+
+
+	// To detect whether a collapse protrudes the mesh silhouette we check the new resulting
+	// edges against the normals
+	// Compute the normal of our separation plane (normal points in direction of fl)
+#if 0
+	const auto sepNormal = ei::cross(p0p1Normal, p0p1);
+
+	// Now we can decide: for each incoming edge, determine if it violates convexity
+	for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v0); circIter.is_valid(); ++circIter) {
+		// Don't check the edge that goes to v1
+		if(*circIter == ci.v1)
+			continue;
+		// Compute new edge
+		const auto newEdge = p1 - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter));
+		// Check the side to compare against
+		if(ei::dot(sepNormal, newEdge) > 0) {
+			if(ei::dot(newEdge, flNormal) < 0)
+				return true;
+		} else {
+			if(ei::dot(newEdge, frNormal) < 0)
+				return true;
+		}
+	}
+#endif
+}
+
+bool ImportanceDecimater::check_normal_deviation(const CollapseInfo& ci) {
+	static thread_local std::vector<typename Mesh::Normal> normalStorage;
+
+	// Compute the face normals before the collapse
+	normalStorage.clear();
+	for(auto iter = m_decimatedMesh.cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter) {
+		typename Mesh::FaceHandle fh = *iter;
+		if(fh != ci.fl && fh != ci.fr) {
+			normalStorage.push_back(m_decimatedMesh.calc_face_normal(fh));
+		}
+	}
+
+	// simulate collapse
+	m_decimatedMesh.set_point(ci.v0, ci.p1);
+
+	// check for flipping normals
+	typename Mesh::Scalar c(1.0);
+	u32 index = 0u;
+	for(auto iter = m_decimatedMesh.cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter, ++index) {
+		typename Mesh::FaceHandle fh = *iter;
+		if(fh != ci.fl && fh != ci.fr) {
+			typename const Mesh::Normal& n1 = normalStorage[index];
+			typename Mesh::Normal n2 = m_decimatedMesh.calc_face_normal(fh);
+
+			c = dot(n1, n2);
+
+			if(c < m_minNormalCos)
+				break;
+		}
+	}
+
+	// undo simulation changes
+	m_decimatedMesh.set_point(ci.v0, ci.p0);
+
+	return c >= m_minNormalCos;
+}
+
 float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pair<float, float>>& newDensities,
 														   const Mesh::VertexHandle v0, const Mesh::VertexHandle v1,
 														   const Mesh::VertexHandle vl, const Mesh::VertexHandle vr,
@@ -434,10 +609,12 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 
 	float v0Importance = 0.f;
 
-	for(auto heh = v1vl; m_decimatedMesh.to_vertex_handle(heh) != vr;
-		heh = m_decimatedMesh.opposite_halfedge_handle(m_decimatedMesh.prev_halfedge_handle(heh))) {
-		const auto vb = m_decimatedMesh.to_vertex_handle(heh);
-		distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vb)) - v0Pos);
+	if(v1 != vl && v1 != vr && vl != vr) {
+		for(auto heh = v1vl; m_decimatedMesh.to_vertex_handle(heh) != vr;
+			heh = m_decimatedMesh.opposite_halfedge_handle(m_decimatedMesh.prev_halfedge_handle(heh))) {
+			const auto vb = m_decimatedMesh.to_vertex_handle(heh);
+			distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vb)) - v0Pos);
+		}
 	}
 	distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(vr)) - v0Pos);
 	distSqrSum += ei::lensq(util::pun<ei::Vec3>(m_decimatedMesh.point(v1)) - v0Pos);
@@ -459,9 +636,9 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 	// Interjection: check vl
 	const float vlImp = m_importance[get_original_vertex_handle(vl).idx()].load();
 	const float vlArea = vlImp / m_decimatedMesh.property(m_importanceDensity, vl);
-	const float vlImpLoss = ei::lensq(vlPos - v0Pos) / distSqrSum;
+	const float vlImpLoss = vlImp * ei::lensq(vlPos - v0Pos) / distSqrSum;
 	v0Importance += vlImpLoss;
-	const float vlNewImp = vlImp * (1.f - vlImpLoss);
+	const float vlNewImp = vlImp - vlImpLoss;
 	const float vlNewDensity = vlNewImp / (vlArea - rightV1Area + rightV0Area + v0vlv1Area);
 	newDensities.push_back(std::make_pair(vlNewImp, vlNewDensity));
 	if(newDensities.back().second < threshold)
@@ -486,9 +663,9 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 		// Compare importance
 		const float middleImp = m_importance[get_original_vertex_handle(middleVertex).idx()].load();
 		const float middleArea = middleImp / m_decimatedMesh.property(m_importanceDensity, middleVertex);
-		const float middleImpLoss = ei::lensq(middlePos - v0Pos) / distSqrSum;
+		const float middleImpLoss = middleImp * ei::lensq(middlePos - v0Pos) / distSqrSum;
 		v0Importance += middleImpLoss;
-		const float middleNewImp = middleImp * (1.f - middleImpLoss);
+		const float middleNewImp = middleImp - middleImpLoss;
 		const float middleNewDensity = middleNewImp / (middleArea - leftV1Area - rightV1Area + leftV0Area + rightV0Area);
 		newDensities.push_back(std::make_pair(middleNewImp, middleNewDensity));
 		if(newDensities.back().second < threshold)
@@ -499,9 +676,9 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 	// Check vr
 	const float vrImp = m_importance[get_original_vertex_handle(vr).idx()].load();
 	const float vrArea = vrImp / m_decimatedMesh.property(m_importanceDensity, vr);
-	const float vrImpLoss = ei::lensq(vrPos - v0Pos) / distSqrSum;
+	const float vrImpLoss = vrImp * ei::lensq(vrPos - v0Pos) / distSqrSum;
 	v0Importance += vrImpLoss;
-	const float vrNewImp = vrImp * (1.f - vrImpLoss);
+	const float vrNewImp = vrImp - vrImpLoss;
 	const float vrNewDensity = vrNewImp / (vrArea - rightV1Area + rightV0Area + v0vrv1Area);
 	newDensities.push_back(std::make_pair(vlNewImp, vlNewDensity));
 	if(newDensities.back().second < threshold)
@@ -510,9 +687,9 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 	// Now check v1
 	const float v1Imp = m_importance[get_original_vertex_handle(v1).idx()].load();
 	const float v1Area = v1Imp / m_decimatedMesh.property(m_importanceDensity, v1);
-	const float v1ImpLoss = ei::lensq(v1Pos - v0Pos) / distSqrSum;
+	const float v1ImpLoss = v1Imp * ei::lensq(v1Pos - v0Pos) / distSqrSum;
 	v0Importance += v1ImpLoss;
-	const float v1NewImp = v1Imp * (1.f - v1ImpLoss);
+	const float v1NewImp = v1Imp - v1ImpLoss;
 	const float v1NewDensity = v1NewImp / (v1Area - v1InnerArea + v0vlv1Area + v0vrv1Area);
 	newDensities.push_back(std::make_pair(vlNewImp, vlNewDensity));
 	if(newDensities.back().second < threshold)
@@ -621,16 +798,26 @@ DecimationTrackerModule<MeshT>::DecimationTrackerModule(MeshT& mesh) :
 
 template < class MeshT >
 void DecimationTrackerModule<MeshT>::set_properties(MeshT& originalMesh, OpenMesh::VPropHandleT<typename MeshT::VertexHandle> originalVertex,
-													OpenMesh::VPropHandleT<typename MeshT::VertexHandle> collapsedTo,
-													OpenMesh::VPropHandleT<bool> collapsed) {
+													OpenMesh::VPropHandleT<ImportanceDecimater::CollapseHistory> collapsedTo,
+													OpenMesh::VPropHandleT<bool> collapsed, const float minNormalCos,
+													const CollapseMode collapseMode) {
 	m_originalMesh = &originalMesh;
 	m_originalVertex = originalVertex;
 	m_collapsedTo = collapsedTo;
 	m_collapsed = collapsed;
+	m_minNormalCos = minNormalCos;
+	m_collapseMode = m_collapseMode;
 }
 
 template < class MeshT >
 float DecimationTrackerModule<MeshT>::collapse_priority(const CollapseInfo& ci) {
+	// Check normal, concavity
+	if(!check_normal_deviation(ci))
+		return Base::ILLEGAL_COLLAPSE;
+
+	if(m_collapseMode == CollapseMode::NO_CONCAVE && is_concave_collapse(ci))
+		return Base::ILLEGAL_COLLAPSE;
+
 	return Base::LEGAL_COLLAPSE;
 }
 
@@ -639,7 +826,84 @@ void DecimationTrackerModule<MeshT>::postprocess_collapse(const CollapseInfo& ci
 	// Track the properties
 	// This should work because the indices should still be the same as in the original mesh
 	m_originalMesh->property(m_collapsed, ci.v0) = true;
-	m_originalMesh->property(m_collapsedTo, ci.v0) = ci.v1;
+	m_originalMesh->property(m_collapsedTo, ci.v0) = ImportanceDecimater::CollapseHistory{ ci.v1, ci.vl, ci.vr };
+}
+
+
+template < class MeshT >
+bool DecimationTrackerModule<MeshT>::is_concave_collapse(const CollapseInfo& ci) {
+	const auto p0 = util::pun<ei::Vec3>(ci.p0);
+	const auto p1 = util::pun<ei::Vec3>(ci.p1);
+	const auto p0p1 = p1 - p0;
+	const auto pl = util::pun<ei::Vec3>(Base::mesh().point(ci.vl));
+	const auto pr = util::pun<ei::Vec3>(Base::mesh().point(ci.vr));
+	const auto flNormal = ei::cross(p0p1, pl - p0);
+	const auto frNormal = ei::cross(pr - p0, p0p1);
+	const auto p0p1Normal = 0.5f * (flNormal + frNormal); // Not normalized because not needed
+	// First condition is a "saddle edge": if we're either all convex or all concave then we're a-okay
+	bool isSaddle = false;
+	{
+		int sgn = 0;
+		// First for v0: vx -> v0
+		for(auto circIter = Base::mesh().cvv_ccwbegin(ci.v0); circIter.is_valid() && !isSaddle; ++circIter) {
+			const auto pxp0 = util::pun<ei::Vec3>(Base::mesh().point(*circIter)) - p0;
+			const auto dot = ei::dot(p0p1Normal, pxp0);
+			const auto currSgn = (dot > 0) ? 1 : -1;
+			if(sgn == 0) {
+				sgn = currSgn;
+			} else if(sgn != currSgn)
+				isSaddle = true;
+		}
+		// Then for v1: vx -> v1
+		for(auto circIter = Base::mesh().cvv_ccwbegin(ci.v1); circIter.is_valid() && !isSaddle; ++circIter) {
+			const auto pxp1 = util::pun<ei::Vec3>(Base::mesh().point(*circIter)) - p1;
+			const auto dot = ei::dot(p0p1Normal, pxp1);
+			const auto currSgn = (dot > 0) ? 1 : -1;
+			if(sgn != currSgn)
+				isSaddle = true;
+		}
+	}
+
+	// TODO
+	return isSaddle;
+}
+
+template < class MeshT >
+bool DecimationTrackerModule<MeshT>::check_normal_deviation(const CollapseInfo& ci) {
+	static thread_local std::vector<typename Mesh::Normal> normalStorage;
+
+	// Compute the face normals before the collapse
+	normalStorage.clear();
+	for(auto iter = Base::mesh().cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter) {
+		typename Mesh::FaceHandle fh = *iter;
+		if(fh != ci.fl && fh != ci.fr) {
+			normalStorage.push_back(Base::mesh().calc_face_normal(fh));
+		}
+	}
+
+	// simulate collapse
+	Base::mesh().set_point(ci.v0, ci.p1);
+
+	// check for flipping normals
+	typename Mesh::Scalar c(1.0);
+	u32 index = 0u;
+	for(auto iter = Base::mesh().cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter, ++index) {
+		typename Mesh::FaceHandle fh = *iter;
+		if(fh != ci.fl && fh != ci.fr) {
+			typename const Mesh::Normal& n1 = normalStorage[index];
+			typename Mesh::Normal n2 = Base::mesh().calc_face_normal(fh);
+
+			c = dot(n1, n2);
+
+			if(c < m_minNormalCos)
+				break;
+		}
+	}
+
+	// undo simulation changes
+	Base::mesh().set_point(ci.v0, ci.p0);
+
+	return c >= m_minNormalCos;
 }
 
 } // namespace mufflon::renderer::silhouette::decimation
