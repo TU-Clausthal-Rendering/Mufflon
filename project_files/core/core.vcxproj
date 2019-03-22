@@ -181,6 +181,7 @@
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_common.hpp" />

@@ -195,7 +195,7 @@ class HashMapManager {
 	u32 compute_valid_size(u32 desiredSize) {
 		do {
 			desiredSize = ei::nextPrime(desiredSize);
-		} while(desiredSize & 3 != 3);
+		} while((desiredSize & 3) != 3);
 		return desiredSize;
 	}
 public:
