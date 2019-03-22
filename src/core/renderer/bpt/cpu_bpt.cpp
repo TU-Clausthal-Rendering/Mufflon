@@ -13,12 +13,8 @@ namespace mufflon::renderer {
 
 namespace {
 
-//using BptPathVertex = PathVertex<struct BptVertexExt>;
-
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct BptVertexExt {
-	//scene::Direction excident;	// The excident direction from this vertex (after sampling)
-	//AngularPdf pdf;				// PDF of excident, only valid after update()
 	AreaPdf incidentPdf;
 	// A cache to shorten the recursive evaluation of MIS.
 	// It is only possible to store the previous sum, as the current sum
@@ -39,8 +35,6 @@ struct BptVertexExt {
 	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
 							  const scene::Direction& excident,
 							  const math::PdfPair pdf) {
-	//	this->excident = excident;
-	//	this->pdf = pdfF;
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
 		const BptPathVertex* prev = thisVertex.previous();
@@ -180,8 +174,6 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	math::Throughput throughput;
 	VertexSample sample;
 
-	//if(coord == Pixel{240,599-24}) __debugbreak();
-
 	int lightPathLen = 0;
 	do {
 		// Walk
@@ -202,13 +194,11 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		// Make a connection to any event on the light path
 		int maxL = ei::min(lightPathLen+1, m_params.maxPathLength-viewPathLen);
 		for(int l = ei::max(0, m_params.minPathLength-viewPathLen-1); l < maxL; ++l) {
-		//int l = 0; {
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
 			mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
 			outputBuffer.contribute(outCoord, throughput, path[l].ext().throughput, conVal.cosines, conVal.bxdfs);
 		}
-		//break;
 
 		// Walk
 		int otherV = 1 - currentV;

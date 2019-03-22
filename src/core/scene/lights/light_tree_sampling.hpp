@@ -131,7 +131,11 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
 		// Sample background
-		return adjustPdf(sample_light_pos(tree.background, bounds, rnd), envProb);
+		auto photon = sample_light_pos(tree.background, bounds, rnd);
+		// Adjust pdf (but apply the probability to the directional pdf and NOT the pos.pdf)
+		photon.intensity /= envProb;
+		photon.source_param.dir.dirPdf *= envProb;
+		return photon;
 	}
 	// ...then the directional lights come...
 	u64 right = math::percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
