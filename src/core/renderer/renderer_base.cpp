@@ -13,6 +13,7 @@ RendererBase<Device::CPU>::RendererBase() = default;
 template < Device dev >
 bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 	m_outputBuffer = outputBuffer.begin_iteration<dev>(m_reset);
+	m_currentIteration = outputBuffer.get_current_iteration();
 	if(m_reset) {
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");

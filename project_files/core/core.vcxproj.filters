@@ -119,6 +119,9 @@
     <Filter Include="Source Files\core\renderer\wireframe">
       <UniqueIdentifier>{074bee21-e7ed-49eb-978d-358d1185538a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\bpm">
+      <UniqueIdentifier>{aeda282e-fb5a-4b05-96f1-59b19abd7196}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -243,6 +246,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\util\parallel.cpp">
       <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -854,6 +860,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
       <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

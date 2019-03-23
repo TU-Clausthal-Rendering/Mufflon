@@ -65,6 +65,14 @@ class HashGrid<Device::CPU, V> : public HashGridCommon {
 		clear(1.0f);
 	}
 public:
+	HashGrid() :
+		m_map{nullptr},
+		m_dataCount{nullptr},
+		m_data{nullptr},
+		m_dataCapacity{0},
+		m_mapSize{0}
+	{}
+
 	// Clear and reset the cell size. The cell size must be at least query radius * 2.
 	void clear(float cellEdgeLength) {
 		m_cellDensity = 1.0f / cellEdgeLength;
@@ -176,9 +184,11 @@ public:
 
 	// Reallocates the map (previous data is lost)
 	void resize(int numExpectedEntries) {
-		m_dataCapacity = numExpectedEntries;
-		m_mapSize = compute_valid_size(u32(numExpectedEntries * 1.15f));
-		m_memory.resize(m_dataCapacity * sizeof(HashGridCommon::LinkedData<V>) + m_mapSize * sizeof(u32));
+		if(m_dataCapacity != numExpectedEntries) {
+			m_dataCapacity = numExpectedEntries;
+			m_mapSize = compute_valid_size(u32(numExpectedEntries * 1.15f));
+			m_memory.resize(m_dataCapacity * sizeof(HashGridCommon::LinkedData<V>) + m_mapSize * sizeof(u32));
+		}
 	}
 
 	template < Device dstDev >

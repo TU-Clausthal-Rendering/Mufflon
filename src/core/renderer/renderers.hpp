@@ -6,13 +6,15 @@
 #include "core/renderer/wireframe/cpu_wireframe.hpp"
 #include "core/renderer/wireframe/gpu_wireframe.hpp"
 #include "core/renderer/bpt/cpu_bpt.hpp"
+#include "core/renderer/bpm/cpu_bpm.hpp"
 
 namespace mufflon::renderer {
 
 using Renderers = util::TaggedTuple<
 	CpuPathTracer, GpuPathTracer,
 	CpuWireframe, GpuWireframe,
-	CpuBidirPathTracer
+	CpuBidirPathTracer,
+	CpuBidirPhotonMapper
 >;
 
 } // namespace mufflon::renderer
