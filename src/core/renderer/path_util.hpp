@@ -159,6 +159,15 @@ public:
 		}
 		return scene::Direction{0.0f};
 	}
+	CUDA_FUNCTION scene::Direction get_geometric_normal() const {
+		if(m_type == Interaction::LIGHT_AREA) {
+			return m_incident;
+		}
+		if(m_type == Interaction::SURFACE) {
+			return m_desc.surface.tangentSpace.geoN;
+		}
+		return scene::Direction{0.0f};
+	}
 
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
@@ -171,9 +180,9 @@ public:
 		// It is simply projected directly to the surface.
 		bool orthoSource = renderer::is_orthographic(sourceType);
 		bool orthoTarget = this->is_orthographic();
-		float geoFactor = ei::abs(this->get_geometrical_factor(connection.dir));
+		float geoFactor = this->get_geometrical_factor(connection.dir);
 		if(orthoSource || orthoTarget) {
-			return { AreaPdf{ float(samplePdf) * geoFactor }, geoFactor };
+			return { AreaPdf{ float(samplePdf) * ei::abs(geoFactor) }, geoFactor };
 		}
 		return { samplePdf.to_area_pdf(geoFactor, connection.distanceSq), geoFactor };
 	}
@@ -190,15 +199,15 @@ public:
 	// coord: [out] Pixel coordinate if a projection was done.
 	//		Otherwise the input value will be preserved.
 	// adjoint: Is this a vertex on a light sub-path?
-	// lightCosineAbs: !=0 -> Evaluation takes place in a merge.
+	// lightNormal: !=0 -> Evaluation takes place in a merge.
 	//		For shading normal correction in merges it is necessary to know the
-	//		cosine at the other vertex. Note that merges are always evaluated
+	//		cosines at the other vertex. Note that merges are always evaluated
 	//		at the view path vertex.
 	CUDA_FUNCTION math::EvalValue evaluate(const scene::Direction& excident,
 							 const scene::materials::Medium* media,
 							 Pixel& coord,
 							 bool adjoint = false,
-							 float lightCosineAbs = 0.0f
+							 const scene::Direction* lightNormal = nullptr
 	) const {
 		using namespace scene;
 		switch(m_type) {
@@ -220,12 +229,14 @@ public:
 				return lights::evaluate_area(excident, m_desc.areaLight.intensity, m_incident);
 			}
 			case Interaction::CAMERA_PINHOLE: {
+				// TODO: fractional pixel coords?
 				cameras::ProjectionResult proj = pinholecam_project(m_desc.pinholeCam, excident);
 				coord = proj.coord;
 				return math::EvalValue{ Spectrum{ proj.w }, 1.0f,
 										proj.pdf, AngularPdf{ 0.0f } };
 			}
 			case Interaction::CAMERA_FOCUS: {
+				// TODO: fractional pixel coords?
 				cameras::ProjectionResult proj = focuscam_project(m_desc.focusCam, m_position, excident);
 				coord = proj.coord;
 				return math::EvalValue{ Spectrum{ proj.w }, 1.0f,
@@ -233,26 +244,10 @@ public:
 			}
 			case Interaction::SURFACE: {
 				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.mat(),
-										   m_incident, excident, media, adjoint, lightCosineAbs);
+										   m_incident, excident, media, adjoint, lightNormal);
 			}
 		}
 		return math::EvalValue{};
-	}
-
-	// TODO: fractional pixel coords?
-	CUDA_FUNCTION Pixel get_pixel(const scene::Direction& excident) const {
-		if(m_type == Interaction::CAMERA_PINHOLE) {
-			const cameras::PinholeParams* desc = as<cameras::PinholeParams>(this->desc());
-			cameras::ProjectionResult proj = pinholecam_project(*desc, excident);
-			return proj.coord;
-		}
-		if(m_type == Interaction::CAMERA_FOCUS) {
-			const cameras::FocusParams* desc = as<cameras::FocusParams>(this->desc());
-			cameras::ProjectionResult proj = focuscam_project(*desc, m_position, excident);
-			return proj.coord;
-		}
-		// TODO: get from first vertex of path?
-		return Pixel{-1};
 	}
 
 	/*
@@ -556,7 +551,7 @@ public:
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
-						 incidentPdf.pdf, incidentPdf.geoFactor, incidentThrougput);
+						 incidentPdf.pdf, -incidentPdf.geoFactor, incidentThrougput);
 		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.mat());
 		return (int)round_to_align<8u>( round_to_align<8u>(this_size() + sizeof(scene::TangentSpace)
 			+ sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization))

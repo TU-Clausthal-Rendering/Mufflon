@@ -135,7 +135,7 @@ sample(const TangentSpace& tangentSpace,
  * adjoint: false if the incident is a view sub-path, true if it is a light sub-path.
  *		Must be 'false' for merges (they should alwas be evaluated at the view path
  *		vertex, which reduces the bias).
- * lightCosineAbs: Used to apply a different shading normal correction for merges.
+ * lightCosine: Used to apply a different shading normal correction for merges.
  *		Use 0 for connection events! Otherwise this is the dot(geoN, lightDir) at the
  *		point where the photon hit.
  */
@@ -146,7 +146,7 @@ evaluate(const TangentSpace& tangentSpace,
 		 const Direction& excident,
 		 const Medium* media,
 		 bool adjoint,
-		 float lightCosineAbs
+		 const scene::Direction* lightNormal
 ) {
 	float iDotN = -dot(incident, tangentSpace.shadingN);
 	float eDotN =  dot(excident, tangentSpace.shadingN);
@@ -156,8 +156,9 @@ evaluate(const TangentSpace& tangentSpace,
 	if(!params.flags.is_set(MaterialPropertyFlags::REFRACTIVE) && iDotN * eDotN < 0.0f)
 		return math::EvalValue{};
 
-	float iDotG = -dot(incident, tangentSpace.geoN);
-	float eDotG =  dot(excident, tangentSpace.geoN);
+	const scene::Direction& geoN = lightNormal ? *lightNormal : tangentSpace.geoN;
+	float iDotG = -dot(incident, geoN);
+	float eDotG =  dot(excident, geoN);
 	// Shadow masking for the shading normal
 	if(eDotG * eDotN <= 0.0f || iDotG * iDotN <= 0.0f)
 		return math::EvalValue{};
@@ -199,10 +200,10 @@ evaluate(const TangentSpace& tangentSpace,
 	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	// Shading normal caused density correction.
-	if(lightCosineAbs != 0.0f) {
+	if(lightNormal != nullptr) {
 		mAssertMsg(!adjoint, "Merges should be evaluated at the view path vertex.");
 		res.value *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
-				   / (SHADING_NORMAL_EPS + lightCosineAbs);
+				   / (SHADING_NORMAL_EPS + ei::abs(eDotG));
 	} else if(adjoint) {
 		res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
