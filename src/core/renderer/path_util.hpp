@@ -162,19 +162,20 @@ public:
 
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
-	CUDA_FUNCTION AreaPdf convert_pdf(Interaction sourceType, AngularPdf samplePdf,
-									  const ConnectionDir& connection) const {
+	CUDA_FUNCTION struct { AreaPdf pdf; float geoFactor; }
+	convert_pdf(Interaction sourceType, AngularPdf samplePdf,
+				const ConnectionDir& connection) const {
 		if(sourceType == Interaction::VIRTUAL)
-			return AreaPdf{ float(samplePdf) };
+			return { AreaPdf{ float(samplePdf) }, 1.0f };
 		// For orthographic vertices the pdf does not change with a distance.
 		// It is simply projected directly to the surface.
 		bool orthoSource = renderer::is_orthographic(sourceType);
 		bool orthoTarget = this->is_orthographic();
 		float geoFactor = ei::abs(this->get_geometrical_factor(connection.dir));
 		if(orthoSource || orthoTarget) {
-			return AreaPdf{ float(samplePdf) * geoFactor };
+			return { AreaPdf{ float(samplePdf) * geoFactor }, geoFactor };
 		}
-		return samplePdf.to_area_pdf(geoFactor, connection.distanceSq);
+		return { samplePdf.to_area_pdf(geoFactor, connection.distanceSq), geoFactor };
 	}
 
 	// Get the sampling PDFs of this vertex (not defined, if
@@ -189,11 +190,15 @@ public:
 	// coord: [out] Pixel coordinate if a projection was done.
 	//		Otherwise the input value will be preserved.
 	// adjoint: Is this a vertex on a light sub-path?
-	// merge: Evaluation takes place in a merge?
+	// lightCosineAbs: !=0 -> Evaluation takes place in a merge.
+	//		For shading normal correction in merges it is necessary to know the
+	//		cosine at the other vertex. Note that merges are always evaluated
+	//		at the view path vertex.
 	CUDA_FUNCTION math::EvalValue evaluate(const scene::Direction& excident,
 							 const scene::materials::Medium* media,
 							 Pixel& coord,
-							 bool adjoint = false, bool merge = false
+							 bool adjoint = false,
+							 float lightCosineAbs = 0.0f
 	) const {
 		using namespace scene;
 		switch(m_type) {
@@ -228,7 +233,7 @@ public:
 			}
 			case Interaction::SURFACE: {
 				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.mat(),
-										   m_incident, excident, media, adjoint, merge);
+										   m_incident, excident, media, adjoint, lightCosineAbs);
 			}
 		}
 		return math::EvalValue{};
@@ -455,7 +460,7 @@ public:
 			vert->m_desc.pinholeCam = static_cast<const cameras::PinholeParams&>(camera);
 			auto position = pinholecam_sample_position(vert->m_desc.pinholeCam);
 			vert->m_position = position.position;
-			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, position.pdf, math::Throughput{});
+			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, position.pdf, 1.0f, math::Throughput{});
 			return (int)round_to_align<8u>( this_size() + sizeof(cameras::PinholeParams));
 		}
 		else if(camera.type == cameras::CameraModel::FOCUS) {
@@ -463,7 +468,7 @@ public:
 			vert->m_desc.focusCam = static_cast<const cameras::FocusParams&>(camera);
 			auto position = focuscam_sample_position(vert->m_desc.focusCam, rndSet);
 			vert->m_position = position.position;
-			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, position.pdf, math::Throughput{});
+			vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, position.pdf, 1.0f, math::Throughput{});
 			return (int)round_to_align<8u>( this_size() + sizeof(cameras::FocusParams));
 		}
 		mAssertMsg(false, "Not implemented yet.");
@@ -482,7 +487,7 @@ public:
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
 				vert->m_incident = lightSample.intensity;
-				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, math::Throughput{});
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, 1.0f, math::Throughput{});
 				return this_size();
 			}
 			case scene::lights::LightType::SPOT_LIGHT: {
@@ -491,7 +496,7 @@ public:
 				vert->m_desc.spotLight.intensity = lightSample.intensity;
 				vert->m_desc.spotLight.cosThetaMax = lightSample.source_param.spot.cosThetaMax;
 				vert->m_desc.spotLight.cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
-				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, math::Throughput{});
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(SpotLightDesc) );
 			}
 			case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
@@ -500,7 +505,7 @@ public:
 				vert->m_type = Interaction::LIGHT_AREA;
 				vert->m_incident = lightSample.source_param.area.normal;
 				vert->m_desc.areaLight.intensity = lightSample.intensity;
-				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, math::Throughput{});
+				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
 			}
 			case scene::lights::LightType::DIRECTIONAL_LIGHT: {
@@ -513,7 +518,7 @@ public:
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
 				vert->m_desc.dirLight.areaPdfConverted = AngularPdf{float(lightSample.pos.pdf)};
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, 0.0f,
-					AreaPdf{float(lightSample.source_param.dir.dirPdf)}, math::Throughput{});
+					AreaPdf{float(lightSample.source_param.dir.dirPdf)}, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 			case scene::lights::LightType::ENVMAP_LIGHT: {
@@ -522,7 +527,7 @@ public:
 				vert->m_desc.dirLight.flux = lightSample.intensity;
 				vert->m_desc.dirLight.areaPdfConverted = AngularPdf{float(lightSample.pos.pdf)};
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, 0.0f,
-					AreaPdf{float(lightSample.source_param.dir.dirPdf)}, math::Throughput{});
+					AreaPdf{float(lightSample.source_param.dir.dirPdf)}, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
 		}
@@ -549,9 +554,9 @@ public:
 		vert->m_desc.surface.tangentSpace = tangentSpace;
 		vert->m_desc.surface.primitiveId = hit.hitId;
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
-		AreaPdf incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
+		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
-						 incidentPdf, incidentThrougput);
+						 incidentPdf.pdf, incidentPdf.geoFactor, incidentThrougput);
 		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.mat());
 		return (int)round_to_align<8u>( round_to_align<8u>(this_size() + sizeof(scene::TangentSpace)
 			+ sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization))
@@ -570,7 +575,7 @@ public:
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
 		vert->ext().init(*vert, incident, 0.0f,
-						 AreaPdf{float(prevPdf)},
+						 AreaPdf{float(prevPdf)}, 1.0f,
 						 incidentThrougput);
 		return (int)round_to_align<8u>( this_size() );
 	}
@@ -662,7 +667,8 @@ struct VertexExtension {
 	// The init function gets called at the end of vertex creation.
 	CUDA_FUNCTION void init(const PathVertex<VertexExtension>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const math::Throughput& incidentThrougput)
+							const AreaPdf incidentPdf, const float incidentCosineAbs,
+							const math::Throughput& incidentThrougput)
 	{}
 
 	// The update function gets called whenever the excident direction changes.

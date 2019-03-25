@@ -27,7 +27,8 @@ struct BptVertexExt {
 
 	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const math::Throughput& incidentThrougput) {
+							const AreaPdf incidentPdf, const float incidentCosineAbs,
+							const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 		this->throughput = incidentThrougput;
 	}
@@ -40,7 +41,7 @@ struct BptVertexExt {
 		const BptPathVertex* prev = thisVertex.previous();
 		if(prev) { // !prev: Current one is a start vertex. There is no previous sum
 			AreaPdf prevReversePdf = prev->convert_pdf(thisVertex.get_type(), pdf.back,
-				{thisVertex.get_incident_direction(), thisVertex.get_incident_dist_sq()});
+				{thisVertex.get_incident_direction(), thisVertex.get_incident_dist_sq()}).pdf;
 			// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
 			float relToPrev = prevReversePdf / prev->ext().incidentPdf;
 			prevRelativeProbabilitySum = relToPrev + relToPrev * prev->ext().prevRelativeProbabilitySum;
@@ -60,14 +61,14 @@ float get_mis_part(const BptPathVertex& vertex, const AngularPdf& vertexPdfBack,
 				   const ConnectionDir& connection) {
 	// 1. Prev connection probability: got to the current vertex from the next one instead
 	// of from the previous one.
-	AreaPdf reversePdf = vertex.convert_pdf(nextEventType, nextPdfBack, connection);
+	AreaPdf reversePdf = vertex.convert_pdf(nextEventType, nextPdfBack, connection).pdf;
 	float relPdf = reversePdf / vertex.ext().incidentPdf;
 	// 2. Prev-prev connection probability: only now that we have a connection we
 	// know 'vertexPdfs' which is necessary to do the same computation at the previous vertex.
 	const BptPathVertex* prev = vertex.previous();
 	if(prev) {
 		reversePdf = prev->convert_pdf(vertex.get_type(), vertexPdfBack,
-			{ vertex.get_incident_direction(), vertex.get_incident_dist_sq() });
+			{ vertex.get_incident_direction(), vertex.get_incident_dist_sq() }).pdf;
 		float prevRelPdf = reversePdf / prev->ext().incidentPdf;
 		// For older events we have a result in ext().prevRelativeProbabilitySum
 		// (cached recursion). Also see PBRT p.1015.

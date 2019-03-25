@@ -133,7 +133,11 @@ sample(const TangentSpace& tangentSpace,
  * incident: normalized incident direction. Points towards the surface.
  * excident: normalized excident direction. Points away from the surface.
  * adjoint: false if the incident is a view sub-path, true if it is a light sub-path.
- * merge: Used to apply a different shading normal correction.
+ *		Must be 'false' for merges (they should alwas be evaluated at the view path
+ *		vertex, which reduces the bias).
+ * lightCosineAbs: Used to apply a different shading normal correction for merges.
+ *		Use 0 for connection events! Otherwise this is the dot(geoN, lightDir) at the
+ *		point where the photon hit.
  */
 CUDA_FUNCTION math::EvalValue
 evaluate(const TangentSpace& tangentSpace,
@@ -142,7 +146,7 @@ evaluate(const TangentSpace& tangentSpace,
 		 const Direction& excident,
 		 const Medium* media,
 		 bool adjoint,
-		 bool merge
+		 float lightCosineAbs
 ) {
 	float iDotN = -dot(incident, tangentSpace.shadingN);
 	float eDotN =  dot(excident, tangentSpace.shadingN);
@@ -195,13 +199,10 @@ evaluate(const TangentSpace& tangentSpace,
 	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	// Shading normal caused density correction.
-	if(merge) {
-		if(adjoint)
-			res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN))
-					   / (SHADING_NORMAL_EPS + ei::abs(iDotG));
-		else
-			res.value *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
-					   / (SHADING_NORMAL_EPS + ei::abs(eDotG));
+	if(lightCosineAbs != 0.0f) {
+		mAssertMsg(!adjoint, "Merges should be evaluated at the view path vertex.");
+		res.value *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
+				   / (SHADING_NORMAL_EPS + lightCosineAbs);
 	} else if(adjoint) {
 		res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));

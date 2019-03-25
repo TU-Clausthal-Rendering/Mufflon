@@ -16,7 +16,8 @@ struct PtVertexExt {
 
 	CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
 			  const scene::Direction& incident, const float incidentDistance,
-			  const AreaPdf incidentPdf, const math::Throughput& incidentThrougput) {
+			  const AreaPdf incidentPdf, const float incidentCosineAbs,
+			  const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 	}
 

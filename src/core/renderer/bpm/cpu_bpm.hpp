@@ -47,6 +47,7 @@ private:
 		scene::Direction incident;
 		int pathLen;
 		Spectrum flux;
+		float incidentCosineAbs;
 	};
 
 	BpmParameters m_params = {};

@@ -23,14 +23,17 @@ struct BpmVertexExt {
 	// the moment of the full connection.
 	// only valid after update().
 	float prevRelativeProbabilitySum{ 0.0f };
+	float incidentCosineAbs;
 
-	math::Throughput throughput;	// Throughput of the path up to this point
+	//math::Throughput throughput;	// Throughput of the path up to this point
 
 	CUDA_FUNCTION void init(const BpmPathVertex& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const math::Throughput& incidentThrougput) {
+							const AreaPdf incidentPdf, const float incidentCosineAbs,
+							const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
-		this->throughput = incidentThrougput;
+		this->incidentCosineAbs = incidentCosineAbs;
+		//this->throughput = incidentThrougput;
 	}
 
 	CUDA_FUNCTION void update(const BpmPathVertex& thisVertex,
@@ -111,7 +114,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed) {
 		m_photonMap.insert(vertex[currentV].get_position(),
 			{ vertex[currentV].get_position(), vertex[currentV].ext().incidentPdf,
 			  vertex[currentV].get_incident_direction(), pathLen,
-			  throughput.weight / numPhotons });
+			  throughput.weight / numPhotons, vertex[currentV].ext().incidentCosineAbs });
 	} while(pathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
 }
 
@@ -165,7 +168,8 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, float currentMerge
 				// Radiance estimate
 				Pixel tmpCoord;
 				auto bsdf = vertex[currentV].evaluate(-photonIt->incident,
-													  m_sceneDesc.media, tmpCoord, false, true);
+													  m_sceneDesc.media, tmpCoord, false,
+													  photonIt->incidentCosineAbs);
 				radiance += bsdf.value * photonIt->flux * mergeAreaInv;
 			}
 			++photonIt;
