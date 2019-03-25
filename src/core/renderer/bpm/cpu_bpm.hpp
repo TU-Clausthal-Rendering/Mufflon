@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "bpm_params.hpp"
 #include "core/scene/handles.hpp"
@@ -34,21 +34,23 @@ public:
 
 	void on_reset() final;
 
-private:
-	void trace_photon(int idx, int numPhotons, u64 seed);
-	// Create one sample path (PT view path with merges)
-	void sample(const Pixel coord, int idx, float currentMergeRadius);
-	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
-	void init_rngs(int num);
-
+	// Information which are stored in the photon map
 	struct PhotonDesc {
 		scene::Point position;
 		AreaPdf incidentPdf;
 		scene::Direction incident;
 		int pathLen;
 		Spectrum flux;
-		scene::Direction geoNormal;
+		float prevPrevRelativeProbabilitySum;	// Sum of relative probabilities for merges and the connection up to the second previous vertex.
+		scene::Direction geoNormal;				// Geometric normal at photon hit point. This is crucial for normal correction.
+		float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	};
+private:
+	void trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius);
+	// Create one sample path (PT view path with merges)
+	void sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius);
+	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
+	void init_rngs(int num);
 
 	BpmParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
