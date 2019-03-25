@@ -25,19 +25,30 @@ class HashGridCommon {
 protected:
 	float m_cellDensity;		//< 1 / cellEdgeLength
 
+	// 3 Magic numbers to scrample intput positions for the hash computation
+	static constexpr ei::UVec3 MAGIC {0xb286aff7, 0x35e4a487, 0x75a9c18f};
+
 	CUDA_FUNCTION ei::UVec3 get_grid_cell(const ei::Vec3& position) {
 		return ei::UVec3(ei::ceil(position * m_cellDensity));
 	}
 
 	static CUDA_FUNCTION u32 get_cell_hash(const ei::UVec3& cell) {
 		// Use the Cantor pairing function to compress ℕ³->ℕ
-		u32 preHash = (cell.x + cell.y) * (cell.x + cell.y + 1) / 2 + cell.y;
-		preHash = (preHash + cell.z) * (preHash + cell.z + 1) / 2 + cell.z;
+		//u32 preHash = ((cell.x + cell.y) * (cell.x + cell.y + 1)) / 2 + cell.y;
+		//preHash = ((preHash + cell.z) * (preHash + cell.z + 1)) / 2 + cell.z;
+		// Cantor pairing as a problem with the modulo property: if either x+y or x+y+1
+		// get zero we get the same hash for two adjacent cells.
+		// Szudzik pairing: same problem as cantor pairing.
+		/*u32 preHash = cell.x > cell.y ? cell.x * cell.x + cell.y
+									  : cell.y * cell.y + cell.y + cell.x;
+		preHash = preHash > cell.z ? preHash * preHash + cell.z
+								   : cell.z * cell.y + cell.z + preHash;*/
+		//u32 preHash = cell.x * 0xb286aff7 + cell.y * 0x35e4a487 + cell.z * 0x75a9c18f;
 		// Randomize it a bit (changes permutation) with Xorshift 32.
-		preHash ^= preHash << 13;
+		/*preHash ^= preHash << 13;
 		preHash ^= preHash >> 17;
-		preHash ^= preHash << 5;
-		return preHash;
+		preHash ^= preHash << 5;*/
+		return dot(cell, MAGIC);
 	}
 
 public:
@@ -105,7 +116,8 @@ public:
 	class NeighborIterator
 	{
 		const HashGrid<Device::CPU, V>* m_container;
-		ei::UVec3 m_baseCell;	//< Smallest index of all cells in a 8 neighborhood.
+		u32 m_baseHash;			//< Hash of the current cell with smallest index of all cells in a 8 neighborhood.
+		//ei::UVec3 m_baseCell;	//< Smallest index of all cells in a 8 neighborhood.
 		i32 m_cellIdx;			//< In [0,7] specifying one of the 8 neighbors.
 		u32 m_datIdx;
 		friend class HashGrid;
@@ -118,8 +130,11 @@ public:
 				m_datIdx = ~0u;
 				// Other cells to check?
 				while(m_datIdx == ~0u && ++m_cellIdx < 8) {
-					ei::UVec3 cell = m_baseCell + (ei::UVec3(m_cellIdx, m_cellIdx>>1, m_cellIdx>>2) & 1);
-					u32 i = get_cell_hash(cell) % m_container->m_mapSize;
+					u32 h = m_baseHash;
+					if(m_cellIdx & 1) h += MAGIC.x;
+					if(m_cellIdx & 2) h += MAGIC.y;
+					if(m_cellIdx & 4) h += MAGIC.z;
+					u32 i = h % m_container->m_mapSize;
 					m_datIdx = m_container->m_map[i];
 				}
 			}
@@ -138,7 +153,9 @@ public:
 	NeighborIterator find_first(const ei::Vec3& position) const {
 		NeighborIterator it;
 		it.m_container = this;
-		it.m_baseCell = ei::UVec3(ei::round(position * m_cellDensity));
+		//it.m_baseCell = ei::UVec3(ei::round(position * m_cellDensity));
+		ei::UVec3 baseCell = ei::UVec3(ei::round(position * m_cellDensity));
+		it.m_baseHash = get_cell_hash(baseCell);
 		it.m_cellIdx = -1;
 		it.m_datIdx = ~0u;
 		++it;
