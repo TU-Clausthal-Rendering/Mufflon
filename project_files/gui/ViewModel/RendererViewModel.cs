@@ -11,6 +11,23 @@ using gui.Properties;
 
 namespace gui.ViewModel
 {
+    // https://stackoverflow.com/a/17142844/1913512
+    /*public class FloatConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            // return an invalid value in case of the value ends with a point
+            //return value.ToString().EndsWith(".") ? "." : value;
+            value = System.Text.RegularExpressions.Regex.Replace(value.ToString(), "[^.0-9]", "");
+            return value;
+        }
+    }*/
+
     // Classes for the different renderer properties
     public class RendererPropertyBool : INotifyPropertyChanged
     {
