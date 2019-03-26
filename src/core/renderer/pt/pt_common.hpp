@@ -55,27 +55,29 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			// What means more complicated?
 			// A connnection to the camera results in a different pixel. In a multithreaded
 			// environment this means that we need a write mutex for each pixel.
-			// TODO: test/parametrize multievent estimation (more indices in connect) and different guides.
+			// TODO: test different guides.
 			u64 neeSeed = rng.next();
-			math::RndSet2 neeRnd = rng.next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
-							   vertex.get_position(), scene.aabb,
-							   neeRnd, scene::lights::guide_flux);
-			Pixel outCoord;
-			auto value = vertex.evaluate(nee.direction, scene.media, outCoord);
-			if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
-			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
-			Spectrum radiance = value.value * nee.diffIrradiance;
-			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				bool anyhit = scene::accel_struct::any_intersection(
-								scene, { vertex.get_position(), nee.direction },
-								vertex.get_primitive_id(), nee.dist);
-				if(!anyhit) {
-					AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
-					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-					mAssert(!isnan(mis));
-					outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
-											value.cosOut, radiance * mis);
+			for(int i = 0; i < params.neeCount; ++i) {
+				math::RndSet2 neeRnd = rng.next();
+				auto nee = connect(scene.lightTree, i, params.neeCount, neeSeed,
+								   vertex.get_position(), scene.aabb,
+								   neeRnd, scene::lights::guide_flux);
+				Pixel outCoord;
+				auto value = vertex.evaluate(nee.direction, scene.media, outCoord);
+				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
+				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
+				Spectrum radiance = value.value * nee.diffIrradiance;
+				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
+					bool anyhit = scene::accel_struct::any_intersection(
+									scene, { vertex.get_position(), nee.direction },
+									vertex.get_primitive_id(), nee.dist);
+					if(!anyhit) {
+						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
+						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
+						mAssert(!isnan(mis));
+						outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
+												value.cosOut, radiance * mis);
+					}
 				}
 			}
 		}
@@ -90,7 +92,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				auto background = evaluate_background(scene.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
 					AreaPdf startPdf = background_pdf(scene.lightTree, background);
-					float mis = 1.0f / (1.0f + float(startPdf) / float(sample.pdf.forw));
+					float mis = 1.0f / (1.0f + params.neeCount * float(startPdf) / float(sample.pdf.forw));
 					background.value *= mis;
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -109,7 +111,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 												  vertex.get_surface_params(),
 												  lastPosition, scene::lights::guide_flux);
 				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + startPdf / vertex.ext().incidentPdf);
+					: 1.0f / (1.0f + params.neeCount * (startPdf / vertex.ext().incidentPdf));
 				emission *= mis;
 			}
 			outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
