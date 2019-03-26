@@ -133,6 +133,10 @@ public:
 		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
+	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident) {
+		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
+		m_incident = incident;
+	}
 
 	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
 	// This method ensures compatibility with any kind of interaction.
@@ -536,7 +540,6 @@ public:
 		const scene::TangentSpace& tangentSpace,
 		const scene::Direction& incident,
 		const float incidentDistance,
-		const Interaction prevEventType,
 		const AngularPdf prevPdf,
 		const math::Throughput& incidentThrougput
 	) {
@@ -549,6 +552,8 @@ public:
 		vert->m_desc.surface.tangentSpace = tangentSpace;
 		vert->m_desc.surface.primitiveId = hit.hitId;
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
+		Interaction prevEventType = (previous != mem) && (previous != nullptr) ?
+			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
 						 incidentPdf.pdf, -incidentPdf.geoFactor, incidentThrougput);

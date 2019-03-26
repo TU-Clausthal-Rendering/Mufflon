@@ -103,18 +103,10 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	ei::Vec3 position = outSample.origin + outSample.excident * nextHit.hitT;
 	// Get tangent space and parameter pack from nextHit
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
-	// Find material
-	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
-	scene::MaterialIndex matIdx;
-	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
-	if(static_cast<u32>(nextHit.hitId.primId) < FACE_COUNT)
-		matIdx = object.polygon.matIndices[nextHit.hitId.primId];
-	else
-		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
 	// Finalize
-	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
+	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(nextHit.hitId),
 				position, tangentSpace, outSample.excident, nextHit.hitT,
-				vertex.get_type(), outSample.pdf.forw, throughput);
+				outSample.pdf.forw, throughput);
 	return true;
 }
 
