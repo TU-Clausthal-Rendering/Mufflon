@@ -67,7 +67,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 
 	// Russian roulette
 	if(u0 >= 0.0f) {
-		float continuationPropability = ei::min(max(outSample.throughput) + 0.05f, 1.0f);
+		float continuationPropability = ei::min(max(throughput.weight) + 0.1f, 1.0f);
 		if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
 			throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
 			return false;

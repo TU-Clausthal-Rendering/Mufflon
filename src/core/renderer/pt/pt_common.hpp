@@ -83,7 +83,8 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 		// Walk
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
-		if(!walk(scene, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
+		float rndRoulette = math::sample_uniform(u32(rng.next()));
+		if(!walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
 				auto background = evaluate_background(scene.lightTree.background, sample.excident);

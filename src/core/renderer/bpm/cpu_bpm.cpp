@@ -141,6 +141,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 	do {
 		// Walk
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
+		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, true, throughput, vertex[otherV], sample))
 			break;
@@ -175,6 +176,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		// Walk
 		int otherV = 1 - currentV;
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
+		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, false, throughput, vertex[otherV], sample)) {
 			if(throughput.weight != Spectrum{ 0.0f }) {
