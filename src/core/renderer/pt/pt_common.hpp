@@ -46,6 +46,9 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, scene.camera.get(), coord, rng.next());
 
+	auto& guideFunction = params.neeUsePositionGuide ? scene::lights::guide_flux_pos
+													 : scene::lights::guide_flux;
+
 	int pathLen = 0;
 	do {
 		if(pathLen > 0 && pathLen+1 <= params.maxPathLength) {
@@ -55,13 +58,12 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			// What means more complicated?
 			// A connnection to the camera results in a different pixel. In a multithreaded
 			// environment this means that we need a write mutex for each pixel.
-			// TODO: test different guides.
 			u64 neeSeed = rng.next();
 			for(int i = 0; i < params.neeCount; ++i) {
 				math::RndSet2 neeRnd = rng.next();
 				auto nee = connect(scene.lightTree, i, params.neeCount, neeSeed,
-								   vertex.get_position(), scene.aabb,
-								   neeRnd, scene::lights::guide_flux);
+								   vertex.get_position(), scene.aabb, neeRnd,
+								   guideFunction);
 				Pixel outCoord;
 				auto value = vertex.evaluate(nee.direction, scene.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
@@ -109,7 +111,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			if(emission != 0.0f) {
 				AreaPdf startPdf = connect_pdf(scene.lightTree, vertex.get_primitive_id(),
 												  vertex.get_surface_params(),
-												  lastPosition, scene::lights::guide_flux);
+												  lastPosition, guideFunction);
 				float mis = pathLen == 1 ? 1.0f
 					: 1.0f / (1.0f + params.neeCount * (startPdf / vertex.ext().incidentPdf));
 				emission *= mis;
