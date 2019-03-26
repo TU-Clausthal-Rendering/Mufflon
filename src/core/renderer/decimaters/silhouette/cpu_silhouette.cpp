@@ -284,8 +284,8 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 		scene::Point lastPosition = vertices[pathLen].get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		VertexSample sample;
-
-		if(!walk(m_sceneDesc, vertices[pathLen], rnd, -1.0f, false, throughput, vertices[pathLen + 1], sample))
+		float rndRoulette = math::sample_uniform(u32(m_rngs[pixel].next()));
+		if(!walk(m_sceneDesc, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample))
 			break;
 
 		// Update old vertex with accumulated throughput
@@ -294,7 +294,10 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 		// Don't update sharpness for camera vertex
 		if(pathLen > 0) {
 			const ei::Vec3 bxdf = sample.throughput * (float)sample.pdfF;
-			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf) / m_params.sharpnessFactor)) - 1.f;
+			const float bxdfLum = get_luminance(bxdf);
+			if(isnan(bxdfLum))
+				return;
+			sharpness *= 2.f / (1.f + ei::exp(-bxdfLum / m_params.sharpnessFactor)) - 1.f;
 		}
 
 		// Fetch the relevant information for attributing the instance to the correct vertices
@@ -393,7 +396,8 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		// Walk
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
-		if(!walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
+		float rndRoulette = math::sample_uniform(u32(m_rngs[pixel].next()));
+		if(!walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);

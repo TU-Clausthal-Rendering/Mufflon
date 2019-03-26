@@ -175,7 +175,8 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	do {
 		// Walk
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
-		if(!walk(m_sceneDesc, path[lightPathLen], rnd, -1.0f, true, throughput, path[lightPathLen+1], sample))
+		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
+		if(!walk(m_sceneDesc, path[lightPathLen], rnd, rndRoulette, true, throughput, path[lightPathLen+1], sample))
 			break;
 		++lightPathLen;
 	} while(lightPathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
@@ -199,8 +200,9 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		// Walk
 		int otherV = 1 - currentV;
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, true, throughput, vertex[otherV], sample)) {
-			if(throughput.weight != Spectrum{ 0.f }) {
+		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
+		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample)) {
+			if(throughput.weight != Spectrum{ 0.0f }) {
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {

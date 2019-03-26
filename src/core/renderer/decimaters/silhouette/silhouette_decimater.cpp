@@ -181,8 +181,9 @@ void ImportanceDecimater::udpate_importance_density() {
 		const float area = compute_area(*m_decimatedMesh, vertex);
 		const float flux = m_importances[vertex.idx()].irradiance.load()
 			/ std::max(1.f, static_cast<float>(m_importances[vertex.idx()].hitCounter.load()));
+		const float viewImportance = m_importances[vertex.idx()].viewImportance;
 
-		const float importance = m_importances[vertex.idx()].viewImportance + m_lightWeight * flux;
+		const float importance = viewImportance + m_lightWeight * flux;
 
 		importanceSum += importance;
 		m_importances[vertex.idx()].viewImportance.store(importance / area);
@@ -273,11 +274,15 @@ void ImportanceDecimater::record_silhouette_vertex_contribution(const u32 localI
 
 	const float weightedImportance = importance * m_shadowSilhouetteWeight;
 
+	if(isnan(weightedImportance))
+		__debugbreak();
 	atomic_add(m_importances[m_decimatedMesh->vertex_handle(localIndex).idx()].viewImportance, weightedImportance);
 	atomic_add(m_shadowSilhouetteImportance, weightedImportance);
 }
 
 void ImportanceDecimater::record_shadow(const float irradiance) {
+	if(isnan(irradiance))
+		__debugbreak();
 	atomic_add(m_shadowImportance, irradiance);
 }
 
@@ -295,6 +300,10 @@ void ImportanceDecimater::record_direct_hit(const u32* vertexIndices, const u32 
 		}
 	}
 
+	if(isnan(sharpness))
+		__debugbreak();
+	if(isnan(cosAngle))
+		__debugbreak();
 	atomic_add(m_importances[min.idx()].viewImportance, m_viewWeight * sharpness * (1.f - ei::abs(cosAngle)));
 }
 
@@ -328,6 +337,8 @@ void ImportanceDecimater::record_indirect_irradiance(const u32* vertexIndices, c
 		}
 	}
 
+	if(isnan(irradiance))
+		__debugbreak();
 	atomic_add(m_importances[min.idx()].irradiance, irradiance);
 }
 
