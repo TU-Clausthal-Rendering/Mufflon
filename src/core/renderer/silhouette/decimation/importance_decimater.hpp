@@ -113,7 +113,7 @@ private:
 	float collapse_priority(const OpenMesh::Decimater::CollapseInfoT<Mesh>& ci);
 
 	// Check if a collapse is concave
-	bool is_concave_collapse(const CollapseInfo& ci) const;
+	bool is_convex_collapse(const CollapseInfo& ci) const;
 	// Checks if the changed face normals are within reasonable limits
 	bool check_normal_deviation(const CollapseInfo& ci);
 
@@ -129,11 +129,10 @@ private:
 	// Decimated mesh properties
 	OpenMesh::VPropHandleT<Mesh::VertexHandle> m_originalVertex;	// Vertex handle in the original mesh
 	OpenMesh::VPropHandleT<float> m_importanceDensity;				// Importance per m² for the decimated mesh
+	OpenMesh::HPropHandleT<bool> m_uncollapsed;						// Whether a given halfedge has been uncollapsed before
 	// Original mesh properties
 	OpenMesh::VPropHandleT<CollapseHistory> m_collapsedTo;			// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
 	OpenMesh::VPropHandleT<bool> m_collapsed;						// Whether collapsedTo refers to original or decimated mesh
-	OpenMesh::HPropHandleT<bool> m_uncollapsed;						// Whether a given halfedge has been uncollapsed before
-	OpenMesh::HPropHandleT<char> m_uncollapsedCount;				// Number of times a halfedge has been restored
 
 	// Stuff for decimation
 	std::unique_ptr<OpenMesh::Utils::HeapT<Mesh::VertexHandle, HeapInterface>> m_heap;
@@ -164,7 +163,7 @@ public:
 						const CollapseMode collapseMode);
 	float collapse_priority(const CollapseInfo& ci) final;
 	void postprocess_collapse(const CollapseInfo& ci) final;
-	bool is_concave_collapse(const CollapseInfo& ci);
+	bool is_convex_collapse(const CollapseInfo& ci);
 	bool check_normal_deviation(const CollapseInfo& ci);
 
 private:

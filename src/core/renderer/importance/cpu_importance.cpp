@@ -122,9 +122,9 @@ void CpuImportanceDecimater::decimate() {
 					ModImportance<>::Handle impModHdl;
 					decimater.add(impModHdl);
 					decimater.module(impModHdl).set_importance_map(m_importanceMap, meshIndex);
-					//MaxNormalDeviation<>::Handle normModHdl;
-					//decimater.add(normModHdl);
-					//decimater.module(normModHdl).set_max_deviation(60.0);
+					MaxNormalDeviation<>::Handle normModHdl;
+					decimater.add(normModHdl);
+					decimater.module(normModHdl).set_max_deviation(60.0);
 					polygons.decimate(decimater, targetVertexCount, true);
 
 					lod.clear_accel_structure();

@@ -122,7 +122,7 @@ float MaxNormalDeviation<MeshT>::collapse_priority(const CollapseInfo& ci) {
 	// check for flipping normals
 	typename Mesh::Scalar c(1.0);
 	u32 index = 0u;
-	for(typename Mesh::ConstVertexFaceIter iter(Base::mesh(), ci.v0); iter.is_valid(); ++iter, ++index) {
+	for(typename Mesh::ConstVertexFaceIter iter(Base::mesh(), ci.v0); iter.is_valid(); ++iter) {
 		typename Mesh::FaceHandle fh = *iter;
 		if(fh != ci.fl && fh != ci.fr) {
 			typename const Mesh::Normal& n1 = m_normalStorage[index];
@@ -132,6 +132,8 @@ float MaxNormalDeviation<MeshT>::collapse_priority(const CollapseInfo& ci) {
 
 			if(c < m_minCos)
 				break;
+
+			++index;
 		}
 	}
 

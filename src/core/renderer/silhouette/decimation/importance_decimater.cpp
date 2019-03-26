@@ -64,9 +64,7 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 	m_decimatedMesh.request_face_status();
 	// Add optional properties
 	if(m_collapseMode == CollapseMode::NO_CONCAVE_AFTER_UNCOLLAPSE)
-		m_originalMesh.add_property(m_uncollapsed);
-	else if(m_collapseMode == CollapseMode::DAMPENED_CONCAVE)
-		m_originalMesh.add_property(m_uncollapsedCount);
+		m_decimatedMesh.add_property(m_uncollapsed);
 
 	// Set the original vertices for the (to be) decimated mesh
 	for(auto vertex : m_decimatedMesh.vertices())
@@ -147,7 +145,6 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	dec.m_priority.invalidate();
 	dec.m_heapPosition.invalidate();
 	dec.m_uncollapsed.invalidate();
-	dec.m_uncollapsedCount.invalidate();
 }
 
 ImportanceDecimater::~ImportanceDecimater() {
@@ -160,9 +157,7 @@ ImportanceDecimater::~ImportanceDecimater() {
 	if(m_collapsed.is_valid())
 		m_originalMesh.remove_property(m_collapsed);
 	if(m_uncollapsed.is_valid())
-		m_originalMesh.remove_property(m_uncollapsed);
-	if(m_uncollapsedCount.is_valid())
-		m_originalMesh.remove_property(m_uncollapsedCount);
+		m_decimatedMesh.remove_property(m_uncollapsed);
 
 	m_decimatedMesh.release_vertex_status();
 	m_decimatedMesh.release_edge_status();
@@ -172,8 +167,6 @@ ImportanceDecimater::~ImportanceDecimater() {
 
 void ImportanceDecimater::udpate_importance_density() {
 	// Update our statistics: the importance density of each vertex
-	// TODO: I think we don't actually compute the correct density
-
 	double importanceSum = 0.0;
 	for(const auto vertex : m_decimatedMesh.vertices()) {
 		const auto oh = get_original_vertex_handle(vertex);
@@ -271,6 +264,9 @@ std::size_t ImportanceDecimater::collapse(const float threshold) {
 	m_decimatedMesh.remove_property(m_collapseTarget);
 	m_decimatedMesh.remove_property(m_priority);
 	m_decimatedMesh.remove_property(m_heapPosition);
+	
+
+
 	m_decimatedPoly.garbage_collect();
 	m_decimated.clear_accel_structure();
 
@@ -283,7 +279,6 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 	static thread_local std::vector<std::pair<float, float>> newDensities;
 
 	std::size_t uncollapses = 0u;
-	// TODO: buggy somehow
 
 	// Go through all vertices and check those that got collapsed somewhere
 	for(const auto vertex : m_originalMesh.vertices()) {
@@ -364,10 +359,7 @@ std::size_t ImportanceDecimater::uncollapse(const float threshold) {
 
 			// Count up the uncollapse, if necessary
 			if(m_collapseMode == CollapseMode::NO_CONCAVE_AFTER_UNCOLLAPSE) {
-				m_originalMesh.property(m_uncollapsed, v0v1) = true;
-			} else if(m_collapseMode == CollapseMode::DAMPENED_CONCAVE) {
-				mAssert(m_originalMesh.property(m_uncollapsedCount, v0v1) < std::numeric_limits<char>::max());
-				m_originalMesh.property(m_uncollapsedCount, v0v1) += 1u;
+				m_decimatedMesh.property(m_uncollapsed, v0v1) = true;
 			}
 
 			++uncollapses;
@@ -435,12 +427,13 @@ float ImportanceDecimater::collapse_priority(const OpenMesh::Decimater::Collapse
 		return -1.f;
 
 
-	if(m_collapseMode == CollapseMode::NO_CONCAVE && is_concave_collapse(ci))
+	if(m_collapseMode == CollapseMode::NO_CONCAVE && !is_convex_collapse(ci))
 		return -1.f;
 
 	if(m_collapseMode == CollapseMode::NO_CONCAVE_AFTER_UNCOLLAPSE) {
 		// Find the original halfedge and check if it has been collapsed before
-		// TODO: check flag
+		if(m_decimatedMesh.property(m_uncollapsed, ci.v0v1))
+			return -1.f;
 	}
 
 	float importance = m_decimatedMesh.property(m_importanceDensity, ci.v0);
@@ -452,7 +445,7 @@ float ImportanceDecimater::collapse_priority(const OpenMesh::Decimater::Collapse
 	importance /= static_cast<float>(count);
 
 	if(m_collapseMode == CollapseMode::DAMPENED_CONCAVE) {
-		// TODO: modify importance
+		// TODO: modify importance?
 	}
 
 	return importance;
@@ -496,7 +489,7 @@ void ImportanceDecimater::add_vertex_collapse(const Mesh::VertexHandle vh, const
 	}
 }
 
-bool ImportanceDecimater::is_concave_collapse(const CollapseInfo& ci) const {
+bool ImportanceDecimater::is_convex_collapse(const CollapseInfo& ci) const {
 	const auto p0 = util::pun<ei::Vec3>(ci.p0);
 	const auto p1 = util::pun<ei::Vec3>(ci.p1);
 	const auto p0p1 = p1 - p0;
@@ -505,57 +498,28 @@ bool ImportanceDecimater::is_concave_collapse(const CollapseInfo& ci) const {
 	const auto flNormal = ei::cross(p0p1, pl - p0);
 	const auto frNormal = ei::cross(pr - p0, p0p1);
 	const auto p0p1Normal = 0.5f * (flNormal + frNormal); // Not normalized because not needed
-	// First condition is a "saddle edge": if we're either all convex or all concave then we're a-okay
-	bool isSaddle = false;
 	{
-		int sgn = 0;
 		// First for v0: vx -> v0
-		for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v0); circIter.is_valid() && !isSaddle; ++circIter) {
-			const auto pxp0 = util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)) - p0;
+		for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v0); circIter.is_valid(); ++circIter) {
+			if(*circIter == ci.v1)
+				continue;
+			const auto pxp0 = p0 - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter));
 			const auto dot = ei::dot(p0p1Normal, pxp0);
-			const auto currSgn = (dot > 0) ? 1 : -1;
-			if(sgn == 0) {
-				sgn = currSgn;
-			} else if(sgn != currSgn)
-				isSaddle = true;
+			if(dot < 0.f)
+				return false;
 		}
 		// Then for v1: vx -> v1
-		for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v1); circIter.is_valid() && !isSaddle; ++circIter) {
-			const auto pxp1 = util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter)) - p1;
+		for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v1); circIter.is_valid(); ++circIter) {
+			if(*circIter == ci.v0)
+				continue;
+			const auto pxp1 = p1 - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter));
 			const auto dot = ei::dot(p0p1Normal, pxp1);
-			const auto currSgn = (dot > 0) ? 1 : -1;
-			if(sgn != currSgn)
-				isSaddle = true;
+			if(dot < 0.f)
+				return false;
 		}
 	}
 
-	// TODO
-	return isSaddle;
-
-
-	// To detect whether a collapse protrudes the mesh silhouette we check the new resulting
-	// edges against the normals
-	// Compute the normal of our separation plane (normal points in direction of fl)
-#if 0
-	const auto sepNormal = ei::cross(p0p1Normal, p0p1);
-
-	// Now we can decide: for each incoming edge, determine if it violates convexity
-	for(auto circIter = m_decimatedMesh.cvv_ccwbegin(ci.v0); circIter.is_valid(); ++circIter) {
-		// Don't check the edge that goes to v1
-		if(*circIter == ci.v1)
-			continue;
-		// Compute new edge
-		const auto newEdge = p1 - util::pun<ei::Vec3>(m_decimatedMesh.point(*circIter));
-		// Check the side to compare against
-		if(ei::dot(sepNormal, newEdge) > 0) {
-			if(ei::dot(newEdge, flNormal) < 0)
-				return true;
-		} else {
-			if(ei::dot(newEdge, frNormal) < 0)
-				return true;
-		}
-	}
-#endif
+	return true;
 }
 
 bool ImportanceDecimater::check_normal_deviation(const CollapseInfo& ci) {
@@ -576,7 +540,7 @@ bool ImportanceDecimater::check_normal_deviation(const CollapseInfo& ci) {
 	// check for flipping normals
 	typename Mesh::Scalar c(1.0);
 	u32 index = 0u;
-	for(auto iter = m_decimatedMesh.cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter, ++index) {
+	for(auto iter = m_decimatedMesh.cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter) {
 		typename Mesh::FaceHandle fh = *iter;
 		if(fh != ci.fl && fh != ci.fr) {
 			typename const Mesh::Normal& n1 = normalStorage[index];
@@ -586,6 +550,8 @@ bool ImportanceDecimater::check_normal_deviation(const CollapseInfo& ci) {
 
 			if(c < m_minNormalCos)
 				break;
+
+			++index;
 		}
 	}
 
@@ -606,6 +572,9 @@ float ImportanceDecimater::compute_new_importance_densities(std::vector<std::pai
 	const auto vlPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vl));
 	const auto vrPos = util::pun<ei::Vec3>(m_decimatedMesh.point(vr));
 	const auto v1vl = m_decimatedMesh.find_halfedge(v1, vl);
+
+	if(!v1vl.is_valid())
+		const int test = 0;
 
 	float v0Importance = 0.f;
 
@@ -815,7 +784,7 @@ float DecimationTrackerModule<MeshT>::collapse_priority(const CollapseInfo& ci) 
 	if(!check_normal_deviation(ci))
 		return Base::ILLEGAL_COLLAPSE;
 
-	if(m_collapseMode == CollapseMode::NO_CONCAVE && is_concave_collapse(ci))
+	if(m_collapseMode == CollapseMode::NO_CONCAVE && !is_convex_collapse(ci))
 		return Base::ILLEGAL_COLLAPSE;
 
 	return Base::LEGAL_COLLAPSE;
@@ -831,7 +800,7 @@ void DecimationTrackerModule<MeshT>::postprocess_collapse(const CollapseInfo& ci
 
 
 template < class MeshT >
-bool DecimationTrackerModule<MeshT>::is_concave_collapse(const CollapseInfo& ci) {
+bool DecimationTrackerModule<MeshT>::is_convex_collapse(const CollapseInfo& ci) {
 	const auto p0 = util::pun<ei::Vec3>(ci.p0);
 	const auto p1 = util::pun<ei::Vec3>(ci.p1);
 	const auto p0p1 = p1 - p0;
@@ -840,32 +809,28 @@ bool DecimationTrackerModule<MeshT>::is_concave_collapse(const CollapseInfo& ci)
 	const auto flNormal = ei::cross(p0p1, pl - p0);
 	const auto frNormal = ei::cross(pr - p0, p0p1);
 	const auto p0p1Normal = 0.5f * (flNormal + frNormal); // Not normalized because not needed
-	// First condition is a "saddle edge": if we're either all convex or all concave then we're a-okay
-	bool isSaddle = false;
 	{
-		int sgn = 0;
 		// First for v0: vx -> v0
-		for(auto circIter = Base::mesh().cvv_ccwbegin(ci.v0); circIter.is_valid() && !isSaddle; ++circIter) {
-			const auto pxp0 = util::pun<ei::Vec3>(Base::mesh().point(*circIter)) - p0;
+		for(auto circIter = Base::mesh().cvv_ccwbegin(ci.v0); circIter.is_valid(); ++circIter) {
+			if(*circIter == ci.v1)
+				continue;
+			const auto pxp0 = p0 - util::pun<ei::Vec3>(Base::mesh().point(*circIter));
 			const auto dot = ei::dot(p0p1Normal, pxp0);
-			const auto currSgn = (dot > 0) ? 1 : -1;
-			if(sgn == 0) {
-				sgn = currSgn;
-			} else if(sgn != currSgn)
-				isSaddle = true;
+			if(dot < 0.f)
+				return false;
 		}
 		// Then for v1: vx -> v1
-		for(auto circIter = Base::mesh().cvv_ccwbegin(ci.v1); circIter.is_valid() && !isSaddle; ++circIter) {
-			const auto pxp1 = util::pun<ei::Vec3>(Base::mesh().point(*circIter)) - p1;
+		for(auto circIter = Base::mesh().cvv_ccwbegin(ci.v1); circIter.is_valid(); ++circIter) {
+			if(*circIter == ci.v0)
+				continue;
+			const auto pxp1 = p1 - util::pun<ei::Vec3>(Base::mesh().point(*circIter));
 			const auto dot = ei::dot(p0p1Normal, pxp1);
-			const auto currSgn = (dot > 0) ? 1 : -1;
-			if(sgn != currSgn)
-				isSaddle = true;
+			if(dot < 0.f)
+				return false;
 		}
 	}
 
-	// TODO
-	return isSaddle;
+	return true;
 }
 
 template < class MeshT >
@@ -887,7 +852,7 @@ bool DecimationTrackerModule<MeshT>::check_normal_deviation(const CollapseInfo& 
 	// check for flipping normals
 	typename Mesh::Scalar c(1.0);
 	u32 index = 0u;
-	for(auto iter = Base::mesh().cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter, ++index) {
+	for(auto iter = Base::mesh().cvf_ccwbegin(ci.v0); iter.is_valid(); ++iter) {
 		typename Mesh::FaceHandle fh = *iter;
 		if(fh != ci.fl && fh != ci.fr) {
 			typename const Mesh::Normal& n1 = normalStorage[index];
@@ -897,6 +862,7 @@ bool DecimationTrackerModule<MeshT>::check_normal_deviation(const CollapseInfo& 
 
 			if(c < m_minNormalCos)
 				break;
+			++index;
 		}
 	}
 
