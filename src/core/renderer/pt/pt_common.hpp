@@ -51,7 +51,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 
 	int pathLen = 0;
 	do {
-		if(pathLen > 0 && pathLen+1 <= params.maxPathLength) {
+		if(pathLen > 0 && pathLen+1 >= params.minPathLength && pathLen+1 <= params.maxPathLength) {
 			// Call NEE member function for recursive vertices.
 			// Do not connect to the camera, because this makes the renderer much more
 			// complicated. Our decision: The PT should be as simple as possible!
@@ -89,7 +89,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
 		if(!walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
-			if(throughput.weight != Spectrum{ 0.f }) {
+			if((pathLen+1 >= params.minPathLength) && (throughput.weight != Spectrum{ 0.0f })) {
 				// Missed scene - sample background
 				auto background = evaluate_background(scene.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
