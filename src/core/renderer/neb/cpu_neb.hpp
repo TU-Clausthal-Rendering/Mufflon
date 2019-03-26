@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "neb_params.hpp"
 #include "core/scene/handles.hpp"
@@ -34,6 +34,17 @@ public:
 
 	void on_reset() final;
 
+	// Information which are stored in the photon map
+	struct PhotonDesc {
+		scene::Point position;
+		AreaPdf incidentPdf;
+		scene::Direction incident;
+		int pathLen;
+		Spectrum irradiance;
+	//	float prevPrevRelativeProbabilitySum;	// Sum of relative probabilities for merges and the connection up to the second previous vertex.
+		scene::Direction geoNormal;				// Geometric normal at photon hit point. This is crucial for normal correction.
+	//	float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
+	};
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
@@ -42,6 +53,9 @@ private:
 	std::vector<math::Rng> m_rngs;
 	HashGridManager<NebPathVertex> m_viewVertexMapManager;
 	HashGrid<Device::CPU, NebPathVertex> m_viewVertexMap;
+
+	HashGridManager<PhotonDesc> m_photonMapManager;
+	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
 };
 
 } // namespace mufflon::renderer
