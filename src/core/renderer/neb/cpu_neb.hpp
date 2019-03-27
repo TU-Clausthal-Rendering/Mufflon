@@ -41,10 +41,20 @@ public:
 		scene::Direction incident;
 		int pathLen;
 		Spectrum irradiance;
-	//	float prevPrevRelativeProbabilitySum;	// Sum of relative probabilities for merges and the connection up to the second previous vertex.
+		float prevRelativeProbabilitySum;		// Sum of relative probabilities for merges and the connection up to the previous vertex.
 		scene::Direction geoNormal;				// Geometric normal at photon hit point. This is crucial for normal correction.
-	//	float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
+		float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	};
+
+	/*struct ImportonDesc {
+		ImportonDesc* previous;
+		scene::PrimitiveHandle primitive;
+		Spectrum throughput;
+		i16 pathLen;
+		i16 neeCount;
+		scene::TangentSpace tangentSpace;
+		ei::Vec2 uv;
+	};*/
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
