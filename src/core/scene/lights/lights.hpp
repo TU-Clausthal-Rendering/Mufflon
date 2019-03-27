@@ -275,7 +275,7 @@ evaluate_spot(const scene::Direction& excident,
 CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 			  const scene::Direction& normal) {
-	mAssert(ei::approx(len(excident), 1.0f) && ei::approx(len(normal), 1.0f));
+	mAssert(ei::approx(len(excident), 1.0f, 1e-4f) && ei::approx(len(normal), 1.0f, 1e-4f));
 	const float cosOut = dot(normal, excident);
 	// Early out (wrong hemisphere)
 	if(cosOut <= 0.0f) return math::EvalValue{};

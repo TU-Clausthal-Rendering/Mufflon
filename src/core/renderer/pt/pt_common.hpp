@@ -108,13 +108,13 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 		// Evaluate direct hit of area ligths
 		if(pathLen >= params.minPathLength) {
 			Spectrum emission = vertex.get_emission().value;
-			if(emission != 0.0f) {
+			if(emission != 0.0f && pathLen > 1) {
+				// misWeight for pathLen==1 is always 1 -> skip computation
 				AreaPdf startPdf = connect_pdf(scene.lightTree, vertex.get_primitive_id(),
 												  vertex.get_surface_params(),
 												  lastPosition, guideFunction);
-				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + params.neeCount * (startPdf / vertex.ext().incidentPdf));
-				emission *= mis;
+				float misWeight = 1.0f / (1.0f + params.neeCount * (startPdf / vertex.ext().incidentPdf));
+				emission *= misWeight;
 			}
 			outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
 									vertex.get_normal(), vertex.get_albedo());
