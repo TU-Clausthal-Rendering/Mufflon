@@ -28,7 +28,7 @@ public:
 	Lod(Lod&) = default;
 	Lod(Lod&& obj) = default;
 	Lod& operator=(const Lod&) = delete;
-	Lod& operator=(Lod&&) = delete;
+	Lod& operator=(Lod&&) = default;
 	~Lod() = default;
 
 	// Grants direct access to the mesh data (const only).

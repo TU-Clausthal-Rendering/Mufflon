@@ -39,28 +39,4 @@ private:
 	u32 m_meshIndex;
 };
 
-template < typename MeshT = scene::geometry::PolygonMeshType >
-class MaxNormalDeviation : public OpenMesh::Decimater::ModBaseT<MeshT> {
-public:
-	DECIMATING_MODULE(MaxNormalDeviation, MeshT, MaxNormalDeviation);
-
-	MaxNormalDeviation(MeshT &mesh);
-	virtual ~MaxNormalDeviation() = default;
-	MaxNormalDeviation(const MaxNormalDeviation&) = delete;
-	MaxNormalDeviation(MaxNormalDeviation&&) = delete;
-	MaxNormalDeviation& operator=(const MaxNormalDeviation&) = delete;
-	MaxNormalDeviation& operator=(MaxNormalDeviation&&) = delete;
-
-	float collapse_priority(const CollapseInfo& ci) final;
-	void set_max_deviation(const double deviation);
-	double get_max_devation() const noexcept;
-	void set_error_tolerance_factor(const double factor);
-
-private:
-	std::vector<typename MeshT::Normal> m_normalStorage;
-
-	double m_maxDeviation;
-	double m_minCos;
-};
-
 } // namespace mufflon::renderer::importance

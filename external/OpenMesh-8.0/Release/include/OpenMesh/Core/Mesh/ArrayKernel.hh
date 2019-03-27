@@ -54,6 +54,7 @@
 
 
 //== INCLUDES =================================================================
+#include <functional>
 #include <vector>
 
 #include <OpenMesh/Core/System/config.h>
@@ -314,7 +315,8 @@ public:
   void garbage_collection(std_API_Container_VHandlePointer& vh_to_update,
                           std_API_Container_HHandlePointer& hh_to_update,
                           std_API_Container_FHandlePointer& fh_to_update,
-                          bool _v=true, bool _e=true, bool _f=true);
+                          bool _v=true, bool _e=true, bool _f=true,
+						  std::function<void(VertexHandle, VertexHandle)> vCallback = {});
 
   /// \brief Does the same as clean() and in addition erases all properties.
   void clear();

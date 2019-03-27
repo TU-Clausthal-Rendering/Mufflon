@@ -138,11 +138,11 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 		// TODO
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		// TODO: compute threshold!
-		constexpr float threshold = 10.f;
+		constexpr float threshold = 20.0f;
 
 		logInfo("Performing decimation/undecimation iteration");
 		for(auto& decimater : m_decimaters) {
-			decimater.iterate(static_cast<std::size_t>(m_params.threshold), threshold);
+			decimater.iterate(static_cast<std::size_t>(m_params.threshold), threshold, m_params.reduction);
 		}
 
 		m_currentScene->clear_accel_structure();
@@ -491,8 +491,8 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 				for(i32 i = 0; i < sharedVertices; ++i) {
 					// x86_64 doesn't support atomic_fetch_add for floats FeelsBadMan
 					const auto lodIdx = m_sceneDesc.lodIndices[vertex.ext().shadowHit.instanceId];
-					m_decimaters[lodIdx].record_vertex_contribution(edgeIdxFirst[i], importance);
-					m_decimaters[lodIdx].record_vertex_contribution(edgeIdxSecond[i], importance);
+					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxFirst[i], importance);
+					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxSecond[i], importance);
 				}
 				return true;
 			} else {

@@ -531,12 +531,9 @@ OpenMesh::HalfedgeHandle Polygons::insert_edge(const OpenMesh::VertexHandle vh, 
 	OpenMesh::HalfedgeHandle v0v1 = m_meshData->new_edge(v0, v1);
 	OpenMesh::HalfedgeHandle v1v0 = m_meshData->opposite_halfedge_handle(v0v1);
 
-
-
 	// vertex -> halfedge
 	m_meshData->set_halfedge_handle(v0, v0v1);
 	m_meshData->set_halfedge_handle(v1, v1v0);
-
 
 	// halfedge -> halfedge
 	m_meshData->set_next_halfedge_handle(v0v1, m_meshData->next_halfedge_handle(h0));
@@ -544,11 +541,9 @@ OpenMesh::HalfedgeHandle Polygons::insert_edge(const OpenMesh::VertexHandle vh, 
 	m_meshData->set_next_halfedge_handle(v1v0, m_meshData->next_halfedge_handle(h1));
 	m_meshData->set_next_halfedge_handle(h1, v1v0);
 
-
 	// halfedge -> vertex
 	for(auto vih_it = m_meshData->vih_iter(v0); vih_it.is_valid(); ++vih_it)
 		m_meshData->set_vertex_handle(*vih_it, v0);
-
 
 	// halfedge -> face
 	m_meshData->set_face_handle(v0v1, m_meshData->face_handle(h0));
@@ -561,7 +556,6 @@ OpenMesh::HalfedgeHandle Polygons::insert_edge(const OpenMesh::VertexHandle vh, 
 	if(m_meshData->face_handle(v1v0).is_valid())
 		m_meshData->set_halfedge_handle(m_meshData->face_handle(v1v0), v1v0);
 
-
 	// vertex -> halfedge
 	m_meshData->adjust_outgoing_halfedge(v0);
 	m_meshData->adjust_outgoing_halfedge(v1);
@@ -570,8 +564,16 @@ OpenMesh::HalfedgeHandle Polygons::insert_edge(const OpenMesh::VertexHandle vh, 
 	return v0v1;
 }
 
-void Polygons::garbage_collect() {
-	m_meshData->garbage_collection();
+void Polygons::garbage_collect(std::function<void(VertexHandle, VertexHandle)> vCallback) {
+	if(vCallback) {
+		// "Manual" call
+		std::vector<PolygonMeshType::VertexHandle*> emptyVh;
+		std::vector<PolygonMeshType::HalfedgeHandle*> emptyHh;
+		std::vector<PolygonMeshType::FaceHandle*> emptyFh;
+		m_meshData->garbage_collection(emptyVh, emptyHh, emptyFh, true, true, true, vCallback);
+	} else {
+		m_meshData->garbage_collection();
+	}
 	this->rebuild_index_buffer();
 }
 

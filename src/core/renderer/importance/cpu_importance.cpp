@@ -1,6 +1,7 @@
 ﻿#include "cpu_importance.hpp"
 #include "imp_decimater.hpp"
 #include "imp_common.hpp"
+#include "normal_deviation.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
@@ -122,9 +123,9 @@ void CpuImportanceDecimater::decimate() {
 					ModImportance<>::Handle impModHdl;
 					decimater.add(impModHdl);
 					decimater.module(impModHdl).set_importance_map(m_importanceMap, meshIndex);
-					MaxNormalDeviation<>::Handle normModHdl;
+					NormalDeviationModule<>::Handle normModHdl;
 					decimater.add(normModHdl);
-					decimater.module(normModHdl).set_max_deviation(60.0);
+					decimater.module(normModHdl).set_max_deviation(Degrees(60.0));
 					polygons.decimate(decimater, targetVertexCount, true);
 
 					lod.clear_accel_structure();

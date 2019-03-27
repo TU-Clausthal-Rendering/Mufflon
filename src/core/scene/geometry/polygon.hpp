@@ -9,6 +9,7 @@
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <optional>
 #include "util/string_view.hpp"
+#include <functional>
 #include <tuple>
 #include <vector>
 #include <unordered_set>
@@ -284,7 +285,7 @@ public:
 	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,
 												   const VertexHandle vl, const VertexHandle vr);
 	// Garbage-collects the mesh and the index buffer
-	void garbage_collect();
+	void garbage_collect(std::function<void(VertexHandle, VertexHandle)> vCallback = {});
 
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
