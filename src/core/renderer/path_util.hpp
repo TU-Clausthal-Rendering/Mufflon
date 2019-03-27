@@ -543,6 +543,8 @@ public:
 		const AngularPdf prevPdf,
 		const math::Throughput& incidentThrougput
 	) {
+		Interaction prevEventType = (previous != nullptr) ?
+			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
 		vert->init_prev_offset(mem, previous);
@@ -552,8 +554,6 @@ public:
 		vert->m_desc.surface.tangentSpace = tangentSpace;
 		vert->m_desc.surface.primitiveId = hit.hitId;
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
-		Interaction prevEventType = (previous != mem) && (previous != nullptr) ?
-			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
 						 incidentPdf.pdf, -incidentPdf.geoFactor, incidentThrougput);
