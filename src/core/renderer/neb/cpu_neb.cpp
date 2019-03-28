@@ -110,7 +110,8 @@ void sample_view_path(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(!walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
+		NebPathVertex& sourceVertex = previous ? *previous : vertex;	// Make sure the update function is called for the correct vertex.
+		if(!walk(scene, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// TODO: store void photon?
 				// Missed scene - sample background
@@ -256,18 +257,19 @@ void CpuNextEventBacktracking::iterate() {
 		// Merge photons
 		auto photonIt = m_photonMap.find_first(currentPos);
 		while(photonIt) {
-			int pathLen = photonIt->pathLen + vertex.ext().pathLen;
+			auto& photon = *photonIt;
+			int pathLen = photon.pathLen + vertex.ext().pathLen;
 			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
-				&& lensq(photonIt->position - currentPos) < mergeRadiusSq) {
+				&& lensq(photon.position - currentPos) < mergeRadiusSq) {
 				Pixel tmpCoord;
-				auto bsdf = vertex.evaluate(-photonIt->incident,
+				auto bsdf = vertex.evaluate(-photon.incident,
 											m_sceneDesc.media, tmpCoord, false,
-											&photonIt->geoNormal);
+											&photon.geoNormal);
 				// MIS compare against previous merges (view path) AND feature merges (light path)
 				float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
-				relSum += get_previous_merge_sum(*photonIt, bsdf.pdf.forw);
+				relSum += get_previous_merge_sum(photon, bsdf.pdf.forw);
 				float misWeight = 1.0f / (1.0f + relSum);
-				radiance += bsdf.value * photonIt->irradiance * misWeight;
+				radiance += bsdf.value * photon.irradiance * misWeight;
 			}
 			++photonIt;
 		}
