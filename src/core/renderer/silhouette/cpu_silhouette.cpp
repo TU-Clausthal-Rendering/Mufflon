@@ -121,8 +121,26 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 }
 
 void CpuShadowSilhouettes::on_scene_load() {
-	if(m_params.resetOnReload)
+	if(m_params.resetOnReload) {
 		m_currentDecimationIteration = 0u;
+	} else if(m_currentDecimationIteration != 0u) {
+		// At least activate the created LoDs
+		for(auto& obj : m_currentScene->get_objects()) {
+			if(obj.second.size() != 1u)
+				throw std::runtime_error("We cannot deal with instancing yet");
+
+			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
+			// TODO: this reeeeally breaks instancing
+			for(scene::InstanceHandle inst : obj.second) {
+				// Modify the scenario to use this lod instead
+				scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+			}
+		}
+	}
+}
+
+void CpuShadowSilhouettes::on_scene_unload() {
+	m_decimaters.clear();
 }
 
 bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {	
@@ -156,7 +174,6 @@ void CpuShadowSilhouettes::pre_descriptor_requery() {
 
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
-	logWarning(m_currentDecimationIteration);
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 }

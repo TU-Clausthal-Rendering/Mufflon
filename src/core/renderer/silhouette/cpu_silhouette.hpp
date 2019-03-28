@@ -29,6 +29,7 @@ public:
 	bool pre_iteration(OutputHandler& outputBuffer) final;
 	void post_iteration(OutputHandler& outputBuffer) final;
 	void on_scene_load() final;
+	void on_scene_unload() final;
 
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.

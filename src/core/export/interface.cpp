@@ -1125,6 +1125,9 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLev
 
 void world_clear_all() {
 	TRY
+	// Let the renderers know that we just lost all of our data
+	for(auto& renderer : s_renderers)
+		renderer->on_scene_unload();
 	WorldContainer::clear_instance();
 	CATCH_ALL(;)
 }
