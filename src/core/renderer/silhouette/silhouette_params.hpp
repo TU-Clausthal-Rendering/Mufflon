@@ -67,8 +67,15 @@ struct PCollapseMode {
 	}
 };
 
+struct PResetOnReload {
+	bool resetOnReload = true;
+	static ParamDesc get_desc() noexcept {
+		return { "Reset the mesh/importance on reload", ParameterTypes::BOOL };
+	}
+};
+
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PVertexThreshold,
 	PDirectIndirectRatio, PDecimationEnabled, PMemoryConstraint, PInitialConstraint, PNormalDeviation, PCollapseMode, PMaxPathLength,
-	PDirectImportance, PIndirectImportance, PEyeImportance>;
+	PDirectImportance, PIndirectImportance, PEyeImportance, PResetOnReload>;
 
 }} // namespace mufflon::renderer

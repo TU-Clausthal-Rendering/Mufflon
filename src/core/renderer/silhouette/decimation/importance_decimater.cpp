@@ -239,7 +239,7 @@ void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float 
 		decimater.module(silhouetteHandle).set_properties(m_originalMesh, m_silhouette);
 	}
 	
-	const std::size_t targetCount = (reduction == 0.f) ? 0u : static_cast<std::size_t>(reduction * m_originalPoly.get_vertex_count());
+	const std::size_t targetCount = (reduction == 0.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
 	const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 	m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
 		// Adjust the reference from original to decimated mesh

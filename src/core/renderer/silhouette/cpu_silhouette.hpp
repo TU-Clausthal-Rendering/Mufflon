@@ -54,8 +54,6 @@ private:
 	std::vector<silhouette::decimation::ImportanceDecimater> m_decimaters;
 
 	// Superfluous
-	bool m_addedLods = false;
-	bool m_finishedDecimation = false;
 	u32 m_currentDecimationIteration = 0u;
 	float m_maxImportance;
 };

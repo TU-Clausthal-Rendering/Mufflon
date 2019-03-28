@@ -121,8 +121,8 @@ CpuShadowSilhouettes::CpuShadowSilhouettes()
 }
 
 void CpuShadowSilhouettes::on_scene_load() {
-	m_addedLods = false;
-	m_currentDecimationIteration = 0u;
+	if(m_params.resetOnReload)
+		m_currentDecimationIteration = 0u;
 }
 
 bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {	
@@ -156,6 +156,7 @@ void CpuShadowSilhouettes::pre_descriptor_requery() {
 
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
+	logWarning(m_currentDecimationIteration);
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 }
@@ -314,8 +315,17 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 				const float ratio = totalLuminance / indirectLuminance - 1.f;
 				if (ratio > 0.02f) {
 					constexpr float DIST_EPSILON = 0.000125f;
+					constexpr float FACTOR = 2000.f;
 					// TODO: proper factor!
-					trace_shadow_silhouette(vertices[p].ext().shadowRay, vertices[p], 2000.0f * (totalLuminance - indirectLuminance));
+					trace_shadow_silhouette(vertices[p].ext().shadowRay, vertices[p], FACTOR * (totalLuminance - indirectLuminance));
+
+					// Also add importance if we're at the edge of the viewport
+					if(coord.x == 0 || coord.x == m_outputBuffer.get_resolution().x - 1
+					   || coord.y == 0 || coord.y == m_outputBuffer.get_resolution().y - 1) {
+						m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																										numVertices, vertices[p].get_position(),
+																										FACTOR * (totalLuminance - indirectLuminance));
+					}
 				}
 			}
 		}
