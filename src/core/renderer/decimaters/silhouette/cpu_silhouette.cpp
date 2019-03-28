@@ -19,7 +19,7 @@
 #include <stdexcept>
 #include <queue>
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::decimaters {
 
 using namespace silhouette;
 
@@ -141,6 +141,7 @@ void CpuShadowSilhouettes::on_scene_load() {
 
 void CpuShadowSilhouettes::on_scene_unload() {
 	m_decimaters.clear();
+	m_currentDecimationIteration = 0u;
 }
 
 bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {	
@@ -159,8 +160,8 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 		constexpr float threshold = 20.0f;
 
 		logInfo("Performing decimation/undecimation iteration");
-		for(auto& decimater : m_decimaters) {
-			decimater.iterate(static_cast<std::size_t>(m_params.threshold), threshold, m_params.reduction);
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			m_decimaters[i].iterate(static_cast<std::size_t>(m_params.threshold), threshold, (float)(1.0 - m_remainingVertexFactor[i]));
 		}
 
 		m_currentScene->clear_accel_structure();
@@ -183,14 +184,43 @@ void CpuShadowSilhouettes::iterate() {
 		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
 		gather_importance();
 
+		if(m_decimaters.size() == 0u) {
+			++m_currentDecimationIteration;
+			return;
+		}
+
 		// We need to update the importance density
-		for(auto& decimater : m_decimaters)
-			decimater.udpate_importance_density();
+		this->update_reduction_factors();
 
 		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+			if(m_params.displayProjection) {
+				// For debugging: display the original mesh instead of the LoD
+				for(auto& obj : m_currentScene->get_objects()) {
+					auto& lod = obj.first->get_lod(0u);
+					const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					for(scene::InstanceHandle inst : obj.second) 
+						scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, 0u);
+				}
+				m_currentScene->clear_accel_structure();
+				m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
+			}
+
 			compute_max_importance();
 			logInfo("Max. importance: ", m_maxImportance);
 			display_importance();
+
+			if(m_params.displayProjection) {
+				// For debugging: undo the LoD change
+				for(auto& obj : m_currentScene->get_objects()) {
+					auto& lod = obj.first->get_lod(0u);
+					const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					for(scene::InstanceHandle inst : obj.second)
+						scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, static_cast<u32>(obj.first->get_lod_slot_count() - 1u));
+				}
+				m_currentScene->clear_accel_structure();
+				m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
+			}
+
 		}
 		++m_currentDecimationIteration;
 	} else {
@@ -332,7 +362,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 				const float ratio = totalLuminance / indirectLuminance - 1.f;
 				if (ratio > 0.02f) {
 					constexpr float DIST_EPSILON = 0.000125f;
-					constexpr float FACTOR = 2000.f;
+					constexpr float FACTOR = 2000'000'000.f;
 					// TODO: proper factor!
 					trace_shadow_silhouette(vertices[p].ext().shadowRay, vertices[p], FACTOR * (totalLuminance - indirectLuminance));
 
@@ -404,13 +434,21 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 					float mis = 1.0f / (1.0f + background.pdfB / sample.pdfF);
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
+											  ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
+											  ei::Vec3{ 0, 0, 0 });
 				}
 			}
 			break;
 		}
 		++pathLen;
+
+		// Query importance if the target is active
+		if(pathLen == 1 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+			const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
+			const bool isSilhouette = decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });
+		}
 
 		// Evaluate direct hit of area ligths
 		Spectrum emission = vertex.get_emission().value;
@@ -432,8 +470,12 @@ void CpuShadowSilhouettes::compute_max_importance() {
 
 	// Compute the maximum normalized importance for visualization
 //#pragma omp parallel for reduction(max:m_maxImportance)
-	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i)
-		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_max_importance_density());
+	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
+		if(m_params.displayProjection && m_currentDecimationIteration < static_cast<u32>(m_params.decimationIterations))
+			m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_mapped_max_importance());
+		else
+			m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_current_max_importance());
+	}
 }
 
 void CpuShadowSilhouettes::display_importance() {
@@ -452,20 +494,26 @@ void CpuShadowSilhouettes::display_importance() {
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		VertexSample sample;
-		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample))
+		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
+			const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
+			const bool isSilhouette = m_params.displayProjection ? decimater.is_original_marked_as_silhouette(vertex.get_primitive_id().primId)
+				: decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
 			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
+			m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });
+		}
 	}
 
 }
 
-
-
 float CpuShadowSilhouettes::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
 	// TODO: density or importance?
-	return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_importance_density(hitId.primId, hitPoint)/ m_maxImportance;
+	if(m_params.displayProjection && m_currentDecimationIteration < static_cast<u32>(m_params.decimationIterations))
+		return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_mapped_importance(hitId.primId, hitPoint) / m_maxImportance;
+	else
+		return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_current_importance(hitId.primId, hitPoint)/ m_maxImportance;
 }
 
-bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex,const float importance) {
+bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, const SilPathVertex& vertex, const float importance) {
 	constexpr float DIST_EPSILON = 0.001f;
 
 	// TODO: worry about spheres?
@@ -516,9 +564,16 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
 				for(i32 i = 0; i < sharedVertices; ++i) {
+					const auto ab = obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 0]]
+						- obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 1]];;
+					const auto ac = obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 0]]
+						- obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 2]];;
+					const auto area = ei::len(ei::cross(ab, ac));
+					const float solidAngle = area / (vertex.ext().lightDistance*vertex.ext().lightDistance);
+
 					// x86_64 doesn't support atomic_fetch_add for floats FeelsBadMan
 					const auto lodIdx = m_sceneDesc.lodIndices[vertex.ext().shadowHit.instanceId];
-					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxFirst[i], importance);
+					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxFirst[i], importance / solidAngle);
 					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxSecond[i], importance);
 				}
 				return true;
@@ -561,98 +616,67 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 
 	// TODO: clean temporary LoDs!
 
-	if(m_params.isConstraintInitial) {
-		u32 memory = 0u;
-		std::vector<u32> reducible;
+	for(auto& obj : m_currentScene->get_objects()) {
+		if(obj.second.size() != 1u)
+			throw std::runtime_error("We cannot deal with instancing yet");
 
-		// TODO: this doesn't work with instancing
-		// TODO: find a way to make this work more elegantly with instancing
-		for(auto& obj : m_currentScene->get_objects()) {
-			mAssert(obj.first != nullptr);
-			mAssert(obj.second.size() != 0u);
+		auto& lod = obj.first->get_lod(0u);
+		const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
 
-			if(obj.second.size() != 1u)
-				throw std::runtime_error("We cannot deal with instancing yet");
+		std::size_t collapses = 0u;
 
-			// Only care about highest-level LoD
-
-			mAssert(obj.first->has_lod_available(0u));
-			const auto& lod = obj.first->get_lod(0u);
-			const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-
-			const u32 lodMemory = static_cast<u32>(polygons.get_triangle_count() * 3u * sizeof(u32)
-												   + polygons.get_quad_count() * 3u * sizeof(u32)
-												   + polygons.get_vertex_count() * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2)));
-			if(polygons.get_vertex_count() >= m_params.threshold)
-				reducible.push_back(lodMemory);
-			else
-				reducible.push_back(0u);
-			memory += lodMemory;
+		if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction) {
+			collapses = static_cast<std::size_t>(std::ceil(m_params.reduction * polygons.get_vertex_count()));
+			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
+		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
+		auto& newLod = obj.first->add_lod(newLodLevel, lod);
+		m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
+								  static_cast<CollapseMode>(m_params.collapseMode),
+								  collapses);
 
-		logInfo("Required memory for scene: ", pretty_print_size(memory), " (available: ", pretty_print_size(m_params.memoryConstraint), ")");
+		// TODO: this reeeeally breaks instancing
+		for(scene::InstanceHandle inst : obj.second) {
+			// Modify the scenario to use this lod instead
+			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
+		}
+	}
+}
 
-		if(static_cast<u32>(m_params.memoryConstraint) < memory) {
-			// Compute the memory shares for each LoD
-			const float reduction = 1.f - std::min(1.f, static_cast<float>(m_params.memoryConstraint) / std::max(1.f, static_cast<float>(memory)));
-			for(auto& mem : reducible)
-				mem = static_cast<u32>(mem * reduction);
+void CpuShadowSilhouettes::update_reduction_factors() {
+	m_remainingVertexFactor.clear();
+	double expectedVertexCount = 0.0;
+	for(auto& decimater : m_decimaters) {
+		decimater.udpate_importance_density();
+		if(decimater.get_original_vertex_count() > m_params.threshold) {
+			m_remainingVertexFactor.push_back(decimater.get_importance_sum());
+			expectedVertexCount += (1.f - m_params.reduction) * decimater.get_original_vertex_count();
+		} else {
+			m_remainingVertexFactor.push_back(1.0);
+			expectedVertexCount += decimater.get_original_vertex_count();
+		}
+	}
 
-			u32 index = 0u;
-			for(auto& obj : m_currentScene->get_objects()) {
-				auto& lod = obj.first->get_lod(0u);
-				const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+	// Determine the reduction parameters for each mesh
+	constexpr u32 MAX_ITERATION_COUNT = 10u;
+	for(u32 iteration = 0u; iteration < MAX_ITERATION_COUNT; ++iteration) {
+		double vertexCountAfterDecimation = 0.0;
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
+			vertexCountAfterDecimation += m_remainingVertexFactor[i] * m_decimaters[i].get_original_vertex_count();
+		const double normalizationFactor = expectedVertexCount / vertexCountAfterDecimation;
 
-				// Copy the LoD
-				const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-				auto& newLod = obj.first->add_lod(newLodLevel, lod);
-				std::size_t collapses = 0u;
+		bool anyAboveOne = false;
 
-				if(polygons.get_vertex_count() >= m_params.threshold) {
-					// Figure out how many edges we need to collapse - for a manifold, every collapse removes one vertex and two triangles
-					constexpr std::size_t MEM_PER_COLLAPSE = 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2) + 2u * 3u * sizeof(u32);
-					collapses = static_cast<std::size_t>(std::ceil(static_cast<float>(reducible[index]) / static_cast<float>(MEM_PER_COLLAPSE)));
-
-					logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ",
-							pretty_print_size(reducible[index]), "/", collapses, " vertices");
-
-				}
-
-				// Initialize the decimater with a possible initial decimation
-				m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
-										  static_cast<decimation::CollapseMode>(m_params.collapseMode),
-										  collapses);
-				// TODO: this reeeeally breaks instancing
-				for(scene::InstanceHandle inst : obj.second) {
-					// Modify the scenario to use this lod instead
-					scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
-				}
-
-				++index;
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			if(m_decimaters[i].get_original_vertex_count() > m_params.threshold) {
+				m_remainingVertexFactor[i] *= normalizationFactor;
+				anyAboveOne |= m_remainingVertexFactor[i] > 1.0;
+				m_remainingVertexFactor[i] = std::clamp(m_remainingVertexFactor[i], 0.0, 1.0);
 			}
 		}
-		logInfo("Finished scene reduction");
-	} else {
-		for(auto& obj : m_currentScene->get_objects()) {
-			if(obj.second.size() != 1u)
-				throw std::runtime_error("We cannot deal with instancing yet");
 
-			auto& lod = obj.first->get_lod(0u);
-			const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-
-			// No initial decimation
-			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-			auto& newLod = obj.first->add_lod(newLodLevel, lod);
-			m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
-									  static_cast<decimation::CollapseMode>(m_params.collapseMode),
-									  0u);
-
-			// TODO: this reeeeally breaks instancing
-			for(scene::InstanceHandle inst : obj.second) {
-				// Modify the scenario to use this lod instead
-				scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
-			}
-		}
+		if(!anyAboveOne)
+			break;
 	}
 }
 
@@ -663,4 +687,4 @@ void CpuShadowSilhouettes::init_rngs(int num) {
 		m_rngs[i] = math::Rng(i);
 }
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::decimaters

@@ -175,7 +175,14 @@ struct PImportanceIterations {
 struct PTargetReduction {
 	float reduction{ 0.875f };
 	static ParamDesc get_desc() noexcept {
-		return { "Target reduction", ParameterTypes::FLOAT };
+		return { "Target mesh reduction", ParameterTypes::FLOAT };
+	}
+};
+
+struct PInitialReduction {
+	bool initialReduction = true;
+	static ParamDesc get_desc() noexcept {
+		return { "Reduce mesh initially", ParameterTypes::BOOL };
 	}
 };
 

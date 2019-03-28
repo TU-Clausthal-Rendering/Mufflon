@@ -4,7 +4,7 @@
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 
-namespace mufflon::renderer::silhouette::decimation::modules {
+namespace mufflon::renderer::decimaters::modules {
 
 // General importance decimater based on threshold
 template < class MeshT = scene::geometry::PolygonMeshType >
@@ -61,4 +61,4 @@ private:
 	float m_threshold;
 };
 
-} // namespace mufflon::renderer::silhouette::decimation::modules
+} // namespace mufflon::renderer::decimaters::modules

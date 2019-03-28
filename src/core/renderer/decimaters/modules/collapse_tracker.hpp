@@ -4,7 +4,7 @@
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 
-namespace mufflon::renderer::silhouette::decimation::modules {
+namespace mufflon::renderer::decimaters::modules {
 
 // Tracks the collapses of a mesh
 template < class MeshT = scene::geometry::PolygonMeshType >
@@ -42,4 +42,4 @@ private:
 };
 
 
-} // namespace mufflon::renderer::silhouette::decimation::modules
+} // namespace mufflon::renderer::decimaters::modules

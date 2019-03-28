@@ -1,11 +1,10 @@
 #pragma once
 
 #include "core/renderer/path_util.hpp"
-#include <ei/vector.hpp>
 
-namespace mufflon::renderer::importance {
+namespace mufflon::renderer::decimaters::silhouette {
 
-struct ImpVertexExt {
+struct SilVertexExt {
 	scene::Direction excident;
 	AngularPdf pdf;
 	AreaPdf incidentPdf;
@@ -14,16 +13,19 @@ struct ImpVertexExt {
 	float outCos;
 	ei::Vec3 bxdfPdf;
 	ei::Vec3 pathRadiance;
+	ei::Ray shadowRay;
+	float lightDistance;
+	scene::PrimitiveHandle shadowHit;
+	float firstShadowDistance;
 
-
-	CUDA_FUNCTION void init(const PathVertex<ImpVertexExt>& thisVertex,
+	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
 							const float incidentCosine, const AreaPdf incidentPdf,
 							const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 	}
 
-	CUDA_FUNCTION void update(const PathVertex<ImpVertexExt>& thisVertex,
+	CUDA_FUNCTION void update(const PathVertex<SilVertexExt>& thisVertex,
 							  const scene::Direction& excident,
 							  const AngularPdf pdfF, const AngularPdf pdfB) {
 		this->excident = excident;
@@ -38,6 +40,6 @@ struct ImpVertexExt {
 	}
 };
 
-using ImpPathVertex = PathVertex<ImpVertexExt>;
+using SilPathVertex = PathVertex<SilVertexExt>;
 
-} // namespace mufflon::renderer::importance
+} // namespace mufflon::renderer::decimaters::silhouette

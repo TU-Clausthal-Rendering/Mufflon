@@ -4,7 +4,7 @@
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 
-namespace mufflon::renderer::silhouette::decimation::modules {
+namespace mufflon::renderer::decimaters::silhouette::modules {
 
 // Disallows collapse when a vertex has been marked as silhouette
 template < class MeshT = scene::geometry::PolygonMeshType >
@@ -37,4 +37,4 @@ private:
 	OpenMesh::VPropHandleT<bool> m_silhouette;
 };
 
-} // namespace mufflon::renderer::silhouette::decimation::modules
+} // namespace mufflon::renderer::decimaters::silhouette::modules

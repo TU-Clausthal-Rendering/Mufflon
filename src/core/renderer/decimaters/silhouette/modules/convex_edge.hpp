@@ -4,7 +4,7 @@
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 
-namespace mufflon::renderer::silhouette::decimation::modules {
+namespace mufflon::renderer::decimaters::silhouette::modules {
 
 // Disallows non-convex edges from collapsing
 template < class MeshT = scene::geometry::PolygonMeshType >
@@ -54,4 +54,4 @@ public:
 	}
 };
 
-} // namespace mufflon::renderer::silhouette::decimation::modules
+} // namespace mufflon::renderer::decimaters::silhouette::modules

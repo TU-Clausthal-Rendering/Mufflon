@@ -2,14 +2,14 @@
 
 #include "silhouette_params.hpp"
 #include "sil_common.hpp"
-#include "decimation/importance_decimater.hpp"
+#include "silhouette_decimater.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <atomic>
 #include <vector>
 
-namespace mufflon::renderer {
+namespace mufflon::renderer::decimaters {
 
 template < Device >
 struct RenderBuffer;
@@ -22,7 +22,7 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Shadow silhouettes"; }
+	StringView get_name() const noexcept final { return "Shadow Silhouette"; }
 	StringView get_short_name() const noexcept final { return "SS"; }
 
 	void pre_descriptor_requery() final;
@@ -47,16 +47,19 @@ private:
 
 	u32 get_memory_requirement() const;
 
+	void update_reduction_factors();
+
 	void initialize_decimaters();
 
-	SilhouetteParameters m_params = {};
+	silhouette::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	std::vector<silhouette::decimation::ImportanceDecimater> m_decimaters;
+	std::vector<silhouette::ImportanceDecimater> m_decimaters;
+	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous
 	u32 m_currentDecimationIteration = 0u;
 	float m_maxImportance;
 };
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::decimaters

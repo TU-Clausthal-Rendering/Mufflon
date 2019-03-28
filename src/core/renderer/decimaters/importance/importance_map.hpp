@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-namespace mufflon::renderer::importance {
+namespace mufflon::renderer::decimaters::importance {
 
 // Keeps importance information on a per-mesh basis
 class ImportanceMap {
@@ -73,6 +73,8 @@ public:
 
 private:
 	std::vector<scene::geometry::PolygonMeshType*> m_meshes;
+
+	// Part of the 
 	std::vector<OpenMesh::VPropHandleT<float>> m_normalizedImportance;
 	std::vector<OpenMesh::VPropHandleT<u32>> m_collapseHistory;
 	std::vector<u32> m_vertexOffsets;
@@ -82,4 +84,4 @@ private:
 	std::vector<double> m_meshAreas;
 };
 
-} // namespace mufflon::renderer::importance
+} // namespace mufflon::renderer::decimaters::importance

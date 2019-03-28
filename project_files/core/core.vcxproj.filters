@@ -119,17 +119,20 @@
     <Filter Include="Source Files\core\renderer\wireframe">
       <UniqueIdentifier>{074bee21-e7ed-49eb-978d-358d1185538a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\core\renderer\silhouette">
-      <UniqueIdentifier>{106d2a6f-3e42-44e5-bc0c-6c48b9713311}</UniqueIdentifier>
+    <Filter Include="Source Files\core\renderer\decimaters">
+      <UniqueIdentifier>{0c3b4292-7127-49d3-8833-24a67d3b2924}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\core\renderer\importance">
-      <UniqueIdentifier>{d181a66b-62b9-4969-b20c-4ff066c4c62f}</UniqueIdentifier>
+    <Filter Include="Source Files\core\renderer\decimaters\modules">
+      <UniqueIdentifier>{c3ba8ee8-647b-4bc1-984a-eba11cec776c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\core\renderer\silhouette\decimation">
-      <UniqueIdentifier>{2aa840cd-77a6-4cc7-a3e8-6b915e6ba211}</UniqueIdentifier>
+    <Filter Include="Source Files\core\renderer\decimaters\importance">
+      <UniqueIdentifier>{28554636-70fd-4352-94a3-cc82ee284b7a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\core\renderer\silhouette\decimation\modules">
-      <UniqueIdentifier>{a62f6e5d-a2c0-48e5-84ca-18841ad55627}</UniqueIdentifier>
+    <Filter Include="Source Files\core\renderer\decimaters\silhouette">
+      <UniqueIdentifier>{6ab62860-d67b-4c8a-9b14-f41b0c385aac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\silhouette\modules">
+      <UniqueIdentifier>{590ade27-d078-42cc-84aa-a39d40e1eec9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -250,29 +253,26 @@
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\silhouette\cpu_silhouette.cpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\importance\cpu_importance.cpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp">
       <Filter>Source Files\core\renderer</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\importance\importance_map.cpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\importance\imp_decimater.cpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\silhouette\decimation\importance_decimater.cpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\util\parallel.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\importance\normal_deviation.cpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu_silhouette.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_decimater.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.cpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.cpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_map.cpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -879,56 +879,53 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\cpu_silhouette.hpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\silhouette_params.hpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
+    <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
+      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\cpu_importance.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\modules\collapse_tracker.hpp">
+      <Filter>Source Files\core\renderer\decimaters\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\importance_params.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\modules\importance.hpp">
+      <Filter>Source Files\core\renderer\decimaters\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
-      <Filter>Source Files\core\renderer</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\modules\normal_deviation.hpp">
+      <Filter>Source Files\core\renderer\decimaters\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\importance_map.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\modules\convex_edge.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\sil_common.hpp">
-      <Filter>Source Files\core\renderer\silhouette</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\modules\silhouette.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\imp_common.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu_silhouette.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\imp_decimater.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\sil_common.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\importance_decimater.hpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\importance\normal_deviation.hpp">
-      <Filter>Source Files\core\renderer\importance</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\modules\collapse_tracker.hpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation\modules</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.hpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\modules\convex_edge.hpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation\modules</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\importance\imp_common.hpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\modules\importance.hpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation\modules</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\modules\normal_deviation.hpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation\modules</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_map.hpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\silhouette\decimation\modules\silhouette.hpp">
-      <Filter>Source Files\core\renderer\silhouette\decimation\modules</Filter>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

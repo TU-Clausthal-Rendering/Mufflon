@@ -1,7 +1,7 @@
 #include "importance_map.hpp"
 #include "util/log.hpp"
 
-namespace mufflon::renderer::importance {
+namespace mufflon::renderer::decimaters::importance {
 
 ImportanceMap::ImportanceMap(std::vector<scene::geometry::PolygonMeshType*> meshes) :
 	m_meshes(std::move(meshes)),
@@ -148,4 +148,4 @@ void ImportanceMap::collapse(u32 meshIndex, u32 localFrom, u32 localTo) {
 	} while(!m_importance[vertexTo].compare_exchange_weak(expected, desired));
 }
 
-} // namespace mufflon::renderer::importance
+} // namespace mufflon::renderer::decimaters::importance

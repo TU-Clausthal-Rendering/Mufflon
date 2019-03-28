@@ -1,16 +1,15 @@
 #pragma once
 
 #include "importance_params.hpp"
-#include "importance_map.hpp"
+#include "imp_common.hpp"
+#include "importance_decimater.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <atomic>
 #include <vector>
 
-// Decimation according to 'Illumination-driven Mesh Reduction for Accelerating Light Transport Simulations' (Andreas Reich, 2015)
-
-namespace mufflon::renderer {
+namespace mufflon::renderer::decimaters {
 
 template < Device >
 struct RenderBuffer;
@@ -23,38 +22,42 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Importance decimation"; }
+	StringView get_name() const noexcept final { return "Importance decimater"; }
 	StringView get_short_name() const noexcept final { return "ImpD"; }
 
-	void post_descriptor_requery() final;
+	void pre_descriptor_requery() final;
+	bool pre_iteration(OutputHandler& outputBuffer) final;
+	void post_iteration(OutputHandler& outputBuffer) final;
 	void on_scene_load() final;
+	void on_scene_unload() final;
 
 private:
-	// Create one sample path (actual PT algorithm)
-	void pt_sample(const Pixel coord);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
 	void importance_sample(const Pixel coord);
+	void pt_sample(const Pixel coord);
 
-	void initialize_importance_map();
 	void gather_importance();
-	void decimate();
 	void compute_max_importance();
 	void display_importance();
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 
-	ImportanceParameters m_params = {};
+	u32 get_memory_requirement() const;
+
+	void update_reduction_factors();
+
+	void initialize_decimaters();
+
+	importance::ImportanceParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	// Data buffer for importance
-	importance::ImportanceMap m_importanceMap;
+	std::vector<importance::ImportanceDecimater> m_decimaters;
+	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous
-	bool m_gotImportance = false;
-	bool m_finishedDecimation = false;
-	int m_currentImportanceIteration = 0;
+	u32 m_currentDecimationIteration = 0u;
 	float m_maxImportance;
 };
 
-} // namespace mufflon::renderer
+} // namespace mufflon::renderer::decimaters
