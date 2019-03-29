@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cpu_silhouette.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
@@ -160,12 +161,18 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 		constexpr float threshold = 20.0f;
 
 		logInfo("Performing decimation/undecimation iteration");
+		const auto processTime = CpuProfileState::get_process_time();
+		const auto cycles = CpuProfileState::get_cpu_cycle();
+		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 			m_decimaters[i].iterate(static_cast<std::size_t>(m_params.threshold), threshold, (float)(1.0 - m_remainingVertexFactor[i]));
 		}
+		logPedantic("Duration: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
+					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles");
 
 		m_currentScene->clear_accel_structure();
 		m_reset = true;
+		++m_currentDecimationIteration;
 	}
 	RendererBase<Device::CPU>::post_iteration(outputBuffer);
 }
@@ -184,10 +191,8 @@ void CpuShadowSilhouettes::iterate() {
 		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
 		gather_importance();
 
-		if(m_decimaters.size() == 0u) {
-			++m_currentDecimationIteration;
+		if(m_decimaters.size() == 0u)
 			return;
-		}
 
 		// We need to update the importance density
 		this->update_reduction_factors();
@@ -222,7 +227,6 @@ void CpuShadowSilhouettes::iterate() {
 			}
 
 		}
-		++m_currentDecimationIteration;
 	} else {
 		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR

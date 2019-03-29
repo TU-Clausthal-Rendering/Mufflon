@@ -236,7 +236,7 @@ void ImportanceDecimater::record_face_contribution(const u32* vertexIndices, con
 	float distSqrSum = 0.f;
 	for(u32 v = 0u; v < vertexCount; ++v) {
 		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+			distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
 	}
 	const float distSqrSumInv = 1.f / distSqrSum;
 
@@ -260,18 +260,18 @@ ImportanceDecimater::Mesh::VertexHandle ImportanceDecimater::get_original_vertex
 	return originalHandle;
 }
 
-float ImportanceDecimater::get_max_importance() const {
+float ImportanceDecimater::get_current_max_importance() const {
 	float maxImp = 0.f;
 	for(auto vertex : m_decimatedMesh->vertices())
-		maxImp = std::max(maxImp, m_importance[vertex.idx()].load());
+		maxImp = std::max(maxImp, m_originalMesh.property(m_importanceDensity, get_original_vertex_handle(vertex)));
 	return maxImp;
 }
 
-float ImportanceDecimater::get_max_importance_density() const {
-	float maxImpDensity = 0.f;
-	for(auto vertex : m_decimatedMesh->vertices())
-		maxImpDensity = std::max(maxImpDensity, m_importance[vertex.idx()].load());
-	return maxImpDensity;
+float ImportanceDecimater::get_mapped_max_importance() const {
+	float maxImp = 0.f;
+	for(auto vertex : m_originalMesh.vertices())
+		maxImp = std::max(maxImp, m_originalMesh.property(m_importanceDensity, vertex));
+	return maxImp;
 }
 
 float ImportanceDecimater::get_current_importance(const u32 localFaceIndex, const ei::Vec3& hitpoint) const {
@@ -284,23 +284,23 @@ float ImportanceDecimater::get_current_importance(const u32 localFaceIndex, cons
 
 	for(auto circIter = m_decimatedMesh->cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
 		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(*circIter)));
-		importance += m_importance[circIter->idx()].load() * distSqr / distSqrSum;
+		importance += m_originalMesh.property(m_importanceDensity, get_original_vertex_handle(*circIter)) * distSqr / distSqrSum;
 	}
 
 	return importance;
 }
 
-float ImportanceDecimater::get_current_importance_density(const u32 localFaceIndex, const ei::Vec3& hitpoint) const {
-	const auto faceHandle = m_decimatedMesh->face_handle(localFaceIndex);
+float ImportanceDecimater::get_mapped_importance(const u32 originalFaceIndex, const ei::Vec3& hitpoint) const {
+	const auto faceHandle = m_originalMesh.face_handle(originalFaceIndex);
 
 	float importance = 0.f;
 	float distSqrSum = 0.f;
-	for(auto circIter = m_decimatedMesh->cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter)
-		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(*circIter)));
+	for(auto circIter = m_originalMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter)
+		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_originalMesh.point(*circIter)));
 
-	for(auto circIter = m_decimatedMesh->cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
-		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(*circIter)));
-		importance += m_importance[circIter->idx()].load() * distSqr / distSqrSum;
+	for(auto circIter = m_originalMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
+		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_originalMesh.point(*circIter)));
+		importance += m_originalMesh.property(m_importanceDensity, *circIter) * distSqr / distSqrSum;
 	}
 
 	return importance;

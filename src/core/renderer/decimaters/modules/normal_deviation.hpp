@@ -64,12 +64,16 @@ public:
 
 	void postprocess_collapse(const CollapseInfo& ci) final {
 		// Adjust the vertex normal
+		// Requires triangles
 		// TODO: find better way to adjust normal (e.g. compute from collapsed vertex normal)
 		auto computeAndSetVertexNormal = [](MeshT& mesh, typename MeshT::VertexHandle v) {
-			ei::Vec3 normal{};
-			for(auto faceIter = mesh.cvf_ccwbegin(v); faceIter.is_valid(); ++faceIter)
-				normal += util::pun<ei::Vec3>(mesh.calc_face_normal(*faceIter));
-			mesh.set_normal(v, util::pun<typename MeshT::Normal>(ei::normalize(normal)));
+			typename MeshT::Normal normal{};
+			// Ignoring warning about OpenMesh initializing a float vector with '0.0'...
+#pragma warning(push)
+#pragma warning(disable : 4244)
+			mesh.calc_vertex_normal_correct(v, normal);
+#pragma warning(pop)
+			mesh.set_normal(v, util::pun<typename MeshT::Normal>(ei::normalize(util::pun<ei::Vec3>(normal))));
 		};
 
 		computeAndSetVertexNormal(Base::mesh(), ci.v1);

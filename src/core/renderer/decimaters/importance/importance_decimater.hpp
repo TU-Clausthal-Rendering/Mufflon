@@ -35,10 +35,10 @@ public:
 	void record_face_contribution(const u32* vertexIndices, const u32 vertexCount,
 								  const ei::Vec3& hitpoint, const float importance);
 
-	float get_max_importance() const;
-	float get_max_importance_density() const;
+	float get_current_max_importance() const;
 	float get_current_importance(const u32 localFaceIndex, const ei::Vec3& hitpoint) const;
-	float get_current_importance_density(const u32 localFaceIndex, const ei::Vec3& hitpoint) const;
+	float get_mapped_max_importance() const;
+	float get_mapped_importance(const u32 originalFaceIndex, const ei::Vec3& hitpoint) const;
 	double get_importance_sum() const noexcept { return m_importanceSum; }
 
 	std::size_t get_original_vertex_count() const noexcept;

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "cpu_importance.hpp"
+#include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
@@ -155,12 +156,18 @@ void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
 		m_reset = true;
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		logInfo("Performing decimation/undecimation iteration");
+		const auto processTime = CpuProfileState::get_process_time();
+		const auto cycles = CpuProfileState::get_cpu_cycle();
+		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 			m_decimaters[i].iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
+		logPedantic("Duration: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
+					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles");
 
 		m_currentScene->clear_accel_structure();
 		m_reset = true;
+		++m_currentDecimationIteration;
 	}
 	RendererBase<Device::CPU>::post_iteration(outputBuffer);
 }
@@ -179,10 +186,8 @@ void CpuImportanceDecimater::iterate() {
 		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
 		gather_importance();
 
-		if(m_decimaters.size() == 0u) {
-			++m_currentDecimationIteration;
+		if(m_decimaters.size() == 0u)
 			return;
-		}
 
 		// We need to update the importance density
 		this->update_reduction_factors();
@@ -192,7 +197,6 @@ void CpuImportanceDecimater::iterate() {
 			logInfo("Max. importance: ", m_maxImportance);
 			display_importance();
 		}
-		++m_currentDecimationIteration;
 	} else {
 		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
@@ -413,7 +417,7 @@ void CpuImportanceDecimater::compute_max_importance() {
 	// Compute the maximum normalized importance for visualization
 //#pragma omp parallel for reduction(max:m_maxImportance)
 	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i)
-		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_max_importance_density());
+		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_current_max_importance());
 }
 
 void CpuImportanceDecimater::display_importance() {
@@ -442,7 +446,7 @@ void CpuImportanceDecimater::display_importance() {
 
 float CpuImportanceDecimater::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
 	// TODO: density or importance?
-	return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_current_importance_density(hitId.primId, hitPoint) / m_maxImportance;
+	return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_current_importance(hitId.primId, hitPoint) / m_maxImportance;
 }
 
 u32 CpuImportanceDecimater::get_memory_requirement() const {
