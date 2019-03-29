@@ -41,7 +41,7 @@ public:
 		scene::Direction incident;
 		int pathLen;
 		Spectrum irradiance;
-		float prevRelativeProbabilitySum;		// Sum of relative probabilities for merges and the connection up to the previous vertex.
+		float prevPrevRelativeProbabilitySum;	// Sum of relative probabilities for merges and the connection up to the previous vertex.
 		scene::Direction geoNormal;				// Geometric normal at photon hit point. This is crucial for normal correction.
 		float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	};

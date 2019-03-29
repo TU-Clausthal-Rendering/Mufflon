@@ -58,21 +58,23 @@ void sample_photons(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 					const NebParameters& params, math::Rng& rng, NebPathVertex& virtualLight,
 					HashGrid<Device::CPU, CpuNextEventBacktracking::PhotonDesc>& photonMap) {
 	int lightPathLength = 1;
-	math::Throughput lightThroughput { virtualLight.ext().neeIrradiance, 0.0f };
-	math::RndSet2_1 rnd { rng.next(), rng.next() };
-	float rndRoulette = math::sample_uniform(u32(rng.next()));
-	VertexSample sample;
+	math::Throughput lightThroughput { Spectrum{1.0f}, 0.0f };
+	const float neeConversion = virtualLight.ext().neeConversion / virtualLight.ext().count;
+	const Spectrum neeIrradiance = virtualLight.ext().neeIrradiance;
 	scene::Direction prevNormal = virtualLight.get_geometric_normal();
 	CpuNextEventBacktracking::PhotonDesc* previous = nullptr;
-	float neeConversion = virtualLight.ext().neeConversion / virtualLight.ext().count;
-	while(lightPathLength < params.maxPathLength-1
-		&& walk(scene, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample)) {
+	while(lightPathLength < params.maxPathLength-1) {
+		math::RndSet2_1 rnd { rng.next(), rng.next() };
+		float rndRoulette = math::sample_uniform(u32(rng.next()));
+		VertexSample sample;
+		if(!walk(scene, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample))
+			break;
 		++lightPathLength;
 		float prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / ei::sq(virtualLight.ext().incidentDist);
 		float relPdfSum = 0.0f;
 		if(previous) {
 			float relPdf = previous->prevConversionFactor * float(sample.pdf.back) / float(previous->incidentPdf);
-			relPdfSum = relPdf + relPdf * previous->prevRelativeProbabilitySum;
+			relPdfSum = relPdf + relPdf * previous->prevPrevRelativeProbabilitySum;
 		} else {
 			// No previous photon means that the previous vertex was the NEE start vertex.
 			// Compute the random hit event probability relative to this start vertex.
@@ -81,7 +83,7 @@ void sample_photons(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		previous = photonMap.insert(virtualLight.get_position(),
 			{ virtualLight.get_position(), virtualLight.ext().incidentPdf,
 				sample.excident, lightPathLength,
-				lightThroughput.weight, relPdfSum,
+				lightThroughput.weight * neeIrradiance, relPdfSum,
 				virtualLight.get_geometric_normal(), prevConversionFactor
 			});
 		prevNormal = virtualLight.get_geometric_normal();
@@ -129,42 +131,46 @@ void sample_view_path(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		}
 		++pathLen;
 
-		// Simulate an NEE, but do not contribute. Instead store the resulting
-		// vertex for later use.
-		u64 neeSeed = rng.next();
-		math::RndSet2 neeRnd = rng.next();
-		auto nee = connect(scene.lightTree, 0, 1, neeSeed,
-							vertex.get_position(), scene.aabb, neeRnd,
-							guideFunction);
-		if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
-		//if(any(greater(nee.diffIrradiance, 0.0f))) {
-		scene::Point neePos = vertex.get_position() + nee.direction * nee.dist;
-		auto hit = scene::accel_struct::first_intersection(scene,
-												{ neePos, -nee.direction },
-												{}, nee.dist);
-		if(hit.hitT < nee.dist * 0.999f) {
-			// Hit a different surface than the current one.
-			// Additionally storing this vertex further reduces variance for direct lighted
-			// surfaces and allows the light-bulb scenario when using the backtracking.
-			/*scene::Point hitPos = neePos - nee.direction * hit.hitT;
-			const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, hit);
-			NebPathVertex virtualLight;
-			NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
-				scene.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
-				nee.dist, AngularPdf{1.0f}, math::Throughput{});
-			// Compensate the changed distance in diffIrradiance.
-			virtualLight.ext().neeIrradiance = nee.diffIrradiance * nee.distSq / (hit.hitT * hit.hitT);
-			virtualLight.ext().neeDirection = nee.direction;
-			virtualLight.ext().coord = coord;
-			virtualLight.ext().pathLen = -100000;	// Mark this as non contributing (not connected to a pixel)
-			viewVertexMap.insert(virtualLight.get_position(), virtualLight);*/
-			// Make sure the vertex for which we did the NEE knows it is shadowed.
-			nee.diffIrradiance *= 0.0f;
+		if(pathLen == params.maxPathLength) {
+			// Mark vertex that it does not have a NEE and skip the computation.
+			// Using NEE on random hit vertices has low contribution in general.
+			vertex.ext().neeIrradiance = Spectrum{-1.0f};
+		} else {
+			// Simulate an NEE, but do not contribute. Instead store the resulting
+			// vertex for later use.
+			u64 neeSeed = rng.next();
+			math::RndSet2 neeRnd = rng.next();
+			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
+								vertex.get_position(), scene.aabb, neeRnd,
+								guideFunction);
+			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
+			scene::Point neePos = vertex.get_position() + nee.direction * nee.dist;
+			auto hit = scene::accel_struct::first_intersection(scene,
+													{ neePos, -nee.direction },
+													{}, nee.dist);
+			if(hit.hitT < nee.dist * 0.999f) {
+				// Hit a different surface than the current one.
+				// Additionally storing this vertex further reduces variance for direct lighted
+				// surfaces and allows the light-bulb scenario when using the backtracking.
+				/*scene::Point hitPos = neePos - nee.direction * hit.hitT;
+				const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, hit);
+				NebPathVertex virtualLight;
+				NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
+					scene.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
+					nee.dist, AngularPdf{1.0f}, math::Throughput{});
+				// Compensate the changed distance in diffIrradiance.
+				virtualLight.ext().neeIrradiance = nee.diffIrradiance * nee.distSq / (hit.hitT * hit.hitT);
+				virtualLight.ext().neeDirection = nee.direction;
+				virtualLight.ext().coord = coord;
+				virtualLight.ext().pathLen = -100000;	// Mark this as non contributing (not connected to a pixel)
+				viewVertexMap.insert(virtualLight.get_position(), virtualLight);*/
+				// Make sure the vertex for which we did the NEE knows it is shadowed.
+				nee.diffIrradiance *= 0.0f;
+			}
+			vertex.ext().neeIrradiance = nee.diffIrradiance;
+			vertex.ext().neeDirection = nee.direction;
+			vertex.ext().neeConversion = nee.cosOut / (nee.distSq * float(nee.creationPdf));
 		}
-		//}
-		vertex.ext().neeIrradiance = nee.diffIrradiance;
-		vertex.ext().neeDirection = nee.direction;
-		vertex.ext().neeConversion = nee.cosOut / (nee.distSq * float(nee.creationPdf));
 		vertex.ext().coord = coord;
 		vertex.ext().pathLen = pathLen;
 		vertex.ext().previous = previous;
@@ -184,7 +190,7 @@ float get_previous_merge_sum(const NebPathVertex& vertex, AngularPdf pdfBack) {
 float get_previous_merge_sum(const CpuNextEventBacktracking::PhotonDesc& photon, AngularPdf pdfBack) {
 	AreaPdf reversePdf { photon.prevConversionFactor * float(pdfBack) };
 	float relPdf = reversePdf / photon.incidentPdf;
-	return relPdf + relPdf * photon.prevRelativeProbabilitySum;
+	return relPdf + relPdf * photon.prevPrevRelativeProbabilitySum;
 }
 
 } // namespace ::
@@ -223,13 +229,16 @@ void CpuNextEventBacktracking::iterate() {
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
+		if(vertex.ext().neeIrradiance.r < 0.0f) // Non-NEE contributing (random hit vertex only)
+			continue;
 		scene::Point currentPos = vertex.get_position();
 		int count = 0;
 		// If path length is already too large there will be no contribution from this vertex.
 		// It only exists for the sake of random hit evaluation (and as additional sample).
 		auto otherEndIt = m_viewVertexMap.find_first(currentPos);
 		while(otherEndIt) {
-			if(lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) 
+			if(otherEndIt->ext().neeIrradiance.r >= 0.0f // Skip vertices which are marked as non-NEE contributing
+				&& lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) 
 				++count;
 			++otherEndIt;
 		}
@@ -282,7 +291,7 @@ void CpuNextEventBacktracking::iterate() {
 			auto otherEndIt = m_viewVertexMap.find_first(currentPos);
 			while(otherEndIt) {
 				auto& otherExt = otherEndIt->ext();
-				if((otherExt.neeIrradiance != 0.0f)
+				if((otherExt.neeIrradiance > 0.0f)
 				&& (lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) ) {
 					Pixel tmpCoord;
 					auto bsdf = vertex.evaluate(otherExt.neeDirection,

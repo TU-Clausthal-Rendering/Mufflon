@@ -51,7 +51,7 @@ struct NextEventEstimation {
 	//math::PositionSample pos;			// Not required ATM
 	//math::DirectionSample dir;		// PDF not needed, because PT is the only user of NEE, maybe required later again??
 	scene::Direction direction {0.0f};	// From surface to the light source, normalized
-	float cosOut {0.0f};				// Cos of the surface or 0 for non-hitable sources
+	float cosOut {0.0f};				// Cosine of the light-surface or 0 for non-hitable sources
 	Spectrum diffIrradiance {0.0f};		// Unit: W/m²sr²
 	float dist {0.0f};
 	float distSq {0.0f};
