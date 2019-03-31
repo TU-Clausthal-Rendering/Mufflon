@@ -17,9 +17,7 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
-template < typename ExtensionT >
-class PathVertex;
-namespace { using NebPathVertex = PathVertex<struct NebVertexExt>; }
+namespace { class NebPathVertex; }
 
 class CpuNextEventBacktracking final : public RendererBase<Device::CPU> {
 public:

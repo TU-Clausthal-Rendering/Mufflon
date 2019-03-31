@@ -13,14 +13,21 @@ namespace mufflon::renderer {
 
 namespace {
 
+float get_photon_path_chance(const AngularPdf pdf) {
+	return float(pdf) / (1.0f + float(pdf));
+}
+
+
 struct NebVertexExt {
-	NebPathVertex* previous;
-	//scene::Direction excident;
-	//AngularPdf pdf;
+	PathVertex<NebVertexExt>* previous;
+	AngularPdf pdfBack;
 	AreaPdf incidentPdf { 0.0f };
 	Spectrum throughput;
 	Spectrum neeIrradiance;
-	Pixel coord;
+	union {
+		int pixelIndex;
+		float rnd;		// An additional random value (first vertex of light paths only).
+	};
 	scene::Direction neeDirection;
 	i16 pathLen;
 	i16 count { -1 };
@@ -28,7 +35,7 @@ struct NebVertexExt {
 	float incidentDist;
 	float neeConversion;	// Partial evaluation of the relPdf for the next event: (cosθ / d²) / nee.creationPdf
 
-	CUDA_FUNCTION void init(const NebPathVertex& thisVertex,
+	void init(const PathVertex<NebVertexExt>& thisVertex,
 			  const scene::Direction& incident, const float incidentDistance,
 			  const AreaPdf incidentPdf, const float incidentCosineAbs,
 			  const math::Throughput& incidentThrougput) {
@@ -37,18 +44,40 @@ struct NebVertexExt {
 		this->incidentDist = incidentDistance;
 	}
 
-	CUDA_FUNCTION void update(const NebPathVertex& thisVertex,
-							  const scene::Direction& excident,
-							  const math::PdfPair& pdf) {
-		//excident = sample.excident;
-		//pdf = sample.pdfF;
-		const NebPathVertex* prev = thisVertex.ext().previous;
+	void update(const PathVertex<NebVertexExt>& thisVertex,
+				const scene::Direction& excident,
+				const math::PdfPair& pdf) {
+		pdfBack = pdf.back;
+		const PathVertex<NebVertexExt>* prev = thisVertex.ext().previous;
 		if(prev) {
 			AreaPdf reversePdf = prev->convert_pdf(Interaction::SURFACE, pdf.back,
 				{ thisVertex.get_incident_direction(), ei::sq(thisVertex.ext().incidentDist) }).pdf;
 			float relPdf = reversePdf / thisVertex.ext().incidentPdf;
 			prevRelativeProbabilitySum = relPdf + relPdf * prev->ext().prevRelativeProbabilitySum;
 		}
+	}
+};
+
+
+class NebPathVertex : public PathVertex<NebVertexExt> {
+public:
+	// Overload the vertex sample operator to have more RR control.
+	VertexSample sample(const scene::materials::Medium* media,
+						const math::RndSet2_1& rndSet,
+						bool adjoint) const {
+		VertexSample s = PathVertex<NebVertexExt>::sample(media, rndSet, adjoint);
+		// Conditionally kill the photon path tracing if we are on the
+		// NEE vertex. Goal: trace only photons which we cannot NEE.
+		if(adjoint && ext().pathLen == 1) {
+			float keepChance = get_photon_path_chance(s.pdf.forw);
+			if(keepChance < ext().rnd) {
+				s.type = math::PathEventType::INVALID;
+			} else {
+				s.pdf.forw *= keepChance;
+				s.throughput /= keepChance;
+			}
+		}
+		return s;
 	}
 };
 
@@ -79,8 +108,12 @@ Spectrum evaluate_self_radiance(const scene::SceneDescriptor<CURRENT_DEV>& scene
 			AreaPdf startPdf = connect_pdf(scene.lightTree, vertex.get_primitive_id(),
 			                               vertex.get_surface_params(),
 			                               vertex.ext().previous->get_position(), guideFunction);
+			// Get the NEE versus random hit chance.
 			float relPdf = startPdf / vertex.ext().incidentPdf;
-			float relSum = relPdf + relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum;
+			float relSum = relPdf;
+			// All merges previous to the NEE where light paths which might be cancled.
+			relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
+				* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
 			//relSum /= vertex.ext().previous->ext().queryArea / mergeArea;
 			// All previous events were merges with a reuse count according to our parameter.
 			relSum *= vertex.ext().previous->ext().count;
@@ -95,6 +128,7 @@ Spectrum evaluate_self_radiance(const scene::SceneDescriptor<CURRENT_DEV>& scene
 void sample_view_path(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 					  const NebParameters& params,
 					  const Pixel coord,
+					  const int pixelIdx,
 					  math::Rng& rng,
 					  HashGrid<Device::CPU, NebPathVertex>& viewVertexMap,
 					  HashGrid<Device::CPU, CpuNextEventBacktracking::PhotonDesc>& photonMap) {
@@ -173,7 +207,7 @@ void sample_view_path(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 			vertex.ext().neeDirection = nee.direction;
 			vertex.ext().neeConversion = nee.cosOut / (nee.distSq * float(nee.creationPdf));
 		}
-		vertex.ext().coord = coord;
+		vertex.ext().pixelIndex = pixelIdx;
 		vertex.ext().pathLen = pathLen;
 		vertex.ext().previous = previous;
 		previous = viewVertexMap.insert(vertex.get_position(), vertex);
@@ -210,6 +244,7 @@ void sample_photons(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	float cosLight = ei::abs(vertex.get_geometrical_factor(vertex.ext().neeDirection));
 
 	// Trace a path
+	virtualLight.ext().rnd = math::sample_uniform(u32(rng.next()));
 	int lightPathLength = 1;
 	math::Throughput lightThroughput { Spectrum{1.0f}, 0.0f };
 	scene::Direction prevNormal = virtualLight.get_geometric_normal();
@@ -218,6 +253,7 @@ void sample_photons(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
 		VertexSample sample;
+		virtualLight.ext().pathLen = lightPathLength;
 		if(!walk(scene, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample))
 			break;
 		++lightPathLength;
@@ -294,6 +330,7 @@ Spectrum merge_nees(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 											nullptr);
 				// MIS compares against all previous merges (there are no feature ones)
 				float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
+				relSum *= get_photon_path_chance(bsdf.pdf.back);
 				// And the random hit connection
 				float relHitPdf = float(bsdf.pdf.forw) * otherExt.neeConversion / vertex.ext().count;
 				float misWeight = 1.0f / (1.0f + relSum + relHitPdf);
@@ -331,7 +368,7 @@ void CpuNextEventBacktracking::iterate() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
 		Pixel coord { pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		sample_view_path(m_sceneDesc, m_params, coord, m_rngs[pixel], m_viewVertexMap, m_photonMap);
+		sample_view_path(m_sceneDesc, m_params, coord, pixel, m_rngs[pixel], m_viewVertexMap, m_photonMap);
 	}
 
 	// Second pass: merge NEEs and backtrack. For each stored vertex find all other
@@ -362,7 +399,8 @@ void CpuNextEventBacktracking::iterate() {
 		radiance += merge_nees(m_sceneDesc, m_params, mergeRadiusSq, m_viewVertexMap, vertex);
 		radiance += evaluate_self_radiance(m_sceneDesc, m_params, vertex);
 
-		m_outputBuffer.contribute(vertex.ext().coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
+		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(), vertex.ext().pixelIndex / m_outputBuffer.get_width() };
+		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
 								  1.0f, radiance);
 	}
 
