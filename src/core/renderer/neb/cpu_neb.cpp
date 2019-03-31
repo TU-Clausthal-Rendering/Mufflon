@@ -313,43 +313,54 @@ Spectrum merge_photons(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	return radiance / (ei::PI * mergeRadiusSq);
 }
 
+Spectrum evaluate_nee(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+					  const NebPathVertex& vertex, const NebVertexExt& ext,
+					  float reuseCount) {
+	Pixel tmpCoord;
+	auto bsdf = vertex.evaluate(ext.neeDirection,
+								scene.media, tmpCoord, false,
+								nullptr);
+	// MIS compares against all previous merges (there are no feature ones)
+	float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
+	relSum *= get_photon_path_chance(bsdf.pdf.back);
+	// And the random hit connection
+	float relHitPdf = float(bsdf.pdf.forw) * ext.neeConversion / reuseCount;
+	float misWeight = 1.0f / (1.0f + relSum + relHitPdf);
+	return (misWeight * bsdf.cosOut) * bsdf.value * ext.neeIrradiance;
+}
+
 Spectrum merge_nees(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 					const NebParameters& params, float mergeRadiusSq,
 					const HashGrid<Device::CPU, NebPathVertex>& viewVertexMap,
 					const NebPathVertex& vertex) {
 	scene::Point currentPos = vertex.get_position();
-	Spectrum radiance { 0.0f };
 	int neePathLen = vertex.ext().pathLen + 1;
-	float reuseCount = ei::max(1.0f, mergeRadiusSq * ei::PI * vertex.ext().density);
 	// If path length is already too large there will be no contribution from this vertex.
 	// It only exists for the sake of random hit evaluation (and as additional sample).
 	if(neePathLen >= params.minPathLength && neePathLen <= params.maxPathLength) {
-		int count = 0;	// Number of merged NEE events
-		auto otherEndIt = viewVertexMap.find_first(currentPos);
-		while(otherEndIt) {
-			auto& otherExt = otherEndIt->ext();
-			if(otherExt.neeIrradiance.r >= 0.0f
-				&& lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) {
-				++count;
-				if(otherExt.neeIrradiance > 0.0f) {
-					Pixel tmpCoord;
-					auto bsdf = vertex.evaluate(otherExt.neeDirection,
-												scene.media, tmpCoord, false,
-												nullptr);
-					// MIS compares against all previous merges (there are no feature ones)
-					float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
-					relSum *= get_photon_path_chance(bsdf.pdf.back);
-					// And the random hit connection
-					float relHitPdf = float(bsdf.pdf.forw) * otherExt.neeConversion / reuseCount;
-					float misWeight = 1.0f / (1.0f + relSum + relHitPdf);
-					radiance += (misWeight * bsdf.cosOut) * bsdf.value * otherExt.neeIrradiance;
+		if(mergeRadiusSq == 0.0f) {
+			// Merges are disabled -> use the current vertex only
+			if(vertex.ext().neeIrradiance.r > 0.0f)
+				return evaluate_nee(scene, vertex, vertex.ext(), 1.0f);
+		} else {
+			Spectrum radiance { 0.0f };
+			int count = 0;	// Number of merged NEE events
+			float reuseCount = ei::max(1.0f, mergeRadiusSq * ei::PI * vertex.ext().density);
+			auto otherEndIt = viewVertexMap.find_first(currentPos);
+			while(otherEndIt) {
+				auto& otherExt = otherEndIt->ext();
+				if(otherExt.neeIrradiance.r >= 0.0f
+					&& lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) {
+					++count;
+					if(otherExt.neeIrradiance > 0.0f)
+						radiance += evaluate_nee(scene, vertex, otherExt, reuseCount);
 				}
+				++otherEndIt;
 			}
-			++otherEndIt;
+			return radiance / count;
 		}
-		return radiance / count;
 	}
-	return radiance;
+	return Spectrum { 0.0f };
 }
 
 } // namespace ::
@@ -361,14 +372,11 @@ void CpuNextEventBacktracking::iterate() {
 	auto scope = Profiler::instance().start<CpuProfileState>("CPU NEB iteration", ProfileLevel::HIGH);
 
 	float sceneSize = len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min);
-	float currentMergeRadius = m_params.mergeRadius * sceneSize;
-//	if(m_params.progressive)
-//		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
-	float mergeRadiusSq = currentMergeRadius * currentMergeRadius;
-	float mergeArea = mergeRadiusSq * ei::PI;
-	m_viewVertexMap.clear(currentMergeRadius * 2.0001f);
-	m_photonMap.clear(currentMergeRadius * 2.0001f);
-//	float densityEstimateRadiusSq = sceneSize * 0.0025f;
+	float photonMergeRadiusSq = ei::sq(m_params.mergeRadius * sceneSize);
+	float neeMergeRadiusSq = ei::sq(m_params.neeMergeRadius * sceneSize);
+	float neeMergeArea = neeMergeRadiusSq * ei::PI;
+	m_viewVertexMap.clear(m_params.mergeRadius * sceneSize * 2.0001f);
+	m_photonMap.clear(m_params.mergeRadius * sceneSize * 2.0001f);
 
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
@@ -391,10 +399,10 @@ void CpuNextEventBacktracking::iterate() {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
 		if(vertex.ext().neeIrradiance.r < 0.0f) // Non-NEE contributing (random hit vertex only)
 			continue;
-		estimate_density(m_viewVertexMap, mergeRadiusSq, vertex);
+		estimate_density(m_viewVertexMap, photonMergeRadiusSq, vertex);
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
-		sample_photons(m_sceneDesc, m_params, mergeArea, m_rngs[rngIndex], vertex, m_photonMap);
+		sample_photons(m_sceneDesc, m_params, neeMergeArea, m_rngs[rngIndex], vertex, m_photonMap);
 	}
 
 	// Third pass: merge backtracked photons, average NEE events and compute random hit
@@ -405,9 +413,9 @@ void CpuNextEventBacktracking::iterate() {
 		scene::Point currentPos = vertex.get_position();
 		Spectrum radiance { 0.0f };
 
-		radiance += merge_photons(m_sceneDesc, m_params, mergeRadiusSq, m_photonMap, vertex);
-		radiance += merge_nees(m_sceneDesc, m_params, mergeRadiusSq, m_viewVertexMap, vertex);
-		radiance += evaluate_self_radiance(m_sceneDesc, m_params, mergeArea, vertex);
+		radiance += merge_photons(m_sceneDesc, m_params, photonMergeRadiusSq, m_photonMap, vertex);
+		radiance += merge_nees(m_sceneDesc, m_params, neeMergeRadiusSq, m_viewVertexMap, vertex);
+		radiance += evaluate_self_radiance(m_sceneDesc, m_params, neeMergeArea, vertex);
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(), vertex.ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
