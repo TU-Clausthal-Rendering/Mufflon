@@ -9,8 +9,7 @@ using NebParameters = ParameterHandler<
 	PMaxPathLength,
 	PNeeCount,
 	PNeePositionGuide,
-	PMergeRadius,
-	PProgressive
+	PMergeRadius
 >;
 
 }} // namespace mufflon::renderer
