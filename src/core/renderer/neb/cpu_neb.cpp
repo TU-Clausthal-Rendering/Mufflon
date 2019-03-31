@@ -96,10 +96,11 @@ float get_previous_merge_sum(const CpuNextEventBacktracking::PhotonDesc& photon,
 	return relPdf + relPdf * photon.prevPrevRelativeProbabilitySum;
 }
 
-// Evaluate direct hit of area ligths
-Spectrum evaluate_self_radiance(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-								const NebParameters& params, float mergeArea,
-								const NebPathVertex& vertex) {
+// Evaluate direct hit of area lights
+struct { Spectrum radiance; float relSum; }
+evaluate_self_radiance(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+					   const NebParameters& params,
+					   const NebPathVertex& vertex) {
 	auto& guideFunction = params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													 : scene::lights::guide_flux;
 
@@ -115,16 +116,16 @@ Spectrum evaluate_self_radiance(const scene::SceneDescriptor<CURRENT_DEV>& scene
 			// All merges previous to the NEE where light paths which might be cancled.
 			relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
 				* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
-			//relSum /= vertex.ext().previous->ext().queryArea / mergeArea;
+			return { emission.value, relSum };
 			// All previous events were merges with a reuse count according to our parameter.
-			float reuseCount = ei::max(1.0f, mergeArea * vertex.ext().previous->ext().density);
-			relSum *= reuseCount;
-			float misWeight = 1.0f / (1.0f + relSum);
-			emission.value *= misWeight;
+			//float reuseCount = ei::max(1.0f, neeMergeArea * vertex.ext().previous->ext().density);
+			//relSum *= reuseCount;
+			//float misWeight = 1.0f / (1.0f + relSum);
+			//emission.value *= misWeight;
 		}
-		return emission.value;
+		return { emission.value, 0.0f };
 	}
-	return Spectrum { 0.0f };
+	return { Spectrum { 0.0f }, 0.0f };
 }
 
 void sample_view_path(const scene::SceneDescriptor<CURRENT_DEV>& scene,
@@ -415,7 +416,10 @@ void CpuNextEventBacktracking::iterate() {
 
 		radiance += merge_photons(m_sceneDesc, m_params, photonMergeRadiusSq, m_photonMap, vertex);
 		radiance += merge_nees(m_sceneDesc, m_params, neeMergeRadiusSq, m_viewVertexMap, vertex);
-		radiance += evaluate_self_radiance(m_sceneDesc, m_params, neeMergeArea, vertex);
+		auto emission = evaluate_self_radiance(m_sceneDesc, m_params, vertex);
+		float reuseCount = vertex.ext().previous ? ei::max(1.0f, neeMergeArea * vertex.ext().previous->ext().density) : 0.0f;
+		float misWeight = 1.0f / (1.0f + emission.relSum * reuseCount);
+		radiance += emission.radiance * misWeight;
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(), vertex.ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },

@@ -53,6 +53,12 @@ public:
 		scene::TangentSpace tangentSpace;
 		ei::Vec2 uv;
 	};*/
+
+	struct EmissionDesc {
+		NebPathVertex* previous;	// The previous vertex to compute the reuseCount after the density estimate
+		Spectrum radiance;			// emission.value
+		float relSum;				// Part of the MIS-weight (without the reuseCount)
+	};
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
