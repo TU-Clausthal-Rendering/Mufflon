@@ -49,7 +49,7 @@ namespace mufflon::renderer {
 	// A sparse octree with atomic insertion to measure the density of elements in space.
 	class DensityOctree {
 		static constexpr int LVL0_N = 4;
-		static constexpr int SPLIT_FACTOR = 2;
+		static constexpr int SPLIT_FACTOR = 1;
 	public:
 		void set_iteration(int iter) {
 			m_densityScale = 1.0f / iter;
@@ -94,7 +94,8 @@ namespace mufflon::renderer {
 		}
 
 		float getDensity(const ei::Vec3& pos, const ei::Vec3& normal) {
-			ei::Vec3 normPos = (pos - m_minBound) * m_sceneSizeInv;
+			ei::Vec3 offPos = pos - m_minBound;
+			ei::Vec3 normPos = offPos * m_sceneSizeInv;
 			// The first level is a uniform grid of size LVL0_N³
 			ei::IVec3 rootPos { normPos * LVL0_N };
 			int idx = rootPos.x + LVL0_N * (rootPos.y + LVL0_N * rootPos.z);
@@ -114,7 +115,7 @@ namespace mufflon::renderer {
 				ei::IVec3 intPos { normPos * edgeL };
 				ei::Vec3 cellMin = intPos / (edgeL * m_sceneSizeInv);
 				ei::Vec3 cellMax = (intPos+1) / (edgeL * m_sceneSizeInv);
-				float area = intersection_area(cellMin, cellMax, pos, normal);
+				float area = intersection_area(cellMin, cellMax, offPos, normal);
 //				float projArea = dot(abs(normal), m_sceneAreas) / (edgeL * edgeL);
 				return m_densityScale * countOrChild / area;
 			}
