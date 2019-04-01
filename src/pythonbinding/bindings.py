@@ -18,13 +18,18 @@ class DllInterface:
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.world_get_current_scenario.restype = POINTER(c_int)
+        self.dllHolder.core.world_find_scenario.restype = c_void_p
+        self.dllHolder.core.world_load_scenario.restype = c_void_p
+		
+    def __del__(self):
+        self.dllHolder.core.mufflon_destroy()
 
     def disable_profiling(self):
         self.dllHolder.core.profiling_disable()
         self.dllHolder.mffLoader.loader_profiling_disable()
 
-    def loader_load_json(self, szeneJson):
-        return self.dllHolder.mffLoader.loader_load_json(c_char_p(szeneJson.encode('utf-8')))
+    def loader_load_json(self, sceneJson):
+        return self.dllHolder.mffLoader.loader_load_json(c_char_p(sceneJson.encode('utf-8')))
 
     def renderer_set_parameter_bool(self, parameterName, value):
         return self.dllHolder.core.renderer_set_parameter_bool(c_char_p(parameterName.encode('utf-8')), c_bool(value))
@@ -71,6 +76,12 @@ class DllInterface:
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
 
+    def world_find_scenario(self, name):
+        return self.dllHolder.core.world_find_scenario(c_char_p(name.encode('utf-8')))
+
+    def world_load_scenario(self, hdl):
+        return self.dllHolder.core.world_load_scenario(c_void_p(hdl))
+
 
 def path_leaf(path):
     head, tail = ntpath.split(path)
@@ -99,6 +110,14 @@ class RenderActions:
                 self.activeRendererName = rendererString
                 self.dllInterface.render_enable_renderer(i)
                 return True
+        return False
+		
+    def load_scenario(self, scenarioName):
+        hdl = self.dllInterface.world_find_scenario(scenarioName)
+        if not hdl:
+            return False
+        if self.dllInterface.world_load_scenario(hdl):
+            return True
         return False
 
     def enable_render_target(self, targetIndex, variance):
