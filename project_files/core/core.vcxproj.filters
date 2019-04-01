@@ -879,6 +879,9 @@
     <ClInclude Include="..\..\src\core\renderer\neb\neb_params.hpp">
       <Filter>Source Files\core\renderer\neb</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\neb\density_octree.hpp">
+      <Filter>Source Files\core\renderer\neb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">

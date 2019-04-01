@@ -6,6 +6,7 @@
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/photon_map.hpp"
+#include "density_octree.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -79,9 +80,9 @@ private:
 	HashGrid<Device::CPU, NebPathVertex> m_viewVertexMap;
 	std::vector<EmissionDesc> m_selfEmissiveEndVertices;
 	std::atomic_int32_t m_selfEmissionCount;
-
 	HashGridManager<PhotonDesc> m_photonMapManager;
 	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
+	DensityOctree m_density;
 };
 
 } // namespace mufflon::renderer
