@@ -447,11 +447,16 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		++pathLen;
 
 		// Query importance if the target is active
-		if(pathLen == 1 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-			const bool isSilhouette = decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
-			m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });
+		if(pathLen == 1 && m_params.importanceIterations > 0) {
+			if(m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
+				const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
+				m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
+			}
+			if(m_outputBuffer.is_target_enabled(RenderTargets::SHADOW_SILHOUETTE)) {
+				const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
+				const bool isSilhouette = decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
+				m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });
+			}
 		}
 
 		// Evaluate direct hit of area ligths

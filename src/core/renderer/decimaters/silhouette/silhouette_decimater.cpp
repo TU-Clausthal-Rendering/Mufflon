@@ -232,27 +232,31 @@ void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float 
 	decimater.module(normalHandle).set_max_deviation(m_maxNormalDeviation);
 	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity, threshold);
 	if(m_collapseMode == CollapseMode::NO_CONCAVE) {
+		logPedantic("Using convexity module");
 		decimater.add(convexHandle);
 	} else if(m_collapseMode == CollapseMode::NO_SILHOUETTE) {
+		logPedantic("Using silhouette module");
 		decimater.add(silhouetteHandle);
 		decimater.module(silhouetteHandle).set_properties(m_originalMesh, m_silhouette);
 	}
 	
-	const std::size_t targetCount = (reduction == 0.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
-	const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
-	m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
-		// Adjust the reference from original to decimated mesh
-		const auto originalVertex = this->get_original_vertex_handle(changedVertex);
-		if(!m_originalMesh.property(m_collapsed, originalVertex))
-			m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
-	});
+	if(reduction != 0.f) {
+		const std::size_t targetCount = (reduction == 1.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
+		const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
+		m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
+			// Adjust the reference from original to decimated mesh
+			const auto originalVertex = this->get_original_vertex_handle(changedVertex);
+			if(!m_originalMesh.property(m_collapsed, originalVertex))
+				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
+		});
+		logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
+	}
 
 	// Initialize importance map
 	m_importance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
 	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i)
 		m_importance[i].store(0.f);
 
-	logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
 
 	// Update the damping factor
 	// TODO: use parameter
