@@ -17,7 +17,8 @@ namespace mufflon::renderer {
 template < Device >
 struct RenderBuffer;
 
-namespace { class NebPathVertex; }
+class NebPathVertex;
+struct NebVertexExt;
 
 class CpuNextEventBacktracking final : public RendererBase<Device::CPU> {
 public:
@@ -63,10 +64,18 @@ private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
+	void sample_view_path(const Pixel coord, const int pixelIdx);
+	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
+	void sample_photon_path(float neeMergeArea, math::Rng& rng, const NebPathVertex& vertex);
+	Spectrum merge_photons(float mergeRadiusSq, const NebPathVertex& vertex);
+	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float reuseCount);
+	Spectrum merge_nees(float mergeRadiusSq, const NebPathVertex& vertex);
+
 	NebParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 	HashGridManager<NebPathVertex> m_viewVertexMapManager;
 	HashGrid<Device::CPU, NebPathVertex> m_viewVertexMap;
+	std::vector<EmissionDesc> m_selfEmissiveEndVertices;
 
 	HashGridManager<PhotonDesc> m_photonMapManager;
 	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
