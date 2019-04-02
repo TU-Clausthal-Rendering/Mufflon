@@ -117,8 +117,8 @@ CpuNextEventBacktracking::evaluate_self_radiance(const NebPathVertex& vertex,
 			float relPdf = startPdf / vertex.ext().incidentPdf;
 			float relSum = relPdf;
 			// All merges previous to the NEE were light paths which might be cancled.
-			relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
-				* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
+			//relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
+			//	* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
 			return { &vertex.ext().previous->ext(), emission.value, relSum };
 		}
 		return { nullptr, emission.value, 0.0f };
@@ -139,8 +139,8 @@ CpuNextEventBacktracking::evaluate_background(const NebPathVertex& vertex, const
 			float relPdf = float(startPdf) / float(sample.pdf.forw);
 			float relSum = relPdf;
 			// All merges previous to the NEE were light paths which might be cancled.
-			relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
-				* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
+			//relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
+			//	* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
 			return { &vertex.ext().previous->ext(), background.value, relSum };
 		}
 		return { nullptr, background.value, 0.0f };
@@ -279,7 +279,7 @@ void CpuNextEventBacktracking::estimate_density(float densityEstimateRadiusSq, N
 }
 
 // Create the backtracking path
-void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, math::Rng& rng, const NebPathVertex& vertex) {
+void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float photonMergeArea, math::Rng& rng, const NebPathVertex& vertex) {
 	// Prepare a start vertex to begin the sampling of the photon event.
 	NebPathVertex virtualLight = vertex;
 	virtualLight.set_incident_direction(-vertex.ext().neeDirection);
@@ -314,6 +314,9 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, math::Rng&
 			// Compute the random hit event probability relative to this start vertex.
 			float reuseCount = ei::max(1.0f, neeMergeArea * vertex.ext().density);
 			relPdfSum = float(sample.pdf.back) * vertex.ext().neeConversion / reuseCount;
+			// Additionally, the next vertex has to see the nee-merge with a respective factor.
+			float photonReuseCount = ei::max(1.0f, photonMergeArea * vertex.ext().density);
+			prevConversionFactor *= reuseCount / photonReuseCount;
 		}
 
 		// Store the new photon
@@ -354,30 +357,31 @@ Spectrum CpuNextEventBacktracking::merge_photons(float mergeRadiusSq, const NebP
 
 Spectrum CpuNextEventBacktracking::evaluate_nee(const NebPathVertex& vertex,
 												const NebVertexExt& ext,
-												float reuseCount) {
+												float neeReuseCount, float mergeReuseCount) {
 	Pixel tmpCoord;
 	auto bsdf = vertex.evaluate(ext.neeDirection,
 								m_sceneDesc.media, tmpCoord, false,
 								nullptr);
 	// MIS compares against all previous merges (there are no feature ones)
 	float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
-	relSum *= get_photon_path_chance(bsdf.pdf.back);
+	relSum *= get_photon_path_chance(bsdf.pdf.back) * mergeReuseCount / neeReuseCount;
 	// And the random hit connection
-	float relHitPdf = float(bsdf.pdf.forw) * ext.neeConversion / reuseCount;
+	float relHitPdf = float(bsdf.pdf.forw) * ext.neeConversion / neeReuseCount;
 	float misWeight = 1.0f / (1.0f + relSum + relHitPdf);
 	return (misWeight * bsdf.cosOut) * bsdf.value * ext.neeIrradiance;
 }
 
-Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, const NebPathVertex& vertex) {
+Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex) {
 	scene::Point currentPos = vertex.get_position();
 	int neePathLen = vertex.ext().pathLen + 1;
+	float photonReuseCount = ei::max(1.0f, photonMergeArea * vertex.ext().density);
 	// If path length is already too large there will be no contribution from this vertex.
 	// It only exists for the sake of random hit evaluation (and as additional sample).
 	if(neePathLen >= m_params.minPathLength && neePathLen <= m_params.maxPathLength) {
 		if(mergeRadiusSq == 0.0f) {
 			// Merges are disabled -> use the current vertex only
 			if(any(greater(vertex.ext().neeIrradiance, 0.0f)))
-				return evaluate_nee(vertex, vertex.ext(), 1.0f);
+				return evaluate_nee(vertex, vertex.ext(), 1.0f, photonReuseCount);
 		} else {
 			Spectrum radiance { 0.0f };
 			int count = 0;	// Number of merged NEE events
@@ -388,7 +392,7 @@ Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, const NebPath
 				if(lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) {
 					++count;
 					if(any(greater(otherExt.neeIrradiance, 0.0f)))
-						radiance += evaluate_nee(vertex, otherExt, reuseCount);
+						radiance += evaluate_nee(vertex, otherExt, reuseCount, photonReuseCount);
 				}
 				++otherEndIt;
 			}
@@ -398,9 +402,16 @@ Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, const NebPath
 	return Spectrum { 0.0f };
 }
 
-Spectrum CpuNextEventBacktracking::finalize_emission(float neeMergeArea, const EmissionDesc& emission) {
-	float reuseCount = emission.previous ? ei::max(1.0f, neeMergeArea * emission.previous->density) : 1.0f;
-	float misWeight = 1.0f / (1.0f + emission.relSum * reuseCount);
+Spectrum CpuNextEventBacktracking::finalize_emission(float neeMergeArea, float photonMergeArea, const EmissionDesc& emission) {
+	float relSum = emission.relPdf;
+	if(emission.previous) {
+		float neeReuseCount = ei::max(1.0f, neeMergeArea * emission.previous->density);
+		float photonReuseCount = ei::max(1.0f, photonMergeArea * emission.previous->density);
+		relSum = emission.relPdf * neeReuseCount
+				+ emission.relPdf * emission.previous->prevRelativeProbabilitySum
+				* get_photon_path_chance(emission.previous->pdfBack) * photonReuseCount;
+	}
+	float misWeight = 1.0f / (1.0f + relSum);
 	return emission.radiance * misWeight;
 }
 
@@ -412,6 +423,7 @@ void CpuNextEventBacktracking::iterate() {
 
 	float sceneSize = len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min);
 	float photonMergeRadiusSq = ei::sq(m_params.mergeRadius * sceneSize);
+	float photonMergeArea = photonMergeRadiusSq * ei::PI;
 	float neeMergeRadiusSq = ei::sq(m_params.neeMergeRadius * sceneSize);
 	float neeMergeArea = neeMergeRadiusSq * ei::PI;
 	m_viewVertexMap.clear(m_params.mergeRadius * sceneSize * 2.0001f);
@@ -446,7 +458,7 @@ void CpuNextEventBacktracking::iterate() {
 		vertex.ext().density = m_density.getDensity(vertex.get_position(), vertex.get_geometric_normal());
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
-		sample_photon_path(neeMergeArea, m_rngs[rngIndex], vertex);
+		sample_photon_path(neeMergeArea, photonMergeArea, m_rngs[rngIndex], vertex);
 	}//*/
 
 	// Third pass: merge backtracked photons, average NEE events and compute random hit
@@ -460,9 +472,9 @@ void CpuNextEventBacktracking::iterate() {
 		Spectrum radiance { 0.0f };
 
 		radiance += merge_photons(photonMergeRadiusSq, vertex);
-		radiance += merge_nees(neeMergeRadiusSq, vertex);
+		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
-		radiance += finalize_emission(neeMergeArea, emission);
+		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
@@ -475,7 +487,7 @@ void CpuNextEventBacktracking::iterate() {
 	i32 selfEmissionCount = m_selfEmissionCount.load();
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < selfEmissionCount; ++i) {
-		Spectrum emission = finalize_emission(neeMergeArea, m_selfEmissiveEndVertices[i]);
+		Spectrum emission = finalize_emission(neeMergeArea, photonMergeArea, m_selfEmissiveEndVertices[i]);
 		Pixel coord { m_selfEmissiveEndVertices[i].previous->pixelIndex % m_outputBuffer.get_width(),
 					  m_selfEmissiveEndVertices[i].previous->pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute(coord, { Spectrum{1.0f}, 1.0f }, { Spectrum{1.0f}, 1.0f },

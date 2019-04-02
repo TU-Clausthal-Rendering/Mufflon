@@ -59,7 +59,7 @@ public:
 	struct EmissionDesc {
 		const NebVertexExt* previous;	// The previous vertex to compute the reuseCount after the density estimate
 		Spectrum radiance;				// emission.value
-		float relSum;					// Part of the MIS-weight (without the reuseCount)
+		float relPdf;					// Part of the MIS-weight (without the reuseCount)
 	};
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
@@ -69,11 +69,11 @@ private:
 	EmissionDesc evaluate_background(const NebPathVertex& vertex, const VertexSample& sample, int pathLen);
 	void sample_view_path(const Pixel coord, const int pixelIdx);
 	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
-	void sample_photon_path(float neeMergeArea, math::Rng& rng, const NebPathVertex& vertex);
+	void sample_photon_path(float neeMergeArea, float photonMergeArea, math::Rng& rng, const NebPathVertex& vertex);
 	Spectrum merge_photons(float mergeRadiusSq, const NebPathVertex& vertex);
-	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float reuseCount);
-	Spectrum merge_nees(float mergeRadiusSq, const NebPathVertex& vertex);
-	Spectrum finalize_emission(float neeMergeArea, const EmissionDesc& emission);
+	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float neeReuseCount, float mergeReuseCount);
+	Spectrum merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex);
+	Spectrum finalize_emission(float neeMergeArea, float photonMergeArea, const EmissionDesc& emission);
 
 	NebParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
