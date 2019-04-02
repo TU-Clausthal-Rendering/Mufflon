@@ -224,24 +224,40 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 				// Additionally storing this vertex further reduces variance for direct lighted
 				// surfaces and allows the light-bulb scenario when using the backtracking.
 				/*scene::Point hitPos = neePos - nee.direction * hit.hitT;
-				const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, hit);
+				const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(m_sceneDesc, hit);
 				NebPathVertex virtualLight;
 				NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
-					scene.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
-					nee.dist, AngularPdf{1.0f}, math::Throughput{});
+					m_sceneDesc.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
+					hit.hitT, AngularPdf{1.0f}, math::Throughput{});
 				// Compensate the changed distance in diffIrradiance.
-				virtualLight.ext().neeIrradiance = nee.diffIrradiance * nee.distSq / (hit.hitT * hit.hitT);
-				virtualLight.ext().neeDirection = nee.direction;
-				virtualLight.ext().coord = coord;
-				virtualLight.ext().pathLen = -100000;	// Mark this as non contributing (not connected to a pixel)
-				viewVertexMap.insert(virtualLight.get_position(), virtualLight);*/
+				//virtualLight.ext().neeIrradiance = nee.diffIrradiance * nee.distSq / (hit.hitT * hit.hitT);
+				//virtualLight.ext().neeDirection = nee.direction;
+				// An additional NEE is necessary, such that this new vertex is an unbiased
+				// estimate again.
+				neeSeed = m_rngs[pixelIdx].next();
+				neeRnd = m_rngs[pixelIdx].next();
+				auto neeSec = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
+									  hitPos, m_sceneDesc.aabb, neeRnd,
+									  guideFunction);
+				bool anyhit = scene::accel_struct::any_intersection(
+									m_sceneDesc, { hitPos, neeSec.direction },
+									hit.hitId, neeSec.dist);
+				if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
+				virtualLight.ext().pathLen = -32000;	// Mark this as non contributing (not connected to a pixel)
+				virtualLight.ext().previous = nullptr;
+				virtualLight.ext().neeIrradiance = neeSec.diffIrradiance;
+				virtualLight.ext().neeDirection = neeSec.direction;
+				virtualLight.ext().neeConversion = neeSec.cosOut / (neeSec.distSq * float(neeSec.creationPdf));
+				m_viewVertexMap.insert(hitPos, virtualLight);
+				m_density.increment(hitPos);//*/
 				// Make sure the vertex for which we did the NEE knows it is shadowed.
-				nee.diffIrradiance *= 0.0f;
+				nee.diffIrradiance = Spectrum{0.0f};
 			}
 			vertex.ext().neeIrradiance = nee.diffIrradiance;
 			vertex.ext().neeDirection = nee.direction;
 			vertex.ext().neeConversion = nee.cosOut / (nee.distSq * float(nee.creationPdf));
 			previous = m_viewVertexMap.insert(vertex.get_position(), vertex);
+			if(previous == nullptr) __debugbreak();
 			m_density.increment(vertex.get_position());
 		}
 	} while(pathLen < m_params.maxPathLength);
@@ -330,7 +346,7 @@ Spectrum CpuNextEventBacktracking::merge_photons(float mergeRadiusSq, const NebP
 			// MIS compare against previous merges (view path) AND feature merges (light path)
 			float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
 			relSum += get_previous_merge_sum(photon, bsdf.pdf.forw);
-			float misWeight = 1.0f / (1.0f + relSum);
+			float misWeight = 1.0f;// / (1.0f + relSum);
 			radiance += bsdf.value * photon.irradiance * misWeight;
 		}
 		++photonIt;
@@ -405,6 +421,8 @@ void CpuNextEventBacktracking::iterate() {
 	m_selfEmissionCount.store(0);
 	m_density.set_iteration(m_currentIteration + 1);
 
+	logInfo("[NEB] Density map occupation: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
+
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
 
@@ -438,13 +456,15 @@ void CpuNextEventBacktracking::iterate() {
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
+		// Secondary source vertices to not contribute (not connected to a pixel)
+		if(vertex.ext().pathLen < 0) continue;
 		scene::Point currentPos = vertex.get_position();
 		Spectrum radiance { 0.0f };
 
 		radiance += merge_photons(photonMergeRadiusSq, vertex);
-		radiance += merge_nees(neeMergeRadiusSq, vertex);
-		auto emission = evaluate_self_radiance(vertex, false);
-		radiance += finalize_emission(neeMergeArea, emission);
+		//radiance += merge_nees(neeMergeRadiusSq, vertex);
+		//auto emission = evaluate_self_radiance(vertex, false);
+		//radiance += finalize_emission(neeMergeArea, emission);
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
@@ -454,7 +474,7 @@ void CpuNextEventBacktracking::iterate() {
 
 	// Finialize the evaluation of emissive end vertices.
 	// It is necessary to do this after the density estimate for a correct mis.
-	i32 selfEmissionCount = m_selfEmissionCount.load();
+	/*i32 selfEmissionCount = m_selfEmissionCount.load();
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < selfEmissionCount; ++i) {
 		Spectrum emission = finalize_emission(neeMergeArea, m_selfEmissiveEndVertices[i]);
@@ -469,13 +489,13 @@ void CpuNextEventBacktracking::iterate() {
 
 void CpuNextEventBacktracking::on_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
-	m_viewVertexMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1));
+	m_viewVertexMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * 2);
 	m_viewVertexMap = m_viewVertexMapManager.acquire<Device::CPU>();
 	m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * m_params.maxPathLength);
 	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
 	// There is at most one emissive end vertex per path
 	m_selfEmissiveEndVertices.resize(m_outputBuffer.get_num_pixels());
-	m_density.initialize(m_sceneDesc.aabb, m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
+	m_density.initialize(m_sceneDesc.aabb, m_outputBuffer.get_num_pixels() * m_params.maxPathLength * 2);
 }
 
 void CpuNextEventBacktracking::init_rngs(int num) {

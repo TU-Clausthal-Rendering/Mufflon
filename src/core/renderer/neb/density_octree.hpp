@@ -121,6 +121,9 @@ namespace mufflon::renderer {
 			}
 			return 0.0f;
 		}
+
+		int capacity() const { return m_capacity; }
+		int size() const { return ei::min(m_capacity, m_allocationCounter.load()); }
 	private:
 		float m_densityScale;		// 1/#iterations to normalize the counters into a density
 		int m_splitCountDensity;	// The number when a node is split must be a multiple of 8 and must grow proportional to #iterations
