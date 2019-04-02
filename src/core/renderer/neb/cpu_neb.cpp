@@ -13,8 +13,8 @@ namespace mufflon::renderer {
 
 namespace {
 float get_photon_path_chance(const AngularPdf pdf) {
-	return 1.0f;
-	//return float(pdf) / (1.0f + float(pdf));
+	//return 1.0f;
+	return float(pdf) / (1.0f + float(pdf));
 }
 } // namespace ::
 
@@ -116,12 +116,34 @@ CpuNextEventBacktracking::evaluate_self_radiance(const NebPathVertex& vertex,
 			// Get the NEE versus random hit chance.
 			float relPdf = startPdf / vertex.ext().incidentPdf;
 			float relSum = relPdf;
-			// All merges previous to the NEE where light paths which might be cancled.
+			// All merges previous to the NEE were light paths which might be cancled.
 			relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
 				* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
 			return { &vertex.ext().previous->ext(), emission.value, relSum };
 		}
 		return { nullptr, emission.value, 0.0f };
+	}
+	return { nullptr, Spectrum { 0.0f }, 0.0f };
+}
+
+// Evaluate a hit of the background
+// TODO: unify by making the background behaving like an area light.
+CpuNextEventBacktracking::EmissionDesc
+CpuNextEventBacktracking::evaluate_background(const NebPathVertex& vertex, const VertexSample& sample, int pathLen) {
+	if(pathLen >= m_params.minPathLength) {
+		auto background = scene::lights::evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
+		background.value *= vertex.ext().throughput;
+		if(any(greater(background.value, 0.0f)) && pathLen > 1) {
+			AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
+			// Get the NEE versus random hit chance.
+			float relPdf = float(startPdf) / float(sample.pdf.forw);
+			float relSum = relPdf;
+			// All merges previous to the NEE were light paths which might be cancled.
+			relSum += relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum
+				* get_photon_path_chance(vertex.ext().previous->ext().pdfBack);
+			return { &vertex.ext().previous->ext(), background.value, relSum };
+		}
+		return { nullptr, background.value, 0.0f };
 	}
 	return { nullptr, Spectrum { 0.0f }, 0.0f };
 }
@@ -146,17 +168,20 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 		NebPathVertex& sourceVertex = previous ? *previous : vertex;	// Make sure the update function is called for the correct vertex.
 		if(!walk(m_sceneDesc, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
-				// TODO: store void photon?
 				// Missed scene - sample background
-				/*auto background = evaluate_background(scene.lightTree.background, sample.excident);
-				if(any(greater(background.value, 0.0f))) {
-					AreaPdf startPdf = background_pdf(scene.lightTree, background);
-					float mis = 1.0f / (1.0f + params.neeCount * float(startPdf) / float(sample.pdf.forw));
-					background.value *= mis;
-					outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
-				}*/
+				vertex.ext().previous = previous;
+				auto emission = evaluate_background(vertex, sample, pathLen+1);
+				if(emission.radiance != 0.0f) {
+					// In the case that there is no previous, there is also no MIS and we
+					// contribute directly.
+					if(!previous) {
+						m_outputBuffer.contribute(coord, { Spectrum{1.0f}, 1.0f }, { Spectrum{1.0f}, 1.0f },
+												  1.0f, emission.radiance);
+					} else {
+						u32 idx = m_selfEmissionCount.fetch_add(1);
+						m_selfEmissiveEndVertices[idx] = emission;
+					}
+				}
 			}
 			break;
 		}
@@ -189,11 +214,12 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 								vertex.get_position(), m_sceneDesc.aabb, neeRnd,
 								guideFunction);
 			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
-			scene::Point neePos = vertex.get_position() + nee.direction * nee.dist;
+			float tracingDist = (nee.dist >= scene::MAX_SCENE_SIZE) ? len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min) : nee.dist;
+			scene::Point neePos = vertex.get_position() + nee.direction * tracingDist;
 			auto hit = scene::accel_struct::first_intersection(m_sceneDesc,
 													{ neePos, -nee.direction },
-													{}, nee.dist);
-			if(hit.hitT < nee.dist * 0.999f) {
+													{}, tracingDist);
+			if(hit.hitT < tracingDist * 0.999f) {
 				// Hit a different surface than the current one.
 				// Additionally storing this vertex further reduces variance for direct lighted
 				// surfaces and allows the light-bulb scenario when using the backtracking.
@@ -304,7 +330,7 @@ Spectrum CpuNextEventBacktracking::merge_photons(float mergeRadiusSq, const NebP
 			// MIS compare against previous merges (view path) AND feature merges (light path)
 			float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
 			relSum += get_previous_merge_sum(photon, bsdf.pdf.forw);
-			float misWeight = 1.0f;// / (1.0f + relSum);
+			float misWeight = 1.0f / (1.0f + relSum);
 			radiance += bsdf.value * photon.irradiance * misWeight;
 		}
 		++photonIt;

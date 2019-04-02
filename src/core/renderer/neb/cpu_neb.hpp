@@ -66,6 +66,7 @@ private:
 	void init_rngs(int num);
 
 	EmissionDesc evaluate_self_radiance(const NebPathVertex& vertex, bool includeThroughput);
+	EmissionDesc evaluate_background(const NebPathVertex& vertex, const VertexSample& sample, int pathLen);
 	void sample_view_path(const Pixel coord, const int pixelIdx);
 	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
 	void sample_photon_path(float neeMergeArea, math::Rng& rng, const NebPathVertex& vertex);
