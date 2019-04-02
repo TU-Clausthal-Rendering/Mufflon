@@ -336,7 +336,7 @@ Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, const NebPath
 	if(neePathLen >= m_params.minPathLength && neePathLen <= m_params.maxPathLength) {
 		if(mergeRadiusSq == 0.0f) {
 			// Merges are disabled -> use the current vertex only
-			if(vertex.ext().neeIrradiance.r > 0.0f)
+			if(any(greater(vertex.ext().neeIrradiance, 0.0f)))
 				return evaluate_nee(vertex, vertex.ext(), 1.0f);
 		} else {
 			Spectrum radiance { 0.0f };
@@ -365,23 +365,6 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float neeMergeArea, const E
 }
 
 CpuNextEventBacktracking::CpuNextEventBacktracking() {
-	ei::Vec3 cellMin{-1.0f};
-	ei::Vec3 cellMax{1.0f};
-	ei::Vec3 pos{0.1f};
-	float a = intersection_area(cellMin, cellMax, pos, {1.0f, 0.0f, 0.0f});
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{1.0f, 1.0f, 0.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{-1.0f, 1.0f, 0.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{1.0f, -1.0f, 0.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{-1.0f, -1.0f, 0.0f}));
-
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{1.0f, 1.0f, 1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{-1.0f, -1.0f, -1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{-1.0f, -1.0f, 1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{-1.0f, 1.0f, -1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{1.0f, -1.0f, -1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{1.0f, 1.0f, -1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{1.0f, -1.0f, 1.0f}));
-	a = intersection_area(cellMin, cellMax, pos, normalize(ei::Vec3{-1.0f, 1.0f, 1.0f}));
 }
 
 void CpuNextEventBacktracking::iterate() {
@@ -433,9 +416,9 @@ void CpuNextEventBacktracking::iterate() {
 		Spectrum radiance { 0.0f };
 
 		radiance += merge_photons(photonMergeRadiusSq, vertex);
-		//radiance += merge_nees(neeMergeRadiusSq, vertex);
-		//auto emission = evaluate_self_radiance(vertex, false);
-		//radiance += finalize_emission(neeMergeArea, emission);
+		radiance += merge_nees(neeMergeRadiusSq, vertex);
+		auto emission = evaluate_self_radiance(vertex, false);
+		radiance += finalize_emission(neeMergeArea, emission);
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
@@ -445,7 +428,7 @@ void CpuNextEventBacktracking::iterate() {
 
 	// Finialize the evaluation of emissive end vertices.
 	// It is necessary to do this after the density estimate for a correct mis.
-	/*i32 selfEmissionCount = m_selfEmissionCount.load();
+	i32 selfEmissionCount = m_selfEmissionCount.load();
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < selfEmissionCount; ++i) {
 		Spectrum emission = finalize_emission(neeMergeArea, m_selfEmissiveEndVertices[i]);
