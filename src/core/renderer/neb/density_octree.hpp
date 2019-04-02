@@ -49,11 +49,11 @@ namespace mufflon::renderer {
 	// A sparse octree with atomic insertion to measure the density of elements in space.
 	class DensityOctree {
 		static constexpr int LVL0_N = 4;
-		static constexpr int SPLIT_FACTOR = 1;
+		static constexpr float SPLIT_FACTOR = 0.5f;
 	public:
 		void set_iteration(int iter) {
 			m_densityScale = 1.0f / iter;
-			m_splitCountDensity = SPLIT_FACTOR * 8 * iter;
+			m_splitCountDensity = ei::ceil(SPLIT_FACTOR * 8) * iter;
 		}
 
 		void initialize(const ei::Box& sceneBounds, int capacity) {
@@ -70,7 +70,7 @@ namespace mufflon::renderer {
 			// TODO: parallelize?
 			// The other nodes are only used if the parent is split
 			for(int i = LVL0_N * LVL0_N * LVL0_N; i < m_capacity; ++i)
-				m_nodes[i].store(SPLIT_FACTOR);
+				m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
 			m_allocationCounter.store(LVL0_N * LVL0_N * LVL0_N);
 		}
 
