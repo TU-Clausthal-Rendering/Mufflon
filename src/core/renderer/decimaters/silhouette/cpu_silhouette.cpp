@@ -157,15 +157,12 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 		m_reset = true;
 		// TODO
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		// TODO: compute threshold!
-		constexpr float threshold = 20.0f;
-
-		logInfo("Performing decimation/undecimation iteration");
+		logInfo("Performing decimation iteration");
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			m_decimaters[i].iterate(static_cast<std::size_t>(m_params.threshold), threshold, (float)(1.0 - m_remainingVertexFactor[i]));
+			m_decimaters[i].iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
 		logPedantic("Duration: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
 					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles");
@@ -196,6 +193,7 @@ void CpuShadowSilhouettes::iterate() {
 
 		// We need to update the importance density
 		this->update_reduction_factors();
+		compute_max_importance();
 
 		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
 			if(m_params.displayProjection) {
@@ -210,9 +208,8 @@ void CpuShadowSilhouettes::iterate() {
 				m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {}, m_outputBuffer.get_resolution());
 			}
 
-			compute_max_importance();
 			logInfo("Max. importance: ", m_maxImportance);
-			display_importance();
+			//display_importance();
 
 			if(m_params.displayProjection) {
 				// For debugging: undo the LoD change
@@ -227,18 +224,18 @@ void CpuShadowSilhouettes::iterate() {
 			}
 
 		}
-	} else {
-		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+	}
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
-		for(int i = 0; i < (int)NUM_PIXELS; ++i) {
-			this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
-		}
+	for(int i = 0; i < (int)NUM_PIXELS; ++i) {
+		this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
 	}
 }
 
 
 void CpuShadowSilhouettes::gather_importance() {
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+	const u32 iterations = m_params.importanceIterations;
 #pragma PARALLEL_FOR
 	for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
 		const int pixel = i / m_params.importanceIterations;
@@ -290,21 +287,22 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
+				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
+				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				if(shadowHit.hitId.instanceId < 0 && m_params.enableDirectImportance) {
 					mAssert(!isnan(mis));
 					// Save the radiance for the later indirect lighting computation
 					// Compute how much radiance arrives at the previous vertex from the direct illumination
 					// Add the importance
-					const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
-					const float weightedIrradianceLuminance = mis * get_luminance(throughput.weight * irradiance) * (1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 
 					const auto& hitId = vertices[pathLen].get_primitive_id();
 					const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
 					const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 					const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
-					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																									numVertices, vertices[pathLen].get_position(),
-																									weightedIrradianceLuminance);
+					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_direct_irradiance(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																									numVertices, vertices[pathLen].get_position(), weightedIrradianceLuminance);
+				} else {
+					this->trace_shadow(vertices[pathLen].ext().shadowRay, vertices[pathLen], weightedIrradianceLuminance);
 				}
 			}
 		}
@@ -326,11 +324,13 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 		const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
 
-		if(pathLen > 0 && m_params.enableEyeImportance) {
+		if(pathLen == 0 && m_params.enableEyeImportance) {
+			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_direct_hit(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																					 numVertices, vertices[pathLen].get_position(),
+																					 -ei::dot(vertices[pathLen + 1].get_incident_direction(),
+																							 vertices[pathLen + 1].get_normal()));
 			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
 			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertices[pathLen].get_normal(), vertices[pathLen].get_incident_direction())));
-			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																							numVertices, vertices[pathLen + 1].get_position(), importance);
 
 			const ei::Vec3 bxdf = vertices[pathLen].ext().bxdfPdf * (float)vertices[pathLen].ext().pdf;
 			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf))) - 1.f;
@@ -346,7 +346,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 		for (int p = pathLen - 2; p >= 1; --p) {
 			accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().shadowHit.instanceId < 0 ?
 				vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f });
-			const ei::Vec3 irradiance = vertices[p].ext().accumThroughput * vertices[p].ext().outCos * accumRadiance;
+			const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
 			const auto& hitId = vertices[p].get_primitive_id();
 			const auto* lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
@@ -354,9 +354,8 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 			const u32 vertexOffset = hitId.primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 
 			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
-			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																							numVertices, vertices[p].get_position(), importance);
-
+			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_indirect_irradiance(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																							  numVertices, vertices[pathLen].get_position(), importance);
 			// TODO: store accumulated sharpness
 			// Check if it is sensible to keep shadow silhouettes intact
 			// TODO: replace threshold with something sensible
@@ -366,17 +365,10 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 				const float ratio = totalLuminance / indirectLuminance - 1.f;
 				if (ratio > 0.02f) {
 					constexpr float DIST_EPSILON = 0.000125f;
-					constexpr float FACTOR = 2000'000'000.f;
+					constexpr float FACTOR = 2'000.f;
+
 					// TODO: proper factor!
 					trace_shadow_silhouette(vertices[p].ext().shadowRay, vertices[p], FACTOR * (totalLuminance - indirectLuminance));
-
-					// Also add importance if we're at the edge of the viewport
-					if(coord.x == 0 || coord.x == m_outputBuffer.get_resolution().x - 1
-					   || coord.y == 0 || coord.y == m_outputBuffer.get_resolution().y - 1) {
-						m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																										numVertices, vertices[p].get_position(),
-																										FACTOR * (totalLuminance - indirectLuminance));
-					}
 				}
 			}
 		}
@@ -446,6 +438,14 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		}
 		++pathLen;
 
+		/*const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
+		const auto val = decimater.get_quadric(vertex.get_primitive_id().primId, vertex.get_position())
+			* decimater.get_current_importance(vertex.get_primitive_id().primId, vertex.get_position());
+		//const auto val = decimater.get_current_importance(vertex.get_primitive_id().primId, vertex.get_position());
+		m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4(val));
+		break;*/
+
+
 		// Query importance if the target is active
 		if(pathLen == 1 && m_params.importanceIterations > 0) {
 			if(m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
@@ -454,8 +454,9 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 			}
 			if(m_outputBuffer.is_target_enabled(RenderTargets::SHADOW_SILHOUETTE)) {
 				const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-				const bool isSilhouette = decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
-				m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });
+				// TODO
+				/*const bool isSilhouette = decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
+				m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });*/
 			}
 		}
 
@@ -505,10 +506,10 @@ void CpuShadowSilhouettes::display_importance() {
 		VertexSample sample;
 		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
 			const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-			const bool isSilhouette = m_params.displayProjection ? decimater.is_original_marked_as_silhouette(vertex.get_primitive_id().primId)
-				: decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
 			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
-			m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });
+			/*const bool isSilhouette = m_params.displayProjection ? decimater.is_original_marked_as_silhouette(vertex.get_primitive_id().primId)
+				: decimater.is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
+			m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });*/
 		}
 	}
 
@@ -573,16 +574,9 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
 				for(i32 i = 0; i < sharedVertices; ++i) {
-					const auto ab = obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 0]]
-						- obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 1]];;
-					const auto ac = obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 0]]
-						- obj.polygon.vertices[obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + 2]];;
-					const auto area = ei::len(ei::cross(ab, ac));
-					const float solidAngle = area / (vertex.ext().lightDistance*vertex.ext().lightDistance);
-
 					// x86_64 doesn't support atomic_fetch_add for floats FeelsBadMan
 					const auto lodIdx = m_sceneDesc.lodIndices[vertex.ext().shadowHit.instanceId];
-					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxFirst[i], importance / solidAngle);
+					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxFirst[i], importance);
 					m_decimaters[lodIdx].record_silhouette_vertex_contribution(edgeIdxSecond[i], importance);
 				}
 				return true;
@@ -591,6 +585,29 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 				// TODO: store a shadow photon?
 			}
 		}
+	}
+	return false;
+}
+
+bool CpuShadowSilhouettes::trace_shadow(const ei::Ray& shadowRay, const SilPathVertex& vertex, const float importance) {
+	constexpr float DIST_EPSILON = 0.001f;
+
+	// TODO: worry about spheres?
+	const ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
+
+	const auto secondHit = scene::accel_struct::first_intersection(m_sceneDesc, backfaceRay, vertex.ext().shadowHit,
+																   vertex.ext().lightDistance - vertex.ext().firstShadowDistance + DIST_EPSILON);
+	if(secondHit.hitId.instanceId < 0 || secondHit.hitId == vertex.get_primitive_id())
+		return false;
+
+	const ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
+	const auto thirdHit = scene::accel_struct::first_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
+																  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
+	if(thirdHit.hitId == vertex.get_primitive_id()) {
+		const auto& hitId = vertex.ext().shadowHit;
+		const auto lodIdx = m_sceneDesc.lodIndices[hitId.instanceId];
+		m_decimaters[lodIdx].record_shadow(importance);
+		return true;
 	}
 	return false;
 }
@@ -641,7 +658,6 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
-								  static_cast<CollapseMode>(m_params.collapseMode),
 								  collapses);
 
 		// TODO: this reeeeally breaks instancing
@@ -654,6 +670,13 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 
 void CpuShadowSilhouettes::update_reduction_factors() {
 	m_remainingVertexFactor.clear();
+	if(m_params.reduction == 0.f) {
+		// Do not reduce anything
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
+			m_remainingVertexFactor.push_back(1.0);
+		return;
+	}
+
 	double expectedVertexCount = 0.0;
 	for(auto& decimater : m_decimaters) {
 		decimater.udpate_importance_density();

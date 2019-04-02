@@ -134,6 +134,9 @@
     <Filter Include="Source Files\core\renderer\decimaters\silhouette\modules">
       <UniqueIdentifier>{590ade27-d078-42cc-84aa-a39d40e1eec9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\importance\modules">
+      <UniqueIdentifier>{cd006c0b-20eb-4fe1-a7af-9480b4a42fbd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -888,9 +891,6 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\modules\collapse_tracker.hpp">
       <Filter>Source Files\core\renderer\decimaters\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\modules\importance.hpp">
-      <Filter>Source Files\core\renderer\decimaters\modules</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\modules\normal_deviation.hpp">
       <Filter>Source Files\core\renderer\decimaters\modules</Filter>
     </ClInclude>
@@ -926,6 +926,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_params.hpp">
       <Filter>Source Files\core\renderer\decimaters\importance</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\importance\modules\importance.hpp">
+      <Filter>Source Files\core\renderer\decimaters\importance\modules</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\modules\importance_quadrics.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\modules</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

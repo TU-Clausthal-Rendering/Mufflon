@@ -4,7 +4,7 @@
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 
-namespace mufflon::renderer::decimaters::modules {
+namespace mufflon::renderer::decimaters::importance::modules {
 
 // General importance decimater based on threshold
 template < class MeshT = scene::geometry::PolygonMeshType >
@@ -21,11 +21,9 @@ public:
 	ImportanceDecimationModule& operator=(ImportanceDecimationModule&&) = delete;
 
 	void set_properties(MeshT& originalMesh,
-						OpenMesh::VPropHandleT<float> importanceDensity,
-						const float threshold) {
+						OpenMesh::VPropHandleT<float> importanceDensity) {
 		m_originalMesh = &originalMesh;
 		m_importanceDensity = importanceDensity;
-		m_threshold = threshold;
 	}
 
 	float collapse_priority(const CollapseInfo& ci) final {
@@ -42,8 +40,6 @@ public:
 			importance += m_originalMesh->property(m_importanceDensity, *circIter) * factor;
 		}
 
-		if(importance < m_threshold)
-			return Base::ILLEGAL_COLLAPSE;
 		return importance;
 	}
 
@@ -57,8 +53,6 @@ private:
 
 	// Original mesh properties
 	OpenMesh::VPropHandleT<float> m_importanceDensity;								// Temporary storage to keep track of the remapped importance
-
-	float m_threshold;
 };
 
-} // namespace mufflon::renderer::decimaters::modules
+} // namespace mufflon::renderer::decimaters::importance::modules

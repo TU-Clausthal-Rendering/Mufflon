@@ -197,12 +197,11 @@ void CpuImportanceDecimater::iterate() {
 			logInfo("Max. importance: ", m_maxImportance);
 			display_importance();
 		}
-	} else {
-		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+	}
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
-		for(int i = 0; i < (int)NUM_PIXELS; ++i) {
-			this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
-		}
+	for(int i = 0; i < (int)NUM_PIXELS; ++i) {
+		this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
 	}
 }
 
@@ -243,38 +242,34 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertices[pathLen].get_position(), m_sceneDesc.aabb,
+							   vertices[pathLen].get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
-			Pixel outCoord;
-			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media, outCoord);
-			if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
+			Pixel projCoord;
+			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				bool anyhit = scene::accel_struct::any_intersection(
-					m_sceneDesc, { vertices[pathLen].get_position(), nee.direction },
-					vertices[pathLen].get_primitive_id(), nee.dist);
+				const auto shadowRay = ei::Ray{ nee.lightPoint, -nee.direction };
 
+				auto shadowHit = scene::accel_struct::first_intersection(m_sceneDesc, shadowRay,
+																		 vertices[pathLen].get_primitive_id(), nee.dist);
 				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-				mAssert(!isnan(mis));
-				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
-				vertices[pathLen].ext().shadowed = !anyhit;
-
-				if(!anyhit) {
+				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
+				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
+				if(shadowHit.hitId.instanceId < 0 && m_params.enableDirectImportance) {
+					mAssert(!isnan(mis));
 					// Save the radiance for the later indirect lighting computation
 					// Compute how much radiance arrives at the previous vertex from the direct illumination
 					// Add the importance
-					const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
-					const float weightedIrradianceLuminance = mis * get_luminance(throughput.weight * irradiance) * (1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
+					vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 
 					const auto& hitId = vertices[pathLen].get_primitive_id();
 					const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
 					const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 					const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
-					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																									numVertices, vertices[pathLen].get_position(),
-																									weightedIrradianceLuminance);
+					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_direct_irradiance(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																									numVertices, vertices[pathLen].get_position(), weightedIrradianceLuminance);
 				}
 			}
 		}
@@ -296,16 +291,19 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
 
-		++pathLen;
-
-		if(m_params.enableEyeImportance) {
+		if(pathLen == 0 && m_params.enableEyeImportance) {
+			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_direct_hit(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																					 numVertices, vertices[pathLen].get_position(),
+																					 -ei::dot(vertices[pathLen + 1].get_incident_direction(),
+																							  vertices[pathLen + 1].get_normal()));
 			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
-			const float importance = (1.f - ei::abs(ei::dot(vertices[pathLen - 1].get_normal(), vertices[pathLen - 1].get_incident_direction())));
-			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																							numVertices, vertices[pathLen].get_position(), importance);
-			const ei::Vec3 bxdf = vertices[pathLen - 1].ext().bxdfPdf * (float)vertices[pathLen - 1].ext().pdf;
+			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertices[pathLen].get_normal(), vertices[pathLen].get_incident_direction())));
+
+			const ei::Vec3 bxdf = vertices[pathLen].ext().bxdfPdf * (float)vertices[pathLen].ext().pdf;
 			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf))) - 1.f;
 		}
+
+		++pathLen;
 	} while(pathLen < m_params.maxPathLength);
 
 	// Go back over the path and add up the irradiance from indirect illumination
@@ -313,9 +311,8 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		ei::Vec3 accumRadiance{ 0.f };
 		float accumThroughout = 1.f;
 		for(int p = pathLen - 2; p >= 1; --p) {
-			accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().shadowed ?
-																			ei::Vec3{ 0.f } : vertices[p + 1].ext().pathRadiance);
-			const ei::Vec3 irradiance = vertices[p].ext().accumThroughput * vertices[p].ext().outCos * accumRadiance;
+			accumRadiance = vertices[p].ext().throughput * accumRadiance + vertices[p + 1].ext().pathRadiance;
+			const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
 			const auto& hitId = vertices[p].get_primitive_id();
 			const auto* lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
@@ -323,8 +320,8 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 			const u32 vertexOffset = hitId.primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 
 			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
-			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_face_contribution(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																							numVertices, vertices[p].get_position(), importance);
+			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_indirect_irradiance(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																							  numVertices, vertices[pathLen].get_position(), importance);
 		}
 	}
 }
@@ -507,6 +504,13 @@ void CpuImportanceDecimater::initialize_decimaters() {
 
 void CpuImportanceDecimater::update_reduction_factors() {
 	m_remainingVertexFactor.clear();
+	if(m_params.reduction == 0.f) {
+		// Do not reduce anything
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
+			m_remainingVertexFactor.push_back(1.0);
+		return;
+	}
+
 	double expectedVertexCount = 0.0;
 	for(auto& decimater : m_decimaters) {
 		decimater.udpate_importance_density();

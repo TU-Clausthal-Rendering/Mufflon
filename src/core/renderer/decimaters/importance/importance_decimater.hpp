@@ -31,9 +31,12 @@ public:
 	 */
 	void iterate(const std::size_t minVertexCount, const float reduction);
 
-	// Increases the importance for all bordering vertices of a face, weighted by distance² to the hit point
-	void record_face_contribution(const u32* vertexIndices, const u32 vertexCount,
-								  const ei::Vec3& hitpoint, const float importance);
+	void record_direct_hit(const u32* vertexIndices, const u32 vertexCount,
+						   const ei::Vec3& hitpoint, const float cosAngle);
+	void record_direct_irradiance(const u32* vertexIndices, const u32 vertexCount,
+								  const ei::Vec3& hitpoint, const float irradiance);
+	void record_indirect_irradiance(const u32* vertexIndices, const u32 vertexCount,
+									const ei::Vec3& hitpoint, const float irradiance);
 
 	float get_current_max_importance() const;
 	float get_current_importance(const u32 localFaceIndex, const ei::Vec3& hitpoint) const;
@@ -58,7 +61,9 @@ private:
 	double m_importanceSum = 0.0;									// Stores the current importance sum (updates in update_importance_density)
 
 	// General stuff
-	std::unique_ptr<std::atomic<float>[]> m_importance;				// Absolute importance per vertex (accumulative, indexed in decimated vertex handles!)
+	std::unique_ptr<std::atomic<float>[]> m_importance;				// Importance hits (not light!)
+	std::unique_ptr<std::atomic<float>[]> m_irradiance;				// Accumulated irradiance
+	std::unique_ptr<std::atomic<u32>[]> m_hitCounter;				// Number of hits
 	// Decimated mesh properties
 	OpenMesh::VPropHandleT<VertexHandle> m_originalVertex;			// Vertex handle in the original mesh
 	// Original mesh properties

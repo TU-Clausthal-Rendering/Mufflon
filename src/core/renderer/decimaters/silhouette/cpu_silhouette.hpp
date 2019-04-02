@@ -44,6 +44,8 @@ private:
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
 								 const float importance);
+	bool trace_shadow(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
+					  const float importance);
 
 	u32 get_memory_requirement() const;
 

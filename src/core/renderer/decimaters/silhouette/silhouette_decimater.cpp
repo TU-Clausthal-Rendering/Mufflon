@@ -3,9 +3,9 @@
 #include "silhouette_decimater.hpp"
 #include "util/punning.hpp"
 #include "modules/convex_edge.hpp"
+#include "modules/importance_quadrics.hpp"
 #include "modules/silhouette.hpp"
 #include "core/renderer/decimaters/modules/collapse_tracker.hpp"
-#include "core/renderer/decimaters/modules/importance.hpp"
 #include "core/renderer/decimaters/modules/normal_deviation.hpp"
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
@@ -48,7 +48,6 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 										 const Degrees maxNormalDeviation,
-										 const CollapseMode mode,
 										 const std::size_t initialCollapses) :
 	m_original(original),
 	m_decimated(decimated),
@@ -57,15 +56,13 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(&m_decimatedPoly->get_mesh()),
 	m_importance(nullptr),
-	m_maxNormalDeviation(maxNormalDeviation),
-	m_collapseMode(mode)
+	m_maxNormalDeviation(maxNormalDeviation)
 {
 	// Add necessary properties
 	m_decimatedMesh->add_property(m_originalVertex);
 	m_originalMesh.add_property(m_accumulatedImportanceDensity);
 	m_originalMesh.add_property(m_collapsedTo);
 	m_originalMesh.add_property(m_collapsed);
-	m_originalMesh.add_property(m_silhouette);
 	m_decimatedMesh->request_vertex_status();
 	m_decimatedMesh->request_edge_status();
 	m_decimatedMesh->request_halfedge_status();
@@ -86,14 +83,11 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
 		CollapseTrackerModule<>::Handle trackerHandle;
 		NormalDeviationModule<>::Handle normalHandle;
-		ConvexDecimationModule<>::Handle convexHandle;
 		decimater.add(modQuadricHandle);
 		decimater.add(trackerHandle);
 		decimater.add(normalHandle);
 		decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 		decimater.module(normalHandle).set_max_deviation(m_maxNormalDeviation);
-		if(m_collapseMode == CollapseMode::NO_CONCAVE)
-			decimater.add(convexHandle);
 		// Possibly repeat until we reached the desired count
 		const std::size_t targetCollapses = std::min(initialCollapses, m_originalPoly.get_vertex_count());
 		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
@@ -108,13 +102,21 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
 		});
 
+		m_decimated.clear_accel_structure();
 		logPedantic("Initial mesh decimation (", m_decimatedPoly->get_vertex_count(), "/", m_originalPoly.get_vertex_count(), ")");
 	}
 
 	// Initialize importance map
+	m_shadowImportance.store(0.f);
+	m_shadowSilhouetteImportance.store(0.f);
 	m_importance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
-	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i)
+	m_irradiance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
+	m_hitCounter = std::make_unique<std::atomic<u32>[]>(m_decimatedPoly->get_vertex_count());
+	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i) {
 		m_importance[i].store(0.f);
+		m_irradiance[i].store(0.f);
+		m_hitCounter[i].store(0u);
+	}
 }
 
 ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
@@ -125,13 +127,13 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	m_originalMesh(dec.m_originalMesh),
 	m_decimatedMesh(dec.m_decimatedMesh),
 	m_importance(std::move(dec.m_importance)),
+	m_irradiance(std::move(dec.m_irradiance)),
+	m_hitCounter(std::move(dec.m_hitCounter)),
 	m_originalVertex(dec.m_originalVertex),
 	m_accumulatedImportanceDensity(dec.m_accumulatedImportanceDensity),
 	m_collapsedTo(dec.m_collapsedTo),
 	m_collapsed(dec.m_collapsed),
-	m_silhouette(dec.m_silhouette),
-	m_maxNormalDeviation(dec.m_maxNormalDeviation),
-	m_collapseMode(dec.m_collapseMode)
+	m_maxNormalDeviation(dec.m_maxNormalDeviation)
 {
 	// Request the status again since it will get removed once in the destructor
 	m_decimatedMesh->request_vertex_status();
@@ -143,7 +145,9 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	dec.m_accumulatedImportanceDensity.invalidate();
 	dec.m_collapsedTo.invalidate();
 	dec.m_collapsed.invalidate();
-	dec.m_silhouette.invalidate();
+
+	m_shadowImportance.store(dec.m_shadowImportance.load());
+	m_shadowSilhouetteImportance.store(dec.m_shadowSilhouetteImportance.load());
 }
 
 ImportanceDecimater::~ImportanceDecimater() {
@@ -155,8 +159,6 @@ ImportanceDecimater::~ImportanceDecimater() {
 		m_originalMesh.remove_property(m_collapsedTo);
 	if(m_collapsed.is_valid())
 		m_originalMesh.remove_property(m_collapsed);
-	if(m_silhouette.is_valid())
-		m_originalMesh.remove_property(m_silhouette);
 
 	m_decimatedMesh->release_vertex_status();
 	m_decimatedMesh->release_edge_status();
@@ -168,16 +170,20 @@ void ImportanceDecimater::udpate_importance_density() {
 	// Update our statistics: the importance density of each vertex
 	m_importanceSum = 0.0;
 	for(const auto vertex : m_decimatedMesh->vertices()) {
-		const float importance = m_importance[vertex.idx()].load();
-		mAssert(!isnan(importance));
-		m_importanceSum += importance;
-
 		// Important: only works for triangles!
 		const float area = compute_area(*m_decimatedMesh, vertex);
+		const float flux = m_irradiance[vertex.idx()] / std::max(1.f, static_cast<float>(m_hitCounter[vertex.idx()]));
 
-		mAssertMsg(area != 0.f, "Degenerated vertex");
-		m_importance[vertex.idx()].store(importance / area);
+		const float importance = m_importance[vertex.idx()] + flux;// 10000.f * flux;
+
+		m_importanceSum += importance;
+		m_importance[vertex.idx()] = importance / area;
 	}
+
+	// Subtract the shadow silhouette importance and use shadow importance instead
+	logPedantic("Importance sum/shadow/silhouette: ", m_importanceSum, " ", m_shadowImportance, " ", m_shadowSilhouetteImportance);
+	m_importanceSum += m_shadowImportance;
+	m_importanceSum -= m_shadowSilhouetteImportance;
 
 	// Map the importance back to the original mesh
 	for(auto vertex : m_originalMesh.vertices()) {
@@ -187,14 +193,11 @@ void ImportanceDecimater::udpate_importance_density() {
 			v = m_originalMesh.property(m_collapsedTo, v);
 
 		// Put importance into temporary storage
-		if(m_collapseMode == CollapseMode::DAMPENED_IMPORTANCE)
-			m_originalMesh.property(m_accumulatedImportanceDensity, vertex) += m_damping * m_importance[m_originalMesh.property(m_collapsedTo, v).idx()].load();
-		else
-			m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importance[m_originalMesh.property(m_collapsedTo, v).idx()].load();
+		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importance[m_originalMesh.property(m_collapsedTo, v).idx()].load();
 	}
 }
 
-void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float threshold, const float reduction) {
+void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float reduction) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -223,44 +226,39 @@ void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float 
 	CollapseTrackerModule<>::Handle trackerHandle;
 	NormalDeviationModule<>::Handle normalHandle;
 	ImportanceDecimationModule<>::Handle impHandle;
-	ConvexDecimationModule<>::Handle convexHandle;
-	SilhouetteDecimationModule<>::Handle silhouetteHandle;
 	decimater.add(trackerHandle);
 	decimater.add(normalHandle);
 	decimater.add(impHandle);
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 	decimater.module(normalHandle).set_max_deviation(m_maxNormalDeviation);
-	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity, threshold);
-	if(m_collapseMode == CollapseMode::NO_CONCAVE) {
-		logPedantic("Using convexity module");
-		decimater.add(convexHandle);
-	} else if(m_collapseMode == CollapseMode::NO_SILHOUETTE) {
-		logPedantic("Using silhouette module");
-		decimater.add(silhouetteHandle);
-		decimater.module(silhouetteHandle).set_properties(m_originalMesh, m_silhouette);
-	}
+	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity);
 	
 	if(reduction != 0.f) {
 		const std::size_t targetCount = (reduction == 1.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
 		const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
-		m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
-			// Adjust the reference from original to decimated mesh
-			const auto originalVertex = this->get_original_vertex_handle(changedVertex);
-			if(!m_originalMesh.property(m_collapsed, originalVertex))
-				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
-		});
+		if(collapses > 0u) {
+			m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
+				// Adjust the reference from original to decimated mesh
+				const auto originalVertex = this->get_original_vertex_handle(changedVertex);
+				if(!m_originalMesh.property(m_collapsed, originalVertex))
+					m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
+			});
+			m_decimated.clear_accel_structure();
+		}
 		logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
 	}
 
-	// Initialize importance map
+	// Reinitialize importance map
+	m_shadowImportance.store(0.f);
+	m_shadowSilhouetteImportance.store(0.f);
 	m_importance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
-	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i)
+	m_irradiance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
+	m_hitCounter = std::make_unique<std::atomic<u32>[]>(m_decimatedPoly->get_vertex_count());
+	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i) {
 		m_importance[i].store(0.f);
-
-
-	// Update the damping factor
-	// TODO: use parameter
-	m_damping *= 0.925f;
+		m_irradiance[i].store(0.f);
+		m_hitCounter[i].store(0u);
+	}
 }
 
 void ImportanceDecimater::record_silhouette_vertex_contribution(const u32 localIndex, const float importance) {
@@ -268,30 +266,60 @@ void ImportanceDecimater::record_silhouette_vertex_contribution(const u32 localI
 	mAssert(localIndex < m_decimatedPoly->get_vertex_count());
 
 	atomic_add(m_importance[m_decimatedMesh->vertex_handle(localIndex).idx()], importance);
-
-	if(m_collapseMode == CollapseMode::NO_SILHOUETTE)
-		m_originalMesh.property(m_silhouette, this->get_original_vertex_handle(m_decimatedMesh->vertex_handle(localIndex))) = true;
+	atomic_add(m_shadowSilhouetteImportance, importance);
 }
 
-void ImportanceDecimater::record_face_contribution(const u32* vertexIndices, const u32 vertexCount,
-												   const ei::Vec3& hitpoint, const float importance) {
-	mAssert(vertexIndices != nullptr);
+void ImportanceDecimater::record_shadow(const float irradiance) {
+	atomic_add(m_shadowImportance, irradiance);
+}
 
-	float distSqrSum = 0.f;
+void ImportanceDecimater::record_direct_hit(const u32* vertexIndices, const u32 vertexCount,
+											const ei::Vec3& hitpoint, const float cosAngle) {
+	typename Mesh::VertexHandle min;
+	float minDist = std::numeric_limits<float>::max();
 	for(u32 v = 0u; v < vertexCount; ++v) {
 		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		if(dist < minDist) {
+			minDist = dist;
+			min = vh;
+		}
 	}
-	const float distSqrSumInv = 1.f / distSqrSum;
 
-	// Now do the actual attribution
+	atomic_add(m_importance[min.idx()], 1.f - ei::abs(cosAngle));
+}
+
+void ImportanceDecimater::record_direct_irradiance(const u32* vertexIndices, const u32 vertexCount,
+												   const ei::Vec3& hitpoint, const float irradiance) {
+	typename Mesh::VertexHandle min;
+	float minDist = std::numeric_limits<float>::max();
 	for(u32 v = 0u; v < vertexCount; ++v) {
 		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
-		const float weightedImportance = importance * distSqr * distSqrSumInv;
-
-		atomic_add(m_importance[vh.idx()], weightedImportance);
+		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		if(dist < minDist) {
+			minDist = dist;
+			min = vh;
+		}
 	}
+
+	atomic_add(m_irradiance[min.idx()], irradiance);
+	++m_hitCounter[min.idx()];
+}
+
+void ImportanceDecimater::record_indirect_irradiance(const u32* vertexIndices, const u32 vertexCount,
+													 const ei::Vec3& hitpoint, const float irradiance) {
+	typename Mesh::VertexHandle min;
+	float minDist = std::numeric_limits<float>::max();
+	for(u32 v = 0u; v < vertexCount; ++v) {
+		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
+		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		if(dist < minDist) {
+			minDist = dist;
+			min = vh;
+		}
+	}
+
+	atomic_add(m_irradiance[min.idx()], irradiance);
 }
 
 // Utility only
@@ -334,14 +362,6 @@ float ImportanceDecimater::get_current_importance(const u32 localFaceIndex, cons
 	return importance;
 }
 
-bool ImportanceDecimater::is_current_marked_as_silhouette(const u32 localFaceIndex) const noexcept {
-	for(auto circIter = m_decimatedMesh->cfv_ccwbegin(m_decimatedMesh->face_handle(localFaceIndex)); circIter.is_valid(); ++circIter) {
-		if(m_originalMesh.property(m_silhouette, get_original_vertex_handle(*circIter)))
-			return true;
-	}
-	return false;
-}
-
 float ImportanceDecimater::get_mapped_importance(const u32 originalFaceIndex, const ei::Vec3& hitpoint) const {
 	const auto faceHandle = m_originalMesh.face_handle(originalFaceIndex);
 
@@ -356,14 +376,6 @@ float ImportanceDecimater::get_mapped_importance(const u32 originalFaceIndex, co
 	}
 
 	return importance;
-}
-
-bool ImportanceDecimater::is_original_marked_as_silhouette(const u32 originalFaceIndex) const noexcept {
-	for(auto circIter = m_originalMesh.cfv_ccwbegin(m_originalMesh.face_handle(originalFaceIndex)); circIter.is_valid(); ++circIter) {
-		if(m_originalMesh.property(m_silhouette, *circIter))
-			return true;
-	}
-	return false;
 }
 
 std::size_t ImportanceDecimater::get_original_vertex_count() const noexcept {

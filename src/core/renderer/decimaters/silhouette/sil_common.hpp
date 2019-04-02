@@ -30,7 +30,7 @@ struct SilVertexExt {
 							  const AngularPdf pdfF, const AngularPdf pdfB) {
 		this->excident = excident;
 		this->pdf = pdfF;
-		this->outCos = -ei::dot(thisVertex.get_normal(), excident);
+		this->outCos = ei::dot(thisVertex.get_normal(), excident);
 	}
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {

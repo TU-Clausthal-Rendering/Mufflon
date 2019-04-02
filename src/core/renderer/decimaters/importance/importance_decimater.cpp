@@ -1,9 +1,9 @@
 #pragma once
 
 #include "importance_decimater.hpp"
+#include "modules/importance.hpp"
 #include "util/punning.hpp"
 #include "core/renderer/decimaters/modules/collapse_tracker.hpp"
-#include "core/renderer/decimaters/modules/importance.hpp"
 #include "core/renderer/decimaters/modules/normal_deviation.hpp"
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
@@ -12,6 +12,7 @@ namespace mufflon::renderer::decimaters::importance {
 
 using namespace scene;
 using namespace scene::geometry;
+using namespace modules;
 using namespace decimaters::modules;
 
 namespace {
@@ -97,14 +98,20 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 			if(!m_originalMesh.property(m_collapsed, originalVertex))
 				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
 		});
+		m_decimated.clear_accel_structure();
 
 		logPedantic("Initial mesh decimation (", m_decimatedPoly->get_vertex_count(), "/", m_originalPoly.get_vertex_count(), ")");
 	}
 
 	// Initialize importance map
 	m_importance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
-	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i)
+	m_irradiance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
+	m_hitCounter = std::make_unique<std::atomic<u32>[]>(m_decimatedPoly->get_vertex_count());
+	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i) {
 		m_importance[i].store(0.f);
+		m_irradiance[i].store(0.f);
+		m_hitCounter[i].store(0u);
+	}
 }
 
 ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
@@ -115,6 +122,8 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	m_originalMesh(dec.m_originalMesh),
 	m_decimatedMesh(dec.m_decimatedMesh),
 	m_importance(std::move(dec.m_importance)),
+	m_irradiance(std::move(dec.m_irradiance)),
+	m_hitCounter(std::move(dec.m_hitCounter)),
 	m_originalVertex(dec.m_originalVertex),
 	m_importanceDensity(dec.m_importanceDensity),
 	m_collapsedTo(dec.m_collapsedTo),
@@ -153,15 +162,14 @@ void ImportanceDecimater::udpate_importance_density() {
 	// Update our statistics: the importance density of each vertex
 	m_importanceSum = 0.0;
 	for(const auto vertex : m_decimatedMesh->vertices()) {
-		const float importance = m_importance[vertex.idx()].load();
-		mAssert(!isnan(importance));
-		m_importanceSum += importance;
-
 		// Important: only works for triangles!
 		const float area = compute_area(*m_decimatedMesh, vertex);
+		const float flux = m_irradiance[vertex.idx()] / std::max(1.f, static_cast<float>(m_hitCounter[vertex.idx()]));
 
-		mAssertMsg(area != 0.f, "Degenerated vertex");
-		m_importance[vertex.idx()].store(importance / area);
+		const float importance = m_importance[vertex.idx()] + flux;// 10000.f * flux;
+
+		m_importanceSum += importance;
+		m_importance[vertex.idx()] = importance / area;
 	}
 
 	// Map the importance back to the original mesh
@@ -210,44 +218,82 @@ void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float 
 	decimater.add(impHandle);
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 	decimater.module(normalHandle).set_max_deviation(m_maxNormalDeviation);
-	decimater.module(impHandle).set_properties(m_originalMesh, m_importanceDensity, 0.f);
+	decimater.module(impHandle).set_properties(m_originalMesh, m_importanceDensity);
 
-	const std::size_t targetCount = (reduction == 0.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
-	const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
-	m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
-		// Adjust the reference from original to decimated mesh
-		const auto originalVertex = this->get_original_vertex_handle(changedVertex);
-		if(!m_originalMesh.property(m_collapsed, originalVertex))
-			m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
-	});
+	if(reduction != 0.f) {
+		const std::size_t targetCount = (reduction == 1.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
+		const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
+		if(collapses > 0u) {
+			m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
+				// Adjust the reference from original to decimated mesh
+				const auto originalVertex = this->get_original_vertex_handle(changedVertex);
+				if(!m_originalMesh.property(m_collapsed, originalVertex))
+					m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
+			});
+			m_decimated.clear_accel_structure();
+		}
+		logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
+	}
 
-	// Initialize importance map
+	// Reinitialize importance map
 	m_importance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
-	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i)
+	m_irradiance = std::make_unique<std::atomic<float>[]>(m_decimatedPoly->get_vertex_count());
+	m_hitCounter = std::make_unique<std::atomic<u32>[]>(m_decimatedPoly->get_vertex_count());
+	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i) {
 		m_importance[i].store(0.f);
+		m_irradiance[i].store(0.f);
+		m_hitCounter[i].store(0u);
+	}
 
-	logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
 }
 
-void ImportanceDecimater::record_face_contribution(const u32* vertexIndices, const u32 vertexCount,
-												   const ei::Vec3& hitpoint, const float importance) {
-	mAssert(vertexIndices != nullptr);
-
-	float distSqrSum = 0.f;
+void ImportanceDecimater::record_direct_hit(const u32* vertexIndices, const u32 vertexCount,
+											const ei::Vec3& hitpoint, const float cosAngle) {
+	typename Mesh::VertexHandle min;
+	float minDist = std::numeric_limits<float>::max();
 	for(u32 v = 0u; v < vertexCount; ++v) {
 		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-			distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		if(dist < minDist) {
+			minDist = dist;
+			min = vh;
+		}
 	}
-	const float distSqrSumInv = 1.f / distSqrSum;
 
-	// Now do the actual attribution
+	atomic_add(m_importance[min.idx()], 1.f - ei::abs(cosAngle));
+}
+
+void ImportanceDecimater::record_direct_irradiance(const u32* vertexIndices, const u32 vertexCount,
+												   const ei::Vec3& hitpoint, const float irradiance) {
+	typename Mesh::VertexHandle min;
+	float minDist = std::numeric_limits<float>::max();
 	for(u32 v = 0u; v < vertexCount; ++v) {
 		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
-		const float weightedImportance = importance * distSqr * distSqrSumInv;
-
-		atomic_add(m_importance[vh.idx()], weightedImportance);
+		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		if(dist < minDist) {
+			minDist = dist;
+			min = vh;
+		}
 	}
+
+	atomic_add(m_irradiance[min.idx()], irradiance);
+	++m_hitCounter[min.idx()];
+}
+
+void ImportanceDecimater::record_indirect_irradiance(const u32* vertexIndices, const u32 vertexCount,
+													 const ei::Vec3& hitpoint, const float irradiance) {
+	typename Mesh::VertexHandle min;
+	float minDist = std::numeric_limits<float>::max();
+	for(u32 v = 0u; v < vertexCount; ++v) {
+		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
+		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
+		if(dist < minDist) {
+			minDist = dist;
+			min = vh;
+		}
+	}
+
+	atomic_add(m_irradiance[min.idx()], irradiance);
 }
 
 // Utility only

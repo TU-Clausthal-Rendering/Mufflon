@@ -46,13 +46,6 @@ struct PNormalDeviation {
 	}
 };
 
-struct PCollapseMode {
-	int collapseMode = 0;
-	static ParamDesc get_desc() noexcept {
-		return { "Collapse mode (0 = none, 1 = no concave, 2 = remember silhouettes, 3 = dampen importance)", ParameterTypes::INT };
-	}
-};
-
 struct PDisplayProjection {
 	bool displayProjection = true;
 	static ParamDesc get_desc() noexcept {
@@ -68,7 +61,7 @@ struct PResetOnReload {
 };
 
 using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PInitialReduction,
-	PVertexThreshold, PDirectIndirectRatio, PNormalDeviation, PCollapseMode, PMaxPathLength,
+	PVertexThreshold, PDirectIndirectRatio, PNormalDeviation, PMaxPathLength,
 	PDirectImportance, PIndirectImportance, PEyeImportance, PDisplayProjection, PResetOnReload>;
 
 } // namespace mufflon::renderer::decimaters::silhouette
