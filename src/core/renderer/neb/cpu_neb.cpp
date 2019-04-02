@@ -373,7 +373,7 @@ Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, const NebPath
 				auto& otherExt = otherEndIt->ext();
 				if(lensq(otherEndIt->get_position() - currentPos) < mergeRadiusSq) {
 					++count;
-					if(otherExt.neeIrradiance > 0.0f)
+					if(any(greater(otherExt.neeIrradiance, 0.0f)))
 						radiance += evaluate_nee(vertex, otherExt, reuseCount);
 				}
 				++otherEndIt;
@@ -431,7 +431,7 @@ void CpuNextEventBacktracking::iterate() {
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
 		sample_photon_path(neeMergeArea, m_rngs[rngIndex], vertex);
-	}
+	}//*/
 
 	// Third pass: merge backtracked photons, average NEE events and compute random hit
 	//		contributions.
