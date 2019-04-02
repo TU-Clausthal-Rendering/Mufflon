@@ -223,15 +223,12 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 				// Hit a different surface than the current one.
 				// Additionally storing this vertex further reduces variance for direct lighted
 				// surfaces and allows the light-bulb scenario when using the backtracking.
-				/*scene::Point hitPos = neePos - nee.direction * hit.hitT;
+				scene::Point hitPos = neePos - nee.direction * hit.hitT;
 				const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(m_sceneDesc, hit);
 				NebPathVertex virtualLight;
 				NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
 					m_sceneDesc.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
 					hit.hitT, AngularPdf{1.0f}, math::Throughput{});
-				// Compensate the changed distance in diffIrradiance.
-				//virtualLight.ext().neeIrradiance = nee.diffIrradiance * nee.distSq / (hit.hitT * hit.hitT);
-				//virtualLight.ext().neeDirection = nee.direction;
 				// An additional NEE is necessary, such that this new vertex is an unbiased
 				// estimate again.
 				neeSeed = m_rngs[pixelIdx].next();
@@ -243,6 +240,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 									m_sceneDesc, { hitPos, neeSec.direction },
 									hit.hitId, neeSec.dist);
 				if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
+				if(nee.cosOut != 0) neeSec.diffIrradiance *= neeSec.cosOut;
 				virtualLight.ext().pathLen = -32000;	// Mark this as non contributing (not connected to a pixel)
 				virtualLight.ext().previous = nullptr;
 				virtualLight.ext().neeIrradiance = neeSec.diffIrradiance;
@@ -346,7 +344,7 @@ Spectrum CpuNextEventBacktracking::merge_photons(float mergeRadiusSq, const NebP
 			// MIS compare against previous merges (view path) AND feature merges (light path)
 			float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
 			relSum += get_previous_merge_sum(photon, bsdf.pdf.forw);
-			float misWeight = 1.0f;// / (1.0f + relSum);
+			float misWeight = 1.0f / (1.0f + relSum);
 			radiance += bsdf.value * photon.irradiance * misWeight;
 		}
 		++photonIt;
@@ -421,7 +419,7 @@ void CpuNextEventBacktracking::iterate() {
 	m_selfEmissionCount.store(0);
 	m_density.set_iteration(m_currentIteration + 1);
 
-	logInfo("[NEB] Density map occupation: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
+	//logInfo("[NEB] Density map occupation: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
 
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
@@ -462,9 +460,9 @@ void CpuNextEventBacktracking::iterate() {
 		Spectrum radiance { 0.0f };
 
 		radiance += merge_photons(photonMergeRadiusSq, vertex);
-		//radiance += merge_nees(neeMergeRadiusSq, vertex);
-		//auto emission = evaluate_self_radiance(vertex, false);
-		//radiance += finalize_emission(neeMergeArea, emission);
+		radiance += merge_nees(neeMergeRadiusSq, vertex);
+		auto emission = evaluate_self_radiance(vertex, false);
+		radiance += finalize_emission(neeMergeArea, emission);
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
@@ -474,7 +472,7 @@ void CpuNextEventBacktracking::iterate() {
 
 	// Finialize the evaluation of emissive end vertices.
 	// It is necessary to do this after the density estimate for a correct mis.
-	/*i32 selfEmissionCount = m_selfEmissionCount.load();
+	i32 selfEmissionCount = m_selfEmissionCount.load();
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < selfEmissionCount; ++i) {
 		Spectrum emission = finalize_emission(neeMergeArea, m_selfEmissiveEndVertices[i]);
