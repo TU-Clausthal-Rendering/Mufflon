@@ -315,7 +315,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 			float reuseCount = ei::max(1.0f, neeMergeArea * vertex.ext().density);
 			relPdfSum = float(sample.pdf.back) * vertex.ext().neeConversion / reuseCount;
 			// Additionally, the next vertex has to see the nee-merge with a respective factor.
-			float photonReuseCount = ei::max(1.0f, photonMergeArea * vertex.ext().density);
+			float photonReuseCount = photonMergeArea * vertex.ext().density;
 			prevConversionFactor *= reuseCount / photonReuseCount;
 		}
 
@@ -374,7 +374,7 @@ Spectrum CpuNextEventBacktracking::evaluate_nee(const NebPathVertex& vertex,
 Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex) {
 	scene::Point currentPos = vertex.get_position();
 	int neePathLen = vertex.ext().pathLen + 1;
-	float photonReuseCount = ei::max(1.0f, photonMergeArea * vertex.ext().density);
+	float photonReuseCount = photonMergeArea * vertex.ext().density;
 	// If path length is already too large there will be no contribution from this vertex.
 	// It only exists for the sake of random hit evaluation (and as additional sample).
 	if(neePathLen >= m_params.minPathLength && neePathLen <= m_params.maxPathLength) {
@@ -406,7 +406,7 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float neeMergeArea, float p
 	float relSum = emission.relPdf;
 	if(emission.previous) {
 		float neeReuseCount = ei::max(1.0f, neeMergeArea * emission.previous->density);
-		float photonReuseCount = ei::max(1.0f, photonMergeArea * emission.previous->density);
+		float photonReuseCount = photonMergeArea * emission.previous->density;
 		relSum = emission.relPdf * neeReuseCount
 				+ emission.relPdf * emission.previous->prevRelativeProbabilitySum
 				* get_photon_path_chance(emission.previous->pdfBack) * photonReuseCount;
@@ -426,7 +426,7 @@ void CpuNextEventBacktracking::iterate() {
 	float photonMergeArea = photonMergeRadiusSq * ei::PI;
 	float neeMergeRadiusSq = ei::sq(m_params.neeMergeRadius * sceneSize);
 	float neeMergeArea = neeMergeRadiusSq * ei::PI;
-	m_viewVertexMap.clear(m_params.mergeRadius * sceneSize * 2.0001f);
+	m_viewVertexMap.clear(m_params.neeMergeRadius * sceneSize * 2.0001f);
 	m_photonMap.clear(m_params.mergeRadius * sceneSize * 2.0001f);
 	m_selfEmissionCount.store(0);
 	m_density.set_iteration(m_currentIteration + 1);
@@ -471,7 +471,8 @@ void CpuNextEventBacktracking::iterate() {
 		scene::Point currentPos = vertex.get_position();
 		Spectrum radiance { 0.0f };
 
-		radiance += merge_photons(photonMergeRadiusSq, vertex);
+		if(photonMergeArea > 0.0f)
+			radiance += merge_photons(photonMergeRadiusSq, vertex);
 		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
 		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);
