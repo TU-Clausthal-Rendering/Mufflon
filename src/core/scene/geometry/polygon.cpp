@@ -410,10 +410,11 @@ std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>&
 
 	m_vertexAttributes.mark_changed(Device::CPU);
 	if(targetVertices == 0) {
-		logInfo("Decimated polygon mesh (", actualDecimations, " decimations performed)");
+		logInfo("Decimated polygon mesh (", actualDecimations, " decimations performed; ",
+				decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
 	} else {
 		logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
-				" decimations performed)");
+				" decimations performed; ", decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
 	}
 	// TODO: this leaks mesh outside
 

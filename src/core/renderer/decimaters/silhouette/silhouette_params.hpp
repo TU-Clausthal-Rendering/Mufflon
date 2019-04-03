@@ -18,50 +18,62 @@ struct PDirectIndirectRatio {
 	}
 };
 
-struct PDirectImportance {
-	bool enableDirectImportance = true;
+struct PSharpnessFactor {
+	float sharpnessFactor = 10.f;
 	static ParamDesc get_desc() noexcept {
-		return { "Enable direct importance", ParameterTypes::BOOL };
+		return { "2/(1+exp(-BxDF/factor)) - 1", ParameterTypes::FLOAT };
 	}
 };
 
-struct PIndirectImportance {
-	bool enableIndirectImportance = true;
-	static ParamDesc get_desc() noexcept {
-		return { "Enable indirect importance", ParameterTypes::BOOL };
-	}
-};
-
-struct PEyeImportance {
-	bool enableEyeImportance = true;
-	static ParamDesc get_desc() noexcept {
-		return { "Enable eye importance", ParameterTypes::BOOL };
-	}
-};
-
-struct PNormalDeviation {
+struct PMaxNormalDeviation {
 	float maxNormalDeviation = 60.f;
 	static ParamDesc get_desc() noexcept {
 		return { "Max. normal deviation from collapse", ParameterTypes::FLOAT};
 	}
 };
 
-struct PDisplayProjection {
-	bool displayProjection = true;
+struct PViewWeight {
+	float viewWeight = 1.f;
 	static ParamDesc get_desc() noexcept {
-		return { "Displays the projected importance/silhouettes instead", ParameterTypes::BOOL };
+		return { "Imp. weight of view paths", ParameterTypes::FLOAT };
 	}
 };
 
-struct PResetOnReload {
-	bool resetOnReload = true;
+struct PLightWeight {
+	float lightWeight = 1.f;
 	static ParamDesc get_desc() noexcept {
-		return { "Reset the mesh/importance on reload", ParameterTypes::BOOL };
+		return { "Imp. weight of light paths", ParameterTypes::FLOAT };
 	}
 };
 
-using SilhouetteParameters = ParameterHandler<PImportanceIterations, PDecimationIterations, PTargetReduction, PInitialReduction,
-	PVertexThreshold, PDirectIndirectRatio, PNormalDeviation, PMaxPathLength,
-	PDirectImportance, PIndirectImportance, PEyeImportance, PDisplayProjection, PResetOnReload>;
+struct PShadowWeight {
+	float shadowWeight = 1.f;
+	static ParamDesc get_desc() noexcept {
+		return { "Imp. weight of shadow paths", ParameterTypes::FLOAT };
+	}
+};
+
+struct PShadowSilhouetteWeight {
+	float shadowSilhouetteWeight = 1.f;
+	static ParamDesc get_desc() noexcept {
+		return { "Imp. weight of shadow silhouette paths", ParameterTypes::FLOAT };
+	}
+};
+
+struct PRenderUpdate {
+	bool renderUpdate = false;
+	static ParamDesc get_desc() noexcept {
+		return { "Show update between decimations", ParameterTypes::BOOL };
+	}
+};
+
+using SilhouetteParameters = ParameterHandler<
+	PImportanceIterations, PDecimationIterations,
+	PTargetReduction, PInitialReduction, PVertexThreshold,
+	PDirectIndirectRatio, PSharpnessFactor, PMaxNormalDeviation,
+	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,
+	PMaxPathLength,
+	PRenderUpdate
+>;
 
 } // namespace mufflon::renderer::decimaters::silhouette

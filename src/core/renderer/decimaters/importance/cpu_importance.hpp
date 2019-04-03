@@ -52,7 +52,7 @@ private:
 	importance::ImportanceParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	std::vector<importance::ImportanceDecimater> m_decimaters;
+	std::vector<std::unique_ptr<importance::ImportanceDecimater>> m_decimaters;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous

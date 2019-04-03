@@ -56,7 +56,7 @@ private:
 	silhouette::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	std::vector<silhouette::ImportanceDecimater> m_decimaters;
+	std::vector<std::unique_ptr<silhouette::ImportanceDecimater>> m_decimaters;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous

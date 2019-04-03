@@ -48,7 +48,7 @@ public:
 		const auto q = Base::mesh().property(m_quadrics, ci.v0) + Base::mesh().property(m_quadrics, ci.v1);
 		const auto err = q(ci.p1);
 
-		return static_cast<float>(importance * err);
+		return static_cast<float>(std::sqrt(importance * err));
 	}
 
 	void postprocess_collapse(const CollapseInfo& ci) final {

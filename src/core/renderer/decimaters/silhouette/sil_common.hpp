@@ -35,7 +35,7 @@ struct SilVertexExt {
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
 		this->throughput = sample.throughput;
-		this->bxdfPdf = this->throughput / this->outCos;
+		this->bxdfPdf = this->throughput;
 		this->accumThroughput = accum.weight;
 	}
 };

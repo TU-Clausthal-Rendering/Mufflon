@@ -4,6 +4,7 @@
 
 #ifndef DEBUG_ENABLED
 #define PARALLEL_FOR omp parallel for
+#define PARALLEL_REDUCTION(op, var) omp parallel for reduction (op:var)
 #else // DEBUG_ENABLED
 #define PARALLEL_FOR
 #endif // DEBUG_ENABLED

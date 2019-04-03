@@ -121,9 +121,7 @@ CpuImportanceDecimater::CpuImportanceDecimater() {
 }
 
 void CpuImportanceDecimater::on_scene_load() {
-	if(m_params.resetOnReload) {
-		m_currentDecimationIteration = 0u;
-	} else if(m_currentDecimationIteration != 0u) {
+	if(m_currentDecimationIteration != 0u) {
 		// At least activate the created LoDs
 		for(auto& obj : m_currentScene->get_objects()) {
 			if(obj.second.size() != 1u)
@@ -154,13 +152,15 @@ void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
 		logInfo("Finished decimation process");
 		++m_currentDecimationIteration;
 		m_reset = true;
+		// TODO
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		logInfo("Performing decimation/undecimation iteration");
+		logInfo("Performing decimation iteration");
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			m_decimaters[i].iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
+#pragma PARALLEL_FOR
+		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
+			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
 		logPedantic("Duration: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
 					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles");
@@ -198,10 +198,13 @@ void CpuImportanceDecimater::iterate() {
 			display_importance();
 		}
 	}
-	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+
+	if(m_params.renderUpdate || (int)m_currentDecimationIteration >= m_params.decimationIterations) {
+		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
-	for(int i = 0; i < (int)NUM_PIXELS; ++i) {
-		this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
+		for(int i = 0; i < (int)NUM_PIXELS; ++i) {
+			this->pt_sample(Pixel{ i % m_outputBuffer.get_width(), i / m_outputBuffer.get_width() });
+		}
 	}
 }
 
@@ -257,7 +260,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
 				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
-				if(shadowHit.hitId.instanceId < 0 && m_params.enableDirectImportance) {
+				if(shadowHit.hitId.instanceId < 0) {
 					mAssert(!isnan(mis));
 					// Save the radiance for the later indirect lighting computation
 					// Compute how much radiance arrives at the previous vertex from the direct illumination
@@ -268,8 +271,8 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 					const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
 					const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 					const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
-					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_direct_irradiance(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																									numVertices, vertices[pathLen].get_position(), weightedIrradianceLuminance);
+					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]]->record_direct_irradiance(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																									 numVertices, vertices[pathLen].get_position(), weightedIrradianceLuminance);
 				}
 			}
 		}
@@ -285,44 +288,42 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		// Update old vertex with accumulated throughput
 		vertices[pathLen].ext().updateBxdf(sample, throughput);
 
+		// Don't update sharpness for camera vertex
+		if(pathLen > 0) {
+			const ei::Vec3 bxdf = sample.throughput * (float)sample.pdfF;
+			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf) / m_params.sharpnessFactor)) - 1.f;
+		}
+
 		// Fetch the relevant information for attributing the instance to the correct vertices
 		const auto& hitId = vertices[pathLen + 1].get_primitive_id();
 		const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
 		const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = hitId.primId < (i32)lod.polygon.numTriangles ? 0u : 3u * lod.polygon.numTriangles;
 
-		if(pathLen == 0 && m_params.enableEyeImportance) {
-			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_direct_hit(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																					 numVertices, vertices[pathLen].get_position(),
-																					 -ei::dot(vertices[pathLen + 1].get_incident_direction(),
-																							  vertices[pathLen + 1].get_normal()));
-			// Direct hits are being scaled down in importance by a sigmoid of the BxDF to get an idea of the "sharpness"
-			const float importance = sharpness * (1.f - ei::abs(ei::dot(vertices[pathLen].get_normal(), vertices[pathLen].get_incident_direction())));
-
-			const ei::Vec3 bxdf = vertices[pathLen].ext().bxdfPdf * (float)vertices[pathLen].ext().pdf;
-			sharpness *= 2.f / (1.f + ei::exp(-get_luminance(bxdf))) - 1.f;
-		}
+		m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]]->record_direct_hit(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																				  numVertices, vertices[pathLen].get_position(),
+																				  -ei::dot(vertices[pathLen + 1].get_incident_direction(),
+																						   vertices[pathLen + 1].get_normal()),
+																				  sharpness);
 
 		++pathLen;
 	} while(pathLen < m_params.maxPathLength);
 
 	// Go back over the path and add up the irradiance from indirect illumination
-	if(m_params.enableIndirectImportance) {
-		ei::Vec3 accumRadiance{ 0.f };
-		float accumThroughout = 1.f;
-		for(int p = pathLen - 2; p >= 1; --p) {
-			accumRadiance = vertices[p].ext().throughput * accumRadiance + vertices[p + 1].ext().pathRadiance;
-			const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
+	ei::Vec3 accumRadiance{ 0.f };
+	float accumThroughout = 1.f;
+	for(int p = pathLen - 2; p >= 1; --p) {
+		accumRadiance = vertices[p].ext().throughput * accumRadiance + vertices[p + 1].ext().pathRadiance;
+		const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
-			const auto& hitId = vertices[p].get_primitive_id();
-			const auto* lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
-			const u32 numVertices = hitId.primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
-			const u32 vertexOffset = hitId.primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
+		const auto& hitId = vertices[p].get_primitive_id();
+		const auto* lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];
+		const u32 numVertices = hitId.primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
+		const u32 vertexOffset = hitId.primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 
-			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
-			m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].record_indirect_irradiance(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
-																							  numVertices, vertices[pathLen].get_position(), importance);
-		}
+		const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
+		m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]]->record_indirect_irradiance(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
+																							numVertices, vertices[pathLen].get_position(), importance);
 	}
 }
 
@@ -414,7 +415,7 @@ void CpuImportanceDecimater::compute_max_importance() {
 	// Compute the maximum normalized importance for visualization
 //#pragma omp parallel for reduction(max:m_maxImportance)
 	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i)
-		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]].get_current_max_importance());
+		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]]->get_current_max_importance());
 }
 
 void CpuImportanceDecimater::display_importance() {
@@ -443,7 +444,7 @@ void CpuImportanceDecimater::display_importance() {
 
 float CpuImportanceDecimater::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
 	// TODO: density or importance?
-	return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]].get_current_importance(hitId.primId, hitPoint) / m_maxImportance;
+	return m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]]->get_current_importance(hitId.primId, hitPoint) / m_maxImportance;
 }
 
 u32 CpuImportanceDecimater::get_memory_requirement() const {
@@ -471,12 +472,17 @@ u32 CpuImportanceDecimater::get_memory_requirement() const {
 }
 
 void CpuImportanceDecimater::initialize_decimaters() {
+	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
-	// Request status once to remember which vertices we deleted
+	m_decimaters.resize(objects.size());
+	auto objIter = objects.begin();
 
-	// TODO: clean temporary LoDs!
-
-	for(auto& obj : m_currentScene->get_objects()) {
+#pragma PARALLEL_FOR
+	for(i32 i = 0; i < static_cast<i32>(objects.size()); ++i) {
+		auto objIter = objects.begin();
+		for(i32 j = 0; j < i; ++j)
+			++objIter;
+		auto& obj = *objIter;
 		if(obj.second.size() != 1u)
 			throw std::runtime_error("We cannot deal with instancing yet");
 
@@ -491,8 +497,9 @@ void CpuImportanceDecimater::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters.emplace_back(lod, newLod, Degrees(m_params.maxNormalDeviation),
-								  collapses);
+		m_decimaters[i] = std::make_unique<ImportanceDecimater>(lod, newLod, collapses,
+																Degrees(m_params.maxNormalDeviation),
+																m_params.viewWeight, m_params.lightWeight);
 
 		// TODO: this reeeeally breaks instancing
 		for(scene::InstanceHandle inst : obj.second) {
@@ -506,20 +513,22 @@ void CpuImportanceDecimater::update_reduction_factors() {
 	m_remainingVertexFactor.clear();
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			m_decimaters[i]->udpate_importance_density();
 			m_remainingVertexFactor.push_back(1.0);
+		}
 		return;
 	}
 
 	double expectedVertexCount = 0.0;
 	for(auto& decimater : m_decimaters) {
-		decimater.udpate_importance_density();
-		if(decimater.get_original_vertex_count() > m_params.threshold) {
-			m_remainingVertexFactor.push_back(decimater.get_importance_sum());
-			expectedVertexCount += (1.f - m_params.reduction) * decimater.get_original_vertex_count();
+		decimater->udpate_importance_density();
+		if(decimater->get_original_vertex_count() > m_params.threshold) {
+			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
+			expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
 		} else {
 			m_remainingVertexFactor.push_back(1.0);
-			expectedVertexCount += decimater.get_original_vertex_count();
+			expectedVertexCount += decimater->get_original_vertex_count();
 		}
 	}
 
@@ -528,13 +537,13 @@ void CpuImportanceDecimater::update_reduction_factors() {
 	for(u32 iteration = 0u; iteration < MAX_ITERATION_COUNT; ++iteration) {
 		double vertexCountAfterDecimation = 0.0;
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-			vertexCountAfterDecimation += m_remainingVertexFactor[i] * m_decimaters[i].get_original_vertex_count();
+			vertexCountAfterDecimation += m_remainingVertexFactor[i] * m_decimaters[i]->get_original_vertex_count();
 		const double normalizationFactor = expectedVertexCount / vertexCountAfterDecimation;
 
 		bool anyAboveOne = false;
 
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			if(m_decimaters[i].get_original_vertex_count() > m_params.threshold) {
+			if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {
 				m_remainingVertexFactor[i] *= normalizationFactor;
 				anyAboveOne |= m_remainingVertexFactor[i] > 1.0;
 				m_remainingVertexFactor[i] = std::clamp(m_remainingVertexFactor[i], 0.0, 1.0);
