@@ -116,6 +116,10 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleWalter& params, const sc
 	return math::SampleValue{};
 }
 
+CUDA_FUNCTION float pdf_max(const MatSampleWalter& params) {
+	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
+}
+
 template MaterialSampleConcept<MatSampleWalter>;
 template MaterialConcept<MatWalter>;
 

@@ -420,6 +420,14 @@ public:
 		return {0.0f, 0.0f};
 	}
 
+	// TODO: for other vertices than surfaces
+	CUDA_FUNCTION float get_pdf_max() const {
+		if(m_type == Interaction::SURFACE) {
+			return pdf_max(m_desc.surface.mat());
+		}
+		return 0.0f;
+	}
+
 	/* *************************************************************************
 	 * Creation methods (factory)											   *
 	 * Memory management of vertices is quite challenging, because its size	   *

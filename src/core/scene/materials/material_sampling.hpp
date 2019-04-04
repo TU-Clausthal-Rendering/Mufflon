@@ -243,4 +243,17 @@ emission(const ParameterPack& params, const scene::Direction& geoN, const scene:
 	return math::SampleValue{};
 }
 
+
+/* 
+ * Get the maximum value of the pdf (approximated for some models).
+ */
+CUDA_FUNCTION float
+pdf_max(const ParameterPack& params) {
+	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
+	material_switch(params.type,
+		return pdf_max(*as<typename MatType::SampleType>(subParams));
+	);
+	return 0.0f;
+}
+
 }}} // namespace mufflon::scene::materials

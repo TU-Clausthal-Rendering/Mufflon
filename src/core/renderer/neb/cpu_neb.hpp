@@ -84,6 +84,7 @@ private:
 	HashGridManager<PhotonDesc> m_photonMapManager;
 	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
 	DensityOctree m_density;
+	float m_targetDensity;
 };
 
 } // namespace mufflon::renderer
