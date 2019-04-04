@@ -39,7 +39,8 @@ namespace gui.Dll
                     default:
                         color = Brushes.White; break;
                 }
-                Application.Current.Dispatcher.BeginInvoke(Log, message, color);
+                if(Application.Current != null)
+                    Application.Current.Dispatcher.BeginInvoke(Log, message, color);
             }
         }
     }
