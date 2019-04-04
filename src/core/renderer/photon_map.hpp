@@ -111,7 +111,7 @@ public:
 	}
 
 	// Get the number of elements in the hash map
-	u32 size() const { return m_dataCount->load(); }
+	u32 size() const { return ei::min(m_dataCapacity, m_dataCount->load()); }
 	u32 capacity() const { return m_dataCapacity; }
 
 	class NeighborIterator

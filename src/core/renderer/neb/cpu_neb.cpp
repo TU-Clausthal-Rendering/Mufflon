@@ -255,7 +255,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			vertex.ext().neeDirection = nee.direction;
 			vertex.ext().neeConversion = nee.cosOut / (nee.distSq * float(nee.creationPdf));
 			previous = m_viewVertexMap.insert(vertex.get_position(), vertex);
-			if(previous == nullptr) __debugbreak();
+			if(previous == nullptr) break;	// OVERFLOW
 			m_density.increment(vertex.get_position());
 		}
 	} while(pathLen < m_params.maxPathLength);
@@ -326,6 +326,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 				lightThroughput.weight * vertex.ext().neeIrradiance * toFlux, relPdfSum,
 				virtualLight.get_geometric_normal(), prevConversionFactor
 			});
+		if(previous == nullptr) break;	// OVERFLOW
 		prevNormal = virtualLight.get_geometric_normal();
 	}
 }
@@ -502,9 +503,11 @@ void CpuNextEventBacktracking::iterate() {
 
 void CpuNextEventBacktracking::on_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
-	m_viewVertexMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * 2);
+	//int countHeuristic = m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * 2; // Save count
+	int countHeuristic = m_outputBuffer.get_num_pixels() * ei::ceil(logf(float(m_params.maxPathLength)) * 4.0f);
+	m_viewVertexMapManager.resize(countHeuristic);
 	m_viewVertexMap = m_viewVertexMapManager.acquire<Device::CPU>();
-	m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * m_params.maxPathLength);
+	m_photonMapManager.resize(countHeuristic / 2);
 	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
 	// There is at most one emissive end vertex per path
 	m_selfEmissiveEndVertices.resize(m_outputBuffer.get_num_pixels());
@@ -514,6 +517,7 @@ void CpuNextEventBacktracking::on_reset() {
 	logInfo("[NEB] Photon map size: ", m_photonMapManager.mem_size() / (1024*1024), " MB");
 	logInfo("[NEB] Density octree size: ", m_density.mem_size() / (1024*1024), " MB");
 	logInfo("[NEB] Self emission size: ", (m_selfEmissiveEndVertices.size() * sizeof(EmissionDesc)) / (1024*1024), " MB");
+	logInfo("[NEB] sizeof(PhotonDesc)=", sizeof(PhotonDesc), ", sizeof(NebPathVertex)=", sizeof(NebPathVertex));
 }
 
 void CpuNextEventBacktracking::init_rngs(int num) {

@@ -59,7 +59,7 @@ public:
 	struct EmissionDesc {
 		const NebVertexExt* previous;	// The previous vertex to compute the reuseCount after the density estimate
 		Spectrum radiance;				// emission.value
-		float relPdf;					// Part of the MIS-weight (without the reuseCount)
+		float relPdf;					// Part of the MIS-weight relative to the NEE event (without the reuseCount)
 	};
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
