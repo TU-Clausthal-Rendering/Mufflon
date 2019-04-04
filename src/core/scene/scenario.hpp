@@ -14,7 +14,7 @@ namespace mufflon { namespace scene {
  */
 class Scenario {
 public:
-	static constexpr u64 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
+	static constexpr u32 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
 
 	Scenario();
 	Scenario(const Scenario&) = delete;

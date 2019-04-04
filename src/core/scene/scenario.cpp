@@ -112,7 +112,11 @@ void Scenario::mask_object(ConstObjectHandle hdl) {
 }
 
 void Scenario::mask_instance(ConstInstanceHandle hdl) {
-	// TODO
+	auto iter = m_perInstanceCustomization.find(hdl);
+	if(iter != m_perInstanceCustomization.end())
+		iter->second.masked = true;
+	else
+		m_perInstanceCustomization.insert({ hdl, CustomProperty{true, NO_CUSTOM_LOD} });
 }
 
 void Scenario::set_custom_lod(ConstObjectHandle hdl, u32 level) {
