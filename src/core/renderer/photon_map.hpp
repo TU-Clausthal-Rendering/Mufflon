@@ -112,6 +112,7 @@ public:
 
 	// Get the number of elements in the hash map
 	u32 size() const { return m_dataCount->load(); }
+	u32 capacity() const { return m_dataCapacity; }
 
 	class NeighborIterator
 	{
@@ -270,6 +271,10 @@ public:
 	void mark_changed(Device changed) noexcept {
 		m_memory.mark_changed(changed);
 	}
+
+	// Get the size of assoziated memory blocks (does not count the header information
+	// in the current instance).
+	std::size_t mem_size() const { return m_memory.size(); }
 private:
 	GenericResource m_memory;	// Contains both: hash table and data
 	u32 m_mapSize;				// Size of the hash table

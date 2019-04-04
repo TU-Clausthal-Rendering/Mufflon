@@ -124,6 +124,8 @@ namespace mufflon::renderer {
 
 		int capacity() const { return m_capacity; }
 		int size() const { return ei::min(m_capacity, m_allocationCounter.load()); }
+		// Get the size of the associated memory excluding this instance.
+		std::size_t mem_size() const { return sizeof(std::atomic_int32_t) * m_capacity; }
 	private:
 		float m_densityScale;		// 1/#iterations to normalize the counters into a density
 		int m_splitCountDensity;	// The number when a node is split must be a multiple of 8 and must grow proportional to #iterations

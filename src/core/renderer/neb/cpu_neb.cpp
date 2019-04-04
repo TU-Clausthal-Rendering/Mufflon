@@ -431,8 +431,6 @@ void CpuNextEventBacktracking::iterate() {
 	m_selfEmissionCount.store(0);
 	m_density.set_iteration(m_currentIteration + 1);
 
-	//logInfo("[NEB] Density map occupation: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
-
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
 
@@ -496,6 +494,10 @@ void CpuNextEventBacktracking::iterate() {
 	}//*/
 
 	Profiler::instance().create_snapshot_all();
+
+	logPedantic("[NEB] View-Vertex map occupation: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()), "%.");
+	logPedantic("[NEB] Photon map occupation: ", m_photonMap.size() * 100.0f / float(m_photonMap.capacity()), "%.");
+	logPedantic("[NEB] Density octree occupation: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
 }
 
 void CpuNextEventBacktracking::on_reset() {
@@ -507,6 +509,11 @@ void CpuNextEventBacktracking::on_reset() {
 	// There is at most one emissive end vertex per path
 	m_selfEmissiveEndVertices.resize(m_outputBuffer.get_num_pixels());
 	m_density.initialize(m_sceneDesc.aabb, m_outputBuffer.get_num_pixels() * m_params.maxPathLength * 2);
+
+	logInfo("[NEB] View-Vertex map size: ", m_viewVertexMapManager.mem_size() / (1024*1024), " MB");
+	logInfo("[NEB] Photon map size: ", m_photonMapManager.mem_size() / (1024*1024), " MB");
+	logInfo("[NEB] Density octree size: ", m_density.mem_size() / (1024*1024), " MB");
+	logInfo("[NEB] Self emission size: ", (m_selfEmissiveEndVertices.size() * sizeof(EmissionDesc)) / (1024*1024), " MB");
 }
 
 void CpuNextEventBacktracking::init_rngs(int num) {
