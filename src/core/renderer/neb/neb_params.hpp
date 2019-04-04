@@ -11,13 +11,21 @@ struct PNeeMergeRadius {
 	}
 };
 
+struct PTargetFlux {
+	float targetFlux { 0.0005f };
+	static ParamDesc get_desc() noexcept {
+		return {"Target flux", ParameterTypes::FLOAT};
+	}
+};
+
 using NebParameters = ParameterHandler<
 	PMinPathLength,
 	PMaxPathLength,
 	PNeeCount,
 	PNeePositionGuide,
 	PMergeRadius,
-	PNeeMergeRadius
+	PNeeMergeRadius,
+	PTargetFlux
 >;
 
 }} // namespace mufflon::renderer

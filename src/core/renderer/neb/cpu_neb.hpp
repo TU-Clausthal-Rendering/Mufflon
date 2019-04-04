@@ -57,7 +57,7 @@ public:
 	};*/
 
 	struct EmissionDesc {
-		const NebVertexExt* previous;	// The previous vertex to compute the reuseCount after the density estimate
+		const NebPathVertex* previous;	// The previous vertex to compute the reuseCount after the density estimate
 		Spectrum radiance;				// emission.value
 		float relPdf;					// Part of the MIS-weight relative to the NEE event (without the reuseCount)
 	};
@@ -71,7 +71,7 @@ private:
 	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
 	void sample_photon_path(float neeMergeArea, float photonMergeArea, math::Rng& rng, const NebPathVertex& vertex);
 	Spectrum merge_photons(float mergeRadiusSq, const NebPathVertex& vertex);
-	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float neeReuseCount, float mergeReuseCount);
+	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float neeReuseCount, float photonReuseCount);
 	Spectrum merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex);
 	Spectrum finalize_emission(float neeMergeArea, float photonMergeArea, const EmissionDesc& emission);
 
@@ -84,7 +84,6 @@ private:
 	HashGridManager<PhotonDesc> m_photonMapManager;
 	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
 	DensityOctree m_density;
-	float m_targetDensity;
 };
 
 } // namespace mufflon::renderer
