@@ -12,9 +12,7 @@ struct ImpVertexExt {
 	ei::Vec3 throughput;
 	ei::Vec3 accumThroughput;
 	float outCos;
-	ei::Vec3 bxdfPdf;
 	ei::Vec3 pathRadiance;
-	bool shadowed = true;
 
 
 	CUDA_FUNCTION void init(const PathVertex<ImpVertexExt>& thisVertex,
@@ -34,7 +32,6 @@ struct ImpVertexExt {
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
 		this->throughput = sample.throughput;
-		this->bxdfPdf = this->throughput / this->outCos;
 		this->accumThroughput = accum.weight;
 	}
 };

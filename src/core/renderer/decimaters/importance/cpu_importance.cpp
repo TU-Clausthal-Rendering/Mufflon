@@ -129,10 +129,7 @@ void CpuImportanceDecimater::on_scene_load() {
 
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
 			// TODO: this reeeeally breaks instancing
-			for(scene::InstanceHandle inst : obj.second) {
-				// Modify the scenario to use this lod instead
-				scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
-			}
+			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 		}
 	}
 }
@@ -152,7 +149,15 @@ void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
 		logInfo("Finished decimation process");
 		++m_currentDecimationIteration;
 		m_reset = true;
-		// TODO
+
+		// Fix up all other scenarios too (TODO: not a wise choice to do so indiscriminately...)
+		for(std::size_t i = 0u; i < scene::WorldContainer::instance().get_scenario_count(); ++i) {
+			auto handle = scene::WorldContainer::instance().get_scenario(i);
+			for(const auto& obj : m_currentScene->get_objects()) {
+				const auto newLodLevel = obj.first->get_lod_slot_count() - 1u;
+				handle->set_custom_lod(obj.first, static_cast<u32>(newLodLevel));
+			}
+		}
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		logInfo("Performing decimation iteration");
 		const auto processTime = CpuProfileState::get_process_time();
@@ -225,6 +230,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	// We gotta keep track of our vertices
 	thread_local std::vector<ImpPathVertex> vertices(std::max(2, m_params.maxPathLength + 1));
+	vertices.clear();
 	// Create a start for the path
 	(void)ImpPathVertex::create_camera(&vertices.front(), &vertices.front(), m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
 
@@ -506,10 +512,7 @@ void CpuImportanceDecimater::initialize_decimaters() {
 																m_params.viewWeight, m_params.lightWeight);
 
 		// TODO: this reeeeally breaks instancing
-		for(scene::InstanceHandle inst : obj.second) {
-			// Modify the scenario to use this lod instead
-			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(inst, newLodLevel);
-		}
+		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
 }
 

@@ -11,7 +11,6 @@ struct SilVertexExt {
 	ei::Vec3 throughput;
 	ei::Vec3 accumThroughput;
 	float outCos;
-	ei::Vec3 bxdfPdf;
 	ei::Vec3 pathRadiance;
 	ei::Ray shadowRay;
 	float lightDistance;
@@ -35,7 +34,6 @@ struct SilVertexExt {
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
 		this->throughput = sample.throughput;
-		this->bxdfPdf = this->throughput;
 		this->accumThroughput = accum.weight;
 	}
 };
