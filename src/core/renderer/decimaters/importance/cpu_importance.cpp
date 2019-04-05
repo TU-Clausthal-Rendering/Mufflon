@@ -17,7 +17,6 @@
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 #include <cstdio>
 #include <random>
-#include <stdexcept>
 #include <queue>
 
 namespace mufflon::renderer::decimaters {
@@ -124,9 +123,6 @@ void CpuImportanceDecimater::on_scene_load() {
 	if(m_currentDecimationIteration != 0u) {
 		// At least activate the created LoDs
 		for(auto& obj : m_currentScene->get_objects()) {
-			if(obj.second.size() != 1u)
-				throw std::runtime_error("We cannot deal with instancing yet");
-
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
 			// TODO: this reeeeally breaks instancing
 			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
@@ -460,9 +456,6 @@ u32 CpuImportanceDecimater::get_memory_requirement() const {
 		mAssert(obj.first != nullptr);
 		mAssert(obj.second.size() != 0u);
 
-		if(obj.second.size() != 1u)
-			throw std::runtime_error("We cannot deal with instancing yet");
-
 		for(scene::InstanceHandle inst : obj.second) {
 			mAssert(inst != nullptr);
 			const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
@@ -489,8 +482,6 @@ void CpuImportanceDecimater::initialize_decimaters() {
 		for(i32 j = 0; j < i; ++j)
 			++objIter;
 		auto& obj = *objIter;
-		if(obj.second.size() != 1u)
-			throw std::runtime_error("We cannot deal with instancing yet");
 
 		auto& lod = obj.first->get_lod(0u);
 		const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
