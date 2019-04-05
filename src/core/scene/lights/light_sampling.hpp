@@ -56,7 +56,7 @@ struct NextEventEstimation {
 	Spectrum diffIrradiance {0.0f};		// Unit: W/m²sr²
 	float dist {0.0f};
 	float distSq {0.0f};
-	AreaPdf creationPdf;			// Pdf to create this connection event (depends on light choice probability and positional sampling)
+	AreaPdf creationPdf;				// Pdf to create this connection event (depends on light choice probability and positional sampling)
 	//LightType type; // Not required ATM
 };
 
@@ -107,7 +107,8 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_spot(const Spectrum& in
 	const scene::Direction globalDir = dir.direction.x * tangentX + dir.direction.y * tangentY + dir.direction.z * direction;
 	// Compute falloff for cone
 	const float falloff = scene::lights::get_falloff(dir.direction.z, cosThetaMax, cosFalloffStart);
-	return { {globalDir, dir.pdf}, intensity * falloff }; // TODO flux likely wrong (misses the pdf?)
+	const Spectrum flux = intensity * falloff / float(dir.pdf);
+	return { {globalDir, dir.pdf}, flux };
 }
 
 // *** AREA LIGHT : TRIANGLE ***
@@ -195,9 +196,10 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const DirectionalLight& li
 													  const ei::Box& bounds,
 													  const math::RndSet2& rnd) {
 	// TODO: invalid unit? irradiance != intensity != flux, photons should have flux...
+	auto pos = math::sample_position(light.direction, bounds, rnd.u0, rnd.u1);
+	Spectrum flux = light.irradiance / float(pos.pdf);
 	return Photon{
-		math::sample_position(light.direction, bounds, rnd.u0, rnd.u1),
-		light.irradiance, LightType::DIRECTIONAL_LIGHT,
+		pos, flux, LightType::DIRECTIONAL_LIGHT,
 		{light.direction, AngularPdf::infinite()}
 	};
 }
@@ -262,13 +264,13 @@ CUDA_FUNCTION __forceinline__ Photon sample_light_pos(const BackgroundDesc<CURRE
 
 	// Sample a start position on the bounding box
 	math::RndSet2 rnd2{ rnd.i0 };
-	auto pos = math::sample_position(sample.dir.direction, bounds, rnd2.u0, rnd2.u1);;
+	auto pos = math::sample_position(-sample.dir.direction, bounds, rnd2.u0, rnd2.u1);;
 
 	// Convert radiance to flux (applies division from Monte-Carlo)
 	Spectrum flux = sample.radiance / float(pos.pdf) / float(sample.dir.pdf);
 
 	return Photon { pos, flux, LightType::ENVMAP_LIGHT,
-					Photon::SourceParam{sample.dir.direction, sample.dir.pdf} };
+					Photon::SourceParam{-sample.dir.direction, sample.dir.pdf} };
 }
 
 
@@ -403,8 +405,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Background
 // Evaluate a directional hit of the background.
 // This function would be more logical in lights.hpp. But it requires textures
 // and would increase header dependencies.
-template < Device dev >
-CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<dev>& background,
+CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_DEV>& background,
 												  const ei::Vec3& direction) {
 	switch(background.type) {
 		case BackgroundType::COLORED: return { background.color, 1.0f, AngularPdf{0.0f}, 

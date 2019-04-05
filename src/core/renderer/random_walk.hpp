@@ -58,12 +58,12 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	}
 	mAssert(!isnan(outSample.excident.x) && !isnan(outSample.excident.y) && !isnan(outSample.excident.z)
 		&& !isnan(outSample.origin.x) && !isnan(outSample.origin.y) && !isnan(outSample.origin.z)
-		&& !isnan(float(outSample.pdfF)) && !isnan(float(outSample.pdfB)));
-	vertex.ext().update(vertex, outSample.excident, outSample.pdfF, outSample.pdfB);
+		&& !isnan(float(outSample.pdf.forw)) && !isnan(float(outSample.pdf.back)));
+	vertex.update_ext(outSample.excident, outSample.pdf);
 
 	// Update throughputs
 	throughput.weight *= outSample.throughput;
-	throughput.guideWeight *= 1.0f - expf(-(outSample.pdfF * outSample.pdfF) / 5.0f);
+	throughput.guideWeight *= 1.0f - expf(-(outSample.pdf.forw * outSample.pdf.forw) / 5.0f);
 
 	// Russian roulette
 	if(u0 >= 0.0f) {
@@ -93,24 +93,20 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
 
 	// If we missed the scene, terminate the ray
-	if(nextHit.hitId.instanceId < 0)
+	if(nextHit.hitId.instanceId < 0) {
+		VertexType::create_void(&outVertex, &vertex, outSample.excident, outSample.pdf.forw,
+								throughput);
 		return false;
+	}
 
 	// Create the new surface vertex
-	ei::Vec3 position = vertex.get_position() + outSample.excident * nextHit.hitT;
+	ei::Vec3 position = outSample.origin + outSample.excident * nextHit.hitT;
+	// Get tangent space and parameter pack from nextHit
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
-	// TODO: get tangent space and parameter pack from nextHit
-	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[nextHit.hitId.instanceId]];
-	scene::MaterialIndex matIdx;
-	const u32 FACE_COUNT = object.polygon.numTriangles + object.polygon.numQuads;
-	if(static_cast<u32>(nextHit.hitId.primId) < FACE_COUNT)
-		matIdx = object.polygon.matIndices[nextHit.hitId.primId];
-	else
-		matIdx = object.spheres.matIndices[nextHit.hitId.primId];
-	const float incidentCos = dot(nextHit.normal, outSample.excident);
-	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(matIdx),
+	// Finalize
+	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(nextHit.hitId),
 				position, tangentSpace, outSample.excident, nextHit.hitT,
-				incidentCos, outSample.pdfF, throughput);
+				outSample.pdf.forw, throughput);
 	return true;
 }
 

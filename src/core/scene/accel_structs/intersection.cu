@@ -244,10 +244,13 @@ CUDA_FUNCTION bool intersects_primitve(
 		// Masking not possible for spheres: in case of transparent objects we need
 		// self intersections inside.
 		const ei::Sphere& sph = obj.spheres.spheres[primId];
+		// Because it is important if we start incide or outside it is better
+		// to modify the ray beforhand. Testing for tmin afterwards is buggy.
+		ei::Ray epsRay{ ray.origin + tmin * ray.direction, ray.direction };;
 		float t;
 		// TODO: use some epsilon?
-		if(ei::intersects(ray, sph, t) && t > tmin && t < hitT) {
-			hitT = t;
+		if(ei::intersects(epsRay, sph, t) && t+tmin < hitT) {
+			hitT = t+tmin;
 			hitPrimId = primId;
 			// Barycentrics unused; TODO: get coordinates anyway?
 			return true;

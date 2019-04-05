@@ -106,8 +106,21 @@ struct SceneDescriptor {
 	ConstArrayDevHandle_t<dev, materials::Medium> media;
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
 
+
+	CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
+		const LodDescriptor<dev>& object = lods[lodIndices[primitive.instanceId]];
+		const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;
+		if(static_cast<u32>(primitive.primId) < faceCount)
+			return object.polygon.matIndices[primitive.primId];
+		else
+			return object.spheres.matIndices[primitive.primId];
+	}
+
 	CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(MaterialIndex matIdx) const {
 		return *as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[matIdx]);
+	}
+	CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(PrimitiveHandle primitive) const {
+		return get_material(get_material_index(primitive));
 	}
 };
 

@@ -247,6 +247,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
+			// TODO: use multiple NEEs
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				vertices[pathLen].ext().shadowRay = ei::Ray{ nee.lightPoint, -nee.direction };
 				vertices[pathLen].ext().lightDistance = nee.dist;
@@ -255,7 +256,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 																		 vertices[pathLen].get_primitive_id(), nee.dist);
 				vertices[pathLen].ext().shadowHit = shadowHit.hitId;
 				vertices[pathLen].ext().firstShadowDistance = shadowHit.hitT;
-				AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
+				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
@@ -291,7 +292,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 
 		// Don't update sharpness for camera vertex
 		if(pathLen > 0) {
-			const ei::Vec3 bxdf = sample.throughput * (float)sample.pdfF;
+			const ei::Vec3 bxdf = sample.throughput * (float)sample.pdf.forw;
 			const float bxdfLum = get_luminance(bxdf);
 			if(isnan(bxdfLum))
 				return;
@@ -357,36 +358,40 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, rng.next());
 
+	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
+		: scene::lights::guide_flux;
+
 	int pathLen = 0;
 	do {
-		if(pathLen > 0 && pathLen + 1 <= m_params.maxPathLength) {
+		if(pathLen > 0 && pathLen + 1 >= m_params.minPathLength && pathLen + 1 <= m_params.maxPathLength) {
 			// Call NEE member function for recursive vertices.
 			// Do not connect to the camera, because this makes the renderer much more
 			// complicated. Our decision: The PT should be as simple as possible!
 			// What means more complicated?
 			// A connnection to the camera results in a different pixel. In a multithreaded
 			// environment this means that we need a write mutex for each pixel.
-			// TODO: test/parametrize mulievent estimation (more indices in connect) and different guides.
 			u64 neeSeed = rng.next();
-			math::RndSet2 neeRnd = rng.next();
-			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertex.get_position(), m_sceneDesc.aabb,
-							   neeRnd, scene::lights::guide_flux);
-			Pixel outCoord;
-			auto value = vertex.evaluate(nee.direction, m_sceneDesc.media, outCoord);
-			if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
-			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
-			Spectrum radiance = value.value * nee.diffIrradiance;
-			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				bool anyhit = scene::accel_struct::any_intersection(
-					m_sceneDesc, { vertex.get_position(), nee.direction },
-					vertex.get_primitive_id(), nee.dist);
-				if(!anyhit) {
-					AreaPdf hitPdf = value.pdfF.to_area_pdf(nee.cosOut, nee.distSq);
-					float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-					mAssert(!isnan(mis));
-					m_outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
-											value.cosOut, radiance * mis);
+			for(int i = 0; i < m_params.neeCount; ++i) {
+				math::RndSet2 neeRnd = rng.next();
+				auto nee = connect(m_sceneDesc.lightTree, i, m_params.neeCount, neeSeed,
+								   vertex.get_position(), m_sceneDesc.aabb, neeRnd,
+								   guideFunction);
+				Pixel outCoord;
+				auto value = vertex.evaluate(nee.direction, m_sceneDesc.media, outCoord);
+				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
+				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
+				Spectrum radiance = value.value * nee.diffIrradiance;
+				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
+					bool anyhit = scene::accel_struct::any_intersection(
+						m_sceneDesc, { vertex.get_position(), nee.direction },
+						vertex.get_primitive_id(), nee.dist);
+					if(!anyhit) {
+						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
+						float mis = 1.0f / (m_params.neeCount + hitPdf / nee.creationPdf);
+						mAssert(!isnan(mis));
+						m_outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
+												  value.cosOut, radiance * mis);
+					}
 				}
 			}
 		}
@@ -394,13 +399,14 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		// Walk
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
-		float rndRoulette = math::sample_uniform(u32(m_rngs[pixel].next()));
+		float rndRoulette = math::sample_uniform(u32(rng.next()));
 		if(!walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
-			if(throughput.weight != Spectrum{ 0.f }) {
+			if((pathLen + 1 >= m_params.minPathLength) && (throughput.weight != Spectrum{ 0.0f })) {
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					float mis = 1.0f / (1.0f + background.pdfB / sample.pdfF);
+					AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
+					float mis = 1.0f / (1.0f + m_params.neeCount * float(startPdf) / float(sample.pdf.forw));
 					background.value *= mis;
 					m_outputBuffer.contribute(coord, throughput, background.value,
 											  ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
@@ -411,40 +417,25 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 		}
 		++pathLen;
 
-		/*const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-		const auto val = decimater->get_quadric(vertex.get_primitive_id().primId, vertex.get_position())
-			* decimater->get_current_importance(vertex.get_primitive_id().primId, vertex.get_position());
-		//const auto val = decimater->get_current_importance(vertex.get_primitive_id().primId, vertex.get_position());
-		m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4(val));
-		break;*/
-
-
 		// Query importance if the target is active
-		if(pathLen == 1 && m_params.importanceIterations > 0) {
-			if(m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-				const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-				m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
-			}
-			if(m_outputBuffer.is_target_enabled(RenderTargets::SHADOW_SILHOUETTE)) {
-				const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-				// TODO
-				/*const bool isSilhouette = decimater->is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
-				m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });*/
-			}
-		}
+		if(pathLen == 1 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE))
+			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
+
 
 		// Evaluate direct hit of area ligths
-		Spectrum emission = vertex.get_emission().value;
-		if(emission != 0.0f) {
-			AreaPdf backwardPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
-												vertex.get_surface_params(),
-												lastPosition, scene::lights::guide_flux);
-			float mis = pathLen == 1 ? 1.0f
-				: 1.0f / (1.0f + backwardPdf / vertex.ext().incidentPdf);
-			emission *= mis;
+		if(pathLen >= m_params.minPathLength) {
+			Spectrum emission = vertex.get_emission().value;
+			if(emission != 0.0f) {
+				AreaPdf startPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
+											   vertex.get_surface_params(),
+											   lastPosition, guideFunction);
+				float mis = pathLen == 1 ? 1.0f
+					: 1.0f / (1.0f + m_params.neeCount * (startPdf / vertex.ext().incidentPdf));
+				emission *= mis;
+			}
+			m_outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+									  vertex.get_normal(), vertex.get_albedo());
 		}
-		m_outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
-								  vertex.get_normal(), vertex.get_albedo());
 	} while(pathLen < m_params.maxPathLength);
 }
 

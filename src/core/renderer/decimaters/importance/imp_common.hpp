@@ -17,16 +17,16 @@ struct ImpVertexExt {
 
 	CUDA_FUNCTION void init(const PathVertex<ImpVertexExt>& thisVertex,
 							const scene::Direction& incident, const float incidentDistance,
-							const float incidentCosine, const AreaPdf incidentPdf,
+							const AreaPdf incidentPdf, const float incidentCosineAbs,
 							const math::Throughput& incidentThrougput) {
 		this->incidentPdf = incidentPdf;
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<ImpVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const AngularPdf pdfF, const AngularPdf pdfB) {
+							  const math::PdfPair& pdf) {
 		this->excident = excident;
-		this->pdf = pdfF;
+		this->pdf = pdf.forw;
 		this->outCos = -ei::dot(thisVertex.get_normal(), excident);
 	}
 

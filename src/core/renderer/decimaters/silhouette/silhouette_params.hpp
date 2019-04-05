@@ -72,7 +72,7 @@ using SilhouetteParameters = ParameterHandler<
 	PTargetReduction, PInitialReduction, PVertexThreshold,
 	PDirectIndirectRatio, PSharpnessFactor, PMaxNormalDeviation,
 	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,
-	PMaxPathLength,
+	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide,
 	PRenderUpdate
 >;
 

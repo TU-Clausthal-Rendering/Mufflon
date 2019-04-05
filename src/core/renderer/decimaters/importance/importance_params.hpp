@@ -51,7 +51,7 @@ using ImportanceParameters = ParameterHandler<
 	PTargetReduction, PInitialReduction, PVertexThreshold,
 	PSharpnessFactor, PMaxNormalDeviation,
 	PViewWeight, PLightWeight,
-	PMaxPathLength,
+	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide,
 	PRenderUpdate
 >;
 

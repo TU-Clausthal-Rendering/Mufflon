@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.cpp" />
@@ -181,6 +182,8 @@
     <ClInclude Include="..\..\src\core\memory\hashmap.hpp" />
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.hpp" />
@@ -201,6 +204,7 @@
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_common.hpp" />

@@ -28,6 +28,13 @@ enum class LightType : u16 {
 	NUM_LIGHTS
 };
 
+CUDA_FUNCTION bool is_hitable(LightType type) {
+	return type == LightType::AREA_LIGHT_TRIANGLE
+		|| type == LightType::AREA_LIGHT_QUAD
+		|| type == LightType::AREA_LIGHT_SPHERE
+		|| type == LightType::ENVMAP_LIGHT;
+}
+
 // Important: light structs need to be packed to save storage space on the GPU
 #pragma pack(push, 1)
 
@@ -245,7 +252,7 @@ CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_point(const Spectrum& intensity) {
-	return { intensity, 0.0f, AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } };
+	return { intensity, 1.0f, AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } };
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
@@ -260,7 +267,7 @@ evaluate_spot(const scene::Direction& excident,
 	// OK, there will be some contribution
 	const float cosFalloffStartf = __half2float(cosFalloffStart);
 	const float falloff = get_falloff(cosOut, cosThetaMaxf, cosFalloffStartf);
-	return { intensity * falloff, 0.0f,
+	return { intensity * falloff, 1.0f,
 			 AngularPdf{ math::get_uniform_cone_pdf(cosThetaMaxf) },
 			 AngularPdf{ 0.0f } };
 }
@@ -277,10 +284,12 @@ evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
-evaluate_dir(const Spectrum& intensity, bool isEnvMap, AngularPdf pdf) {
+evaluate_dir(const Spectrum& flux, bool isEnvMap, AngularPdf pdf) {
 	// Special case: the incindent area PDF is directly projected.
-	// To avoid the wrong conversion later we need to do its reversal here.
-	return { intensity, isEnvMap ? 1.0f : 0.0f, pdf, AngularPdf{0.0f} };
+	// To avoid the wrong contribution values later we need to do its reversal here.
+	// 'pdf' contains 1 / projectedSceneArea
+	Spectrum intensity = flux * float(pdf);
+	return { intensity, 1.0f, pdf, AngularPdf{0.0f} };
 }
 
 }}} // namespace mufflon::scene::lights

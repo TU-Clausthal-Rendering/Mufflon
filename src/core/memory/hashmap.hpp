@@ -89,7 +89,9 @@ public:
 		while(!std::atomic_compare_exchange_strong(&m_map[idx], &expected, dataIdx)) {
 			mAssertMsg(!(m_data[expected].first == key), "Not allowed to add the same value twice.");
 			++step;
-			idx = (idx + step * step) % m_mapSize;
+			if(step & 1) idx = idx + step * step;
+			else         idx = idx - step * step + m_mapSize;
+			idx = idx % m_mapSize;
 			expected = ~0u;
 		}
 	}
@@ -103,7 +105,9 @@ public:
 		while((res = std::atomic_load(&m_map[idx])) != ~0u) {
 			if(m_data[res].first == key) return &m_data[res].second;
 			++step;
-			idx = (idx + step * step) % m_mapSize;
+			if(step & 1) idx = idx + step * step;
+			else         idx = idx - step * step + m_mapSize;
+			idx = idx % m_mapSize;
 		}
 		return nullptr;
 	}
@@ -147,7 +151,9 @@ public:
 		u32 step = 0;
 		while(atomicCAS(&m_map[idx], ~0u, dataIdx) != ~0u) {
 			++step;
-			idx = (idx + step * step) % m_mapSize;
+			if(step & 1) idx = idx + step * step;
+			else         idx = idx - step * step + m_mapSize;
+			idx = idx % m_mapSize;
 		}
 	}
 
@@ -159,7 +165,9 @@ public:
 		while((res = m_map[idx]) != ~0u) { // NO ATOMIC-LOAD ON CUDA??
 			if(m_data[res].first == key) return &m_data[res].second;
 			++step;
-			idx = (idx + step * step) % m_mapSize;
+			if(step & 1) idx = idx + step * step;
+			else         idx = idx - step * step + m_mapSize;
+			idx = idx % m_mapSize;
 		}
 		return nullptr;
 	}
@@ -183,19 +191,24 @@ private:
  */
 template < typename K, typename V >
 class HashMapManager {
+	// Only primes congruent to 3 modulo 4 guarantee a well behaved quadratic probing
+	u32 compute_valid_size(u32 desiredSize) {
+		do {
+			desiredSize = ei::nextPrime(desiredSize);
+		} while((desiredSize & 3) != 3);
+		return desiredSize;
+	}
 public:
 	HashMapManager(int numExpectedEntries = 0) :
 		m_cpuHMCounter{0}
 	{
-		m_dataCapacity = numExpectedEntries;
-		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
+		resize(numExpectedEntries);
 	}
 
 	// Reallocates the map (previous data is lost)
 	void resize(int numExpectedEntries) {
 		m_dataCapacity = numExpectedEntries;
-		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
+		m_mapSize = compute_valid_size(u32(numExpectedEntries * 1.15f));
 		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
 	}
 

@@ -54,17 +54,20 @@
                           DataType="{x:Type viewmodel:RendererPropertyBool}">
                 <CheckBox HorizontalAlignment="Center"
                           VerticalAlignment="Center"
-                          IsChecked="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
+                          IsChecked="{Binding Value, UpdateSourceTrigger=LostFocus}"/>
             </DataTemplate>
             <DataTemplate x:Key="IntTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyInt}">
-                <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=LostFocus}"
                                      HorizontalContentAlignment="Right"
                                      VerticalContentAlignment="Center"/>
             </DataTemplate>
+            <!--<viewmodel:FloatConverter x:Key="FloatConverterKey"/>
+            Then ', Converter={StaticResource FloatConverterKey}' behind UpdateSourceTrigger
+            -->
             <DataTemplate x:Key="FloatTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyFloat}">
-                <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                    <helper:EnterTextBox Text="{Binding Value, UpdateSourceTrigger=LostFocus}"
                                      HorizontalContentAlignment="Right"
                                      VerticalContentAlignment="Center"/>
             </DataTemplate>

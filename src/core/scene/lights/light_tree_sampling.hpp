@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "light_sampling.hpp"
 #include "light_tree.hpp"
@@ -123,17 +123,20 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	if(rndChoice == ~0ull) --rndChoice;
 
 	float fluxSum = ei::sum(tree.background.flux) + tree.dirLights.root.flux + tree.posLights.root.flux;
-	float envProb = ei::sum(tree.background.flux) / fluxSum;;
+	float envProb = ei::sum(tree.background.flux) / fluxSum;
 	float dirProb = tree.dirLights.root.flux / fluxSum;
 	float posProb = tree.posLights.root.flux / fluxSum;
 
 	// Now split up based on flux
 	// First is envmap...
-	u64 rightEnv = static_cast<u64>(std::numeric_limits<u64>::max() * envProb);
+	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
-		// TODO: sample background, if there is one
-		return {};
-		//return adjustPdf(sample_light_pos(tree.background, bounds, rnd), envProb);
+		// Sample background
+		auto photon = sample_light_pos(tree.background, bounds, rnd);
+		// Adjust pdf (but apply the probability to the directional pdf and NOT the pos.pdf)
+		photon.intensity /= envProb;
+		photon.source_param.dir.dirPdf *= envProb;
+		return photon;
 	}
 	// ...then the directional lights come...
 	u64 right = math::percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
@@ -361,6 +364,16 @@ CUDA_FUNCTION AreaPdf emit_pdf(const LightTree<CURRENT_DEV>& tree,
 							   PrimitiveHandle primitive, ei::Vec2 surfaceParams,
 							   const ei::Vec3& refPosition, Guide&& guide) {
 	return light_pdf<false>(tree, primitive, surfaceParams, refPosition, guide);
+}
+
+/*
+ * Analogous to the area light hit-pdf there is an environment hit-pdf.
+ * While the pdf is an AngularPdf it is reinterpreted as AreaPdf for compatibility reasons.
+ */
+CUDA_FUNCTION AreaPdf background_pdf(const LightTree<CURRENT_DEV>& tree, const math::EvalValue& value) {
+	float backgroundFlux = ei::sum(tree.background.flux);
+	float p = backgroundFlux / (tree.dirLights.root.flux + tree.posLights.root.flux + backgroundFlux);
+	return AreaPdf{ float(value.pdf.back) * p };
 }
 
 // Guide the light tree traversal based on flux only

@@ -23,6 +23,7 @@ namespace mufflon { namespace scene {
 	// A reasonable maximum size. Larger scenes will cause numeric problems.
 	// Also, the PathVertex class relies on some constant maximum to leave the scene.
 	constexpr float MAX_SCENE_SIZE = 1048576.0f;	// 2^20
+	constexpr float MAX_SCENE_SIZE_SQ = MAX_SCENE_SIZE * MAX_SCENE_SIZE;
 
 
 }} // namespace mufflon::scene

@@ -121,7 +121,7 @@ sample(const TangentSpace& tangentSpace,
 						/ (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
-	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)));
+	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	return res;
 }
@@ -133,7 +133,11 @@ sample(const TangentSpace& tangentSpace,
  * incident: normalized incident direction. Points towards the surface.
  * excident: normalized excident direction. Points away from the surface.
  * adjoint: false if the incident is a view sub-path, true if it is a light sub-path.
- * merge: Used to apply a different shading normal correction.
+ *		Must be 'false' for merges (they should alwas be evaluated at the view path
+ *		vertex, which reduces the bias).
+ * lightCosine: Used to apply a different shading normal correction for merges.
+ *		Use 0 for connection events! Otherwise this is the dot(geoN, lightDir) at the
+ *		point where the photon hit.
  */
 CUDA_FUNCTION math::EvalValue
 evaluate(const TangentSpace& tangentSpace,
@@ -142,7 +146,7 @@ evaluate(const TangentSpace& tangentSpace,
 		 const Direction& excident,
 		 const Medium* media,
 		 bool adjoint,
-		 bool merge
+		 const scene::Direction* lightNormal
 ) {
 	float iDotN = -dot(incident, tangentSpace.shadingN);
 	float eDotN =  dot(excident, tangentSpace.shadingN);
@@ -152,8 +156,9 @@ evaluate(const TangentSpace& tangentSpace,
 	if(!params.flags.is_set(MaterialPropertyFlags::REFRACTIVE) && iDotN * eDotN < 0.0f)
 		return math::EvalValue{};
 
-	float iDotG = -dot(incident, tangentSpace.geoN);
-	float eDotG =  dot(excident, tangentSpace.geoN);
+	const scene::Direction& geoN = lightNormal ? *lightNormal : tangentSpace.geoN;
+	float iDotG = -dot(incident, geoN);
+	float eDotG =  dot(excident, geoN);
 	// Shadow masking for the shading normal
 	if(eDotG * eDotN <= 0.0f || iDotG * iDotN <= 0.0f)
 		return math::EvalValue{};
@@ -192,16 +197,13 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return math::EvalValue{};
-	mAssert(!isnan(res.value.x) && !isnan(float(res.pdfF)) && !isnan(float(res.pdfB)));
+	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	// Shading normal caused density correction.
-	if(merge) {
-		if(adjoint)
-			res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN))
-					   / (SHADING_NORMAL_EPS + ei::abs(iDotG));
-		else
-			res.value *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
-					   / (SHADING_NORMAL_EPS + ei::abs(eDotG));
+	if(lightNormal != nullptr) {
+		mAssertMsg(!adjoint, "Merges should be evaluated at the view path vertex.");
+		res.value *= (SHADING_NORMAL_EPS + ei::abs(eDotN))
+				   / (SHADING_NORMAL_EPS + ei::abs(eDotG));
 	} else if(adjoint) {
 		res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
@@ -210,8 +212,8 @@ evaluate(const TangentSpace& tangentSpace,
 	return math::EvalValue{
 		res.value, ei::abs(eDotN),
 		// Swap back output values if we swapped the directions before
-		adjoint ? res.pdfB : res.pdfF,
-		adjoint ? res.pdfF : res.pdfB
+		adjoint ? res.pdf.back : res.pdf.forw,
+		adjoint ? res.pdf.forw : res.pdf.back
 	};
 }
 

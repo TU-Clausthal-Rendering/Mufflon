@@ -114,14 +114,14 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 	ei::Vec3 position;
 	float x = u0 * area;
 	if(x < projAx) {
-		u0 = rescale_sample(u0, 0.0f, projAx);
-		position = ei::Vec3{ (dir.x < 0.f) ? 1.f : 0.f, u1, u0 };
+		x = rescale_sample(x, 0.0f, projAx);
+		position = ei::Vec3{ (dir.x < 0.f) ? 1.f : 0.f, u1, x };
 	} else if(x < projAx + projAy) {
-		u0 = rescale_sample(u0, projAx, projAx + projAy);
-		position = ei::Vec3{ u1, (dir.y < 0.f) ? 1.f : 0.f, u0 };
+		x = rescale_sample(x, projAx, projAx + projAy);
+		position = ei::Vec3{ u1, (dir.y < 0.f) ? 1.f : 0.f, x };
 	} else {
-		u0 = rescale_sample(u0, projAx + projAy, 1.0f);
-		position = ei::Vec3{ u1, u0, (dir.z < 0.f) ? 1.f : 0.f };
+		x = rescale_sample(x, projAx + projAy, area);
+		position = ei::Vec3{ u1, x, (dir.z < 0.f) ? 1.f : 0.f };
 	}
 	return PositionSample{ bounds.min + position * sides, AreaPdf{ 1.f / area } };
 }

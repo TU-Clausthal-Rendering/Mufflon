@@ -53,6 +53,7 @@ public:
 protected:
 	bool m_reset = true;
 	mufflon::scene::SceneHandle m_currentScene = nullptr;
+	int m_currentIteration = 0;
 };
 
 }} // namespace mufflon::renderer
