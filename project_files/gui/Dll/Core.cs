@@ -378,7 +378,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_renderer(UInt32 index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_iterate(out ProcessTime time);
+        internal static extern bool render_iterate(out ProcessTime iterateTime, out ProcessTime preTime, out ProcessTime postTime);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_reset();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
