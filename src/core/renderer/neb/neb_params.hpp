@@ -18,14 +18,22 @@ struct PTargetFlux {
 	}
 };
 
+struct PSecondaryNEEs {
+	bool secondaryNEEs { true };
+	static ParamDesc get_desc() noexcept {
+		return {"Secondary NEEs", ParameterTypes::BOOL};
+	}
+};
+
 using NebParameters = ParameterHandler<
 	PMinPathLength,
 	PMaxPathLength,
-	PNeeCount,
+//	PNeeCount,
 	PNeePositionGuide,
 	PMergeRadius,
 	PNeeMergeRadius,
-	PTargetFlux
+	PTargetFlux,
+	PSecondaryNEEs
 >;
 
 }} // namespace mufflon::renderer

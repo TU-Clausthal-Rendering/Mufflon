@@ -234,42 +234,51 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 								vertex.get_position(), m_sceneDesc.aabb, neeRnd,
 								guideFunction);
 			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
-			float tracingDist = (nee.dist >= scene::MAX_SCENE_SIZE) ? len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min) : nee.dist;
-			scene::Point neePos = vertex.get_position() + nee.direction * tracingDist;
-			auto hit = scene::accel_struct::first_intersection(m_sceneDesc,
-													{ neePos, -nee.direction },
-													{}, tracingDist);
-			if(hit.hitT < tracingDist * 0.999f) {
-				// Hit a different surface than the current one.
-				// Additionally storing this vertex further reduces variance for direct lighted
-				// surfaces and allows the light-bulb scenario when using the backtracking.
-				scene::Point hitPos = neePos - nee.direction * hit.hitT;
-				const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(m_sceneDesc, hit);
-				NebPathVertex virtualLight;
-				NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
-					m_sceneDesc.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
-					hit.hitT, AngularPdf{1.0f}, math::Throughput{});
-				// An additional NEE is necessary, such that this new vertex is an unbiased
-				// estimate again.
-				neeSeed = m_rngs[pixelIdx].next();
-				neeRnd = m_rngs[pixelIdx].next();
-				auto neeSec = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-									  hitPos, m_sceneDesc.aabb, neeRnd,
-									  guideFunction);
+			if(m_params.secondaryNEEs) {
+				float tracingDist = (nee.dist >= scene::MAX_SCENE_SIZE) ? len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min) : nee.dist;
+				scene::Point neePos = vertex.get_position() + nee.direction * tracingDist;
+				auto hit = scene::accel_struct::first_intersection(m_sceneDesc,
+														{ neePos, -nee.direction },
+														{}, tracingDist);
+				if(hit.hitT < tracingDist * 0.999f) {
+					// Hit a different surface than the current one.
+					// Additionally storing this vertex further reduces variance for direct lighted
+					// surfaces and allows the light-bulb scenario when using the backtracking.
+					scene::Point hitPos = neePos - nee.direction * hit.hitT;
+					const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(m_sceneDesc, hit);
+					NebPathVertex virtualLight;
+					NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
+						m_sceneDesc.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
+						hit.hitT, AngularPdf{1.0f}, math::Throughput{});
+					// An additional NEE is necessary, such that this new vertex is an unbiased
+					// estimate again.
+					neeSeed = m_rngs[pixelIdx].next();
+					neeRnd = m_rngs[pixelIdx].next();
+					auto neeSec = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
+										  hitPos, m_sceneDesc.aabb, neeRnd,
+										  guideFunction);
+					bool anyhit = scene::accel_struct::any_intersection(
+										m_sceneDesc, { hitPos, neeSec.direction },
+										hit.hitId, neeSec.dist);
+					if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
+					if(nee.cosOut != 0) neeSec.diffIrradiance *= neeSec.cosOut;
+					virtualLight.ext().pathLen = -32000;	// Mark this as non contributing (not connected to a pixel)
+					virtualLight.ext().previous = nullptr;
+					virtualLight.ext().neeIrradiance = neeSec.diffIrradiance;
+					virtualLight.ext().neeDirection = neeSec.direction;
+					virtualLight.ext().neeConversion = neeSec.cosOut / (neeSec.distSq * float(neeSec.creationPdf));
+					m_viewVertexMap.insert(hitPos, virtualLight);
+					m_density.increment(hitPos);
+					// Make sure the vertex for which we did the NEE knows it is shadowed.
+					nee.diffIrradiance = Spectrum{0.0f};
+				}
+			} else {
 				bool anyhit = scene::accel_struct::any_intersection(
-									m_sceneDesc, { hitPos, neeSec.direction },
-									hit.hitId, neeSec.dist);
-				if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
-				if(nee.cosOut != 0) neeSec.diffIrradiance *= neeSec.cosOut;
-				virtualLight.ext().pathLen = -32000;	// Mark this as non contributing (not connected to a pixel)
-				virtualLight.ext().previous = nullptr;
-				virtualLight.ext().neeIrradiance = neeSec.diffIrradiance;
-				virtualLight.ext().neeDirection = neeSec.direction;
-				virtualLight.ext().neeConversion = neeSec.cosOut / (neeSec.distSq * float(neeSec.creationPdf));
-				m_viewVertexMap.insert(hitPos, virtualLight);
-				m_density.increment(hitPos);//*/
+									m_sceneDesc, { vertex.get_position(), nee.direction },
+									vertex.get_primitive_id(), nee.dist);
 				// Make sure the vertex for which we did the NEE knows it is shadowed.
-				nee.diffIrradiance = Spectrum{0.0f};
+				if(anyhit)
+					nee.diffIrradiance = Spectrum{0.0f};
 			}
 			vertex.ext().neeIrradiance = nee.diffIrradiance;
 			vertex.ext().neeDirection = nee.direction;
