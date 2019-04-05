@@ -26,7 +26,6 @@ public:
 	StringView get_short_name() const noexcept final { return "ImpD"; }
 
 	void pre_descriptor_requery() final;
-	bool pre_iteration(OutputHandler& outputBuffer) final;
 	void post_iteration(OutputHandler& outputBuffer) final;
 	void on_scene_load() final;
 	void on_scene_unload() final;

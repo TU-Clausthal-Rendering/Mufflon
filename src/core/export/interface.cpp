@@ -2661,7 +2661,7 @@ Boolean render_enable_renderer(uint32_t index) {
 	CATCH_ALL(false)
 }
 
-Boolean render_iterate(ProcessTime* time) {
+Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTime* postTime) {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
@@ -2679,17 +2679,33 @@ Boolean render_iterate(ProcessTime* time) {
 	// Check if the scene needed a reload -> reset
 	if(s_world.reload_scene())
 		s_currentRenderer->reset();
+	if(preTime != nullptr) {
+		preTime->cycles = CpuProfileState::get_cpu_cycle();
+		preTime->microseconds = CpuProfileState::get_process_time().count();
+	}
 	s_currentRenderer->pre_iteration(*s_imageOutput);
-	if(time != nullptr) {
-		time->cycles = CpuProfileState::get_cpu_cycle();
-		time->microseconds = CpuProfileState::get_process_time().count();
+	if(preTime != nullptr) {
+		preTime->cycles = CpuProfileState::get_cpu_cycle() - preTime->cycles;
+		preTime->microseconds = CpuProfileState::get_process_time().count() - preTime->microseconds;
+	}
+	if(iterateTime != nullptr) {
+		iterateTime->cycles = CpuProfileState::get_cpu_cycle();
+		iterateTime->microseconds = CpuProfileState::get_process_time().count();
 	}
 	s_currentRenderer->iterate();
-	if(time != nullptr) {
-		time->cycles = CpuProfileState::get_cpu_cycle() - time->cycles;
-		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
+	if(iterateTime != nullptr) {
+		iterateTime->cycles = CpuProfileState::get_cpu_cycle() - iterateTime->cycles;
+		iterateTime->microseconds = CpuProfileState::get_process_time().count() - iterateTime->microseconds;
+	}
+	if(postTime != nullptr) {
+		postTime->cycles = CpuProfileState::get_cpu_cycle();
+		postTime->microseconds = CpuProfileState::get_process_time().count();
 	}
 	s_currentRenderer->post_iteration(*s_imageOutput);
+	if(postTime != nullptr) {
+		postTime->cycles = CpuProfileState::get_cpu_cycle() - postTime->cycles;
+		postTime->microseconds = CpuProfileState::get_process_time().count() - postTime->microseconds;
+	}
 	return true;
 	CATCH_ALL(false)
 }

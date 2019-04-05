@@ -140,10 +140,6 @@ void CpuShadowSilhouettes::on_scene_unload() {
 	m_currentDecimationIteration = 0u;
 }
 
-bool CpuShadowSilhouettes::pre_iteration(OutputHandler& outputBuffer) {	
-	return RendererBase<Device::CPU>::pre_iteration(outputBuffer);
-}
-
 void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 		// Finalize the decimation process
