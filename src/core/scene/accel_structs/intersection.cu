@@ -526,7 +526,7 @@ RayIntersectionResult first_intersection(
 	const float tmax
 ) {
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
-	const float tmin = SCENE_SCALE_EPS * len(scene.aabb.max - scene.aabb.min);
+	const float tmin = SCENE_SCALE_EPS * scene.diagSize;
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	SurfaceParametrization surfParams;
@@ -806,7 +806,7 @@ bool any_intersection(
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
-	const float tmin = SCENE_SCALE_EPS * len(scene.aabb.max - scene.aabb.min);
+	const float tmin = SCENE_SCALE_EPS * scene.diagSize;
 	const float tmax = maxDist - tmin*2; // Do not intersect the target surface
 
 	if(scene.numInstances == 1) {

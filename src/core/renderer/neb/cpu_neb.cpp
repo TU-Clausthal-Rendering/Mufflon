@@ -235,7 +235,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 								guideFunction);
 			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
 			if(m_params.secondaryNEEs) {
-				float tracingDist = (nee.dist >= scene::MAX_SCENE_SIZE) ? len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min) : nee.dist;
+				float tracingDist = (nee.dist >= scene::MAX_SCENE_SIZE) ? m_sceneDesc.diagSize : nee.dist;
 				scene::Point neePos = vertex.get_position() + nee.direction * tracingDist;
 				auto hit = scene::accel_struct::first_intersection(m_sceneDesc,
 														{ neePos, -nee.direction },
@@ -461,13 +461,12 @@ CpuNextEventBacktracking::CpuNextEventBacktracking() {
 void CpuNextEventBacktracking::iterate() {
 	auto scope = Profiler::instance().start<CpuProfileState>("CPU NEB iteration", ProfileLevel::HIGH);
 
-	float sceneSize = len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min);
-	float photonMergeRadiusSq = ei::sq(m_params.mergeRadius * sceneSize);
+	float photonMergeRadiusSq = ei::sq(m_params.mergeRadius * m_sceneDesc.diagSize);
 	float photonMergeArea = photonMergeRadiusSq * ei::PI;
-	float neeMergeRadiusSq = ei::sq(m_params.neeMergeRadius * sceneSize);
+	float neeMergeRadiusSq = ei::sq(m_params.neeMergeRadius * m_sceneDesc.diagSize);
 	float neeMergeArea = neeMergeRadiusSq * ei::PI;
-	m_viewVertexMap.clear(m_params.neeMergeRadius * sceneSize * 2.0001f);
-	m_photonMap.clear(m_params.mergeRadius * sceneSize * 2.0001f);
+	m_viewVertexMap.clear(m_params.neeMergeRadius * m_sceneDesc.diagSize * 2.0001f);
+	m_photonMap.clear(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
 	m_selfEmissionCount.store(0);
 	m_density.set_iteration(m_currentIteration + 1);
 

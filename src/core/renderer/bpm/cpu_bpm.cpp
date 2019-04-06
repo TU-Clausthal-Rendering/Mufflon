@@ -96,8 +96,7 @@ CpuBidirPhotonMapper::CpuBidirPhotonMapper() {
 void CpuBidirPhotonMapper::iterate() {
 	auto scope = Profiler::instance().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
 
-	float sceneSize = len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min);
-	float currentMergeRadius = m_params.mergeRadius * sceneSize;
+	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)
 		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
 	m_photonMap.clear(currentMergeRadius * 2.0001f);

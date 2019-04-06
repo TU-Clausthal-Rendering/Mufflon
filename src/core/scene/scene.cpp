@@ -196,6 +196,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 		sceneDescriptor.numLods = static_cast<u32>(lodDescs.size());
 		sceneDescriptor.numInstances = static_cast<i32>(instanceCount);
+		sceneDescriptor.diagSize = len(m_boundingBox.max - m_boundingBox.min);
 		sceneDescriptor.aabb = m_boundingBox;
 		sceneDescriptor.lods = lodDevDesc.get();
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
