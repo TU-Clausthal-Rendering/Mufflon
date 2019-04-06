@@ -115,6 +115,10 @@ sample(const TangentSpace& tangentSpace,
 	if(eDotG * eDotN <= 0.0f) res.throughput = Spectrum{0.0f};
 	res.excident = globalDir;
 
+	// Make sure the PDFs do not overflow in MIS
+	res.pdf.forw = AngularPdf{ei::min(float(res.pdf.forw), 1e9f)};
+	res.pdf.back = AngularPdf{ei::min(float(res.pdf.back), 1e9f)};
+
 	// Shading normal correction
 	if(adjoint) {
 		res.throughput *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
@@ -208,6 +212,11 @@ evaluate(const TangentSpace& tangentSpace,
 		res.value *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
+
+	// Make sure the PDFs do not overflow in MIS
+	res.pdf.forw = AngularPdf{ei::min(float(res.pdf.forw), 1e9f)};
+	res.pdf.back = AngularPdf{ei::min(float(res.pdf.back), 1e9f)};
+
 
 	return math::EvalValue{
 		res.value, ei::abs(eDotN),

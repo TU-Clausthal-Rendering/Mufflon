@@ -33,7 +33,7 @@ enum class Materials: u16 {
 	//FRESNEL_TORRANCE_LAMBERT,	// FRESNEL [ TORRANCE, LAMBERT ]
 	//TORRANCE_ORENNAYAR,		// BLEND [ TORRANCE, ORENNAYAR ]
 	//FRESNEL_TORRANCE_ORENNAYAR,	// FRESNEL [ TORRANCE, ORENNAYAR ]
-	//WALTER_TORRANCE			// BLEND [ WALTER, TORRANCE ]
+	WALTER_TORRANCE,			// BLEND [ WALTER, TORRANCE ]
 	//FRESNEL_WALTER_TORRANCE	// FRESNEL [ WALETR, TORRANCE ] = Specialization for glass
 
 	NUM				// How many materials are there?
@@ -281,6 +281,7 @@ template<> struct mat_info<Materials::TORRANCE> { using type = MatTorrance; };
 template<> struct mat_info<Materials::WALTER> { using type = MatWalter; };
 template<> struct mat_info<Materials::LAMBERT_EMISSIVE> { using type = MatBlend<MatLambert,MatEmissive>; };
 template<> struct mat_info<Materials::TORRANCE_LAMBERT> { using type = MatBlend<MatTorrance, MatLambert>; };
+template<> struct mat_info<Materials::WALTER_TORRANCE> { using type = MatBlend<MatWalter, MatTorrance>; };
 template<Materials M>
 using mat_type = typename mat_info<M>::type;
 
@@ -362,12 +363,16 @@ constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
 			using MatType = mat_type<Materials::WALTER>;	\
 			expr;											\
 		}													\
-		case Materials::LAMBERT_EMISSIVE: {							\
+		case Materials::LAMBERT_EMISSIVE: {					\
 			using MatType = mat_type<Materials::LAMBERT_EMISSIVE>;	\
 			expr;											\
 		}													\
-		case Materials::TORRANCE_LAMBERT: {							\
+		case Materials::TORRANCE_LAMBERT: {					\
 			using MatType = mat_type<Materials::TORRANCE_LAMBERT>;	\
+			expr;											\
+		}													\
+		case Materials::WALTER_TORRANCE: {					\
+			using MatType = mat_type<Materials::WALTER_TORRANCE>;	\
 			expr;											\
 		}													\
 		default:											\

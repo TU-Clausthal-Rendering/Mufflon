@@ -232,6 +232,8 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		if(viewPathLen >= m_params.minPathLength) {
 			math::SampleValue emission = vertex[currentV].get_emission();
 			if(emission.value != 0.0f) {
+				//if(sample.type == math::PathEventType::REFRACTED)
+				//	__debugbreak();
 				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
 											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
 											scene::lights::guide_flux);

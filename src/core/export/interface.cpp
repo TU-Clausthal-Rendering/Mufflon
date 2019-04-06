@@ -1309,6 +1309,11 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
 					to_ctor_args(layerA->inner.torrance),
 					to_ctor_args(layerB->inner.lambert));
+			} else if(layerA->innerType == MATERIAL_WALTER && layerB->innerType == MATERIAL_TORRANCE) {
+				newMaterial = std::make_unique<Material<Materials::WALTER_TORRANCE>>(
+					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
+					to_ctor_args(layerA->inner.walter),
+					to_ctor_args(layerB->inner.torrance));
 			} else {
 				logWarning("[", FUNCTION_NAME, "] Unsupported 'blend' material. The combination of layers is not supported.");
 				return nullptr;
