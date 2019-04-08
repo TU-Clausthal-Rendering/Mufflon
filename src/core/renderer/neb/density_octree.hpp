@@ -61,7 +61,6 @@ namespace mufflon::renderer {
 			ei::Vec3 sceneSize = (sceneBounds.max - sceneBounds.min) * 1.002f;
 			m_sceneSizeInv = 1.0f / sceneSize;
 			m_minBound = sceneBounds.min - sceneSize * (0.001f / 1.002f);
-			m_sceneAreas = ei::Vec3(sceneSize.y * sceneSize.z, sceneSize.x * sceneSize.z, sceneSize.x * sceneSize.y);
 			m_capacity = LVL0_N * LVL0_N * LVL0_N + ((capacity + 7) & (~7));
 			m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
 			// Root nodes have a count of 0
@@ -80,7 +79,7 @@ namespace mufflon::renderer {
 			ei::IVec3 rootPos { normPos * LVL0_N };
 			int idx = rootPos.x + LVL0_N * (rootPos.y + LVL0_N * rootPos.z);
 			int countOrChild = increment_if_positive(idx);
-			split_node_if_necessary(idx, countOrChild);
+			countOrChild = split_node_if_necessary(idx, countOrChild);
 			int edgeL = LVL0_N;
 			while(countOrChild < 0) {
 				edgeL *= 2;
@@ -89,7 +88,7 @@ namespace mufflon::renderer {
 				idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
 				idx -= countOrChild;	// 'Add' global offset (which is stored negative)
 				countOrChild = increment_if_positive(idx);
-				split_node_if_necessary(idx, countOrChild);
+				countOrChild = split_node_if_necessary(idx, countOrChild);
 			}
 		}
 
@@ -131,7 +130,6 @@ namespace mufflon::renderer {
 		int m_splitCountDensity;	// The number when a node is split must be a multiple of 8 and must grow proportional to #iterations
 		ei::Vec3 m_minBound;
 		ei::Vec3 m_sceneSizeInv;
-		ei::Vec3 m_sceneAreas;		// Area of the bounding box in YZ, XZ and XY direction
 		// Nodes consist of 8 atomic counters OR child indices. Each number is either a
 		// counter (positive) or a negated child index.
 		std::unique_ptr<std::atomic_int32_t[]> m_nodes;
@@ -175,7 +173,7 @@ namespace mufflon::renderer {
 					return child;
 				}
 			}
-			return 0;
+			return count;
 		}
 	};
 

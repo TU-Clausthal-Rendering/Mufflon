@@ -222,8 +222,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 					__half* layerData = reinterpret_cast<__half*>(&texData->data[(face + layer * tex.faces()) * layerSize]);
 					for(std::size_t y = 0u; y < texData->height; ++y) {
 						for(std::size_t x = 0u; x < texData->width; ++x) {
-							eitypes::uint32 rgb9e5;
-							std::memcpy(&rgb9e5, &data[4u * (y * texData->width + x)], 4u);
+							eitypes::uint32 rgb9e5 = data[4u * (y * texData->width + x)];
 							ei::Vec3 rgb = ei::unpackRGB9E5(rgb9e5);
 							// We need to flip the texture on load
 							const std::size_t pixel = channels * ((texData->height - y - 1u) * texData->width + x);
