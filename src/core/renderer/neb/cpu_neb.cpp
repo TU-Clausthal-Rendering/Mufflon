@@ -490,7 +490,7 @@ void CpuNextEventBacktracking::iterate() {
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
 		//estimate_density(photonMergeRadiusSq, vertex);
-		vertex.ext().density = m_density.getDensity(vertex.get_position(), vertex.get_geometric_normal());
+		vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
 		sample_photon_path(neeMergeArea, photonMergeArea, m_rngs[rngIndex], vertex);

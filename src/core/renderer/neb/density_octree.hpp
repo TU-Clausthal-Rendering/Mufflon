@@ -93,7 +93,7 @@ namespace mufflon::renderer {
 			}
 		}
 
-		float getDensity(const ei::Vec3& pos, const ei::Vec3& normal) {
+		float get_density(const ei::Vec3& pos, const ei::Vec3& normal) {
 			ei::Vec3 offPos = pos - m_minBound;
 			ei::Vec3 normPos = offPos * m_sceneSizeInv;
 			// The first level is a uniform grid of size LVL0_N³
@@ -110,7 +110,7 @@ namespace mufflon::renderer {
 				countOrChild = m_nodes[idx].load();
 			}
 			if(countOrChild > 0) {
-				float countPerIteration = m_densityScale * countOrChild;
+				//float countPerIteration = m_densityScale * countOrChild;
 				// Get the world space cell boundaries
 				ei::IVec3 intPos { normPos * edgeL };
 				ei::Vec3 cellMin = intPos / (edgeL * m_sceneSizeInv);
