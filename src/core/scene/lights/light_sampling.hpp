@@ -220,15 +220,15 @@ sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 	if(layers == 6u) {
 		// Cubemap: adjust the layer and texel
 		const Pixel texSize = textures::get_texture_size(light.envmap);
-		int layer = sample.texel.x / texSize.x;
+		layer = sample.texel.x / texSize.x;
 		sample.texel.x -= layer * texSize.x;
 		// Bring the UV into the interval as well
-		sample.uv.x -= static_cast<float>(layer);
-		// Turn the texel coordinates into UVs and remap from [0, 1] to [-1, 1]
+		sample.uv.x = sample.uv.x * 6.0f - static_cast<float>(layer);
 		dir.direction = textures::cubemap_uv_to_surface(sample.uv, layer);
 		const float lsq = ei::lensq(dir.direction);
 		const float l = ei::sqrt(lsq);
 		dir.direction *= 1.f / l;
+		dir.direction.z = -dir.direction.z;
 		// See Johannes' renderer
 		dir.pdf = AngularPdf(sample.pdf * lsq * l / 24.f);
 	} else {
