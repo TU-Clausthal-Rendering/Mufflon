@@ -74,6 +74,9 @@ class DllInterface:
 
     def render_enable_render_target(self, targetIndex, variance):
         return self.dllHolder.core.render_enable_render_target(c_uint32(targetIndex), c_bool(variance))
+		
+    def render_disable_render_target(self, targetIndex, variance):
+        return self.dllHolder.core.render_disable_render_target(c_uint32(targetIndex), c_bool(variance))
 
     def render_enable_renderer(self, rendererIndex):
         return self.dllHolder.core.render_enable_renderer(c_uint32(rendererIndex))
@@ -133,6 +136,9 @@ class RenderActions:
 
     def enable_render_target(self, targetIndex, variance):
         self.dllInterface.render_enable_render_target(targetIndex, variance)
+		
+    def disable_render_target(self, targetIndex, variance):
+        self.dllInterface.render_disable_render_target(targetIndex, variance)
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
