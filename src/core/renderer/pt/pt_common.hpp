@@ -93,9 +93,11 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				// Missed scene - sample background
 				auto background = evaluate_background(scene.lightTree.background, sample.excident);
 				if(any(greater(background.value, 0.0f))) {
-					AreaPdf startPdf = background_pdf(scene.lightTree, background);
-					float mis = 1.0f / (1.0f + params.neeCount * float(startPdf) / float(sample.pdf.forw));
-					background.value *= mis;
+					if(pathLen > 0) {
+						AreaPdf startPdf = background_pdf(scene.lightTree, background);
+						float mis = 1.0f / (1.0f + params.neeCount * float(startPdf) / float(sample.pdf.forw));
+						background.value *= mis;
+					}
 					outputBuffer.contribute(coord, throughput, background.value,
 											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
 											ei::Vec3{ 0, 0, 0 });
