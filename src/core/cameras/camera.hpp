@@ -104,7 +104,7 @@ public:
 	}
 	// Rotate around the up direction (y-axis).
 	void rotate_left_right(Radians a) noexcept {
-		m_viewSpace = ei::rotationY(a) * m_viewSpace;
+		m_viewSpace = m_viewSpace * ei::rotationY(a);
 	}
 	// Rotate around the view direction (z-axis).
 	void roll(Radians a) noexcept {
