@@ -4,6 +4,13 @@
 
 namespace mufflon {namespace renderer {
 
-using WireframeParameters = ParameterHandler<PWireframeThickness, PWireframeNormalize>;
+struct PWireframeLinewidth {
+	int lineWidth = 1;
+	static ParamDesc get_desc() noexcept {
+		return { "Line width", ParameterTypes::INT };
+	}
+};
+
+using WireframeParameters = ParameterHandler<PWireframeLinewidth>;
 
 }} // namespace mufflon::renderer
