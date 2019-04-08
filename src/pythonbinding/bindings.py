@@ -2,6 +2,12 @@ from ctypes import *
 from time import *
 import ntpath
 
+class ProcessTime(Structure):
+    _fields_ = [
+        ("cycles", c_ulonglong),
+        ("microseconds", c_ulonglong)
+    ]
+
 class DllHolder:
     def __init__(self):
         self.core = cdll.LoadLibrary("core.dll")
@@ -16,11 +22,12 @@ class DllInterface:
         self.disable_profiling()
         self.dllHolder.core.render_get_renderer_name.restype = c_char_p
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
+        self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.world_get_current_scenario.restype = POINTER(c_int)
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
-		
+        
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
 
@@ -41,7 +48,11 @@ class DllInterface:
         return self.dllHolder.core.renderer_set_parameter_int(c_char_p(parameterName.encode('utf-8')), c_int32(value))
 
     def render_iterate(self):
-        return self.dllHolder.core.render_iterate()
+        iterateTime = ProcessTime(0,0)
+        preTime = ProcessTime(0,0)
+        postTime = ProcessTime(0,0)
+        self.dllHolder.core.render_iterate(byref(iterateTime), byref(preTime), byref(postTime))
+        return iterateTime, preTime, postTime
 
     def render_reset(self):
         return self.dllHolder.core.render_reset()
@@ -111,7 +122,7 @@ class RenderActions:
                 self.dllInterface.render_enable_renderer(i)
                 return True
         return False
-		
+        
     def load_scenario(self, scenarioName):
         hdl = self.dllInterface.world_find_scenario(scenarioName)
         if not hdl:
@@ -123,12 +134,18 @@ class RenderActions:
     def enable_render_target(self, targetIndex, variance):
         self.dllInterface.render_enable_render_target(targetIndex, variance)
 
-    def take_screenshot(self, iterationNr):
+    def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
         filename = filename.replace("#scene", self.sceneName, 1)
         filename = filename.replace("#scenario", self.dllInterface.render_get_active_scenario_name(), 1)
         filename = filename.replace("#renderer", self.activeRendererName, 1)
         filename = filename.replace("#iteration", str(iterationNr), 1)
+        filename = filename.replace("#iterateTime", str(iterateTime.microseconds / 1000) + "ms", 1)
+        filename = filename.replace("#preTime", str(iterateTime.microseconds / 1000) + "ms", 1)
+        filename = filename.replace("#postTime", str(iterateTime.microseconds / 1000) + "ms", 1)
+        filename = filename.replace("#iterateCycles", str(iterateTime.cycles / 1000000) + "MCycles", 1)
+        filename = filename.replace("#preCycles", str(preTime.cycles / 1000000) + "MCycles", 1)
+        filename = filename.replace("#postCycles", str(postTime.cycles / 1000000) + "MCycles", 1)
 
         for targetIndex in range(self.dllInterface.render_get_render_target_count()):
             if self.dllInterface.render_is_render_target_enabled(targetIndex, False):
@@ -139,8 +156,17 @@ class RenderActions:
                 self.dllInterface.render_save_screenshot(fName, targetIndex, True)
 
     def render_for_iterations(self, iterationCount):
+        accumIterateTime = ProcessTime(0,0)
+        accumPreTime = ProcessTime(0,0)
+        accumPostTime = ProcessTime(0,0)
         for i in range(iterationCount):
-            self.dllInterface.render_iterate()
+            [iterateTime, preTime, postTime] = self.dllInterface.render_iterate()
+            accumIterateTime.microseconds += iterateTime.microseconds
+            accumIterateTime.cycles += iterateTime.cycles
+            accumPreTime.microseconds += preTime.microseconds
+            accumPreTime.cycles += preTime.cycles
+            accumPostTime.microseconds += postTime.microseconds
+            accumPostTime.cycles += postTime.cycles
         self.take_screenshot(self.dllInterface.render_get_current_iteration())
 
     def render_for_seconds(self, secondsToRender):
