@@ -4,20 +4,13 @@
 
 namespace mufflon {namespace renderer {
 
-struct PWireframeThickness {
-	float thickness{ 0.025f };
+struct PWireframeLinewidth {
+	int lineWidth = 1;
 	static ParamDesc get_desc() noexcept {
-		return { "Border thickness", ParameterTypes::FLOAT };
+		return { "Line width", ParameterTypes::INT };
 	}
 };
 
-struct PWireframeNormalize {
-	bool normalize = false;
-	static ParamDesc get_desc() noexcept {
-		return { "Normalize thickness", ParameterTypes::BOOL };
-	}
-};
-
-using WireframeParameters = ParameterHandler<PWireframeThickness, PWireframeNormalize>;
+using WireframeParameters = ParameterHandler<PWireframeLinewidth>;
 
 }} // namespace mufflon::renderer
