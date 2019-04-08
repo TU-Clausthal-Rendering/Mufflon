@@ -173,7 +173,7 @@ class RenderActions:
             accumPreTime.cycles += preTime.cycles
             accumPostTime.microseconds += postTime.microseconds
             accumPostTime.cycles += postTime.cycles
-        self.take_screenshot(self.dllInterface.render_get_current_iteration())
+        self.take_screenshot(self.dllInterface.render_get_current_iteration(), accumIterateTime, accumPreTime, accumPostTime)
 
     def render_for_seconds(self, secondsToRender):
         startTime = process_time()
