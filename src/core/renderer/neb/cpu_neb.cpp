@@ -29,7 +29,6 @@ struct NebVertexExt {
 		float rnd;		// An additional random value (first vertex of light paths only).
 	};
 	scene::Direction neeDirection;
-	i16 pathLen;
 	float density { -1.0f };
 	float prevRelativeProbabilitySum { 0.0f };
 	float incidentDist;
@@ -68,7 +67,7 @@ public:
 		VertexSample s = PathVertex<NebVertexExt>::sample(media, rndSet, adjoint);
 		// Conditionally kill the photon path tracing if we are on the
 		// NEE vertex. Goal: trace only photons which we cannot NEE.
-		if(adjoint && ext().pathLen == 1) {
+		if(adjoint && get_path_len() == 1) {
 			float keepChance = get_photon_path_chance(s.pdf.forw);
 			if(keepChance < ext().rnd) {
 				s.type = math::PathEventType::INVALID;
@@ -126,10 +125,10 @@ CpuNextEventBacktracking::evaluate_self_radiance(const NebPathVertex& vertex,
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
 
-	if(vertex.ext().pathLen >= m_params.minPathLength) {
+	if(vertex.get_path_len() >= m_params.minPathLength) {
 		auto emission = vertex.get_emission();
 		if(includeThroughput) emission.value *= vertex.ext().throughput;
-		if(emission.value != 0.0f && vertex.ext().pathLen > 1) {
+		if(emission.value != 0.0f && vertex.get_path_len() > 1) {
 			AreaPdf startPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
 			                               vertex.get_surface_params(),
 			                               vertex.previous()->get_position(), guideFunction);
@@ -206,7 +205,6 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 		++pathLen;
 
 		vertex.ext().pixelIndex = pixelIdx;
-		vertex.ext().pathLen = pathLen;
 		if(pathLen == m_params.maxPathLength) {
 			// Using NEE on random hit vertices has low contribution in general.
 			// Therefore, we store the preevaluated emission only.
@@ -247,6 +245,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 					NebPathVertex::create_surface(&virtualLight, nullptr, hit,
 						m_sceneDesc.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
 						hit.hitT, AngularPdf{1.0f}, math::Throughput{});
+					virtualLight.set_path_len(1);
 					// An additional NEE is necessary, such that this new vertex is an unbiased
 					// estimate again.
 					neeSeed = m_rngs[pixelIdx].next();
@@ -259,7 +258,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 										hit.hitId, neeSec.dist);
 					if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
 					if(nee.cosOut != 0) neeSec.diffIrradiance *= neeSec.cosOut;
-					virtualLight.ext().pathLen = -32000;	// Mark this as non contributing (not connected to a pixel)
+					virtualLight.ext().pixelIndex = -1;	// Mark this as non contributing (not connected to a pixel)
 					virtualLight.ext().neeIrradiance = neeSec.diffIrradiance;
 					virtualLight.ext().neeDirection = neeSec.direction;
 					virtualLight.ext().neeConversion = neeSec.cosOut / (neeSec.distSq * float(neeSec.creationPdf));
@@ -324,7 +323,6 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 			math::RndSet2_1 rnd { rng.next(), rng.next() };
 			float rndRoulette = math::sample_uniform(u32(rng.next()));
 			VertexSample sample;
-			virtualLight.ext().pathLen = lightPathLength;
 			if(!walk(m_sceneDesc, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample))
 				break;
 			++lightPathLength;
@@ -365,7 +363,7 @@ Spectrum CpuNextEventBacktracking::merge_photons(float mergeRadiusSq, const NebP
 	auto photonIt = m_photonMap.find_first(currentPos);
 	while(photonIt) {
 		auto& photon = *photonIt;
-		int pathLen = photon.pathLen + vertex.ext().pathLen;
+		int pathLen = photon.pathLen + vertex.get_path_len();
 		if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 			&& lensq(photon.position - currentPos) < mergeRadiusSq) {
 			Pixel tmpCoord;
@@ -401,7 +399,7 @@ Spectrum CpuNextEventBacktracking::evaluate_nee(const NebPathVertex& vertex,
 
 Spectrum CpuNextEventBacktracking::merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex) {
 	scene::Point currentPos = vertex.get_position();
-	int neePathLen = vertex.ext().pathLen + 1;
+	int neePathLen = vertex.get_path_len() + 1;
 	float photonReuseCount = photonMergeArea * vertex.ext().density;
 	// If path length is already too large there will be no contribution from this vertex.
 	// It only exists for the sake of random hit evaluation (and as additional sample).
@@ -499,7 +497,7 @@ void CpuNextEventBacktracking::iterate() {
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
 		// Secondary source vertices to not contribute (not connected to a pixel)
-		if(vertex.ext().pathLen < 0) continue;
+		if(vertex.ext().pixelIndex < 0) continue;
 		scene::Point currentPos = vertex.get_position();
 		Spectrum radiance { 0.0f };
 

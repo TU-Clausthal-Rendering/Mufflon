@@ -191,6 +191,11 @@ public:
 		return { samplePdf.to_area_pdf(geoFactor, connection.distanceSq), geoFactor };
 	}
 
+	// Get the path length in segments up to this vertex.
+	int get_path_len() const { return m_pathLen; }
+	// Overwrite path length (e.g. if the previous element is not set/changed for this vertex)
+	void set_path_len(int l) { m_pathLen = l; }
+
 	// Get the sampling PDFs of this vertex (not defined, if
 	// the vertex is an end point on a surface). Details at the members
 	//AngularPdf get_forward_pdf() const { return m_pdfF; }
@@ -442,6 +447,7 @@ public:
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = incidentRay.origin + incidentRay.direction * scene::MAX_SCENE_SIZE;
 		vert->m_previous = static_cast<const PathVertex*>(previous);
+		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incidentRay.direction;
 		vert->m_extension = ExtensionT{};
@@ -456,6 +462,7 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_previous = static_cast<const PathVertex*>(previous);
+		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
 		vert->m_incident = ei::Vec3{
 			static_cast<float>(pixel.x),
 			static_cast<float>(pixel.y),
@@ -488,6 +495,7 @@ public:
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = lightSample.pos.position;
 		vert->m_previous = static_cast<const PathVertex*>(previous);
+		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
 		vert->m_extension = ExtensionT{};
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
@@ -555,6 +563,7 @@ public:
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
 		vert->m_previous = static_cast<const PathVertex*>(previous);
+		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::SURFACE;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
@@ -578,6 +587,7 @@ public:
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = scene::Point{0.0f};
 		vert->m_previous = static_cast<const PathVertex*>(previous);
+		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
@@ -619,7 +629,7 @@ private:
 
 	// Interaction type of this vertex (the descriptor at the end of the vertex depends on this).
 	Interaction m_type;
-	i16 m_UNUSED;
+	i16 m_pathLen;
 
 	// Direction from which this vertex was reached.
 	// For end points the following values are stored:
