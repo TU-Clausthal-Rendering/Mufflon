@@ -178,7 +178,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	VertexSample sample;
 
 	int lightPathLen = 0;
-	do {
+	if(m_params.maxPathLength > 1) do {
 		// Walk
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
@@ -234,8 +234,6 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		if(viewPathLen >= m_params.minPathLength) {
 			math::SampleValue emission = vertex[currentV].get_emission();
 			if(emission.value != 0.0f) {
-				//if(sample.type == math::PathEventType::REFRACTED)
-				//	__debugbreak();
 				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
 											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
 											scene::lights::guide_flux);
