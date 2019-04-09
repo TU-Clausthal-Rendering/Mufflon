@@ -14,7 +14,7 @@ namespace mufflon::renderer {
 namespace {
 float get_photon_path_chance(const AngularPdf pdf) {
 	//return 1.0f;
-	return float(pdf) / (1.0f + float(pdf));
+	return float(pdf) / (10.0f + float(pdf));
 }
 } // namespace ::
 
@@ -491,6 +491,7 @@ void CpuNextEventBacktracking::iterate() {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
 		//estimate_density(photonMergeRadiusSq, vertex);
 		vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
+		mAssert(vertex.ext().density < 1e38f);
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
 		sample_photon_path(neeMergeArea, photonMergeArea, m_rngs[rngIndex], vertex);

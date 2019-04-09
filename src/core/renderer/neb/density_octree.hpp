@@ -60,6 +60,7 @@ namespace mufflon::renderer {
 			// Slightly enlarge the volume to avoid numerical issues on the boundary
 			ei::Vec3 sceneSize = (sceneBounds.max - sceneBounds.min) * 1.002f;
 			m_sceneSizeInv = 1.0f / sceneSize;
+			m_sceneScale = len(sceneSize);
 			m_minBound = sceneBounds.min - sceneSize * (0.001f / 1.002f);
 			m_capacity = LVL0_N * LVL0_N * LVL0_N + ((capacity + 7) & (~7));
 			m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
@@ -115,8 +116,10 @@ namespace mufflon::renderer {
 				ei::Vec3 cellMin = intPos / (edgeL * m_sceneSizeInv);
 				ei::Vec3 cellMax = (intPos+1) / (edgeL * m_sceneSizeInv);
 				float area = intersection_area(cellMin, cellMax, offPos, normal);
-//				float projArea = dot(abs(normal), m_sceneAreas) / (edgeL * edgeL);
-				return m_densityScale * countOrChild / area;
+				// Sometimes the above method returns zero. Therefore we restrict the
+				// area to something larger then a thousands part of an approximate cell area.
+				float minArea = 1e-3f * ei::sq(m_sceneScale / edgeL);
+				return m_densityScale * countOrChild / ei::max(minArea, area);
 			}
 			return 0.0f;
 		}
@@ -135,6 +138,7 @@ namespace mufflon::renderer {
 		std::unique_ptr<std::atomic_int32_t[]> m_nodes;
 		std::atomic_int32_t m_allocationCounter;
 		int m_capacity;
+		float m_sceneScale;
 
 		// Returns the new value
 		int increment_if_positive(int idx) {
