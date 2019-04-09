@@ -44,7 +44,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	PtPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
-	PtPathVertex::create_camera(&vertex, &vertex, scene.camera.get(), coord, rng.next());
+	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
 
 	auto& guideFunction = params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													 : scene::lights::guide_flux;

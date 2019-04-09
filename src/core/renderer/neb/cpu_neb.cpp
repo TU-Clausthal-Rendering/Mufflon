@@ -20,7 +20,6 @@ float get_photon_path_chance(const AngularPdf pdf) {
 
 
 struct NebVertexExt {
-	PathVertex<NebVertexExt>* previous;
 	AngularPdf pdfBack;
 	AreaPdf incidentPdf { 0.0f };
 	Spectrum throughput;
@@ -49,7 +48,7 @@ struct NebVertexExt {
 				const scene::Direction& excident,
 				const math::PdfPair& pdf) {
 		pdfBack = pdf.back;
-		const PathVertex<NebVertexExt>* prev = thisVertex.ext().previous;
+		const PathVertex<NebVertexExt>* prev = thisVertex.previous();
 		if(prev) {
 			AreaPdf reversePdf = prev->convert_pdf(Interaction::SURFACE, pdf.back,
 				{ thisVertex.get_incident_direction(), ei::sq(thisVertex.ext().incidentDist) }).pdf;
@@ -105,12 +104,12 @@ get_photon_conversion_factors(const NebPathVertex& vertex,
 }
 
 float get_previous_merge_sum(const NebPathVertex& vertex, AngularPdf pdfBack) {
-	if(!vertex.ext().previous)
+	if(!vertex.previous())
 		return 0.0f;
-	AreaPdf reversePdf = vertex.ext().previous->convert_pdf(Interaction::SURFACE, pdfBack,
+	AreaPdf reversePdf = vertex.previous()->convert_pdf(Interaction::SURFACE, pdfBack,
 		{ vertex.get_incident_direction(), ei::sq(vertex.ext().incidentDist) }).pdf;
 	float relPdf = reversePdf / vertex.ext().incidentPdf;
-	return relPdf + relPdf * vertex.ext().previous->ext().prevRelativeProbabilitySum;
+	return relPdf + relPdf * vertex.previous()->ext().prevRelativeProbabilitySum;
 }
 
 float get_previous_merge_sum(const CpuNextEventBacktracking::PhotonDesc& photon, AngularPdf pdfBack) {
@@ -133,14 +132,14 @@ CpuNextEventBacktracking::evaluate_self_radiance(const NebPathVertex& vertex,
 		if(emission.value != 0.0f && vertex.ext().pathLen > 1) {
 			AreaPdf startPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
 			                               vertex.get_surface_params(),
-			                               vertex.ext().previous->get_position(), guideFunction);
+			                               vertex.previous()->get_position(), guideFunction);
 			// Get the NEE versus random hit chance.
 			float relPdf = startPdf / vertex.ext().incidentPdf;
 			float relSum = relPdf;
-			scene::Direction incident = (vertex.get_position() - vertex.ext().previous->get_position()) / vertex.ext().incidentDist;
-			float LtoE = ei::abs(vertex.get_geometrical_factor(incident) * vertex.ext().previous->get_geometrical_factor(incident))
+			scene::Direction incident = (vertex.get_position() - vertex.previous()->get_position()) / vertex.ext().incidentDist;
+			float LtoE = ei::abs(vertex.get_geometrical_factor(incident) * vertex.previous()->get_geometrical_factor(incident))
 				/ (float(emission.pdf) * ei::sq(vertex.ext().incidentDist));
-			return { static_cast<NebPathVertex*>(vertex.ext().previous), emission.value, relSum, LtoE };
+			return { static_cast<const NebPathVertex*>(vertex.previous()), emission.value, relSum, LtoE };
 		}
 		return { nullptr, emission.value, 0.0f, 0.0f };
 	}
@@ -159,9 +158,9 @@ CpuNextEventBacktracking::evaluate_background(const NebPathVertex& vertex, const
 			// Get the NEE versus random hit chance.
 			float relPdf = float(startPdf) / float(sample.pdf.forw);
 			float relSum = relPdf;
-			float LtoE = ei::abs(vertex.ext().previous->get_geometrical_factor(sample.excident))
+			float LtoE = ei::abs(vertex.previous()->get_geometrical_factor(sample.excident))
 				/ float(background.pdf.back);
-			return { static_cast<NebPathVertex*>(vertex.ext().previous), background.value, relSum, LtoE };
+			return { static_cast<const NebPathVertex*>(vertex.previous()), background.value, relSum, LtoE };
 		}
 		return { nullptr, background.value, 0.0f, 0.0f };
 	}
@@ -174,7 +173,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 	NebPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
-	NebPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixelIdx].next());
+	NebPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), coord, m_rngs[pixelIdx].next());
 
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
@@ -189,7 +188,6 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 		if(!walk(m_sceneDesc, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
 			if(throughput.weight != Spectrum{ 0.f }) {
 				// Missed scene - sample background
-				vertex.ext().previous = previous;
 				auto emission = evaluate_background(vertex, sample, pathLen+1);
 				if(emission.radiance != 0.0f) {
 					// In the case that there is no previous, there is also no MIS and we
@@ -209,7 +207,6 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 
 		vertex.ext().pixelIndex = pixelIdx;
 		vertex.ext().pathLen = pathLen;
-		vertex.ext().previous = previous;
 		if(pathLen == m_params.maxPathLength) {
 			// Using NEE on random hit vertices has low contribution in general.
 			// Therefore, we store the preevaluated emission only.
@@ -247,7 +244,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 					scene::Point hitPos = neePos - nee.direction * hit.hitT;
 					const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(m_sceneDesc, hit);
 					NebPathVertex virtualLight;
-					NebPathVertex::create_surface(&virtualLight, &virtualLight, hit,
+					NebPathVertex::create_surface(&virtualLight, nullptr, hit,
 						m_sceneDesc.get_material(hit.hitId), hitPos, tangentSpace, -nee.direction,
 						hit.hitT, AngularPdf{1.0f}, math::Throughput{});
 					// An additional NEE is necessary, such that this new vertex is an unbiased
@@ -263,7 +260,6 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 					if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
 					if(nee.cosOut != 0) neeSec.diffIrradiance *= neeSec.cosOut;
 					virtualLight.ext().pathLen = -32000;	// Mark this as non contributing (not connected to a pixel)
-					virtualLight.ext().previous = nullptr;
 					virtualLight.ext().neeIrradiance = neeSec.diffIrradiance;
 					virtualLight.ext().neeDirection = neeSec.direction;
 					virtualLight.ext().neeConversion = neeSec.cosOut / (neeSec.distSq * float(neeSec.creationPdf));

@@ -315,16 +315,15 @@ public:
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
 	CUDA_FUNCTION float get_incident_dist_sq() const {
-		if(is_end_point()) return 0.0f;
-		const PathVertex* prev = as<PathVertex>(as<u8>(this) + m_offsetToPath);
+		if(is_end_point() || !m_previous) return 0.0f;
 		// The m_position is always a true position (the 'this' vertex is not an
 		// end-point and can thus not be an orthogonal source).
-		return lensq(prev->get_position(m_position) - m_position);
+		return lensq(m_previous->get_position(m_position) - m_position);
 	}
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
 	CUDA_FUNCTION const PathVertex* previous() const {
-		return m_offsetToPath == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPath);
+		return m_previous;
 	}
 
 	// Access to the renderer dependent extension
@@ -442,7 +441,7 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = incidentRay.origin + incidentRay.direction * scene::MAX_SCENE_SIZE;
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = static_cast<const PathVertex*>(previous);
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incidentRay.direction;
 		vert->m_extension = ExtensionT{};
@@ -456,7 +455,7 @@ public:
 		const math::RndSet2& rndSet
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = static_cast<const PathVertex*>(previous);
 		vert->m_incident = ei::Vec3{
 			static_cast<float>(pixel.x),
 			static_cast<float>(pixel.y),
@@ -488,7 +487,7 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = lightSample.pos.position;
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = static_cast<const PathVertex*>(previous);
 		vert->m_extension = ExtensionT{};
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
@@ -555,7 +554,7 @@ public:
 			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = static_cast<const PathVertex*>(previous);
 		vert->m_type = Interaction::SURFACE;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
@@ -578,7 +577,7 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = scene::Point{0.0f};
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = static_cast<const PathVertex*>(previous);
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
@@ -611,16 +610,16 @@ private:
 		CUDA_FUNCTION scene::materials::ParameterPack& mat() { return *as<scene::materials::ParameterPack>(matParams); }
 	};
 
+	// The previous vertex on the path or nullptr.
+	const PathVertex* m_previous;
 
 	// The vertex position in world space. For orthographic end vertices
 	// this is the start point on the boundary or any other artificial point outside the boundary.
 	scene::Point m_position;
 
-	// Byte offset to the beginning of a path.
-	i16 m_offsetToPath;
-
 	// Interaction type of this vertex (the descriptor at the end of the vertex depends on this).
 	Interaction m_type;
+	i16 m_UNUSED;
 
 	// Direction from which this vertex was reached.
 	// For end points the following values are stored:
@@ -654,12 +653,6 @@ private:
 		cameras::PinholeParams pinholeCam;
 		cameras::FocusParams focusCam;
 	} m_desc;
-
-	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
-		std::ptrdiff_t s = as<u8>(previous) - as<u8>(mem);
-		mAssert(ei::abs(s) < 0x1000);
-		m_offsetToPath = static_cast<i16>(s);
-	}
 
 	// Vertex size without the descriptor, the descriptor is 8byte aligned...
 	static constexpr int this_size() {
