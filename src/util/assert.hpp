@@ -5,7 +5,6 @@
 
 namespace mufflon {
 
-void debug_break();
 void check_assert(bool condition, const char* file, int line, const char* condStr);
 void check_assert(bool condition, const char* file, int line, const char* condStr, const char* msg);
 
@@ -46,8 +45,13 @@ void check_assert(bool condition, const char* file, int line, const char* condSt
 		}																																\
 	} while(0)
 #else // __CUDA_ARCH__
+#ifdef NO_BREAK_ON_ASSERT
 #define mAssert(cond) ::mufflon::check_assert((cond), __FILE__, __LINE__, #cond)
 #define mAssertMsg(cond, msg) ::mufflon::check_assert((cond), __FILE__, __LINE__, #cond, msg)
+#else // NO_BREAK_ON_ASSERT
+#define mAssert(cond) do { if(!(cond)) debugBreak; } while(0)
+#define mAssertMsg(cond, msg) do { if(!(cond)) debugBreak; } while(0)
+#endif
 #endif // __CUDA_ARCH__
 #else // NDEBUG
 #define mAssert(cond) ((void)0)
