@@ -53,8 +53,10 @@ public:
 
 		dir = ei::normalize(dir);
 		up = ei::normalize(up);
-		if(ei::dot(dir, up) > 0.999f)
+		float zDotY = dot(dir, up);
+		if(zDotY > 0.999f)
 			throw std::runtime_error("View direction and up-vector are too close to each other");
+		up = normalize(up - zDotY * dir);
 		// Create orthonormal basis to determine view matrix
 		const ei::Vec3 right = ei::normalize(ei::cross(dir, up));
 

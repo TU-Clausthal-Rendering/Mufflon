@@ -118,6 +118,8 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	Connection connection = BptPathVertex::get_connection(path0, path1);
 	auto val0 = path0.evaluate( connection.dir, scene.media, coord, false);
 	auto val1 = path1.evaluate(-connection.dir, scene.media, coord, true);
+	// Cancel reprojections outside the screen
+	if(coord.x == -1) return {Spectrum{0.0f}, 0.0f};
 	Spectrum bxdfProd = val0.value * val1.value;
 	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
