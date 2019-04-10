@@ -133,7 +133,7 @@ public:
 		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
-	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident) {
+	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident, const PathVertex* previous) {
 		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		m_incident = incident;
 	}
@@ -446,8 +446,8 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = incidentRay.origin + incidentRay.direction * scene::MAX_SCENE_SIZE;
-		vert->m_previous = static_cast<const PathVertex*>(previous);
-		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incidentRay.direction;
 		vert->m_extension = ExtensionT{};
@@ -461,8 +461,8 @@ public:
 		const math::RndSet2& rndSet
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		vert->m_previous = static_cast<const PathVertex*>(previous);
-		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_incident = ei::Vec3{
 			static_cast<float>(pixel.x),
 			static_cast<float>(pixel.y),
@@ -494,8 +494,8 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = lightSample.pos.position;
-		vert->m_previous = static_cast<const PathVertex*>(previous);
-		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_extension = ExtensionT{};
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
@@ -562,8 +562,8 @@ public:
 			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
-		vert->m_previous = static_cast<const PathVertex*>(previous);
-		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::SURFACE;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
@@ -586,8 +586,8 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = scene::Point{0.0f};
-		vert->m_previous = static_cast<const PathVertex*>(previous);
-		vert->m_pathLen = previous ? vert->m_previous->m_pathLen + 1 : 0;
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};

@@ -311,7 +311,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 	for(int i = 0; i < pFactors.photonCount; ++i) {
 		// Prepare a start vertex to begin the sampling of the photon event.
 		NebPathVertex virtualLight = vertex;
-		virtualLight.set_incident_direction(-vertex.ext().neeDirection);
+		virtualLight.set_incident_direction(-vertex.ext().neeDirection, nullptr);
 
 		// Trace a path
 		virtualLight.ext().rnd = math::sample_uniform(u32(rng.next()));
