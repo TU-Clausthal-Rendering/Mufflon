@@ -49,6 +49,9 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	auto& guideFunction = params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													 : scene::lights::guide_flux;
 
+	//if(coord == Pixel{588,749-19})
+	//	__debugbreak();
+
 	int pathLen = 0;
 	do {
 		if(pathLen > 0 && pathLen+1 >= params.minPathLength && pathLen+1 <= params.maxPathLength) {
@@ -72,7 +75,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 					bool anyhit = scene::accel_struct::any_intersection(
 									scene, { vertex.get_position(), nee.direction },
-									vertex.get_primitive_id(), nee.dist);
+									vertex.get_geometric_normal(), nee.dist);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);

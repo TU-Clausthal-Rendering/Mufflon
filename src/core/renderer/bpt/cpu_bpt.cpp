@@ -130,7 +130,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 		// Shadow test
 		if(!scene::accel_struct::any_intersection(
 				scene, { connection.v0, connection.dir },
-				path0.get_primitive_id(), connection.distance)) {
+				path0.get_geometric_normal(), connection.distance)) {
 			float mis = get_mis_weight(path0, val0.pdf, path1, val1.pdf, connection);
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}

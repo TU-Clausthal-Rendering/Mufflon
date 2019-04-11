@@ -43,7 +43,7 @@ __global__ static void sample_wireframe(RenderBuffer<Device::CUDA> outputBuffer,
 #ifdef __CUDA_ARCH__
 	while(true) {
 		scene::accel_struct::RayIntersectionResult nextHit =
-			scene::accel_struct::first_intersection(*scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
+			scene::accel_struct::first_intersection(*scene, ray, vertex.get_geometric_normal(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
 			auto background = evaluate_background(scene->lightTree.background, ray.direction);
 			if(any(greater(background.value, 0.0f))) {

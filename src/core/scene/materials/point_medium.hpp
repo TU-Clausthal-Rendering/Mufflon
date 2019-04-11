@@ -28,7 +28,7 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	const float length = ei::len(dir);
 	dir /= length;
 	ei::Ray ray{ pos, dir };
-	auto res = accel_struct::first_intersection(scene, ray, { -1l, -1l }, length + 1.f);
+	auto res = accel_struct::first_intersection(scene, ray, ei::Vec3{0.0f}, length + 1.f);
 	mAssert(res.hitId.instanceId != -1l);
 	// From the intersection we get the primitive, from which we can look up the material
 	const i32 instanceId = res.hitId.instanceId;

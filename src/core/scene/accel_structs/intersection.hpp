@@ -41,8 +41,8 @@ template < Device dev = CURRENT_DEV >
 __host__ __device__
 bool any_intersection(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
+	ei::Ray ray,
+	const ei::Vec3& geoNormal,
 	const float tmax
 );
 
@@ -50,8 +50,8 @@ template < Device dev = CURRENT_DEV >
 __host__ __device__
 RayIntersectionResult first_intersection(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
+	ei::Ray& ray,
+	const ei::Vec3& geoNormal,
 	const float tmax
 );
 

@@ -83,7 +83,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Go to the next intersection
 	ei::Ray ray {outSample.origin, outSample.excident};
 	scene::accel_struct::RayIntersectionResult nextHit =
-		scene::accel_struct::first_intersection(scene, ray, vertex.get_primitive_id(), scene::MAX_SCENE_SIZE);
+		scene::accel_struct::first_intersection(scene, ray, vertex.get_geometric_normal(), scene::MAX_SCENE_SIZE);
 
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[outSample.medium];
@@ -100,7 +100,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	}
 
 	// Create the new surface vertex
-	ei::Vec3 position = outSample.origin + outSample.excident * nextHit.hitT;
+	ei::Vec3 position = ray.origin + outSample.excident * nextHit.hitT;
 	// Get tangent space and parameter pack from nextHit
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// Finalize

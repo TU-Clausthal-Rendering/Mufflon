@@ -11,7 +11,16 @@ namespace mufflon { namespace scene { namespace accel_struct {
 
 namespace {
 
-constexpr float SCENE_SCALE_EPS = 1e-5f;
+constexpr float SCENE_SCALE_EPS = 1e-4f;
+
+CUDA_FUNCTION __forceinline void add_epsilon(ei::Ray& ray, const ei::Vec3& geoNormal) {
+	ei::Vec3 offset = geoNormal * SCENE_SCALE_EPS;
+	if(dot(geoNormal, ray.direction) >= 0.0f)
+		ray.origin += offset;
+	else
+		ray.origin -= offset;
+}
+
 
 #define STACK_SIZE              96 //64          // Size of the traversal stack in local memory.
 #define OBJ_STACK_SIZE              64 //64          // Size of the traversal stack in local memory.
@@ -146,6 +155,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 		if(v0 >= 0.f && v0 <= 1.f) {
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
+				ei::Vec3 test = (u0*v0 * a + u0*b + v0*c + d - ray.origin) / ray.direction;
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
 				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x - ray.origin.x) / ray.direction.x;
@@ -158,6 +168,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 		if(v1 >= 0.f && v1 <= 1.f) {
 			u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u1 >= 0.f && u1 <= 1.f) {
+				ei::Vec3 test = (u1*v1 * a + u1*b + v1*c + d - ray.origin) / ray.direction;
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
 				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
@@ -189,16 +200,12 @@ CUDA_FUNCTION bool intersects_primitve(
 	const LodDescriptor<dev>& obj,
 	const ei::Ray& ray,
 	const i32 primId,
-	const i32 startPrimId,
-	const float tmin,
 	int& hitPrimId,
 	float& hitT,				// In out: max hit distance before, if hit then returns the new distance
 	SurfaceParametrization& surfParams
 ) {
 	if(primId < (i32)obj.polygon.numTriangles) {
 		// Triangle.
-		if(startPrimId == primId) return false; // Masking to avoid self intersections
-
 		const ei::Vec3* meshVertices = obj.polygon.vertices;
 		const i32 indexOffset = primId * 3;
 		const ei::IVec3 ids = { obj.polygon.vertexIndices[indexOffset],
@@ -210,7 +217,7 @@ CUDA_FUNCTION bool intersects_primitve(
 
 		float t;
 		ei::Vec3 barycentric;
-		if(ei::intersects(ray, tri, t, barycentric) && t < hitT && t > tmin) {
+		if(ei::intersects(ray, tri, t, barycentric) && t < hitT && t > 0.0f) {
 			hitT = t;
 			surfParams.barycentric = ei::Vec2{ barycentric.x, barycentric.y };
 			hitPrimId = primId;
@@ -231,9 +238,11 @@ CUDA_FUNCTION bool intersects_primitve(
 										meshVertices[ids[2]],
 										meshVertices[ids[3]] };
 		ei::Vec2 bilinear;
+		// There are up to two intersections with a quad. Since the closer one
+		// could be the self intersection move forward on the ray before testing.
 		const float t = intersectQuad(quad, ray, bilinear);
 
-		if(t > tmin*2 && t < hitT) {
+		if(t > 0.0f && t < hitT) {
 			hitT = t;
 			surfParams.bilinear = bilinear;
 			hitPrimId = primId;
@@ -245,12 +254,11 @@ CUDA_FUNCTION bool intersects_primitve(
 		// self intersections inside.
 		const ei::Sphere& sph = obj.spheres.spheres[primId];
 		// Because it is important if we start incide or outside it is better
-		// to modify the ray beforhand. Testing for tmin afterwards is buggy.
-		ei::Ray epsRay{ ray.origin + tmin * ray.direction, ray.direction };;
+		// to modify the ray beforehand. Testing for tmin afterwards is buggy.
 		float t;
 		// TODO: use some epsilon?
-		if(ei::intersects(epsRay, sph, t) && t+tmin < hitT) {
-			hitT = t+tmin;
+		if(ei::intersects(ray, sph, t) && t < hitT) {
+			hitT = t;
 			hitPrimId = primId;
 			// Barycentrics unused; TODO: get coordinates anyway?
 			return true;
@@ -266,10 +274,8 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 	const LBVH& bvh,
 	const LodDescriptor<dev>& obj,
 	const ei::Ray& ray,
-	const i32 startPrimId,
 	const ei::Vec3& invDir, 
 	const ei::Vec3& ood,
-	const float tmin,
 	const float tmax,
 	i32* traversalStack
 ) {
@@ -279,7 +285,7 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 		float hitT = tmax;
 		SurfaceParametrization surfParams;
 		i32 hitPrimitiveId;
-		if(intersects_primitve(obj, ray, 0, startPrimId, tmin, hitPrimitiveId, hitT, surfParams)) {
+		if(intersects_primitve(obj, ray, 0, hitPrimitiveId, hitT, surfParams)) {
 			return true;
 		}
 		return false;
@@ -303,8 +309,8 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 
 			// Intersect the ray against the children bounds.
 			float c0min, c1min;
-			bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, tmin, tmax, c0min);
-			bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, tmin, tmax, c1min);
+			bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, tmax, c0min);
+			bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, tmax, c1min);
 
 			// Neither child was intersected => pop stack.
 			if(!traverseChild0 && !traverseChild1) {
@@ -350,7 +356,7 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 				float hitT = tmax;
 				SurfaceParametrization surfParams;
 				i32 hitPrimitiveId;
-				if(intersects_primitve(obj, ray, bvh.primIds[primId + i], startPrimId, tmin, hitPrimitiveId, hitT, surfParams))
+				if(intersects_primitve(obj, ray, bvh.primIds[primId + i], hitPrimitiveId, hitT, surfParams))
 					return true;
 			}
 
@@ -372,17 +378,15 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 	const LBVH& bvh,
 	const LodDescriptor<dev>& obj,
 	const ei::Ray& ray,
-	const i32 startPrimId,
 	const ei::Vec3& invDir, 
 	const ei::Vec3& ood,
-	const float tmin,
 	int& hitPrimId, float& hitT,
 	SurfaceParametrization& surfParams,
 	i32* traversalStack
 ) {
 	// Fast path - no BVH
 	if(obj.numPrimitives == 1) {
-		return intersects_primitve(obj, ray, 0, startPrimId, tmin,
+		return intersects_primitve(obj, ray, 0,
 			hitPrimId, hitT, surfParams);
 	}
 	
@@ -406,8 +410,8 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 
 			// Intersect the ray against the children bounds.
 			float c0min, c1min;
-			bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, tmin, hitT, c0min);
-			bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, tmin, hitT, c1min);
+			bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, hitT, c0min);
+			bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, hitT, c1min);
 
 			// Neither child was intersected => pop stack.
 			if(!traverseChild0 && !traverseChild1) {
@@ -451,7 +455,7 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 			// All intersection distances are in this instance's object space
 			// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 			for(i32 i = 0; i < primCount; i++) {
-				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], startPrimId, tmin, hitPrimId, hitT, surfParams))
+				if(intersects_primitve(obj, ray, bvh.primIds[primId+i], hitPrimId, hitT, surfParams))
 					hasHit = true;
 			}
 
@@ -472,7 +476,6 @@ template < Device dev > CUDA_FUNCTION
 void first_intersection_scene_obj_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
 	const i32 instanceId,
 	i32* traversalStack,
 	float& hitT,
@@ -495,22 +498,19 @@ void first_intersection_scene_obj_lbvh(
 
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
-	const float tmin = SCENE_SCALE_EPS * len(box.max - box.min);
 
 	// Scale our current maximum intersection distance into the object space to avoid false negatives
 	float objSpaceHitT = hitT * rayScale;
-	const float objSpaceMinT = tmin * rayScale;
 
 	// Intersect the ray against the obj bounding box.
 	float objSpaceT;
-	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceHitT, objSpaceT)) {
+	if(intersect(box.min, box.max, invDir, ood, 0.0f, objSpaceHitT, objSpaceT)) {
 		// Intersect the ray against the obj primitive bvh.
 		const LodDescriptor<dev>& obj = scene.lods[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
-		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
 		if (first_intersection_obj_lbvh_imp(
-			*lbvh, obj, transRay, checkPrimId, invDir, ood, objSpaceMinT,
-			hitPrimId, objSpaceHitT, surfParams, traversalStack)) {
+			*lbvh, obj, transRay, invDir, ood, hitPrimId,
+			objSpaceHitT, surfParams, traversalStack)) {
 			// Translate the object-space distance into world space again
 			hitT = invRayScale * objSpaceHitT;
 			hitInstanceId = instanceId;
@@ -521,12 +521,12 @@ void first_intersection_scene_obj_lbvh(
 template < Device dev > __host__ __device__
 RayIntersectionResult first_intersection(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
+	ei::Ray& ray,
+	const ei::Vec3& geoNormal,
 	const float tmax
 ) {
+	add_epsilon(ray, geoNormal);
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
-	const float tmin = SCENE_SCALE_EPS * scene.diagSize;
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	SurfaceParametrization surfParams;
@@ -535,7 +535,7 @@ RayIntersectionResult first_intersection(
 	if(scene.numInstances == 1) {
 		i32 traversalStack[OBJ_STACK_SIZE];
 		first_intersection_scene_obj_lbvh(
-			scene, ray, startInsPrimId, 0, traversalStack,
+			scene, ray, 0, traversalStack,
 			hitT, hitInstanceId, hitPrimId, surfParams);
 	} else {
 		const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
@@ -561,8 +561,8 @@ RayIntersectionResult first_intersection(
 
 				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, tmin, tmax, c0min);
-				bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, tmin, tmax, c1min);
+				bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, tmax, c0min);
+				bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, tmax, c1min);
 
 				// Neither child was intersected => pop stack.
 				if(!traverseChild0 && !traverseChild1) {
@@ -605,7 +605,7 @@ RayIntersectionResult first_intersection(
 
 				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 				for(i32 i = 0; i < primCount; i++) {
-					first_intersection_scene_obj_lbvh(scene, ray, startInsPrimId,
+					first_intersection_scene_obj_lbvh(scene, ray,
 						bvh.primIds[ instanceId + i], stackPtr+1,
 						hitT, hitInstanceId, hitPrimId, surfParams);
 				}
@@ -756,7 +756,6 @@ template < Device dev > __host__ __device__
 bool any_intersection_scene_obj_lbvh(
 	const SceneDescriptor<dev>& scene,
 	const ei::Ray ray,
-	const PrimitiveHandle& startInsPrimId,
 	const i32 instanceId,
 	float tmax,
 	i32* traversalStack
@@ -776,22 +775,19 @@ bool any_intersection_scene_obj_lbvh(
 
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
-	const float tmin = SCENE_SCALE_EPS * len(box.max - box.min);
 
 	// Scale our current maximum intersection distance into the object space to avoid false negatives
-	const float objSpaceMinT = tmin * rayScale;
 	const float objSpaceMaxT = tmax * rayScale;
 
 	// Intersect the ray against the obj bounding box.
 	float hitT;
-	if(intersect(box.min, box.max, invDir, ood, objSpaceMinT, objSpaceMaxT, hitT)) {
+	if(intersect(box.min, box.max, invDir, ood, 0.0f, objSpaceMaxT, hitT)) {
 		// Intersect the ray against the obj primtive bvh.
 		const LodDescriptor<dev>& obj = scene.lods[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
-		const i32 checkPrimId = (startInsPrimId.instanceId == instanceId) ? startInsPrimId.primId : IGNORE_ID;
 		// Do ray-obj test.
-		return any_intersection_obj_lbvh_imp(*lbvh, obj, transRay, checkPrimId,
-			invDir, ood, objSpaceMinT, objSpaceMaxT, traversalStack);
+		return any_intersection_obj_lbvh_imp(*lbvh, obj, transRay,
+			invDir, ood, objSpaceMaxT, traversalStack);
 	}
 	return false;
 }
@@ -799,19 +795,19 @@ bool any_intersection_scene_obj_lbvh(
 template < Device dev > __host__ __device__
 bool any_intersection(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const PrimitiveHandle& startInsPrimId,
+	ei::Ray ray,
+	const ei::Vec3& geoNormal,
 	const float maxDist
 ) {
+	add_epsilon(ray, geoNormal);
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
-	const float tmin = SCENE_SCALE_EPS * scene.diagSize;
-	const float tmax = maxDist - tmin*2; // Do not intersect the target surface
+	const float tmax = maxDist - SCENE_SCALE_EPS * 2.0f; // Do not intersect the target surface
 
 	if(scene.numInstances == 1) {
 		i32 traversalStack[OBJ_STACK_SIZE];
-		return any_intersection_scene_obj_lbvh(scene, ray, startInsPrimId,
+		return any_intersection_scene_obj_lbvh(scene, ray,
 			0, tmax, traversalStack);
 	} else {
 		// Setup traversal.
@@ -834,8 +830,8 @@ bool any_intersection(
 
 				// Intersect the ray against the child bvh.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, tmin, tmax, c0min);
-				bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, tmin, tmax, c1min);
+				bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, tmax, c0min);
+				bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, tmax, c1min);
 
 				// Neither child was intersected => pop stack.
 				if (!traverseChild0 && !traverseChild1) {
@@ -878,7 +874,7 @@ bool any_intersection(
 
 				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
 				for(i32 i = 0; i < primCount; i++) {
-					if(any_intersection_scene_obj_lbvh(scene, ray, startInsPrimId,
+					if(any_intersection_scene_obj_lbvh(scene, ray,
 						bvh.primIds[ instanceId + i ], tmax, stackPtr+1))
 						return true;
 				}
@@ -898,29 +894,23 @@ bool any_intersection(
 
 
 template __host__ __device__ bool any_intersection(
-	const SceneDescriptor<Device::CUDA>& scene,
-	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
-	const float tmax
+	const SceneDescriptor<Device::CUDA>&,
+	ei::Ray, const ei::Vec3&, const float
 );
 
 template __host__ __device__ bool any_intersection(
-	const SceneDescriptor<Device::CPU>& scene,
-	const ei::Ray& ray, const PrimitiveHandle& startInsPrimId,
-	const float tmax
+	const SceneDescriptor<Device::CPU>&,
+	ei::Ray, const ei::Vec3&, const float
 );
 
 template __host__ __device__ RayIntersectionResult first_intersection(
-	const SceneDescriptor<Device::CUDA>&,
-	const ei::Ray&,
-	const PrimitiveHandle&,
-	const float
+	const SceneDescriptor<Device::CUDA>&, ei::Ray&, 
+	const ei::Vec3&, const float
 );
 
 template __host__ __device__ RayIntersectionResult first_intersection(
-	const SceneDescriptor<Device::CPU>& ,
-	const ei::Ray&,
-	const PrimitiveHandle&,
-	const float
+	const SceneDescriptor<Device::CPU>&, ei::Ray&,
+	const ei::Vec3&, const float
 );
 
 }}} // namespace mufflon::scene::accel_struct
