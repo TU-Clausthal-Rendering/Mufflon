@@ -474,12 +474,22 @@ void CpuNextEventBacktracking::iterate() {
 		Pixel coord { pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		sample_view_path(coord, pixel);
 	}
+	i32 numViewVertices = m_viewVertexMap.size();
+
+	// In the first iteration, the octree has a bad quality, because on each split
+	// the distribution information is lost.
+	// In this case we use the current allocation and readd all photons
+	if(m_currentIteration == 0) {
+		m_density.clear_counters();
+#pragma PARALLEL_FOR
+		for(i32 i = 0; i < numViewVertices; ++i)
+			m_density.increment(m_viewVertexMap.get_data_by_index(i).get_position());
+	}
 
 	// Second pass: merge NEEs and backtrack. For each stored vertex find all other
 	// vertices in the neighborhood and average the NEE result. Then trace a light path
 	// beginning with a virtual source using the NEE direction as incident direction.
 	// Store the new vertices in a standard photon map.
-	i32 numViewVertices = m_viewVertexMap.size();
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
@@ -506,6 +516,8 @@ void CpuNextEventBacktracking::iterate() {
 		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
 		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);
+		//if(vertex.get_path_len() == 1)
+		//	radiance = Spectrum{vertex.ext().density};
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };

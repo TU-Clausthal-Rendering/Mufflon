@@ -48,7 +48,7 @@ namespace mufflon::renderer {
 
 	// A sparse octree with atomic insertion to measure the density of elements in space.
 	class DensityOctree {
-		static constexpr int LVL0_N = 4;
+		static constexpr int LVL0_N = 1;
 		static constexpr float SPLIT_FACTOR = 0.5f;
 	public:
 		void set_iteration(int iter) {
@@ -72,6 +72,15 @@ namespace mufflon::renderer {
 			for(int i = LVL0_N * LVL0_N * LVL0_N; i < m_capacity; ++i)
 				m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
 			m_allocationCounter.store(LVL0_N * LVL0_N * LVL0_N);
+			m_depth.store(1);
+		}
+
+		// Overwrite all counters with 0, but keep allocation and child pointers.
+		void clear_counters() {
+			int n = m_allocationCounter.load();
+			for(int i = 0; i < n; ++i)
+				if(m_nodes[i].load() > 0)
+					m_nodes[i].store(0);
 		}
 
 		void increment(const ei::Vec3& pos) {
@@ -137,6 +146,7 @@ namespace mufflon::renderer {
 		// counter (positive) or a negated child index.
 		std::unique_ptr<std::atomic_int32_t[]> m_nodes;
 		std::atomic_int32_t m_allocationCounter;
+		std::atomic_int32_t m_depth;
 		int m_capacity;
 		float m_sceneScale;
 
@@ -162,8 +172,9 @@ namespace mufflon::renderer {
 						m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
 						return 0;
 					}
+					// We do not know anything about the distribution of of photons -> equally
+					// distribute. Therefore, all eight children are initilized with SPLIT_FACTOR on clear().
 					m_nodes[idx].store(-child);
-					// All eight children are initilized with SPLIT_FACTOR on clear().
 					return -child;
 				} else {
 					// Spin-lock until the responsible thread has set the child pointer
