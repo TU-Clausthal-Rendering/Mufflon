@@ -55,10 +55,22 @@ namespace mufflon::renderer {
 	// A sparse octree with atomic insertion to measure the density of elements in space.
 	class DensityOctree {
 		static constexpr float SPLIT_FACTOR = 0.5f;
+		// At some time the counting should stop -- otherwise the counter will overflow inevitable.
+		static constexpr int FILL_ITERATIONS = 1000;
 	public:
 		void set_iteration(int iter) {
-			m_densityScale = 1.0f / iter;
-			m_splitCountDensity = ei::ceil(SPLIT_FACTOR * 8) * iter;
+			int iterClamp = ei::min(FILL_ITERATIONS, iter);
+			m_stopFilling = iter > FILL_ITERATIONS;
+			m_densityScale = 1.0f / iterClamp;
+			m_splitCountDensity = ei::ceil(SPLIT_FACTOR * 8) * iterClamp;
+			// Set the counter of all unused cells to the number of expected samples
+			// times 2. A planar surface will never extend to all eight cells. It might
+			// intersect 7 of them, but still the distribution is one of a surface.
+			// Therefore, the factor 2 (distribute among 4 cells) gives a much better initial
+			// value.
+			if(!m_stopFilling)
+				for(int i = m_allocationCounter.load(); i < m_capacity; ++i)
+					m_nodes[i].store(ei::ceil(SPLIT_FACTOR * 2 * iter));
 		}
 
 		void initialize(const ei::Box& sceneBounds, int capacity) {
@@ -74,8 +86,8 @@ namespace mufflon::renderer {
 			m_nodes[0].store(0);
 			// TODO: parallelize?
 			// The other nodes are only used if the parent is split
-			for(int i = 1; i < m_capacity; ++i)
-				m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
+			//for(int i = 1; i < m_capacity; ++i)
+			//	m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
 			m_depth.store(0);
 		}
 
@@ -88,6 +100,7 @@ namespace mufflon::renderer {
 		}
 
 		void increment(const ei::Vec3& pos) {
+			if(m_stopFilling) return;
 			ei::Vec3 normPos = (pos - m_minBound) * m_sceneSizeInv;
 			int countOrChild = increment_if_positive(0);
 			countOrChild = split_node_if_necessary(0, countOrChild, 0);
@@ -116,9 +129,7 @@ namespace mufflon::renderer {
 			// The most significant bit in iPos distinguishes the children of the root node.
 			// For each level, the next bit will be the relevant one.
 			int currentLvlMask = gridRes;
-			int edgeL = 1;
 			while(countOrChild < 0) {
-				edgeL *= 2;
 				currentLvlMask >>= 1;
 				// Get the relative index of the child [0,7]
 				int idx = ((iPos.x & currentLvlMask) ? 1 : 0)
@@ -138,6 +149,7 @@ namespace mufflon::renderer {
 				float area = intersection_area(cellMin, cellMax, offPos, normal);
 				// Sometimes the above method returns zero. Therefore we restrict the
 				// area to something larger then a hunderds part of an approximate cell area.
+				//return m_densityScale * countOrChild;
 				float minArea = 1e-2f * ei::sq(m_sceneScale / currentGridRes);
 				return m_densityScale * countOrChild / ei::max(minArea, area);
 			}
@@ -160,6 +172,7 @@ namespace mufflon::renderer {
 		std::atomic_int32_t m_depth;
 		int m_capacity;
 		float m_sceneScale;
+		bool m_stopFilling;
 
 		// Returns the new value
 		int increment_if_positive(int idx) {

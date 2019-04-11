@@ -515,13 +515,13 @@ void CpuNextEventBacktracking::iterate() {
 		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
 		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);
-		//if(vertex.get_path_len() == 1)
-		//	radiance = Spectrum{vertex.ext().density};
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
 								  1.0f, radiance);
+		//if(vertex.get_path_len() == 1)
+//			m_outputBuffer.contribute(coord, 0, ei::Vec4{vertex.ext().density * (m_currentIteration+1)});
 	}
 
 	// Finialize the evaluation of emissive end vertices.
