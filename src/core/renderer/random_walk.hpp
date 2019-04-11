@@ -32,6 +32,9 @@ struct PathHead {
  * sampling and roussian roulette.
  * This also computes the attenuation through the medium.
  *
+ * Args: additional optional arguments to pass information from the renderer
+ * to the ext.update //and ext.init TODO// method.
+ *
  * vertex: generic vertex which is sampled to proceed on the path
  * adjoint: is this a light sub-path?
  * rndSet: a set of random numbers to sample the vertex
@@ -41,14 +44,15 @@ struct PathHead {
  * nextHit [out]: The intersection result of the walk (if any)
  * returns: true if there is a nextHit. false if the path is canceled/misses the scene.
  */
-template < typename VertexType >
+template < typename VertexType, typename... Args >
 CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 						const VertexType& vertex,
 						const math::RndSet2_1& rndSet, float u0,
 						bool adjoint,
 						math::Throughput& throughput,
 						VertexType& outVertex,
-						VertexSample& outSample
+						VertexSample& outSample,
+						Args&&... args
 ) {
 	// Sample the vertex's outgoing direction
 	outSample = vertex.sample(scene.media, rndSet, adjoint);
@@ -59,7 +63,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	mAssert(!isnan(outSample.excident.x) && !isnan(outSample.excident.y) && !isnan(outSample.excident.z)
 		&& !isnan(outSample.origin.x) && !isnan(outSample.origin.y) && !isnan(outSample.origin.z)
 		&& !isnan(float(outSample.pdf.forw)) && !isnan(float(outSample.pdf.back)));
-	vertex.update_ext(outSample.excident, outSample.pdf);
+	vertex.ext().update(vertex, outSample.excident, outSample.pdf, args...);
 
 	// Update throughputs
 	throughput.weight *= outSample.throughput;

@@ -138,19 +138,23 @@ public:
 		m_incident = incident;
 	}
 
-	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
+	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosθ, distSq);
 	// This method ensures compatibility with any kind of interaction.
 	// connection: a direction with arbitrary orientation
-	CUDA_FUNCTION float get_geometrical_factor(const scene::Direction& connection) const {
+	CUDA_FUNCTION float get_geometric_factor(const scene::Direction& connection) const {
 		switch(m_type) {
 			case Interaction::LIGHT_AREA: {
 				return dot(connection, m_incident);
 			}
-			case Interaction::SURFACE: {
+			case Interaction::SURFACE:
+			case Interaction::VIRTUAL: {
 				return dot(connection, m_desc.surface.tangentSpace.shadingN);
 			}
+			case Interaction::LIGHT_ENVMAP: {
+				return 1.0f;
+			}
 		}
-		return 1.0f;
+		return 0.0f;
 	}
 
 	// Get a normal if there is any. Otherwise returns a 0-vector.
@@ -184,7 +188,7 @@ public:
 		// It is simply projected directly to the surface.
 		bool orthoSource = renderer::is_orthographic(sourceType);
 		bool orthoTarget = this->is_orthographic();
-		float geoFactor = this->get_geometrical_factor(connection.dir);
+		float geoFactor = this->get_geometric_factor(connection.dir);
 		if(orthoSource || orthoTarget) {
 			return { AreaPdf{ float(samplePdf) * ei::abs(geoFactor) }, geoFactor };
 		}
@@ -333,12 +337,6 @@ public:
 
 	// Access to the renderer dependent extension
 	CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
-
-	// Call the vertex-extension's update function for this vertex (see extension for more details).
-	CUDA_FUNCTION void update_ext(const scene::Direction& excident,
-								  const math::PdfPair& pdf) const {
-		m_extension.update(*this, excident, pdf);
-	}
 
 	/*
 	* Compute the connection vector from path0 to path1.

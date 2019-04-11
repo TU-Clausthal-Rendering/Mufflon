@@ -95,7 +95,7 @@ int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, const Neb
 struct { float toFlux; int photonCount; }
 get_photon_conversion_factors(const NebPathVertex& vertex,
 							  const NebVertexExt& ext, const NebParameters& params) {
-	float toFlux = ei::abs(vertex.get_geometrical_factor(ext.neeDirection)) / ext.density;
+	float toFlux = ei::abs(vertex.get_geometric_factor(ext.neeDirection)) / ext.density;
 	float smoothness = ei::min(1e30f, vertex.get_pdf_max() * ei::PI);
 	float maxFlux = max(ext.neeIrradiance) * toFlux;
 	int photonCount = get_photon_split_count(vertex, maxFlux, params);
@@ -136,7 +136,7 @@ CpuNextEventBacktracking::evaluate_self_radiance(const NebPathVertex& vertex,
 			float relPdf = startPdf / vertex.ext().incidentPdf;
 			float relSum = relPdf;
 			scene::Direction incident = (vertex.get_position() - vertex.previous()->get_position()) / vertex.ext().incidentDist;
-			float LtoE = ei::abs(vertex.get_geometrical_factor(incident) * vertex.previous()->get_geometrical_factor(incident))
+			float LtoE = ei::abs(vertex.get_geometric_factor(incident) * vertex.previous()->get_geometric_factor(incident))
 				/ (float(emission.pdf) * ei::sq(vertex.ext().incidentDist));
 			return { static_cast<const NebPathVertex*>(vertex.previous()), emission.value, relSum, LtoE };
 		}
@@ -157,7 +157,7 @@ CpuNextEventBacktracking::evaluate_background(const NebPathVertex& vertex, const
 			// Get the NEE versus random hit chance.
 			float relPdf = float(startPdf) / float(sample.pdf.forw);
 			float relSum = relPdf;
-			float LtoE = ei::abs(vertex.previous()->get_geometrical_factor(sample.excident))
+			float LtoE = ei::abs(vertex.previous()->get_geometric_factor(sample.excident))
 				/ float(background.pdf.back);
 			return { static_cast<const NebPathVertex*>(vertex.previous()), background.value, relSum, LtoE };
 		}
