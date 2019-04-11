@@ -46,9 +46,14 @@ namespace mufflon::renderer {
 		return ei::abs(sum / (2.0f * normal.x * normal.y * normal.z));
 	}
 
+	template<typename T>
+	inline void atomic_max(std::atomic<T>& a, T b) {
+		T oldV = a.load();
+		while(oldV < b && !a.compare_exchange_weak(oldV, b)) ;
+	}
+
 	// A sparse octree with atomic insertion to measure the density of elements in space.
 	class DensityOctree {
-		static constexpr int LVL0_N = 1;
 		static constexpr float SPLIT_FACTOR = 0.5f;
 	public:
 		void set_iteration(int iter) {
@@ -62,17 +67,16 @@ namespace mufflon::renderer {
 			m_sceneSizeInv = 1.0f / sceneSize;
 			m_sceneScale = len(sceneSize);
 			m_minBound = sceneBounds.min - sceneSize * (0.001f / 1.002f);
-			m_capacity = LVL0_N * LVL0_N * LVL0_N + ((capacity + 7) & (~7));
+			m_capacity = 1 + ((capacity + 7) & (~7));
 			m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
 			// Root nodes have a count of 0
-			for(int i = 0; i < LVL0_N * LVL0_N * LVL0_N; ++i)
-				m_nodes[i].store(0);
+			m_allocationCounter.store(1);
+			m_nodes[0].store(0);
 			// TODO: parallelize?
 			// The other nodes are only used if the parent is split
-			for(int i = LVL0_N * LVL0_N * LVL0_N; i < m_capacity; ++i)
+			for(int i = 1; i < m_capacity; ++i)
 				m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
-			m_allocationCounter.store(LVL0_N * LVL0_N * LVL0_N);
-			m_depth.store(1);
+			m_depth.store(0);
 		}
 
 		// Overwrite all counters with 0, but keep allocation and child pointers.
@@ -85,49 +89,56 @@ namespace mufflon::renderer {
 
 		void increment(const ei::Vec3& pos) {
 			ei::Vec3 normPos = (pos - m_minBound) * m_sceneSizeInv;
-			// The first level is a uniform grid of size LVL0_N³
-			ei::IVec3 rootPos { normPos * LVL0_N };
-			int idx = rootPos.x + LVL0_N * (rootPos.y + LVL0_N * rootPos.z);
-			int countOrChild = increment_if_positive(idx);
-			countOrChild = split_node_if_necessary(idx, countOrChild);
-			int edgeL = LVL0_N;
+			int countOrChild = increment_if_positive(0);
+			countOrChild = split_node_if_necessary(0, countOrChild, 0);
+			int edgeL = 1;
+			int currentDepth = 0;
 			while(countOrChild < 0) {
 				edgeL *= 2;
+				++currentDepth;
 				// Get the relative index of the child [0,7]
 				ei::IVec3 intPos = (ei::IVec3{ normPos * edgeL }) & 1;
-				idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
+				int idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
 				idx -= countOrChild;	// 'Add' global offset (which is stored negative)
 				countOrChild = increment_if_positive(idx);
-				countOrChild = split_node_if_necessary(idx, countOrChild);
+				countOrChild = split_node_if_necessary(idx, countOrChild, currentDepth);
 			}
 		}
 
 		float get_density(const ei::Vec3& pos, const ei::Vec3& normal) {
 			ei::Vec3 offPos = pos - m_minBound;
 			ei::Vec3 normPos = offPos * m_sceneSizeInv;
-			// The first level is a uniform grid of size LVL0_N³
-			ei::IVec3 rootPos { normPos * LVL0_N };
-			int idx = rootPos.x + LVL0_N * (rootPos.y + LVL0_N * rootPos.z);
-			int countOrChild = m_nodes[idx].load();
-			int edgeL = LVL0_N;
+			// Get the integer position on the finest level.
+			int gridRes = 1 << m_depth.load();
+			ei::IVec3 iPos { normPos * gridRes };
+			// Get root value. This will most certainly be a child pointer...
+			int countOrChild = m_nodes[0].load();
+			// The most significant bit in iPos distinguishes the children of the root node.
+			// For each level, the next bit will be the relevant one.
+			int currentLvlMask = gridRes;
+			int edgeL = 1;
 			while(countOrChild < 0) {
 				edgeL *= 2;
+				currentLvlMask >>= 1;
 				// Get the relative index of the child [0,7]
-				ei::IVec3 intPos = (ei::IVec3{ normPos * edgeL }) & 1;
-				idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
-				idx -= countOrChild;	// 'Add' global offset (which is stored negative)
+				int idx = ((iPos.x & currentLvlMask) ? 1 : 0)
+						+ ((iPos.y & currentLvlMask) ? 2 : 0)
+						+ ((iPos.z & currentLvlMask) ? 4 : 0);
+				// 'Add' global offset (which is stored negative)
+				idx -= countOrChild;
 				countOrChild = m_nodes[idx].load();
 			}
 			if(countOrChild > 0) {
-				//float countPerIteration = m_densityScale * countOrChild;
 				// Get the world space cell boundaries
-				ei::IVec3 intPos { normPos * edgeL };
-				ei::Vec3 cellMin = intPos / (edgeL * m_sceneSizeInv);
-				ei::Vec3 cellMax = (intPos+1) / (edgeL * m_sceneSizeInv);
+				int currentGridRes = gridRes / currentLvlMask;
+				ei::IVec3 cellPos = iPos / currentLvlMask;
+				ei::Vec3 cellSize = 1.0f / (currentGridRes * m_sceneSizeInv);
+				ei::Vec3 cellMin = cellPos * cellSize;
+				ei::Vec3 cellMax = cellMin + cellSize;
 				float area = intersection_area(cellMin, cellMax, offPos, normal);
 				// Sometimes the above method returns zero. Therefore we restrict the
-				// area to something larger then a thousands part of an approximate cell area.
-				float minArea = 1e-3f * ei::sq(m_sceneScale / edgeL);
+				// area to something larger then a hunderds part of an approximate cell area.
+				float minArea = 1e-2f * ei::sq(m_sceneScale / currentGridRes);
 				return m_densityScale * countOrChild / ei::max(minArea, area);
 			}
 			return 0.0f;
@@ -162,7 +173,7 @@ namespace mufflon::renderer {
 		}
 
 		// Returns the new child pointer or 0
-		int split_node_if_necessary(int idx, int count) {
+		int split_node_if_necessary(int idx, int count, int currentDepth) {
 			// The node must be split if its density gets too high
 			if(count >= m_splitCountDensity) {
 				// Only one thread is responsible to do the allocation
@@ -175,6 +186,8 @@ namespace mufflon::renderer {
 					// We do not know anything about the distribution of of photons -> equally
 					// distribute. Therefore, all eight children are initilized with SPLIT_FACTOR on clear().
 					m_nodes[idx].store(-child);
+					// Update depth
+					atomic_max(m_depth, currentDepth+1);
 					return -child;
 				} else {
 					// Spin-lock until the responsible thread has set the child pointer
