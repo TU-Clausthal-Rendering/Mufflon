@@ -307,7 +307,12 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 	// Precomupte the irradiance -> flux factor and
 	// pplit photons on rough surfaces if their density is much smaller than necessary
 	auto pFactors = get_photon_conversion_factors(vertex, vertex.ext(), m_params);
+	Spectrum flux = vertex.ext().neeIrradiance * pFactors.toFlux;
+	// Clamping for bad photons (due to errors in the density estimation)
+	float expectedFluxMax = max(flux);
+	flux *= ei::min(expectedFluxMax, m_params.targetFlux) / expectedFluxMax;
 	for(int i = 0; i < pFactors.photonCount; ++i) {
+
 		// Prepare a start vertex to begin the sampling of the photon event.
 		NebPathVertex virtualLight = vertex;
 		virtualLight.set_incident_direction(-vertex.ext().neeDirection, nullptr);
@@ -346,7 +351,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 			previous = m_photonMap.insert(virtualLight.get_position(),
 				{ virtualLight.get_position(), virtualLight.ext().incidentPdf,
 					sample.excident, lightPathLength,
-					lightThroughput.weight * vertex.ext().neeIrradiance * pFactors.toFlux, relPdfSum,
+					lightThroughput.weight * flux, relPdfSum,
 					virtualLight.get_geometric_normal(), prevConversionFactor
 				});
 			if(previous == nullptr) break;	// OVERFLOW
