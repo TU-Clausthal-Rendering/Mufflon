@@ -142,7 +142,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, true, throughput, vertex[otherV], sample))
+		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, true, throughput, vertex[otherV], sample))
 			break;
 		++pathLen;
 		currentV = otherV;
@@ -177,7 +177,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, false, throughput, vertex[otherV], sample)) {
+		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample)) {
 			if(throughput.weight != Spectrum{ 0.0f }) {
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);

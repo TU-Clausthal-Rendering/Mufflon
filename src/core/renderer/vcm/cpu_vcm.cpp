@@ -45,8 +45,6 @@ struct VcmVertexExt {
 			this->prevConversionFactor = float(
 				thisVertex.previous()->convert_pdf(thisVertex.get_type(), AngularPdf{1.0f},
 				{ incident, incidentDistance * incidentDistance }).pdf );
-			//if(thisVertex.previous()->is_end_point())
-			//	this->prevConversionFactor /= float(thisVertex.previous()->ext().incidentPdf);
 		}
 	}
 
@@ -102,10 +100,10 @@ float get_mis_weight(const VcmPathVertex& viewVertex, const math::PdfPair viewPd
 	// vertex was made.
 	AreaPdf lightToViewPdf = viewVertex.convert_pdf(lightVertex.get_type(), lightPdf.forw, connection).pdf;
 	relSumV *= lightToViewPdf / viewVertex.ext().incidentPdf;
-	relSumV += float(lightToViewPdf) * numPhotons * area;
+	if(viewVertex.previous()) relSumV += float(lightToViewPdf) * numPhotons * area;
 	AreaPdf viewToLightPdf = lightVertex.convert_pdf(viewVertex.get_type(), viewPdf.forw, connection).pdf;
 	relSumL *= viewToLightPdf / lightVertex.ext().incidentPdf;
-	relSumL += float(viewToLightPdf) * numPhotons * area;
+	if(lightVertex.previous()) relSumL += float(viewToLightPdf) * numPhotons * area;
 	return 1.0f / (1.0f + relSumV + relSumL);
 }
 
@@ -140,8 +138,8 @@ ConnectionValue connect(const VcmPathVertex& path0, const VcmPathVertex& path1,
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
 		// Shadow test
 		if(!scene::accel_struct::any_intersection(
-				scene, { connection.v0, connection.dir },
-				path0.get_geometric_normal(), connection.distance)) {
+				scene,connection.v0, path1.get_position(connection.v0),
+				path0.get_geometric_normal(),  path1.get_geometric_normal(), connection.dir)) {
 			float mis = get_mis_weight(path0, val0.pdf, path1, val1.pdf, connection, numPhotons, area);
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}
@@ -210,11 +208,6 @@ void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeR
 			break;
 		++pathLen;
 
-		// Complete the convertion factor with the quantities which where not known
-		// to ext().init().
-		//if(pathLen == 1)
-		//	vertex.ext().prevConversionFactor /= numPhotons * mergeArea;
-
 		// Store a photon to the photon map
 		previous = m_photonMap.insert(vertex.get_position(), vertex);
 	}
@@ -225,7 +218,6 @@ void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeR
 void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius) {
 	float mergeRadiusSq = currentMergeRadius * currentMergeRadius;
 	float mergeArea = ei::PI * mergeRadiusSq;
-	float mergeAreaInv = 1.0f / mergeArea;
 	u64 lightPathIdx = cn::WangHash{}(idx) % numPhotons;
 	// Trace view path
 	VcmPathVertex vertex[2];
@@ -293,10 +285,11 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 													  m_sceneDesc.media, tmpCoord, false,
 													  &geoNormal);
 				float misWeight = get_mis_weight(vertex[currentV], bsdf.pdf, photon, numPhotons, mergeArea);
-				radiance += bsdf.value * photon.ext().throughput * (mergeAreaInv * misWeight / numPhotons);
+				radiance += bsdf.value * photon.ext().throughput * misWeight;
 			}
 			++photonIt;
 		}
+		radiance /= mergeArea * numPhotons;
 		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
 			scene::Direction{0.0f}, Spectrum{0.0f});//*/
 

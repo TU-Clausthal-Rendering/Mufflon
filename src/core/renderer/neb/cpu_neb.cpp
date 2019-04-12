@@ -253,8 +253,8 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 										  hitPos, m_sceneDesc.aabb, neeRnd,
 										  guideFunction);
 					bool anyhit = scene::accel_struct::any_intersection(
-										m_sceneDesc, { hitPos, neeSec.direction },
-										tangentSpace.geoN, neeSec.dist);
+										m_sceneDesc, hitPos, neeSec.position,
+										tangentSpace.geoN, neeSec.geoNormal, neeSec.direction);
 					if(anyhit) neeSec.diffIrradiance = Spectrum{0.0f};
 					if(nee.cosOut != 0) neeSec.diffIrradiance *= neeSec.cosOut;
 					virtualLight.ext().pixelIndex = -1;	// Mark this as non contributing (not connected to a pixel)
@@ -268,8 +268,8 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 				}
 			} else {
 				bool anyhit = scene::accel_struct::any_intersection(
-									m_sceneDesc, { vertex.get_position(), nee.direction },
-									vertex.get_geometric_normal(), nee.dist);
+									m_sceneDesc, vertex.get_position(), nee.position,
+									vertex.get_geometric_normal(), nee.geoNormal, nee.direction);
 				// Make sure the vertex for which we did the NEE knows it is shadowed.
 				if(anyhit)
 					nee.diffIrradiance = Spectrum{0.0f};

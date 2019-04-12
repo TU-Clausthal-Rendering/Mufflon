@@ -13,12 +13,12 @@ namespace {
 
 constexpr float SCENE_SCALE_EPS = 1e-4f;
 
-CUDA_FUNCTION __forceinline void add_epsilon(ei::Ray& ray, const ei::Vec3& geoNormal) {
+CUDA_FUNCTION __forceinline void add_epsilon(ei::Vec3& rayOrigin, const ei::Vec3& dir, const ei::Vec3& geoNormal) {
 	ei::Vec3 offset = geoNormal * SCENE_SCALE_EPS;
-	if(dot(geoNormal, ray.direction) >= 0.0f)
-		ray.origin += offset;
+	if(dot(geoNormal, dir) >= 0.0f)
+		rayOrigin += offset;
 	else
-		ray.origin -= offset;
+		rayOrigin -= offset;
 }
 
 
@@ -525,7 +525,7 @@ RayIntersectionResult first_intersection(
 	const ei::Vec3& geoNormal,
 	const float tmax
 ) {
-	add_epsilon(ray, geoNormal);
+	add_epsilon(ray.origin, ray.direction, geoNormal);
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
@@ -795,15 +795,21 @@ bool any_intersection_scene_obj_lbvh(
 template < Device dev > __host__ __device__
 bool any_intersection(
 	const SceneDescriptor<dev>& scene,
-	ei::Ray ray,
-	const ei::Vec3& geoNormal,
-	const float maxDist
+	scene::Point a,
+	scene::Point b,
+	const scene::Direction& geoNormalA,
+	const scene::Direction& geoNormalB,
+	const scene::Direction& connectionDirAtoB
 ) {
-	add_epsilon(ray, geoNormal);
+	add_epsilon(a,  connectionDirAtoB, geoNormalA);
+	add_epsilon(b, -connectionDirAtoB, geoNormalB);
+	ei::Vec3 correctedDir = b - a;
+	const float tmax = len(correctedDir);
+	ei::Ray ray { a, correctedDir / tmax };
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
 	const ei::Vec3 ood = ray.origin * invDir;
-	const float tmax = maxDist - SCENE_SCALE_EPS * 2.0f; // Do not intersect the target surface
+	//const float tmax = maxDist - SCENE_SCALE_EPS * 3.0f; // Do not intersect the target surface
 
 	if(scene.numInstances == 1) {
 		i32 traversalStack[OBJ_STACK_SIZE];
@@ -895,12 +901,14 @@ bool any_intersection(
 
 template __host__ __device__ bool any_intersection(
 	const SceneDescriptor<Device::CUDA>&,
-	ei::Ray, const ei::Vec3&, const float
+	scene::Point, scene::Point, const scene::Direction&, const scene::Direction&,
+	const scene::Direction&
 );
 
 template __host__ __device__ bool any_intersection(
 	const SceneDescriptor<Device::CPU>&,
-	ei::Ray, const ei::Vec3&, const float
+	scene::Point, scene::Point, const scene::Direction&, const scene::Direction&,
+	const scene::Direction&
 );
 
 template __host__ __device__ RayIntersectionResult first_intersection(

@@ -74,8 +74,9 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				Spectrum radiance = value.value * nee.diffIrradiance;
 				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 					bool anyhit = scene::accel_struct::any_intersection(
-									scene, { vertex.get_position(), nee.direction },
-									vertex.get_geometric_normal(), nee.dist);
+									scene, vertex.get_position(), nee.position,
+									vertex.get_geometric_normal(), nee.geoNormal,
+									nee.direction);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
