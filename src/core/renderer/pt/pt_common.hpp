@@ -49,8 +49,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	auto& guideFunction = params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													 : scene::lights::guide_flux;
 
-	//if(coord == Pixel{588,749-19})
-	//	__debugbreak();
+//	if(coord == Pixel{575, 210}) __debugbreak();
 
 	int pathLen = 0;
 	do {

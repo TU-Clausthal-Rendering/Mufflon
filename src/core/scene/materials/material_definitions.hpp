@@ -138,7 +138,7 @@ struct MatSampleWalter {
 // Class for the handling of the Walter microfacet refraction model.
 struct MatWalter {
 	static constexpr MaterialPropertyFlags PROPERTIES =
-		MaterialPropertyFlags::REFRACTIVE | MaterialPropertyFlags::HALFVECTOR_BASED;
+		MaterialPropertyFlags::REFLECTIVE | MaterialPropertyFlags::REFRACTIVE | MaterialPropertyFlags::HALFVECTOR_BASED;
 
 	enum Textures {
 		ROUGHNESS,
