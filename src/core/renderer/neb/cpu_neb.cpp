@@ -195,8 +195,10 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 						m_outputBuffer.contribute(coord, { Spectrum{1.0f}, 1.0f }, { Spectrum{1.0f}, 1.0f },
 												  1.0f, emission.radiance);
 					} else {
-						u32 idx = m_selfEmissionCount.fetch_add(1);
-						m_selfEmissiveEndVertices[idx] = emission;
+						if(emission.previous) { // Can get zero due to black or invalid background
+							u32 idx = m_selfEmissionCount.fetch_add(1);
+							m_selfEmissiveEndVertices[idx] = emission;
+						}
 					}
 				}
 			}
@@ -216,8 +218,10 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 					m_outputBuffer.contribute(coord, { Spectrum{1.0f}, 1.0f }, { Spectrum{1.0f}, 1.0f },
 											  1.0f, emission.radiance);
 				} else {
-					u32 idx = m_selfEmissionCount.fetch_add(1);
-					m_selfEmissiveEndVertices[idx] = emission;
+					if(emission.previous) {
+						u32 idx = m_selfEmissionCount.fetch_add(1);
+						m_selfEmissiveEndVertices[idx] = emission;
+					}
 				}
 			}
 		} else {
@@ -309,8 +313,8 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 	auto pFactors = get_photon_conversion_factors(vertex, vertex.ext(), m_params);
 	Spectrum flux = vertex.ext().neeIrradiance * pFactors.toFlux;
 	// Clamping for bad photons (due to errors in the density estimation)
-	float expectedFluxMax = max(flux);
-	flux *= ei::min(expectedFluxMax, m_params.targetFlux) / expectedFluxMax;
+	//float expectedFluxMax = max(flux);
+	//flux *= ei::min(expectedFluxMax, m_params.targetFlux) / expectedFluxMax;
 	for(int i = 0; i < pFactors.photonCount; ++i) {
 
 		// Prepare a start vertex to begin the sampling of the photon event.
