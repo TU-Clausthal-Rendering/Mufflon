@@ -177,6 +177,13 @@ public:
 		return scene::Direction{0.0f};
 	}
 
+	CUDA_FUNCTION const scene::TangentSpace* get_tangent_space() const {
+		if(m_type == Interaction::SURFACE) {
+			return &m_desc.surface.tangentSpace;
+		}
+		return nullptr;
+	}
+
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
 	CUDA_FUNCTION struct { AreaPdf pdf; float geoFactor; }

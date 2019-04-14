@@ -503,6 +503,7 @@ void CpuNextEventBacktracking::iterate() {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
 		//estimate_density(photonMergeRadiusSq, vertex);
 		vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
+		//vertex.ext().density = m_density.get_density_robust(vertex.get_position(), *vertex.get_tangent_space());
 		mAssert(vertex.ext().density < 1e38f);
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
@@ -523,14 +524,14 @@ void CpuNextEventBacktracking::iterate() {
 			radiance += merge_photons(photonMergeRadiusSq, vertex);
 		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
-		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);
+		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);*/
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
 								  1.0f, radiance);
 		//if(vertex.get_path_len() == 1)
-//			m_outputBuffer.contribute(coord, 0, ei::Vec4{vertex.ext().density * (m_currentIteration+1)});
+		//	m_outputBuffer.set(coord, 0, ei::Vec4{vertex.ext().density * (m_currentIteration+1)});
 	}
 
 	// Finialize the evaluation of emissive end vertices.

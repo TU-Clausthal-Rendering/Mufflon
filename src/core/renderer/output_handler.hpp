@@ -165,6 +165,14 @@ struct RenderBuffer {
 		}
 	}
 
+	__host__ __device__ void set(Pixel pixel, u32 target, const ei::Vec4& value) {
+		using namespace scene::textures;
+		if(is_valid(m_targets[target])) {
+			ei::Vec4 newVal = check_nan(value);
+			write(m_targets[target], pixel, newVal);
+		}
+	}
+
 	__host__ __device__ int get_width() const { return m_resolution.x; }
 	__host__ __device__ int get_height() const { return m_resolution.y; }
 	__host__ __device__ ei::IVec2 get_resolution() const { return m_resolution; }

@@ -156,6 +156,17 @@ namespace mufflon::renderer {
 			return 0.0f;
 		}
 
+		float get_density_robust(const ei::Vec3& pos, const scene::TangentSpace& ts) {
+			float d[5];
+			d[0] = get_density(pos, ts.geoN);
+			d[1] = get_density(pos + ts.shadingTX * 4e-3f, ts.geoN);
+			d[2] = get_density(pos - ts.shadingTX * 4e-3f, ts.geoN);
+			d[3] = get_density(pos + ts.shadingTY * 4e-3f, ts.geoN);
+			d[4] = get_density(pos - ts.shadingTY * 4e-3f, ts.geoN);
+			std::sort(d, d+5);
+			return d[3];
+		}
+
 		int capacity() const { return m_capacity; }
 		int size() const { return ei::min(m_capacity, m_allocationCounter.load()); }
 		// Get the size of the associated memory excluding this instance.
