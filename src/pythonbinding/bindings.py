@@ -41,7 +41,7 @@ class DllInterface:
         return self.dllHolder.core.renderer_set_parameter_int(c_char_p(parameterName.encode('utf-8')), c_int32(value))
 
     def render_iterate(self):
-        return self.dllHolder.core.render_iterate()
+        return self.dllHolder.core.render_iterate(0)
 
     def render_reset(self):
         return self.dllHolder.core.render_reset()
