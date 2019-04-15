@@ -72,7 +72,6 @@ public:
 			if(keepChance < ext().rnd) {
 				s.type = math::PathEventType::INVALID;
 			} else {
-				s.pdf.forw *= keepChance;
 				s.throughput /= keepChance;
 			}
 		}
@@ -135,7 +134,7 @@ CpuNextEventBacktracking::evaluate_self_radiance(const NebPathVertex& vertex,
 			// Get the NEE versus random hit chance.
 			float relPdf = startPdf / vertex.ext().incidentPdf;
 			float relSum = relPdf;
-			scene::Direction incident = (vertex.get_position() - vertex.previous()->get_position()) / vertex.ext().incidentDist;
+			scene::Direction incident = vertex.get_incident_direction();// (vertex.get_position() - vertex.previous()->get_position()) / vertex.ext().incidentDist;
 			float LtoE = ei::abs(vertex.get_geometric_factor(incident) * vertex.previous()->get_geometric_factor(incident))
 				/ (float(emission.pdf) * ei::sq(vertex.ext().incidentDist));
 			return { static_cast<const NebPathVertex*>(vertex.previous()), emission.value, relSum, LtoE };
@@ -316,7 +315,6 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 	//float expectedFluxMax = max(flux);
 	//flux *= ei::min(expectedFluxMax, m_params.targetFlux) / expectedFluxMax;
 	for(int i = 0; i < pFactors.photonCount; ++i) {
-
 		// Prepare a start vertex to begin the sampling of the photon event.
 		NebPathVertex virtualLight = vertex;
 		virtualLight.set_incident_direction(-vertex.ext().neeDirection, nullptr);
@@ -348,7 +346,8 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 				relPdfSum = float(sample.pdf.back) * vertex.ext().neeConversion / neeReuseCount;
 				// Additionally, the next vertex has to see the nee-merge with a respective factor.
 				float photonReuseCount = photonMergeArea * vertex.ext().density * pFactors.photonCount;
-				prevConversionFactor *= neeReuseCount / photonReuseCount;
+				float keepChance = get_photon_path_chance(sample.pdf.forw);
+				prevConversionFactor *= neeReuseCount / (photonReuseCount * keepChance);
 			}
 
 			// Store the new photon
@@ -395,7 +394,7 @@ Spectrum CpuNextEventBacktracking::evaluate_nee(const NebPathVertex& vertex,
 	Pixel tmpCoord;
 	auto bsdf = vertex.evaluate(ext.neeDirection,
 								m_sceneDesc.media, tmpCoord, false,
-								nullptr);
+								nullptr); // TODO: use light normal for merges
 	// MIS compares against all previous merges (there are no feature ones)
 	float relSum = get_previous_merge_sum(vertex, bsdf.pdf.back);
 	relSum *= get_photon_path_chance(bsdf.pdf.back) * photonReuseCount / neeReuseCount;

@@ -152,7 +152,7 @@ namespace mufflon::renderer {
 				float cellDiag = m_sceneScale / currentGridRes;
 				float minArea = cellDiag * cellDiag;
 				if(size) { *size = cellDiag; minArea *= 0.1f; }
-				else minArea *= 1e-2f;
+				else minArea *= 0.01f;
 				return m_densityScale * countOrChild / ei::max(minArea, area);
 			}
 			return 0.0f;
