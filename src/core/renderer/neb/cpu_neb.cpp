@@ -13,7 +13,7 @@ namespace mufflon::renderer {
 
 namespace {
 float get_photon_path_chance(const AngularPdf pdf) {
-	//return 1.0f;
+	return 1.0f;
 	return float(pdf) / (10.0f + float(pdf));
 }
 } // namespace ::
@@ -114,6 +114,70 @@ float get_previous_merge_sum(const CpuNextEventBacktracking::PhotonDesc& photon,
 	AreaPdf reversePdf { photon.prevConversionFactor * float(pdfBack) };
 	float relPdf = reversePdf / photon.incidentPdf;
 	return relPdf + relPdf * photon.prevPrevRelativeProbabilitySum;
+}
+
+float mis_stdphoton(const AreaPdf* incidentF, const AreaPdf* incidentB, int n, int idx,
+	float density, float mergeArea, int numPhotons) {
+	if(idx == 0 || idx == n) return 0.0f;
+	float relPdfSumV = 0.0f;
+	float toNebMerge = density / (numPhotons * float(incidentB[n-1]));
+	// Collect merges along view path
+	for(int i = 1; i < idx; ++i) {
+		float prevMerge = incidentB[i] / incidentF[i+1];
+		relPdfSumV = prevMerge * (1.0f + toNebMerge + relPdfSumV);
+	}
+	// Collect merges/nee/random hit along light path
+	float relPdfSumL = 1.0f / (numPhotons * mergeArea * incidentB[n-1]);	// Connection
+	relPdfSumL += incidentF[n] / incidentB[n] * relPdfSumL;					// Random hit
+	for(int i = n-2; i >= idx; --i) {
+		float prevMerge = incidentF[i+1] / incidentB[i];
+		relPdfSumL = prevMerge * (1.0f + relPdfSumL);
+		relPdfSumL += toNebMerge;		// Other merge at the current point possible
+	}
+	return 1.0f / (1.0f + relPdfSumV + relPdfSumL);
+}
+
+float mis_nebphoton(const AreaPdf* incidentF, const AreaPdf* incidentB, int n, int idx,
+	float density, float mergeArea, int numPhotons, bool stdPhotons) {
+	if(idx == 0 || idx == n) return 0.0f;
+	float relPdfSumV = 0.0f;
+	float toStdMerge = stdPhotons ? (numPhotons * float(incidentB[n-1])) / density : 0.0f;
+	// Collect merges along view path
+	for(int i = 1; i < idx; ++i) {
+		float prevMerge = incidentB[i] / incidentF[i+1];
+		relPdfSumV = prevMerge * (1.0f + toStdMerge + relPdfSumV);
+	}
+	// Collect merges/nee/random hit along light path
+	float relPdfSumL = 1.0f / (mergeArea * density);			// Connection
+	relPdfSumL += incidentF[n] / incidentB[n] * relPdfSumL;		// Random hit
+	for(int i = n-2; i >= idx; --i) {
+		float prevMerge = incidentF[i+1] / incidentB[i];
+		relPdfSumL = prevMerge * (toStdMerge + relPdfSumL);
+		relPdfSumL += 1.0f;
+	}
+	return 1.0f / (relPdfSumV + relPdfSumL);
+}
+
+float mis_nee(const AreaPdf* incidentF, const AreaPdf* incidentB, int n,
+	float density, float mergeArea, int numPhotons, bool stdPhotons) {
+	float relPdfSumL = incidentF[n] / incidentB[n];		// Random hit
+	// Collect merges along view path
+	float toStdMerge = stdPhotons ? numPhotons * mergeArea * float(incidentB[n-1]) : 0.0f;
+	float toNebMerge = mergeArea * density;
+	float relPdfSumV = 0.0f;
+	for(int i = 1; i < n-1; ++i) {
+		float prevMerge = incidentB[i] / incidentF[i+1];
+		relPdfSumV = prevMerge * (toNebMerge + toStdMerge + relPdfSumV);
+	}
+	relPdfSumV += toStdMerge;
+	return 1.0f / (1.0f + relPdfSumV + relPdfSumL);
+}
+
+float mis_rhit_sum(const AreaPdf* incidentF, const AreaPdf* incidentB, int n,
+	float density, float mergeArea, int numPhotons, bool stdPhotons) {
+	float relConnection = incidentB[n] / incidentF[n];
+	return mis_nee(incidentF, incidentB, n, density,
+		mergeArea, numPhotons, stdPhotons) / relConnection;
 }
 } // namespace ::
 
@@ -363,6 +427,56 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 	}
 }
 
+void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea) {
+	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	//u64 lightTreeRnd = m_rngs[idx].next();
+	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
+		m_sceneDesc.aabb, rndStart);
+	NebPathVertex vertex[2];
+	NebPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
+	math::Throughput throughput;
+
+	float prevPrevConversionFactor = 0.0f;
+	float relPdfSum = 0.0f;
+	float mergeConversionFactor = 0.0f;
+	int lightPathLength = 0;
+	int currentV = 0;
+	while(lightPathLength < m_params.maxPathLength-1) { // -1 because there is at least one segment on the view path
+		// Walk
+		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
+		math::RndSet2 rndRoulette { m_rngs[idx].next() };
+		vertex[currentV].ext().rnd = rndRoulette.u1;
+		VertexSample sample;
+		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette.u0, true, throughput, vertex[1-currentV], sample))
+			break;
+		++lightPathLength;
+		const auto& previous = vertex[currentV];
+		currentV = 1-currentV;
+
+		float prevConversionFactor = float(previous.convert_pdf(Interaction::SURFACE,
+			AngularPdf{1.0f}, { sample.excident, ei::sq(vertex[currentV].ext().incidentDist) }).pdf);
+		if(lightPathLength == 1) {
+			prevConversionFactor = 0.0f; // TMP: no merge at light (but other events)
+			float density = m_density.get_density_robust(vertex[currentV].get_position(), *vertex[currentV].get_tangent_space());
+			mergeConversionFactor = density / (numPhotons * float(vertex[currentV].ext().incidentPdf))
+		}
+		float relPdf = prevPrevConversionFactor * float(sample.pdf.back) / float(previous.ext().incidentPdf);
+		relPdfSum = relPdf + relPdf * relPdfSum;
+		if(lightPathLength >= 2) {
+			// Regard merges from view paths
+			relPdfSum += mergeConversionFactor;
+		}
+		prevPrevConversionFactor = prevConversionFactor;
+
+		// Store a photon to the photon map
+		m_photonMap.insert(vertex[currentV].get_position(),
+			{ vertex[currentV].get_position(), vertex[currentV].ext().incidentPdf,
+			  sample.excident, lightPathLength, throughput.weight / numPhotons,
+			  relPdfSum, vertex[currentV].get_geometric_normal(), prevConversionFactor
+			});
+	}
+}
+
 Spectrum CpuNextEventBacktracking::merge_photons(float mergeRadiusSq, const NebPathVertex& vertex) {
 	scene::Point currentPos = vertex.get_position();
 	Spectrum radiance { 0.0f };
@@ -474,6 +588,8 @@ void CpuNextEventBacktracking::iterate() {
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
 
+	u64 photonSeed = m_rngs[0].next();
+
 	// First pass: distribute and store view path vertices.
 	// For each vertex compute the next event estimate, but do not contribute yet.
 #pragma PARALLEL_FOR
@@ -491,6 +607,12 @@ void CpuNextEventBacktracking::iterate() {
 #pragma PARALLEL_FOR
 		for(i32 i = 0; i < numViewVertices; ++i)
 			m_density.increment(m_viewVertexMap.get_data_by_index(i).get_position());
+	}
+
+	// Additional standard photons
+#pragma PARALLEL_FOR
+	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+		sample_std_photon(pixel, m_outputBuffer.get_num_pixels(), photonSeed, photonMergeArea);
 	}
 
 	// Second pass: merge NEEs and backtrack. For each stored vertex find all other
@@ -521,7 +643,7 @@ void CpuNextEventBacktracking::iterate() {
 
 		if(photonMergeArea > 0.0f)
 			radiance += merge_photons(photonMergeRadiusSq, vertex);
-		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
+	/*	radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
 		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);//*/
 
@@ -535,7 +657,7 @@ void CpuNextEventBacktracking::iterate() {
 
 	// Finialize the evaluation of emissive end vertices.
 	// It is necessary to do this after the density estimate for a correct mis.
-	i32 selfEmissionCount = m_selfEmissionCount.load();
+	/*i32 selfEmissionCount = m_selfEmissionCount.load();
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < selfEmissionCount; ++i) {
 		Spectrum emission = finalize_emission(neeMergeArea, photonMergeArea, m_selfEmissiveEndVertices[i]);
@@ -558,7 +680,7 @@ void CpuNextEventBacktracking::on_reset() {
 	int countHeuristic = m_outputBuffer.get_num_pixels() * ei::ceil(logf(float(m_params.maxPathLength)) * 4.0f);
 	m_viewVertexMapManager.resize(countHeuristic);
 	m_viewVertexMap = m_viewVertexMapManager.acquire<Device::CPU>();
-	m_photonMapManager.resize(countHeuristic / 2);
+	m_photonMapManager.resize(countHeuristic);
 	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
 	// There is at most one emissive end vertex per path
 	m_selfEmissiveEndVertices.resize(m_outputBuffer.get_num_pixels());

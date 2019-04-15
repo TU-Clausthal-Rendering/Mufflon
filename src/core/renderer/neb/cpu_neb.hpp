@@ -71,6 +71,7 @@ private:
 	void sample_view_path(const Pixel coord, const int pixelIdx);
 	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
 	void sample_photon_path(float neeMergeArea, float photonMergeArea, math::Rng& rng, const NebPathVertex& vertex);
+	void sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea);
 	Spectrum merge_photons(float mergeRadiusSq, const NebPathVertex& vertex);
 	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float neeReuseCount, float photonReuseCount);
 	Spectrum merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex);
