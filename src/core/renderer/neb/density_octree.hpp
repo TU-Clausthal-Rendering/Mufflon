@@ -118,7 +118,7 @@ namespace mufflon::renderer {
 			}
 		}
 
-		float get_density(const ei::Vec3& pos, const ei::Vec3& normal) {
+		float get_density(const ei::Vec3& pos, const ei::Vec3& normal, float* size = nullptr) {
 			ei::Vec3 offPos = pos - m_minBound;
 			ei::Vec3 normPos = offPos * m_sceneSizeInv;
 			// Get the integer position on the finest level.
@@ -149,8 +149,10 @@ namespace mufflon::renderer {
 				float area = intersection_area(cellMin, cellMax, offPos, normal);
 				// Sometimes the above method returns zero. Therefore we restrict the
 				// area to something larger then a hunderds part of an approximate cell area.
-				//return m_densityScale * countOrChild;
-				float minArea = 1e-2f * ei::sq(m_sceneScale / currentGridRes);
+				float cellDiag = m_sceneScale / currentGridRes;
+				float minArea = cellDiag * cellDiag;
+				if(size) { *size = cellDiag; minArea *= 0.1f; }
+				else minArea *= 1e-2f;
 				return m_densityScale * countOrChild / ei::max(minArea, area);
 			}
 			return 0.0f;
@@ -158,13 +160,31 @@ namespace mufflon::renderer {
 
 		float get_density_robust(const ei::Vec3& pos, const scene::TangentSpace& ts) {
 			float d[5];
-			d[0] = get_density(pos, ts.geoN);
-			d[1] = get_density(pos + ts.shadingTX * 4e-3f, ts.geoN);
-			d[2] = get_density(pos - ts.shadingTX * 4e-3f, ts.geoN);
-			d[3] = get_density(pos + ts.shadingTY * 4e-3f, ts.geoN);
-			d[4] = get_density(pos - ts.shadingTY * 4e-3f, ts.geoN);
-			std::sort(d, d+5);
-			return d[3];
+			float cellDiag = 1e-3f;
+			int count = 0;
+			d[0] = get_density(pos, ts.geoN, &cellDiag);
+			cellDiag *= 1.1f;
+			if(d[0] > 0.0f) ++count;
+			d[count] = get_density(pos + ts.shadingTX * cellDiag, ts.geoN);
+			if(d[count] > 0.0f) ++count;
+			d[count] = get_density(pos - ts.shadingTX * cellDiag, ts.geoN);
+			if(d[count] > 0.0f) ++count;
+			d[count] = get_density(pos + ts.shadingTY * cellDiag, ts.geoN);
+			if(d[count] > 0.0f) ++count;
+			d[count] = get_density(pos - ts.shadingTY * cellDiag, ts.geoN);
+			if(d[count] > 0.0f) ++count;
+			// Find the median via selection sort up to the element m.
+			// Prefer the greater element, because overestimations do not
+			// cause such visible artifacts.
+			int m = count / 2;
+			for(int i = 0; i <= m; ++i) for(int j = i+1; j < count; ++j)
+				if(d[j] < d[i])
+					std::swap(d[i], d[j]);
+			return d[m];
+			/*float maxD = d[0];
+			for(int i = 1; i < count; ++i)
+				if(d[i] > maxD) maxD = d[i];
+			return maxD;*/
 		}
 
 		int capacity() const { return m_capacity; }
@@ -212,7 +232,8 @@ namespace mufflon::renderer {
 					m_nodes[idx].store(-child);
 					// Update depth
 					atomic_max(m_depth, currentDepth+1);
-					return -child;
+					// The current photon is already counted before the split -> return stop
+					return 0;
 				} else {
 					// Spin-lock until the responsible thread has set the child pointer
 					int child = m_nodes[idx].load();

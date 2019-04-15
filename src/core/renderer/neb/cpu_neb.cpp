@@ -502,8 +502,8 @@ void CpuNextEventBacktracking::iterate() {
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
 		//estimate_density(photonMergeRadiusSq, vertex);
-		vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
-		//vertex.ext().density = m_density.get_density_robust(vertex.get_position(), *vertex.get_tangent_space());
+		//vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
+		vertex.ext().density = m_density.get_density_robust(vertex.get_position(), *vertex.get_tangent_space());
 		mAssert(vertex.ext().density < 1e38f);
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
@@ -524,7 +524,7 @@ void CpuNextEventBacktracking::iterate() {
 			radiance += merge_photons(photonMergeRadiusSq, vertex);
 		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex);
 		auto emission = evaluate_self_radiance(vertex, false);
-		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);*/
+		radiance += finalize_emission(neeMergeArea, photonMergeArea, emission);//*/
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
