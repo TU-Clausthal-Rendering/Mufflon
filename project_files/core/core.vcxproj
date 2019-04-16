@@ -206,6 +206,7 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\tangent_space.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />

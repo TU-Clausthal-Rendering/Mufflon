@@ -7,7 +7,10 @@
 #include "core/math/rng.hpp"
 #include "core/renderer/photon_map.hpp"
 #include "density_octree.hpp"
+#include "core/scene/accel_structs/kdtree.hpp"
 #include <vector>
+
+//#define NEB_KDTREE
 
 namespace mufflon::cameras {
 	struct CameraParams;
@@ -100,7 +103,11 @@ private:
 	std::atomic_int32_t m_selfEmissionCount;
 	HashGridManager<PhotonDesc> m_photonMapManager;
 	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
+#ifdef NEB_KDTREE
+	scene::accel_struct::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
+#else
 	DensityOctree m_density;
+#endif
 };
 
 } // namespace mufflon::renderer

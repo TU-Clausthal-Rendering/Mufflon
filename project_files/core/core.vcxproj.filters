@@ -894,6 +894,9 @@
     <ClInclude Include="..\..\src\core\renderer\vcm\vcm_params.hpp">
       <Filter>Source Files\core\renderer\vcm</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp">
+      <Filter>Source Files\core\scene\accel_structs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">

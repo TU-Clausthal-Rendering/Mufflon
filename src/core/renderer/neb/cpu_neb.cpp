@@ -16,6 +16,18 @@ float get_photon_path_chance(const AngularPdf pdf) {
 	return 1.0f;
 	return float(pdf) / (10.0f + float(pdf));
 }
+
+#ifdef NEB_KDTREE
+float get_density(const scene::accel_struct::KdTree<char, 3>& tree, const ei::Vec3& currentPos) {
+	int idx[4];
+	float distSq[4];
+	tree.query_euclidean(currentPos, 4, idx, distSq);
+	float queryArea = (distSq[3]) * ei::PI / 3.0f;
+	//float queryArea = (distSq[3] - distSq[2]) * ei::PI / 1.0f;
+	return 1.0f / queryArea;
+}
+#endif
+
 } // namespace ::
 
 
@@ -201,7 +213,7 @@ CpuNextEventBacktracking::evaluate_background(const NebPathVertex& vertex, const
 			AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
 			return { static_cast<const NebPathVertex*>(vertex.previous()), background.value,
 				AreaPdf{float(sample.pdf.forw)}, startPdf, background.pdf.back,
-				sample.excident, 1.0f }
+				sample.excident, 1.0f };
 		}
 		return { nullptr, background.value, AreaPdf{0.0f}, AreaPdf{0.0f}, AngularPdf{0.0f}, scene::Direction{0.0f}, 0.0f };
 	}
@@ -288,7 +300,11 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			vertex.ext().neeBackPdf = nee.dir.pdf.to_area_pdf(ei::abs(vertex.get_geometric_factor(nee.dir.direction)), nee.distSq);
 			previous = m_viewVertexMap.insert(vertex.get_position(), vertex);
 			if(previous == nullptr) { mAssert(false); break; }	// OVERFLOW
+#ifdef NEB_KDTREE
+			m_density.insert(vertex.get_position(), 0);
+#else
 			m_density.increment(vertex.get_position());
+#endif
 		}
 	} while(pathLen < m_params.maxPathLength);
 }
@@ -399,7 +415,11 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 			photon.sourceDensity = previous->sourceDensity;
 		} else {
 			photon.prev.creationPdf = p.pos.pdf;
+#ifdef NEB_KDTREE
+			photon.sourceDensity = get_density(m_density, vertex[currentV].get_position());
+#else
 			photon.sourceDensity = m_density.get_density_robust(vertex[currentV].get_position(), *vertex[currentV].get_tangent_space());
+#endif
 		}
 		photon.position = vertex[currentV].get_position();
 		photon.incidentPdf = vertex[currentV].ext().incidentPdf;
@@ -585,7 +605,9 @@ void CpuNextEventBacktracking::iterate() {
 	m_viewVertexMap.clear(m_params.neeMergeRadius * m_sceneDesc.diagSize * 2.0001f);
 	m_photonMap.clear(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
 	m_selfEmissionCount.store(0);
+#ifndef NEB_KDTREE
 	m_density.set_iteration(m_currentIteration + 1);
+#endif
 
 	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
 													   : scene::lights::guide_flux;
@@ -603,6 +625,9 @@ void CpuNextEventBacktracking::iterate() {
 	}
 	i32 numViewVertices = m_viewVertexMap.size();
 
+#ifdef NEB_KDTREE
+	m_density.build();
+#else
 	// In the first iteration, the octree has a bad quality, because on each split
 	// the distribution information is lost.
 	// In this case we use the current allocation and readd all photons
@@ -612,6 +637,7 @@ void CpuNextEventBacktracking::iterate() {
 		for(i32 i = 0; i < numViewVertices; ++i)
 			m_density.increment(m_viewVertexMap.get_data_by_index(i).get_position());
 	}
+#endif
 
 	// Additional standard photons
 	int numStdPhotonPaths = m_outputBuffer.get_num_pixels();
@@ -629,9 +655,12 @@ void CpuNextEventBacktracking::iterate() {
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < numViewVertices; ++i) {
 		auto& vertex = m_viewVertexMap.get_data_by_index(i);
-		//estimate_density(photonMergeRadiusSq, vertex);
+#ifdef NEB_KDTREE
+		vertex.ext().density = get_density(m_density, vertex.get_position());
+#else
 		//vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
 		vertex.ext().density = m_density.get_density_robust(vertex.get_position(), *vertex.get_tangent_space());
+#endif
 		mAssert(vertex.ext().density < 1e38f);
 
 		int rngIndex = i % m_outputBuffer.get_num_pixels();
@@ -660,8 +689,8 @@ void CpuNextEventBacktracking::iterate() {
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
 								  1.0f, radiance);
-		//if(vertex.get_path_len() == 1)
-		//	m_outputBuffer.set(coord, 0, ei::Vec4{vertex.ext().density * (m_currentIteration+1)});
+		/*if(vertex.get_path_len() == 1)
+			m_outputBuffer.set(coord, 0, ei::Vec4{vertex.ext().density * (m_currentIteration+1)});//*/
 	}
 
 	// Finialize the evaluation of emissive end vertices.
@@ -697,11 +726,19 @@ void CpuNextEventBacktracking::on_reset() {
 	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
 	// There is at most one emissive end vertex per path
 	m_selfEmissiveEndVertices.resize(m_outputBuffer.get_num_pixels());
+#ifdef NEB_KDTREE
+	m_density.reserve(countHeuristic);
+#else
 	m_density.initialize(m_sceneDesc.aabb, m_outputBuffer.get_num_pixels() * m_params.maxPathLength * 2);
+#endif
 
 	logInfo("[NEB] View-Vertex map size: ", m_viewVertexMapManager.mem_size() / (1024*1024), " MB");
 	logInfo("[NEB] Photon map size: ", m_photonMapManager.mem_size() / (1024*1024), " MB");
+#ifdef NEB_KDTREE
+	logInfo("[NEB] Density kd-tree size: ", m_density.mem_size() / (1024*1024), " MB");
+#else
 	logInfo("[NEB] Density octree size: ", m_density.mem_size() / (1024*1024), " MB");
+#endif
 	logInfo("[NEB] Self emission size: ", (m_selfEmissiveEndVertices.size() * sizeof(EmissionDesc)) / (1024*1024), " MB");
 	logInfo("[NEB] sizeof(PhotonDesc)=", sizeof(PhotonDesc), ", sizeof(NebPathVertex)=", sizeof(NebPathVertex));
 }
