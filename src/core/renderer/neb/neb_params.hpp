@@ -18,10 +18,10 @@ struct PTargetFlux {
 	}
 };
 
-struct PSecondaryNEEs {
-	bool secondaryNEEs { true };
+struct PStdPhotons {
+	bool stdPhotons { true };
 	static ParamDesc get_desc() noexcept {
-		return {"Secondary NEEs", ParameterTypes::BOOL};
+		return {"Std photons", ParameterTypes::BOOL};
 	}
 };
 
@@ -33,7 +33,7 @@ using NebParameters = ParameterHandler<
 	PMergeRadius,
 	PNeeMergeRadius,
 	PTargetFlux,
-	PSecondaryNEEs
+	PStdPhotons
 >;
 
 }} // namespace mufflon::renderer

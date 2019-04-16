@@ -67,7 +67,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 								   vertex.get_position(), scene.aabb, neeRnd,
 								   guideFunction);
 				Pixel outCoord;
-				auto value = vertex.evaluate(nee.direction, scene.media, outCoord);
+				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
 				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 				Spectrum radiance = value.value * nee.diffIrradiance;
@@ -75,7 +75,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 					bool anyhit = scene::accel_struct::any_intersection(
 									scene, vertex.get_position(), nee.position,
 									vertex.get_geometric_normal(), nee.geoNormal,
-									nee.direction);
+									nee.dir.direction);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);

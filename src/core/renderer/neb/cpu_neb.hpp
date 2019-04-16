@@ -36,14 +36,26 @@ public:
 
 	// Information which are stored in the photon map
 	struct PhotonDesc {
+		PhotonDesc() : prev{} {}
+		union {
+			const PhotonDesc* previous;
+			struct PrevInfo {
+				PrevInfo() {};
+				AreaPdf creationPdf;		// Set if pathLen == -1 || pathLen == 2
+				AreaPdf incidentPdf;		// Set if pathLen == 2
+				AreaPdf hitPdf;				// Set if pathLen == 2
+			} prev;
+		};
 		scene::Point position;
 		AreaPdf incidentPdf;
 		scene::Direction incident;
-		int pathLen;
-		Spectrum irradiance;
-		float prevPrevRelativeProbabilitySum;	// Sum of relative probabilities for merges and the connection up to the previous vertex.
+		int pathLen;							// Negative if standard vertex
+		Spectrum flux;
+		//float prevPrevRelativeProbabilitySum;	// Sum of relative probabilities for merges and the connection up to the previous vertex.
 		scene::Direction geoNormal;				// Geometric normal at photon hit point. This is crucial for normal correction.
 		float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
+		AngularPdf pdfBack;
+		float sourceDensity;
 	};
 
 	/*struct ImportonDesc {
@@ -59,8 +71,11 @@ public:
 	struct EmissionDesc {
 		const NebPathVertex* previous;	// The previous vertex to compute the reuseCount after the density estimate
 		Spectrum radiance;				// emission.value
-		float relPdf;					// Part of the MIS-weight relative to the NEE event (without the reuseCount)
-		float radianceToIrradiance;
+		AreaPdf incidentPdf;
+		AreaPdf startPdf;
+		AngularPdf samplePdf;
+		scene::Direction incident;
+		float incidentDistSq;
 	};
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
@@ -72,10 +87,10 @@ private:
 	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
 	void sample_photon_path(float neeMergeArea, float photonMergeArea, math::Rng& rng, const NebPathVertex& vertex);
 	void sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea);
-	Spectrum merge_photons(float mergeRadiusSq, const NebPathVertex& vertex);
-	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float neeReuseCount, float photonReuseCount);
-	Spectrum merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex);
-	Spectrum finalize_emission(float neeMergeArea, float photonMergeArea, const EmissionDesc& emission);
+	Spectrum merge_photons(float mergeRadiusSq, const NebPathVertex& vertex, AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons);
+	Spectrum evaluate_nee(const NebPathVertex& vertex, const NebVertexExt& ext, float neeReuseCount, AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons, float photonMergeArea);
+	Spectrum merge_nees(float mergeRadiusSq, float photonMergeArea, const NebPathVertex& vertex, AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons);
+	Spectrum finalize_emission(float neeMergeArea, float photonMergeArea, const EmissionDesc& emission, AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons);
 
 	NebParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
