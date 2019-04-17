@@ -25,14 +25,12 @@ public:
 	IParameterHandler& get_parameters() final { return m_params; }
 	StringView get_name() const noexcept { return "Pathtracer"; }
 	StringView get_short_name() const noexcept final { return "PT"; }
-
+	void on_reset() final;
 	void on_descriptor_requery() final;
 
 private:
 	PtParameters m_params;
-	math::Rng m_rng;
-	std::unique_ptr<u32[]> m_seeds;
-	unique_device_ptr<Device::CUDA, u32[]> m_seedsPtr;
+	unique_device_ptr<Device::CUDA, math::Rng[]> m_rngs;
 };
 
 }} // namespace mufflon::renderer
