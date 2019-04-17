@@ -55,7 +55,8 @@ void Scene::load_materials() {
 	// TODO: if multiple slots bind the same material it would be possible to copy
 	// the offset and to upload less materials in total.
 	std::vector<int> offsets;
-	std::size_t offset = sizeof(int) * m_scenario.get_num_material_slots(); // Store in one block -> table size is offset of first material
+	// Store in one block -> table size is offset of first material and align the offset to the required alignment of material descriptors 
+	std::size_t offset = round_to_align<alignof(materials::MaterialDescriptorBase)>(sizeof(int) * m_scenario.get_num_material_slots());
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
 		mAssert(offset <= std::numeric_limits<i32>::max());
 		offsets.push_back(i32(offset));
