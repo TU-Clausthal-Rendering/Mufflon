@@ -91,7 +91,7 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[outSample.medium];
-	Spectrum transmission = currentMedium.get_transmission( nextHit.hitT );
+	Spectrum transmission = currentMedium.get_transmission( nextHit.distance );
 	throughput.weight *= transmission;
 	throughput.guideWeight *= avg(transmission);
 	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
@@ -104,12 +104,12 @@ CUDA_FUNCTION bool walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	}
 
 	// Create the new surface vertex
-	ei::Vec3 position = ray.origin + outSample.excident * nextHit.hitT;
+	ei::Vec3 position = ray.origin + outSample.excident * nextHit.distance;
 	// Get tangent space and parameter pack from nextHit
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// Finalize
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(nextHit.hitId),
-				position, tangentSpace, outSample.excident, nextHit.hitT,
+				position, tangentSpace, outSample.excident, nextHit.distance,
 				outSample.pdf.forw, throughput);
 	return true;
 }
