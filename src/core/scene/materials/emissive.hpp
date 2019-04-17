@@ -43,6 +43,10 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleEmissive& params, const 
 	return { params.radiance, AngularPdf{cosOut / ei::PI} };
 }
 
+CUDA_FUNCTION float pdf_max(const MatSampleEmissive& params) {
+	return 0.0f;
+}
+
 template MaterialSampleConcept<MatSampleEmissive>;
 template MaterialConcept<MatEmissive>;
 

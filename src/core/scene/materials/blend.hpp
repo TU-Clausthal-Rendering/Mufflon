@@ -103,6 +103,12 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleBlend<LayerASample, Laye
 	return valA;
 }
 
+template<class LayerASample, class LayerBSample>
+CUDA_FUNCTION float pdf_max(const MatSampleBlend<LayerASample, LayerBSample>& params) {
+	// TODO: p based blending as above?
+	return ei::max(pdf_max(params.a), pdf_max(params.b));
+}
+
 template MaterialSampleConcept<MatSampleBlend<MatSampleLambert, MatSampleLambert>>;
 template MaterialConcept<MatBlend<MatLambert, MatLambert>>;
 

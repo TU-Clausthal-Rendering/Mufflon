@@ -97,6 +97,10 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleTorrance& params, const 
 	return math::SampleValue{};
 }
 
+CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
+	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
+}
+
 template MaterialSampleConcept<MatSampleTorrance>;
 template MaterialConcept<MatTorrance>;
 

@@ -61,6 +61,34 @@ struct RenderBuffer {
 	scene::textures::TextureDevHandle_t<dev> m_targets[OutputValue::TARGET_COUNT] = {};
 	ei::IVec2 m_resolution;
 
+	__host__ __device__ float check_nan(float x) {
+		if(isnan(x)) {
+#ifndef  __CUDA_ARCH__
+			logWarning("[RenderBuffer] Detected NaN on output. Returning 0 instead.");
+#endif // ! __CUDA_ARCH__
+			return 0.0f;
+		}
+		return x;
+	}
+	__host__ __device__ ei::Vec3 check_nan(const ei::Vec3& x) {
+		if(isnan(x.x) || isnan(x.y) || isnan(x.z)) {
+#ifndef  __CUDA_ARCH__
+			logWarning("[RenderBuffer] Detected NaN on output. Returning 0 instead.");
+#endif // ! __CUDA_ARCH__
+			return ei::Vec3{ 0.0f };
+		}
+		return x;
+	}
+	__host__ __device__ ei::Vec4 check_nan(const ei::Vec4& x) {
+		if(isnan(x.x) || isnan(x.y) || isnan(x.z) || isnan(x.w)) {
+#ifndef  __CUDA_ARCH__
+			logWarning("[RenderBuffer] Detected NaN on output. Returning 0 instead.");
+#endif // ! __CUDA_ARCH__
+			return ei::Vec4{ 0.0f };
+		}
+		return x;
+	}
+
 	/*
 	 * Handle contribution of connection and merge events
 	 * value: The radiance estimate from the event. This can be the BxDF (merge) or
@@ -75,13 +103,13 @@ struct RenderBuffer {
 		if(is_valid(m_targets[RenderTargets::RADIANCE])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::RADIANCE], pixel);
 			ei::Vec3 newVal = viewThroughput.weight * lightThroughput.weight * value * cosines;
-			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::RADIANCE], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_targets[RenderTargets::LIGHTNESS])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::LIGHTNESS], pixel);
 			float newVal = viewThroughput.guideWeight * lightThroughput.guideWeight * cosines;
-			mAssert(!isnan(newVal));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::LIGHTNESS], pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 		// Position, Normal and Albedo are handled by the random hit contribution.
@@ -99,31 +127,31 @@ struct RenderBuffer {
 		if(is_valid(m_targets[RenderTargets::RADIANCE])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::RADIANCE], pixel);
 			ei::Vec3 newVal = viewThroughput.weight * radiance;
-			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::RADIANCE], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_targets[RenderTargets::POSITION])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::POSITION], pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * position;
-			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::POSITION], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_targets[RenderTargets::NORMAL])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::NORMAL], pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * normal;
-			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::NORMAL], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_targets[RenderTargets::ALBEDO])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::ALBEDO], pixel);
 			ei::Vec3 newVal = viewThroughput.guideWeight * albedo;
-			mAssert(!isnan(newVal.x) && !isnan(newVal.y) && !isnan(newVal.z));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::ALBEDO], pixel, prev+ei::Vec4{newVal, 0.0f});
 		}
 		if(is_valid(m_targets[RenderTargets::LIGHTNESS])) {
 			ei::Vec4 prev = read(m_targets[RenderTargets::LIGHTNESS], pixel);
 			float newVal = viewThroughput.guideWeight * avg(radiance);
-			mAssert(!isnan(newVal));
+			newVal = check_nan(newVal);
 			write(m_targets[RenderTargets::LIGHTNESS], pixel, prev+ei::Vec4{newVal, 0.0f, 0.0f, 0.0f});
 		}
 	}
@@ -131,9 +159,17 @@ struct RenderBuffer {
 	__host__ __device__ void contribute(Pixel pixel, u32 target, const ei::Vec4& value) {
 		using namespace scene::textures;
 		if(is_valid(m_targets[target])) {
-			mAssert(!isnan(value.x) && !isnan(value.y) && !isnan(value.z) && !isnan(value.w));
+			ei::Vec4 newVal = check_nan(value);
 			ei::Vec4 prev = read(m_targets[target], pixel);
-			write(m_targets[target], pixel, prev + value);
+			write(m_targets[target], pixel, prev + newVal);
+		}
+	}
+
+	__host__ __device__ void set(Pixel pixel, u32 target, const ei::Vec4& value) {
+		using namespace scene::textures;
+		if(is_valid(m_targets[target])) {
+			ei::Vec4 newVal = check_nan(value);
+			write(m_targets[target], pixel, newVal);
 		}
 	}
 

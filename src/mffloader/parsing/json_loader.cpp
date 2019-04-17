@@ -251,8 +251,7 @@ void JsonLoader::free_material(MaterialParams* mat) {
 		case MATERIAL_WALTER:
 		case MATERIAL_EMISSIVE:
 		case MATERIAL_ORENNAYAR:
-			if(mat != nullptr)
-				delete mat;
+			delete mat;
 			return;
 		case MATERIAL_BLEND:
 			if(mat->inner.blend.a.mat != nullptr)

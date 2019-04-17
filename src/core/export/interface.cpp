@@ -1295,20 +1295,25 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			return nullptr;
 		case MATERIAL_BLEND: {
 			// Order materials to reduce the number of cases
-			const MaterialParams* layerA = mat->inner.blend.a.mat;
-			const MaterialParams* layerB = mat->inner.blend.b.mat;
+			const auto* layerA = &mat->inner.blend.a;
+			const auto* layerB = &mat->inner.blend.b;
 			if(mat->inner.blend.a.mat->innerType < mat->inner.blend.b.mat->innerType)
 				std::swap(layerA, layerB);
-			if(layerA->innerType == MATERIAL_LAMBERT && layerB->innerType == MATERIAL_EMISSIVE) {
+			if(layerA->mat->innerType == MATERIAL_LAMBERT && layerB->mat->innerType == MATERIAL_EMISSIVE) {
 				newMaterial = std::make_unique<Material<Materials::LAMBERT_EMISSIVE>>(
-					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
-					to_ctor_args(layerA->inner.lambert),
-					to_ctor_args(layerB->inner.emissive));
-			} else if(layerA->innerType == MATERIAL_TORRANCE && layerB->innerType == MATERIAL_LAMBERT) {
+					layerA->factor, layerB->factor,
+					to_ctor_args(layerA->mat->inner.lambert),
+					to_ctor_args(layerB->mat->inner.emissive));
+			} else if(layerA->mat->innerType == MATERIAL_TORRANCE && layerB->mat->innerType == MATERIAL_LAMBERT) {
 				newMaterial = std::make_unique<Material<Materials::TORRANCE_LAMBERT>>(
-					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
-					to_ctor_args(layerA->inner.torrance),
-					to_ctor_args(layerB->inner.lambert));
+					layerA->factor, layerB->factor,
+					to_ctor_args(layerA->mat->inner.torrance),
+					to_ctor_args(layerB->mat->inner.lambert));
+			} else if(layerA->mat->innerType == MATERIAL_WALTER && layerB->mat->innerType == MATERIAL_TORRANCE) {
+				newMaterial = std::make_unique<Material<Materials::WALTER_TORRANCE>>(
+					layerA->factor, layerB->factor,
+					to_ctor_args(layerA->mat->inner.walter),
+					to_ctor_args(layerB->mat->inner.torrance));
 			} else {
 				logWarning("[", FUNCTION_NAME, "] Unsupported 'blend' material. The combination of layers is not supported.");
 				return nullptr;

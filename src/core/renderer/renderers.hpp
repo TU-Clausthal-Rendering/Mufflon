@@ -7,6 +7,8 @@
 #include "core/renderer/wireframe/gpu_wireframe.hpp"
 #include "core/renderer/bpt/cpu_bpt.hpp"
 #include "core/renderer/bpm/cpu_bpm.hpp"
+#include "core/renderer/neb/cpu_neb.hpp"
+#include "core/renderer/vcm/cpu_vcm.hpp"
 
 namespace mufflon::renderer {
 
@@ -14,7 +16,9 @@ using Renderers = util::TaggedTuple<
 	CpuPathTracer, GpuPathTracer,
 	CpuWireframe, GpuWireframe,
 	CpuBidirPathTracer,
-	CpuBidirPhotonMapper
+	CpuBidirPhotonMapper,
+	CpuNextEventBacktracking,
+	CpuVcm
 >;
 
 } // namespace mufflon::renderer

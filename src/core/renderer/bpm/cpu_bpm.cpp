@@ -96,8 +96,7 @@ CpuBidirPhotonMapper::CpuBidirPhotonMapper() {
 void CpuBidirPhotonMapper::iterate() {
 	auto scope = Profiler::instance().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
 
-	float sceneSize = len(m_sceneDesc.aabb.max - m_sceneDesc.aabb.min);
-	float currentMergeRadius = m_params.mergeRadius * sceneSize;
+	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)
 		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
 	m_photonMap.clear(currentMergeRadius * 2.0001f);
@@ -131,7 +130,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
 		m_sceneDesc.aabb, rndStart);
 	BpmPathVertex vertex[2];
-	BpmPathVertex::create_light(&vertex[0], &vertex[1], p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
+	BpmPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	math::Throughput throughput;
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 
@@ -143,7 +142,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, true, throughput, vertex[otherV], sample))
+		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, true, throughput, vertex[otherV], sample))
 			break;
 		++pathLen;
 		currentV = otherV;
@@ -168,7 +167,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 	// Trace view path
 	BpmPathVertex vertex[2];
 	// Create a start for the path
-	BpmPathVertex::create_camera(&vertex[0], &vertex[0], m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
+	BpmPathVertex::create_camera(&vertex[0], nullptr, m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
 	math::Throughput throughput;
 	int currentV = 0;
 	int viewPathLen = 0;
@@ -178,7 +177,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, -1.0f, false, throughput, vertex[otherV], sample)) {
+		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample)) {
 			if(throughput.weight != Spectrum{ 0.0f }) {
 				// Missed scene - sample background
 				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
@@ -225,7 +224,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		// Evaluate direct hit of area ligths
 		if(viewPathLen >= m_params.minPathLength) {
 			math::SampleValue emission = vertex[currentV].get_emission();
-			if(emission.value != 0.0f) {
+			if(emission.value != 0.0f && viewPathLen > 1) {
 				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
 											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
 											scene::lights::guide_flux);

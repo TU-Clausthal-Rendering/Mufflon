@@ -53,8 +53,10 @@ public:
 
 		dir = ei::normalize(dir);
 		up = ei::normalize(up);
-		if(ei::dot(dir, up) > 0.999f)
+		float zDotY = dot(dir, up);
+		if(zDotY > 0.999f)
 			throw std::runtime_error("View direction and up-vector are too close to each other");
+		up = normalize(up - zDotY * dir);
 		// Create orthonormal basis to determine view matrix
 		const ei::Vec3 right = ei::normalize(ei::cross(dir, up));
 
@@ -104,7 +106,7 @@ public:
 	}
 	// Rotate around the up direction (y-axis).
 	void rotate_left_right(Radians a) noexcept {
-		m_viewSpace = ei::rotationY(a) * m_viewSpace;
+		m_viewSpace = m_viewSpace * ei::rotationY(a);
 	}
 	// Rotate around the view direction (z-axis).
 	void roll(Radians a) noexcept {

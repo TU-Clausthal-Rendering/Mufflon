@@ -89,6 +89,7 @@ struct SceneDescriptor {
 	CameraDescriptor camera;
 	u32 numLods;
 	i32 numInstances;
+	float diagSize;	// len(aabb.max - aabb.min)
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
 	ArrayDevHandle_t<dev, LodDescriptor<dev>> lods;

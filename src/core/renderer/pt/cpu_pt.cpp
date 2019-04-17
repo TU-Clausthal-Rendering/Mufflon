@@ -30,6 +30,9 @@ void CpuPathTracer::iterate() {
 
 void CpuPathTracer::on_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
+	logInfo("[CpuPathTracer] Params: path length in [", m_params.minPathLength, ", ",
+		m_params.maxPathLength, "]; nee count ", m_params.neeCount,
+		"; position guide: ", m_params.neeUsePositionGuide);
 }
 
 void CpuPathTracer::init_rngs(int num) {
