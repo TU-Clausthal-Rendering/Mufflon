@@ -79,10 +79,14 @@ public:
 
 	// Gets the bounding box of the object
 	ei::Box get_bounding_box() const noexcept {
-		return ei::Box{
-			m_geometry.template get<geometry::Polygons>().get_bounding_box(),
-			m_geometry.template get<geometry::Spheres>().get_bounding_box()
-		};
+		ei::Box aabb;
+		aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
+		aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+		if(m_geometry.template get<geometry::Polygons>().get_vertex_count() > 0u)
+			aabb = ei::Box{ aabb, m_geometry.template get<geometry::Polygons>().get_bounding_box() };
+		if(m_geometry.template get<geometry::Spheres>().get_sphere_count() > 0u)
+			aabb = ei::Box{ aabb, m_geometry.template get<geometry::Spheres>().get_bounding_box() };
+		return aabb;
 	}
 
 private:
