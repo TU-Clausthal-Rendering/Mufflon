@@ -152,7 +152,7 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 			}
 		}
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		logInfo("Performing decimation iteration");
+		logInfo("Performing decimation iteration...");
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
@@ -160,8 +160,8 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
-		logPedantic("Duration: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
-					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles");
+		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
+				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
 
 		m_currentScene->clear_accel_structure();
 		m_reset = true;
@@ -181,7 +181,10 @@ void CpuShadowSilhouettes::pre_descriptor_requery() {
 
 void CpuShadowSilhouettes::iterate() {
 	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
+		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")...");
+
+		const auto processTime = CpuProfileState::get_process_time();
+		const auto cycles = CpuProfileState::get_cpu_cycle();
 		gather_importance();
 
 		if(m_decimaters.size() == 0u)
@@ -190,7 +193,10 @@ void CpuShadowSilhouettes::iterate() {
 		// We need to update the importance density
 		this->update_reduction_factors();
 		compute_max_importance();
-		logPedantic("Finished importance gathering (max. importance: ", m_maxImportance, ")");
+
+		logInfo("Finished importance gathering (max. importance: ", m_maxImportance, "; ",
+					std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
+					"ms, ", cycles / 1'000'000, " MCycles)");
 	}
 
 	if(m_params.renderUpdate || (int)m_currentDecimationIteration >= m_params.decimationIterations) {
@@ -205,12 +211,11 @@ void CpuShadowSilhouettes::iterate() {
 
 void CpuShadowSilhouettes::gather_importance() {
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
-	const u32 iterations = m_params.importanceIterations;
 #pragma PARALLEL_FOR
-	for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
-		const int pixel = i / m_params.importanceIterations;
-		this->importance_sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
-	}
+		for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
+			const int pixel = i / m_params.importanceIterations;
+			this->importance_sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
+		}
 	// TODO: allow for this with proper reset "events"
 }
 
@@ -258,8 +263,9 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 				vertices[pathLen].ext().firstShadowDistance = shadowHit.hitT;
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
+				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
+
 				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				if(shadowHit.hitId.instanceId < 0) {
 					mAssert(!isnan(mis));
@@ -274,6 +280,7 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 					m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]]->record_direct_irradiance(&lod.polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
 																									numVertices, vertices[pathLen].get_position(), weightedIrradianceLuminance);
 				} else {
+					//m_decimaters[m_sceneDesc.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
 					this->trace_shadow(vertices[pathLen].ext().shadowRay, vertices[pathLen], weightedIrradianceLuminance);
 				}
 			}
@@ -526,6 +533,9 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 			// Got at least a silhouette point - now make sure we're seeing the silhouette
 			const ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
 
+			/*const auto thirdHit = scene::accel_struct::any_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
+																		vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
+			if(!thirdHit) {*/
 			const auto thirdHit = scene::accel_struct::first_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
 																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
@@ -595,6 +605,8 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 	m_decimaters.resize(objects.size());
 	auto objIter = objects.begin();
 
+	const auto timeBegin = CpuProfileState::get_process_time();
+
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < static_cast<i32>(objects.size()); ++i) {
 		auto objIter = objects.begin();
@@ -607,20 +619,21 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 
 		std::size_t collapses = 0u;
 
-		if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction) {
-			collapses = static_cast<std::size_t>(std::ceil(m_params.reduction * polygons.get_vertex_count()));
+		if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction > 0.f) {
+			collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater>(lod, newLod, collapses,
-																Degrees(m_params.maxNormalDeviation),
 																m_params.viewWeight, m_params.lightWeight,
 																m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 
 		// TODO: this reeeeally breaks instancing
 		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
+
+	logError("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
 void CpuShadowSilhouettes::update_reduction_factors() {

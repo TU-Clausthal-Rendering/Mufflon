@@ -151,7 +151,7 @@ void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
 			}
 		}
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		logInfo("Performing decimation iteration");
+		logInfo("Performing decimation iteration...");
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
@@ -159,8 +159,8 @@ void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
-		logPedantic("Duration: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
-					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles");
+		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
+				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
 
 		m_currentScene->clear_accel_structure();
 		m_reset = true;
@@ -180,7 +180,10 @@ void CpuImportanceDecimater::pre_descriptor_requery() {
 
 void CpuImportanceDecimater::iterate() {
 	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")");
+		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")...");
+
+		const auto processTime = CpuProfileState::get_process_time();
+		const auto cycles = CpuProfileState::get_cpu_cycle();
 		gather_importance();
 
 		if(m_decimaters.size() == 0u)
@@ -188,12 +191,11 @@ void CpuImportanceDecimater::iterate() {
 
 		// We need to update the importance density
 		this->update_reduction_factors();
+		compute_max_importance();
 
-		if(m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE)) {
-			compute_max_importance();
-			logInfo("Max. importance: ", m_maxImportance);
-			display_importance();
-		}
+		logInfo("Finished importance gathering (max. importance: ", m_maxImportance, "; ",
+				std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
+				"ms, ", cycles / 1'000'000, " MCycles)");
 	}
 
 	if(m_params.renderUpdate || (int)m_currentDecimationIteration >= m_params.decimationIterations) {
@@ -323,7 +325,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		const u32 numVertices = hitId.primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = hitId.primId < (i32)lod->polygon.numTriangles ? 0u : 3u * lod->polygon.numTriangles;
 
-		const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
+		const float importance = ei::max(0.f, get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos)));
 		m_decimaters[m_sceneDesc.lodIndices[hitId.instanceId]]->record_indirect_irradiance(&lod->polygon.vertexIndices[vertexOffset + numVertices * hitId.primId],
 																							numVertices, vertices[pathLen].get_position(), importance);
 	}
@@ -497,8 +499,8 @@ void CpuImportanceDecimater::initialize_decimaters() {
 
 		std::size_t collapses = 0u;
 
-		if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction) {
-			collapses = static_cast<std::size_t>(std::ceil(m_params.reduction * polygons.get_vertex_count()));
+		if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction > 0.f) {
+			collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());

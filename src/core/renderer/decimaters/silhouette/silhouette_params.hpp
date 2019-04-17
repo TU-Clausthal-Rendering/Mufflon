@@ -25,13 +25,6 @@ struct PSharpnessFactor {
 	}
 };
 
-struct PMaxNormalDeviation {
-	float maxNormalDeviation = 60.f;
-	static ParamDesc get_desc() noexcept {
-		return { "Max. normal deviation from collapse", ParameterTypes::FLOAT};
-	}
-};
-
 struct PViewWeight {
 	float viewWeight = 1.f;
 	static ParamDesc get_desc() noexcept {
@@ -70,7 +63,7 @@ struct PRenderUpdate {
 using SilhouetteParameters = ParameterHandler<
 	PImportanceIterations, PDecimationIterations,
 	PTargetReduction, PInitialReduction, PVertexThreshold,
-	PDirectIndirectRatio, PSharpnessFactor, PMaxNormalDeviation,
+	PDirectIndirectRatio, PSharpnessFactor,
 	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,
 	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide,
 	PRenderUpdate

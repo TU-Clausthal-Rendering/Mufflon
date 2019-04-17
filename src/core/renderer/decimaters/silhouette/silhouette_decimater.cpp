@@ -7,7 +7,6 @@
 #include "modules/importance_quadrics.hpp"
 #include "modules/silhouette.hpp"
 #include "core/renderer/decimaters/modules/collapse_tracker.hpp"
-#include "core/renderer/decimaters/modules/normal_deviation.hpp"
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
@@ -49,7 +48,6 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 										 const std::size_t initialCollapses,
-										 const Degrees maxNormalDeviation,
 										 const float viewWeight, const float lightWeight,
 										 const float shadowWeight, const float shadowSilhouetteWeight) :
 	m_original(original),
@@ -59,7 +57,6 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(&m_decimatedPoly->get_mesh()),
 	m_importances(nullptr),
-	m_maxNormalDeviation(maxNormalDeviation),
 	m_viewWeight(viewWeight),
 	m_lightWeight(lightWeight),
 	m_shadowWeight(shadowWeight),
@@ -89,12 +86,9 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 		auto decimater = m_decimatedPoly->create_decimater();
 		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
 		CollapseTrackerModule<>::Handle trackerHandle;
-		NormalDeviationModule<>::Handle normalHandle;
 		decimater.add(modQuadricHandle);
 		decimater.add(trackerHandle);
-		decimater.add(normalHandle);
 		decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
-		decimater.module(normalHandle).set_max_deviation(m_maxNormalDeviation);
 		// Possibly repeat until we reached the desired count
 		const std::size_t targetCollapses = std::min(initialCollapses, m_originalPoly.get_vertex_count());
 		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
@@ -107,6 +101,7 @@ ImportanceDecimater::ImportanceDecimater(Lod& original, Lod& decimated,
 			if(!m_originalMesh.property(m_collapsed, originalVertex))
 				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
 		});
+		this->recompute_geometric_vertex_normals();
 
 		m_decimated.clear_accel_structure();
 	}
@@ -134,7 +129,6 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	m_accumulatedImportanceDensity(dec.m_accumulatedImportanceDensity),
 	m_collapsedTo(dec.m_collapsedTo),
 	m_collapsed(dec.m_collapsed),
-	m_maxNormalDeviation(dec.m_maxNormalDeviation),
 	m_viewWeight(dec.m_viewWeight),
 	m_lightWeight(dec.m_lightWeight),
 	m_shadowWeight(dec.m_shadowWeight),
@@ -206,6 +200,20 @@ void ImportanceDecimater::udpate_importance_density() {
 	}
 }
 
+void ImportanceDecimater::recompute_geometric_vertex_normals() {
+#pragma PARALLEL_FOR
+	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
+		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u64>(i));
+
+		typename Mesh::Normal normal;
+#pragma warning(push)
+#pragma warning(disable : 4244)
+		m_decimatedMesh->calc_vertex_normal_correct(vertex, normal);
+#pragma warning(pop)
+		m_decimatedMesh->set_normal(vertex, util::pun<typename Mesh::Normal>(ei::normalize(util::pun<ei::Vec3>(normal))));
+	}
+}
+
 void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float reduction) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
@@ -233,13 +241,10 @@ void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float 
 	// Perform decimation
 	auto decimater = m_decimatedPoly->create_decimater();
 	CollapseTrackerModule<>::Handle trackerHandle;
-	NormalDeviationModule<>::Handle normalHandle;
 	ImportanceDecimationModule<>::Handle impHandle;
 	decimater.add(trackerHandle);
-	decimater.add(normalHandle);
 	decimater.add(impHandle);
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
-	decimater.module(normalHandle).set_max_deviation(m_maxNormalDeviation);
 	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity);
 	
 	if(reduction != 0.f) {
@@ -252,6 +257,7 @@ void ImportanceDecimater::iterate(const std::size_t minVertexCount, const float 
 				if(!m_originalMesh.property(m_collapsed, originalVertex))
 					m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
 			});
+			this->recompute_geometric_vertex_normals();
 			m_decimated.clear_accel_structure();
 		}
 		logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
@@ -274,15 +280,11 @@ void ImportanceDecimater::record_silhouette_vertex_contribution(const u32 localI
 
 	const float weightedImportance = importance * m_shadowSilhouetteWeight;
 
-	if(isnan(weightedImportance))
-		__debugbreak();
 	atomic_add(m_importances[m_decimatedMesh->vertex_handle(localIndex).idx()].viewImportance, weightedImportance);
 	atomic_add(m_shadowSilhouetteImportance, weightedImportance);
 }
 
 void ImportanceDecimater::record_shadow(const float irradiance) {
-	if(isnan(irradiance))
-		__debugbreak();
 	atomic_add(m_shadowImportance, irradiance);
 }
 
@@ -300,11 +302,8 @@ void ImportanceDecimater::record_direct_hit(const u32* vertexIndices, const u32 
 		}
 	}
 
-	if(isnan(sharpness))
-		__debugbreak();
-	if(isnan(cosAngle))
-		__debugbreak();
-	atomic_add(m_importances[min.idx()].viewImportance, m_viewWeight * sharpness * (1.f - ei::abs(cosAngle)));
+	if(!isnan(cosAngle))
+		atomic_add(m_importances[min.idx()].viewImportance, m_viewWeight * sharpness * (1.f - ei::abs(cosAngle)));
 }
 
 void ImportanceDecimater::record_direct_irradiance(const u32* vertexIndices, const u32 vertexCount,

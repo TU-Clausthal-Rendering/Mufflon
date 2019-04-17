@@ -180,9 +180,9 @@ struct PTargetReduction {
 };
 
 struct PInitialReduction {
-	bool initialReduction = true;
+	float initialReduction = 0.f;
 	static ParamDesc get_desc() noexcept {
-		return { "Reduce mesh initially", ParameterTypes::BOOL };
+		return { "Reduce mesh initially", ParameterTypes::FLOAT };
 	}
 };
 

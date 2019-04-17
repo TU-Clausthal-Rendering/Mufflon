@@ -18,7 +18,6 @@ public:
 
 	ImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
 						const std::size_t initialCollapses,
-						const Degrees maxNormalDeviation,
 						const float viewWeight, const float lightWeight,
 						const float shadowWeight, const float shadowSilhouetteWeight);
 	ImportanceDecimater(const ImportanceDecimater&) = delete;
@@ -65,6 +64,9 @@ private:
 	// Returns the vertex handle in the original mesh
 	VertexHandle get_original_vertex_handle(const VertexHandle decimatedHandle) const;
 
+	// Recomputes normals for decimated mesh
+	void recompute_geometric_vertex_normals();
+
 	scene::Lod& m_original;
 	scene::Lod& m_decimated;
 	scene::geometry::Polygons& m_originalPoly;
@@ -84,8 +86,6 @@ private:
 	OpenMesh::VPropHandleT<float> m_accumulatedImportanceDensity;	// Tracks the remapped importance (accumulated, if dampened)
 	OpenMesh::VPropHandleT<VertexHandle> m_collapsedTo;				// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
 	OpenMesh::VPropHandleT<bool> m_collapsed;						// Whether collapsedTo refers to original or decimated mesh
-
-	const Degrees m_maxNormalDeviation;								// Maximum allowed normal deviation after collapse
 
 	const float m_viewWeight;										// Weight assigned to the viewpath importance
 	const float m_lightWeight;										// Weight assigned to the irradiance-based importance
