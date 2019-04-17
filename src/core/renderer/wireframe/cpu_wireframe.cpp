@@ -70,12 +70,13 @@ void CpuWireframe::sample(const Pixel coord) {
 					poly.vertexIndices[3 * hitId.primId + 2]
 				};
 				closestLinePoint = computeClosestLinePoint(hitId.instanceId, indices, hit);
-			} else if(static_cast<u32>(nextHit.hitId.primId < (poly.numTriangles + poly.numQuads))) {
+			} else if(static_cast<u32>(nextHit.hitId.primId) < (poly.numTriangles + poly.numQuads)) {
+				const u32 quadId = static_cast<u32>(nextHit.hitId.primId) - poly.numTriangles;
 				const ei::IVec4 indices{
-					poly.vertexIndices[3 * poly.numTriangles + 4 * hitId.primId + 0],
-					poly.vertexIndices[3 * poly.numTriangles + 4 * hitId.primId + 1],
-					poly.vertexIndices[3 * poly.numTriangles + 4 * hitId.primId + 2],
-					poly.vertexIndices[3 * poly.numTriangles + 4 * hitId.primId + 3]
+					poly.vertexIndices[3 * poly.numTriangles + 4 * quadId + 0],
+					poly.vertexIndices[3 * poly.numTriangles + 4 * quadId + 1],
+					poly.vertexIndices[3 * poly.numTriangles + 4 * quadId + 2],
+					poly.vertexIndices[3 * poly.numTriangles + 4 * quadId + 3]
 				};
 				closestLinePoint = computeClosestLinePoint(hitId.instanceId, indices, hit);
 			} else {
