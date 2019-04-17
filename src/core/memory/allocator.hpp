@@ -37,15 +37,16 @@ public:
 		return alloc_array<T>(1, std::forward<Args>(args)...);
 	}
 
-	template < class T, typename... Args >
+	template < class T, bool Init = true, typename... Args >
 	static T* alloc_array(std::size_t n, Args... args) {
 		// Get the memory
 		T* ptr = reinterpret_cast<T*>(new unsigned char[sizeof(T) * n]);
 		if(ptr == nullptr)
 			throw BadAllocation<DEVICE>();
 		// Initialize it
-		for(std::size_t i = 0; i < n; ++i)
-			new (ptr+i) T {std::forward<Args>(args)...};
+		if(Init)
+			for(std::size_t i = 0; i < n; ++i)
+				new (ptr+i) T {std::forward<Args>(args)...};
 		return ptr;
 	}
 
@@ -88,7 +89,7 @@ public:
 		return alloc_array<T>(1, std::forward<Args>(args)...);
 	}
 
-	template < class T, typename... Args >
+	template < class T, bool Init = true, typename... Args >
 	static T* alloc_array(std::size_t n, Args... args) {
 		// Get the memory
 		T* ptr = nullptr;
@@ -100,7 +101,7 @@ public:
 		// Initialize it
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		if(!std::is_fundamental<T>::value) {
+		if(!std::is_fundamental<T>::value && Init) {
 			T prototype{ std::forward<Args>(args)... };
 			memory_details::copy_element(&prototype, ptr, sizeof(T), n);
 		}
@@ -162,10 +163,10 @@ make_udevptr(Args... args) {
 	);
 }
 
-template < Device dev, typename T, typename... Args > inline unique_device_ptr<dev,T[]>
+template < Device dev, typename T, bool Init = true, typename... Args > inline unique_device_ptr<dev,T[]>
 make_udevptr_array(std::size_t n, Args... args) {
-	return unique_device_ptr<dev,T[]>(
-		Allocator<dev>::template alloc_array<std::remove_pointer_t<std::decay_t<T>>>(n, std::forward<Args>(args)...),
+	return unique_device_ptr<dev, T[]>(
+		Allocator<dev>::template alloc_array<std::remove_pointer_t<std::decay_t<T>>, Init>(n, std::forward<Args>(args)...),
 		Deleter<dev>(n)
 	);
 }

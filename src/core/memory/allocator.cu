@@ -17,7 +17,7 @@ void copy_element(const void* element, void* targetMem, const std::size_t elemBy
 	cuda::check_error(cudaMalloc(&deviceMem, elemBytes));
 	cudaMemcpy(deviceMem, targetMem, elemBytes, cudaMemcpyDefault);
 
-	cuda_copy_element<<< 1, 1 >>>(deviceMem, targetMem, elemBytes, count);
+	cuda_copy_element<<< 1, 1024 >>>(deviceMem, targetMem, elemBytes, count);
 
 	cuda::check_error(cudaGetLastError());
 	cuda::check_error(cudaFree(deviceMem));
