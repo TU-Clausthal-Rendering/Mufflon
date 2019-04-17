@@ -926,5 +926,8 @@
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\..\src\core\memory\allocator.cu">
+      <Filter>Source Files\core\memory</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

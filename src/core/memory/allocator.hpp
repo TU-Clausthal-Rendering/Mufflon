@@ -7,6 +7,13 @@
 
 namespace mufflon { // There is no memory namespace on purpose
 
+namespace memory_details {
+
+void copy_element(const void* element, void* targetMem, const std::size_t elemBytes,
+				  const std::size_t count);
+
+} // namespace memory_details
+
 // Error class for per-device allocation failure
 
 template < Device dev >
@@ -95,8 +102,7 @@ public:
 					  "Must be trivially copyable");
 		if(!std::is_fundamental<T>::value) {
 			T prototype{ std::forward<Args>(args)... };
-			for (std::size_t i = 0; i < n; ++i)
-				cuda::check_error(cudaMemcpy(ptr + i, &prototype, sizeof(T), cudaMemcpyDefault));
+			memory_details::copy_element(&prototype, ptr, sizeof(T), n);
 		}
 		return ptr;
 	}

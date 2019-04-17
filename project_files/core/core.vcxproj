@@ -270,6 +270,7 @@
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
     <ClCompile Include="..\..\src\core\renderer\output_handler.cpp" />
+    <CudaCompile Include="..\..\src\core\memory\allocator.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />
