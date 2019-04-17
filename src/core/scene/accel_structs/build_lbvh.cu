@@ -641,10 +641,10 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// cannot allocate the other parts in bvh.
 	m_primIds.resize(numPrimitives * sizeof(i32));
 	i32* primIds = as<i32>(m_primIds.acquire<DescType::DEVICE>());
-	auto parents = make_udevptr_array<DescType::DEVICE, i32>(numNodes);
+	auto parents = make_udevptr_array<DescType::DEVICE, i32, false>(numNodes);
 
 	// Allocate a block of temporary memory for several build purposes
-	auto tmpMem = make_udevptr_array<DescType::DEVICE, u8>(ei::max(
+	auto tmpMem = make_udevptr_array<DescType::DEVICE, u8, false>(ei::max(
 		numPrimitives * sizeof(MortonCode_t<DescType>) // For unsorted morton codes and
 		+ numPrimitives * sizeof(i32),					 // primIds at the same time
 		numInternalNodes * sizeof(i32)				 // OR deviceCountes later
@@ -652,7 +652,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 	// Calculate Morton codes.
 	{
-		auto sortedMortonCodes = make_udevptr_array<DescType::DEVICE, MortonCode_t<DescType>>(numPrimitives);
+		auto sortedMortonCodes = make_udevptr_array<DescType::DEVICE, MortonCode_t<DescType>, false>(numPrimitives);
 		auto* mortonCodes = as<MortonCode_t<DescType>>(tmpMem.get());
 		auto* primIdsUnsorted = as<i32>(tmpMem.get() + numPrimitives * sizeof(MortonCode_t<DescType>));
 		if(DescType::DEVICE == Device::CUDA) {
@@ -698,14 +698,14 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	}
 
 	// Calculate bounding boxes and SAH.
-	auto boundingBoxes = make_udevptr_array<DescType::DEVICE, ei::Vec4>(numNodes * 2);
+	auto boundingBoxes = make_udevptr_array<DescType::DEVICE, ei::Vec4, false>(numNodes * 2);
 	// The counters buffer is used with atomics to detect the order of executions within the launch.
 	auto* deviceCounters = as<i32>(tmpMem.get());
 	mem_set<DescType::DEVICE>(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
 	// Allocate some memory of the later computation of partial BVH collapses.
 	// This memory is initialized in the calculate_bounding_boxesD kernel to 1,
 	// because setting 32bit integers to 1 is not possible with a memSet.
-	auto collapseOffsets = make_udevptr_array<DescType::DEVICE, i32>(numInternalNodes);
+	auto collapseOffsets = make_udevptr_array<DescType::DEVICE, i32, false>(numInternalNodes);
 	if(DescType::DEVICE == Device::CUDA) {
 		// Calculate BVH bounding boxes.
 		cudaFuncSetCacheConfig(calculate_bounding_boxesD<DescType>, cudaFuncCachePreferShared);
