@@ -159,7 +159,7 @@ namespace gui.Dll
                             Vector drag = m_window.getMouseDiffAndReset();
                             if (drag.X != 0 || drag.Y != 0)
                             {
-                                if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, mouseSpeed * (float)drag.X, 0))
+                                if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
                                     throw new Exception(Core.core_get_dll_error());
                             }
                         }
