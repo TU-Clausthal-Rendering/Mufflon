@@ -1,4 +1,5 @@
 #include "lbvh.hpp"
+#include "util/parallel.hpp"
 #include "util/types.hpp"
 #include "core/cuda/cu_lib_wrapper.hpp"
 #include "core/cuda/cuda_utils.hpp"
@@ -255,7 +256,7 @@ struct BBCache {
 										  float cost,
 										  const ei::Vec3& boxMax,
 										  i32 primCount) :
-		boxMin(boxMin), cost(cost), boxMax(boxMax), primCount(primCount) {}
+		boxMin(boxMin), primCount(primCount), boxMax(boxMax), cost(cost) {}
 	ei::Vec3 boxMin;
 	i32 primCount;
 	ei::Vec3 boxMax;
@@ -317,11 +318,8 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	i32 numPrimitives,
 	const i32* __restrict__ parents,
 	ei::Vec4* boundingBoxes,
-	i32* __restrict__ counters,
-	i32* __restrict__ nodeMarks,
-	const i32 firstThreadInBlock = 0,
-	const i32 lastThreadInBlock = 0,
-	BBCache* sharedBb = nullptr
+	cuda::Atomic<DescType::DEVICE, i32> * __restrict__ counters,
+	i32* __restrict__ nodeMarks
 ) {
 
 	ei::Box currentBb = get_bounding_box(desc, primIdx);
@@ -331,42 +329,27 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 	auto primitiveCount = get_count(desc, primIdx);
 	float cost = get_cost<DescType>(primitiveCount);
 
-	// Store in cache and global array
-#ifdef __CUDA_ARCH__
-	sharedBb[threadIdx.x] = { currentBb.min, cost, currentBb.max, encode_prim_counts(primitiveCount) };
-#endif
+	// Store in global array
 	const i32 numInternalNodes = numPrimitives - 1;
 	const i32 leafIndex = idx + numInternalNodes;
 	const i32 boxId = leafIndex << 1;
 	boundingBoxes[boxId] = { currentBb.min, int_bits_as_float(encode_prim_counts(primitiveCount)) };
 	boundingBoxes[boxId + 1] = { currentBb.max, cost };
 
-	cuda::syncthreads(); // For shared memory cache
-
 	// Proceed upwards in the hierarchy
 	i32 currentNode = parents[leafIndex];
 	i32 lastNode = idx; // Only for the first iteration is is the thread index, later it is realy a node
-//	i32 lastNode = leafIndex;
 	bool lastIsLeftChild = currentNode < 0;
 	if(currentNode < 0) currentNode = ~currentNode;
 
 	// In the counters array, we have stored the id of the thread that processed the other
 	// children of this node.
-#ifdef __CUDA_ARCH__
-	// Need to write the node index (instead real thread index) to communicate
-	// that this was a leaf.
-	i32 otherChildThreadIdx = atomicExch(&counters[currentNode], leafIndex);
-#else
-	i32 otherChildThreadIdx = counters[currentNode]; 
-	//i32 otherChildNode = counters[currentNode]; 
-	counters[currentNode] = leafIndex;
-#endif // __CUDA_ARCH__
+	i32 otherChildThreadIdx = cuda::atomic_exchange<DescType::DEVICE>(counters[currentNode], leafIndex);
 
 	// The first thread to reach a node will just die.
 	// This circumvents the global sync problem. The second thread
 	// can be sure that the data of the first one is present.
 	while(otherChildThreadIdx != 0xFFFFFFFF) {
-	//while(otherChildNode != 0xFFFFFFFF) {
 		cuda::globalMemoryBarrier();		// For reads on boundingBoxes[]
 
 		i32 otherChildNode = lastIsLeftChild ? lastNode + 1 : lastNode - 1;
@@ -378,24 +361,12 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 		}
 
 		BBCache childInfo;
-#ifdef __CUDA_ARCH__
-		// Read from cache possible, iff in the same block as the current thread
-		if(otherChildThreadIdx >= firstThreadInBlock && otherChildThreadIdx <= lastThreadInBlock)
-			childInfo = sharedBb[otherChildThreadIdx - firstThreadInBlock];
-		else {
-			i32 boxId = otherChildNode * 2;
-			childInfo = BBCache{ boundingBoxes[boxId], boundingBoxes[boxId + 1] };
-		}
-#else
 		// The children were processed in different blocks, so we have to find out if the one
 		// that was not processed by this thread was the left or right one.
 		{
 			i32 boxId = otherChildNode * 2;
 			childInfo = BBCache{ boundingBoxes[boxId], boundingBoxes[boxId + 1] };
 		}
-#endif
-
-		cuda::syncthreads(); // For cached reads
 
 		// Compute data for this node
 		currentBb.min = ei::min(currentBb.min, childInfo.boxMin);
@@ -418,14 +389,7 @@ CUDA_FUNCTION void calculate_bounding_boxes(
 		lastIsLeftChild = currentNode < 0;
 		if(currentNode < 0) currentNode = ~currentNode;
 		if(currentNode == TreeHead) break;
-#ifdef __CUDA_ARCH__
-		otherChildThreadIdx = atomicExch(&counters[currentNode], idx);
-#else
-		otherChildThreadIdx = counters[currentNode];
-		counters[currentNode] = idx;
-		//otherChildNode = counters[currentNode]; 
-		//counters[currentNode] = lastNode;
-#endif // __CUDA_ARCH__
+		otherChildThreadIdx = cuda::atomic_exchange<DescType::DEVICE>(counters[currentNode], idx);
 	}
 
 	// Initialize nodeMarks for the next kernel.
@@ -493,23 +457,17 @@ __global__ void calculate_bounding_boxesD(
 	const i32* __restrict__ sortedIndices,
 	const i32* __restrict__ parents,
 	ei::Vec4* boundingBoxes,
-	i32* __restrict__ counters,
+	cuda::Atomic<DescType::DEVICE, i32>* __restrict__ counters,
 	i32* __restrict__ nodeMarks
 ) {
 	const i32 idx = threadIdx.x + blockIdx.x * blockDim.x;
-	const i32 firstThreadInBlock = blockIdx.x * blockDim.x;
-	const i32 lastThreadInBlock = firstThreadInBlock + blockDim.x - 1;
-
-	// Initialize cache of bounding boxes in shared memory.
-	extern __shared__ BBCache sharedBb[];
 
 	// Check for valid threads.
 	if(idx >= numPrimitives)
 		return;
 
 	calculate_bounding_boxes<DescType>(*desc, idx, sortedIndices[idx],
-									   numPrimitives, parents, boundingBoxes, counters, nodeMarks,
-									   firstThreadInBlock, lastThreadInBlock, sharedBb);
+									   numPrimitives, parents, boundingBoxes, counters, nodeMarks);
 }
 
 template< typename DescType >
@@ -641,24 +599,37 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// cannot allocate the other parts in bvh.
 	m_primIds.resize(numPrimitives * sizeof(i32));
 	i32* primIds = as<i32>(m_primIds.acquire<DescType::DEVICE>());
-	auto parents = make_udevptr_array<DescType::DEVICE, i32>(numNodes);
+	auto parents = make_udevptr_array<DescType::DEVICE, i32, false>(numNodes);
 
-	// Allocate a block of temporary memory for several build purposes
-	auto tmpMem = make_udevptr_array<DescType::DEVICE, u8>(ei::max(
+	// To avoid unnecessary allocations we allocate the device counter array here already (usage in calculate_bounding_boxes)
+	// The counters buffer is used with atomics to detect the order of executions within the launch.
+	unique_device_ptr<DescType::DEVICE, cuda::Atomic<DescType::DEVICE, i32>[]> deviceCounters = nullptr;
+	// Temporary buffer used for all kinds of things on CUDA side (nothing on CPU side)
+	unique_device_ptr<DescType::DEVICE, u8[]> tmpMem = nullptr;
+
+	const auto maxTmpMemSize = ei::max(
 		numPrimitives * sizeof(MortonCode_t<DescType>) // For unsorted morton codes and
 		+ numPrimitives * sizeof(i32),					 // primIds at the same time
 		numInternalNodes * sizeof(i32)				 // OR deviceCountes later
-	));
+	);
+	if(DescType::DEVICE == Device::CPU) {
+		deviceCounters = make_udevptr_array<DescType::DEVICE, cuda::Atomic<DescType::DEVICE, i32>>(maxTmpMemSize / sizeof(i32));
+	} else {
+		// Allocate a block of temporary memory for several build purposes
+		// This is only necessary for CUDA as of now
+		tmpMem = make_udevptr_array<DescType::DEVICE, u8, false>(maxTmpMemSize);
+
+		// The device counters may use the temporary memory, but don't get to own it; the pointer is released in calculate_bounding_boxes
+		deviceCounters.reset(as<cuda::Atomic<DescType::DEVICE, i32>>(tmpMem.get()));
+	}
 
 	// Calculate Morton codes.
 	{
-		auto sortedMortonCodes = make_udevptr_array<DescType::DEVICE, MortonCode_t<DescType>>(numPrimitives);
-		auto* mortonCodes = as<MortonCode_t<DescType>>(tmpMem.get());
-		auto* primIdsUnsorted = as<i32>(tmpMem.get() + numPrimitives * sizeof(MortonCode_t<DescType>));
+		auto sortedMortonCodes = make_udevptr_array<DescType::DEVICE, MortonCode_t<DescType>, false>(numPrimitives);
 		if(DescType::DEVICE == Device::CUDA) {
-			// Satisfy the compiler (this brach is never reached without having the correct type,
-			// so the cast is effectless. However, the cleaner 'if constexpr' is not supported in cuda.
-			//auto dobj = reinterpret_cast<const LodDescriptor<Device::CUDA>&>(obj);
+			auto* mortonCodes = as<MortonCode_t<DescType>>(tmpMem.get());
+			auto* primIdsUnsorted = as<i32>(tmpMem.get() + numPrimitives * sizeof(MortonCode_t<DescType>));
+
 			i32 numBlocks, numThreads;
 			get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codesD<DescType>);
 			calculate_morton_codesD <<< numBlocks, numThreads >>> (
@@ -670,6 +641,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 							  primIdsUnsorted, primIds);
 			cuda::check_error(cudaGetLastError());
 		} else {
+#pragma PARALLEL_FOR
 			for(i32 idx = 0; idx < numPrimitives; idx++) {
 				sortedMortonCodes[idx] = calculate_morton_code<DescType>(desc, idx, sceneBB);
 				primIds[idx] = idx;
@@ -691,6 +663,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 				parents.get());
 			cuda::check_error(cudaGetLastError());
 		} else {
+#pragma PARALLEL_FOR
 			for(i32 idx = 0; idx < numInternalNodes; idx++)
 				build_lbvh_tree<MortonCode_t<DescType>>(numPrimitives,
 														sortedMortonCodes.get(), parents.get(), idx);
@@ -698,14 +671,12 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	}
 
 	// Calculate bounding boxes and SAH.
-	auto boundingBoxes = make_udevptr_array<DescType::DEVICE, ei::Vec4>(numNodes * 2);
-	// The counters buffer is used with atomics to detect the order of executions within the launch.
-	auto* deviceCounters = as<i32>(tmpMem.get());
-	mem_set<DescType::DEVICE>(deviceCounters, 0xFF, numInternalNodes * sizeof(i32));
+	auto boundingBoxes = make_udevptr_array<DescType::DEVICE, ei::Vec4, false>(numNodes * 2);
+	mem_set<DescType::DEVICE>(deviceCounters.get(), 0xFF, numInternalNodes * sizeof(i32));
 	// Allocate some memory of the later computation of partial BVH collapses.
 	// This memory is initialized in the calculate_bounding_boxesD kernel to 1,
 	// because setting 32bit integers to 1 is not possible with a memSet.
-	auto collapseOffsets = make_udevptr_array<DescType::DEVICE, i32>(numInternalNodes);
+	auto collapseOffsets = make_udevptr_array<DescType::DEVICE, i32, false>(numInternalNodes);
 	if(DescType::DEVICE == Device::CUDA) {
 		// Calculate BVH bounding boxes.
 		cudaFuncSetCacheConfig(calculate_bounding_boxesD<DescType>, cudaFuncCachePreferShared);
@@ -716,15 +687,19 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		const i32 bboxCacheSize = numThreads * sizeof(BBCache);
 		calculate_bounding_boxesD <<< numBlocks, numThreads, bboxCacheSize >>> (
 			deviceDesc.get(), numPrimitives, primIds, parents.get(),
-			boundingBoxes.get(), deviceCounters,
+			boundingBoxes.get(), deviceCounters.get(),
 			collapseOffsets.get()
 			);
 		cuda::check_error(cudaGetLastError());
+
+		// We need to release the pointer from deviceCounters here since the deallocation is part of tmpMem for CUDA side
+		deviceCounters.release();
 	} else {
+#pragma PARALLEL_FOR
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			calculate_bounding_boxes(desc, idx, primIds[idx],
 									 numPrimitives, parents.get(), boundingBoxes.get(),
-									 deviceCounters, collapseOffsets.get());
+									 deviceCounters.get(), collapseOffsets.get());
 		}
 	}
 
@@ -738,6 +713,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 															   );
 		cuda::check_error(cudaGetLastError());
 	} else {
+#pragma PARALLEL_FOR
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
 										   idx + numInternalNodes, collapseOffsets.get());
@@ -770,6 +746,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			collapseOffsets.get(), collapsedBVH);
 		cuda::check_error(cudaGetLastError());
 	} else {
+#pragma PARALLEL_FOR
 		for(i32 idx = 1; idx < numNodes; ++idx)
 			copy_to_collapsed_bvh<DescType>(
 				boundingBoxes.get(), parents.get(), collapseOffsets.get(),

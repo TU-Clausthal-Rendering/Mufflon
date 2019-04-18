@@ -249,16 +249,16 @@ void CpuShadowSilhouettes::importance_sample(const Pixel coord) {
 							   vertices[pathLen].get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
 			Pixel projCoord;
-			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media, projCoord);
+			auto value = vertices[pathLen].evaluate(nee.dir.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			// TODO: use multiple NEEs
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				vertices[pathLen].ext().shadowRay = ei::Ray{ nee.lightPoint, -nee.direction };
+				vertices[pathLen].ext().shadowRay = ei::Ray{ nee.position, -nee.dir.direction };
 				vertices[pathLen].ext().lightDistance = nee.dist;
 
 				auto shadowHit = scene::accel_struct::first_intersection(m_sceneDesc, vertices[pathLen].ext().shadowRay,
-																		 vertices[pathLen].get_primitive_id(), nee.dist);
+																		 vertices[pathLen].get_geometric_normal(), nee.dist);
 				vertices[pathLen].ext().shadowHit = shadowHit.hitId;
 				vertices[pathLen].ext().firstShadowDistance = shadowHit.hitT;
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
@@ -384,14 +384,15 @@ void CpuShadowSilhouettes::pt_sample(const Pixel coord) {
 								   vertex.get_position(), m_sceneDesc.aabb, neeRnd,
 								   guideFunction);
 				Pixel outCoord;
-				auto value = vertex.evaluate(nee.direction, m_sceneDesc.media, outCoord);
+				auto value = vertex.evaluate(nee.dir.direction, m_sceneDesc.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
 				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 				Spectrum radiance = value.value * nee.diffIrradiance;
 				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 					bool anyhit = scene::accel_struct::any_intersection(
-						m_sceneDesc, { vertex.get_position(), nee.direction },
-						vertex.get_primitive_id(), nee.dist);
+						m_sceneDesc, vertex.get_position(), nee.position,
+						vertex.get_geometric_normal(), nee.geoNormal,
+						nee.dir.direction);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (m_params.neeCount + hitPdf / nee.creationPdf);
@@ -490,9 +491,9 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 	constexpr float DIST_EPSILON = 0.001f;
 
 	// TODO: worry about spheres?
-	const ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
+	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
 
-	const auto secondHit = scene::accel_struct::first_intersection(m_sceneDesc, backfaceRay, vertex.ext().shadowHit,
+	const auto secondHit = scene::accel_struct::first_intersection(m_sceneDesc, backfaceRay, vertex.get_geometric_normal(),
 																   vertex.ext().lightDistance - vertex.ext().firstShadowDistance + DIST_EPSILON);
 	// We absolutely have to have a second hit - either us (since we weren't first hit) or something else
 	if(secondHit.hitId.instanceId >= 0 && secondHit.hitId != vertex.get_primitive_id()
@@ -531,12 +532,12 @@ bool CpuShadowSilhouettes::trace_shadow_silhouette(const ei::Ray& shadowRay, con
 
 		if(sharedVertices >= 1) {
 			// Got at least a silhouette point - now make sure we're seeing the silhouette
-			const ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
+			ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
 
 			/*const auto thirdHit = scene::accel_struct::any_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
 																		vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
 			if(!thirdHit) {*/
-			const auto thirdHit = scene::accel_struct::first_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
+			const auto thirdHit = scene::accel_struct::first_intersection(m_sceneDesc, silhouetteRay, secondHit.normal,
 																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
 				for(i32 i = 0; i < sharedVertices; ++i) {
@@ -559,15 +560,15 @@ bool CpuShadowSilhouettes::trace_shadow(const ei::Ray& shadowRay, const SilPathV
 	constexpr float DIST_EPSILON = 0.001f;
 
 	// TODO: worry about spheres?
-	const ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
+	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
 
-	const auto secondHit = scene::accel_struct::first_intersection(m_sceneDesc, backfaceRay, vertex.ext().shadowHit,
+	const auto secondHit = scene::accel_struct::first_intersection(m_sceneDesc, backfaceRay, vertex.get_geometric_normal(),
 																   vertex.ext().lightDistance - vertex.ext().firstShadowDistance + DIST_EPSILON);
 	if(secondHit.hitId.instanceId < 0 || secondHit.hitId == vertex.get_primitive_id())
 		return false;
 
-	const ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
-	const auto thirdHit = scene::accel_struct::first_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
+	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
+	const auto thirdHit = scene::accel_struct::first_intersection(m_sceneDesc, silhouetteRay, secondHit.normal,
 																  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
 	if(thirdHit.hitId == vertex.get_primitive_id()) {
 		const auto& hitId = vertex.ext().shadowHit;
@@ -633,7 +634,7 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
 
-	logError("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
+	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
 void CpuShadowSilhouettes::update_reduction_factors() {

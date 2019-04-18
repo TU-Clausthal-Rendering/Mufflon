@@ -4,11 +4,11 @@
 
 namespace mufflon { namespace renderer {
 
-using PtParameters = ParameterHandler<
+using VcmParameters = ParameterHandler<
 	PMinPathLength,
 	PMaxPathLength,
-	PNeeCount,
-	PNeePositionGuide
+	PMergeRadius,
+	PProgressive
 >;
 
 }} // namespace mufflon::renderer

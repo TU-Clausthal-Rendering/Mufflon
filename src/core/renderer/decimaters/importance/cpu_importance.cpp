@@ -248,15 +248,14 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 							   vertices[pathLen].get_position(), m_currentScene->get_bounding_box(),
 							   neeRnd, scene::lights::guide_flux);
 			Pixel projCoord;
-			auto value = vertices[pathLen].evaluate(nee.direction, m_sceneDesc.media, projCoord);
+			auto value = vertices[pathLen].evaluate(nee.dir.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			// TODO: use multiple NEEs
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				const auto shadowRay = ei::Ray{ nee.lightPoint, -nee.direction };
+				auto shadowRay = ei::Ray{ nee.position, -nee.dir.direction };
 
-				auto shadowHit = scene::accel_struct::first_intersection(m_sceneDesc, shadowRay,
-																		 vertices[pathLen].get_primitive_id(), nee.dist);
+				auto shadowHit = scene::accel_struct::first_intersection(m_sceneDesc, shadowRay, vertices[pathLen].get_geometric_normal(), nee.dist);
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
@@ -360,14 +359,15 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 								   vertex.get_position(), m_sceneDesc.aabb, neeRnd,
 								   guideFunction);
 				Pixel outCoord;
-				auto value = vertex.evaluate(nee.direction, m_sceneDesc.media, outCoord);
+				auto value = vertex.evaluate(nee.dir.direction, m_sceneDesc.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
 				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 				Spectrum radiance = value.value * nee.diffIrradiance;
 				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 					bool anyhit = scene::accel_struct::any_intersection(
-						m_sceneDesc, { vertex.get_position(), nee.direction },
-						vertex.get_primitive_id(), nee.dist);
+						m_sceneDesc, vertex.get_position(), nee.position,
+						vertex.get_geometric_normal(), nee.geoNormal,
+						nee.dir.direction);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (m_params.neeCount + hitPdf / nee.creationPdf);
@@ -487,6 +487,8 @@ void CpuImportanceDecimater::initialize_decimaters() {
 	m_decimaters.resize(objects.size());
 	auto objIter = objects.begin();
 
+	const auto timeBegin = CpuProfileState::get_process_time();
+
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < static_cast<i32>(objects.size()); ++i) {
 		auto objIter = objects.begin();
@@ -512,6 +514,8 @@ void CpuImportanceDecimater::initialize_decimaters() {
 		// TODO: this reeeeally breaks instancing
 		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
+
+	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
 void CpuImportanceDecimater::update_reduction_factors() {

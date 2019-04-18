@@ -9,6 +9,8 @@
 #include "core/renderer/wireframe/gpu_wireframe.hpp"
 #include "core/renderer/bpt/cpu_bpt.hpp"
 #include "core/renderer/bpm/cpu_bpm.hpp"
+#include "core/renderer/neb/cpu_neb.hpp"
+#include "core/renderer/vcm/cpu_vcm.hpp"
 
 namespace mufflon::renderer {
 
@@ -17,6 +19,8 @@ using Renderers = util::TaggedTuple<
 	CpuWireframe, GpuWireframe,
 	CpuBidirPathTracer,
 	CpuBidirPhotonMapper,
+	CpuNextEventBacktracking,
+	CpuVcm,
 	decimaters::CpuShadowSilhouettes, decimaters::CpuImportanceDecimater
 >;
 

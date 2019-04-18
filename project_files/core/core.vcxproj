@@ -27,9 +27,11 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_map.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu_silhouette.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_decimater.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\neb\cpu_neb.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\vcm\cpu_vcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
@@ -201,6 +203,9 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_decimater.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\sil_common.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\neb\cpu_neb.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\neb\density_octree.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\neb\neb_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
@@ -213,12 +218,15 @@
     <ClInclude Include="..\..\src\core\renderer\renderer.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderers.hpp" />
     <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\vcm\cpu_vcm.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\vcm\vcm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\cpu_wireframe.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\gpu_wireframe.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_params.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\intersection.hpp" />
+    <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\tangent_space.hpp" />
     <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
@@ -282,6 +290,7 @@
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
     <ClCompile Include="..\..\src\core\renderer\output_handler.cpp" />
+    <CudaCompile Include="..\..\src\core\memory\allocator.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />

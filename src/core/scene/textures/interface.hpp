@@ -102,6 +102,8 @@ CUDA_FUNCTION UvCoordinate cubemap_surface_to_uv(const Point& cubePos, int& laye
 
 // Compute the postion on the unit cube given a layer index and the local uv coordinates.
 CUDA_FUNCTION Point cubemap_uv_to_surface(UvCoordinate uv, int layer) {
+	// Turn the texel coordinates into UVs and remap from [0, 1] to [-1, 1]
+	uv = uv * 2.0f - 1.0f;
 	switch(layer) {
 		case 0: return Point{ 1.f, uv.y, -uv.x };
 		case 1: return Point{ -1.f, uv.y, uv.x };
@@ -125,6 +127,7 @@ CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const
 		// Cubemap
 		// Find out which face by elongating the direction
 		ei::Vec3 projDir = direction / ei::max(ei::abs(direction));
+		projDir.z = -projDir.z;
 		// Set the layer and UV coordinates
 		int layer;
 		uvOut = cubemap_surface_to_uv(projDir, layer);

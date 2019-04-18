@@ -30,6 +30,7 @@ bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 
 bool RendererBase<Device::CPU>::pre_iteration(OutputHandler& outputBuffer) {
 	m_outputBuffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
+	m_currentIteration = outputBuffer.get_current_iteration();
 	if(m_reset) {
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");

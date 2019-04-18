@@ -612,6 +612,8 @@ bool WorldContainer::load_scene_lights() {
 				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
 				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
 				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
+				ei::Mat3x4 instanceTransformation = inst->get_transformation_matrix() * ei::scaling(ei::Vec4{inst->get_scale(), 1.0f});
+				bool isMirroring = determinant(ei::Mat3x3{instanceTransformation}) < 0.0f;
 				for(const auto& face : polygons.faces()) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
 					if(mat->get_properties().is_emissive()) {
@@ -623,9 +625,13 @@ bool WorldContainer::load_scene_lights() {
 							al.scale = ei::packRGB9E5(emission.scale);
 							int i = 0;
 							for(auto vHdl : face) {
-								al.points[i] = inst->get_transformation_matrix() * ei::Vec4{inst->get_scale() * positions[vHdl.idx()], 1.0f};
+								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
+							}
+							if(isMirroring) {
+								std::swap(al.points[1], al.points[2]);
+								std::swap(al.uv[1], al.uv[2]);
 							}
 							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
 						} else {
@@ -634,9 +640,13 @@ bool WorldContainer::load_scene_lights() {
 							al.scale = emission.scale;
 							int i = 0;
 							for(auto vHdl : face) {
-								al.points[i] = inst->get_transformation_matrix() * ei::Vec4{inst->get_scale() * positions[vHdl.idx()], 1.0f};
+								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
+							}
+							if(isMirroring) {
+								std::swap(al.points[1], al.points[3]);
+								std::swap(al.uv[1], al.uv[3]);
 							}
 							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
 						}

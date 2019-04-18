@@ -115,6 +115,10 @@ sample(const TangentSpace& tangentSpace,
 	if(eDotG * eDotN <= 0.0f) res.throughput = Spectrum{0.0f};
 	res.excident = globalDir;
 
+	// Make sure the PDFs do not overflow in MIS
+	res.pdf.forw = AngularPdf{ei::min(float(res.pdf.forw), 1e9f)};
+	res.pdf.back = AngularPdf{ei::min(float(res.pdf.back), 1e9f)};
+
 	// Shading normal correction
 	if(adjoint) {
 		res.throughput *= (SHADING_NORMAL_EPS + ei::abs(iDotN * eDotG))
@@ -209,6 +213,11 @@ evaluate(const TangentSpace& tangentSpace,
 				   / (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
+	// Make sure the PDFs do not overflow in MIS
+	res.pdf.forw = AngularPdf{ei::min(float(res.pdf.forw), 1e9f)};
+	res.pdf.back = AngularPdf{ei::min(float(res.pdf.back), 1e9f)};
+
+
 	return math::EvalValue{
 		res.value, ei::abs(eDotN),
 		// Swap back output values if we swapped the directions before
@@ -241,6 +250,19 @@ emission(const ParameterPack& params, const scene::Direction& geoN, const scene:
 		return emission(*as<typename MatType::SampleType>(subParams), geoN, excident);
 	);
 	return math::SampleValue{};
+}
+
+
+/* 
+ * Get the maximum value of the pdf (approximated for some models).
+ */
+CUDA_FUNCTION float
+pdf_max(const ParameterPack& params) {
+	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
+	material_switch(params.type,
+		return pdf_max(*as<typename MatType::SampleType>(subParams));
+	);
+	return 0.0f;
 }
 
 }}} // namespace mufflon::scene::materials

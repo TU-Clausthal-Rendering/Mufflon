@@ -133,24 +133,28 @@ public:
 		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
-	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident) {
+	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident, const PathVertex* previous) {
 		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		m_incident = incident;
 	}
 
-	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosT, distSq);
+	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosθ, distSq);
 	// This method ensures compatibility with any kind of interaction.
 	// connection: a direction with arbitrary orientation
-	CUDA_FUNCTION float get_geometrical_factor(const scene::Direction& connection) const {
+	CUDA_FUNCTION float get_geometric_factor(const scene::Direction& connection) const {
 		switch(m_type) {
 			case Interaction::LIGHT_AREA: {
 				return dot(connection, m_incident);
 			}
-			case Interaction::SURFACE: {
+			case Interaction::SURFACE:
+			case Interaction::VIRTUAL: {
 				return dot(connection, m_desc.surface.tangentSpace.shadingN);
 			}
+			case Interaction::LIGHT_ENVMAP: {
+				return 1.0f;
+			}
 		}
-		return 1.0f;
+		return 0.0f;
 	}
 
 	// Get a normal if there is any. Otherwise returns a 0-vector.
@@ -173,6 +177,13 @@ public:
 		return scene::Direction{0.0f};
 	}
 
+	CUDA_FUNCTION const scene::TangentSpace* get_tangent_space() const {
+		if(m_type == Interaction::SURFACE) {
+			return &m_desc.surface.tangentSpace;
+		}
+		return nullptr;
+	}
+
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
 	CUDA_FUNCTION struct { AreaPdf pdf; float geoFactor; }
@@ -184,12 +195,17 @@ public:
 		// It is simply projected directly to the surface.
 		bool orthoSource = renderer::is_orthographic(sourceType);
 		bool orthoTarget = this->is_orthographic();
-		float geoFactor = this->get_geometrical_factor(connection.dir);
+		float geoFactor = this->get_geometric_factor(connection.dir);
 		if(orthoSource || orthoTarget) {
 			return { AreaPdf{ float(samplePdf) * ei::abs(geoFactor) }, geoFactor };
 		}
 		return { samplePdf.to_area_pdf(geoFactor, connection.distanceSq), geoFactor };
 	}
+
+	// Get the path length in segments up to this vertex.
+	int get_path_len() const { return m_pathLen; }
+	// Overwrite path length (e.g. if the previous element is not set/changed for this vertex)
+	void set_path_len(int l) { m_pathLen = l; }
 
 	// Get the sampling PDFs of this vertex (not defined, if
 	// the vertex is an end point on a surface). Details at the members
@@ -315,26 +331,19 @@ public:
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
 	CUDA_FUNCTION float get_incident_dist_sq() const {
-		if(is_end_point()) return 0.0f;
-		const PathVertex* prev = as<PathVertex>(as<u8>(this) + m_offsetToPath);
+		if(is_end_point() || !m_previous) return 0.0f;
 		// The m_position is always a true position (the 'this' vertex is not an
 		// end-point and can thus not be an orthogonal source).
-		return lensq(prev->get_position(m_position) - m_position);
+		return lensq(m_previous->get_position(m_position) - m_position);
 	}
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
 	CUDA_FUNCTION const PathVertex* previous() const {
-		return m_offsetToPath == 0 ? nullptr : as<PathVertex>(as<u8>(this) + m_offsetToPath);
+		return m_previous;
 	}
 
 	// Access to the renderer dependent extension
 	CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
-
-	// Call the vertex-extension's update function for this vertex (see extension for more details).
-	CUDA_FUNCTION void update_ext(const scene::Direction& excident,
-								  const math::PdfPair& pdf) const {
-		m_extension.update(*this, excident, pdf);
-	}
 
 	/*
 	* Compute the connection vector from path0 to path1.
@@ -420,6 +429,14 @@ public:
 		return {0.0f, 0.0f};
 	}
 
+	// TODO: for other vertices than surfaces
+	CUDA_FUNCTION float get_pdf_max() const {
+		if(m_type == Interaction::SURFACE) {
+			return pdf_max(m_desc.surface.mat());
+		}
+		return 0.0f;
+	}
+
 	/* *************************************************************************
 	 * Creation methods (factory)											   *
 	 * Memory management of vertices is quite challenging, because its size	   *
@@ -434,7 +451,8 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = incidentRay.origin + incidentRay.direction * scene::MAX_SCENE_SIZE;
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incidentRay.direction;
 		vert->m_extension = ExtensionT{};
@@ -448,7 +466,8 @@ public:
 		const math::RndSet2& rndSet
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_incident = ei::Vec3{
 			static_cast<float>(pixel.x),
 			static_cast<float>(pixel.y),
@@ -480,7 +499,8 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = lightSample.pos.position;
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_extension = ExtensionT{};
 		switch(lightSample.type) {
 			case scene::lights::LightType::POINT_LIGHT: {
@@ -543,17 +563,18 @@ public:
 		const AngularPdf prevPdf,
 		const math::Throughput& incidentThrougput
 	) {
+		Interaction prevEventType = (previous != nullptr) ?
+			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::SURFACE;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
 		vert->m_desc.surface.tangentSpace = tangentSpace;
 		vert->m_desc.surface.primitiveId = hit.hitId;
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
-		Interaction prevEventType = (previous != mem) && (previous != nullptr) ?
-			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
 						 incidentPdf.pdf, -incidentPdf.geoFactor, incidentThrougput);
@@ -570,7 +591,8 @@ public:
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = scene::Point{0.0f};
-		vert->init_prev_offset(mem, previous);
+		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
+		vert->m_pathLen = previous ? static_cast<const PathVertex*>(previous)->m_pathLen + 1 : 0;
 		vert->m_type = Interaction::VOID;
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
@@ -603,16 +625,16 @@ private:
 		CUDA_FUNCTION scene::materials::ParameterPack& mat() { return *as<scene::materials::ParameterPack>(matParams); }
 	};
 
+	// The previous vertex on the path or nullptr.
+	const PathVertex* m_previous;
 
 	// The vertex position in world space. For orthographic end vertices
 	// this is the start point on the boundary or any other artificial point outside the boundary.
 	scene::Point m_position;
 
-	// Byte offset to the beginning of a path.
-	i16 m_offsetToPath;
-
 	// Interaction type of this vertex (the descriptor at the end of the vertex depends on this).
 	Interaction m_type;
+	i16 m_pathLen;
 
 	// Direction from which this vertex was reached.
 	// For end points the following values are stored:
@@ -646,12 +668,6 @@ private:
 		cameras::PinholeParams pinholeCam;
 		cameras::FocusParams focusCam;
 	} m_desc;
-
-	CUDA_FUNCTION void init_prev_offset(void* mem, const void* previous) {
-		std::ptrdiff_t s = as<u8>(previous) - as<u8>(mem);
-		mAssert(ei::abs(s) < 0x1000);
-		m_offsetToPath = static_cast<i16>(s);
-	}
 
 	// Vertex size without the descriptor, the descriptor is 8byte aligned...
 	static constexpr int this_size() {

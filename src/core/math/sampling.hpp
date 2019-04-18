@@ -123,7 +123,10 @@ CUDA_FUNCTION __forceinline__ PositionSample sample_position(const scene::Direct
 		x = rescale_sample(x, projAx + projAy, area);
 		position = ei::Vec3{ u1, x, (dir.z < 0.f) ? 1.f : 0.f };
 	}
-	return PositionSample{ bounds.min + position * sides, AreaPdf{ 1.f / area } };
+	// Go a small step backward (dir * 1e-3f), because in some cases the
+	// scene boundary are true surface (e.g. cornell box), which would be
+	// ignored/unshadowed in this case.
+	return PositionSample{ bounds.min + position * sides - dir * 1e-3f, AreaPdf{ 1.f / area } };
 }
 
 CUDA_FUNCTION __forceinline__ float projected_area(const scene::Direction& dir,

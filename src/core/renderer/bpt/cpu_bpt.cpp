@@ -118,6 +118,8 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	Connection connection = BptPathVertex::get_connection(path0, path1);
 	auto val0 = path0.evaluate( connection.dir, scene.media, coord, false);
 	auto val1 = path1.evaluate(-connection.dir, scene.media, coord, true);
+	// Cancel reprojections outside the screen
+	if(coord.x == -1) return {Spectrum{0.0f}, 0.0f};
 	Spectrum bxdfProd = val0.value * val1.value;
 	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
@@ -127,8 +129,8 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
 		// Shadow test
 		if(!scene::accel_struct::any_intersection(
-				scene, { connection.v0, connection.dir },
-				path0.get_primitive_id(), connection.distance)) {
+				scene, connection.v0, path1.get_position(connection.v0),
+				path0.get_geometric_normal(), path1.get_geometric_normal(), connection.dir)) {
 			float mis = get_mis_weight(path0, val0.pdf, path1, val1.pdf, connection);
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}
@@ -171,12 +173,12 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	u64 lightTreeSeed = m_rngs[idx].next();
 	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, outputBuffer.get_num_pixels(),
 		lightTreeSeed, m_sceneDesc.aabb, rndStart);
-	BptPathVertex::create_light(&path[0], &path[0], p, m_rngs[idx]);
+	BptPathVertex::create_light(&path[0], nullptr, p, m_rngs[idx]);
 	math::Throughput throughput;
 	VertexSample sample;
 
 	int lightPathLen = 0;
-	do {
+	if(m_params.maxPathLength > 1) do {
 		// Walk
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
@@ -188,7 +190,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	// Trace view path
 	BptPathVertex vertex[2];
 	// Create a start for the path
-	BptPathVertex::create_camera(&vertex[0], &vertex[0], m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
+	BptPathVertex::create_camera(&vertex[0], nullptr, m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
 	int currentV = 0;
 	throughput = math::Throughput{};
 	int viewPathLen = 0;

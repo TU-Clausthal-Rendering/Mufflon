@@ -23,7 +23,7 @@ namespace gui.Command
         {
             m_models = models;
             m_lastDirectory = models.Settings.LastWorldPath;
-            if(m_lastDirectory.Length == 0)
+            if(m_lastDirectory == null || m_lastDirectory.Length == 0)
                 m_lastDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
@@ -59,6 +59,7 @@ namespace gui.Command
                 dialog.RestoreDirectory = false;
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
+                    m_models.Settings.LastWorldPath = Path.GetDirectoryName(dialog.FileName);
                     m_models.LoadSceneAsynch(dialog.FileName);
                 }
             }

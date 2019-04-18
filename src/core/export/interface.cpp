@@ -82,6 +82,10 @@ using SphereVHdl = Spheres::SphereHandle;
 // Return values for invalid handles/attributes
 namespace {
 
+// Specifies the minimum compute capability requirements
+constexpr int minMajorCC = 5;
+constexpr int minMinorCC = 0;
+
 // static variables for interacting with the renderer
 renderer::IRenderer* s_currentRenderer;
 // Current iteration counter
@@ -1298,20 +1302,25 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			return nullptr;
 		case MATERIAL_BLEND: {
 			// Order materials to reduce the number of cases
-			const MaterialParams* layerA = mat->inner.blend.a.mat;
-			const MaterialParams* layerB = mat->inner.blend.b.mat;
+			const auto* layerA = &mat->inner.blend.a;
+			const auto* layerB = &mat->inner.blend.b;
 			if(mat->inner.blend.a.mat->innerType < mat->inner.blend.b.mat->innerType)
 				std::swap(layerA, layerB);
-			if(layerA->innerType == MATERIAL_LAMBERT && layerB->innerType == MATERIAL_EMISSIVE) {
+			if(layerA->mat->innerType == MATERIAL_LAMBERT && layerB->mat->innerType == MATERIAL_EMISSIVE) {
 				newMaterial = std::make_unique<Material<Materials::LAMBERT_EMISSIVE>>(
-					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
-					to_ctor_args(layerA->inner.lambert),
-					to_ctor_args(layerB->inner.emissive));
-			} else if(layerA->innerType == MATERIAL_TORRANCE && layerB->innerType == MATERIAL_LAMBERT) {
+					layerA->factor, layerB->factor,
+					to_ctor_args(layerA->mat->inner.lambert),
+					to_ctor_args(layerB->mat->inner.emissive));
+			} else if(layerA->mat->innerType == MATERIAL_TORRANCE && layerB->mat->innerType == MATERIAL_LAMBERT) {
 				newMaterial = std::make_unique<Material<Materials::TORRANCE_LAMBERT>>(
-					mat->inner.blend.a.factor, mat->inner.blend.b.factor,
-					to_ctor_args(layerA->inner.torrance),
-					to_ctor_args(layerB->inner.lambert));
+					layerA->factor, layerB->factor,
+					to_ctor_args(layerA->mat->inner.torrance),
+					to_ctor_args(layerB->mat->inner.lambert));
+			} else if(layerA->mat->innerType == MATERIAL_WALTER && layerB->mat->innerType == MATERIAL_TORRANCE) {
+				newMaterial = std::make_unique<Material<Materials::WALTER_TORRANCE>>(
+					layerA->factor, layerB->factor,
+					to_ctor_args(layerA->mat->inner.walter),
+					to_ctor_args(layerB->mat->inner.torrance));
 			} else {
 				logWarning("[", FUNCTION_NAME, "] Unsupported 'blend' material. The combination of layers is not supported.");
 				return nullptr;
@@ -3178,7 +3187,7 @@ Boolean mufflon_initialize() {
 			cudaDeviceProp deviceProp;
 			for (int c = 0; c < count; ++c) {
 				cuda::check_error(cudaGetDeviceProperties(&deviceProp, c));
-				if(deviceProp.unifiedAddressing) {
+				if(deviceProp.unifiedAddressing && deviceProp.major >= minMajorCC && deviceProp.minor >= minMinorCC) {
 					if(deviceProp.major > major ||
 						((deviceProp.major == major) && (deviceProp.minor > minor))) {
 						major = deviceProp.major;
@@ -3188,13 +3197,15 @@ Boolean mufflon_initialize() {
 				}
 			}
 			if(devIndex < 0) {
-				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none supports unified addressing; "
+				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none support unified addressing or have the required compute capability; "
 						 "continuing without CUDA");
 			} else {
 				cuda::check_error(cudaSetDevice(devIndex));
+				cuda::check_error(cudaGetDeviceProperties(&deviceProp, devIndex));
 				s_cudaDevIndex = devIndex;
 				logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
-						"devices; initializing device ", devIndex, " (", deviceProp.name, ")");
+						"devices; initializing device ", devIndex, " (", deviceProp.name, ", compute capability ",
+						deviceProp.major, ".", deviceProp.minor, ")");
 			}
 		} else {
 			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");

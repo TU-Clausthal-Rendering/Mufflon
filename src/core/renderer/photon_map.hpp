@@ -111,7 +111,8 @@ public:
 	}
 
 	// Get the number of elements in the hash map
-	u32 size() const { return m_dataCount->load(); }
+	u32 size() const { return ei::min(m_dataCapacity, m_dataCount->load()); }
+	u32 capacity() const { return m_dataCapacity; }
 
 	class NeighborIterator
 	{
@@ -161,6 +162,40 @@ public:
 		++it;
 		return it;
 	}
+
+	/*class MapIterator {
+		const HashGrid<Device::CPU, V>* m_container;
+		u32 m_dataIdx = 0;
+		u32 m_dataCount;
+		friend class HashGrid;
+	public:
+		MapIterator& operator ++ () {
+			++m_dataIdx;
+			return *this;
+		}
+
+		const V& operator * () const { return m_container->m_data[m_dataIdx].data; }
+		const V* operator -> () const { return &m_container->m_data[m_dataIdx].data; }
+		bool operator == (const NeighborIterator& _other) const { return m_container == _other.m_container && m_dataIdx == _other.m_dataIdx; }
+		bool operator != (const NeighborIterator& _other) const { return m_container != _other.m_container || m_dataIdx != _other.m_dataIdx; }
+		operator bool () const { return m_dataIdx < m_dataCount; }
+	};
+	MapIterator begin() const {
+		MapIterator it;
+		it.m_container = this;
+		it.m_dataCount = m_dataCount->load();
+		return it;
+	}
+	MapIterator end() const {
+		MapIterator it;
+		it.m_container = this;
+		it.m_dataCount = m_dataCount->load();
+		it.m_dataIdx = it.m_dataCount;
+		return it;
+	}*/
+
+	V& get_data_by_index(u32 index) { return m_data[index].data; }
+	const V& get_data_by_index(u32 index) const { return m_data[index].data; }
 
 private:
 	std::atomic_uint32_t* m_map;
@@ -236,6 +271,10 @@ public:
 	void mark_changed(Device changed) noexcept {
 		m_memory.mark_changed(changed);
 	}
+
+	// Get the size of assoziated memory blocks (does not count the header information
+	// in the current instance).
+	std::size_t mem_size() const { return m_memory.size(); }
 private:
 	GenericResource m_memory;	// Contains both: hash table and data
 	u32 m_mapSize;				// Size of the hash table

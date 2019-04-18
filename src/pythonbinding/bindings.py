@@ -1,5 +1,6 @@
 from ctypes import *
 from time import *
+from enum import IntEnum
 import ntpath
 
 class ProcessTime(Structure):
@@ -13,6 +14,22 @@ class DllHolder:
         self.core = cdll.LoadLibrary("core.dll")
         self.mffLoader = cdll.LoadLibrary("mffloader.dll")
 
+class Device(IntEnum):
+    CPU = 1,
+    CUDA = 2,
+    OPENGL = 4
+
+class LogLevel(IntEnum):
+    PEDANTIC = 0,
+    INFO = 1,
+    WARNING = 2,
+    ERROR = 3,
+    FATAL_ERROR = 4
+    
+class LoaderStatus(IntEnum):
+    SUCCESS = 0,
+    ERROR = 1,
+    ABORT = 2
 
 class DllInterface:
 
@@ -21,6 +38,7 @@ class DllInterface:
         self.dllHolder.core.mufflon_initialize()
         self.disable_profiling()
         self.dllHolder.core.render_get_renderer_name.restype = c_char_p
+        self.dllHolder.core.render_get_renderer_short_name.restype = c_char_p
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
@@ -30,6 +48,12 @@ class DllInterface:
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
+        
+    def core_set_log_level(self, logLevel):
+        return self.dllHolder.core.core_set_log_level(c_int32(logLevel)) != 0
+        
+    def loader_set_log_level(self, logLevel):
+        return self.dllHolder.mffLoader.loader_set_log_level(c_int32(logLevel)) != 0
 
     def disable_profiling(self):
         self.dllHolder.core.profiling_disable()
@@ -74,7 +98,7 @@ class DllInterface:
 
     def render_enable_render_target(self, targetIndex, variance):
         return self.dllHolder.core.render_enable_render_target(c_uint32(targetIndex), c_bool(variance))
-		
+    
     def render_disable_render_target(self, targetIndex, variance):
         return self.dllHolder.core.render_disable_render_target(c_uint32(targetIndex), c_bool(variance))
 
@@ -86,6 +110,12 @@ class DllInterface:
 
     def render_get_renderer_name(self, rendererIndex):
         return self.dllHolder.core.render_get_renderer_name(c_uint32(rendererIndex)).decode()
+
+    def render_get_renderer_short_name(self, rendererIndex):
+        return self.dllHolder.core.render_get_renderer_short_name(c_uint32(rendererIndex)).decode()
+
+    def render_renderer_uses_device(self, rendererIndex, device):
+        return self.dllHolder.core.render_renderer_uses_device(c_uint32(rendererIndex), c_int32(device)) != 0
 
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
@@ -114,31 +144,52 @@ class RenderActions:
         fileName = path_leaf(sceneJson)
         self.sceneName = fileName.split(".")[0]
         returnValue = self.dllInterface.loader_load_json(sceneJson)
-        self.dllInterface.render_enable_render_target(0, False)
-        return returnValue
+        if returnValue != LoaderStatus.SUCCESS:
+            raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + returnValue.name + ")")
+        self.enable_render_target(0, False)
 
-    def enable_renderer(self, rendererString):
+    def enable_renderer(self, rendererName, devices):
         for i in range(self.dllInterface.render_get_renderer_count()):
             name = self.dllInterface.render_get_renderer_name(i)
-            if name == rendererString:
-                self.activeRendererName = rendererString
-                self.dllInterface.render_enable_renderer(i)
-                return True
-        return False
+            shortName = self.dllInterface.render_get_renderer_short_name(i)
+            if (name.lower() == rendererName.lower() or shortName.lower() == rendererName.lower()):
+                matchesDevices = True
+                for dev in Device:
+                    if (dev in devices) != self.dllInterface.render_renderer_uses_device(i, dev):
+                        matchesDevices = False
+                        break
+                if matchesDevices:
+                    self.activeRendererName = rendererName
+                    self.dllInterface.render_enable_renderer(i)
+                    return
+        deviceStr = "[ "
+        for dev in devices:
+            deviceStr += dev.name + " "
+        deviceStr += "]"
+        raise Exception("Could not find renderer '" + rendererName + "' for the devices " + deviceStr)
         
     def load_scenario(self, scenarioName):
         hdl = self.dllInterface.world_find_scenario(scenarioName)
         if not hdl:
-            return False
-        if self.dllInterface.world_load_scenario(hdl):
-            return True
-        return False
+            raise Exception("Failed to find scenario '" + scenarioName + "'")
+        if not self.dllInterface.world_load_scenario(hdl):
+            raise Exception("Failed to load scenario '" + scenarioName + "'")
+        
+    def set_renderer_log_level(self, logLevel):
+        if not self.dllInterface.core_set_log_level(logLevel):
+            raise Exception("Failed to set log level to '" + logLevel.name + "'")
+			
+    def set_loader_log_level(self, logLevel):
+        if not self.dllInterface.loader_set_log_level(logLevel):
+            raise Exception("Failed to set log level to '" + logLevel.name + "'")
 
     def enable_render_target(self, targetIndex, variance):
-        self.dllInterface.render_enable_render_target(targetIndex, variance)
-		
+        if not self.dllInterface.render_enable_render_target(targetIndex, variance):
+            raise Exception("Failed to enable render target " + str(targetIndex) + " (variance: " + str(variance) + ")")
+        
     def disable_render_target(self, targetIndex, variance):
-        self.dllInterface.render_disable_render_target(targetIndex, variance)
+      if not self.dllInterface.render_disable_render_target(targetIndex, variance):
+            raise Exception("Failed to disable render target " + str(targetIndex) + " (variance: " + str(variance) + ")")
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
@@ -161,11 +212,13 @@ class RenderActions:
                 fName = filename.replace("#target", self.dllInterface.render_get_render_target_name(targetIndex) + "(Variance)", 1)
                 self.dllInterface.render_save_screenshot(fName, targetIndex, True)
 
-    def render_for_iterations(self, iterationCount):
+    def render_for_iterations(self, iterationCount, printProgress=False, progressSteps=1):
         accumIterateTime = ProcessTime(0,0)
         accumPreTime = ProcessTime(0,0)
         accumPostTime = ProcessTime(0,0)
         for i in range(iterationCount):
+            if printProgress and (i % progressSteps == 0):
+                print("--- ", (i + 1), " of ", iterationCount, " ---")
             [iterateTime, preTime, postTime] = self.dllInterface.render_iterate()
             accumIterateTime.microseconds += iterateTime.microseconds
             accumIterateTime.cycles += iterateTime.cycles

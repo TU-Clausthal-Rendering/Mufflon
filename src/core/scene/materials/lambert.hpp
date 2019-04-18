@@ -54,6 +54,10 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleLambert& params, const s
 	return math::SampleValue{};
 }
 
+CUDA_FUNCTION float pdf_max(const MatSampleLambert& params) {
+	return 1.0f / ei::PI;
+}
+
 template MaterialSampleConcept<MatSampleLambert>;
 template MaterialConcept<MatLambert>;
 
