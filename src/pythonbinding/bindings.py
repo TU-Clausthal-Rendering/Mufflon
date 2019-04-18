@@ -19,6 +19,18 @@ class Device(IntEnum):
     CUDA = 2,
     OPENGL = 4
 
+class LogLevel(IntEnum):
+    PEDANTIC = 0,
+    INFO = 1,
+    WARNING = 2,
+    ERROR = 3,
+    FATAL_ERROR = 4
+    
+class LoaderStatus(IntEnum):
+    SUCCESS = 0,
+    ERROR = 1,
+    ABORT = 2
+
 class DllInterface:
 
     def __init__(self):
@@ -36,6 +48,12 @@ class DllInterface:
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
+        
+    def core_set_log_level(self, logLevel):
+        return self.dllHolder.core.core_set_log_level(c_int32(logLevel)) != 0
+        
+    def loader_set_log_level(self, logLevel):
+        return self.dllHolder.mffLoader.loader_set_log_level(c_int32(logLevel)) != 0
 
     def disable_profiling(self):
         self.dllHolder.core.profiling_disable()
@@ -126,8 +144,9 @@ class RenderActions:
         fileName = path_leaf(sceneJson)
         self.sceneName = fileName.split(".")[0]
         returnValue = self.dllInterface.loader_load_json(sceneJson)
-        self.dllInterface.render_enable_render_target(0, False)
-        return returnValue
+        if returnValue != LoaderStatus.SUCCESS:
+            raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + returnValue.name + ")")
+        self.enable_render_target(0, False)
 
     def enable_renderer(self, rendererName, devices):
         for i in range(self.dllInterface.render_get_renderer_count()):
@@ -152,16 +171,25 @@ class RenderActions:
     def load_scenario(self, scenarioName):
         hdl = self.dllInterface.world_find_scenario(scenarioName)
         if not hdl:
-            return False
-        if self.dllInterface.world_load_scenario(hdl):
-            return True
-        return False
+            raise Exception("Failed to find scenario '" + scenarioName + "'")
+        if not self.dllInterface.world_load_scenario(hdl):
+            raise Exception("Failed to load scenario '" + scenarioName + "'")
+        
+    def set_renderer_log_level(self, logLevel):
+        if not self.dllInterface.core_set_log_level(logLevel):
+            raise Exception("Failed to set log level to '" + logLevel.name + "'")
+			
+    def set_loader_log_level(self, logLevel):
+        if not self.dllInterface.loader_set_log_level(logLevel):
+            raise Exception("Failed to set log level to '" + logLevel.name + "'")
 
     def enable_render_target(self, targetIndex, variance):
-        self.dllInterface.render_enable_render_target(targetIndex, variance)
+        if not self.dllInterface.render_enable_render_target(targetIndex, variance):
+            raise Exception("Failed to enable render target " + str(targetIndex) + " (variance: " + str(variance) + ")")
         
     def disable_render_target(self, targetIndex, variance):
-        self.dllInterface.render_disable_render_target(targetIndex, variance)
+      if not self.dllInterface.render_disable_render_target(targetIndex, variance):
+            raise Exception("Failed to disable render target " + str(targetIndex) + " (variance: " + str(variance) + ")")
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern

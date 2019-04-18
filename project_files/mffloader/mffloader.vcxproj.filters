@@ -5,9 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\core">
-      <UniqueIdentifier>{cb799c0c-f3d0-4f32-9d0d-5d81003d2b7c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\deps">
       <UniqueIdentifier>{adc8945a-e961-41dc-a999-159a2781adc4}</UniqueIdentifier>
     </Filter>
@@ -25,9 +22,6 @@
     </Filter>
     <Filter Include="Source Files\profiler">
       <UniqueIdentifier>{0ebc98a5-a258-48ec-9fe9-d56a906b738e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\core\export">
-      <UniqueIdentifier>{7875ae35-a123-434f-b195-f62080099bc7}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\mffloader">
       <UniqueIdentifier>{87db4711-2986-4032-b8f1-8e6bd2d6041b}</UniqueIdentifier>
