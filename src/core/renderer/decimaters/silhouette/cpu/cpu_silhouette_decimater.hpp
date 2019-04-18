@@ -11,21 +11,23 @@
 
 namespace mufflon::renderer::decimaters::silhouette {
 
-class ImportanceDecimater {
+class CpuImportanceDecimater {
 public:
 	using Mesh = scene::geometry::PolygonMeshType;
 	using VertexHandle = typename Mesh::VertexHandle;
 
-	ImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
+	CpuImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
 						const std::size_t initialCollapses,
 						const float viewWeight, const float lightWeight,
 						const float shadowWeight, const float shadowSilhouetteWeight);
-	ImportanceDecimater(const ImportanceDecimater&) = delete;
-	ImportanceDecimater(ImportanceDecimater&&);
-	ImportanceDecimater& operator=(const ImportanceDecimater&) = delete;
-	ImportanceDecimater& operator=(ImportanceDecimater&&) = delete;
-	~ImportanceDecimater();
+	CpuImportanceDecimater(const CpuImportanceDecimater&) = delete;
+	CpuImportanceDecimater(CpuImportanceDecimater&&);
+	CpuImportanceDecimater& operator=(const CpuImportanceDecimater&) = delete;
+	CpuImportanceDecimater& operator=(CpuImportanceDecimater&&) = delete;
+	~CpuImportanceDecimater();
 
+	// Resizes the buffers properly
+	void start_iteration();
 	// Updates the importance densities of the decimated mesh
 	void udpate_importance_density();
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.

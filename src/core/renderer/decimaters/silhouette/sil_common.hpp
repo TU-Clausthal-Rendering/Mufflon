@@ -1,8 +1,27 @@
 #pragma once
 
 #include "core/renderer/path_util.hpp"
+#include "core/cuda/cuda_utils.hpp"
 
-namespace mufflon::renderer::decimaters::silhouette {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
+
+template < Device dev >
+struct Importances {
+	cuda::Atomic<dev, float> viewImportance;	// Importance hits (not light!); also holds final normalized importance value after update
+	cuda::Atomic<dev, float> irradiance;		// Accumulated irradiance
+	cuda::Atomic<dev, u32> hitCounter;			// Number of hits
+};
+
+template < Device dev >
+struct DeviceImportanceSums {
+	cuda::Atomic<dev, float> shadowImportance;
+	cuda::Atomic<dev, float> shadowSilhouetteImportance;
+};
+
+struct ImportanceSums {
+	float shadowImportance;
+	float shadowSilhouetteImportance;
+};
 
 struct SilVertexExt {
 	scene::Direction excident;
@@ -41,4 +60,4 @@ struct SilVertexExt {
 
 using SilPathVertex = PathVertex<SilVertexExt>;
 
-} // namespace mufflon::renderer::decimaters::silhouette
+}}}} // namespace mufflon::renderer::decimaters::silhouette

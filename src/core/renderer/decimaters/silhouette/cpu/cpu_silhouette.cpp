@@ -25,90 +25,9 @@ using namespace silhouette;
 
 namespace {
 
-struct LightData {
-	scene::lights::LightType type;
-	float flux;
-	u32 offset;
-};
-
-inline LightData get_light_data(const u32 lightIdx, const scene::lights::LightSubTree& tree) {
-	// Special case for only single light
-	if(tree.lightCount == 1) {
-		return LightData{
-			static_cast<scene::lights::LightType>(tree.root.type),
-			tree.root.flux,
-			0u
-		};
-	}
-
-	// Determine what level of the tree the light is on
-	const u32 level = std::numeric_limits<u32>::digits - 1u - static_cast<u32>(std::log2(tree.internalNodeCount + lightIdx + 1u));
-	// Determine the light's node index within its level
-	const u32 levelIndex = (tree.internalNodeCount + lightIdx) - ((1u << level) - 1u);
-	// The corresponding parent node's level index is then the level index / 2
-	const u32 parentLevelIndex = levelIndex / 2u;
-	// Finally, compute the tree index of the node
-	const u32 parentIndex = (1u << (level - 1u)) - 1u + parentLevelIndex;
-	const scene::lights::LightSubTree::Node& node = *tree.get_node(parentIndex * sizeof(scene::lights::LightSubTree::Node));
-
-	// Left vs. right node
-	// TODO: for better divergence let all even indices be processes first, then the uneven ones
-	if(levelIndex % 2 == 0) {
-		mAssert(node.left.type < static_cast<u16>(scene::lights::LightType::NUM_LIGHTS));
-		return LightData{
-			static_cast<scene::lights::LightType>(node.left.type),
-			node.left.flux, node.left.offset
-		};
-	} else {
-		mAssert(node.right.type < static_cast<u16>(scene::lights::LightType::NUM_LIGHTS));
-		return LightData{
-			static_cast<scene::lights::LightType>(node.right.type),
-			node.right.flux, node.right.offset
-		};
-	}
-}
-
 inline float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
-}
-
-inline std::string pretty_print_size(u32 bytes) {
-	std::string str;
-
-	const u32 decimals = 1u + static_cast<u32>(std::log10(bytes));
-	const u32 sizeBox = decimals / 3u;
-	const float val = static_cast<float>(bytes) / std::pow(10.f, static_cast<float>(sizeBox) * 3.f);
-	StringView suffix;
-
-
-	switch(sizeBox) {
-		case 0u: suffix = "bytes"; break;
-		case 1u: suffix = "KBytes"; break;
-		case 2u: suffix = "MBytes"; break;
-		case 3u: suffix = "GBytes"; break;
-		case 4u: suffix = "TBytes"; break;
-		default: suffix = "?Bytes"; break;
-	}
-	const u32 numberSize = (decimals - sizeBox * 3u) + 4u;
-	str.resize(numberSize + suffix.size());
-
-	std::snprintf(str.data(), str.size(), "%.2f ", val);
-	// Gotta print the suffix separately to overwrite the terminating '\0'
-	std::strncpy(str.data() + numberSize, suffix.data(), suffix.size());
-	return str;
-}
-
-u32 get_lod_memory(const scene::Lod& lod) {
-	const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-	return static_cast<u32>(polygons.get_triangle_count() * 3u * sizeof(u32)
-							+ polygons.get_quad_count() * 3u * sizeof(u32)
-							+ polygons.get_vertex_count() * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2)));
-}
-
-u32 get_vertices_for_memory(const u32 memory) {
-	// Assumes that one "additional" vertex (uncollapsed) results in one "extra" edge and two "extra" triangles
-	return memory / (2u * 3u * sizeof(u32) + 2u * sizeof(ei::Vec3) + sizeof(ei::Vec2));
 }
 
 } // namespace
@@ -210,6 +129,9 @@ void CpuShadowSilhouettes::iterate() {
 
 
 void CpuShadowSilhouettes::gather_importance() {
+	for(auto& decimater : m_decimaters)
+		decimater->start_iteration();
+
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 		for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
@@ -452,35 +374,8 @@ void CpuShadowSilhouettes::compute_max_importance() {
 
 	// Compute the maximum normalized importance for visualization
 //#pragma omp parallel for reduction(max:m_maxImportance)
-	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i)
-		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]]->get_current_max_importance());
-}
-
-void CpuShadowSilhouettes::display_importance() {
-	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
-#pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
-		const ei::IVec2 coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		//m_params.maxPathLength = 2;
-
-		math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-		PtPathVertex vertex;
-		// Create a start for the path
-		(void)PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-
-		// Walk
-		scene::Point lastPosition = vertex.get_position();
-		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		VertexSample sample;
-		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample)) {
-			const auto& decimater = m_decimaters[m_sceneDesc.lodIndices[vertex.get_primitive_id().instanceId]];
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
-			/*const bool isSilhouette = m_params.displayProjection ? decimater->is_original_marked_as_silhouette(vertex.get_primitive_id().primId)
-				: decimater->is_current_marked_as_silhouette(vertex.get_primitive_id().primId);
-			m_outputBuffer.contribute(coord, RenderTargets::SHADOW_SILHOUETTE, ei::Vec4{ isSilhouette ? 1.f : 0.f });*/
-		}
-	}
-
+	for(i32 i = 0u; i < m_decimaters.size(); ++i)
+		m_maxImportance = std::max(m_maxImportance, m_decimaters[i]->get_current_max_importance());
 }
 
 float CpuShadowSilhouettes::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
@@ -579,27 +474,6 @@ bool CpuShadowSilhouettes::trace_shadow(const ei::Ray& shadowRay, const SilPathV
 	return false;
 }
 
-u32 CpuShadowSilhouettes::get_memory_requirement() const {
-	u32 memory = 0u;
-
-	for(auto& obj : m_currentScene->get_objects()) {
-		mAssert(obj.first != nullptr);
-		mAssert(obj.second.size() != 0u);
-
-		for(scene::InstanceHandle inst : obj.second) {
-			mAssert(inst != nullptr);
-			const u32 instanceLod = scene::WorldContainer::instance().get_current_scenario()->get_effective_lod(inst);
-			mAssert(obj.first->has_lod_available(instanceLod));
-			const auto& lod = obj.first->get_lod(instanceLod);
-
-			const u32 lodMemory = get_lod_memory(lod);
-			memory += lodMemory;
-		}
-	}
-
-	return memory;
-}
-
 void CpuShadowSilhouettes::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
@@ -626,7 +500,7 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters[i] = std::make_unique<ImportanceDecimater>(lod, newLod, collapses,
+		m_decimaters[i] = std::make_unique<CpuImportanceDecimater>(lod, newLod, collapses,
 																m_params.viewWeight, m_params.lightWeight,
 																m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 

@@ -146,6 +146,12 @@
     <Filter Include="Source Files\core\renderer\vcm">
       <UniqueIdentifier>{c8378561-379b-40ec-b4fa-95b2012d8fbd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\silhouette\cpu">
+      <UniqueIdentifier>{00cbca90-242f-4d68-97e2-bbd4b37d14de}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\silhouette\gpu">
+      <UniqueIdentifier>{4f17b2da-2a72-4cbc-b056-1963a60b65a4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -271,12 +277,6 @@
     <ClCompile Include="..\..\src\util\parallel.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
-	<ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu_silhouette.cpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_decimater.cpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.cpp">
       <Filter>Source Files\core\renderer\decimaters\importance</Filter>
     </ClCompile>
@@ -291,6 +291,21 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\vcm\cpu_vcm.cpp">
       <Filter>Source Files\core\renderer\vcm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -897,7 +912,7 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClInclude>
-	<ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
+    <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\renderer_base.hpp">
@@ -915,13 +930,7 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\modules\silhouette.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu_silhouette.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\sil_common.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_decimater.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp">
@@ -966,6 +975,24 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -997,6 +1024,9 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\memory\allocator.cu">
       <Filter>Source Files\core\memory</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.cu">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

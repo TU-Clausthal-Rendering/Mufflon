@@ -166,7 +166,7 @@ make_udevptr(Args... args) {
 template < Device dev, typename T, bool Init = true, typename... Args > inline unique_device_ptr<dev,T[]>
 make_udevptr_array(std::size_t n, Args... args) {
 	return unique_device_ptr<dev, T[]>(
-		Allocator<dev>::template alloc_array<std::remove_pointer_t<std::decay_t<T>>, Init>(n, std::forward<Args>(args)...),
+		Allocator<dev>::template alloc_array<std::decay_t<T>, Init>(n, std::forward<Args>(args)...),
 		Deleter<dev>(n)
 	);
 }

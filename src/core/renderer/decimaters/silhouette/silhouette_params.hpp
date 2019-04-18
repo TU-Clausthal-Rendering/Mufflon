@@ -2,7 +2,7 @@
 
 #include "core/renderer/parameter.hpp"
 
-namespace mufflon::renderer::decimaters::silhouette {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
 
 struct PDecimationIterations {
 	int decimationIterations{ 10 };
@@ -69,4 +69,4 @@ using SilhouetteParameters = ParameterHandler<
 	PRenderUpdate
 >;
 
-} // namespace mufflon::renderer::decimaters::silhouette
+}}}} // namespace mufflon::renderer::decimaters::silhouette

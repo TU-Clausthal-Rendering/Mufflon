@@ -1,8 +1,8 @@
 #pragma once
 
-#include "silhouette_params.hpp"
-#include "sil_common.hpp"
-#include "silhouette_decimater.hpp"
+#include "cpu_silhouette_decimater.hpp"
+#include "core/renderer/decimaters/silhouette/silhouette_params.hpp"
+#include "core/renderer/decimaters/silhouette/sil_common.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -39,7 +39,6 @@ private:
 
 	void gather_importance();
 	void compute_max_importance();
-	void display_importance();
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
 								 const float importance);
@@ -55,7 +54,7 @@ private:
 	silhouette::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	std::vector<std::unique_ptr<silhouette::ImportanceDecimater>> m_decimaters;
+	std::vector<std::unique_ptr<silhouette::CpuImportanceDecimater>> m_decimaters;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous
