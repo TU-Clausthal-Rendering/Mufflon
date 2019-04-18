@@ -11,11 +11,8 @@
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 
-namespace mufflon {
-namespace renderer {
-namespace decimaters {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
 
-using namespace silhouette;
 using namespace scene::lights;
 
 namespace {
@@ -196,12 +193,12 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 
 } // namespace
 
-CUDA_FUNCTION void sample(RenderBuffer<CURRENT_DEV> outputBuffer,
-						  const scene::SceneDescriptor<CURRENT_DEV>& scene,
-						  const SilhouetteParameters& params,
-						  const Pixel& coord, math::Rng rng,
-						  Importances<CURRENT_DEV>** importances,
-						  DeviceImportanceSums<CURRENT_DEV>* sums) {
+CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& outputBuffer,
+									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
+									 const SilhouetteParameters& params,
+									 const Pixel& coord, math::Rng rng,
+									 Importances<CURRENT_DEV>** importances,
+									 DeviceImportanceSums<CURRENT_DEV>* sums) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -334,7 +331,7 @@ CUDA_FUNCTION void sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	}
 }
 
-CUDA_FUNCTION void sample_vis_importance(RenderBuffer<CURRENT_DEV> outputBuffer,
+CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& outputBuffer,
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										 const Pixel& coord, math::Rng rng,
 										 Importances<CURRENT_DEV>** importances,
@@ -371,4 +368,4 @@ CUDA_FUNCTION void sample_vis_importance(RenderBuffer<CURRENT_DEV> outputBuffer,
 	}
 }
 
-}}} // namespace mufflon::renderer::decimaters
+}}}} // namespace mufflon::renderer::decimaters

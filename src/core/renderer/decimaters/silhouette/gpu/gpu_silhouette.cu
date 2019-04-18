@@ -4,6 +4,8 @@
 
 namespace mufflon { namespace renderer { namespace decimaters {
 
+using namespace silhouette;
+
 __global__ static void silhouette_kernel(RenderBuffer<Device::CUDA> outputBuffer,
 										 scene::SceneDescriptor<Device::CUDA>* scene,
 										 const u32* seeds, SilhouetteParameters params,
@@ -20,7 +22,7 @@ __global__ static void silhouette_kernel(RenderBuffer<Device::CUDA> outputBuffer
 
 	math::Rng rng(seeds[pixel]);
 #ifdef __CUDA_ARCH__
-	sample(outputBuffer, *scene, params, coord, rng, importances, sums);
+	sample_importance(outputBuffer, *scene, params, coord, rng, importances, sums);
 #endif // __CUDA_ARCH__
 }
 

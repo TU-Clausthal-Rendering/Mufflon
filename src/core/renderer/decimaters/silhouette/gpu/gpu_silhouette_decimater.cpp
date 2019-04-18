@@ -114,6 +114,7 @@ GpuImportanceDecimater::GpuImportanceDecimater(GpuImportanceDecimater&& dec) :
 	m_originalMesh(dec.m_originalMesh),
 	m_decimatedMesh(dec.m_decimatedMesh),
 	m_importances(std::move(dec.m_importances)),
+	m_devImportances(std::move(dec.m_devImportances)),
 	m_originalVertex(dec.m_originalVertex),
 	m_accumulatedImportanceDensity(dec.m_accumulatedImportanceDensity),
 	m_collapsedTo(dec.m_collapsedTo),

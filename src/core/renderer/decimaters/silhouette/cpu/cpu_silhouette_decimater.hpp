@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/renderer/decimaters/silhouette/sil_common.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include "core/scene/lod.hpp"
 #include <OpenMesh/Tools/Utils/HeapT.hh>
@@ -26,43 +27,25 @@ public:
 	CpuImportanceDecimater& operator=(CpuImportanceDecimater&&) = delete;
 	~CpuImportanceDecimater();
 
+	void upload_normalized_importance();
+
 	// Resizes the buffers properly
-	void start_iteration();
+	Importances<Device::CPU>* start_iteration();
 	// Updates the importance densities of the decimated mesh
-	void udpate_importance_density();
+	void udpate_importance_density(const DeviceImportanceSums<Device::CPU>& impSums);
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
 	void iterate(const std::size_t minVertexCount, const float reduction);
 
-	// Methods for updating importance from trace events (only touch absolute importance)
-	void record_silhouette_vertex_contribution(const u32 localIndex, const float importance);
-	void record_shadow(const float irradiance);
-	void record_direct_hit(const u32* vertexIndices, const u32 vertexCount,
-						   const ei::Vec3& hitpoint, const float cosAngle,
-						   const float sharpness);
-	void record_direct_irradiance(const u32* vertexIndices, const u32 vertexCount,
-								  const ei::Vec3& hitpoint, const float irradiance);
-	void record_indirect_irradiance(const u32* vertexIndices, const u32 vertexCount,
-									const ei::Vec3& hitpoint, const float irradiance);
-
 	// Functions for querying internal state
 	float get_current_max_importance() const;
-	float get_current_importance(const u32 localFaceIndex, const ei::Vec3& hitpoint) const;
-	float get_mapped_max_importance() const;
-	float get_mapped_importance(const u32 originalFaceIndex, const ei::Vec3& hitpoint) const;
 	double get_importance_sum() const noexcept { return m_importanceSum; }
 
 	std::size_t get_original_vertex_count() const noexcept;
 	std::size_t get_decimated_vertex_count() const noexcept;
 
 private:
-	struct Importances {
-		std::atomic<float> viewImportance;	// Importance hits (not light!); also holds final normalized importance value after update
-		std::atomic<float> irradiance;		// Accumulated irradiance
-		std::atomic<u32> hitCounter;		// Number of hits
-	};
-
 	// Returns the vertex handle in the original mesh
 	VertexHandle get_original_vertex_handle(const VertexHandle decimatedHandle) const;
 
@@ -79,9 +62,7 @@ private:
 	double m_importanceSum = 0.0;									// Stores the current importance sum (updates in update_importance_density)
 	
 	// General stuff
-	std::unique_ptr<Importances[]> m_importances;					// Importance values per vertex
-	std::atomic<float> m_shadowImportance;							// Sum of shadow importance
-	std::atomic<float> m_shadowSilhouetteImportance;				// Sum of "importance" of shadow silhouettes
+	unique_device_ptr<Device::CPU, Importances<Device::CPU>[]> m_devImportances;	// Importance values per vertex
 	// Decimated mesh properties
 	OpenMesh::VPropHandleT<VertexHandle> m_originalVertex;			// Vertex handle in the original mesh
 	// Original mesh properties

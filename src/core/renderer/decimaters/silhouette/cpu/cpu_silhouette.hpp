@@ -33,30 +33,24 @@ public:
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
-
-	void importance_sample(const Pixel coord);
-	void imp_vis_sample(const Pixel coord);
-
 	void gather_importance();
-	void compute_max_importance();
-	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
-								 const float importance);
-	bool trace_shadow(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
-					  const float importance);
-
 	void update_reduction_factors();
-
 	void initialize_decimaters();
+	void compute_max_importance();
+	void display_importance();
 
 	silhouette::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
+	float m_maxImportance = 0.f;
 	std::vector<std::unique_ptr<silhouette::CpuImportanceDecimater>> m_decimaters;
+	// Stores the importance's of each mesh on the GPU/CPU
+	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, silhouette::Importances<Device::CPU>>[]> m_importances;
+	unique_device_ptr<Device::CPU, silhouette::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous
 	u32 m_currentDecimationIteration = 0u;
-	float m_maxImportance;
 };
 
 } // namespace mufflon::renderer::decimaters

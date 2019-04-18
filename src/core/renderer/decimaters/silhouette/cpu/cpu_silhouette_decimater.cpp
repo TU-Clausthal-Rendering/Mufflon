@@ -54,7 +54,7 @@ CpuImportanceDecimater::CpuImportanceDecimater(Lod& original, Lod& decimated,
 	m_decimatedPoly(&m_decimated.template get_geometry<Polygons>()),
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(&m_decimatedPoly->get_mesh()),
-	m_importances(nullptr),
+	m_devImportances(nullptr),
 	m_viewWeight(viewWeight),
 	m_lightWeight(lightWeight),
 	m_shadowWeight(shadowWeight),
@@ -112,7 +112,7 @@ CpuImportanceDecimater::CpuImportanceDecimater(CpuImportanceDecimater&& dec) :
 	m_decimatedPoly(dec.m_decimatedPoly),
 	m_originalMesh(dec.m_originalMesh),
 	m_decimatedMesh(dec.m_decimatedMesh),
-	m_importances(std::move(dec.m_importances)),
+	m_devImportances(std::move(dec.m_devImportances)),
 	m_originalVertex(dec.m_originalVertex),
 	m_accumulatedImportanceDensity(dec.m_accumulatedImportanceDensity),
 	m_collapsedTo(dec.m_collapsedTo),
@@ -132,9 +132,6 @@ CpuImportanceDecimater::CpuImportanceDecimater(CpuImportanceDecimater&& dec) :
 	dec.m_accumulatedImportanceDensity.invalidate();
 	dec.m_collapsedTo.invalidate();
 	dec.m_collapsed.invalidate();
-
-	m_shadowImportance.store(dec.m_shadowImportance.load());
-	m_shadowSilhouetteImportance.store(dec.m_shadowSilhouetteImportance.load());
 }
 
 CpuImportanceDecimater::~CpuImportanceDecimater() {
@@ -153,7 +150,7 @@ CpuImportanceDecimater::~CpuImportanceDecimater() {
 	m_decimatedMesh->release_face_status();
 }
 
-void CpuImportanceDecimater::udpate_importance_density() {
+void CpuImportanceDecimater::udpate_importance_density(const DeviceImportanceSums<Device::CPU>& sum) {
 	// Update our statistics: the importance density of each vertex
 	float importanceSum = 0.0;
 #pragma PARALLEL_REDUCTION(+, importanceSum)
@@ -161,19 +158,19 @@ void CpuImportanceDecimater::udpate_importance_density() {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
 		// Important: only works for triangles!
 		const float area = compute_area(*m_decimatedMesh, vertex);
-		const float flux = m_importances[vertex.idx()].irradiance.load()
-			/ std::max(1.f, static_cast<float>(m_importances[vertex.idx()].hitCounter.load()));
-		const float viewImportance = m_importances[vertex.idx()].viewImportance;
+		const float flux = m_devImportances[vertex.idx()].irradiance.load()
+			/ std::max(1.f, static_cast<float>(m_devImportances[vertex.idx()].hitCounter.load()));
+		const float viewImportance = m_devImportances[vertex.idx()].viewImportance;
 
 		const float importance = viewImportance + m_lightWeight * flux;
 
 		importanceSum += importance;
-		m_importances[vertex.idx()].viewImportance.store(importance / area);
+		m_devImportances[vertex.idx()].viewImportance.store(importance / area);
 	}
 
 	// Subtract the shadow silhouette importance and use shadow importance instead
-	logPedantic("Importance sum/shadow/silhouette: ", importanceSum, " ", m_shadowImportance, " ", m_shadowSilhouetteImportance);
-	m_importanceSum = importanceSum + m_shadowWeight * m_shadowImportance - m_shadowSilhouetteImportance;
+	logPedantic("Importance sum/shadow/silhouette: ", importanceSum, " ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
+	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
 
 	// Map the importance back to the original mesh
 	for(auto iter = m_originalMesh.vertices_begin(); iter != m_originalMesh.vertices_end(); ++iter) {
@@ -184,7 +181,7 @@ void CpuImportanceDecimater::udpate_importance_density() {
 			v = m_originalMesh.property(m_collapsedTo, v);
 
 		// Put importance into temporary storage
-		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance.load();
+		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_devImportances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance.load();
 	}
 }
 
@@ -202,16 +199,15 @@ void CpuImportanceDecimater::recompute_geometric_vertex_normals() {
 	}
 }
 
-void CpuImportanceDecimater::start_iteration() {
+Importances<Device::CPU>* CpuImportanceDecimater::start_iteration() {
 	// Initialize importance map
-	m_shadowImportance.store(0.f);
-	m_shadowSilhouetteImportance.store(0.f);
-	m_importances = std::make_unique<Importances[]>(m_decimatedPoly->get_vertex_count());
+	m_devImportances = make_udevptr_array<Device::CPU, Importances<Device::CPU>, false>(m_decimatedPoly->get_vertex_count());
 	for(std::size_t i = 0u; i < m_decimatedPoly->get_vertex_count(); ++i) {
-		m_importances[i].viewImportance.store(0.f);
-		m_importances[i].irradiance.store(0.f);
-		m_importances[i].hitCounter.store(0u);
+		m_devImportances[i].viewImportance.store(0.f);
+		m_devImportances[i].irradiance.store(0.f);
+		m_devImportances[i].hitCounter.store(0u);
 	}
+	return m_devImportances.get();
 }
 
 void CpuImportanceDecimater::iterate(const std::size_t minVertexCount, const float reduction) {
@@ -264,73 +260,6 @@ void CpuImportanceDecimater::iterate(const std::size_t minVertexCount, const flo
 	}
 }
 
-void CpuImportanceDecimater::record_silhouette_vertex_contribution(const u32 localIndex, const float importance) {
-	// Reminder: local index will refer to the decimated mesh
-	mAssert(localIndex < m_decimatedPoly->get_vertex_count());
-
-	const float weightedImportance = importance * m_shadowSilhouetteWeight;
-
-	atomic_add(m_importances[m_decimatedMesh->vertex_handle(localIndex).idx()].viewImportance, weightedImportance);
-	atomic_add(m_shadowSilhouetteImportance, weightedImportance);
-}
-
-void CpuImportanceDecimater::record_shadow(const float irradiance) {
-	atomic_add(m_shadowImportance, irradiance);
-}
-
-void CpuImportanceDecimater::record_direct_hit(const u32* vertexIndices, const u32 vertexCount,
-											const ei::Vec3& hitpoint, const float cosAngle,
-											const float sharpness) {
-	typename Mesh::VertexHandle min;
-	float minDist = std::numeric_limits<float>::max();
-	for(u32 v = 0u; v < vertexCount; ++v) {
-		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
-		if(dist < minDist) {
-			minDist = dist;
-			min = vh;
-		}
-	}
-
-	if(!isnan(cosAngle))
-		atomic_add(m_importances[min.idx()].viewImportance, m_viewWeight * sharpness * (1.f - ei::abs(cosAngle)));
-}
-
-void CpuImportanceDecimater::record_direct_irradiance(const u32* vertexIndices, const u32 vertexCount,
-												   const ei::Vec3& hitpoint, const float irradiance) {
-	typename Mesh::VertexHandle min;
-	float minDist = std::numeric_limits<float>::max();
-	for(u32 v = 0u; v < vertexCount; ++v) {
-		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
-		if(dist < minDist) {
-			minDist = dist;
-			min = vh;
-		}
-	}
-
-	atomic_add(m_importances[min.idx()].irradiance, irradiance);
-	++m_importances[min.idx()].hitCounter;
-}
-
-void CpuImportanceDecimater::record_indirect_irradiance(const u32* vertexIndices, const u32 vertexCount,
-													 const ei::Vec3& hitpoint, const float irradiance) {
-	typename Mesh::VertexHandle min;
-	float minDist = std::numeric_limits<float>::max();
-	for(u32 v = 0u; v < vertexCount; ++v) {
-		const auto vh = m_decimatedMesh->vertex_handle(vertexIndices[v]);
-		const float dist = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(vh)));
-		if(dist < minDist) {
-			minDist = dist;
-			min = vh;
-		}
-	}
-
-	if(isnan(irradiance))
-		__debugbreak();
-	atomic_add(m_importances[min.idx()].irradiance, irradiance);
-}
-
 // Utility only
 CpuImportanceDecimater::Mesh::VertexHandle CpuImportanceDecimater::get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const {
 	mAssert(decimatedHandle.is_valid());
@@ -343,48 +272,13 @@ CpuImportanceDecimater::Mesh::VertexHandle CpuImportanceDecimater::get_original_
 
 float CpuImportanceDecimater::get_current_max_importance() const {
 	float maxImp = 0.f;
-	for(auto vertex : m_decimatedMesh->vertices())
-		maxImp = std::max(maxImp, m_originalMesh.property(m_accumulatedImportanceDensity, get_original_vertex_handle(vertex)));
-	return maxImp;
-}
-
-float CpuImportanceDecimater::get_mapped_max_importance() const {
-	float maxImp = 0.f;
-	for(auto vertex : m_originalMesh.vertices())
-		maxImp = std::max(maxImp, m_originalMesh.property(m_accumulatedImportanceDensity, vertex));
-	return maxImp;
-}
-
-float CpuImportanceDecimater::get_current_importance(const u32 localFaceIndex, const ei::Vec3& hitpoint) const {
-	const auto faceHandle = m_decimatedMesh->face_handle(localFaceIndex);
-
-	float importance = 0.f;
-	float distSqrSum = 0.f;
-	for(auto circIter = m_decimatedMesh->cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter)
-		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(*circIter)));
-
-	for(auto circIter = m_decimatedMesh->cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
-		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_decimatedMesh->point(*circIter)));
-		importance += m_originalMesh.property(m_accumulatedImportanceDensity, get_original_vertex_handle(*circIter)) * distSqr / distSqrSum;
+#pragma PARALLEL_FOR
+	for(i64 v = 0; v < static_cast<i64>(m_decimatedPoly->get_vertex_count()); ++v) {
+#pragma omp critical
+		if(m_devImportances[v].viewImportance > maxImp)
+			maxImp = m_devImportances[v].viewImportance;
 	}
-
-	return importance;
-}
-
-float CpuImportanceDecimater::get_mapped_importance(const u32 originalFaceIndex, const ei::Vec3& hitpoint) const {
-	const auto faceHandle = m_originalMesh.face_handle(originalFaceIndex);
-
-	float importance = 0.f;
-	float distSqrSum = 0.f;
-	for(auto circIter = m_originalMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter)
-		distSqrSum += ei::lensq(hitpoint - util::pun<ei::Vec3>(m_originalMesh.point(*circIter)));
-
-	for(auto circIter = m_originalMesh.cfv_ccwbegin(faceHandle); circIter.is_valid(); ++circIter) {
-		const float distSqr = ei::lensq(hitpoint - util::pun<ei::Vec3>(m_originalMesh.point(*circIter)));
-		importance += m_originalMesh.property(m_accumulatedImportanceDensity, *circIter) * distSqr / distSqrSum;
-	}
-
-	return importance;
+	return maxImp;
 }
 
 std::size_t CpuImportanceDecimater::get_original_vertex_count() const noexcept {
