@@ -82,6 +82,10 @@ using SphereVHdl = Spheres::SphereHandle;
 // Return values for invalid handles/attributes
 namespace {
 
+// Specifies the minimum compute capability requirements
+constexpr int minMajorCC = 5;
+constexpr int minMinorCC = 0;
+
 // static variables for interacting with the renderer
 renderer::IRenderer* s_currentRenderer;
 // Current iteration counter
@@ -3164,7 +3168,7 @@ Boolean mufflon_initialize() {
 			cudaDeviceProp deviceProp;
 			for (int c = 0; c < count; ++c) {
 				cuda::check_error(cudaGetDeviceProperties(&deviceProp, c));
-				if(deviceProp.unifiedAddressing) {
+				if(deviceProp.unifiedAddressing && deviceProp.major >= minMajorCC && deviceProp.minor >= minMinorCC) {
 					if(deviceProp.major > major ||
 						((deviceProp.major == major) && (deviceProp.minor > minor))) {
 						major = deviceProp.major;
@@ -3174,13 +3178,15 @@ Boolean mufflon_initialize() {
 				}
 			}
 			if(devIndex < 0) {
-				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none supports unified addressing; "
+				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none support unified addressing or have the required compute capability; "
 						 "continuing without CUDA");
 			} else {
 				cuda::check_error(cudaSetDevice(devIndex));
+				cuda::check_error(cudaGetDeviceProperties(&deviceProp, devIndex));
 				s_cudaDevIndex = devIndex;
 				logInfo("[", FUNCTION_NAME, "] Found ", count, " CUDA-capable "
-						"devices; initializing device ", devIndex, " (", deviceProp.name, ")");
+						"devices; initializing device ", devIndex, " (", deviceProp.name, ", compute capability ",
+						deviceProp.major, ".", deviceProp.minor, ")");
 			}
 		} else {
 			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
