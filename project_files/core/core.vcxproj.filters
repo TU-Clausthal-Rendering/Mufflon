@@ -293,7 +293,7 @@
       <Filter>Source Files\core\renderer\vcm</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\core\renderer\bpm</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
@@ -975,9 +975,15 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
+	</ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
+	</ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+	</ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
     </ClInclude>
