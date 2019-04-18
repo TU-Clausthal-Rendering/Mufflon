@@ -35,17 +35,14 @@ private:
 	void init_rngs(int num);
 
 	void importance_sample(const Pixel coord);
-	void pt_sample(const Pixel coord);
+	void imp_vis_sample(const Pixel coord);
 
 	void gather_importance();
 	void compute_max_importance();
-	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 	bool trace_shadow_silhouette(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
 								 const float importance);
 	bool trace_shadow(const ei::Ray& shadowRay, const silhouette::SilPathVertex& vertex,
 					  const float importance);
-
-	u32 get_memory_requirement() const;
 
 	void update_reduction_factors();
 

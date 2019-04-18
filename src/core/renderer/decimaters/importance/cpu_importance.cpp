@@ -399,12 +399,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 			break;
 		}
 		++pathLen;
-
-		// Query importance if the target is active
-		if(pathLen == 1 && m_params.importanceIterations > 0 && m_outputBuffer.is_target_enabled(RenderTargets::IMPORTANCE))
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
-
-
+		
 		// Evaluate direct hit of area ligths
 		if(pathLen >= m_params.minPathLength) {
 			Spectrum emission = vertex.get_emission().value;
@@ -430,30 +425,6 @@ void CpuImportanceDecimater::compute_max_importance() {
 	for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i)
 		m_maxImportance = std::max(m_maxImportance, m_decimaters[m_sceneDesc.lodIndices[i]]->get_current_max_importance());
 }
-
-void CpuImportanceDecimater::display_importance() {
-	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
-#pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
-		const ei::IVec2 coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		//m_params.maxPathLength = 2;
-
-		math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
-		PtPathVertex vertex;
-		// Create a start for the path
-		(void)PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
-
-		// Walk
-		scene::Point lastPosition = vertex.get_position();
-		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
-		VertexSample sample;
-		if(walk(m_sceneDesc, vertex, rnd, -1.0f, false, throughput, vertex, sample))
-			m_outputBuffer.contribute(coord, RenderTargets::IMPORTANCE, ei::Vec4{ query_importance(vertex.get_position(), vertex.get_primitive_id()) });
-	}
-
-}
-
-
 
 float CpuImportanceDecimater::query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId) {
 	// TODO: density or importance?
