@@ -23,7 +23,9 @@ template < Device dev, class T >
 struct AtomicOps {};
 template <  class T >
 struct AtomicOps<Device::CPU, T> {
+#ifdef __CUDACC__
 #pragma nv_exec_check_disable
+#endif // __CUDACC__
 	__host__ __device__ static T exchange(typename AtomicValue<Device::CPU, T>::Type& atom, const T value) {
 #ifdef __CUDA_ARCH__
 		mAssertMsg(false, "This function must not be called on the GPU!");
