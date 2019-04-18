@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/export/api.h"
+#include "core/memory/residency.hpp"
 #include "util/types.hpp"
 #include <atomic>
 
@@ -32,12 +33,30 @@ struct AtomicOps<Device::CPU, T> {
 #endif // __CUDA_ARCH__
 		return std::atomic_exchange_explicit(&atom, value, std::memory_order::memory_order_relaxed);
 	}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static T add(typename AtomicValue<Device::CPU, T>::Type& atom, const T value) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		return std::atomic_fetch_add(&atom, value);
+	}
 };
 template <  class T >
 struct AtomicOps<Device::CUDA, T> {
 	__host__ __device__ static T exchange(typename AtomicValue<Device::CUDA, T>::Type& atom, const T value) {
 #ifdef __CUDA_ARCH__
 		return atomicExch(&atom, value);
+#else // __CUDA_ARCH__
+		return T{};
+#endif // __CUDA_ARCH__
+	}
+
+	__host__ __device__ static T add(typename AtomicValue<Device::CUDA, T>::Type& atom, const T value) {
+#ifdef __CUDA_ARCH__
+		return atomicAdd(&atom, value);
 #else // __CUDA_ARCH__
 		return T{};
 #endif // __CUDA_ARCH__
@@ -102,8 +121,14 @@ CUDA_FUNCTION u32 clz(u32 v) {
 // Atomic operations; gives no(!) guarantees about memory access ordering
 // Note: this function must not be called on the GPU for CPU atomics!
 template < Device dev, class T >
-CUDA_FUNCTION i32 atomic_exchange(Atomic<dev, T>& atom, const T value) {
+CUDA_FUNCTION T atomic_exchange(Atomic<dev, T>& atom, const T value) {
 	return atomic_details::AtomicOps<dev, T>::exchange(atom, value);
+}
+
+// Note: this function must not be called on the GPU for CPU atomics!
+template < Device dev, class T >
+CUDA_FUNCTION T atomic_add(Atomic<dev, T>& atom, const T value) {
+	return atomic_details::AtomicOps<dev, T>::add(atom, value);
 }
 
 }} // namespace mufflon::cuda
