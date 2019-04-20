@@ -300,12 +300,8 @@
                         DockPanel.Dock="Bottom"
                         Background="Black"
                         Focusable="True"
-                        MouseDown="OnMouseDownHandler"
-                        MouseMove="OnMouseMoveHandler"
                         MaxWidth="{Binding Viewport.DesiredWidth}"
-                        MaxHeight="{Binding Viewport.DesiredHeight}"
-                        KeyDown="OnKeyDownHandler"
-                        KeyUp="OnKeyUpHandler">
+                        MaxHeight="{Binding Viewport.DesiredHeight}">
                     </Border>
 
                     <ScrollBar 

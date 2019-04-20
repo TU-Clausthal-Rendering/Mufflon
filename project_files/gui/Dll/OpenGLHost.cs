@@ -26,6 +26,9 @@ namespace gui.Dll
         public delegate void ErrorEvent(string message);
         public event ErrorEvent Error;
 
+        // Event for updating camera
+        public event EventHandler UpdateCamera;
+
         // host of the HwndHost
         private readonly MainWindow m_window;
         private readonly Border m_parent;
@@ -98,10 +101,6 @@ namespace gui.Dll
         /// <param name="data"></param>
         private void Render(object data)
         {
-            // TODO: make these settings
-            float keySpeed = 0.125f;
-            float mouseSpeed = 0.0025f;
-
             try
             {
                 InitializeOpenGl();
@@ -130,39 +129,7 @@ namespace gui.Dll
                     if (m_rendererModel.IsRendering)
                     {
                         if (m_settings.AllowCameraMovement)
-                        {
-                            // Check for keyboard input
-                            float x = 0f;
-                            float y = 0f;
-                            float z = 0f;
-                            // TODO: why does it need to be mirrored?
-                            if (m_window.wasPressedAndClear(Key.W))
-                                z += keySpeed;
-                            if (m_window.wasPressedAndClear(Key.S))
-                                z -= keySpeed;
-                            if (m_window.wasPressedAndClear(Key.D))
-                                x += keySpeed;
-                            if (m_window.wasPressedAndClear(Key.A))
-                                x -= keySpeed;
-                            if (m_window.wasPressedAndClear(Key.Space))
-                                y += keySpeed;
-                            if (m_window.wasPressedAndClear(Key.LeftCtrl))
-                                y -= keySpeed;
-
-                            if (x != 0f || y != 0f || z != 0f)
-                            {
-                                if (!Core.scene_move_active_camera(x, y, z))
-                                    throw new Exception(Core.core_get_dll_error());
-                            }
-
-                            // Check for mouse dragging
-                            Vector drag = m_window.getMouseDiffAndReset();
-                            if (drag.X != 0 || drag.Y != 0)
-                            {
-                                if (!Core.scene_rotate_active_camera(mouseSpeed * (float)drag.Y, -mouseSpeed * (float)drag.X, 0))
-                                    throw new Exception(Core.core_get_dll_error());
-                            }
-                        }
+                            UpdateCamera?.Invoke(this, new EventArgs());
 
                         m_rendererModel.Iterate();
                     }

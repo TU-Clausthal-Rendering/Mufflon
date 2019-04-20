@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using gui.Annotations;
 using gui.Command;
+using gui.Controller;
 using gui.Model;
 using gui.Model.Camera;
 using gui.Model.Light;
@@ -48,6 +49,8 @@ namespace gui.ViewModel
 
         public LoadWorldViewModel LoadWorld { get; }
 
+        public CameraController CameraController { get; }
+
         public ICommand AddLightCommand { get; }
         public ICommand LoadSceneCommand { get; }
         public ICommand SaveSceneCommand { get; }
@@ -68,6 +71,7 @@ namespace gui.ViewModel
             ConsoleOutput = new ConsoleOutputViewModel(m_models);
             ConsoleInput = new ConsoleInputViewModel(m_models, m_models.App.Window.ConsoleInputBox, ConsoleOutput);
             Viewport = new ViewportViewModel(m_models);
+            CameraController = new CameraController(m_models, m_models.App.Window.BorderHost);
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);
             Materials = new MaterialsViewModel(m_models);

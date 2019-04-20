@@ -22,9 +22,9 @@ namespace gui.Utility
             Z = v;
         }
 
-        public T X { get; }
-        public T Y { get; }
-        public T Z { get; }
+        public T X { get; set; }
+        public T Y { get; set; }
+        public T Z { get; set; }
     }
 
     public struct Vec4<T>
@@ -72,9 +72,9 @@ namespace gui.Utility
             return "[" + X.ToString() + "|" + Y.ToString() + "|" + Z.ToString() + "|" + W.ToString() + "]";
         }
 
-        public T X { get; }
-        public T Y { get; }
-        public T Z { get; }
-        public T W { get; }
+        public T X { get; set; }
+        public T Y { get; set; }
+        public T Z { get; set; }
+        public T W { get; set; }
     }
 }
