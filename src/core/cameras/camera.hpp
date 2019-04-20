@@ -51,20 +51,7 @@ public:
 		mAssert(near > 0.0f);
 		mAssert(far > near);
 
-		dir = ei::normalize(dir);
-		up = ei::normalize(up);
-		float zDotY = dot(dir, up);
-		if(zDotY > 0.999f)
-			throw std::runtime_error("View direction and up-vector are too close to each other");
-		up = normalize(up - zDotY * dir);
-		// Create orthonormal basis to determine view matrix
-		const ei::Vec3 right = ei::normalize(ei::cross(dir, up));
-
-		m_viewSpace = ei::Mat3x3{
-			right.x, right.y, right.z,
-			up.x, up.y, up.z,
-			dir.x, dir.y, dir.z
-		};
+		set_view_dir(dir, up);
 	}
 	// Needs virtual destructor
 	virtual ~Camera() = default;
@@ -80,7 +67,24 @@ public:
 	const scene::Direction get_up_dir() const noexcept { return {m_viewSpace.m10, m_viewSpace.m11, m_viewSpace.m12}; }
 	// The z-axis is the view direction
 	const scene::Direction get_view_dir() const noexcept { return {m_viewSpace.m20, m_viewSpace.m21, m_viewSpace.m22}; }
+	void set_view_dir(scene::Direction direction, scene::Direction up) {
+		direction = ei::normalize(direction);
+		up = ei::normalize(up);
+		float zDotY = dot(direction, up);
+		if(zDotY > 0.999f)
+			throw std::runtime_error("View direction and up-vector are too close to each other");
+		up = normalize(up - zDotY * direction);
+		// Create orthonormal basis to determine view matrix
+		const ei::Vec3 right = ei::normalize(ei::cross(direction, up));
+
+		m_viewSpace = ei::Mat3x3{
+			right.x, right.y, right.z,
+			up.x, up.y, up.z,
+			direction.x, direction.y, direction.z
+		};
+	}
 	const scene::Point& get_position() const noexcept { return m_position; }
+	void set_position(const scene::Point position) noexcept { m_position = position; }
 	// The near clipping distance (plane)
 	float get_near() const noexcept { return m_near; }
 	void set_near(float n) noexcept { m_near = n; }

@@ -15,6 +15,10 @@ namespace gui.Model.Camera
     /// </summary>
     public abstract class CameraModel : INotifyPropertyChanged
     {
+        private Vec3<float> m_originalPosition;
+        private Vec3<float> m_originalViewDirection;
+        private Vec3<float> m_originalUp;
+
         public enum CameraType
         {
             Pinhole,
@@ -25,6 +29,9 @@ namespace gui.Model.Camera
         protected CameraModel(IntPtr handle)
         {
             Handle = handle;
+            m_originalPosition = Position;
+            m_originalViewDirection = ViewDirection;
+            m_originalUp = Up;
         }
 
         public abstract CameraType Type { get; }
@@ -62,7 +69,7 @@ namespace gui.Model.Camera
             set
             {
                 if (Equals(ViewDirection, value)) return;
-                if(!Core.world_set_camera_direction(Handle, new Core.Vec3(value)))
+                if(!Core.world_set_camera_direction(Handle, new Core.Vec3(value), new Core.Vec3(Up)))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(ViewDirection));
@@ -81,7 +88,7 @@ namespace gui.Model.Camera
             set
             {
                 if (Equals(Up, value)) return;
-                if (!Core.world_set_camera_up(Handle, new Core.Vec3(value)))
+                if (!Core.world_set_camera_direction(Handle, new Core.Vec3(ViewDirection), new Core.Vec3(value)))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Up));
@@ -127,6 +134,17 @@ namespace gui.Model.Camera
         }
 
         public IntPtr Handle { get; }
+
+        // Resets the camera's rotation and translation to how it was upon loading
+        public void ResetTransRot()
+        {
+            Position = m_originalPosition;
+            ViewDirection = m_originalViewDirection;
+            Up = m_originalUp;
+            OnPropertyChanged(nameof(Position));
+            OnPropertyChanged(nameof(ViewDirection));
+            OnPropertyChanged(nameof(Up));
+        }
 
         /// <summary>
         /// creates a new view model based on this model
