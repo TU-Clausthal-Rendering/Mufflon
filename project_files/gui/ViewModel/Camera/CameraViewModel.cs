@@ -66,7 +66,6 @@ namespace gui.ViewModel.Camera
                     OnPropertyChanged(nameof(PositionZ));
                     break;
                 case nameof(CameraModel.ViewDirection):
-                case nameof(CameraModel.Up):
                     OnPropertyChanged(nameof(DirectionX));
                     OnPropertyChanged(nameof(DirectionY));
                     OnPropertyChanged(nameof(DirectionZ));

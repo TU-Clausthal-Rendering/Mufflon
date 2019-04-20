@@ -135,6 +135,21 @@ namespace gui.Model.Camera
 
         public IntPtr Handle { get; }
 
+        public void Move(Vec3<float> offset)
+        {
+            if (!Core.scene_move_active_camera(offset.X, offset.Y, offset.Z))
+                throw new Exception(Core.core_get_dll_error());
+            OnPropertyChanged(nameof(Position));
+        }
+
+        public void Rotate(Vec2<float> rotation)
+        {
+            if (!Core.scene_rotate_active_camera(rotation.X, rotation.Y, 0))
+                throw new Exception(Core.core_get_dll_error());
+            OnPropertyChanged(nameof(ViewDirection));
+            OnPropertyChanged(nameof(Up));
+        }
+
         // Resets the camera's rotation and translation to how it was upon loading
         public void ResetTransRot()
         {

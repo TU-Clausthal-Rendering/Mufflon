@@ -94,6 +94,7 @@
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Command\SetDialogResultCommand.cs" />
+    <Compile Include="Controller\CameraController.cs" />
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
     <Compile Include="Dll\OpenGlDisplay.cs" />
