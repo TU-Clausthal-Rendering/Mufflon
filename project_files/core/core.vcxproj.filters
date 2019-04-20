@@ -977,13 +977,13 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
       <Filter>Source Files\core\renderer</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
     </ClInclude>
@@ -998,6 +998,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

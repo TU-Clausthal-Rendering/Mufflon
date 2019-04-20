@@ -5,9 +5,9 @@
 namespace mufflon {namespace renderer {
 
 struct PWireframeLinewidth {
-	int lineWidth = 1;
+	float lineWidth = 1.f;
 	static ParamDesc get_desc() noexcept {
-		return { "Line width", ParameterTypes::INT };
+		return { "Line width", ParameterTypes::FLOAT };
 	}
 };
 
