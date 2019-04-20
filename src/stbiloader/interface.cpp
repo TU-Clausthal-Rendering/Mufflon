@@ -1,8 +1,11 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
-#include <stbi/stb_image.h>
-#include <stbi/stb_image_write.h>
 #include <mutex>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stbi/stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stbi/stb_image_write.h>
 
 // Helper macros for error checking and logging
 #define FUNCTION_NAME __func__
