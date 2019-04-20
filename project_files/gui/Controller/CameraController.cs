@@ -40,8 +40,8 @@ namespace gui.Controller
             switch (e.Key)
             {
                 case Key.W: m_keyboardOffset.Z = m_keyboardSpeed; break;
-                case Key.A: m_keyboardOffset.Z = -m_keyboardSpeed; break;
-                case Key.S: m_keyboardOffset.X = -m_keyboardSpeed; break;
+                case Key.S: m_keyboardOffset.Z = -m_keyboardSpeed; break;
+                case Key.A: m_keyboardOffset.X = -m_keyboardSpeed; break;
                 case Key.D: m_keyboardOffset.X = m_keyboardSpeed; break;
                 case Key.E: m_keyboardOffset.Y = m_keyboardSpeed; break;
                 case Key.Q: m_keyboardOffset.Y = -m_keyboardSpeed; break;
