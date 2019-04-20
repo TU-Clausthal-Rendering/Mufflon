@@ -202,6 +202,7 @@
     <ClInclude Include="..\..\src\core\renderer\vcm\vcm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\cpu_wireframe.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\gpu_wireframe.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_params.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_structs_commons.hpp" />

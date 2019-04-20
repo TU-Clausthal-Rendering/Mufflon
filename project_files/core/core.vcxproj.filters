@@ -897,6 +897,33 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
+      <Filter>Source Files\core\renderer\bpm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
