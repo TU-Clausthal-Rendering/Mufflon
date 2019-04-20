@@ -1818,30 +1818,20 @@ Boolean world_set_camera_position(CameraHdl cam, Vec3 pos) {
 	TRY
 		CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
-	scene::Point newPos = camera.get_position() - util::pun<scene::Point>(pos);
-	camera.move(newPos.x, newPos.y, newPos.z);
+	camera.set_position(util::pun<scene::Point>(pos));
 	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_camera_direction(CameraHdl cam, Vec3 dir) {
+Boolean world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
+	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up));
 	// TODO: compute proper rotation
 	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
-	return false;
-	CATCH_ALL(false)
-}
-
-Boolean world_set_camera_up(CameraHdl cam, Vec3 up) {
-	TRY
-	CHECK_NULLPTR(cam, "camera handle", false);
-	auto& camera = *static_cast<cameras::Camera*>(cam);
-	// TODO: ???
-	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
-	return false;
+	return true;
 	CATCH_ALL(false)
 }
 

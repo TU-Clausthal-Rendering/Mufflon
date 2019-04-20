@@ -328,9 +328,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_camera_position(IntPtr cam, Vec3 pos);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_set_camera_direction(IntPtr cam, Vec3 dir);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_set_camera_up(IntPtr cam, Vec3 up);
+        internal static extern bool world_set_camera_direction(IntPtr cam, Vec3 dir, Vec3 up);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_camera_near(IntPtr cam, float near);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

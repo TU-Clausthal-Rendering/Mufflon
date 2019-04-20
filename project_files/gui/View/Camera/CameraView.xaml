@@ -28,16 +28,16 @@
                     Grid.Column="1"
                     HorizontalAlignment="Stretch"
                     Text="{Binding Name, FallbackValue=Name}"/>
-
-                <!--<Button
+              
+                <Button
                     Grid.Column="2"
                     Margin="5 0 0 0"
-                    Command="{Binding RemoveCommand}">
-                    <Image 
-                        Source="../../Icons/cancel.png"
-                        Width="16"
-                        Height="16"/>
-                </Button>-->
+                    Command="{Binding ResetTransRotCommand}">
+                  <Image
+                      Source="../../Icons/restart.png"
+                      Width="16"
+                      Height="16"/>
+                </Button>
             </Grid>
         </GroupBox.Header>
         <StackPanel x:Name="GroupItems">
@@ -64,6 +64,60 @@
                         Grid.Row="0"
                         Text="{Binding Type}"
                         Margin="{StaticResource RightPropertyMargin}"/>
+
+                <TextBlock
+                        Grid.Column="0"
+                        Grid.Row="1"
+                        Text="Position:"
+                        Margin="{StaticResource LeftPropertyMargin}"/>
+                <!-- Position Grid -->
+                <Grid
+                        Grid.Column="1"
+                        Grid.Row="1"
+                        Margin="{StaticResource RightPropertyMargin}"
+                        Visibility="{Binding RadianceVisibility, FallbackValue=Visible}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                          Grid.Column="0"
+                          Text="{Binding PositionX, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock
+                          Grid.Column="1"
+                          Text="{Binding PositionY, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock
+                          Grid.Column="2"
+                          Text="{Binding PositionZ, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
+
+                <TextBlock
+                        Grid.Column="0"
+                        Grid.Row="2"
+                        Text="Direction:"
+                        Margin="{StaticResource LeftPropertyMargin}"/>
+                <!-- Direction Grid -->
+                <Grid
+                        Grid.Column="1"
+                        Grid.Row="2"
+                        Margin="{StaticResource RightPropertyMargin}"
+                        Visibility="{Binding RadianceVisibility, FallbackValue=Visible}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                          Grid.Column="0"
+                          Text="{Binding DirectionX, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock
+                          Grid.Column="1"
+                          Text="{Binding DirectionY, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock
+                          Grid.Column="2"
+                          Text="{Binding DirectionZ, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
             </Grid>
         </StackPanel>
     </GroupBox>
