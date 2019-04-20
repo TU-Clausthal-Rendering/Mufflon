@@ -27,6 +27,7 @@ namespace gui.Controller
             referenceElement.KeyUp += OnKeyUpHandler;
             referenceElement.MouseDown += OnMouseDownHandler;
             referenceElement.MouseMove += OnMouseMoveHandler;
+            referenceElement.MouseWheel += OnMouseWheel;
             m_models.App.GlHost.UpdateCamera += UpdateCamera;
         }
         
@@ -42,8 +43,8 @@ namespace gui.Controller
                 case Key.A: m_keyboardOffset.Z = -m_keyboardSpeed; break;
                 case Key.S: m_keyboardOffset.X = -m_keyboardSpeed; break;
                 case Key.D: m_keyboardOffset.X = m_keyboardSpeed; break;
-                case Key.Space: m_keyboardOffset.Y = m_keyboardSpeed; break;
-                case Key.LeftCtrl: m_keyboardOffset.Y = -m_keyboardSpeed; break;
+                case Key.E: m_keyboardOffset.Y = m_keyboardSpeed; break;
+                case Key.Q: m_keyboardOffset.Y = -m_keyboardSpeed; break;
             }
         }
 
@@ -71,6 +72,11 @@ namespace gui.Controller
             }
         }
 
+        private void OnMouseWheel(object sender, MouseWheelEventArgs args)
+        {
+            m_keyboardSpeed = Math.Max(0f, m_keyboardSpeed + 0.000125f * args.Delta);
+        }
+
         private void UpdateCamera(object sender, EventArgs args)
         {
             // First check for leftover pressed keys
@@ -78,8 +84,8 @@ namespace gui.Controller
             if (m_keyWasPressed[(int)Key.S]) m_keyboardOffset.Z = -m_keyboardSpeed;
             if (m_keyWasPressed[(int)Key.A]) m_keyboardOffset.X = -m_keyboardSpeed;
             if (m_keyWasPressed[(int)Key.D]) m_keyboardOffset.X = m_keyboardSpeed;
-            if (m_keyWasPressed[(int)Key.Space]) m_keyboardOffset.Y = m_keyboardSpeed;
-            if (m_keyWasPressed[(int)Key.LeftCtrl]) m_keyboardOffset.Y = -m_keyboardSpeed;
+            if (m_keyWasPressed[(int)Key.E]) m_keyboardOffset.Y = m_keyboardSpeed;
+            if (m_keyWasPressed[(int)Key.Q]) m_keyboardOffset.Y = -m_keyboardSpeed;
 
             // Check if the camera moved
             if(m_keyboardOffset.X != 0f || m_keyboardOffset.Y != 0f || m_keyboardOffset.Z != 0f)

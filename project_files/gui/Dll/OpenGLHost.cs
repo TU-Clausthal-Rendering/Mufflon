@@ -301,23 +301,26 @@ namespace gui.Dll
         // Handle zooming when mouse wheel is used
         private void OnMouseWheel(object sender, MouseWheelEventArgs args)
         {
-            float step = args.Delta < 0.0f ? 1.0f / 1.001f : 1.001f;
-            float value = (float)Math.Pow(step, Math.Abs(args.Delta));
+            if(Keyboard.IsKeyDown(Key.LeftCtrl))
+            {
+                float step = args.Delta < 0.0f ? 1.0f / 1.001f : 1.001f;
+                float value = (float)Math.Pow(step, Math.Abs(args.Delta));
 
-            float oldZoom = m_viewport.Zoom;
-            int oldMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
-            int oldMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
-            m_viewport.Zoom *= value;
+                float oldZoom = m_viewport.Zoom;
+                int oldMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
+                int oldMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
+                m_viewport.Zoom *= value;
 
-            // Zooming affects offset as well
-            int newMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
-            int newMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
-            // Adjust the offset so that it stays roughly the same fractionally
+                // Zooming affects offset as well
+                int newMaxOffsetX = m_viewport.DesiredWidth - Math.Min(m_viewport.Width, m_viewport.DesiredWidth);
+                int newMaxOffsetY = m_viewport.DesiredHeight - Math.Min(m_viewport.Height, m_viewport.DesiredHeight);
+                // Adjust the offset so that it stays roughly the same fractionally
             
-            if (oldMaxOffsetX != 0)
-                m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
-            if (oldMaxOffsetY != 0)
-                m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
+                if (oldMaxOffsetX != 0)
+                    m_viewport.OffsetX = (int)(m_viewport.OffsetX * newMaxOffsetX / (float)oldMaxOffsetX);
+                if (oldMaxOffsetY != 0)
+                    m_viewport.OffsetY = (int)(m_viewport.OffsetY * newMaxOffsetY / (float)oldMaxOffsetY);
+            }
         }
 
         private void OnMouseMove(object sender, MouseEventArgs args)
