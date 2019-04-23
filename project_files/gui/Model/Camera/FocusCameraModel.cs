@@ -10,6 +10,11 @@ namespace gui.Model.Camera
 {
     public class FocusCameraModel : CameraModel
     {
+        private readonly float m_originalFocalLength;
+        private readonly float m_originalSensorHeight;
+        private readonly float m_originalFocusDistance;
+        private readonly float m_originalAperture;
+
         public override CameraType Type => CameraType.Focus;
 
         public override CameraViewModel CreateViewModel(Models models)
@@ -95,7 +100,22 @@ namespace gui.Model.Camera
 
         public FocusCameraModel(IntPtr handle) : base(handle)
         {
+            m_originalFocalLength = FocalLength;
+            m_originalSensorHeight = SensorHeight;
+            m_originalFocusDistance = FocusDistance;
+            m_originalAperture = Aperture;
+        }
 
+        protected override void ResetConcreteModel()
+        {
+            FocalLength = m_originalFocalLength;
+            SensorHeight = m_originalSensorHeight;
+            FocusDistance = m_originalFocusDistance;
+            Aperture = m_originalAperture;
+            OnPropertyChanged(nameof(FocalLength));
+            OnPropertyChanged(nameof(SensorHeight));
+            OnPropertyChanged(nameof(FocusDistance));
+            OnPropertyChanged(nameof(Aperture));
         }
     }
 }

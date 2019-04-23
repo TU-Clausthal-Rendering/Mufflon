@@ -38,7 +38,7 @@ namespace gui.Command
 
         public virtual void Execute(object parameter)
         {
-            m_camera.ResetTransRot();
+            m_camera.Reset();
         }
 
         public event EventHandler CanExecuteChanged;
