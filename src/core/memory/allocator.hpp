@@ -142,6 +142,8 @@ public:
 	Deleter() :				 m_n(0) {}
 	Deleter(std::size_t n) : m_n(n) {}
 
+	std::size_t get_size() const noexcept { return m_n; }
+
 	template < typename T >
 	void operator () (T * p) const {
 		Allocator<dev>::template free<T>(p, m_n);
