@@ -8,10 +8,12 @@
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/lights/light_medium.hpp"
+#include "core/scene/lights/light_tree_sampling.hpp"
 #include "background.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cmath>
+
 
 namespace mufflon { namespace scene { namespace lights {
 
@@ -301,6 +303,8 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	unload<Device::CPU>();
 	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
 	m_treeCpu->primToNodePath = m_primToNodePath.acquire<Device::CPU>();
+	//m_treeCpu->guide = &guide_flux;
+	m_treeCpu->posGuide = false;
 
 	if(posLights.size() == 0u && dirLights.size() == 0u) {
 		// Shortcut if no lights are specified
@@ -444,6 +448,10 @@ void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, 
 	}
 }
 
+//__device__ GuideFunction cudaGuideFlux = guide_flux;
+//__device__ GuideFunction cudaGuideFluxPos = guide_flux_pos;
+//__device__ float pi_gpu = 0;
+
 template < Device dev >
 void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 	if(dev == Device::CUDA && (m_dirty.needs_sync(dev) || !m_treeCuda)) {
@@ -453,6 +461,12 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		// is simply to start over.
 		m_treeCuda = std::make_unique<LightTree<Device::CUDA>>();
 		m_treeCuda->primToNodePath = m_primToNodePath.acquire<Device::CUDA>(); // Includes synchronization
+		m_treeCuda->posGuide = false;
+		//void* symbolAddress;
+		//cudaGetSymbolAddress(&symbolAddress, guide_flux);
+		//cudaMemcpyFromSymbol(&symbolAddress, &pi_gpu, sizeof(float));
+		//(cudaMemcpyFromSymbol(&m_treeCuda->guide, cudaGuideFlux, sizeof(GuideFunction)));
+		//cudaMemcpy(&m_treeCuda->guide, &cudaGuideFlux, sizeof(GuideFunction), cudaMemcpyDeviceToHost);
 
 		// Equalize bookkeeping of subtrees
 		char* lightMem = m_treeMemory.template is_resident<Device::CPU>() ? m_treeMemory.template acquire<Device::CUDA>() : nullptr;
@@ -476,6 +490,25 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		m_treeCpu->background = m_envLight->acquire_const<Device::CPU>(sceneBounds);
 	// TODO: backsync? Would need another hashmap for texture mapping.
 }
+
+/*template <>
+GuideFunction LightTreeBuilder::get_guide_fptr<Device::CPU>(bool posGuide) {
+	if(posGuide)
+		return &guide_flux_pos;
+	else
+		return &guide_flux;
+}
+
+template <>
+GuideFunction LightTreeBuilder::get_guide_fptr<Device::CUDA>(bool posGuide) {
+	GuideFunction fptr;
+	if(posGuide)
+		cudaMemcpyFromSymbol(&fptr, cudaGuideFluxPos, sizeof(GuideFunction));
+	else
+		cudaMemcpyFromSymbol(&fptr, cudaGuideFlux, sizeof(GuideFunction));
+	return fptr;
+}*/
+
 
 void LightTreeBuilder::update_media_cpu(const SceneDescriptor<Device::CPU>& scene) {
 	char* currLightMem = m_treeCpu->posLights.memory;

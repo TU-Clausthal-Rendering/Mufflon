@@ -47,9 +47,6 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
 
-	auto& guideFunction = params.neeUsePositionGuide ? scene::lights::guide_flux_pos
-													 : scene::lights::guide_flux;
-
 //	if(coord == Pixel{575, 210}) __debugbreak();
 
 	int pathLen = 0;
@@ -65,8 +62,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			for(int i = 0; i < params.neeCount; ++i) {
 				math::RndSet2 neeRnd = rng.next();
 				auto nee = connect(scene.lightTree, i, params.neeCount, neeSeed,
-								   vertex.get_position(), scene.aabb, neeRnd,
-								   guideFunction);
+								   vertex.get_position(), scene.aabb, neeRnd);
 				Pixel outCoord;
 				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
@@ -92,39 +88,22 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(!walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
-			if((pathLen+1 >= params.minPathLength) && (throughput.weight != Spectrum{ 0.0f })) {
-				// Missed scene - sample background
-				auto background = evaluate_background(scene.lightTree.background, sample.excident);
-				if(any(greater(background.value, 0.0f))) {
-					if(pathLen > 0) {
-						AreaPdf startPdf = background_pdf(scene.lightTree, background);
-						float mis = 1.0f / (1.0f + params.neeCount * float(startPdf) / float(sample.pdf.forw));
-						background.value *= mis;
-					}
-					outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
-				}
-			}
+		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::CANCEL)
 			break;
-		}
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
 		if(pathLen >= params.minPathLength) {
-			Spectrum emission = vertex.get_emission().value;
-			if(emission != 0.0f && pathLen > 1) {
+			EmissionValue emission = vertex.get_emission(scene, lastPosition);
+			if(emission.value != 0.0f && pathLen > 1) {
 				// misWeight for pathLen==1 is always 1 -> skip computation
-				AreaPdf startPdf = connect_pdf(scene.lightTree, vertex.get_primitive_id(),
-												  vertex.get_surface_params(),
-												  lastPosition, guideFunction);
-				float misWeight = 1.0f / (1.0f + params.neeCount * (startPdf / vertex.ext().incidentPdf));
-				emission *= misWeight;
+				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
+				emission.value *= misWeight;
 			}
-			outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+			outputBuffer.contribute(coord, throughput, emission.value, vertex.get_position(),
 									vertex.get_normal(), vertex.get_albedo());
 		}
+		if(vertex.is_end_point()) break;
 	} while(pathLen < params.maxPathLength);
 }
 

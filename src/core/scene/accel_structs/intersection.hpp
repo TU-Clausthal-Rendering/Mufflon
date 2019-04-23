@@ -21,7 +21,7 @@ union SurfaceParametrization {
 };
 
 struct RayIntersectionResult {
-	float hitT;
+	float distance;
 	PrimitiveHandle hitId;
 	ei::Vec3 normal;
 	ei::Vec3 tangentX;

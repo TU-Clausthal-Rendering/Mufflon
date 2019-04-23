@@ -54,6 +54,22 @@ CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* ligh
 	}
 }
 
+// Guide the light tree traversal based on flux only
+CUDA_FUNCTION float guide_flux(const scene::Point&, const scene::Point&, const scene::Point&,
+							   float leftFlux, float rightFlux) {
+	return leftFlux / (leftFlux + rightFlux);
+}
+
+// Guide the light tree traversal based on expected contribution
+CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
+								   const scene::Point& leftPosition,
+								   const scene::Point& rightPosition,
+								   float leftFlux, float rightFlux) {
+	leftFlux /= lensq(leftPosition - refPosition);
+	rightFlux /= lensq(rightPosition - refPosition);
+	return leftFlux / (leftFlux + rightFlux);
+}
+
 } // namespace lighttree_detail
 
 /** Shared code for emitting a single photon from the tree.
@@ -160,11 +176,10 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
  * Shared code for connecting to a subtree.
  * Takes the light tree, initial interval limits, and RNG number as inputs.
  */
-template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u64 right,
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const ei::Box& bounds, const math::RndSet2& rnd,
-										  Guide&& guide, u32* lightIndex = nullptr) {
+										  bool posGuide) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -182,12 +197,16 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 		mAssert(currentNode != nullptr);
 		mAssert(intervalLeft <= intervalRight);
 		
-		// Find out the two cluster centers
-		const ei::Vec3 leftCenter = get_center(tree.memory + currentNode->left.offset, currentNode->left.type);
-		const ei::Vec3 rightCenter = get_center(tree.memory + currentNode->right.offset, currentNode->right.type);
-
-		// Scale the flux up
-		float probLeft = guide(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
+		float probLeft = 1.0f;
+		if(posGuide) {
+			// Find out the two cluster centers
+			const ei::Vec3 leftCenter = get_center(tree.memory + currentNode->left.offset, currentNode->left.type);
+			const ei::Vec3 rightCenter = get_center(tree.memory + currentNode->right.offset, currentNode->right.type);
+			probLeft = guide_flux_pos(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
+		} else {
+			const ei::Vec3 leftCenter, rightCenter; // Unused dummies
+			probLeft = guide_flux(position, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
+		}
 		// Compute the integer bounds
 		u64 intervalBoundary = intervalLeft + math::percentage_of(intervalRight - intervalLeft, probLeft);
 		if(rndChoice < intervalBoundary) {
@@ -208,8 +227,6 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 	}
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
-	if(lightIndex != nullptr)
-		*lightIndex = nodeIndex - tree.internalNodeCount;
 	// We got a light source! Sample it
 	return adjustPdf(connect_light(static_cast<LightType>(type), tree.memory + offset,
 							 position, bounds, rnd), lightProb);
@@ -232,11 +249,9 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
  *		Ready to use implementations: guide_flux (ignores the reference position)
  *		or guide_flux_pos
  */
-template < class Guide >
 CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
-										  const ei::Box& bounds, const math::RndSet2& rnd,
-										  Guide&& guide, u32* lightIndex = nullptr) {
+										  const ei::Box& bounds, const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
 	// Scale the indices such that they sample the u64-intervall equally.
 	// The (modulu) addition with the seed randomizes the choice.
@@ -273,7 +288,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 		subTree = &tree.posLights;
 		p = posProb;
 	}
-	return connect(*subTree, left, right, rndChoice, p, position, bounds, rnd, guide, lightIndex);
+	return connect(*subTree, left, right, rndChoice, p, position, bounds, rnd, tree.posGuide);
 }
 
 /*
@@ -285,10 +300,9 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
  *		For both variants there is an alias function called connect_pdf()
  *		and emit_pdf() respectively.
  */
-template < bool connect, class Guide >
-CUDA_FUNCTION AreaPdf light_pdf(const LightTree<CURRENT_DEV>& tree,
+CUDA_FUNCTION LightPdfs light_pdf(const LightTree<CURRENT_DEV>& tree,
 								PrimitiveHandle primitive, ei::Vec2 surfaceParams,
-								const ei::Vec3& refPosition, Guide&& guide) {
+								const ei::Vec3& refPosition) {
 	mAssert(primitive.instanceId != -1);
 	using namespace lighttree_detail;
 
@@ -301,11 +315,17 @@ CUDA_FUNCTION AreaPdf light_pdf(const LightTree<CURRENT_DEV>& tree,
 	// Iterate until we hit a leaf
 	while(type == LightSubTree::Node::INTERNAL_NODE_TYPE) {
 		const LightSubTree::Node* currentNode = tree.posLights.get_node(offset);
-		// Find out the two cluster centers
-		const ei::Vec3 leftCenter = get_center(tree.posLights.memory + currentNode->left.offset, currentNode->left.type);
-		const ei::Vec3 rightCenter = get_center(tree.posLights.memory + currentNode->right.offset, currentNode->right.type);
+		float pLeft = 1.0f;
+		if(tree.posGuide) {
+			// Find out the two cluster centers
+			const ei::Vec3 leftCenter = get_center(tree.posLights.memory + currentNode->left.offset, currentNode->left.type);
+			const ei::Vec3 rightCenter = get_center(tree.posLights.memory + currentNode->right.offset, currentNode->right.type);
+			pLeft = guide_flux_pos(refPosition, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
+		} else {
+			const ei::Vec3 leftCenter, rightCenter; // Dummies
+			pLeft = guide_flux(refPosition, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
+		}
 
-		float pLeft = guide(refPosition, leftCenter, rightCenter, currentNode->left.flux, currentNode->right.flux);
 		// Go right? The code has stored the path to the primitive (beginning with the most significant bit).
 		if(code & 0x80000000) {
 			p *= (1.0f - pLeft);
@@ -324,46 +344,34 @@ CUDA_FUNCTION AreaPdf light_pdf(const LightTree<CURRENT_DEV>& tree,
 		case LightType::AREA_LIGHT_TRIANGLE: {
 			auto& a = *as<AreaLightTriangle<CURRENT_DEV>>(tree.posLights.memory + offset);
 			float area = len(cross(a.posV[1u], a.posV[2u])) / 2.0f;
-			return AreaPdf{ p / area };
+			AreaPdf pdf { p / area };
+			return { pdf, pdf };
 		}
 		case LightType::AREA_LIGHT_QUAD: {
 			auto& light = *as<AreaLightQuad<CURRENT_DEV>>(tree.posLights.memory + offset);
 			// Compute the local density at the point of the surface
 			const ei::Vec3 tangentX = light.posV[1u] + surfaceParams.x * light.posV[3u];
 			const ei::Vec3 tangentY = light.posV[2u] + surfaceParams.y * light.posV[3u];
-			return AreaPdf{ p / len(cross(tangentY, tangentX)) };
+			AreaPdf pdf { p / len(cross(tangentY, tangentX)) };
+			return { pdf, pdf };
 		}
 		case LightType::AREA_LIGHT_SPHERE: {
 			auto& a = *as<AreaLightSphere<CURRENT_DEV>>(tree.posLights.memory + offset);
-			if(connect) {
-				// Only the visible part of the sphere is sampled. Therefore, the area depends
-				// on the distance between reference and sphere.
-				float cosSphere = a.radius / len(refPosition - a.position);
-				mAssert(cosSphere >= 0.0f && cosSphere <= 1.0f);
-				float solidAngle = 2 * ei::PI * (1.0f - cosSphere);
-				float area = solidAngle * ei::sq(a.radius);
-				return AreaPdf{ p / area };
-			} else {
-				float area = 4 * ei::PI * ei::sq(a.radius);
-				return AreaPdf{ p / area };
-			}
+			// Only the visible part of the sphere is sampled in connections.
+			// Therefore, the area depends on the distance between reference and sphere.
+			float cosSphere = a.radius / len(refPosition - a.position);
+			mAssert(cosSphere >= 0.0f && cosSphere <= 1.0f);
+			float solidAngle = 2 * ei::PI * (1.0f - cosSphere);
+			float rsq = a.radius * a.radius;
+			AreaPdf connectPdf { p / (solidAngle * rsq) };
+			// Emit pdf is uniform on the surface
+			AreaPdf emitPdf { p / (4 * ei::PI * rsq) };
+			return { emitPdf, connectPdf };
 		}
 		default:
 			mAssertMsg(false, "Decoded node must be some hitable area light.");
 	}
-	return AreaPdf{0.0f};
-}
-template < class Guide >
-CUDA_FUNCTION AreaPdf connect_pdf(const LightTree<CURRENT_DEV>& tree,
-								  PrimitiveHandle primitive, ei::Vec2 surfaceParams,
-								  const ei::Vec3& refPosition, Guide&& guide) {
-	return light_pdf<true>(tree, primitive, surfaceParams, refPosition, guide);
-}
-template < class Guide >
-CUDA_FUNCTION AreaPdf emit_pdf(const LightTree<CURRENT_DEV>& tree,
-							   PrimitiveHandle primitive, ei::Vec2 surfaceParams,
-							   const ei::Vec3& refPosition, Guide&& guide) {
-	return light_pdf<false>(tree, primitive, surfaceParams, refPosition, guide);
+	return { AreaPdf{0.0f}, AreaPdf{0.0f} };
 }
 
 /*
@@ -374,22 +382,6 @@ CUDA_FUNCTION AreaPdf background_pdf(const LightTree<CURRENT_DEV>& tree, const m
 	float backgroundFlux = ei::sum(tree.background.flux);
 	float p = backgroundFlux / (tree.dirLights.root.flux + tree.posLights.root.flux + backgroundFlux);
 	return AreaPdf{ float(value.pdf.back) * p };
-}
-
-// Guide the light tree traversal based on flux only
-CUDA_FUNCTION float guide_flux(const scene::Point&, const scene::Point&, const scene::Point&,
-							   float leftFlux, float rightFlux) {
-	return leftFlux / (leftFlux + rightFlux);
-}
-
-// Guide the light tree traversal based on expected contribution
-CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
-								   const scene::Point& leftPosition,
-								   const scene::Point& rightPosition,
-								   float leftFlux, float rightFlux) {
-	leftFlux /= lensq(leftPosition - refPosition);
-	rightFlux /= lensq(rightPosition - refPosition);
-	return leftFlux / (leftFlux + rightFlux);
 }
 
 }}} // namespace mufflon::scene::lights

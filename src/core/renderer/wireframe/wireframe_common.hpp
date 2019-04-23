@@ -132,7 +132,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 			const auto& hitId = nextHit.hitId;
 			const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
 			const auto& poly = lod.polygon;
-			const auto& hit = ray.origin + ray.direction * nextHit.hitT;
+			const auto& hit = ray.origin + ray.direction * nextHit.distance;
 
 			ei::Vec3 closestLinePoint;
 			if(static_cast<u32>(nextHit.hitId.primId) < poly.numTriangles) {
@@ -162,7 +162,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 				case cameras::CameraModel::PINHOLE:
 				{
 					const auto& pinholeParams = static_cast<const cameras::PinholeParams&>(camParams);
-					pixelSize = nextHit.hitT * pinholeParams.tanVFov / static_cast<float>(pinholeParams.resolution.y);
+					pixelSize = nextHit.distance * pinholeParams.tanVFov / static_cast<float>(pinholeParams.resolution.y);
 				}	break;
 				case cameras::CameraModel::FOCUS:	// TODO: does this make sense?
 				case cameras::CameraModel::ORTHOGRAPHIC:
@@ -175,7 +175,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 			const float sqDistThreshold = ei::sq(params.lineWidth * pixelSize);
 			// Only draw it if it's below the threshold (expressed in pixels)
 			if(ei::lensq(projectedLineSegment) > sqDistThreshold) {
-				ray.origin = ray.origin + ray.direction * (nextHit.hitT + 0.0001f);
+				ray.origin = ray.origin + ray.direction * (nextHit.distance + 0.0001f);
 			} else {
 				outputBuffer.contribute(coord, throughput, borderColor,
 										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },

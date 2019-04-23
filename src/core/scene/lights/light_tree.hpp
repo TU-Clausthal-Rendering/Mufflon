@@ -106,6 +106,8 @@ struct LightSubTree {
 	CUDA_FUNCTION __forceinline__ const Node* get_node(u32 offset) const { return as<Node>(memory + offset); }
 };
 
+//using GuideFunction = float (*)(const scene::Point&, const scene::Point&, const scene::Point&, float, float);
+
 template < Device dev >
 struct LightTree {
 	static constexpr Device DEVICE = dev;
@@ -119,6 +121,7 @@ struct LightTree {
 	// would be useless in terms of finding its probability. Therefore,
 	// the tree must be traversed
 	HashMap<dev, PrimitiveHandle, u32> primToNodePath;
+	bool posGuide;
 };
 
 #ifndef __CUDACC__
@@ -170,6 +173,10 @@ public:
 		if constexpr(dev == Device::CUDA) return m_treeCuda != nullptr;
 		return false;
 	}
+
+	// Get the function pointer for flux or fluxPos guide on the target device.
+//	template < Device dev >
+//	static GuideFunction get_guide_fptr(bool posGuide);
 private:
 	void update_media_cpu(const SceneDescriptor<Device::CPU>& scene);
 	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);

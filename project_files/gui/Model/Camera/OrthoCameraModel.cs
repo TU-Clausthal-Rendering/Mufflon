@@ -9,6 +9,9 @@ namespace gui.Model.Camera
 {
     public class OrthoCameraModel : CameraModel
     {
+        private readonly float m_originalWidth;
+        private readonly float m_originalHeight;
+
         public override CameraType Type => CameraType.Ortho;
 
         public override CameraViewModel CreateViewModel(Models models)
@@ -46,6 +49,17 @@ namespace gui.Model.Camera
 
         public OrthoCameraModel(IntPtr handle) : base(handle)
         {
+            m_originalWidth = Width;
+            m_originalHeight = Height;
+        }
+
+
+        protected override void ResetConcreteModel()
+        {
+            Width = m_originalWidth;
+            Height = m_originalHeight;
+            OnPropertyChanged(nameof(Width));
+            OnPropertyChanged(nameof(Height));
         }
     }
 }

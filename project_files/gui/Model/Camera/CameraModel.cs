@@ -15,9 +15,11 @@ namespace gui.Model.Camera
     /// </summary>
     public abstract class CameraModel : INotifyPropertyChanged
     {
-        private Vec3<float> m_originalPosition;
-        private Vec3<float> m_originalViewDirection;
-        private Vec3<float> m_originalUp;
+        private readonly Vec3<float> m_originalPosition;
+        private readonly Vec3<float> m_originalViewDirection;
+        private readonly Vec3<float> m_originalUp;
+        private readonly float m_originalNear;
+        private readonly float m_originalFar;
 
         public enum CameraType
         {
@@ -32,6 +34,8 @@ namespace gui.Model.Camera
             m_originalPosition = Position;
             m_originalViewDirection = ViewDirection;
             m_originalUp = Up;
+            m_originalNear = Near;
+            m_originalFar = Far;
         }
 
         public abstract CameraType Type { get; }
@@ -151,15 +155,20 @@ namespace gui.Model.Camera
         }
 
         // Resets the camera's rotation and translation to how it was upon loading
-        public void ResetTransRot()
+        public void Reset()
         {
             Position = m_originalPosition;
             ViewDirection = m_originalViewDirection;
             Up = m_originalUp;
+            Near = m_originalNear;
+            Far = m_originalFar;
+            ResetConcreteModel();
             OnPropertyChanged(nameof(Position));
             OnPropertyChanged(nameof(ViewDirection));
             OnPropertyChanged(nameof(Up));
         }
+
+        protected abstract void ResetConcreteModel();
 
         /// <summary>
         /// creates a new view model based on this model

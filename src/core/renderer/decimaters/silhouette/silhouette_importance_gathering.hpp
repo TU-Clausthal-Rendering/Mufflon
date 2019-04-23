@@ -144,13 +144,13 @@ CUDA_FUNCTION bool trace_shadow_silhouette(const scene::SceneDescriptor<CURRENT_
 
 		if(sharedVertices >= 1) {
 			// Got at least a silhouette point - now make sure we're seeing the silhouette
-			ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
+			ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.distance), shadowRay.direction };
 
 			/*const auto thirdHit = scene::accel_struct::any_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
-																		vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
+																		vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.distance + DIST_EPSILON);
 			if(!thirdHit) {*/
 			const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
-																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
+																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.distance + DIST_EPSILON);
 			if(thirdHit.hitId == vertex.get_primitive_id()) {
 				for(i32 i = 0; i < sharedVertices; ++i) {
 					const auto lodIdx = scene.lodIndices[vertex.ext().shadowHit.instanceId];
@@ -179,9 +179,9 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 	if(secondHit.hitId.instanceId < 0 || secondHit.hitId == vertex.get_primitive_id())
 		return false;
 
-	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.hitT), shadowRay.direction };
+	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.distance), shadowRay.direction };
 	const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
-																  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.hitT + DIST_EPSILON);
+																  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.distance + DIST_EPSILON);
 	if(thirdHit.hitId == vertex.get_primitive_id()) {
 		const auto& hitId = vertex.ext().shadowHit;
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];
@@ -230,7 +230,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 			math::RndSet2 neeRnd = rng.next();
 			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
 							   vertices[pathLen].get_position(), scene.aabb,
-							   neeRnd, scene::lights::guide_flux);
+							   neeRnd);
 			Pixel projCoord;
 			auto value = vertices[pathLen].evaluate(nee.dir.direction, scene.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
@@ -243,7 +243,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 				auto shadowHit = scene::accel_struct::first_intersection(scene, vertices[pathLen].ext().shadowRay,
 																		 vertices[pathLen].get_geometric_normal(), nee.dist);
 				vertices[pathLen].ext().shadowHit = shadowHit.hitId;
-				vertices[pathLen].ext().firstShadowDistance = shadowHit.hitT;
+				vertices[pathLen].ext().firstShadowDistance = shadowHit.distance;
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
@@ -273,7 +273,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		VertexSample sample;
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(!walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample))
+		if(walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) == WalkResult::CANCEL)
 			break;
 
 		// Update old vertex with accumulated throughput
@@ -345,7 +345,7 @@ CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& ou
 	scene::Point lastPosition = vertex.get_position();
 	math::RndSet2_1 rnd{ rng.next(), rng.next() };
 	float rndRoulette = math::sample_uniform(u32(rng.next()));
-	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::HIT) {
 		const auto& hitpoint = vertex.get_position();
 		const auto& hitId = vertex.get_primitive_id();
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];

@@ -12,7 +12,7 @@ namespace mufflon { namespace renderer {
 
 __global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
 								 scene::SceneDescriptor<Device::CUDA>* scene,
-								 const u32* seeds, PtParameters params) {
+								 math::Rng* rngs, PtParameters params) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
@@ -22,9 +22,8 @@ __global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
 
 	const int pixel = coord.x + coord.y * outputBuffer.get_width();
 
-	math::Rng rng(seeds[pixel]);
 #ifdef __CUDA_ARCH__
-	pt_sample(outputBuffer, *scene, params, coord, rng);
+	pt_sample(outputBuffer, *scene, params, coord, rngs[pixel]);
 #endif // __CUDA_ARCH__
 }
 
@@ -33,11 +32,25 @@ namespace gpupt_detail {
 cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
 						RenderBuffer<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
-						const u32* seeds, const PtParameters& params) {
+						math::Rng* rngs, const PtParameters& params) {
 	sample_pt<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
-									   seeds, params);
+									   rngs, params);
 	cudaDeviceSynchronize();
 	return cudaGetLastError();
+}
+
+__global__ static void init_rng(u32 num, math::Rng* rngs) {
+	u32 idx = threadIdx.x + blockDim.x * blockIdx.x;
+	if(idx < num) {
+		rngs[idx] = math::Rng{ idx };
+	}
+}
+void init_rngs(u32 num, math::Rng* rngs) {
+	dim3 blockDims { 256u, 1u, 1u };
+	dim3 gridDims { (num + 255u) / 256u, 1u, 1u };
+	init_rng<<<gridDims, blockDims>>>(num, rngs);
+	cudaDeviceSynchronize();
+	cuda::check_error(cudaGetLastError());
 }
 
 } // namespace gpupt_detail

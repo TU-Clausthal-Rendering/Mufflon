@@ -246,7 +246,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
 			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
 							   vertices[pathLen].get_position(), m_currentScene->get_bounding_box(),
-							   neeRnd, scene::lights::guide_flux);
+							   neeRnd);
 			Pixel projCoord;
 			auto value = vertices[pathLen].evaluate(nee.dir.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
@@ -282,7 +282,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		VertexSample sample;
 		float rndRoulette = math::sample_uniform(u32(m_rngs[pixel].next()));
-		if(!walk(m_sceneDesc, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample))
+		if(walk(m_sceneDesc, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) == WalkResult::CANCEL)
 			break;
 
 		// Update old vertex with accumulated throughput
@@ -340,9 +340,6 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, m_sceneDesc.camera.get(), coord, rng.next());
 
-	auto& guideFunction = m_params.neeUsePositionGuide ? scene::lights::guide_flux_pos
-		: scene::lights::guide_flux;
-
 	int pathLen = 0;
 	do {
 		if(pathLen > 0 && pathLen + 1 >= m_params.minPathLength && pathLen + 1 <= m_params.maxPathLength) {
@@ -356,8 +353,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 			for(int i = 0; i < m_params.neeCount; ++i) {
 				math::RndSet2 neeRnd = rng.next();
 				auto nee = connect(m_sceneDesc.lightTree, i, m_params.neeCount, neeSeed,
-								   vertex.get_position(), m_sceneDesc.aabb, neeRnd,
-								   guideFunction);
+								   vertex.get_position(), m_sceneDesc.aabb, neeRnd);
 				Pixel outCoord;
 				auto value = vertex.evaluate(nee.dir.direction, m_sceneDesc.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
@@ -383,37 +379,22 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(!walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample)) {
-			if((pathLen + 1 >= m_params.minPathLength) && (throughput.weight != Spectrum{ 0.0f })) {
-				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
-				if(any(greater(background.value, 0.0f))) {
-					AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
-					float mis = 1.0f / (1.0f + m_params.neeCount * float(startPdf) / float(sample.pdf.forw));
-					background.value *= mis;
-					m_outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
-				}
-			}
+		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample) != WalkResult::CANCEL)
 			break;
-		}
 		++pathLen;
 		
 		// Evaluate direct hit of area ligths
 		if(pathLen >= m_params.minPathLength) {
-			Spectrum emission = vertex.get_emission().value;
-			if(emission != 0.0f) {
-				AreaPdf startPdf = connect_pdf(m_sceneDesc.lightTree, vertex.get_primitive_id(),
-											   vertex.get_surface_params(),
-											   lastPosition, guideFunction);
-				float mis = pathLen == 1 ? 1.0f
-					: 1.0f / (1.0f + m_params.neeCount * (startPdf / vertex.ext().incidentPdf));
-				emission *= mis;
+			EmissionValue emission = vertex.get_emission(m_sceneDesc, lastPosition);
+			if(emission.value != 0.0f) {
+				float mis = 1.f / (1.f + m_params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
+				emission.value *= mis;
 			}
-			m_outputBuffer.contribute(coord, throughput, emission, vertex.get_position(),
+			m_outputBuffer.contribute(coord, throughput, emission.value, vertex.get_position(),
 									vertex.get_normal(), vertex.get_albedo());
 		}
+		if(vertex.is_end_point())
+			break;
 	} while(pathLen < m_params.maxPathLength);
 }
 

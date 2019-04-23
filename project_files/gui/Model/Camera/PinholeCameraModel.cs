@@ -10,6 +10,8 @@ namespace gui.Model.Camera
 {
     public class PinholeCameraModel : CameraModel
     {
+        private readonly float m_originalFov;
+
         public override CameraType Type => CameraType.Pinhole;
 
         public override CameraViewModel CreateViewModel(Models models)
@@ -38,6 +40,13 @@ namespace gui.Model.Camera
 
         public PinholeCameraModel(IntPtr handle) : base(handle)
         {
+            m_originalFov = Fov;
+        }
+
+        protected override void ResetConcreteModel()
+        {
+            Fov = m_originalFov;
+            OnPropertyChanged(nameof(Fov));
         }
     }
 }
