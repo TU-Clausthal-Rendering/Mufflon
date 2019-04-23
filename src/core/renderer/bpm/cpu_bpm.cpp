@@ -8,7 +8,6 @@
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
-#include "core/scene/lights/light_tree_sampling.hpp"
 
 namespace mufflon::renderer {
 
@@ -142,7 +141,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, true, throughput, vertex[otherV], sample))
+		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, true, throughput, vertex[otherV], sample) != WalkResult::HIT)
 			break;
 		++pathLen;
 		currentV = otherV;
@@ -177,26 +176,23 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample)) {
-			if(throughput.weight != Spectrum{ 0.0f }) {
-				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
-				if(any(greater(background.value, 0.0f))) {
-					// For direction/envmap sources the sampling of position and direction is
-					// reverted, so we need to cast the swapped pdfs to fit the expected order of events.
-					AngularPdf backtracePdf = AngularPdf{ 1.0f / math::projected_area(sample.excident, m_sceneDesc.aabb) };
-					AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
-					float misWeight = get_mis_weight(vertex[otherV], backtracePdf, startPdf, numPhotons, ei::PI * mergeRadiusSq);
-					background.value *= misWeight;
-					m_outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
-				}
-			}
+		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample) == WalkResult::CANCEL)
 			break;
-		}
 		++viewPathLen;
 		currentV = otherV;
+
+		// Evaluate direct hit of area ligths and background
+		if(viewPathLen >= m_params.minPathLength) {
+			EmissionValue emission = vertex[currentV].get_emission(m_sceneDesc, vertex[1-currentV].get_position());
+			if(emission.value != 0.0f && viewPathLen > 1) {
+				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, ei::PI * mergeRadiusSq);
+				emission.value *= misWeight;
+			}
+			mAssert(!isnan(emission.value.x));
+			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
+									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
+		}
+		if(vertex[currentV].is_end_point()) break;
 
 		// Merges
 		Spectrum radiance { 0.0f };
@@ -220,21 +216,6 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		}
 		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
 			scene::Direction{0.0f}, Spectrum{0.0f});
-
-		// Evaluate direct hit of area ligths
-		if(viewPathLen >= m_params.minPathLength) {
-			math::SampleValue emission = vertex[currentV].get_emission();
-			if(emission.value != 0.0f && viewPathLen > 1) {
-				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
-											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
-											scene::lights::guide_flux);
-				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, startPdf, numPhotons, ei::PI * mergeRadiusSq);
-				emission.value *= misWeight;
-			}
-			mAssert(!isnan(emission.value.x));
-			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
-									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
-		}
 	} while(viewPathLen < m_params.maxPathLength);
 }
 

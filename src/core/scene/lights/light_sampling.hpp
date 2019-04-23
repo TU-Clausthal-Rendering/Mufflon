@@ -59,6 +59,12 @@ struct NextEventEstimation {
 	//LightType type; // Not required ATM
 };
 
+// For some area lights, there are two possible variants to sample a surface location.
+struct LightPdfs {
+	AreaPdf emitPdf;
+	AreaPdf connectPdf;
+};
+
 // NEE distance will not go below this threshold (avoid infinity peaks
 constexpr float DISTANCESQ_EPSILON = 1e-10f;
 

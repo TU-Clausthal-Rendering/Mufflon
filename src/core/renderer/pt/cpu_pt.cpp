@@ -17,6 +17,8 @@ CpuPathTracer::CpuPathTracer() {
 void CpuPathTracer::iterate() {
 	auto scope = Profiler::instance().start<CpuProfileState>("CPU PT iteration", ProfileLevel::HIGH);
 
+	m_sceneDesc.lightTree.posGuide = m_params.neeUsePositionGuide;
+
 	// TODO: better pixel order?
 	// TODO: different scheduling?
 #pragma PARALLEL_FOR

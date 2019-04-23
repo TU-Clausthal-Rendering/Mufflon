@@ -7,6 +7,7 @@
 #include "core/scene/types.hpp"
 #include "core/scene/materials/material_sampling.hpp"
 #include "core/scene/lights/light_sampling.hpp"
+#include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
@@ -85,6 +86,18 @@ struct Connection : public ConnectionDir {
 	{}
 };
 
+struct EmissionValue : public math::SampleValue, public scene::lights::LightPdfs {
+	CUDA_FUNCTION EmissionValue(const Spectrum& radiance, AngularPdf pdf, AreaPdf emitPdf, AreaPdf connectPdf) :
+		math::SampleValue{radiance, pdf},
+		scene::lights::LightPdfs{emitPdf, connectPdf}
+	{}
+
+	CUDA_FUNCTION EmissionValue() :
+		math::SampleValue{Spectrum{0.0f}, AngularPdf{0.0f}},
+		scene::lights::LightPdfs{AreaPdf{0.0f}, AreaPdf{0.0f}}
+	{}
+};
+
 /*
  * The vertex is an abstraction layer between light/camera/material implementation
  * and a general rendering routine.
@@ -122,9 +135,9 @@ public:
 		return m_position;
 	}
 
-	// Get the position of the vertex. For orthographic vertices an assertion is issued
+	// Get the position of the vertex. For orthographic vertices zero is returned
 	CUDA_FUNCTION scene::Point get_position() const {
-		mAssertMsg(!is_orthographic(), "Implementation error. Orthogonal vertices have no position.");
+		if(is_orthographic()) return scene::Point{0.0f};
 		return m_position;
 	}
 
@@ -378,28 +391,44 @@ public:
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
-	CUDA_FUNCTION math::SampleValue get_emission() const {
+	// connectPdf: compute the emit_pdf() for area lights, otherwise compute connect_pdf()
+	CUDA_FUNCTION EmissionValue get_emission(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& prevPosition) const {
 		switch(m_type) {
-			case Interaction::VOID:
+			case Interaction::VOID: {
+				math::EvalValue background = evaluate_background(scene.lightTree.background, m_incident);
+				AngularPdf backtracePdf { 0.0f };
+				AreaPdf startPdf { 0.0f };
+				if(background.value != 0.0f) {
+					backtracePdf = AngularPdf{ 1.0f / math::projected_area(m_incident, scene.aabb) };
+					startPdf = background_pdf(scene.lightTree, background);
+				}
+				return { background.value, backtracePdf, startPdf, startPdf };
+			}
 			case Interaction::LIGHT_POINT:
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP:
 			case Interaction::LIGHT_SPOT:
 			case Interaction::CAMERA_PINHOLE:
 			case Interaction::CAMERA_FOCUS:
-				return math::SampleValue{};
+				return EmissionValue{};
 			case Interaction::LIGHT_AREA: {
 				// If an area light is hit, a surface vertex should be created.
 				// Area light vertices do not store the incident direction (they are
 				// start points).
 				mAssert(false);
-				return math::SampleValue{};
+				return EmissionValue{};
 			}
 			case Interaction::SURFACE: {
-				return scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
+				math::SampleValue matValue = scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
+				scene::lights::LightPdfs startPdf { AreaPdf{0.0f}, AreaPdf{0.0f} };
+				if(matValue.value != 0.0f) {
+					startPdf = scene::lights::light_pdf(scene.lightTree, m_desc.surface.primitiveId,
+										 m_desc.surface.surfaceParams, prevPosition);
+				}
+				return { matValue.value, matValue.pdf, startPdf.emitPdf, startPdf.connectPdf };
 			}
 		}
-		return math::SampleValue{};
+		return EmissionValue{};
 	}
 
 	CUDA_FUNCTION Spectrum get_albedo() const {

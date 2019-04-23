@@ -182,7 +182,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		// Walk
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
-		if(!walk(m_sceneDesc, path[lightPathLen], rnd, rndRoulette, true, throughput, path[lightPathLen+1], sample))
+		if(walk(m_sceneDesc, path[lightPathLen], rnd, rndRoulette, true, throughput, path[lightPathLen+1], sample) != WalkResult::HIT)
 			break;
 		++lightPathLen;
 	} while(lightPathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
@@ -208,42 +208,23 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		int otherV = 1 - currentV;
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
-		if(!walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample)) {
-			if(throughput.weight != Spectrum{ 0.0f }) {
-				// Missed scene - sample background
-				auto background = evaluate_background(m_sceneDesc.lightTree.background, sample.excident);
-				if(any(greater(background.value, 0.0f))) {
-					// Update MIS for the last connection and that before.
-					// For direction/envmap sources the sampling of position and direction is
-					// reverted, so we need to cast the swapped pdfs to fit the expected order of events.
-					AngularPdf backtracePdf = AngularPdf{ 1.0f / math::projected_area(sample.excident, m_sceneDesc.aabb) };
-					AreaPdf startPdf = background_pdf(m_sceneDesc.lightTree, background);
-					float mis = get_mis_weight(vertex[otherV], backtracePdf, startPdf);
-					background.value *= mis;
-					m_outputBuffer.contribute(coord, throughput, background.value,
-											ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-											ei::Vec3{ 0, 0, 0 });
-				}
-			}
+		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample) == WalkResult::CANCEL)
 			break;
-		}
 		++viewPathLen;
 		currentV = otherV;
 
 		// Evaluate direct hit of area ligths
 		if(viewPathLen >= m_params.minPathLength) {
-			math::SampleValue emission = vertex[currentV].get_emission();
+			EmissionValue emission = vertex[currentV].get_emission(m_sceneDesc, vertex[1-currentV].get_position());
 			if(emission.value != 0.0f) {
-				AreaPdf startPdf = emit_pdf(m_sceneDesc.lightTree, vertex[currentV].get_primitive_id(),
-											vertex[currentV].get_surface_params(), vertex[1-currentV].get_position(),
-											scene::lights::guide_flux);
-				float mis = get_mis_weight(vertex[currentV], emission.pdf, startPdf);
+				float mis = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf);
 				emission.value *= mis;
 			}
 			mAssert(!isnan(emission.value.x));
 			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
 									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
 		}
+		if(vertex[currentV].is_end_point()) break;
 	} while(viewPathLen < m_params.maxPathLength);
 }
 

@@ -74,9 +74,9 @@ public:
 	struct EmissionDesc {
 		const NebPathVertex* previous;	// The previous vertex to compute the reuseCount after the density estimate
 		Spectrum radiance;				// emission.value
-		AreaPdf incidentPdf;
-		AreaPdf startPdf;
-		AngularPdf samplePdf;
+		AreaPdf incidentPdf;			// From random hit
+		AreaPdf startPdf;				// connectPdf
+		AngularPdf samplePdf;			// samplePdf * emitPdf / connectPdf
 		scene::Direction incident;
 		float incidentDistSq;
 	};
@@ -84,8 +84,8 @@ private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
-	EmissionDesc evaluate_self_radiance(const NebPathVertex& vertex, bool includeThroughput);
-	EmissionDesc evaluate_background(const NebPathVertex& vertex, const VertexSample& sample, int pathLen);
+	//EmissionDesc evaluate_self_radiance(const NebPathVertex& vertex, bool includeThroughput);
+	//EmissionDesc evaluate_background(const NebPathVertex& vertex, const VertexSample& sample, int pathLen);
 	void sample_view_path(const Pixel coord, const int pixelIdx);
 	void estimate_density(float densityEstimateRadiusSq, NebPathVertex& vertex);
 	void sample_photon_path(float neeMergeArea, float photonMergeArea, math::Rng& rng, const NebPathVertex& vertex);
