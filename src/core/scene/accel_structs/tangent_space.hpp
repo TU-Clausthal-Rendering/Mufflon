@@ -16,7 +16,7 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 			intersection.normal,
 			intersection.normal,
 			intersection.tangentX,
-			intersection.tangentY
+			cross(intersection.normal, intersection.tangentX)
 		};
 	}
 

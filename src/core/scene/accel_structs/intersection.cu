@@ -653,13 +653,12 @@ RayIntersectionResult first_intersection(
 				tangentX = ei::Vec3(1.0f, 0.0f, 0.0f);
 			else
 				tangentX = ei::Vec3(normalize(ei::Vec2(geoNormal.y, -geoNormal.x)), 0.0f);
-			tangentY = cross(geoNormal, tangentX);
 
 			const ei::Vec3 localN = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[hitInstanceId] }) * geoNormal);
 			uv.x = atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f;
 			uv.y = acosf(-localN.z) / ei::PI;
 			surfParams.st = uv;
-			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
+			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, uv, surfParams };
 		} else {
 			const i32* indices = (i32*)obj.polygon.vertexIndices;
 			const ei::Vec3* meshVertices = obj.polygon.vertices;
@@ -677,11 +676,9 @@ RayIntersectionResult first_intersection(
 				const ei::Vec3 dx1 = v[2u] - v[0u];
 				const ei::Vec2 du0 = uvV[1u] - uvV[0u];
 				const ei::Vec2 du1 = uvV[2u] - uvV[0u];
-				float det = 1.f / (du0.x * du1.y - du0.y * du1.x);
+				float det = (du0.x * du1.y - du0.y * du1.x);
 				// TODO: fetch the instance instead (issue #44)
-				// TODO: do the tangent's really need to be normalized?
-				tangentX = det * (dx0 * du1.y - dx1 * du0.y);
-				tangentY = det * (dx1 * du0.x - dx0 * du1.x);
+				tangentX = (dx0 * du1.y - dx1 * du0.y) / det;
 
 				// Don't use the UV tangents to compute the normal, since they may be reversed
 				geoNormal = cross(dx0, dx1);
@@ -716,10 +713,14 @@ RayIntersectionResult first_intersection(
 					duds.x, dudt.x,
 					duds.y, dudt.y,
 				};
-				const ei::Mat2x2 dsduv = ei::invert(dudst);
-				const ei::Matrix<float, 3, 2> tangents = dxdst * dsduv;
-				tangentX = ei::Vec3{ tangents(0, 0), tangents(1, 0), tangents(2, 0) };
-				tangentY = ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) };
+				float detDudst = dudst[0] * dudst[3] - dudst[1] * dudst[2];
+				if(detDudst >= 1e-5f || detDudst <= -1e5f)
+					tangentX = dxdst * ei::Vec2 { dudst[3] / detDudst, -dudst[2] / detDudst };
+				else tangentX = dxds;
+				//const ei::Mat2x2 dsduv = ei::invert(dudst);
+				//const ei::Matrix<float, 3, 2> tangents = dxdst * dsduv;
+				//tangentX = ei::Vec3{ tangents(0, 0), tangents(1, 0), tangents(2, 0) };
+				//tangentY = ei::Vec3{ tangents(0, 1), tangents(1, 1), tangents(2, 1) };
 
 				geoNormal = cross(dxdt, dxds);
 				uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], surfParams.bilinear.x, surfParams.bilinear.y);
@@ -731,13 +732,11 @@ RayIntersectionResult first_intersection(
 		ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitInstanceId] });
 		geoNormal = normalize(rotationInvScale * geoNormal);
 		tangentX = normalize(rotationInvScale * tangentX);
-		tangentY = normalize(rotationInvScale * tangentY);
 
 		mAssert(!(isnan(tangentX.x) || isnan(tangentX.y) || isnan(tangentX.z)));
-		mAssert(!(isnan(tangentY.x) || isnan(tangentY.y) || isnan(tangentY.z)));
 		mAssert(!(isnan(geoNormal.x) || isnan(geoNormal.y) || isnan(geoNormal.z)));
 
-		return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, tangentY, uv, surfParams };
+		return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, uv, surfParams };
 	}
 }
 
