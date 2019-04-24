@@ -23,9 +23,8 @@ union SurfaceParametrization {
 struct RayIntersectionResult {
 	float distance;
 	PrimitiveHandle hitId;
-	ei::Vec3 normal;
-	ei::Vec3 tangentX;
-	ei::Vec3 tangentY;
+	ei::Vec3 normal;		// Normalized geometric normal
+	ei::Vec3 tangentX;		// Normalized geometric tangent in texture U direction
 	ei::Vec2 uv;
 	SurfaceParametrization surfaceParams;
 };
