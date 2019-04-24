@@ -100,49 +100,14 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 	const ei::Vec3 c = p01 - p00;
 	const ei::Vec3 d = p00;
 
-	const float AXY = a.y*ray.direction.x - a.x*ray.direction.y;
-	const float AXZ = a.z*ray.direction.x - a.x*ray.direction.z;
-	const float AYZ = a.z*ray.direction.y - a.y*ray.direction.z;
-	const float BXY = b.y*ray.direction.x - b.x*ray.direction.y;
-	const float BXZ = b.z*ray.direction.x - b.x*ray.direction.z;
-	const float BYZ = b.z*ray.direction.y - b.y*ray.direction.z;
-	const float CXY = c.y*ray.direction.x - c.x*ray.direction.y;
-	const float CXZ = c.z*ray.direction.x - c.x*ray.direction.z;
-	const float CYZ = c.z*ray.direction.y - c.y*ray.direction.z;
-	const float DXY = (d.y - ray.origin.y) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.y;
-	const float DXZ = (d.z - ray.origin.z) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.z;
-	const float DYZ = (d.z - ray.origin.z) * ray.direction.y - (d.y - ray.origin.y) * ray.direction.z;
-
-	float A1, A2, B1, B2, C1, C2, D1, D2;
-		// Use the component with largest ray direction component to avoid singularities
-	if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) && ei::abs(ray.direction.x) >= ei::abs(ray.direction.z)) {
-		A1 = AXY;
-		B1 = BXY;
-		C1 = CXY;
-		D1 = DXY;
-		A2 = AXZ;
-		B2 = BXZ;
-		C2 = CXZ;
-		D2 = DXZ;
-	} else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z)) {
-		A1 = -AXY;
-		B1 = -BXY;
-		C1 = -CXY;
-		D1 = -DXY;
-		A2 = AYZ;
-		B2 = BYZ;
-		C2 = CYZ;
-		D2 = DYZ;
-	} else {
-		A1 = AXZ;
-		B1 = BXZ;
-		C1 = CXZ;
-		D1 = DXZ;
-		A2 = AYZ;
-		B2 = BYZ;
-		C2 = CYZ;
-		D2 = DYZ;
-	}
+	const float A1 = a.y * ray.direction.x - a.x * ray.direction.y;
+	const float A2 = a.z * ray.direction.x - a.x * ray.direction.z;
+	const float B1 = b.y * ray.direction.x - b.x * ray.direction.y;
+	const float B2 = b.z * ray.direction.x - b.x * ray.direction.z;
+	const float C1 = c.y * ray.direction.x - c.x * ray.direction.y;
+	const float C2 = c.z * ray.direction.x - c.x * ray.direction.z;
+	const float D1 = (d.y - ray.origin.y) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.y;
+	const float D2 = (d.z - ray.origin.z) * ray.direction.x - (d.x - ray.origin.x)  * ray.direction.z;
 
 	// Solve quadratic equ. for number of hitpoints
 	float t = -1.f;
@@ -152,10 +117,10 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 		float u0, u1;
 		float t0 = -1.f;
 		float t1 = -1.f;
+		// Use the component with largest ray direction component to avoid singularities
 		if(v0 >= 0.f && v0 <= 1.f) {
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
-				ei::Vec3 test = (u0*v0 * a + u0*b + v0*c + d - ray.origin) / ray.direction;
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
 				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
 					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x - ray.origin.x) / ray.direction.x;
@@ -165,30 +130,35 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 					t0 = (u0*v0*a.z + u0 * b.z + v0 * c.z + d.z - ray.origin.z) / ray.direction.z;
 			}
 		}
-		if(v1 >= 0.f && v1 <= 1.f) {
-			u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
-			if(u1 >= 0.f && u1 <= 1.f) {
-				ei::Vec3 test = (u1*v1 * a + u1*b + v1*c + d - ray.origin) / ray.direction;
-				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
-					t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
-				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
-					t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y - ray.origin.y) / ray.direction.y;
-				else
-					t1 = (u1*v1*a.z + u1 * b.z + v1 * c.z + d.z - ray.origin.z) / ray.direction.z;
+		if(v1 == v0) {
+			// There is only one/no hit point (planar quad)!
+			uv = ei::Vec2(u0, v0);
+			t = t0;
+		} else {
+			if(v1 >= 0.f && v1 <= 1.f) {
+				u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
+				if(u1 >= 0.f && u1 <= 1.f) {
+					if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
+					   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
+						t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
+					else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
+						t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y - ray.origin.y) / ray.direction.y;
+					else
+						t1 = (u1*v1*a.z + u1 * b.z + v1 * c.z + d.z - ray.origin.z) / ray.direction.z;
+				}
 			}
-		}
-		if(t0 > 0.f) {
-			if(t1 > 0.f && t1 < t0) {
+			if(t0 > 0.f) {
+				if(t1 > 0.f && t1 < t0) {
+					uv = ei::Vec2(u1, v1);
+					t = t1;
+				} else {
+					uv = ei::Vec2(u0, v0);
+					t = t0;
+				}
+			} else if(t1 > 0.f) {
 				uv = ei::Vec2(u1, v1);
 				t = t1;
-			} else {
-				uv = ei::Vec2(u0, v0);
-				t = t0;
 			}
-		} else if(t1 > 0.f) {
-			uv = ei::Vec2(u1, v1);
-			t = t1;
 		}
 	}
 
