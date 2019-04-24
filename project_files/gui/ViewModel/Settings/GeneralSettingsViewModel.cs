@@ -49,6 +49,7 @@ namespace gui.ViewModel.Settings
 
             ScreenshotFolder = s.ScreenshotFolder;
             SelectedScreenshotNamePattern = s.ScreenshotNamePattern;
+            MaxConsoleMessages = s.MaxConsoleMessages;
         }
 
         internal void StoreSettings()
@@ -59,6 +60,7 @@ namespace gui.ViewModel.Settings
             s.LoaderProfileLevel = SelectedLoaderProfilerLevel.Cargo;
             s.ScreenshotNamePattern = SelectedScreenshotNamePattern;
             s.ScreenshotFolder = ScreenshotFolder;
+            s.MaxConsoleMessages = MaxConsoleMessages;
             // TODO history?
         }
 
@@ -91,6 +93,8 @@ namespace gui.ViewModel.Settings
         public string ScreenshotFolder { get; set; }
 
         public string SelectedScreenshotNamePattern { get; set; }
+
+        public int MaxConsoleMessages { get; set; }
 
         // the history should always be saved
         // TODO update this after selection change

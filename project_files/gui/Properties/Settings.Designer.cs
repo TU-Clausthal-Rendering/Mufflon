@@ -223,5 +223,17 @@ namespace gui.Properties {
                 this["RendererParameters"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("50")]
+        public int MaxConsoleMessages {
+            get {
+                return ((int)(this["MaxConsoleMessages"]));
+            }
+            set {
+                this["MaxConsoleMessages"] = value;
+            }
+        }
     }
 }

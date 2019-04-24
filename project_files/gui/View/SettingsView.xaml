@@ -46,50 +46,55 @@
                                    Text="Logger output level:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
-                                   Margin="0,3,0,5"/>
+                                   Margin="{StaticResource LeftPropertyMargin}"/>
                         <ComboBox Grid.Row="0" 
                                   Grid.Column="1"
                                   ItemsSource="{Binding General.LogLevels}"
                                   SelectedItem="{Binding General.SelectedLogLevel}"
-                                  Margin="{StaticResource RightPropertyMargin}" Grid.ColumnSpan="2"/>
+                                  Margin="{StaticResource RightPropertyMargin}"
+                                  Grid.ColumnSpan="2"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Core Profiler level:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
-                                   Margin="0,3,0,5"/>
+                                   Margin="{StaticResource LeftPropertyMargin}"/>
                         <ComboBox Grid.Row="1" Grid.Column="1"
                                   Margin="{StaticResource RightPropertyMargin}"
                                   ItemsSource="{Binding General.CoreProfilerLevels}"
-                                  SelectedItem="{Binding General.SelectedCoreProfilerLevel}" Grid.ColumnSpan="2"/>
+                                  SelectedItem="{Binding General.SelectedCoreProfilerLevel}"
+                                  Grid.ColumnSpan="2"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Loader Profiler level:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
-                                   Margin="0,3,0,5"/>
+                                   Margin="{StaticResource LeftPropertyMargin}"/>
                         <ComboBox Grid.Row="2" Grid.Column="1"
                                   Margin="{StaticResource RightPropertyMargin}"
                                   ItemsSource="{Binding General.LoaderProfilerLevels}"
-                                  SelectedItem="{Binding General.SelectedLoaderProfilerLevel}" Grid.ColumnSpan="2"/>
+                                  SelectedItem="{Binding General.SelectedLoaderProfilerLevel}"
+                                  Grid.ColumnSpan="2"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0"
                                    Text="Screenshot name pattern:"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
-                                   Margin="0,3,0,5"
+                                   Margin="{StaticResource LeftPropertyMargin}"
                                    ToolTip="{Binding General.ScreenshotNamePatternTooltip}"/>
                         <ComboBox Grid.Row="3" Grid.Column="1"
                                   IsEditable="True"
                                   Margin="{StaticResource RightPropertyMargin}"
                                   ItemsSource="{Binding General.ScreenshotNamePatterns}"
-                                  Text="{Binding General.SelectedScreenshotNamePattern}" Grid.ColumnSpan="2">
+                                  Text="{Binding General.SelectedScreenshotNamePattern}"
+                                  Grid.ColumnSpan="2">
                         </ComboBox>
 
                         <TextBlock Grid.Row="4" Grid.Column="0"
                                    Text="Screenshot folder:"
                                    HorizontalAlignment="Left"
-                                   VerticalAlignment="Center" Margin="0,2"/>
+                                   VerticalAlignment="Center"
+                                   Margin="{StaticResource LeftPropertyMargin}"/>
                         <Grid Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -165,6 +170,25 @@
                 <StackPanel Margin="{StaticResource DialogMargin}"
                             Width="{StaticResource StackPanelWidth}"
                             HorizontalAlignment="Left">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                Text="Max. console messages:"
+                                ToolTip="less or equal to 0 means no limit"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="{StaticResource LeftPropertyMargin}"/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Margin="{StaticResource RightPropertyMargin}"
+                                 Text="{Binding General.MaxConsoleMessages}"/>
+                    </Grid>
                 </StackPanel>
             </TabItem>
         </TabControl>

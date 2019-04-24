@@ -146,6 +146,9 @@ namespace gui.Model
                 case nameof(Settings.AllowCameraMovement):
                     OnPropertyChanged(nameof(AllowCameraMovement));
                     break;
+                case nameof(Settings.MaxConsoleMessages):
+                    OnPropertyChanged(nameof(MaxConsoleMessages));
+                    break;
             }
         }
 
@@ -181,6 +184,12 @@ namespace gui.Model
         }
 
         public LimitedCollection LastWorlds { get; } = new LimitedCollection(MaxLastWorlds);
+
+        public int MaxConsoleMessages
+        {
+            get => Settings.Default.MaxConsoleMessages;
+            set => Settings.Default.MaxConsoleMessages = value;
+        }
 
         public bool AutoStartOnLoad
         {

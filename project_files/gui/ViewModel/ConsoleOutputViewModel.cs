@@ -27,11 +27,14 @@ namespace gui.ViewModel
         public ObservableCollection<TextBox> Output { get; } = new ObservableCollection<TextBox>();
 
         private readonly Models m_models;
+        private int m_maxMessages;
 
         public ConsoleOutputViewModel(Models models)
         {
             m_models = models;
+            m_maxMessages = models.Settings.MaxConsoleMessages;
             Logger.Log += GlHostOnLog;
+            models.Settings.PropertyChanged += OnSettingsChanged;
         }
 
         private void GlHostOnLog(string message, Brush color)
@@ -39,8 +42,17 @@ namespace gui.ViewModel
             AddText(message, color);
         }
 
+        private void OnSettingsChanged(object sender, PropertyChangedEventArgs args)
+        {
+            if (sender == m_models.Settings && args.PropertyName == nameof(SettingsModel.MaxConsoleMessages))
+                m_maxMessages = m_models.Settings.MaxConsoleMessages;
+        }
+
         public void AddText(string text, Brush color)
         {
+            // Remove earlier messages if stack is full
+            if(m_maxMessages > 0 && Output.Count >= m_maxMessages)
+                Output.RemoveAt(0);
             Output.Add(new TextBox
             {
                 Background = Brushes.Transparent,
