@@ -612,7 +612,7 @@ bool WorldContainer::load_scene_lights() {
 				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
 				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
 				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
-				ei::Mat3x4 instanceTransformation = inst->get_transformation_matrix() * ei::scaling(ei::Vec4{inst->get_scale(), 1.0f});
+				ei::Mat3x4 instanceTransformation = inst->get_transformation_matrix();
 				bool isMirroring = determinant(ei::Mat3x3{instanceTransformation}) < 0.0f;
 				for(const auto& face : polygons.faces()) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
