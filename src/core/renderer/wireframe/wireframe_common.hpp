@@ -14,25 +14,13 @@ using PtPathVertex = PathVertex<VertexExtension>;
 
 namespace {
 
-CUDA_FUNCTION ei::Vec3 translateToWorldSpace(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& point,
-											 const i32 instanceId) {
-	const ei::Mat3x3 rotation{ scene.transformations[instanceId] };
-	const ei::Vec3 scale{ scene.scales[instanceId] };
-	const ei::Vec3 translation{
-		scene.transformations[instanceId][3],
-		scene.transformations[instanceId][7],
-		scene.transformations[instanceId][11]
-	};
-	return rotation * (point * scale) + translation;
-}
-
 CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURRENT_DEV>& scene, const i32 instanceId,
 											   const ei::IVec3& indices, const ei::Vec3& hitpoint) {
 	// Compute the projected points on the triangle lines
 	const auto& vertices = scene.lods[scene.lodIndices[instanceId]].polygon.vertices;
-	const auto A = translateToWorldSpace(scene, vertices[indices.x], instanceId);
-	const auto B = translateToWorldSpace(scene, vertices[indices.y], instanceId);
-	const auto C = translateToWorldSpace(scene, vertices[indices.z], instanceId);
+	const auto A = transform(vertices[indices.x], scene.instanceToWorld[instanceId]);
+	const auto B = transform(vertices[indices.y], scene.instanceToWorld[instanceId]);
+	const auto C = transform(vertices[indices.z], scene.instanceToWorld[instanceId]);
 	const auto AB = B - A;
 	const auto AC = C - A;
 	const auto BC = C - B;
@@ -59,10 +47,10 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURR
 											   const ei::IVec4& indices, const ei::Vec3& hitpoint) {
 	// Compute the projected points on the quad lines
 	const auto& vertices = scene.lods[scene.lodIndices[instanceId]].polygon.vertices;
-	const auto A = translateToWorldSpace(scene, vertices[indices.x], instanceId);
-	const auto B = translateToWorldSpace(scene, vertices[indices.y], instanceId);
-	const auto C = translateToWorldSpace(scene, vertices[indices.z], instanceId);
-	const auto D = translateToWorldSpace(scene, vertices[indices.w], instanceId);
+	const auto A = transform(vertices[indices.x], scene.instanceToWorld[instanceId]);
+	const auto B = transform(vertices[indices.y], scene.instanceToWorld[instanceId]);
+	const auto C = transform(vertices[indices.z], scene.instanceToWorld[instanceId]);
+	const auto D = transform(vertices[indices.w], scene.instanceToWorld[instanceId]);
 	const auto AB = B - A;
 	const auto AC = C - A;
 	const auto BD = D - B;
@@ -94,7 +82,7 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURR
 CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURRENT_DEV>& scene, const i32 instanceId,
 											   const u32 index, const ei::Vec3& hitpoint, const ei::Vec3& incident) {
 	const auto& sphere = scene.lods[scene.lodIndices[instanceId]].spheres.spheres[index];
-	const auto center = translateToWorldSpace(scene, sphere.center, instanceId);
+	const auto center = transform(sphere.center, scene.instanceToWorld[instanceId]);
 	// First we compute the vector pointing to the edge of the sphere from our point-of-view
 	const auto centerToHit = hitpoint - center;
 	const auto down = ei::cross(centerToHit, incident);

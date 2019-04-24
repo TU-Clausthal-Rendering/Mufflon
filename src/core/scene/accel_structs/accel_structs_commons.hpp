@@ -76,9 +76,9 @@ CUDA_FUNCTION ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 primI
 	//const ei::Box aabb = ei::transform(prim.objAabbs[objIdx], prim.matrices[idx]);
 	// Extract the translation from the matrix only (no need to compute the
 	// full bounding box.
-	return center(scene.aabbs[objIdx]) + ei::Vec3{scene.transformations[primIdx][3],
-												  scene.transformations[primIdx][7],
-												  scene.transformations[primIdx][11]};
+	return center(scene.aabbs[objIdx]) + ei::Vec3{scene.instanceToWorld[primIdx][3],
+												  scene.instanceToWorld[primIdx][7],
+												  scene.instanceToWorld[primIdx][11]};
 }
 
 // Generic bounding box overloads.
@@ -105,14 +105,7 @@ CUDA_FUNCTION ei::Box get_bounding_box(const LodDescriptor<dev>& obj, i32 idx) {
 template < Device dev >
 CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
 	i32 objIdx = scene.lodIndices[idx];
-
-	const ei::Mat3x3 scaleRot = ei::Mat3x3{ scene.transformations[idx] } * ei::diag(scene.scales[idx]);
-	const ei::Vec3 translation{
-		scene.transformations[idx][3],
-		scene.transformations[idx][7],
-		scene.transformations[idx][11],
-	};
-	return ei::transform(ei::transform(scene.aabbs[objIdx], scaleRot), translation);
+	return transform(scene.aabbs[objIdx], scene.instanceToWorld[idx]);
 }
 
 }}} // namespace mufflon::scene::accel_struct

@@ -129,7 +129,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
 
 		std::vector<ei::Mat3x4> instanceTransformations;
-		std::vector<ei::Vec3> instanceScales;
+		std::vector<ei::Mat3x4> invInstanceTransformations;
 		std::vector<u32> lodIndices;
 		std::vector<LodDescriptor<dev>> lodDescs;
 		std::vector<ei::Box> lodAabbs;
@@ -163,7 +163,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 					lods[instanceLod] = true;
 				}
 				instanceTransformations.push_back(inst->get_transformation_matrix());
-				instanceScales.push_back(inst->get_scale());
+				invInstanceTransformations.push_back(inst->get_inverse_transformation_matrix());
 				lodIndices.push_back(lodCount);
 				// Also expand scene bounding box
 				m_boundingBox = ei::Box(m_boundingBox, inst->get_bounding_box(instanceLod));
@@ -183,9 +183,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
 		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
-		auto& instScaleDesc = m_instScaleDesc.template get<unique_device_ptr<dev, ei::Vec3[]>>();
-		instScaleDesc = make_udevptr_array<dev, ei::Vec3>(instanceScales.size());
-		copy(instScaleDesc.get(), instanceScales.data(), sizeof(ei::Vec3) * instanceScales.size());
+		auto& invInstTransformsDesc = m_invInstTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+		invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(invInstanceTransformations.size());
+		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), sizeof(ei::Mat3x4) * invInstanceTransformations.size());
 
 		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
 		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
@@ -201,8 +201,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.aabb = m_boundingBox;
 		sceneDescriptor.lods = lodDevDesc.get();
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
-		sceneDescriptor.transformations = instTransformsDesc.get();
-		sceneDescriptor.scales = instScaleDesc.get();
+		sceneDescriptor.instanceToWorld = instTransformsDesc.get();
+		sceneDescriptor.worldToInstance = invInstTransformsDesc.get();
 		sceneDescriptor.lodIndices = instLodIndicesDesc.get();
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them

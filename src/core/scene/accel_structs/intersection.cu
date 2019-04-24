@@ -483,16 +483,10 @@ void first_intersection_scene_obj_lbvh(
 	i32& hitPrimId,
 	SurfaceParametrization& surfParams
 ) {
-	const ei::Vec3& invScale = 1.0f / scene.scales[instanceId];
-	const ei::Mat3x3 invRot = ei::transpose(ei::Mat3x3{ scene.transformations[instanceId] });
-	const ei::Vec3 invTranslation{ -scene.transformations[instanceId][3],
-									-scene.transformations[instanceId][7],
-									-scene.transformations[instanceId][11] };
-	const ei::Vec3 rayDir = invScale * (invRot * ray.direction);
-	const float rayScale = ei::len(rayDir);
-	const float invRayScale = 1.f / rayScale;
-	const ei::Ray transRay = { invScale * (invRot * (ray.origin + invTranslation)),
-							   invRayScale * rayDir };
+	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
+	const float rayScale = len(rayDir);
+	const ei::Ray transRay = { ei::transform(ray.origin, scene.worldToInstance[instanceId]),
+							   rayDir / rayScale };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
 
@@ -512,7 +506,7 @@ void first_intersection_scene_obj_lbvh(
 			*lbvh, obj, transRay, invDir, ood, hitPrimId,
 			objSpaceHitT, surfParams, traversalStack)) {
 			// Translate the object-space distance into world space again
-			hitT = invRayScale * objSpaceHitT;
+			hitT = objSpaceHitT / rayScale;
 			hitInstanceId = instanceId;
 		}
 	}
@@ -627,12 +621,8 @@ RayIntersectionResult first_intersection(
 	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
 	for(int i = 0; i < scene.numInstances; ++i) {
 		auto& obj = scene.lods[ scene.lodIndices[i] ];
-		const ei::Mat3x3 invRotScale = ei::invert(ei::Mat3x3{scene.transformations[i]});
-		const ei::Vec3 invTranslation { -scene.transformations[i][3],
-										-scene.transformations[i][7],
-										-scene.transformations[i][11] };
-		ei::Ray transRay = { invRotScale * (ray.origin + invTranslation),
-							 normalize(invRotScale * ray.direction) };
+		ei::Ray transRay = { transform(ray.origin, scene.worldToInstance[i]),
+							 normalize(transformDir(ray.direction, scene.worldToInstance[i])) };
 		for(int p = 0; p < obj.numPrimitives; ++p) {
 			if(intersects_primitve(obj, transRay, p, -1, hitPrimId, hitT, surfParams))
 				hitInstanceId = i;
@@ -651,14 +641,12 @@ RayIntersectionResult first_intersection(
 		i32 primId = hitPrimId;
 
 		const LodDescriptor<dev>& obj = scene.lods[scene.lodIndices[hitInstanceId]];
-		const ei::Vec3& scale = scene.scales[hitInstanceId];
-		ei::Mat3x3 rotation = ei::Mat3x3{ scene.transformations[hitInstanceId] };
 
 		const i32 offsetSpheres = obj.polygon.numTriangles + obj.polygon.numQuads;
 		if(primId >= offsetSpheres) { // Sphere?
 			const i32 sphId = primId - offsetSpheres;
 			const ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
-			const Point center { scene.transformations[hitInstanceId] * ei::Vec4(obj.spheres.spheres[sphId].center, 1.0f) };
+			const Point center = transform(obj.spheres.spheres[sphId].center, scene.instanceToWorld[hitInstanceId]);
 			geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
 
 			if(geoNormal.x == 0.0f && geoNormal.y == 0.0f)
@@ -667,7 +655,7 @@ RayIntersectionResult first_intersection(
 				tangentX = ei::Vec3(normalize(ei::Vec2(geoNormal.y, -geoNormal.x)), 0.0f);
 			tangentY = cross(geoNormal, tangentX);
 
-			const ei::Vec3 localN = transpose(rotation) * geoNormal;
+			const ei::Vec3 localN = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[hitInstanceId] }) * geoNormal);
 			uv.x = atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f;
 			uv.y = acosf(-localN.z) / ei::PI;
 			surfParams.st = uv;
@@ -740,9 +728,10 @@ RayIntersectionResult first_intersection(
 
 		// Transform the normal and tangents into world space
 		// Polygon objects are allowed to have a non-uniform scaling
-		geoNormal = normalize(rotation * (geoNormal / scale));
-		tangentX = normalize(rotation * (tangentX / scale));
-		tangentY = normalize(rotation * (tangentY / scale));
+		ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitInstanceId] });
+		geoNormal = normalize(rotationInvScale * geoNormal);
+		tangentX = normalize(rotationInvScale * tangentX);
+		tangentY = normalize(rotationInvScale * tangentY);
 
 		mAssert(!(isnan(tangentX.x) || isnan(tangentX.y) || isnan(tangentX.z)));
 		mAssert(!(isnan(tangentY.x) || isnan(tangentY.y) || isnan(tangentY.z)));
@@ -760,16 +749,10 @@ bool any_intersection_scene_obj_lbvh(
 	float tmax,
 	i32* traversalStack
 ) {
-	const ei::Vec3& invScale = 1.0f / scene.scales[instanceId];
-	const ei::Mat3x3 invRot = ei::transpose(ei::Mat3x3{ scene.transformations[instanceId] });
-	const ei::Vec3 invTranslation{ -scene.transformations[instanceId][3],
-									-scene.transformations[instanceId][7],
-									-scene.transformations[instanceId][11] };
-	const ei::Vec3 rayDir = invScale * (invRot * ray.direction);
-	const float rayScale = ei::len(rayDir);
-	const float invRayScale = 1.f / rayScale;
-	const ei::Ray transRay = { invScale * (invRot * (ray.origin + invTranslation)),
-							   invRayScale * rayDir };
+	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
+	const float rayScale = len(rayDir);
+	const ei::Ray transRay = { ei::transform(ray.origin, scene.worldToInstance[instanceId]),
+							   rayDir / rayScale };
 	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
 	const ei::Vec3 ood = transRay.origin * invDir;
 

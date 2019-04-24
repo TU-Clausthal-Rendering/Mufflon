@@ -32,19 +32,16 @@ public:
 		m_scale.x = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 0u));
 		m_scale.y = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 1u));
 		m_scale.z = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 2u));
-		m_transMat(0u, 0u) /= m_scale.x;
-		m_transMat(1u, 0u) /= m_scale.x;
-		m_transMat(2u, 0u) /= m_scale.x;
-		m_transMat(0u, 1u) /= m_scale.y;
-		m_transMat(1u, 1u) /= m_scale.y;
-		m_transMat(2u, 1u) /= m_scale.y;
-		m_transMat(0u, 2u) /= m_scale.z;
-		m_transMat(1u, 2u) /= m_scale.z;
-		m_transMat(2u, 2u) /= m_scale.z;
+		ei::Mat4x4 invRS = invert(ei::Mat4x4{mat});
+		m_invTransMat = ei::Mat3x4 { invRS };
 	}
 
 	const ei::Mat3x4& get_transformation_matrix() const noexcept {
 		return m_transMat;
+	}
+
+	const ei::Mat3x4& get_inverse_transformation_matrix() const noexcept {
+		return m_invTransMat;
 	}
 
 	ei::Vec3 get_scale() const noexcept {
@@ -65,6 +62,7 @@ private:
 	std::string m_name;
 	Object* m_objRef;
 	ei::Mat3x4 m_transMat;
+	ei::Mat3x4 m_invTransMat;
 	ei::Vec3 m_scale;
 };
 
