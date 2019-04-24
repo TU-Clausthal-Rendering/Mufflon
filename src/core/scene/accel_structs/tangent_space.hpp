@@ -43,9 +43,8 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 	}
 
 	// Transform the normal to world space (per-vertex normals are in object space)
-	const ei::Vec3& scale = scene.scales[intersection.hitId.instanceId];
-	const ei::Mat3x3 rotation = ei::Mat3x3{ scene.transformations[intersection.hitId.instanceId] };
-	shadingNormal = ei::normalize(rotation * (shadingNormal / scale));
+	const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[intersection.hitId.instanceId] });
+	shadingNormal = ei::normalize(rotationInvScale * shadingNormal);
 
 	// Compute orthonormal shading tangents
 	// Gram-Schmidt

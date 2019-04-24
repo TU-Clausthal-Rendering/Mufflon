@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "util/int_types.hpp"
 #include "lights/light_tree.hpp"
@@ -97,8 +97,8 @@ struct SceneDescriptor {
 	AccelDescriptor accelStruct;
 	// Per instance: transformation + pre-computed scale
 	// TODO: put some of these into one array instead of separate ones
-	ArrayDevHandle_t<dev, ei::Mat3x4> transformations;
-	ArrayDevHandle_t<dev, ei::Vec3> scales;
+	ArrayDevHandle_t<dev, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
+	ArrayDevHandle_t<dev, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
 	ArrayDevHandle_t<dev, u32> lodIndices;
 	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 

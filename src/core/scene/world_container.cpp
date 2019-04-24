@@ -666,7 +666,7 @@ bool WorldContainer::load_scene_lights() {
 						mAssert(emission.texture != nullptr);
 						mAssert(ei::approx(inst->get_scale().x, inst->get_scale().y) && ei::approx(inst->get_scale().x, inst->get_scale().z));
 						lights::AreaLightSphereDesc al{
-							inst->get_transformation_matrix() * ei::Vec4{inst->get_scale() * spheresData[i].center, 1.0f},
+							transform(spheresData[i].center, inst->get_transformation_matrix()),
 							inst->get_scale().x * spheresData[i].radius,
 							emission.texture, emission.scale
 						};

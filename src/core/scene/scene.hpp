@@ -166,8 +166,8 @@ private:
 		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>> m_lodDevDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_instTransformsDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Vec3[]>,
-		unique_device_ptr<Device::CUDA, ei::Vec3[]>> m_instScaleDesc;
+	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
+		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_invInstTransformsDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, u32[]>,
 		unique_device_ptr<Device::CUDA, u32[]>> m_instLodIndicesDesc;
 	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,

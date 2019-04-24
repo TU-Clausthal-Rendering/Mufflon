@@ -12,7 +12,7 @@ Instance::Instance(std::string name, Object& obj, ei::Mat3x4 trans) :
 }
 
 ei::Box Instance::get_bounding_box(u32 lod) const noexcept {
-	return transform(m_objRef->get_lod(lod).get_bounding_box(), m_transMat * ei::scaling(ei::Vec4{m_scale, 1.0f}));
+	return transform(m_objRef->get_lod(lod).get_bounding_box(), m_transMat);
 }
 
 void Instance::set_object(Object& object) noexcept
