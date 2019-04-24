@@ -276,6 +276,9 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 		if(walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) == WalkResult::CANCEL)
 			break;
 
+		// Terminate on background
+		if(vertices[pathLen + 1].is_end_point()) break;
+
 		// Update old vertex with accumulated throughput
 		vertices[pathLen].ext().updateBxdf(sample, throughput);
 

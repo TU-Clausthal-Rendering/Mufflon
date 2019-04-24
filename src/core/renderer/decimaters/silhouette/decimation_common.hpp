@@ -1,38 +1,35 @@
 #pragma once
 
-#include "core/renderer/decimaters/silhouette/sil_common.hpp"
-#include "core/scene/geometry/polygon_mesh.hpp"
+#include "sil_common.hpp"
+#include "core/memory/residency.hpp"
 #include "core/scene/lod.hpp"
-#include <OpenMesh/Tools/Utils/HeapT.hh>
-#include <OpenMesh/Tools/Decimater/CollapseInfoT.hh>
-#include <OpenMesh/Tools/Decimater/ModBaseT.hh>
-#include <OpenMesh/Core/Geometry/QuadricT.hh>
-#include <cstddef>
-#include <memory>
+#include "core/scene/geometry/polygon_mesh.hpp"
 
 namespace mufflon::renderer::decimaters::silhouette {
 
-class CpuImportanceDecimater {
+template < Device dev >
+class ImportanceDecimater {
 public:
 	using Mesh = scene::geometry::PolygonMeshType;
 	using VertexHandle = typename Mesh::VertexHandle;
+	static constexpr Device DEVICE = dev;
 
-	CpuImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
-						const std::size_t initialCollapses,
-						const float viewWeight, const float lightWeight,
-						const float shadowWeight, const float shadowSilhouetteWeight);
-	CpuImportanceDecimater(const CpuImportanceDecimater&) = delete;
-	CpuImportanceDecimater(CpuImportanceDecimater&&);
-	CpuImportanceDecimater& operator=(const CpuImportanceDecimater&) = delete;
-	CpuImportanceDecimater& operator=(CpuImportanceDecimater&&) = delete;
-	~CpuImportanceDecimater();
+	ImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
+						   const std::size_t initialCollapses,
+						   const float viewWeight, const float lightWeight,
+						   const float shadowWeight, const float shadowSilhouetteWeight);
+	ImportanceDecimater(const ImportanceDecimater&) = delete;
+	ImportanceDecimater(ImportanceDecimater&&);
+	ImportanceDecimater& operator=(const ImportanceDecimater&) = delete;
+	ImportanceDecimater& operator=(ImportanceDecimater&&) = delete;
+	~ImportanceDecimater();
 
-	void upload_normalized_importance();
+	void copy_back_normalized_importance();
 
 	// Resizes the buffers properly
-	Importances<Device::CPU>* start_iteration();
+	ArrayDevHandle_t<dev, Importances<dev>> start_iteration();
 	// Updates the importance densities of the decimated mesh
-	void udpate_importance_density(const DeviceImportanceSums<Device::CPU>& impSums);
+	void update_importance_density(const ImportanceSums& impSums);
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
@@ -48,6 +45,8 @@ public:
 private:
 	// Returns the vertex handle in the original mesh
 	VertexHandle get_original_vertex_handle(const VertexHandle decimatedHandle) const;
+	void decimate_with_error_quadrics(const std::size_t collapses);
+	void pull_importance_from_device();
 
 	// Recomputes normals for decimated mesh
 	void recompute_geometric_vertex_normals();
@@ -60,9 +59,10 @@ private:
 	Mesh* m_decimatedMesh;
 
 	double m_importanceSum = 0.0;									// Stores the current importance sum (updates in update_importance_density)
-	
+
 	// General stuff
-	unique_device_ptr<Device::CPU, Importances<Device::CPU>[]> m_devImportances;	// Importance values per vertex
+	unique_device_ptr<dev, Importances<dev>[]> m_devImportances;	// Buffer on the device
+	std::unique_ptr<Importances<dev>[]> m_importances;				// Buffer for copying from device
 	// Decimated mesh properties
 	OpenMesh::VPropHandleT<VertexHandle> m_originalVertex;			// Vertex handle in the original mesh
 	// Original mesh properties

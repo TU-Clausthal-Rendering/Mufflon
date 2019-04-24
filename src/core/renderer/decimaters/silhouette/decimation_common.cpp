@@ -1,30 +1,21 @@
-#pragma once
-
-#include "gpu_silhouette_decimater.hpp"
+#include "decimation_common.hpp"
 #include "util/parallel.hpp"
 #include "util/punning.hpp"
-#include "core/renderer/decimaters/silhouette/modules/importance_quadrics.hpp"
+#include "modules/importance_quadrics.hpp"
 #include "core/renderer/decimaters/modules/collapse_tracker.hpp"
+#include "core/scene/geometry/polygon.hpp"
+#include <ei/vector.hpp>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
 namespace mufflon::renderer::decimaters::silhouette {
 
-using namespace scene;
-using namespace scene::geometry;
 using namespace modules;
-using namespace decimaters::modules;
+using namespace mufflon::scene;
+using namespace mufflon::scene::geometry;
+using namespace mufflon::renderer::decimaters::modules;
 
 namespace {
-
-template < class T >
-inline void atomic_add(std::atomic<T>& atom, const T& val) {
-	float expected = atom.load();
-	float desired;
-	do {
-		desired = expected + val;
-	} while(!atom.compare_exchange_weak(expected, desired));
-}
 
 inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHandle vertex) {
 	// Important: only works for triangles!
@@ -44,7 +35,8 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 } // namespace
 
-GpuImportanceDecimater::GpuImportanceDecimater(Lod& original, Lod& decimated,
+template < Device dev >
+ImportanceDecimater<dev>::ImportanceDecimater(Lod& original, Lod& decimated,
 										 const std::size_t initialCollapses,
 										 const float viewWeight, const float lightWeight,
 										 const float shadowWeight, const float shadowSilhouetteWeight) :
@@ -59,8 +51,7 @@ GpuImportanceDecimater::GpuImportanceDecimater(Lod& original, Lod& decimated,
 	m_viewWeight(viewWeight),
 	m_lightWeight(lightWeight),
 	m_shadowWeight(shadowWeight),
-	m_shadowSilhouetteWeight(shadowSilhouetteWeight)
-{
+	m_shadowSilhouetteWeight(shadowSilhouetteWeight) {
 	// Add necessary properties
 	m_decimatedMesh->add_property(m_originalVertex);
 	m_originalMesh.add_property(m_accumulatedImportanceDensity);
@@ -81,32 +72,11 @@ GpuImportanceDecimater::GpuImportanceDecimater(Lod& original, Lod& decimated,
 	}
 
 	// Perform initial decimation
-	if(initialCollapses > 0u) {
-		auto decimater = m_decimatedPoly->create_decimater();
-		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-		CollapseTrackerModule<>::Handle trackerHandle;
-		decimater.add(modQuadricHandle);
-		decimater.add(trackerHandle);
-		decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
-		// Possibly repeat until we reached the desired count
-		const std::size_t targetCollapses = std::min(initialCollapses, m_originalPoly.get_vertex_count());
-		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
-		std::size_t performedCollapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
-		if(performedCollapses < targetCollapses)
-			logWarning("Not all decimations were performed: ", targetCollapses - performedCollapses, " missing");
-		m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
-			// Adjust the reference from original to decimated mesh
-			const auto originalVertex = this->get_original_vertex_handle(changedVertex);
-			if(!m_originalMesh.property(m_collapsed, originalVertex))
-				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
-		});
-		this->recompute_geometric_vertex_normals();
-
-		m_decimated.clear_accel_structure();
-	}
+	this->decimate_with_error_quadrics(initialCollapses);
 }
 
-GpuImportanceDecimater::GpuImportanceDecimater(GpuImportanceDecimater&& dec) :
+template < Device dev >
+ImportanceDecimater<dev>::ImportanceDecimater(ImportanceDecimater<dev>&& dec) :
 	m_original(dec.m_original),
 	m_decimated(dec.m_decimated),
 	m_originalPoly(dec.m_originalPoly),
@@ -122,8 +92,7 @@ GpuImportanceDecimater::GpuImportanceDecimater(GpuImportanceDecimater&& dec) :
 	m_viewWeight(dec.m_viewWeight),
 	m_lightWeight(dec.m_lightWeight),
 	m_shadowWeight(dec.m_shadowWeight),
-	m_shadowSilhouetteWeight(dec.m_shadowSilhouetteWeight)
-{
+	m_shadowSilhouetteWeight(dec.m_shadowSilhouetteWeight) {
 	// Request the status again since it will get removed once in the destructor
 	m_decimatedMesh->request_vertex_status();
 	m_decimatedMesh->request_edge_status();
@@ -136,7 +105,8 @@ GpuImportanceDecimater::GpuImportanceDecimater(GpuImportanceDecimater&& dec) :
 	dec.m_collapsed.invalidate();
 }
 
-GpuImportanceDecimater::~GpuImportanceDecimater() {
+template < Device dev >
+ImportanceDecimater<dev>::~ImportanceDecimater() {
 	if(m_originalVertex.is_valid())
 		m_decimatedMesh->remove_property(m_originalVertex);
 	if(m_accumulatedImportanceDensity.is_valid())
@@ -152,13 +122,33 @@ GpuImportanceDecimater::~GpuImportanceDecimater() {
 	m_decimatedMesh->release_face_status();
 }
 
-void GpuImportanceDecimater::upload_normalized_importance() {
+template < Device dev >
+void ImportanceDecimater<dev>::copy_back_normalized_importance() {
+	(void)0;
 	copy(m_devImportances.get(), m_importances.get(), sizeof(Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
 }
 
-void GpuImportanceDecimater::udpate_importance_density(const ImportanceSums& sum) {
-	// First get the data off the GPU
+template <>
+void ImportanceDecimater<Device::CPU>::copy_back_normalized_importance() {
+	(void)0;
+	// No need to copy anything
+}
+
+template < Device dev >
+void ImportanceDecimater<dev>::pull_importance_from_device() {
 	copy(m_importances.get(), m_devImportances.get(), sizeof(Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
+}
+
+template < >
+void ImportanceDecimater<Device::CPU>::pull_importance_from_device() {
+	(void)0;
+	// No need to copy anything
+}
+
+template < Device dev >
+void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum) {
+	// First get the data off the GPU
+	this->pull_importance_from_device();
 
 	// Update our statistics: the importance density of each vertex
 	float importanceSum = 0.0;
@@ -194,7 +184,8 @@ void GpuImportanceDecimater::udpate_importance_density(const ImportanceSums& sum
 	}
 }
 
-void GpuImportanceDecimater::recompute_geometric_vertex_normals() {
+template < Device dev >
+void ImportanceDecimater<dev>::recompute_geometric_vertex_normals() {
 #pragma PARALLEL_FOR
 	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
@@ -208,15 +199,25 @@ void GpuImportanceDecimater::recompute_geometric_vertex_normals() {
 	}
 }
 
-Importances<Device::CUDA>* GpuImportanceDecimater::start_iteration() {
+template < Device dev >
+ArrayDevHandle_t<dev, Importances<dev>> ImportanceDecimater<dev>::start_iteration() {
 	// Resize importance map
-	m_importances = std::make_unique<Importances<Device::CUDA>[]>(m_decimatedPoly->get_vertex_count());
-	m_devImportances = make_udevptr_array<Device::CUDA, Importances<Device::CUDA>, false>(m_decimatedPoly->get_vertex_count());
-	cuda::check_error(cudaMemset(m_devImportances.get(), 0, sizeof(Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count()));
+	m_importances = std::make_unique<Importances<dev>[]>(m_decimatedPoly->get_vertex_count());
+	m_devImportances = make_udevptr_array<dev, Importances<dev>, false>(m_decimatedPoly->get_vertex_count());
+	cuda::check_error(cudaMemset(m_devImportances.get(), 0, sizeof(Importances<dev>) * m_decimatedPoly->get_vertex_count()));
 	return m_devImportances.get();
 }
 
-void GpuImportanceDecimater::iterate(const std::size_t minVertexCount, const float reduction) {
+template < >
+ArrayDevHandle_t<Device::CPU, Importances<Device::CPU>> ImportanceDecimater<Device::CPU>::start_iteration() {
+	// Resize importance map (only one on the CPU since we got direct access)
+	m_importances = std::make_unique<Importances<Device::CPU>[]>(m_decimatedPoly->get_vertex_count());
+	std::memset(m_importances.get(), 0, sizeof(Importances<Device::CPU>) * m_decimatedPoly->get_vertex_count());
+	return m_importances.get();
+}
+
+template < Device dev >
+void ImportanceDecimater<dev>::iterate(const std::size_t minVertexCount, const float reduction) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -248,7 +249,7 @@ void GpuImportanceDecimater::iterate(const std::size_t minVertexCount, const flo
 	decimater.add(impHandle);
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity);
-	
+
 	if(reduction != 0.f) {
 		const std::size_t targetCount = (reduction == 1.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
 		const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
@@ -267,7 +268,8 @@ void GpuImportanceDecimater::iterate(const std::size_t minVertexCount, const flo
 }
 
 // Utility only
-GpuImportanceDecimater::Mesh::VertexHandle GpuImportanceDecimater::get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const {
+template < Device dev >
+ImportanceDecimater<dev>::Mesh::VertexHandle ImportanceDecimater<dev>::get_original_vertex_handle(const Mesh::VertexHandle decimatedHandle) const {
 	mAssert(decimatedHandle.is_valid());
 	mAssert(static_cast<std::size_t>(decimatedHandle.idx()) < m_decimatedMesh->n_vertices());
 	const auto originalHandle = m_decimatedMesh->property(m_originalVertex, decimatedHandle);
@@ -276,7 +278,8 @@ GpuImportanceDecimater::Mesh::VertexHandle GpuImportanceDecimater::get_original_
 	return originalHandle;
 }
 
-float GpuImportanceDecimater::get_current_max_importance() const {
+template < Device dev >
+float ImportanceDecimater<dev>::get_current_max_importance() const {
 	float maxImp = 0.f;
 #pragma PARALLEL_FOR
 	for(i64 v = 0; v < static_cast<i64>(m_decimatedPoly->get_vertex_count()); ++v) {
@@ -287,12 +290,44 @@ float GpuImportanceDecimater::get_current_max_importance() const {
 	return maxImp;
 }
 
-std::size_t GpuImportanceDecimater::get_original_vertex_count() const noexcept {
+template < Device dev >
+std::size_t ImportanceDecimater<dev>::get_original_vertex_count() const noexcept {
 	return m_originalMesh.n_vertices();
 }
 
-std::size_t GpuImportanceDecimater::get_decimated_vertex_count() const noexcept {
+template < Device dev >
+std::size_t ImportanceDecimater<dev>::get_decimated_vertex_count() const noexcept {
 	return m_decimatedMesh->n_vertices();
 }
+
+template < Device dev >
+void ImportanceDecimater<dev>::decimate_with_error_quadrics(const std::size_t collapses) {
+	if(collapses > 0u) {
+		auto decimater = m_decimatedPoly->create_decimater();
+		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+		CollapseTrackerModule<>::Handle trackerHandle;
+		decimater.add(modQuadricHandle);
+		decimater.add(trackerHandle);
+		decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
+		// Possibly repeat until we reached the desired count
+		const std::size_t targetCollapses = std::min(collapses, m_originalPoly.get_vertex_count());
+		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
+		std::size_t performedCollapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
+		if(performedCollapses < targetCollapses)
+			logWarning("Not all decimations were performed: ", targetCollapses - performedCollapses, " missing");
+		m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
+			// Adjust the reference from original to decimated mesh
+			const auto originalVertex = this->get_original_vertex_handle(changedVertex);
+			if(!m_originalMesh.property(m_collapsed, originalVertex))
+				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
+										 });
+		this->recompute_geometric_vertex_normals();
+
+		m_decimated.clear_accel_structure();
+	}
+}
+
+template class ImportanceDecimater<Device::CPU>;
+template class ImportanceDecimater<Device::CUDA>;
 
 } // namespace mufflon::renderer::decimaters::silhouette

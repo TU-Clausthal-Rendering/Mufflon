@@ -1,4 +1,4 @@
-#include "core/renderer/decimaters/silhouette/silhouette_importance_gathering.hpp"
+#include "core/renderer/decimaters/silhouette/silhouette_importance_gathering_pt.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 

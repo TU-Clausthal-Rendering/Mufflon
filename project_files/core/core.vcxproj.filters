@@ -301,11 +301,8 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.cpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.cpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\decimation_common.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -990,17 +987,14 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering_pt.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\decimation_common.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gpu_silhouette_decimater.hpp"
+#include "core/renderer/decimaters/silhouette/decimation_common.hpp"
 #include "core/renderer/decimaters/silhouette/silhouette_params.hpp"
 #include "core/renderer/decimaters/silhouette/sil_common.hpp"
 #include "core/math/rng.hpp"
@@ -45,7 +45,7 @@ private:
 	unique_device_ptr<Device::CUDA, u32[]> m_seedsPtr;
 
 	float m_maxImportance = 0.f;
-	std::vector<std::unique_ptr<silhouette::GpuImportanceDecimater>> m_decimaters;
+	std::vector<std::unique_ptr<silhouette::ImportanceDecimater<Device::CUDA>>> m_decimaters;
 	// Stores the importance's of each mesh on the GPU/CPU
 	unique_device_ptr<Device::CUDA, ArrayDevHandle_t<Device::CUDA, silhouette::Importances<Device::CUDA>>[]> m_importances;
 	unique_device_ptr<Device::CUDA, silhouette::DeviceImportanceSums<Device::CUDA>[]> m_importanceSums;

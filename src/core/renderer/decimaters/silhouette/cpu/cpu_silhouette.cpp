@@ -6,7 +6,7 @@
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
-#include "core/renderer/decimaters/silhouette/silhouette_importance_gathering.hpp"
+#include "core/renderer/decimaters/silhouette/silhouette_importance_gathering_pt.hpp"
 #include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scene.hpp"
@@ -119,9 +119,10 @@ void CpuShadowSilhouettes::iterate() {
 					"ms, ", cycles / 1'000'000, " MCycles)");
 	} else {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
+			for(auto& decimater : m_decimaters)
+				decimater->copy_back_normalized_importance();
 			compute_max_importance();
 		}
-
 		display_importance();
 	}
 }
@@ -187,9 +188,9 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters[i] = std::make_unique<CpuImportanceDecimater>(lod, newLod, collapses,
-																m_params.viewWeight, m_params.lightWeight,
-																m_params.shadowWeight, m_params.shadowSilhouetteWeight);
+		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CPU>>(lod, newLod, collapses,
+																			 m_params.viewWeight, m_params.lightWeight,
+																			 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		m_importanceSums[i].shadowImportance.store(0.f);
 		m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 		// TODO: this reeeeally breaks instancing
@@ -204,7 +205,8 @@ void CpuShadowSilhouettes::update_reduction_factors() {
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			m_decimaters[i]->udpate_importance_density(m_importanceSums[i]);
+			ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
+			m_decimaters[i]->update_importance_density(sums);
 			m_importanceSums[i].shadowImportance.store(0.f);
 			m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 			m_remainingVertexFactor.push_back(1.0);
@@ -215,7 +217,8 @@ void CpuShadowSilhouettes::update_reduction_factors() {
 	double expectedVertexCount = 0.0;
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		auto& decimater = m_decimaters[i];
-		m_decimaters[i]->udpate_importance_density(m_importanceSums[i]);
+		ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
+		m_decimaters[i]->update_importance_density(sums);
 		m_importanceSums[i].shadowImportance.store(0.f);
 		m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 		if(decimater->get_original_vertex_count() > m_params.threshold) {

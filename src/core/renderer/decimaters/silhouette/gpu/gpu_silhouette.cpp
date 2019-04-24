@@ -125,7 +125,7 @@ void GpuShadowSilhouettes::iterate() {
 	} else {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 			for(auto& decimater : m_decimaters)
-				decimater->upload_normalized_importance();
+				decimater->copy_back_normalized_importance();
 			compute_max_importance();
 		}
 		display_importance();
@@ -207,9 +207,9 @@ void GpuShadowSilhouettes::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters[i] = std::make_unique<GpuImportanceDecimater>(lod, newLod, collapses,
-																m_params.viewWeight, m_params.lightWeight,
-																m_params.shadowWeight, m_params.shadowSilhouetteWeight);
+		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(lod, newLod, collapses,
+																			  m_params.viewWeight, m_params.lightWeight,
+																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		// TODO: this reeeeally breaks instancing
 		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
@@ -232,7 +232,7 @@ void GpuShadowSilhouettes::update_reduction_factors() {
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			m_decimaters[i]->udpate_importance_density(sums[i]);
+			m_decimaters[i]->update_importance_density(sums[i]);
 			m_remainingVertexFactor.push_back(1.0);
 		}
 		return;
@@ -241,7 +241,7 @@ void GpuShadowSilhouettes::update_reduction_factors() {
 	double expectedVertexCount = 0.0;
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		auto& decimater = m_decimaters[i];
-		decimater->udpate_importance_density(sums[i]);
+		decimater->update_importance_density(sums[i]);
 		if(decimater->get_original_vertex_count() > m_params.threshold) {
 			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
 			expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
