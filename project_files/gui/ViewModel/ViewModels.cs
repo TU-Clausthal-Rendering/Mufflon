@@ -56,10 +56,6 @@ namespace gui.ViewModel
         public ICommand SaveSceneCommand { get; }
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
-        public ICommand AdjustGammaUp { get; }
-        public ICommand AdjustGammaDown { get; }
-
-        public Dictionary<Key, ICommand> Keybindings { get; } = new Dictionary<Key, ICommand>();
 
         private readonly Models m_models;
 
@@ -70,7 +66,7 @@ namespace gui.ViewModel
             // view model initialization
             ConsoleOutput = new ConsoleOutputViewModel(m_models);
             ConsoleInput = new ConsoleInputViewModel(m_models, m_models.App.Window.ConsoleInputBox, ConsoleOutput);
-            Viewport = new ViewportViewModel(m_models);
+            Viewport = new ViewportViewModel(m_models, m_models.App.Window.BorderHost);
             CameraController = new CameraController(m_models, m_models.App.Window.BorderHost);
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);
@@ -94,16 +90,8 @@ namespace gui.ViewModel
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(m_models);
-            AdjustGammaUp = new AdjustGammaUpCommand(m_models);
-            AdjustGammaDown = new AdjustGammaDownCommand(m_models);
 
             KeyGestures = new KeyGestureViewModel(models);
-
-            // Add keybindings
-            Keybindings.Add(Key.OemPlus, AdjustGammaUp);
-            Keybindings.Add(Key.Add, AdjustGammaUp);
-            Keybindings.Add(Key.OemMinus, AdjustGammaDown);
-            Keybindings.Add(Key.Subtract, AdjustGammaDown);
         }
     }
 }
