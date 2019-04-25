@@ -1127,6 +1127,16 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLev
 	CATCH_ALL(false)
 }
 
+Boolean instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame) {
+	TRY
+	CHECK_NULLPTR(inst, "instance handle", false);
+	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
+	if(animationFrame != nullptr)
+		*animationFrame = instance.get_animation_frame();
+	return true;
+	CATCH_ALL(false)
+}
+
 void world_clear_all() {
 	TRY
 	WorldContainer::clear_instance();
@@ -1148,10 +1158,10 @@ ObjectHdl world_get_object(const char* name) {
 	CATCH_ALL(nullptr)
 }
 
-InstanceHdl world_get_instance(const char* name) {
+InstanceHdl world_get_instance(const char* name, const std::uint32_t animationFrame) {
 	TRY
 	CHECK_NULLPTR(name, "instance name", nullptr);
-	return static_cast<InstanceHdl>(s_world.get_instance(name));
+	return static_cast<InstanceHdl>(s_world.get_instance(name, animationFrame));
 	CATCH_ALL(nullptr)
 }
 
@@ -1162,11 +1172,11 @@ const char* world_get_object_name(ObjectHdl obj) {
 	CATCH_ALL(nullptr)
 }
 
-InstanceHdl world_create_instance(const char* name, ObjectHdl obj) {
+InstanceHdl world_create_instance(const char* name, ObjectHdl obj, const uint32_t animationFrame) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(move(std::string(name)), hdl));
+	return static_cast<InstanceHdl>(s_world.create_instance(move(std::string(name)), hdl, animationFrame));
 	CATCH_ALL(nullptr)
 }
 
@@ -1178,22 +1188,28 @@ Boolean world_apply_instance_transformation(InstanceHdl inst) {
 	CATCH_ALL(false)
 }
 
-uint32_t world_get_instance_count() {
+uint32_t world_get_instance_count(const uint32_t frame) {
 	TRY
-	return static_cast<uint32_t>(s_world.get_instance_count());
+	return static_cast<uint32_t>(s_world.get_instance_count(frame));
 	CATCH_ALL(0u)
 }
 
-InstanceHdl world_get_instance_by_index(uint32_t index)
+uint32_t world_get_highest_instance_frame() {
+	TRY
+	return static_cast<uint32_t>(s_world.get_highest_instance_frame());
+	CATCH_ALL(0u)
+}
+
+InstanceHdl world_get_instance_by_index(uint32_t index, const uint32_t animationFrame)
 {
 	TRY
-	const uint32_t MAX_INDEX = static_cast<uint32_t>(s_world.get_instance_count());
+	const uint32_t MAX_INDEX = static_cast<uint32_t>(s_world.get_instance_count(animationFrame));
 	if (index >= MAX_INDEX) {
 		logError("[", FUNCTION_NAME, "] Instance index '", index, "' out of bounds (",
 			MAX_INDEX, ')');
 		return nullptr;
 	}
-	return s_world.get_instance(index);
+	return s_world.get_instance(index, animationFrame);
 	CATCH_ALL(nullptr)
 }
 
@@ -2018,6 +2034,26 @@ CameraHdl scenario_get_camera(ScenarioHdl scenario) {
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	return static_cast<CameraHdl>(static_cast<const Scenario*>(scenario)->get_camera());
 	CATCH_ALL(nullptr)
+}
+
+Boolean scenario_set_animation_frame(ScenarioHdl scenario, const uint32_t animationFrame) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	static_cast<Scenario*>(scenario)->set_animation_frame(animationFrame);
+	// We may need to reload the scene
+	if(scenario == s_world.get_current_scenario())
+		world_load_scenario(scenario);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_get_animation_frame(ConstScenarioHdl scenario, uint32_t* animationFrame) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	if(animationFrame != nullptr)
+		*animationFrame = static_cast<const Scenario*>(scenario)->get_animation_frame();
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {

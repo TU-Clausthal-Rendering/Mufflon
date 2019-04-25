@@ -68,6 +68,14 @@ public:
 		m_cameraChanged = true;
 	}
 
+	u32 get_animation_frame() const noexcept {
+		return m_animationFrame;
+	}
+	void set_animation_frame(const u32 animationFrame) noexcept {
+		m_animationFrame = animationFrame;
+		m_animationFrameChanged = true;
+	}
+
 	// Getter/setter for per-object and per-instance properties
 	bool is_masked(ConstObjectHandle hdl) const noexcept;
 	bool is_masked(ConstInstanceHandle hdl) const noexcept;
@@ -139,6 +147,11 @@ public:
 	}
 	// Queries whether anything in the materials changed and resets the flag(s)
 	bool materials_dirty_reset() const;
+	bool animation_frame_dirty_reset() {
+		bool dirty = m_animationFrameChanged;
+		m_animationFrameChanged = false;
+		return dirty;
+	}
 
 	const std::vector<u32>& get_point_lights() const noexcept {
 		return m_pointLights;
@@ -169,6 +182,7 @@ private:
 	bool m_lightsChanged = true;
 	bool m_envmapLightsChanged = true;
 	bool m_cameraChanged = true;
+	bool m_animationFrameChanged = true;
 	mutable bool m_materialAssignmentChanged = true;
 
 	StringView m_name;
@@ -183,7 +197,7 @@ private:
 	std::vector<u32> m_dirLights;
 	u32 m_background = 0u;
 
-
+	u32 m_animationFrame = 0u;
 	u32 m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution = {};
 	CameraHandle m_camera = nullptr;
