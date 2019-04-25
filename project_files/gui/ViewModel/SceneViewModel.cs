@@ -25,6 +25,22 @@ using gui.View.Helper;
 
 namespace gui.ViewModel
 {
+    public class ScenarioListItem
+    {
+        public ScenarioModel Scenario { get; private set; }
+        public string Name { get => Scenario.Name; }
+        public uint AnimationFrame
+        {
+            get => Scenario.AnimationFrame;
+            set => Scenario.AnimationFrame = value;
+        }
+
+        public ScenarioListItem(ScenarioModel scenario)
+        {
+            Scenario = scenario;
+        }
+    }
+
     public class SceneViewModel : INotifyPropertyChanged
     {
         public class SceneMenuItem : LoadSceneCommand
@@ -47,8 +63,8 @@ namespace gui.ViewModel
         private readonly Models m_models;
         public ObservableCollection<SceneMenuItem> LastScenes { get; } = new ObservableCollection<SceneMenuItem>();
 
-        private ComboBoxItem<ScenarioModel> m_selectedScenario = null;
-        public ComboBoxItem<ScenarioModel> SelectedScenario
+        private ScenarioListItem m_selectedScenario = null;
+        public ScenarioListItem SelectedScenario
         {
             get => m_selectedScenario;
             set
@@ -59,10 +75,10 @@ namespace gui.ViewModel
 
                 // load selected scenario
                 if (m_selectedScenario == null) return;
-                m_models.World.CurrentScenario = m_selectedScenario.Cargo;
+                m_models.World.CurrentScenario = m_selectedScenario.Scenario;
             }
         }
-        public ObservableCollection<ComboBoxItem<ScenarioModel>> Scenarios { get; } = new ObservableCollection<ComboBoxItem<ScenarioModel>>();
+        public ObservableCollection<ScenarioListItem> Scenarios { get; } = new ObservableCollection<ScenarioListItem>();
         public bool CanLoadLastScenes => LastScenes.Count > 0 && !m_models.Renderer.IsRendering;
 
         public SceneViewModel(Models models)
@@ -142,7 +158,7 @@ namespace gui.ViewModel
             foreach (var scenario in m_models.World.Scenarios)
             {
                 // add scenario view
-                var view = new ComboBoxItem<ScenarioModel>(scenario.Name, scenario);
+                var view = new ScenarioListItem(scenario);
                 Scenarios.Add(view);
                 // set selected item
                 if (ReferenceEquals(scenario, m_models.World.CurrentScenario))

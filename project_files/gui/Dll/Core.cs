@@ -228,6 +228,10 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr scenario_get_camera(IntPtr scenario);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scenario_get_animation_frame(IntPtr scenario, out uint frame);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scenario_set_animation_frame(IntPtr scenario, uint frame);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_set_camera(IntPtr scenario, IntPtr cam);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_is_object_masked(IntPtr scenario, IntPtr obj);
