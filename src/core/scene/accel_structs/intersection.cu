@@ -174,6 +174,7 @@ CUDA_FUNCTION bool intersects_primitve(
 	float& hitT,				// In out: max hit distance before, if hit then returns the new distance
 	SurfaceParametrization& surfParams
 ) {
+	mAssert(primId >= 0);
 	if(primId < (i32)obj.polygon.numTriangles) {
 		// Triangle.
 		const ei::Vec3* meshVertices = obj.polygon.vertices;
@@ -219,6 +220,7 @@ CUDA_FUNCTION bool intersects_primitve(
 			return true;
 		}
 	} else {
+		mAssert(primId < obj.numPrimitives);
 		// Sphere.
 		// Masking not possible for spheres: in case of transparent objects we need
 		// self intersections inside.
@@ -648,7 +650,9 @@ RayIntersectionResult first_intersection(
 				const ei::Vec2 du1 = uvV[2u] - uvV[0u];
 				float det = (du0.x * du1.y - du0.y * du1.x);
 				// TODO: fetch the instance instead (issue #44)
-				tangentX = (dx0 * du1.y - dx1 * du0.y) / det;
+				if(det >= 1e-5f || det <= -1e5f)
+					tangentX = (dx0 * du1.y - dx1 * du0.y) / det;
+				else tangentX = dx0;
 
 				// Don't use the UV tangents to compute the normal, since they may be reversed
 				geoNormal = cross(dx0, dx1);

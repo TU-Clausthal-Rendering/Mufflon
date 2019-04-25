@@ -57,7 +57,7 @@ public:
 	}
 
 	template < Device dev >
-	void build(LodDescriptor<dev>& obj, const ei::Box& sceneBB);
+	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB);
 
 	template < Device dev >
 	void build(const SceneDescriptor<dev>& scene);

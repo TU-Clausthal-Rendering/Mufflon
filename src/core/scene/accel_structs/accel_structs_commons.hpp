@@ -73,12 +73,8 @@ CUDA_FUNCTION ei::Vec3 get_centroid(const LodDescriptor<dev>& obj, i32 primIdx) 
 template < Device dev >
 CUDA_FUNCTION ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 primIdx) {
 	const i32 objIdx = scene.lodIndices[primIdx];
-	//const ei::Box aabb = ei::transform(prim.objAabbs[objIdx], prim.matrices[idx]);
-	// Extract the translation from the matrix only (no need to compute the
-	// full bounding box.
-	return center(scene.aabbs[objIdx]) + ei::Vec3{scene.instanceToWorld[primIdx][3],
-												  scene.instanceToWorld[primIdx][7],
-												  scene.instanceToWorld[primIdx][11]};
+	// Transform the center only (no need to compute the full bounding box).
+	return transform(center(scene.aabbs[objIdx]), scene.instanceToWorld[primIdx]);
 }
 
 // Generic bounding box overloads.
