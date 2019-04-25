@@ -6,8 +6,10 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media.Effects;
 using gui.Annotations;
+using gui.Command;
 using gui.Model;
 
 namespace gui.ViewModel
@@ -15,19 +17,31 @@ namespace gui.ViewModel
     public class ViewportViewModel : INotifyPropertyChanged
     {
         private readonly Models m_models;
+        private Dictionary<Key, ICommand> m_keybindings = new Dictionary<Key, ICommand>();
 
-        public ViewportViewModel(Models models)
+        public ICommand AdjustGammaUp { get; }
+        public ICommand AdjustGammaDown { get; }
+
+        public ViewportViewModel(Models models, FrameworkElement host)
         {
             m_models = models;
 
-            m_models.App.Window.BorderHost.SizeChanged += BorderHostOnSizeChanged;
+            AdjustGammaUp = new AdjustGammaUpCommand(m_models);
+            AdjustGammaDown = new AdjustGammaDownCommand(m_models);
 
+            // Add keybindings
+            m_keybindings.Add(Key.OemPlus, AdjustGammaUp);
+            m_keybindings.Add(Key.Add, AdjustGammaUp);
+            m_keybindings.Add(Key.OemMinus, AdjustGammaDown);
+            m_keybindings.Add(Key.Subtract, AdjustGammaDown);
+
+            host.SizeChanged += BorderHostOnSizeChanged;
+            host.KeyDown += OnKeyDown;
             m_models.Viewport.PropertyChanged += ViewportOnPropertyChanged;
         }
 
         private void BorderHostOnSizeChanged(object sender, SizeChangedEventArgs args)
         {
-
             int oldMaxOffsetX = DesiredWidth - Math.Min(m_models.Viewport.Width, DesiredWidth);
             int oldMaxOffsetY = DesiredHeight - Math.Min(m_models.Viewport.Height, DesiredHeight);
 
@@ -85,6 +99,13 @@ namespace gui.ViewModel
                     OnPropertyChanged(nameof(Zoom));
                     break;
             }
+        }
+
+        private void OnKeyDown(object sender, KeyEventArgs args)
+        {
+            ICommand cmd;
+            if(m_keybindings.TryGetValue(args.Key, out cmd) && cmd.CanExecute(null))
+                cmd.Execute(null);
         }
 
         // maximum size of the viewport
