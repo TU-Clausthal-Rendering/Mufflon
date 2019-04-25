@@ -17,13 +17,14 @@ namespace scene {
 // Forward declaration
 template < Device dev >
 struct LodDescriptor;
+class Object;
 
 class Lod {
 public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
 
-	Lod() = default;
+	Lod(const Object* parent) : m_parent{parent} {}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
 	Lod(Lod&& obj) = default;
@@ -89,13 +90,15 @@ public:
 		return aabb;
 	}
 
+	void set_parent(const Object* parent) noexcept {
+		m_parent = parent;
+	}
 private:
 	// Geometry data
 	GeometryTuple m_geometry;
 	// Acceleration structure of the geometry
 	accel_struct::LBVHBuilder m_accelStruct;
-
-	// TODO: how to handle the LoDs?
+	const Object* m_parent;
 };
 
 }} // mufflon::scene

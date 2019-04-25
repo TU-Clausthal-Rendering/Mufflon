@@ -756,7 +756,6 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 template < Device dev >
 void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& sceneBB) {
-	logInfo("[LBVHBuilder::build] Building BVH for object with ", obj.numPrimitives, " primitives.");
 	build_lbvh<LodDescriptor<dev>>(obj, sceneBB, obj.numPrimitives);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
