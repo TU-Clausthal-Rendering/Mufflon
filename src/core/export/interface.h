@@ -358,17 +358,20 @@ CORE_API Boolean CDECL object_get_id(ObjectHdl hdl, uint32_t* id);
 CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod);
+CORE_API Boolean CDECL instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame);
 
 // World container interface
 CORE_API void CDECL world_clear_all();
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
-CORE_API InstanceHdl CDECL world_get_instance(const char* name);
+CORE_API InstanceHdl CDECL world_get_instance(const char* name, const uint32_t animationFrame);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
-CORE_API InstanceHdl CDECL world_create_instance(const char* name, ObjectHdl obj);
+CORE_API InstanceHdl CDECL world_create_instance(const char* name, ObjectHdl obj, const uint32_t animationFrame);
 CORE_API Boolean CDECL world_apply_instance_transformation(InstanceHdl inst);
-CORE_API uint32_t CDECL world_get_instance_count();
-CORE_API InstanceHdl CDECL world_get_instance_by_index(uint32_t index);
+CORE_API uint32_t CDECL world_get_instance_count(uint32_t frame);
+CORE_API uint32_t CDECL world_get_highest_instance_frame();
+CORE_API uint32_t CDECL world_get_instance_frame_count(uint32_t index);
+CORE_API InstanceHdl CDECL world_get_instance_by_index(uint32_t index, const uint32_t animationFrame);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);
 CORE_API uint32_t CDECL world_get_scenario_count();
@@ -418,6 +421,8 @@ CORE_API Boolean CDECL scenario_get_resolution(ScenarioHdl scenario, uint32_t* w
 CORE_API Boolean CDECL scenario_set_resolution(ScenarioHdl scenario, uint32_t width, uint32_t height);
 CORE_API CameraHdl CDECL scenario_get_camera(ScenarioHdl scenario);
 CORE_API Boolean CDECL scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
+CORE_API Boolean CDECL scenario_set_animation_frame(ScenarioHdl scenario, const uint32_t animationFrame);
+CORE_API Boolean CDECL scenario_get_animation_frame(ConstScenarioHdl scenario, uint32_t* animationFrame);
 CORE_API Boolean CDECL scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj);
 CORE_API Boolean CDECL scenario_mask_object(ScenarioHdl scenario, ObjectHdl inst);
 CORE_API Boolean CDECL scenario_mask_instance(ScenarioHdl scenario, InstanceHdl obj);

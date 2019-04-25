@@ -24,7 +24,7 @@ void WorldContainer::clear_instance() {
 
 WorldContainer::Sanity WorldContainer::is_sane_world() const {
 	// Check for objects
-	if(m_instances.empty())
+	if(m_instances.empty() && m_animatedInstances.empty())
 		return Sanity::NO_INSTANCES;
 	if(m_objects.empty())
 		return Sanity::NO_OBJECTS;
@@ -52,8 +52,32 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	bool hasEmitters = false;
 	bool hasObjects = false;
 	// Check for objects (and check for emitters as well)
+	// Gotta check both animated and stationary instances
 	for(const auto& instance : m_instances) {
-		if(!hdl->is_masked(instance.second.get())) {
+		if(hdl->is_masked(instance.second.get()))
+			continue;
+
+		hasObjects = true;
+		const Object& object = instance.second->get_object();
+		const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
+		if(object.has_lod_available(lodLevel)) {
+			const Lod& lod = object.get_lod(lodLevel);
+			if(lod.is_emissive(*hdl)) {
+				hasEmitters = true;
+				break;
+			}
+		} else {
+			// TODO: how could we possibly check this?
+			hasEmitters = true;
+			break;
+		}
+	}
+	if(hdl->get_animation_frame() < m_animatedInstances.size() && m_animatedInstances[hdl->get_animation_frame()] != nullptr) {
+		// Check the instances from the scenario frame
+		for(const auto& instance : *m_animatedInstances[hdl->get_animation_frame()]) {
+			if(hdl->is_masked(instance.second.get()))
+				continue;
+
 			hasObjects = true;
 			const Object& object = instance.second->get_object();
 			const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
@@ -70,6 +94,7 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 			}
 		}
 	}
+
 	if(!hasObjects)
 		return Sanity::NO_OBJECTS;
 	// Check for lights
@@ -128,31 +153,56 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 	hdl->set_transformation_matrix(ei::Mat3x4{ ei::identity4x4() });
 }
 
-InstanceHandle WorldContainer::get_instance(const StringView& name) {
-	auto iter = m_instances.find(name);
-	if(iter != m_instances.end())
-		return iter->second.get();
+InstanceHandle WorldContainer::get_instance(const StringView& name, const u32 animationFrame) {
+	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
+		auto iter = m_instances.find(name);
+		if(iter != m_instances.end())
+			return iter->second.get();
+	} else if(animationFrame < m_animatedInstances.size() && m_animatedInstances[animationFrame] != nullptr) {
+		auto iter = m_animatedInstances[animationFrame]->find(name);
+		if(iter != m_animatedInstances[animationFrame]->end())
+			return iter->second.get();
+	}
 	return nullptr;
 }
 
-InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle obj) {
+InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle obj, const u32 animationFrame) {
 	if(obj == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid object handle");
 		return nullptr;
 	}
 	auto instance = std::make_unique<Instance>(move(name), *obj);
 	StringView nameRef = instance->get_name();
-	return m_instances.emplace(nameRef, std::move(instance)).first->second.get();
+	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
+		m_instances[nameRef] = std::move(instance);
+		return m_instances[nameRef].get();
+	} else {
+		if(m_animatedInstances.size() <= animationFrame)
+			m_animatedInstances.resize(animationFrame + 1u);
+		if(m_animatedInstances[animationFrame] == nullptr)
+			m_animatedInstances[animationFrame] = std::make_unique<std::unordered_map<StringView, std::unique_ptr<Instance>>>();
+		(*m_animatedInstances[animationFrame])[nameRef] = std::move(instance);
+		return (*m_animatedInstances[animationFrame])[nameRef].get();
+	}
 }
 
-InstanceHandle WorldContainer::get_instance(std::size_t index)
-{
-	mAssert(index < m_instances.size());
-	// TODO: use index string map?
-	auto iter = m_instances.begin();
-	for (std::size_t i = 0; i < index; ++i)
-		++iter;
-	return iter->second.get();
+InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animationFrame) {
+	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
+		// TODO: use index string map?
+		auto iter = m_instances.begin();
+		for(std::size_t i = 0; iter != m_instances.end() && i < index; ++i)
+			++iter;
+		if(iter != m_instances.end())
+			return iter->second.get();
+	} else if(animationFrame < m_animatedInstances.size() && m_animatedInstances[animationFrame] != nullptr) {
+		// TODO: use index string map?
+		auto iter = m_animatedInstances[animationFrame]->begin();
+		for(std::size_t i = 0; iter != m_animatedInstances[animationFrame]->end() && i < index; ++i)
+			++iter;
+		if(iter != m_animatedInstances[animationFrame]->end())
+			return iter->second.get();
+	}
+	return nullptr;
 }
 
 ScenarioHandle WorldContainer::create_scenario(std::string name) {
@@ -499,8 +549,8 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	m_scene = std::make_unique<Scene>(scenario);
 	u32 instIdx = 0;
 	// TODO: unload LoDs that are not needed anymore?
-	for(auto& instance : m_instances) {
-		Instance& inst = *instance.second;
+
+	auto addObjAndInstance = [this, &scenario](Instance& inst) {
 		Object& obj = inst.get_object();
 		if(!scenario.is_masked(&obj) && !scenario.is_masked(&inst)) {
 			const u32 lod = scenario.get_effective_lod(&inst);
@@ -525,13 +575,21 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 				if(!(ei::approx(scaleX, scaleY) && ei::approx(scaleX, scaleZ))) {
 					logWarning("Instance of object ", obj.get_object_id(),
 							   "containing spheres with non-uniform scale detected; will be ignored");
-					continue;
+					return;
 				}
 			}
 
-			m_scene->add_instance(instance.second.get());
+			m_scene->add_instance(&inst);
 		}
-	}
+	};
+
+
+	// Load non-animated and animated instances
+	for(auto& instance : m_instances)
+		addObjAndInstance(*instance.second);
+	if(m_animatedInstances[scenario.get_animation_frame()] != nullptr)
+		for(auto& instance : *m_animatedInstances[scenario.get_animation_frame()])
+			addObjAndInstance(*instance.second);
 
 	// Check if the resulting scene has issues with size
 	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
@@ -551,6 +609,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	m_scene->set_camera(m_scenario->get_camera());
 
 	m_scenario->camera_dirty_reset();
+	m_scenario->animation_frame_dirty_reset();
 
 	// Assign the newly created scene and destroy the old one?
 	return m_scene.get();
@@ -565,7 +624,8 @@ bool WorldContainer::reload_scene() {
 	// There is always a scenario set
 	mAssert(m_scenario != nullptr);
 
-	if(m_scene == nullptr) {
+	// TODO: better differentiate what needs to be reloaded on animation change
+	if(m_scene == nullptr || m_scenario->animation_frame_dirty_reset()) {
 		(void) load_scene(*m_scenario);
 		return true;
 	}

@@ -776,7 +776,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", name, "\'");
-		InstanceHdl instHdl = world_create_instance(name.c_str(), m_objects[objId].objHdl);
+		InstanceHdl instHdl = world_create_instance(name.c_str(), m_objects[objId].objHdl, keyframe);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
 									 + std::to_string(objId));
@@ -814,7 +814,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			u32 lod = globalLod;
 			if(auto iter = objectLods.find(objName); iter != objectLods.end())
 				lod = iter->second;
-			InstanceHdl instHdl = world_create_instance(name.c_str(), m_objects[i].objHdl);
+			InstanceHdl instHdl = world_create_instance(name.c_str(), m_objects[i].objHdl, 0xFFFFFFFF);
 			if(instHdl == nullptr)
 				throw std::runtime_error("Failed to create instance for object ID "
 										 + std::to_string(i));
@@ -836,13 +836,20 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	return true;
 }
 
-void BinaryLoader::deinstance()
-{
-	const u32 numInstances = world_get_instance_count();
-	for(u32 i = 0u; i < numInstances; ++i) {
-		InstanceHdl hdl = world_get_instance_by_index(i);
-		world_apply_instance_transformation(hdl);
-	}
+void BinaryLoader::deinstance() {
+	// Both animated and not animated instances
+	auto applyTranformation = [](const u32 frame) {
+		const u32 numInstances = world_get_instance_count(frame);
+		for(u32 i = 0u; i < numInstances; ++i) {
+			InstanceHdl hdl = world_get_instance_by_index(i, frame);
+			world_apply_instance_transformation(hdl);
+		}
+	};
+
+	const u32 frames = world_get_highest_instance_frame();
+	applyTranformation(0xFFFFFFFF);
+	for(u32 i = 0u; i < frames; ++i)
+		applyTranformation(frames);
 }
 
 void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
