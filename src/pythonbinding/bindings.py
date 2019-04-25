@@ -45,6 +45,7 @@ class DllInterface:
         self.dllHolder.core.world_get_current_scenario.restype = POINTER(c_int)
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
+        self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
@@ -126,6 +127,12 @@ class DllInterface:
     def world_load_scenario(self, hdl):
         return self.dllHolder.core.world_load_scenario(c_void_p(hdl))
 
+    def world_get_current_scenario(self):
+        return self.dllHolder.core.world_get_current_scenario()
+
+    def scenario_set_animation_frame(self, scenario, frame):
+        return self.dllHolder.core.scenario_set_animation_frame(c_void_p(scenario), c_uint(frame))
+
 
 def path_leaf(path):
     head, tail = ntpath.split(path)
@@ -174,11 +181,18 @@ class RenderActions:
             raise Exception("Failed to find scenario '" + scenarioName + "'")
         if not self.dllInterface.world_load_scenario(hdl):
             raise Exception("Failed to load scenario '" + scenarioName + "'")
+
+    def set_scenario_animation_frame(self, frame):
+        hdl = self.dllInterface.world_get_current_scenario()
+        if not hdl:
+            raise Exception("No scenario currently loaded")
+        if not self.dllInterface.scenario_set_animation_frame(hdl, frame):
+            raise Exception("Failed to set scenario animation frame to '" + str(frame) + "'")
         
     def set_renderer_log_level(self, logLevel):
         if not self.dllInterface.core_set_log_level(logLevel):
             raise Exception("Failed to set log level to '" + logLevel.name + "'")
-			
+            
     def set_loader_log_level(self, logLevel):
         if not self.dllInterface.loader_set_log_level(logLevel):
             raise Exception("Failed to set log level to '" + logLevel.name + "'")
