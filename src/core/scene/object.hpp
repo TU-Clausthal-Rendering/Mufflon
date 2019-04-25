@@ -79,16 +79,17 @@ public:
 
 	void copy_lods_from(Object& object) {
 		m_lods.clear();
-		for(auto& lod : object.m_lods)
+		for(auto& lod : object.m_lods) {
 			m_lods.emplace_back(std::make_unique<Lod>(*lod));
+			m_lods.back()->set_parent(this);
+		}
 	}
 
 	// Adds a new (or overwrites, if already existing) LoD
-	template < class... Args >
-	Lod& add_lod(u32 level, Args&& ...args) {
+	Lod& add_lod(u32 level) {
 		if(m_lods.size() <= level)
 			m_lods.resize(level + 1u);
-		m_lods[level] = std::make_unique<Lod>(std::forward<Args>(args)...);
+		m_lods[level] = std::make_unique<Lod>(this);
 		return *m_lods[level];
 	}
 

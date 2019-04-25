@@ -1,4 +1,5 @@
 #include "lod.hpp"
+#include "object.hpp"
 #include "scenario.hpp"
 #include "materials/material.hpp"
 #include "profiler/cpu_profiler.hpp"
@@ -32,6 +33,8 @@ LodDescriptor<dev> Lod::get_descriptor() {
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
 	// (Re)build acceleration structure if necessary
 	if(m_accelStruct.needs_rebuild()) {
+		logInfo("[Lod::get_descriptor] Building accelleration structure for object '", m_parent->get_name(),
+				"' with ", desc.numPrimitives, " primitives (", desc.polygon.numTriangles, "T / ", desc.polygon.numQuads, "Q / ", desc.spheres.numSpheres, "S).");
 		auto timer = Profiler::instance().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
 		m_accelStruct.build(desc, get_bounding_box());
 	}

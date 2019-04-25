@@ -206,7 +206,7 @@ void GpuShadowSilhouettes::initialize_decimaters() {
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-		auto& newLod = obj.first->add_lod(newLodLevel, lod);
+		auto& newLod = obj.first->add_lod(newLodLevel);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(lod, newLod, collapses,
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
