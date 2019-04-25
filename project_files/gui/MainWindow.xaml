@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui"
         xmlns:view="clr-namespace:gui.View"
+        xmlns:helper="clr-namespace:gui.View.Helper"
         xmlns:renderer="clr-namespace:gui.View.Renderer"
         xmlns:camera="clr-namespace:gui.View.Camera"
         xmlns:viewmodel="clr-namespace:gui.ViewModel"
@@ -263,7 +264,27 @@
                              Width="Auto">
                         <ListBox 
                             ItemsSource="{Binding Scene.Scenarios}"
-                            SelectedItem="{Binding Scene.SelectedScenario}"/>
+                            SelectedItem="{Binding Scene.SelectedScenario}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="30"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <helper:EnterTextBox Grid.Column="0"
+                                                    HorizontalContentAlignment="Left"
+                                                    HorizontalAlignment="Stretch"
+                                                    Text="{Binding AnimationFrame}"
+                                                    Margin="{StaticResource LeftPropertyMargin}"
+                                                    ToolTip="Animation frame"/>
+                                        <TextBlock Grid.Column="1"
+                                                    Margin="{StaticResource RightPropertyMargin}"
+                                                    Text="{Binding Name}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="Profiler"
                              Width="Auto">
