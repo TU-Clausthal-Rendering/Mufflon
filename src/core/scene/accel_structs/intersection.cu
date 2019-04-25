@@ -22,8 +22,8 @@ CUDA_FUNCTION __forceinline void add_epsilon(ei::Vec3& rayOrigin, const ei::Vec3
 }
 
 
-#define STACK_SIZE              96 //64          // Size of the traversal stack in local memory.
-#define OBJ_STACK_SIZE              64 //64          // Size of the traversal stack in local memory.
+#define STACK_SIZE              64*2+1         // Size of the traversal stack in local memory.
+#define OBJ_STACK_SIZE          64+1           // Size of the traversal stack in local memory.
 enum : i32 {
 	EntrypointSentinel = (i32)0xFFFFFFFF,   // Bottom-most stack entry, indicating the end of traversal.
 	IGNORE_ID = (i32)0xFFFFFFFF
@@ -111,10 +111,10 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 
 	// Solve quadratic equ. for number of hitpoints
 	float t = -1.f;
-	float v0, v1;
+	float v0 = 0.0f, v1 = 0.0f;
 	if(ei::solveSquarePoly(A2*C1 - A1*C2, A2*D1 - A1*D2 + B2*C1 - B1*C2, B2*D1 - B1*D2, v0, v1)) {
 		// For the sake of divergence ignore the fact we might only have a single solution
-		float u0, u1;
+		float u0 = 0.0f, u1 = 0.0f;
 		float t0 = -1.f;
 		float t1 = -1.f;
 		// Use the component with largest ray direction component to avoid singularities
