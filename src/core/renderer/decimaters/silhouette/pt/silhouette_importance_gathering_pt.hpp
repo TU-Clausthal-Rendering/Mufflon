@@ -1,6 +1,5 @@
 #pragma once
 
-#include "sil_common.hpp"
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"

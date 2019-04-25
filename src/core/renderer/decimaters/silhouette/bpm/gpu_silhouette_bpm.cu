@@ -1,3 +1,4 @@
+#if 0
 #include "core/renderer/decimaters/silhouette/silhouette_importance_gathering_pt.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -74,3 +75,4 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 } // namespace gpusil_details
 
 }}} // namespace mufflon::renderer::decimaters
+#endif

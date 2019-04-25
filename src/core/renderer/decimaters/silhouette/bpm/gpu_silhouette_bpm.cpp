@@ -1,5 +1,4 @@
-#pragma once
-
+#if 0
 #include "gpu_silhouette.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
@@ -275,3 +274,4 @@ void GpuShadowSilhouettes::update_reduction_factors() {
 }
 
 } // namespace mufflon::renderer::decimaters
+#endif
