@@ -42,10 +42,11 @@ class DllInterface:
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
-        self.dllHolder.core.world_get_current_scenario.restype = POINTER(c_int)
+        self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
+        self.dllHolder.core.scenario_set_animation_frame.argtypes = [c_void_p, c_uint]
+        self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
-        self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
@@ -121,6 +122,9 @@ class DllInterface:
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
 
+    def scenario_set_animation_frame(self, scenario, frame):
+        return self.dllHolder.core.scenario_set_animation_frame(c_void_p(scenario), c_uint(frame))
+
     def world_find_scenario(self, name):
         return self.dllHolder.core.world_find_scenario(c_char_p(name.encode('utf-8')))
 
@@ -129,9 +133,6 @@ class DllInterface:
 
     def world_get_current_scenario(self):
         return self.dllHolder.core.world_get_current_scenario()
-
-    def scenario_set_animation_frame(self, scenario, frame):
-        return self.dllHolder.core.scenario_set_animation_frame(c_void_p(scenario), c_uint(frame))
 
 
 def path_leaf(path):
