@@ -283,16 +283,14 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 
 		while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
 			// Fetch AABBs of the two child bvh.
-			i32 nodeIdx = nodeAddr * 4;
-			const ei::Vec4 Lmin_cL = bvh.bvh[nodeIdx];
-			const ei::Vec4 Lmax_nL = bvh.bvh[nodeIdx + 1];
-			const ei::Vec4 Rmin_cR = bvh.bvh[nodeIdx + 2];
-			const ei::Vec4 Rmax_nR = bvh.bvh[nodeIdx + 3];
+			i32 nodeIdx = nodeAddr * 2;
+			const BvhNode& left = bvh.bvh[nodeIdx];
+			const BvhNode& right = bvh.bvh[nodeIdx + 1];
 
 			// Intersect the ray against the children bounds.
 			float c0min, c1min;
-			bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, tmax, c0min);
-			bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, tmax, c1min);
+			bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, tmax, c0min);
+			bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, tmax, c1min);
 
 			// Set maximum values to unify upcomming code
 			if(!traverseChild0) c0min = 1e38f;
@@ -300,15 +298,15 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 
 			// If both children are hit, push the farther one to the stack
 			if(traverseChild0 && traverseChild1) {
-				i32 pushAddr = (c1min < c0min) ? float_bits_as_int(Lmin_cL.w) : float_bits_as_int(Rmin_cR.w);
+				i32 pushAddr = (c1min < c0min) ? left.index : right.index;
 				if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
-					traversalStack[stackIdx++] = (c1min < c0min) ? float_bits_as_int(Lmax_nL.w) : float_bits_as_int(Rmax_nR.w);
+					traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
 				traversalStack[stackIdx++] = pushAddr;
 			}
 			// Get address of the closer one (independent of a hit)
-			nodeAddr = (c0min <= c1min) ? float_bits_as_int(Lmin_cL.w) : float_bits_as_int(Rmin_cR.w);
+			nodeAddr = (c0min <= c1min) ? left.index : right.index;
 			if(nodeAddr >= bvh.numInternalNodes) {
-				primCount = (c0min <= c1min) ? float_bits_as_int(Lmax_nL.w) : float_bits_as_int(Rmax_nR.w);
+				primCount = (c0min <= c1min) ? left.primCount : right.primCount;
 				primOffset = 0;
 			} else primCount = 2;
 			// Neither child was intersected => wait for pop stack.
@@ -371,16 +369,14 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 
 		while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
 			// Fetch AABBs of the two child bvh.
-			i32 nodeIdx = nodeAddr * 4;
-			const ei::Vec4 Lmin_cL = bvh.bvh[nodeIdx];
-			const ei::Vec4 Lmax_nL = bvh.bvh[nodeIdx + 1];
-			const ei::Vec4 Rmin_cR = bvh.bvh[nodeIdx + 2];
-			const ei::Vec4 Rmax_nR = bvh.bvh[nodeIdx + 3];
+			i32 nodeIdx = nodeAddr * 2;
+			const BvhNode& left  = bvh.bvh[nodeIdx];
+			const BvhNode& right = bvh.bvh[nodeIdx + 1];
 
 			// Intersect the ray against the children bounds.
 			float c0min, c1min;
-			bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, hitT, c0min);
-			bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, hitT, c1min);
+			bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, hitT, c0min);
+			bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, hitT, c1min);
 
 			// Set maximum values to unify upcomming code
 			if(!traverseChild0) c0min = 1e38f;
@@ -388,15 +384,15 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 
 			// If both children are hit, push the farther one to the stack
 			if(traverseChild0 && traverseChild1) {
-				i32 pushAddr = (c1min < c0min) ? float_bits_as_int(Lmin_cL.w) : float_bits_as_int(Rmin_cR.w);
+				i32 pushAddr = (c1min < c0min) ? left.index : right.index;
 				if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
-					traversalStack[stackIdx++] = (c1min < c0min) ? float_bits_as_int(Lmax_nL.w) : float_bits_as_int(Rmax_nR.w);
+					traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
 				traversalStack[stackIdx++] = pushAddr;
 			}
 			// Get address of the closer one (independent of a hit)
-			nodeAddr = (c0min <= c1min) ? float_bits_as_int(Lmin_cL.w) : float_bits_as_int(Rmin_cR.w);
+			nodeAddr = (c0min <= c1min) ? left.index : right.index;
 			if(nodeAddr >= bvh.numInternalNodes) {
-				primCount = (c0min <= c1min) ? float_bits_as_int(Lmax_nL.w) : float_bits_as_int(Rmax_nR.w);
+				primCount = (c0min <= c1min) ? left.primCount : right.primCount;
 				primOffset = 0;
 			} else primCount = 2;
 			// Neither child was intersected => wait for pop stack.
@@ -492,16 +488,14 @@ RayIntersectionResult first_intersection(
 		while(nodeAddr != EntrypointSentinel) {
 			if(nodeAddr < bvh.numInternalNodes) { // Internal node?
 				// Fetch AABBs of the two child bvh.
-				i32 nodeIdx = nodeAddr * 4;
-				const ei::Vec4 Lmin_cL = bvh.bvh[nodeIdx];
-				const ei::Vec4 Lmax_nL = bvh.bvh[nodeIdx + 1];
-				const ei::Vec4 Rmin_cR = bvh.bvh[nodeIdx + 2];
-				const ei::Vec4 Rmax_nR = bvh.bvh[nodeIdx + 3];
+				i32 nodeIdx = nodeAddr * 2;
+				const BvhNode& left = bvh.bvh[nodeIdx];
+				const BvhNode& right = bvh.bvh[nodeIdx + 1];
 
 				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, tmax, c0min);
-				bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, tmax, c1min);
+				bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, hitT, c0min);
+				bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, hitT, c1min);
 
 				// Neither child was intersected => pop stack.
 				if(!traverseChild0 && !traverseChild1) {
@@ -514,13 +508,13 @@ RayIntersectionResult first_intersection(
 				}
 				// Otherwise => fetch child pointers.
 				else {
-					nodeAddr = traverseChild0 ? float_bits_as_int(Lmin_cL.w) : float_bits_as_int(Rmin_cR.w);
-					primCount = traverseChild0 ? float_bits_as_int(Lmax_nL.w) : float_bits_as_int(Rmax_nR.w);
+					nodeAddr = traverseChild0 ? left.index : right.index;
+					primCount = traverseChild0 ? left.primCount : right.primCount;
 
 					// Both children were intersected => push the farther one.
 					if (traverseChild0 && traverseChild1) {
-						i32 pushAddr = float_bits_as_int(Rmin_cR.w); // nodeAddr is Lmin_cL.w, this is the other one
-						i32 pushCount = float_bits_as_int(Rmax_nR.w);
+						i32 pushAddr = right.index; // nodeAddr is Lmin_cL.w, this is the other one
+						i32 pushCount = right.primCount;
 						if (c1min < c0min) {
 							i32 tmp = nodeAddr;
 							nodeAddr = pushAddr;
@@ -757,16 +751,14 @@ bool any_intersection(
 		while (nodeAddr != EntrypointSentinel) {
 			if(nodeAddr < bvh.numInternalNodes) { // Internal node?
 				// Fetch AABBs of the two child bvh.
-				i32 nodeIdx = nodeAddr * 4;
-				const ei::Vec4 Lmin_cL = bvh.bvh[nodeIdx];
-				const ei::Vec4 Lmax_nL = bvh.bvh[nodeIdx + 1];
-				const ei::Vec4 Rmin_cR = bvh.bvh[nodeIdx + 2];
-				const ei::Vec4 Rmax_nR = bvh.bvh[nodeIdx + 3];
+				i32 nodeIdx = nodeAddr * 2;
+				const BvhNode& left = bvh.bvh[nodeIdx];
+				const BvhNode& right = bvh.bvh[nodeIdx + 1];
 
-				// Intersect the ray against the child bvh.
+				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(ei::Vec3{Lmin_cL}, ei::Vec3{Lmax_nL}, invDir, ood, 0.0f, tmax, c0min);
-				bool traverseChild1 = intersect(ei::Vec3{Rmin_cR}, ei::Vec3{Rmax_nR}, invDir, ood, 0.0f, tmax, c1min);
+				bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, tmax, c0min);
+				bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, tmax, c1min);
 
 				// Neither child was intersected => pop stack.
 				if (!traverseChild0 && !traverseChild1) {
@@ -779,13 +771,13 @@ bool any_intersection(
 				}
 				// Otherwise => fetch child pointers.
 				else {
-					nodeAddr = traverseChild0 ? float_bits_as_int(Lmin_cL.w) : float_bits_as_int(Rmin_cR.w);
-					primCount = traverseChild0 ? float_bits_as_int(Lmax_nL.w) : float_bits_as_int(Rmax_nR.w);
+					nodeAddr = traverseChild0 ? left.index : right.index;
+					primCount = traverseChild0 ? left.primCount : right.primCount;
 
 					// Both children were intersected => push the farther one.
 					if (traverseChild0 && traverseChild1) {
-						i32 pushAddr = float_bits_as_int(Rmin_cR.w); // nodeAddr is Lmin_cL.w, this is the other one
-						i32 pushCount = float_bits_as_int(Rmax_nR.w);
+						i32 pushAddr = right.index; // nodeAddr is Lmin_cL.w, this is the other one
+						i32 pushCount = right.primCount;
 						if (c1min < c0min) {
 							i32 tmp = nodeAddr;
 							nodeAddr = pushAddr;
