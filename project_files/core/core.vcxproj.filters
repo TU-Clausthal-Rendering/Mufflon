@@ -295,9 +295,6 @@
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\decimation_common.cpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\cpu_silhouette_pt.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
     </ClCompile>
@@ -308,6 +305,12 @@
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\cpu_silhouette_bpm.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\decimation_common_pt.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\decimation_common_bpm.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
     </ClCompile>
   </ItemGroup>
@@ -933,9 +936,6 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\modules\silhouette.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\modules</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\sil_common.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </ClInclude>
@@ -990,9 +990,6 @@
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\decimation_common.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\cpu_silhouette_pt.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
     </ClInclude>
@@ -1009,6 +1006,24 @@
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\bpm\cpu_silhouette_bpm.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\bpm\silhouette_bpm_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_common.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\decimation_common_pt.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\bpm\decimation_common_bpm.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\bpm\silhouette_bpm_common.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1048,9 +1063,6 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\gpu_silhouette_bpm.cu">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_impvis.cu">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

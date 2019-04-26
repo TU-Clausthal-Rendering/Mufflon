@@ -27,7 +27,7 @@ namespace gpusil_details {
 cudaError_t call_importance_kernel(const dim3& gridDims, const dim3& blockDims,
 								   renderer::RenderBuffer<Device::CUDA>&& outputBuffer,
 								   scene::SceneDescriptor<Device::CUDA>* scene,
-								   const u32* seeds, const SilhouetteParameters& params,
+								   const u32* seeds, const SilhouetteParametersBPM& params,
 								   Importances<Device::CUDA>** importances,
 								   DeviceImportanceSums<Device::CUDA>* sums);
 
@@ -205,7 +205,7 @@ void GpuShadowSilhouettes::initialize_decimaters() {
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-		auto& newLod = obj.first->add_lod(newLodLevel);
+		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(lod, newLod, collapses,
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);

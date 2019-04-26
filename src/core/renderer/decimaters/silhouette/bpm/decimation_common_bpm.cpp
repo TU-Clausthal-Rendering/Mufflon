@@ -1,14 +1,14 @@
-#include "decimation_common.hpp"
+#include "decimation_common_bpm.hpp"
 #include "util/parallel.hpp"
 #include "util/punning.hpp"
-#include "modules/importance_quadrics.hpp"
+#include "core/renderer/decimaters/silhouette/modules/importance_quadrics.hpp"
 #include "core/renderer/decimaters/modules/collapse_tracker.hpp"
 #include "core/scene/geometry/polygon.hpp"
 #include <ei/vector.hpp>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
-namespace mufflon::renderer::decimaters::silhouette {
+namespace mufflon::renderer::decimaters::silhouette::bpm {
 
 using namespace modules;
 using namespace mufflon::scene;
@@ -37,9 +37,9 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 template < Device dev >
 ImportanceDecimater<dev>::ImportanceDecimater(Lod& original, Lod& decimated,
-										 const std::size_t initialCollapses,
-										 const float viewWeight, const float lightWeight,
-										 const float shadowWeight, const float shadowSilhouetteWeight) :
+											  const std::size_t initialCollapses,
+											  const float viewWeight, const float lightWeight,
+											  const float shadowWeight, const float shadowSilhouetteWeight) :
 	m_original(original),
 	m_decimated(decimated),
 	m_originalPoly(m_original.template get_geometry<Polygons>()),
@@ -157,14 +157,10 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
 		// Important: only works for triangles!
 		const float area = compute_area(*m_decimatedMesh, vertex);
-		const float flux = m_importances[vertex.idx()].irradiance
-			/ std::max(1.f, static_cast<float>(m_importances[vertex.idx()].hitCounter));
-		const float viewImportance = m_importances[vertex.idx()].viewImportance;
+		const float fluxImportance = m_importances[vertex.idx()].fluxImportance;
 
-		const float importance = viewImportance + m_lightWeight * flux;
-
-		importanceSum += importance;
-		m_importances[vertex.idx()].viewImportance = importance / area;
+		importanceSum += fluxImportance;
+		m_importances[vertex.idx()].fluxImportance = fluxImportance / area;
 	}
 
 	// Subtract the shadow silhouette importance and use shadow importance instead
@@ -180,7 +176,7 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 			v = m_originalMesh.property(m_collapsedTo, v);
 
 		// Put importance into temporary storage
-		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance;
+		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].fluxImportance;
 	}
 }
 
@@ -284,8 +280,8 @@ float ImportanceDecimater<dev>::get_current_max_importance() const {
 #pragma PARALLEL_FOR
 	for(i64 v = 0; v < static_cast<i64>(m_decimatedPoly->get_vertex_count()); ++v) {
 #pragma omp critical
-		if(m_importances[v].viewImportance > maxImp)
-			maxImp = m_importances[v].viewImportance;
+		if(m_importances[v].fluxImportance > maxImp)
+			maxImp = m_importances[v].fluxImportance;
 	}
 	return maxImp;
 }
@@ -330,4 +326,4 @@ void ImportanceDecimater<dev>::decimate_with_error_quadrics(const std::size_t co
 template class ImportanceDecimater<Device::CPU>;
 template class ImportanceDecimater<Device::CUDA>;
 
-} // namespace mufflon::renderer::decimaters::silhouette
+} // namespace mufflon::renderer::decimaters::silhouette::bpm

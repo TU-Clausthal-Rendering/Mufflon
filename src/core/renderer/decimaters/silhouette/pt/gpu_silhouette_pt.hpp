@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/renderer/decimaters/silhouette/decimation_common.hpp"
-#include "core/renderer/decimaters/silhouette/silhouette_params.hpp"
-#include "core/renderer/decimaters/silhouette/sil_common.hpp"
+#include "decimation_common_pt.hpp"
+#include "silhouette_pt_common.hpp"
+#include "silhouette_pt_params.hpp"
 #include "core/math/rng.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/renderer/renderer_base.hpp"
@@ -10,7 +10,7 @@
 #include <atomic>
 #include <vector>
 
-namespace mufflon::renderer::decimaters {
+namespace mufflon::renderer::decimaters::silhouette {
 
 template < Device >
 struct RenderBuffer;
@@ -39,20 +39,20 @@ private:
 	void compute_max_importance();
 	void display_importance();
 
-	silhouette::SilhouetteParameters m_params = {};
+	pt::SilhouetteParameters m_params = {};
 	math::Rng m_rng;
 	std::unique_ptr<u32[]> m_seeds;
 	unique_device_ptr<Device::CUDA, u32[]> m_seedsPtr;
 
 	float m_maxImportance = 0.f;
-	std::vector<std::unique_ptr<silhouette::ImportanceDecimater<Device::CUDA>>> m_decimaters;
+	std::vector<std::unique_ptr<pt::ImportanceDecimater<Device::CUDA>>> m_decimaters;
 	// Stores the importance's of each mesh on the GPU/CPU
-	unique_device_ptr<Device::CUDA, ArrayDevHandle_t<Device::CUDA, silhouette::Importances<Device::CUDA>>[]> m_importances;
-	unique_device_ptr<Device::CUDA, silhouette::DeviceImportanceSums<Device::CUDA>[]> m_importanceSums;
+	unique_device_ptr<Device::CUDA, ArrayDevHandle_t<Device::CUDA, pt::Importances<Device::CUDA>>[]> m_importances;
+	unique_device_ptr<Device::CUDA, pt::DeviceImportanceSums<Device::CUDA>[]> m_importanceSums;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous
 	u32 m_currentDecimationIteration = 0u;
 };
 
-} // namespace mufflon::renderer::decimaters
+} // namespace mufflon::renderer::decimaters::silhouette

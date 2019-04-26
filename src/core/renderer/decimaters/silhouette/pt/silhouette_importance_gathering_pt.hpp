@@ -1,16 +1,16 @@
 #pragma once
 
+#include "silhouette_pt_common.hpp"
+#include "silhouette_pt_params.hpp"
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/output_handler.hpp"
-#include "core/renderer/decimaters/silhouette/silhouette_params.hpp"
-#include "core/renderer/decimaters/silhouette/sil_common.hpp"
 #include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 
-namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
 
 using namespace scene::lights;
 
@@ -195,7 +195,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& outputBuffer,
 									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									 const SilhouetteParameters& params,
-									 const Pixel& coord, math::Rng rng,
+									 const Pixel& coord, math::Rng& rng,
 									 Importances<CURRENT_DEV>** importances,
 									 DeviceImportanceSums<CURRENT_DEV>* sums) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
@@ -335,7 +335,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 
 CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& outputBuffer,
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
-										 const Pixel& coord, math::Rng rng,
+										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,
 										 const float maxImportance) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
@@ -370,4 +370,4 @@ CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& ou
 	}
 }
 
-}}}} // namespace mufflon::renderer::decimaters
+}}}}} // namespace mufflon::renderer::decimaters::silhouette::pt

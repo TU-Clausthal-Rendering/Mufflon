@@ -4,6 +4,34 @@
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
 
+struct PImportanceIterations {
+	int importanceIterations{ 1 };
+	static ParamDesc get_desc() noexcept {
+		return { "Importance iterations", ParameterTypes::INT };
+	}
+};
+
+struct PTargetReduction {
+	float reduction{ 0.875f };
+	static ParamDesc get_desc() noexcept {
+		return { "Target mesh reduction", ParameterTypes::FLOAT };
+	}
+};
+
+struct PInitialReduction {
+	float initialReduction = 0.f;
+	static ParamDesc get_desc() noexcept {
+		return { "Reduce mesh initially", ParameterTypes::FLOAT };
+	}
+};
+
+struct PVertexThreshold {
+	int threshold{ 100 };
+	static ParamDesc get_desc() noexcept {
+		return { "Decimation threshold", ParameterTypes::INT };
+	}
+};
+
 struct PDecimationIterations {
 	int decimationIterations{ 10 };
 	static ParamDesc get_desc() noexcept {
@@ -52,21 +80,5 @@ struct PShadowSilhouetteWeight {
 		return { "Imp. weight of shadow silhouette paths", ParameterTypes::FLOAT };
 	}
 };
-
-struct PRenderUpdate {
-	bool renderUpdate = false;
-	static ParamDesc get_desc() noexcept {
-		return { "Show update between decimations", ParameterTypes::BOOL };
-	}
-};
-
-using SilhouetteParameters = ParameterHandler<
-	PImportanceIterations, PDecimationIterations,
-	PTargetReduction, PInitialReduction, PVertexThreshold,
-	PDirectIndirectRatio, PSharpnessFactor,
-	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,
-	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide,
-	PRenderUpdate
->;
 
 }}}} // namespace mufflon::renderer::decimaters::silhouette

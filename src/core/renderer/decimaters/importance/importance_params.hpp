@@ -4,6 +4,34 @@
 
 namespace mufflon::renderer::decimaters::importance {
 
+struct PImportanceIterations {
+	int importanceIterations{ 1 };
+	static ParamDesc get_desc() noexcept {
+		return { "Importance iterations", ParameterTypes::INT };
+	}
+};
+
+struct PTargetReduction {
+	float reduction{ 0.875f };
+	static ParamDesc get_desc() noexcept {
+		return { "Target mesh reduction", ParameterTypes::FLOAT };
+	}
+};
+
+struct PInitialReduction {
+	float initialReduction = 0.f;
+	static ParamDesc get_desc() noexcept {
+		return { "Reduce mesh initially", ParameterTypes::FLOAT };
+	}
+};
+
+struct PVertexThreshold {
+	int threshold{ 100 };
+	static ParamDesc get_desc() noexcept {
+		return { "Decimation threshold", ParameterTypes::INT };
+	}
+};
+
 struct PDecimationIterations {
 	int decimationIterations{ 10 };
 	static ParamDesc get_desc() noexcept {

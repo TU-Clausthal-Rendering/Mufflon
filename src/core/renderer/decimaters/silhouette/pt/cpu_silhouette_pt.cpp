@@ -18,9 +18,9 @@
 #include <random>
 #include <queue>
 
-namespace mufflon::renderer::decimaters {
+namespace mufflon::renderer::decimaters::silhouette {
 
-using namespace silhouette;
+using namespace pt;
 
 namespace {
 
@@ -185,7 +185,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-		auto& newLod = obj.first->add_lod(newLodLevel);
+		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CPU>>(lod, newLod, collapses,
 																			 m_params.viewWeight, m_params.lightWeight,
 																			 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
@@ -258,4 +258,4 @@ void CpuShadowSilhouettesPT::init_rngs(int num) {
 		m_rngs[i] = math::Rng(i);
 }
 
-} // namespace mufflon::renderer::decimaters
+} // namespace mufflon::renderer::decimaters::silhouette

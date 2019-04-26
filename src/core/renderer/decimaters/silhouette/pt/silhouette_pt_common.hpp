@@ -3,7 +3,7 @@
 #include "core/renderer/path_util.hpp"
 #include "core/cuda/cuda_utils.hpp"
 
-namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
 
 template < Device dev >
 struct Importances {
@@ -22,6 +22,7 @@ struct ImportanceSums {
 	float shadowImportance;
 	float shadowSilhouetteImportance;
 };
+
 
 struct SilVertexExt {
 	scene::Direction excident;
@@ -60,4 +61,4 @@ struct SilVertexExt {
 
 using SilPathVertex = PathVertex<SilVertexExt>;
 
-}}}} // namespace mufflon::renderer::decimaters::silhouette
+}}}}} // namespace mufflon::renderer::decimaters::silhouette::pt

@@ -11,7 +11,7 @@
 #include <atomic>
 #include <vector>
 
-namespace mufflon::renderer::decimaters {
+namespace mufflon::renderer::decimaters::silhouette {
 
 template < Device >
 struct RenderBuffer;
@@ -40,7 +40,7 @@ private:
 	void compute_max_importance();
 	void display_importance();
 
-	silhouette::SilhouetteParameters m_params = {};
+	silhouette::SilhouetteParametersBPM m_params = {};
 	math::Rng m_rng;
 	std::unique_ptr<u32[]> m_seeds;
 	unique_device_ptr<Device::CUDA, u32[]> m_seedsPtr;
@@ -56,5 +56,5 @@ private:
 	u32 m_currentDecimationIteration = 0u;
 };
 
-} // namespace mufflon::renderer::decimaters
+} // namespace mufflon::renderer::decimaters::silhouette
 #endif

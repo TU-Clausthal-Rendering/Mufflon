@@ -1,31 +1,31 @@
-#pragma once
+﻿#pragma once
 
-#if 0
-#include "core/renderer/decimaters/silhouette/decimation_common.hpp"
-#include "core/renderer/decimaters/silhouette/silhouette_params.hpp"
-#include "core/renderer/decimaters/silhouette/sil_common.hpp"
+#include "decimation_common_bpm.hpp"
+#include "silhouette_bpm_common.hpp"
+#include "silhouette_bpm_params.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
-#include <OpenMesh/Core/Utils/Property.hh>
+#include "core/renderer/photon_map.hpp"
 #include <atomic>
 #include <vector>
 
-namespace mufflon::renderer::decimaters {
+namespace mufflon::renderer::decimaters::silhouette {
 
 template < Device >
 struct RenderBuffer;
 
-class CpuShadowSilhouettes final : public RendererBase<Device::CPU> {
+class CpuShadowSilhouettesBPM final : public RendererBase<Device::CPU> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuShadowSilhouettes();
-	~CpuShadowSilhouettes() = default;
+	CpuShadowSilhouettesBPM();
+	~CpuShadowSilhouettesBPM() = default;
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Shadow Silhouette"; }
+	StringView get_name() const noexcept final { return "Shadow Silhouette BPM"; }
 	StringView get_short_name() const noexcept final { return "SS"; }
 
+	void on_reset() final;
 	void pre_descriptor_requery() final;
 	void post_iteration(OutputHandler& outputBuffer) final;
 	void on_scene_load() final;
@@ -40,19 +40,20 @@ private:
 	void compute_max_importance();
 	void display_importance();
 
-	silhouette::SilhouetteParameters m_params = {};
+	bpm::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
+	HashGridManager<bpm::PhotonDesc> m_photonMapManager;
+	HashGrid<Device::CPU, bpm::PhotonDesc> m_photonMap;
 
 	float m_maxImportance = 0.f;
-	std::vector<std::unique_ptr<silhouette::ImportanceDecimater<Device::CPU>>> m_decimaters;
+	std::vector<std::unique_ptr<bpm::ImportanceDecimater<Device::CPU>>> m_decimaters;
 	// Stores the importance's of each mesh on the GPU/CPU (ptr to actual arrays)
-	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, silhouette::Importances<Device::CPU>>[]> m_importances;
-	unique_device_ptr<Device::CPU, silhouette::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
+	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, bpm::Importances<Device::CPU>>[]> m_importances;
+	unique_device_ptr<Device::CPU, bpm::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous
 	u32 m_currentDecimationIteration = 0u;
 };
 
-} // namespace mufflon::renderer::decimaters
-#endif
+} // namespace mufflon::renderer::decimaters::silhouette

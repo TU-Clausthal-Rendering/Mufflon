@@ -1,11 +1,11 @@
 #pragma once
 
-#include "sil_common.hpp"
+#include "silhouette_bpm_common.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 
-namespace mufflon::renderer::decimaters::silhouette {
+namespace mufflon::renderer::decimaters::silhouette::bpm {
 
 template < Device dev >
 class ImportanceDecimater {
@@ -76,4 +76,4 @@ private:
 	const float m_shadowSilhouetteWeight;							// Weight assigned to the shadow silhouette importance
 };
 
-} // namespace mufflon::renderer::decimaters::silhouette
+} // namespace mufflon::renderer::decimaters::silhouette::bpm

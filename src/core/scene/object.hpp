@@ -93,6 +93,13 @@ public:
 		return *m_lods[level];
 	}
 
+	Lod& add_lod(u32 level, Lod& make_copy) {
+		if(m_lods.size() <= level)
+			m_lods.resize(level + 1u);
+		m_lods[level] = std::make_unique<Lod>(make_copy);
+		return *m_lods[level];
+	}
+
 	// Removes a LoD
 	void remove_lod(std::size_t level) {
 		if(level < m_lods.size())

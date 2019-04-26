@@ -1,11 +1,10 @@
-#if 0
-#include "cpu_silhouette_pt.hpp"
+#include "cpu_silhouette_bpm.hpp"
+#include "silhouette_importance_gathering_bpm.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
-#include "core/renderer/decimaters/silhouette/silhouette_importance_gathering_pt.hpp"
 #include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scene.hpp"
@@ -14,14 +13,13 @@
 #include "core/scene/lights/light_sampling.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/scene/world_container.hpp"
-#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 #include <cstdio>
 #include <random>
 #include <queue>
 
-namespace mufflon::renderer::decimaters {
+namespace mufflon::renderer::decimaters::silhouette {
 
-using namespace silhouette;
+using namespace bpm;
 
 namespace {
 
@@ -32,14 +30,14 @@ inline float get_luminance(const ei::Vec3& vec) {
 
 } // namespace
 
-CpuShadowSilhouettes::CpuShadowSilhouettes()
+CpuShadowSilhouettesBPM::CpuShadowSilhouettesBPM()
 {
 	// TODO: init one RNG per thread?
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
-void CpuShadowSilhouettes::on_scene_load() {
+void CpuShadowSilhouettesBPM::on_scene_load() {
 	if(m_currentDecimationIteration != 0u) {
 		// At least activate the created LoDs
 		for(auto& obj : m_currentScene->get_objects()) {
@@ -50,12 +48,12 @@ void CpuShadowSilhouettes::on_scene_load() {
 	}
 }
 
-void CpuShadowSilhouettes::on_scene_unload() {
+void CpuShadowSilhouettesBPM::on_scene_unload() {
 	m_decimaters.clear();
 	m_currentDecimationIteration = 0u;
 }
 
-void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
+void CpuShadowSilhouettesBPM::post_iteration(OutputHandler& outputBuffer) {
 	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 		// Finalize the decimation process
 		logInfo("Finished decimation process");
@@ -89,16 +87,20 @@ void CpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 	RendererBase<Device::CPU>::post_iteration(outputBuffer);
 }
 
-void CpuShadowSilhouettes::pre_descriptor_requery() {
+void CpuShadowSilhouettesBPM::on_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
+	m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1));
+	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
+}
 
+void CpuShadowSilhouettesBPM::pre_descriptor_requery() {
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 }
 
-void CpuShadowSilhouettes::iterate() {
+void CpuShadowSilhouettesBPM::iterate() {
 	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")...");
 
@@ -126,32 +128,49 @@ void CpuShadowSilhouettes::iterate() {
 	}
 }
 
-void CpuShadowSilhouettes::gather_importance() {
+void CpuShadowSilhouettesBPM::gather_importance() {
 	// Re-upload the (possibly resized) importance buffers
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
 		m_importances[i] = m_decimaters[i]->start_iteration();
 
-	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+	for(int i = 0; i < m_params.importanceIterations; ++i) {
+		float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
+		if(m_params.progressive)
+			currentMergeRadius *= powf(float(i + 1), -1.0f / 6.0f);
+		m_photonMap.clear(currentMergeRadius * 2.0001f);
+
+		// First pass: Create one photon path per view path
+		u64 photonSeed = m_rngs[0].next();
+		int numPhotons = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
-		for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
-			const int pixel = i / m_params.importanceIterations;
-			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-			silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
+		for(int p = 0; p < numPhotons; ++p) {
+			silhouette::trace_importance_photon(m_sceneDesc, m_photonMap, m_params, p, numPhotons,
+												photonSeed, currentMergeRadius, m_rngs[p]);
+		}
+
+		// Second pass: trace view paths and merge
+#pragma PARALLEL_FOR
+		for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+			silhouette::sample_importance(m_sceneDesc, m_photonMap, m_params,
+										  Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
+										  m_rngs[pixel], numPhotons, currentMergeRadius,
 										  m_importances.get(), m_importanceSums.get());
 		}
+	}
 	// TODO: allow for this with proper reset "events"
 }
 
-void CpuShadowSilhouettes::display_importance() {
+void CpuShadowSilhouettesBPM::display_importance() {
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel], m_importances.get(), m_maxImportance);
+		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
+										  m_importances.get(), m_maxImportance);
 	}
 }
 
-void CpuShadowSilhouettes::compute_max_importance() {
+void CpuShadowSilhouettesBPM::compute_max_importance() {
 	m_maxImportance = 0.f;
 
 	// Compute the maximum normalized importance for visualization
@@ -159,7 +178,7 @@ void CpuShadowSilhouettes::compute_max_importance() {
 		m_maxImportance = std::max(m_maxImportance, m_decimaters[i]->get_current_max_importance());
 }
 
-void CpuShadowSilhouettes::initialize_decimaters() {
+void CpuShadowSilhouettesBPM::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
 	m_decimaters.resize(objects.size());
@@ -186,7 +205,7 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-		auto& newLod = obj.first->add_lod(newLodLevel);
+		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CPU>>(lod, newLod, collapses,
 																			 m_params.viewWeight, m_params.lightWeight,
 																			 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
@@ -199,7 +218,7 @@ void CpuShadowSilhouettes::initialize_decimaters() {
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
-void CpuShadowSilhouettes::update_reduction_factors() {
+void CpuShadowSilhouettesBPM::update_reduction_factors() {
 	m_remainingVertexFactor.clear();
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
@@ -252,12 +271,11 @@ void CpuShadowSilhouettes::update_reduction_factors() {
 	}
 }
 
-void CpuShadowSilhouettes::init_rngs(int num) {
+void CpuShadowSilhouettesBPM::init_rngs(int num) {
 	m_rngs.resize(num);
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i);
 }
 
-} // namespace mufflon::renderer::decimaters
-#endif
+} // namespace mufflon::renderer::decimaters::silhouette

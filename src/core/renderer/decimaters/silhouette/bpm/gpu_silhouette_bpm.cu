@@ -1,5 +1,6 @@
 #if 0
 #include "core/renderer/decimaters/silhouette/silhouette_importance_gathering_pt.hpp"
+#include "silhouette_bpm_params.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
@@ -9,7 +10,7 @@ using namespace silhouette;
 
 __global__ static void silhouette_kernel(RenderBuffer<Device::CUDA> outputBuffer,
 										 scene::SceneDescriptor<Device::CUDA>* scene,
-										 const u32* seeds, SilhouetteParameters params,
+										 const u32* seeds, SilhouetteParametersBPM params,
 										 Importances<Device::CUDA>** importances,
 										 DeviceImportanceSums<Device::CUDA>* sums) {
 	Pixel coord{
@@ -52,7 +53,7 @@ namespace gpusil_details {
 cudaError_t call_importance_kernel(const dim3& gridDims, const dim3& blockDims,
 								   renderer::RenderBuffer<Device::CUDA>&& outputBuffer,
 								   scene::SceneDescriptor<Device::CUDA>* scene,
-								   const u32* seeds, const SilhouetteParameters& params,
+								   const u32* seeds, const SilhouetteParametersBPM& params,
 								   Importances<Device::CUDA>** importances,
 								   DeviceImportanceSums<Device::CUDA>* sums) {
 	silhouette_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,

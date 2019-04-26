@@ -17,11 +17,9 @@
 #include <random>
 #include <queue>
 
-namespace mufflon::renderer::decimaters {
+namespace mufflon::renderer::decimaters::silhouette {
 
-using namespace silhouette;
-
-namespace gpusil_details {
+namespace pt::gpusil_details {
 
 cudaError_t call_importance_kernel(const dim3& gridDims, const dim3& blockDims,
 								   renderer::RenderBuffer<Device::CUDA>&& outputBuffer,
@@ -36,7 +34,9 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 							   const u32* seeds, Importances<Device::CUDA>** importances,
 							   const float maxImportance);
 
-} // namespace gpusil_details
+} // namespace pt::gpusil_details
+
+using namespace pt;
 
 GpuShadowSilhouettesPT::GpuShadowSilhouettesPT() :
 	m_params{}
@@ -204,7 +204,7 @@ void GpuShadowSilhouettesPT::initialize_decimaters() {
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-		auto& newLod = obj.first->add_lod(newLodLevel);
+		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(lod, newLod, collapses,
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
@@ -272,4 +272,4 @@ void GpuShadowSilhouettesPT::update_reduction_factors() {
 	}
 }
 
-} // namespace mufflon::renderer::decimaters
+} // namespace mufflon::renderer::decimaters::silhouette

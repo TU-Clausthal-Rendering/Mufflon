@@ -6,6 +6,8 @@
 #include "core/renderer/decimaters/importance/cpu_importance.hpp"
 #include "core/renderer/decimaters/silhouette/pt/cpu_silhouette_pt.hpp"
 #include "core/renderer/decimaters/silhouette/pt/gpu_silhouette_pt.hpp"
+#include "core/renderer/decimaters/silhouette/bpm/cpu_silhouette_bpm.hpp"
+#include "core/renderer/decimaters/silhouette/bpm/gpu_silhouette_bpm.hpp"
 #include "core/renderer/wireframe/cpu_wireframe.hpp"
 #include "core/renderer/wireframe/gpu_wireframe.hpp"
 #include "core/renderer/bpt/cpu_bpt.hpp"
@@ -22,7 +24,8 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
 	CpuVcm,
-	decimaters::CpuShadowSilhouettesPT, decimaters::GpuShadowSilhouettesPT,
+	decimaters::silhouette::CpuShadowSilhouettesPT, decimaters::silhouette::GpuShadowSilhouettesPT,
+	decimaters::silhouette::CpuShadowSilhouettesBPM,
 	decimaters::CpuImportanceDecimater
 >;
 
