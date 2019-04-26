@@ -124,11 +124,11 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay
 			if(u0 >= 0.f && u0 <= 1.f) {
 				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
 				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
-					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x - ray.origin.x) / ray.direction.x;
+					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x) * ray.invDirection.x - ray.oDivDir.x;
 				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
-					t0 = (u0*v0*a.y + u0 * b.y + v0 * c.y + d.y - ray.origin.y) / ray.direction.y;
+					t0 = (u0*v0*a.y + u0 * b.y + v0 * c.y + d.y) * ray.invDirection.y - ray.oDivDir.y;
 				else
-					t0 = (u0*v0*a.z + u0 * b.z + v0 * c.z + d.z - ray.origin.z) / ray.direction.z;
+					t0 = (u0*v0*a.z + u0 * b.z + v0 * c.z + d.z) * ray.invDirection.z - ray.oDivDir.z;
 			}
 		}
 		if(v1 == v0) {
@@ -141,11 +141,11 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay
 				if(u1 >= 0.f && u1 <= 1.f) {
 					if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
 					   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
-						t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x - ray.origin.x) / ray.direction.x;
+						t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x) * ray.invDirection.x - ray.oDivDir.x;
 					else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
-						t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y - ray.origin.y) / ray.direction.y;
+						t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y) * ray.invDirection.y - ray.oDivDir.y;
 					else
-						t1 = (u1*v1*a.z + u1 * b.z + v1 * c.z + d.z - ray.origin.z) / ray.direction.z;
+						t1 = (u1*v1*a.z + u1 * b.z + v1 * c.z + d.z) * ray.invDirection.z - ray.oDivDir.z;
 				}
 			}
 			if(t0 > 0.f) {
