@@ -124,7 +124,6 @@ ImportanceDecimater<dev>::~ImportanceDecimater() {
 
 template < Device dev >
 void ImportanceDecimater<dev>::copy_back_normalized_importance() {
-	(void)0;
 	copy(m_devImportances.get(), m_importances.get(), sizeof(Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
 }
 

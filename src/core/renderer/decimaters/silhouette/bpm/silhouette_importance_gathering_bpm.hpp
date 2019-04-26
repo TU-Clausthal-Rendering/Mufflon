@@ -237,6 +237,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 	int pathLen = 0;
 	int currentV = 0;
 	int otherV = 1;
+	PhotonDesc* prevPhoton = nullptr;
 	do {
 		// Walk
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
@@ -252,12 +253,15 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 		if(pathLen == 1)
 			vertex[currentV].ext().prevConversionFactor /= photonCount * mergeArea;
 
+		const float angle = -ei::dot(vertex[currentV].get_normal(), vertex[currentV].get_incident_direction());
 		// Store a photon to the photon map
-		photonMap.insert(vertex[currentV].get_position(),
-						 { vertex[currentV].get_position(), vertex[currentV].ext().incidentPdf,
-						 vertex[currentV].get_incident_direction(), pathLen,
-						 throughput.weight / photonCount, vertex[otherV].ext().prevRelativeProbabilitySum,
-						 vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor });
+		prevPhoton = photonMap.insert(vertex[currentV].get_position(),
+									  { vertex[currentV].get_position(), vertex[currentV].ext().incidentPdf,
+									  vertex[currentV].get_incident_direction(), pathLen,
+									  angle * throughput.weight / photonCount, vertex[otherV].ext().prevRelativeProbabilitySum,
+									  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+									  prevPhoton, vertex[currentV].get_primitive_id() });
+
 	} while(pathLen < params.maxPathLength - 1); // -1 because there is at least one segment on the view path
 }
 
@@ -292,17 +296,18 @@ CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& 
 		// TODO: shadow ray
 		if(vertex[currentV].is_end_point()) break;
 
-		const auto& hitId = vertex[currentV].get_primitive_id();
-		const auto lodIdx = scene.lodIndices[hitId.instanceId];
-		const auto& polygon = scene.lods[lodIdx].polygon;
-		const u32 numVertices = hitId.primId < (i32)polygon.numTriangles ? 3u : 4u;
-		// TODO: sharpness
-		record_direct_hit(polygon, importances[lodIdx], hitId.primId, numVertices, vertex[currentV].get_position(),
-						  -ei::dot(vertex[currentV].get_incident_direction(), vertex[currentV].get_normal()),
-						  params.viewWeight * 1.f);
+		{	// View importance
+			const auto& hitId = vertex[currentV].get_primitive_id();
+			const auto lodIdx = scene.lodIndices[hitId.instanceId];
+			const auto& polygon = scene.lods[lodIdx].polygon;
+			const u32 numVertices = hitId.primId < (i32)polygon.numTriangles ? 3u : 4u;
+			// TODO: sharpness
+			record_direct_hit(polygon, importances[lodIdx], hitId.primId, numVertices, vertex[currentV].get_position(),
+							  -ei::dot(vertex[currentV].get_incident_direction(), vertex[currentV].get_normal()),
+							  params.viewWeight * 1.f);
+		}
 
 		// Merges
-		Spectrum radiance{ 0.0f };
 		scene::Point currentPos = vertex[currentV].get_position();
 		auto photonIt = photonMap.find_first(currentPos);
 		while(photonIt) {
@@ -312,15 +317,12 @@ CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& 
 			if(pathLen >= params.minPathLength && pathLen <= params.maxPathLength
 			   && lensq(photonIt->position - currentPos) < mergeRadiusSq) {
 				// Importance attribution
-
-				// Radiance estimate
-				Pixel tmpCoord;
-				auto bsdf = vertex[currentV].evaluate(-photonIt->incident,
-													  scene.media, tmpCoord, false,
-													  &photonIt->geoNormal);
-				float misWeight = get_mis_weight(vertex[currentV], bsdf.pdf, *photonIt);
-				radiance += bsdf.value * photonIt->flux * (mergeAreaInv * misWeight);
-				// TODO: increase importance!
+				const auto& hitId = photonIt->hitId;
+				const auto lodIdx = scene.lodIndices[hitId.instanceId];
+				const auto& polygon = scene.lods[lodIdx].polygon;
+				const u32 numVertices = hitId.primId < (i32)polygon.numTriangles ? 3u : 4u;
+				record_flux(polygon, importances[lodIdx], hitId.primId, numVertices, photonIt->position,
+							get_luminance(photonIt->flux));
 			}
 			++photonIt;
 		}

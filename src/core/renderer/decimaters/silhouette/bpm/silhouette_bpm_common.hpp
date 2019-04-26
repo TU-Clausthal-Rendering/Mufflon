@@ -32,7 +32,8 @@ struct PhotonDesc {
 	scene::Direction geoNormal;				// Geometric normal at photon hit point. This is crucial for normal correction.
 	float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	// TODO: improve memory footprint!
-	int prevPhotonIdx;
+	PhotonDesc* prevPhoton;
+	scene::PrimitiveHandle hitId;
 };
 
 struct SilVertexExt;

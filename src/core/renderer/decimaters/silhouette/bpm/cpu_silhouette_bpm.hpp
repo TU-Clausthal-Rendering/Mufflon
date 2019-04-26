@@ -23,7 +23,7 @@ public:
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
 	StringView get_name() const noexcept final { return "Shadow Silhouette BPM"; }
-	StringView get_short_name() const noexcept final { return "SS"; }
+	StringView get_short_name() const noexcept final { return "SSBPM"; }
 
 	void on_reset() final;
 	void pre_descriptor_requery() final;
