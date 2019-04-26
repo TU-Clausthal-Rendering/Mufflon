@@ -42,36 +42,37 @@ __device__ __inline__ float spanBeginKepler(float a0, float a1, float b0, float 
 __device__ __inline__ float spanEndKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmin_fmin(fmaxf(a0, a1), fmaxf(b0, b1), fmax_fmin(c0, c1, d)); }
 
 
-CUDA_FUNCTION bool intersect(const ei::Vec3& boxMin, const ei::Vec3& boxMax,
-	const ei::Vec3 invDir, const ei::Vec3 ood, 
-	const float tmin, const float tmax, float& cmin) {//, float& cmax) {
+CUDA_FUNCTION bool intersect(const ei::Box& bb,
+	const ei::FastRay& ray,
+	const float tmax, float& cmin) {//, float& cmax) {
 #ifdef __CUDA_ARCH__
-	ei::Vec3 lo = boxMin * invDir - ood;
-	ei::Vec3 hi = boxMax * invDir - ood;
-	cmin = spanBeginKepler(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, tmin);
+	ei::Vec3 lo = bb.min * ray.invDirection - ray.oDivDir;
+	ei::Vec3 hi = bb.max * ray.invDirection - ray.oDivDir;
+	cmin = spanBeginKepler(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, 0.0f);
 	const float cmax = spanEndKepler(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, tmax);
 	return cmin <= cmax;
 #else
+	// return intersects(bb, ray, cmin) && (cmin < tmax);
 	// TODO: use the epsilon one? FastRay one?
-	float t0 = boxMin.x * invDir.x - ood.x;
-	float t1 = boxMax.x * invDir.x - ood.x;
+	float t0 = bb.min.x * ray.invDirection.x - ray.oDivDir.x;
+	float t1 = bb.max.x * ray.invDirection.x - ray.oDivDir.x;
 	cmin = ei::min(t0, t1);
 	float cmax = ei::max(t0, t1);
-	if (cmax < tmin || cmin > tmax) return false;
-	t0 = boxMin.y * invDir.y - ood.y;
-	t1 = boxMax.y * invDir.y - ood.y;
+	if (cmax < 0.0f || cmin > tmax) return false;
+	t0 = bb.min.y * ray.invDirection.y - ray.oDivDir.y;
+	t1 = bb.max.y * ray.invDirection.y - ray.oDivDir.y;
 	float min2 = ei::min(t0, t1);
 	float max2 = ei::max(t0, t1);
 	cmin = ei::max(cmin, min2);
 	cmax = ei::min(cmax, max2);
-	if (cmax < tmin || cmin > tmax || cmin > cmax) return false;
-	t0 = boxMin.z * invDir.z - ood.z;
-	t1 = boxMax.z * invDir.z - ood.z;
+	if (cmax < 0.0f || cmin > tmax || cmin > cmax) return false;
+	t0 = bb.min.z * ray.invDirection.z - ray.oDivDir.z;
+	t1 = bb.max.z * ray.invDirection.z - ray.oDivDir.z;
 	min2 = ei::min(t0, t1);
 	max2 = ei::max(t0, t1);
 	cmin = ei::max(cmin, min2);
 	cmax = ei::min(cmax, max2);
-	return (cmax >= tmin) && (cmin <= tmax) && (cmin <= cmax);
+	return (cmax >= 0.0f) && (cmin <= tmax) && (cmin <= cmax);
 #endif // __CUDA_ARCH__
 }
 
@@ -88,7 +89,7 @@ CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, cons
 }
 
 // Quad intersection test
-CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ray, ei::Vec2& uv) {
+CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay& ray, ei::Vec2& uv) {
 	// Implementation from http://www.sci.utah.edu/~kpotter/publications/ramsey-2004-RBPI.pdf
 	const ei::Vec3& p00 = quad.v0;
 	const ei::Vec3& p10 = quad.v1;
@@ -107,7 +108,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 	const float C1 = c.y * ray.direction.x - c.x * ray.direction.y;
 	const float C2 = c.z * ray.direction.x - c.x * ray.direction.z;
 	const float D1 = (d.y - ray.origin.y) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.y;
-	const float D2 = (d.z - ray.origin.z) * ray.direction.x - (d.x - ray.origin.x)  * ray.direction.z;
+	const float D2 = (d.z - ray.origin.z) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.z;
 
 	// Solve quadratic equ. for number of hitpoints
 	float t = -1.f;
@@ -168,7 +169,7 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::Ray& ra
 template < Device dev >
 CUDA_FUNCTION bool intersects_primitve(
 	const LodDescriptor<dev>& obj,
-	const ei::Ray& ray,
+	const ei::FastRay& ray,
 	const i32 primId,
 	int& hitPrimId,
 	float& hitT,				// In out: max hit distance before, if hit then returns the new distance
@@ -228,7 +229,6 @@ CUDA_FUNCTION bool intersects_primitve(
 		// Because it is important if we start incide or outside it is better
 		// to modify the ray beforehand. Testing for tmin afterwards is buggy.
 		float t;
-		// TODO: use some epsilon?
 		if(ei::intersects(ray, sph, t) && t < hitT) {
 			hitT = t;
 			hitPrimId = primId;
@@ -245,9 +245,7 @@ template < Device dev >
 CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 	const LBVH& bvh,
 	const LodDescriptor<dev>& obj,
-	const ei::Ray& ray,
-	const ei::Vec3& invDir, 
-	const ei::Vec3& ood,
+	const ei::FastRay& ray,
 	const float tmax,
 	i32* traversalStack
 ) {
@@ -289,8 +287,8 @@ CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
 
 			// Intersect the ray against the children bounds.
 			float c0min, c1min;
-			bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, tmax, c0min);
-			bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, tmax, c1min);
+			bool traverseChild0 = intersect(left.bb, ray, tmax, c0min);
+			bool traverseChild1 = intersect(right.bb, ray, tmax, c1min);
 
 			// Set maximum values to unify upcomming code
 			if(!traverseChild0) c0min = 1e38f;
@@ -334,9 +332,7 @@ template < Device dev >
 CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 	const LBVH& bvh,
 	const LodDescriptor<dev>& obj,
-	const ei::Ray& ray,
-	const ei::Vec3& invDir, 
-	const ei::Vec3& ood,
+	const ei::FastRay& ray,
 	int& hitPrimId, float& hitT,
 	SurfaceParametrization& surfParams,
 	i32* traversalStack
@@ -375,8 +371,8 @@ CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
 
 			// Intersect the ray against the children bounds.
 			float c0min, c1min;
-			bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, hitT, c0min);
-			bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, hitT, c1min);
+			bool traverseChild0 = intersect(left.bb, ray, hitT, c0min);
+			bool traverseChild1 = intersect(right.bb, ray, hitT, c1min);
 
 			// Set maximum values to unify upcomming code
 			if(!traverseChild0) c0min = 1e38f;
@@ -428,8 +424,7 @@ void first_intersection_scene_obj_lbvh(
 	const float rayScale = len(rayDir);
 	const ei::Ray transRay = { ei::transform(ray.origin, scene.worldToInstance[instanceId]),
 							   rayDir / rayScale };
-	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
-	const ei::Vec3 ood = transRay.origin * invDir;
+	const ei::FastRay fray { transRay };
 
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
@@ -439,12 +434,12 @@ void first_intersection_scene_obj_lbvh(
 
 	// Intersect the ray against the obj bounding box.
 	float objSpaceT;
-	if(intersect(box.min, box.max, invDir, ood, 0.0f, objSpaceHitT, objSpaceT)) {
+	if(intersect(box, fray, objSpaceHitT, objSpaceT)) {
 		// Intersect the ray against the obj primitive bvh.
 		const LodDescriptor<dev>& obj = scene.lods[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		if (first_intersection_obj_lbvh_imp(
-			*lbvh, obj, transRay, invDir, ood, hitPrimId,
+			*lbvh, obj, fray, hitPrimId,
 			objSpaceHitT, surfParams, traversalStack)) {
 			// Translate the object-space distance into world space again
 			hitT = objSpaceHitT / rayScale;
@@ -473,8 +468,7 @@ RayIntersectionResult first_intersection(
 			scene, ray, 0, traversalStack,
 			hitT, hitInstanceId, hitPrimId, surfParams);
 	} else {
-		const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
-		const ei::Vec3 ood = ray.origin * invDir;
+		const ei::FastRay fray { ray };
 
 		// Setup traversal.
 		// Traversal stack in CUDA thread-local memory.
@@ -494,8 +488,8 @@ RayIntersectionResult first_intersection(
 
 				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, hitT, c0min);
-				bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, hitT, c1min);
+				bool traverseChild0 = intersect(left.bb, fray, hitT, c0min);
+				bool traverseChild1 = intersect(right.bb, fray, hitT, c1min);
 
 				// Neither child was intersected => pop stack.
 				if(!traverseChild0 && !traverseChild1) {
@@ -684,7 +678,7 @@ RayIntersectionResult first_intersection(
 template < Device dev > __host__ __device__
 bool any_intersection_scene_obj_lbvh(
 	const SceneDescriptor<dev>& scene,
-	const ei::Ray ray,
+	const ei::Ray& ray,
 	const i32 instanceId,
 	float tmax,
 	i32* traversalStack
@@ -693,8 +687,7 @@ bool any_intersection_scene_obj_lbvh(
 	const float rayScale = len(rayDir);
 	const ei::Ray transRay = { ei::transform(ray.origin, scene.worldToInstance[instanceId]),
 							   rayDir / rayScale };
-	const ei::Vec3 invDir = sdiv(1.0f, transRay.direction);
-	const ei::Vec3 ood = transRay.origin * invDir;
+	const ei::FastRay fray { transRay };
 
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
@@ -704,13 +697,12 @@ bool any_intersection_scene_obj_lbvh(
 
 	// Intersect the ray against the obj bounding box.
 	float hitT;
-	if(intersect(box.min, box.max, invDir, ood, 0.0f, objSpaceMaxT, hitT)) {
+	if(intersect(box, fray, objSpaceMaxT, hitT)) {
 		// Intersect the ray against the obj primtive bvh.
 		const LodDescriptor<dev>& obj = scene.lods[objId];
 		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
 		// Do ray-obj test.
-		return any_intersection_obj_lbvh_imp(*lbvh, obj, transRay,
-			invDir, ood, objSpaceMaxT, traversalStack);
+		return any_intersection_obj_lbvh_imp(*lbvh, obj, fray, objSpaceMaxT, traversalStack);
 	}
 	return false;
 }
@@ -730,9 +722,7 @@ bool any_intersection(
 	const float tmax = len(correctedDir);
 	ei::Ray ray { a, correctedDir / tmax };
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
-	const ei::Vec3 invDir = sdiv(1.0f, ray.direction);
-	const ei::Vec3 ood = ray.origin * invDir;
-	//const float tmax = maxDist - SCENE_SCALE_EPS * 3.0f; // Do not intersect the target surface
+	const ei::FastRay fray { ray };
 
 	if(scene.numInstances == 1) {
 		i32 traversalStack[OBJ_STACK_SIZE];
@@ -757,8 +747,8 @@ bool any_intersection(
 
 				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(left.bb.min, left.bb.max, invDir, ood, 0.0f, tmax, c0min);
-				bool traverseChild1 = intersect(right.bb.min, right.bb.max, invDir, ood, 0.0f, tmax, c1min);
+				bool traverseChild0 = intersect(left.bb, fray, tmax, c0min);
+				bool traverseChild1 = intersect(right.bb, fray, tmax, c1min);
 
 				// Neither child was intersected => pop stack.
 				if (!traverseChild0 && !traverseChild1) {
