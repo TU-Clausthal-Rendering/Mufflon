@@ -470,80 +470,68 @@ RayIntersectionResult first_intersection(
 	} else {
 		const ei::FastRay fray { ray };
 
-		// Setup traversal.
 		// Traversal stack in CUDA thread-local memory.
 		i32 traversalStack[STACK_SIZE];
-		traversalStack[0] = EntrypointSentinel;	// Bottom-most entry.
-		i32 nodeAddr = 0; // Start from the root.
-		i32 primCount = 0; // Internal nodes have no primitives
-		i32* stackPtr = traversalStack; // Current position in traversal stack.
+
+		// Setup traversal.
+		i32 stackIdx = 0;		// Points to the next free stack entry
+		i32 nodeAddr = 0;		// Start from the root.
+		i32 primCount = 2;		// Internal nodes have two boxes
+		i32 primOffset = 0;
 
 		// Traversal loop.
-		while(nodeAddr != EntrypointSentinel) {
-			if(nodeAddr < bvh.numInternalNodes) { // Internal node?
+		while(stackIdx > 0 || primCount > 0) {
+			// Pop top-most entry
+			if(primCount == 0) {
+				nodeAddr = traversalStack[--stackIdx];
+				if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
+					primCount = traversalStack[--stackIdx];
+					primOffset = 0;
+				}
+				else primCount = 2;
+			}
+
+			while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
 				// Fetch AABBs of the two child bvh.
 				i32 nodeIdx = nodeAddr * 2;
-				const BvhNode& left = bvh.bvh[nodeIdx];
+				const BvhNode& left  = bvh.bvh[nodeIdx];
 				const BvhNode& right = bvh.bvh[nodeIdx + 1];
 
 				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(left.bb, fray, hitT, c0min);
-				bool traverseChild1 = intersect(right.bb, fray, hitT, c1min);
+				bool traverseChild0 = intersect(left.bb, ray, hitT, c0min);
+				bool traverseChild1 = intersect(right.bb, ray, hitT, c1min);
 
-				// Neither child was intersected => pop stack.
-				if(!traverseChild0 && !traverseChild1) {
-					nodeAddr = *stackPtr;
-					--stackPtr;
-					if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-						primCount = *stackPtr;
-						--stackPtr;
-					}
-				}
-				// Otherwise => fetch child pointers.
-				else {
-					nodeAddr = traverseChild0 ? left.index : right.index;
-					primCount = traverseChild0 ? left.primCount : right.primCount;
+				// Set maximum values to unify upcomming code
+				if(!traverseChild0) c0min = 1e38f;
+				if(!traverseChild1) c1min = 1e38f;
 
-					// Both children were intersected => push the farther one.
-					if (traverseChild0 && traverseChild1) {
-						i32 pushAddr = right.index; // nodeAddr is Lmin_cL.w, this is the other one
-						i32 pushCount = right.primCount;
-						if (c1min < c0min) {
-							i32 tmp = nodeAddr;
-							nodeAddr = pushAddr;
-							pushAddr = tmp;
-							tmp = primCount;
-							primCount = pushCount;
-							pushCount = tmp;
-						}
-						if(pushAddr >= bvh.numInternalNodes) { // Leaf? Then push the count too
-							++stackPtr;
-							*stackPtr = pushCount;
-						}
-						++stackPtr;
-						*stackPtr = pushAddr;
-					}
+				// If both children are hit, push the farther one to the stack
+				if(traverseChild0 && traverseChild1) {
+					i32 pushAddr = (c1min < c0min) ? left.index : right.index;
+					if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
+						traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
+					traversalStack[stackIdx++] = pushAddr;
 				}
+				// Get address of the closer one (independent of a hit)
+				nodeAddr = (c0min <= c1min) ? left.index : right.index;
+				if(nodeAddr >= bvh.numInternalNodes) {
+					primCount = (c0min <= c1min) ? left.primCount : right.primCount;
+					primOffset = 0;
+				} else primCount = 2;
+				// Neither child was intersected => wait for pop stack.
+				if(!traverseChild0 && !traverseChild1)
+					primCount = 0;
 			}
-			
-			if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-				const i32 instanceId = nodeAddr - bvh.numInternalNodes;
 
-				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
-				for(i32 i = 0; i < primCount; i++) {
-					first_intersection_scene_obj_lbvh(scene, ray,
-						bvh.primIds[ instanceId + i], stackPtr+1,
-						hitT, hitInstanceId, hitPrimId, surfParams);
-				}
+			while(nodeAddr >= bvh.numInternalNodes && primCount > 0) { // Leaf?
+				const i32 instanceId = nodeAddr - bvh.numInternalNodes + primOffset;
+				++primOffset;
+				--primCount;
 
-				// Pop next node.
-				nodeAddr = *stackPtr;
-				--stackPtr;
-				if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-					primCount = *stackPtr;
-					--stackPtr;
-				}
+				first_intersection_scene_obj_lbvh(scene, ray,
+					bvh.primIds[instanceId], traversalStack + stackIdx,
+					hitT, hitInstanceId, hitPrimId, surfParams);
 			}
 		}
 	}
@@ -729,80 +717,68 @@ bool any_intersection(
 		return any_intersection_scene_obj_lbvh(scene, ray,
 			0, tmax, traversalStack);
 	} else {
-		// Setup traversal.
 		// Traversal stack in CUDA thread-local memory.
 		i32 traversalStack[STACK_SIZE];
-		traversalStack[0] = EntrypointSentinel;	// Bottom-most entry.
-		i32 nodeAddr = 0; // Start from the root.  
-		i32* stackPtr = traversalStack; // Current position in traversal stack.
-		i32 primCount = 0; // Internal nodes have no primitives
+
+		// Setup traversal.
+		i32 stackIdx = 0;		// Points to the next free stack entry
+		i32 nodeAddr = 0;		// Start from the root.
+		i32 primCount = 2;		// Internal nodes have two boxes
+		i32 primOffset = 0;
 
 		// Traversal loop.
-		while (nodeAddr != EntrypointSentinel) {
-			if(nodeAddr < bvh.numInternalNodes) { // Internal node?
+		while(stackIdx > 0 || primCount > 0) {
+			// Pop top-most entry
+			if(primCount == 0) {
+				nodeAddr = traversalStack[--stackIdx];
+				if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
+					primCount = traversalStack[--stackIdx];
+					primOffset = 0;
+				}
+				else primCount = 2;
+			}
+
+			while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
 				// Fetch AABBs of the two child bvh.
 				i32 nodeIdx = nodeAddr * 2;
-				const BvhNode& left = bvh.bvh[nodeIdx];
+				const BvhNode& left  = bvh.bvh[nodeIdx];
 				const BvhNode& right = bvh.bvh[nodeIdx + 1];
 
 				// Intersect the ray against the children bounds.
 				float c0min, c1min;
-				bool traverseChild0 = intersect(left.bb, fray, tmax, c0min);
-				bool traverseChild1 = intersect(right.bb, fray, tmax, c1min);
+				bool traverseChild0 = intersect(left.bb, ray, tmax, c0min);
+				bool traverseChild1 = intersect(right.bb, ray, tmax, c1min);
 
-				// Neither child was intersected => pop stack.
-				if (!traverseChild0 && !traverseChild1) {
-					nodeAddr = *stackPtr;
-					--stackPtr;
-					if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-						primCount = *stackPtr;
-						--stackPtr;
-					}
-				}
-				// Otherwise => fetch child pointers.
-				else {
-					nodeAddr = traverseChild0 ? left.index : right.index;
-					primCount = traverseChild0 ? left.primCount : right.primCount;
+				// Set maximum values to unify upcomming code
+				if(!traverseChild0) c0min = 1e38f;
+				if(!traverseChild1) c1min = 1e38f;
 
-					// Both children were intersected => push the farther one.
-					if (traverseChild0 && traverseChild1) {
-						i32 pushAddr = right.index; // nodeAddr is Lmin_cL.w, this is the other one
-						i32 pushCount = right.primCount;
-						if (c1min < c0min) {
-							i32 tmp = nodeAddr;
-							nodeAddr = pushAddr;
-							pushAddr = tmp;
-							tmp = primCount;
-							primCount = pushCount;
-							pushCount = tmp;
-						}
-						if(pushAddr >= bvh.numInternalNodes) { // Leaf? Then push the count too
-							++stackPtr;
-							*stackPtr = pushCount;
-						}
-						++stackPtr;
-						*stackPtr = pushAddr;
-					}
+				// If both children are hit, push the farther one to the stack
+				if(traverseChild0 && traverseChild1) {
+					i32 pushAddr = (c1min < c0min) ? left.index : right.index;
+					if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
+						traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
+					traversalStack[stackIdx++] = pushAddr;
 				}
+				// Get address of the closer one (independent of a hit)
+				nodeAddr = (c0min <= c1min) ? left.index : right.index;
+				if(nodeAddr >= bvh.numInternalNodes) {
+					primCount = (c0min <= c1min) ? left.primCount : right.primCount;
+					primOffset = 0;
+				} else primCount = 2;
+				// Neither child was intersected => wait for pop stack.
+				if(!traverseChild0 && !traverseChild1)
+					primCount = 0;
 			}
 
-			if(nodeAddr >= bvh.numInternalNodes && nodeAddr != EntrypointSentinel) { // Leaf?
-				const i32 instanceId = nodeAddr - bvh.numInternalNodes;
+			while(nodeAddr >= bvh.numInternalNodes && primCount > 0) { // Leaf?
+				const i32 instanceId = nodeAddr - bvh.numInternalNodes + primOffset;
+				++primOffset;
+				--primCount;
 
-				// TODO: no loop here! better use only one 'primitive' and wait for the next while iteration
-				for(i32 i = 0; i < primCount; i++) {
-					if(any_intersection_scene_obj_lbvh(scene, ray,
-						bvh.primIds[ instanceId + i ], tmax, stackPtr+1))
+				if(any_intersection_scene_obj_lbvh(scene, ray,
+					bvh.primIds[instanceId], tmax, traversalStack + stackIdx))
 						return true;
-				}
-
-				// Pop next node.
-				nodeAddr = *stackPtr;
-				--stackPtr;
-				if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-					primCount = *stackPtr;
-					--stackPtr;
-				}
 			}
 		}
 		return false;
