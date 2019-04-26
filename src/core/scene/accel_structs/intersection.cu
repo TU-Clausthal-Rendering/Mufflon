@@ -239,214 +239,53 @@ CUDA_FUNCTION bool intersects_primitve(
 	return false;
 }
 
-} // namespace ::
 
-template < Device dev >
-CUDA_FUNCTION bool any_intersection_obj_lbvh_imp(
-	const LBVH& bvh,
-	const LodDescriptor<dev>& obj,
-	const ei::FastRay& ray,
-	const float tmax,
-	i32* traversalStack
-) {
-	// Since all threads go to the following branch if numPrimitives == 1,
-	// there is no problem with branching.
-	if(obj.numPrimitives == 1) {
-		float hitT = tmax;
-		SurfaceParametrization surfParams;
-		i32 hitPrimitiveId;
-		if(intersects_primitve(obj, ray, 0, hitPrimitiveId, hitT, surfParams)) {
-			return true;
-		}
-		return false;
-	}
+// Transition from the top-level BVH to the object space BVH.
+// Returns false, if the object is not hit (in which case nothing is changed).
+template < Device dev > CUDA_FUNCTION
+bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instanceId,
+						   const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
+						   float& tmax, const LodDescriptor<dev>*& obj, const LBVH*& currentBvh) {
+	// Transform the ray into instance-local coordinates
+	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
+	float scale = len(rayDir);
+	const ei::Ray transRay = { transform(ray.origin, scene.worldToInstance[instanceId]),
+							   rayDir / scale };
+	ei::FastRay fray { transRay };
+	// Scale our current maximum intersection distance into the object space
+	// to avoid false negatives.
+	float objSpaceHitT = tmax * scale;
 
-	// Setup traversal.
-	i32 stackIdx = 0;		// Points to the next free stack entry
-	i32 nodeAddr = 0;		// Start from the root.
-	i32 primCount = 2;		// Internal nodes have two boxes
-	i32 primOffset = 0;
-
-	// Traversal loop.
-	while(stackIdx > 0 || primCount > 0) {
-		// Pop top-most entry
-		if(primCount == 0) {
-			nodeAddr = traversalStack[--stackIdx];
-			if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-				primCount = traversalStack[--stackIdx];
-				primOffset = 0;
-			}
-			else primCount = 2;
-		}
-
-		while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
-			// Fetch AABBs of the two child bvh.
-			i32 nodeIdx = nodeAddr * 2;
-			const BvhNode& left = bvh.bvh[nodeIdx];
-			const BvhNode& right = bvh.bvh[nodeIdx + 1];
-
-			// Intersect the ray against the children bounds.
-			float c0min, c1min;
-			bool traverseChild0 = intersect(left.bb, ray, tmax, c0min);
-			bool traverseChild1 = intersect(right.bb, ray, tmax, c1min);
-
-			// Set maximum values to unify upcomming code
-			if(!traverseChild0) c0min = 1e38f;
-			if(!traverseChild1) c1min = 1e38f;
-
-			// If both children are hit, push the farther one to the stack
-			if(traverseChild0 && traverseChild1) {
-				i32 pushAddr = (c1min < c0min) ? left.index : right.index;
-				if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
-					traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
-				traversalStack[stackIdx++] = pushAddr;
-			}
-			// Get address of the closer one (independent of a hit)
-			nodeAddr = (c0min <= c1min) ? left.index : right.index;
-			if(nodeAddr >= bvh.numInternalNodes) {
-				primCount = (c0min <= c1min) ? left.primCount : right.primCount;
-				primOffset = 0;
-			} else primCount = 2;
-			// Neither child was intersected => wait for pop stack.
-			if(!traverseChild0 && !traverseChild1)
-				primCount = 0;
-		}
-
-		while(nodeAddr >= bvh.numInternalNodes && primCount > 0) { // Leaf?
-			const i32 primId = nodeAddr - bvh.numInternalNodes + primOffset;
-			++primOffset;
-			--primCount;
-
-			float hitT = tmax;
-			SurfaceParametrization surfParams;
-			i32 hitPrimitiveId;
-			if(intersects_primitve(obj, ray, bvh.primIds[primId], hitPrimitiveId, hitT, surfParams))
-				return true;
-		}
+	// Intersect the ray against the object's bounding box.
+	float objSpaceT;
+	const i32 objId = scene.lodIndices[instanceId];
+	const ei::Box& box = scene.aabbs[objId];
+	if(intersect(box, fray, objSpaceHitT, objSpaceT)) {
+		currentRay = fray;
+		rayScale = scale;
+		tmax = objSpaceHitT;
+		obj = &scene.lods[objId];
+		currentBvh = (const LBVH*)obj->accelStruct.accelParameters;
+		return true;
 	}
 	return false;
 }
 
-
-template < Device dev >
-CUDA_FUNCTION bool first_intersection_obj_lbvh_imp(
-	const LBVH& bvh,
-	const LodDescriptor<dev>& obj,
-	const ei::FastRay& ray,
-	int& hitPrimId, float& hitT,
-	SurfaceParametrization& surfParams,
-	i32* traversalStack
-) {
-	// Fast path - no BVH
-	if(obj.numPrimitives == 1) {
-		return intersects_primitve(obj, ray, 0,
-			hitPrimId, hitT, surfParams);
-	}
-	
-	bool hasHit = false;
-
-	// Setup traversal.
-	i32 stackIdx = 0;		// Points to the next free stack entry
-	i32 nodeAddr = 0;		// Start from the root.
-	i32 primCount = 2;		// Internal nodes have two boxes
-	i32 primOffset = 0;
-
-	// Traversal loop.
-	while(stackIdx > 0 || primCount > 0) {
-		// Pop top-most entry
-		if(primCount == 0) {
-			nodeAddr = traversalStack[--stackIdx];
-			if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-				primCount = traversalStack[--stackIdx];
-				primOffset = 0;
-			}
-			else primCount = 2;
-		}
-
-		while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
-			// Fetch AABBs of the two child bvh.
-			i32 nodeIdx = nodeAddr * 2;
-			const BvhNode& left  = bvh.bvh[nodeIdx];
-			const BvhNode& right = bvh.bvh[nodeIdx + 1];
-
-			// Intersect the ray against the children bounds.
-			float c0min, c1min;
-			bool traverseChild0 = intersect(left.bb, ray, hitT, c0min);
-			bool traverseChild1 = intersect(right.bb, ray, hitT, c1min);
-
-			// Set maximum values to unify upcomming code
-			if(!traverseChild0) c0min = 1e38f;
-			if(!traverseChild1) c1min = 1e38f;
-
-			// If both children are hit, push the farther one to the stack
-			if(traverseChild0 && traverseChild1) {
-				i32 pushAddr = (c1min < c0min) ? left.index : right.index;
-				if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
-					traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
-				traversalStack[stackIdx++] = pushAddr;
-			}
-			// Get address of the closer one (independent of a hit)
-			nodeAddr = (c0min <= c1min) ? left.index : right.index;
-			if(nodeAddr >= bvh.numInternalNodes) {
-				primCount = (c0min <= c1min) ? left.primCount : right.primCount;
-				primOffset = 0;
-			} else primCount = 2;
-			// Neither child was intersected => wait for pop stack.
-			if(!traverseChild0 && !traverseChild1)
-				primCount = 0;
-		}
-
-		while(nodeAddr >= bvh.numInternalNodes && primCount > 0) { // Leaf?
-			const i32 primId = nodeAddr - bvh.numInternalNodes + primOffset;
-			++primOffset;
-			--primCount;
-
-			if(intersects_primitve(obj, ray, bvh.primIds[primId], hitPrimId, hitT, surfParams))
-				hasHit = true;
-		}
-	}
-	return hasHit;
-}
-
-
+// Go back to the scene BVH and adjust tmax. Does nothing if the current
+// state is already in scene space.
 template < Device dev > CUDA_FUNCTION
-void first_intersection_scene_obj_lbvh(
-	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const i32 instanceId,
-	i32* traversalStack,
-	float& hitT,
-	i32& hitInstanceId,
-	i32& hitPrimId,
-	SurfaceParametrization& surfParams
-) {
-	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
-	const float rayScale = len(rayDir);
-	const ei::Ray transRay = { ei::transform(ray.origin, scene.worldToInstance[instanceId]),
-							   rayDir / rayScale };
-	const ei::FastRay fray { transRay };
-
-	const i32 objId = scene.lodIndices[instanceId];
-	const ei::Box& box = scene.aabbs[objId];
-
-	// Scale our current maximum intersection distance into the object space to avoid false negatives
-	float objSpaceHitT = hitT * rayScale;
-
-	// Intersect the ray against the obj bounding box.
-	float objSpaceT;
-	if(intersect(box, fray, objSpaceHitT, objSpaceT)) {
-		// Intersect the ray against the obj primitive bvh.
-		const LodDescriptor<dev>& obj = scene.lods[objId];
-		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
-		if (first_intersection_obj_lbvh_imp(
-			*lbvh, obj, fray, hitPrimId,
-			objSpaceHitT, surfParams, traversalStack)) {
-			// Translate the object-space distance into world space again
-			hitT = objSpaceHitT / rayScale;
-			hitInstanceId = instanceId;
-		}
-	}
+void object_to_world_space(const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
+						   const LBVH& sceneBvh, const LBVH*& currentBvh, float& tmax,
+						   const LodDescriptor<dev>*& obj) {
+	currentRay = ray;
+	currentBvh = &sceneBvh;
+	tmax /= rayScale;
+	rayScale = 1.0f;
+	obj = nullptr;
 }
+
+} // namespace ::
+
 
 template < Device dev > __host__ __device__
 RayIntersectionResult first_intersection(
@@ -456,85 +295,123 @@ RayIntersectionResult first_intersection(
 	const float tmax
 ) {
 	add_epsilon(ray.origin, ray.direction, geoNormal);
+	// Init scene wide properties
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	SurfaceParametrization surfParams;
+	const ei::FastRay fray { ray };
+
+	// Set the current traversal state
 	float hitT = tmax;						// t-value of the closest intersection.
+	ei::FastRay currentRay = fray;
+	float currentTScale = 1.0f;
+	const LodDescriptor<dev>* obj = nullptr;
+	const LBVH* currentBvh = &bvh;
+	i32 currentInstanceId = IGNORE_ID;
 
-	if(scene.numInstances == 1) {
-		i32 traversalStack[OBJ_STACK_SIZE];
-		first_intersection_scene_obj_lbvh(
-			scene, ray, 0, traversalStack,
-			hitT, hitInstanceId, hitPrimId, surfParams);
-	} else {
-		const ei::FastRay fray { ray };
+	// Setup traversal.
+	i32 traversalStack[STACK_SIZE];
+	i32 stackIdx = 0;		// Points to the next free stack entry
+	i32 nodeAddr = 0;		// Start from the root.
+	i32 primCount = 2;		// Internal nodes have two boxes
+	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
-		// Traversal stack in CUDA thread-local memory.
-		i32 traversalStack[STACK_SIZE];
+	// No Scene-BVH => got to object-space directly
+	if(scene.numInstances == 1)
+		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
+			primCount = 0; // No hit of the entire scene, skip the upcoming loop
 
-		// Setup traversal.
-		i32 stackIdx = 0;		// Points to the next free stack entry
-		i32 nodeAddr = 0;		// Start from the root.
-		i32 primCount = 2;		// Internal nodes have two boxes
-		i32 primOffset = 0;
-
-		// Traversal loop.
-		while(stackIdx > 0 || primCount > 0) {
-			// Pop top-most entry
-			if(primCount == 0) {
+	// Traversal loop.
+	while(stackIdx > 0 || primCount > 0) {
+		// Pop top-most entry
+		if(primCount == 0) {
+			nodeAddr = traversalStack[--stackIdx];
+			if(nodeAddr == EntrypointSentinel) { // Was in object BVH, go back to scene
+				if(stackIdx == 0) break;
+				object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
+				// Pop either the parent nodeAddr or the next instance nodeAddr.
 				nodeAddr = traversalStack[--stackIdx];
-				if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-					primCount = traversalStack[--stackIdx];
-					primOffset = 0;
-				}
-				else primCount = 2;
 			}
+			if(nodeAddr >= currentBvh->numInternalNodes) { // Leafs additionally store the primitive count
+				primCount = traversalStack[--stackIdx];
+			} else primCount = 2;
+			primOffset = 0;
+		}
 
-			while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
-				// Fetch AABBs of the two child bvh.
-				i32 nodeIdx = nodeAddr * 2;
-				const BvhNode& left  = bvh.bvh[nodeIdx];
-				const BvhNode& right = bvh.bvh[nodeIdx + 1];
+		while(nodeAddr < currentBvh->numInternalNodes && primCount > 0) { // Internal node?
+			// Fetch AABBs of the two child bvh.
+			i32 nodeIdx = nodeAddr * 2;
+			const BvhNode& left  = currentBvh->bvh[nodeIdx];
+			const BvhNode& right = currentBvh->bvh[nodeIdx + 1];
 
-				// Intersect the ray against the children bounds.
-				float c0min, c1min;
-				bool traverseChild0 = intersect(left.bb, ray, hitT, c0min);
-				bool traverseChild1 = intersect(right.bb, ray, hitT, c1min);
+			// Intersect the ray against the children bounds.
+			float c0min, c1min;
+			bool traverseChild0 = intersect(left.bb, currentRay, hitT, c0min);
+			bool traverseChild1 = intersect(right.bb, currentRay, hitT, c1min);
 
-				// Set maximum values to unify upcomming code
-				if(!traverseChild0) c0min = 1e38f;
-				if(!traverseChild1) c1min = 1e38f;
+			// Set maximum values to unify upcomming code
+			if(!traverseChild0) c0min = 1e38f;
+			if(!traverseChild1) c1min = 1e38f;
 
-				// If both children are hit, push the farther one to the stack
-				if(traverseChild0 && traverseChild1) {
-					i32 pushAddr = (c1min < c0min) ? left.index : right.index;
-					if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
-						traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
-					traversalStack[stackIdx++] = pushAddr;
-				}
-				// Get address of the closer one (independent of a hit)
-				nodeAddr = (c0min <= c1min) ? left.index : right.index;
-				if(nodeAddr >= bvh.numInternalNodes) {
-					primCount = (c0min <= c1min) ? left.primCount : right.primCount;
-					primOffset = 0;
-				} else primCount = 2;
-				// Neither child was intersected => wait for pop stack.
-				if(!traverseChild0 && !traverseChild1)
-					primCount = 0;
+			// If both children are hit, push the farther one to the stack
+			if(traverseChild0 && traverseChild1) {
+				i32 pushAddr = (c1min < c0min) ? left.index : right.index;
+				if(pushAddr >= currentBvh->numInternalNodes)	// Leaf? Then push the count too
+					traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
+				traversalStack[stackIdx++] = pushAddr;
 			}
+			// Get address of the closer one (independent of a hit)
+			nodeAddr = (c0min <= c1min) ? left.index : right.index;
+			if(nodeAddr >= currentBvh->numInternalNodes) {
+				primCount = (c0min <= c1min) ? left.primCount : right.primCount;
+				primOffset = 0;
+			} else primCount = 2;
+			// Neither child was intersected => wait for pop stack.
+			if(!traverseChild0 && !traverseChild1)
+				primCount = 0;
+		}
 
-			while(nodeAddr >= bvh.numInternalNodes && primCount > 0) { // Leaf?
-				const i32 instanceId = nodeAddr - bvh.numInternalNodes + primOffset;
-				++primOffset;
-				--primCount;
+		if(nodeAddr >= currentBvh->numInternalNodes && primCount > 0) { // Leaf?
+			const i32 leafId = nodeAddr - currentBvh->numInternalNodes + primOffset;
+			const i32 primId = currentBvh->primIds[leafId];
+			++primOffset;
+			--primCount;
 
-				first_intersection_scene_obj_lbvh(scene, ray,
-					bvh.primIds[instanceId], traversalStack + stackIdx,
-					hitT, hitInstanceId, hitPrimId, surfParams);
+			// Primitves can be instances or true primities.
+			if(!obj) {		// Currently in scene BVH => go to object space.
+				if(world_to_object_space(scene, primId, fray, currentRay, currentTScale, hitT, obj, currentBvh)) {
+					if(obj->numPrimitives == 1) { // Fast path - no BVH
+						if(intersects_primitve(*obj, currentRay, 0,
+											   hitPrimId, hitT, surfParams)) {
+							hitInstanceId = primId;
+						}
+						// Immediatelly leave the object space again
+						object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
+					} else {
+						// Push a marker and the remaining number of instances to the stack.
+						// This is necessary to know when we must use the backward transition.
+						if(primCount > 0) {
+							traversalStack[stackIdx++] = primCount;
+							traversalStack[stackIdx++] = nodeAddr + primOffset;
+						}
+						traversalStack[stackIdx++] = EntrypointSentinel;
+						// Clean restart in local BVH
+						nodeAddr = 0;
+						primCount = 2;
+						primOffset = 0;
+						currentInstanceId = primId;
+					}
+				}
+			} else if(intersects_primitve(*obj, currentRay, primId,
+										  hitPrimId, hitT, surfParams)) {
+				hitInstanceId = currentInstanceId;
 			}
 		}
 	}
+
+	if(scene.numInstances == 1)
+		object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
 
 	// Nobody should update hitT if no primitive is hit
 	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || hitT == tmax);
@@ -663,37 +540,6 @@ RayIntersectionResult first_intersection(
 	}
 }
 
-template < Device dev > __host__ __device__
-bool any_intersection_scene_obj_lbvh(
-	const SceneDescriptor<dev>& scene,
-	const ei::Ray& ray,
-	const i32 instanceId,
-	float tmax,
-	i32* traversalStack
-) {
-	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
-	const float rayScale = len(rayDir);
-	const ei::Ray transRay = { ei::transform(ray.origin, scene.worldToInstance[instanceId]),
-							   rayDir / rayScale };
-	const ei::FastRay fray { transRay };
-
-	const i32 objId = scene.lodIndices[instanceId];
-	const ei::Box& box = scene.aabbs[objId];
-
-	// Scale our current maximum intersection distance into the object space to avoid false negatives
-	const float objSpaceMaxT = tmax * rayScale;
-
-	// Intersect the ray against the obj bounding box.
-	float hitT;
-	if(intersect(box, fray, objSpaceMaxT, hitT)) {
-		// Intersect the ray against the obj primtive bvh.
-		const LodDescriptor<dev>& obj = scene.lods[objId];
-		const LBVH* lbvh = (LBVH*)obj.accelStruct.accelParameters;
-		// Do ray-obj test.
-		return any_intersection_obj_lbvh_imp(*lbvh, obj, fray, objSpaceMaxT, traversalStack);
-	}
-	return false;
-}
 
 template < Device dev > __host__ __device__
 bool any_intersection(
@@ -707,82 +553,120 @@ bool any_intersection(
 	add_epsilon(a,  connectionDirAtoB, geoNormalA);
 	add_epsilon(b, -connectionDirAtoB, geoNormalB);
 	ei::Vec3 correctedDir = b - a;
-	const float tmax = len(correctedDir);
-	ei::Ray ray { a, correctedDir / tmax };
+	float tmax = len(correctedDir);
+	const ei::Ray ray { a, correctedDir / tmax };
+	// Init scene wide properties
 	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
 	const ei::FastRay fray { ray };
 
-	if(scene.numInstances == 1) {
-		i32 traversalStack[OBJ_STACK_SIZE];
-		return any_intersection_scene_obj_lbvh(scene, ray,
-			0, tmax, traversalStack);
-	} else {
-		// Traversal stack in CUDA thread-local memory.
-		i32 traversalStack[STACK_SIZE];
+	// Set the current traversal state
+	ei::FastRay currentRay = fray;
+	float currentTScale = 1.0f;
+	const LodDescriptor<dev>* obj = nullptr;
+	const LBVH* currentBvh = &bvh;
 
-		// Setup traversal.
-		i32 stackIdx = 0;		// Points to the next free stack entry
-		i32 nodeAddr = 0;		// Start from the root.
-		i32 primCount = 2;		// Internal nodes have two boxes
-		i32 primOffset = 0;
+	// Setup traversal.
+	i32 traversalStack[STACK_SIZE];
+	i32 stackIdx = 0;		// Points to the next free stack entry
+	i32 nodeAddr = 0;		// Start from the root.
+	i32 primCount = 2;		// Internal nodes have two boxes
+	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
-		// Traversal loop.
-		while(stackIdx > 0 || primCount > 0) {
-			// Pop top-most entry
-			if(primCount == 0) {
+	// No Scene-BVH => got to object-space directly
+	if(scene.numInstances == 1)
+		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, tmax, obj, currentBvh))
+			return false; // No hit of the entire scene
+
+	// Traversal loop.
+	while(stackIdx > 0 || primCount > 0) {
+		// Pop top-most entry
+		if(primCount == 0) {
+			nodeAddr = traversalStack[--stackIdx];
+			if(nodeAddr == EntrypointSentinel) { // Was in object BVH, go back to scene
+				if(stackIdx == 0) break;
+				object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, tmax, obj);
+				// Pop either the parent nodeAddr or the next instance nodeAddr.
 				nodeAddr = traversalStack[--stackIdx];
-				if(nodeAddr >= bvh.numInternalNodes) { // Leafs additionally store the primitive count
-					primCount = traversalStack[--stackIdx];
-					primOffset = 0;
-				}
-				else primCount = 2;
 			}
+			if(nodeAddr >= currentBvh->numInternalNodes) { // Leafs additionally store the primitive count
+				primCount = traversalStack[--stackIdx];
+			} else primCount = 2;
+			primOffset = 0;
+		}
 
-			while(nodeAddr < bvh.numInternalNodes && primCount > 0) { // Internal node?
-				// Fetch AABBs of the two child bvh.
-				i32 nodeIdx = nodeAddr * 2;
-				const BvhNode& left  = bvh.bvh[nodeIdx];
-				const BvhNode& right = bvh.bvh[nodeIdx + 1];
+		while(nodeAddr < currentBvh->numInternalNodes && primCount > 0) { // Internal node?
+			// Fetch AABBs of the two child bvh.
+			i32 nodeIdx = nodeAddr * 2;
+			const BvhNode& left  = currentBvh->bvh[nodeIdx];
+			const BvhNode& right = currentBvh->bvh[nodeIdx + 1];
 
-				// Intersect the ray against the children bounds.
-				float c0min, c1min;
-				bool traverseChild0 = intersect(left.bb, ray, tmax, c0min);
-				bool traverseChild1 = intersect(right.bb, ray, tmax, c1min);
+			// Intersect the ray against the children bounds.
+			float c0min, c1min;
+			bool traverseChild0 = intersect(left.bb, currentRay, tmax, c0min);
+			bool traverseChild1 = intersect(right.bb, currentRay, tmax, c1min);
 
-				// Set maximum values to unify upcomming code
-				if(!traverseChild0) c0min = 1e38f;
-				if(!traverseChild1) c1min = 1e38f;
+			// Set maximum values to unify upcomming code
+			if(!traverseChild0) c0min = 1e38f;
+			if(!traverseChild1) c1min = 1e38f;
 
-				// If both children are hit, push the farther one to the stack
-				if(traverseChild0 && traverseChild1) {
-					i32 pushAddr = (c1min < c0min) ? left.index : right.index;
-					if(pushAddr >= bvh.numInternalNodes)	// Leaf? Then push the count too
-						traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
-					traversalStack[stackIdx++] = pushAddr;
-				}
-				// Get address of the closer one (independent of a hit)
-				nodeAddr = (c0min <= c1min) ? left.index : right.index;
-				if(nodeAddr >= bvh.numInternalNodes) {
-					primCount = (c0min <= c1min) ? left.primCount : right.primCount;
-					primOffset = 0;
-				} else primCount = 2;
-				// Neither child was intersected => wait for pop stack.
-				if(!traverseChild0 && !traverseChild1)
-					primCount = 0;
+			// If both children are hit, push the farther one to the stack
+			if(traverseChild0 && traverseChild1) {
+				i32 pushAddr = (c1min < c0min) ? left.index : right.index;
+				if(pushAddr >= currentBvh->numInternalNodes)	// Leaf? Then push the count too
+					traversalStack[stackIdx++] = (c1min < c0min) ? left.primCount : right.primCount;
+				traversalStack[stackIdx++] = pushAddr;
 			}
+			// Get address of the closer one (independent of a hit)
+			nodeAddr = (c0min <= c1min) ? left.index : right.index;
+			if(nodeAddr >= currentBvh->numInternalNodes) {
+				primCount = (c0min <= c1min) ? left.primCount : right.primCount;
+				primOffset = 0;
+			} else primCount = 2;
+			// Neither child was intersected => wait for pop stack.
+			if(!traverseChild0 && !traverseChild1)
+				primCount = 0;
+		}
 
-			while(nodeAddr >= bvh.numInternalNodes && primCount > 0) { // Leaf?
-				const i32 instanceId = nodeAddr - bvh.numInternalNodes + primOffset;
-				++primOffset;
-				--primCount;
+		if(nodeAddr >= currentBvh->numInternalNodes && primCount > 0) { // Leaf?
+			const i32 leafId = nodeAddr - currentBvh->numInternalNodes + primOffset;
+			const i32 primId = currentBvh->primIds[leafId];
+			++primOffset;
+			--primCount;
 
-				if(any_intersection_scene_obj_lbvh(scene, ray,
-					bvh.primIds[instanceId], tmax, traversalStack + stackIdx))
-						return true;
+			i32 hitPrimId;
+			SurfaceParametrization surfParams;
+
+			// Primitves can be instances or true primities.
+			if(!obj) {		// Currently in scene BVH => go to object space.
+				if(world_to_object_space(scene, primId, fray, currentRay, currentTScale, tmax, obj, currentBvh)) {
+					if(obj->numPrimitives == 1) { // Fast path - no BVH
+						if(intersects_primitve(*obj, currentRay, 0,
+											   hitPrimId, tmax, surfParams)) {
+							return true;
+						}
+						// Immediatelly leave the object space again
+						object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, tmax, obj);
+					} else {
+						// Push a marker and the remaining number of instances to the stack.
+						// This is necessary to know when we must use the backward transition.
+						if(primCount > 0) {
+							traversalStack[stackIdx++] = primCount;
+							traversalStack[stackIdx++] = nodeAddr + primOffset;
+						}
+						traversalStack[stackIdx++] = EntrypointSentinel;
+						// Clean restart in local BVH
+						nodeAddr = 0;
+						primCount = 2;
+						primOffset = 0;
+					}
+				}
+			} else if(intersects_primitve(*obj, currentRay, primId,
+										  hitPrimId, tmax, surfParams)) {
+				return true;
 			}
 		}
-		return false;
 	}
+	return false;
 }
 
 
