@@ -587,7 +587,8 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	// Load non-animated and animated instances
 	for(auto& instance : m_instances)
 		addObjAndInstance(*instance.second);
-	if(m_animatedInstances[scenario.get_animation_frame()] != nullptr)
+	if(m_animatedInstances.size() > scenario.get_animation_frame()
+	   && m_animatedInstances[scenario.get_animation_frame()] != nullptr)
 		for(auto& instance : *m_animatedInstances[scenario.get_animation_frame()])
 			addObjAndInstance(*instance.second);
 
