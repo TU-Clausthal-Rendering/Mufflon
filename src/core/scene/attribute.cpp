@@ -42,7 +42,7 @@ void OpenMeshAttributePool<face>::copy(const OpenMeshAttributePool<face>& pool) 
 		m_cudaPool = ArrayDevHandle_t<Device::CUDA, char>{};
 	} else {
 		m_cudaPool = Allocator<Device::CUDA>::template alloc_array<char>(m_poolSize);
-		::mufflon::copy(m_cudaPool, pool.m_cudaPool, m_poolSize);
+		::mufflon::copy(m_cudaPool, pool.m_cudaPool, 0, m_poolSize);
 	}
 }
 
@@ -128,7 +128,7 @@ void OpenMeshAttributePool<face>::synchronize() {
 			for(auto& attrib : m_attributes) {
 				if(attrib.dirty.needs_sync(dev)) {
 					char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(cpuData, &m_cudaPool[currOffset], attrib.elemSize * m_attribElemCount);
+					::mufflon::copy(cpuData, &m_cudaPool[currOffset], 0, attrib.elemSize * m_attribElemCount);
 					currOffset += attrib.elemSize * m_attribElemCount;
 					attrib.dirty.mark_synced(dev);
 				}
@@ -144,7 +144,7 @@ void OpenMeshAttributePool<face>::synchronize() {
 			for(auto& attrib : m_attributes) {
 				if(copyAll || attrib.dirty.needs_sync(dev)) {
 					const char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(&m_cudaPool[currOffset], cpuData, attrib.elemSize * m_attribElemCount);
+					::mufflon::copy(m_cudaPool, cpuData, currOffset, attrib.elemSize * m_attribElemCount);
 					currOffset += attrib.elemSize * m_attribElemCount;
 				}
 				attrib.dirty.mark_synced(dev);
@@ -168,11 +168,11 @@ void OpenMeshAttributePool<face>::synchronize(AttributeHandle hdl) {
 	switch(dev) {
 		case Device::CPU:
 		{
-			::mufflon::copy(m_attributes[hdl.index].accessor(m_mesh) + offset, m_cudaPool + offset, m_attributes[hdl.index].elemSize * m_attribElemCount);
+			::mufflon::copy(m_attributes[hdl.index].accessor(m_mesh), m_cudaPool + offset, offset, m_attributes[hdl.index].elemSize * m_attribElemCount);
 		}	break;
 		case Device::CUDA:
 		{
-			::mufflon::copy(m_cudaPool + offset, m_attributes[hdl.index].accessor(m_mesh) + offset, m_attributes[hdl.index].elemSize * m_attribElemCount);
+			::mufflon::copy(m_cudaPool, m_attributes[hdl.index].accessor(m_mesh) + offset, offset, m_attributes[hdl.index].elemSize * m_attribElemCount);
 		}	break;
 	}
 }
@@ -262,7 +262,7 @@ AttributePool::AttributePool(const AttributePool& pool) :
 			pool.handle = ArrayDevHandle_t<ChangedBuffer::DEVICE, char>{};
 		} else {
 			pool.handle = Allocator<ChangedBuffer::DEVICE>::template alloc_array<char>(m_poolSize);
-			copy(pool.handle, elem.handle, m_poolSize);
+			copy(pool.handle, elem.handle, 0, m_poolSize);
 		}
 	});
 }
@@ -391,13 +391,13 @@ void AttributePool::synchronize() {
 	if(changedPool) {
 		if(hadNoMemory) {
 			// If there was no pool allocated we need to copy everything anyway
-			copy(syncPool, *changedPool, m_poolSize);
+			copy(syncPool, *changedPool, 0, m_poolSize);
 		} else {
 			// Selective update is enough
 			std::size_t currOffset = 0u;
 			for(auto& attrib : m_attributes) {
 				if(attrib.dirty.needs_sync(dev)) {
-					copy(syncPool + currOffset, *changedPool + currOffset, attrib.elemSize * m_attribElemCount);
+					copy(syncPool, *changedPool + currOffset, currOffset, attrib.elemSize * m_attribElemCount);
 					currOffset += attrib.elemSize * m_attribElemCount;
 					attrib.dirty.mark_synced(dev);
 				}
@@ -431,7 +431,7 @@ void AttributePool::synchronize(AttributeHandle hdl) {
 	}
 
 	const std::size_t offset = m_attributes[hdl.index].poolOffset;
-	copy(syncPool + offset, *changedPool + offset, m_attributes[hdl.index].elemSize * m_attribElemCount);
+	copy(syncPool, *changedPool + offset, offset, m_attributes[hdl.index].elemSize * m_attribElemCount);
 }
 
 template < Device dev >

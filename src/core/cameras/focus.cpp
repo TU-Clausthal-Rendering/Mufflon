@@ -24,7 +24,7 @@ void Focus::get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution)
 		m_lensRadius * m_near,
 		ei::Vec<u16,2>{resolution}
 	};
-	copy(as<FocusParams>(outBuffer), &buffer, sizeof(FocusParams));
+	copy(as<FocusParams>(outBuffer), &buffer, 0, sizeof(FocusParams));
 }
 
 std::size_t Focus::get_parameter_pack_size() const {

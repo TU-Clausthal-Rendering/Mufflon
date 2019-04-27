@@ -26,7 +26,7 @@ GpuPathTracer::GpuPathTracer() :
 void GpuPathTracer::iterate() {
 	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 
-	copy(&m_sceneDesc->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
+	copy(&m_sceneDesc->lightTree.posGuide, &m_params.neeUsePositionGuide, 0, sizeof(bool));
 	 
 	// TODO: pass scene data to kernel!
 	dim3 blockDims{ 16u, 16u, 1u };

@@ -25,7 +25,7 @@ void GenericResource::synchronize() {
 			srcDev = m_mem.template get<unique_device_ptr<Device::CUDA, char[]>>().get();
 		mAssertMsg(srcDev != nullptr, "Device not supported or DirtyFlags inconsistent.");
 		copy(m_mem.template get<unique_device_ptr<dstDev, char[]>>().get(),
-			 srcDev, m_size);
+			 srcDev, 0, m_size);
 		m_dirty.mark_synced(dstDev);
 	}
 }

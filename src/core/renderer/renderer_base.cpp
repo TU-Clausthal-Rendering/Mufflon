@@ -18,7 +18,7 @@ bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
 		auto desc = m_currentScene->get_descriptor<dev>({}, {}, {}, outputBuffer.get_resolution());
-		copy(m_sceneDesc.get(), &desc, sizeof(desc));
+		copy(m_sceneDesc.get(), &desc, 0, sizeof(desc));
 		this->on_descriptor_requery();
 		this->on_reset();
 		m_reset = false;
@@ -49,5 +49,6 @@ void RendererBase<dev>::post_iteration(OutputHandler& outputBuffer) {
 
 template class RendererBase<Device::CPU>;
 template class RendererBase<Device::CUDA>;
+template class RendererBase<Device::OPENGL>;
 
 } // namespace mufflon::renderer

@@ -31,7 +31,7 @@ void GpuWireframe::iterate() {
 
 	for(int i = 0; i < m_outputBuffer.get_num_pixels(); ++i)
 		m_seeds[i] = static_cast<u32>(m_rng.next());
-	copy(m_seedsPtr.get(), m_seeds.get(), sizeof(u32) * m_outputBuffer.get_num_pixels());
+	copy(m_seedsPtr.get(), m_seeds.get(), 0, sizeof(u32) * m_outputBuffer.get_num_pixels());
 
 	// TODO: pass scene data to kernel!
 	dim3 blockDims{ 16u, 16u, 1u };

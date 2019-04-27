@@ -77,7 +77,7 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 
 template RenderBuffer<Device::CPU> OutputHandler::begin_iteration<Device::CPU>(bool reset);
 template RenderBuffer<Device::CUDA> OutputHandler::begin_iteration<Device::CUDA>(bool reset);
-
+template RenderBuffer<Device::OPENGL> OutputHandler::begin_iteration<Device::OPENGL>(bool reset);
 
 
 template < Device dev >

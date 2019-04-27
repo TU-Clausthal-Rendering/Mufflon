@@ -60,6 +60,11 @@ void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
 	}
 	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDefault));
 }
+template < class T >
+void synchronize(ConstArrayDevHandle_t<Device::OPENGL, T> changed,
+				 ArrayDevHandle_t<Device::OPENGL, T>& sync, std::size_t length) {
+	gl::copyBufferSubData(changed, sync, 0, 0, length);
+}
 
 // Functions for unloading a handle from the device
 template < class T >
@@ -74,18 +79,26 @@ void unload(ArrayDevHandle_t<Device::CUDA, T>& hdl) {
 		hdl.handle = nullptr;
 	}
 }
-
+template < class T >
+void unload(ArrayDevHandle_t<Device::OPENGL, T>& hdl) {
+	gl::deleteBuffer(hdl);
+}
 
 // A number of copy primitives which call the internal required methods.
 // This relies on CUDA UVA
 template < typename T >
-inline void copy(T* dst, const T* src, std::size_t size ) {
+inline void copy(T* dst, const T* src, std::size_t dstOffset, std::size_t size ) {
 	static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
+	cuda::check_error(cudaMemcpy(dst + dstOffset, src, size, cudaMemcpyDefault));
 }
-// mAssertMsg(dstDev != Device::OPENGL && srcDev != Device::OPENGL, "Unimplemented copy specialization.");
-// TODO: OpenGL (glBufferSubData with offset and object handle as target/src types
+
+template < typename T >
+inline void copy(gl::Handle dst, const T* src, std::size_t dstOffset, std::size_t size) {
+	static_assert(std::is_trivially_copyable<T>::value,
+		"Must be trivially copyable");
+	gl::bufferSubData(dst, dstOffset, size, src);
+}
 
 template < Device dev >
 inline void mem_set(void* mem, int value, std::size_t size) {
@@ -95,5 +108,9 @@ template <>
 inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
 	cudaMemset(mem, value, size);
 }
+//template <>
+//inline void mem_set<Device::OPENGL>(gl::Handle handle, int value, std::size_t size) {
+//	
+//}
 
 } // namespace mufflon

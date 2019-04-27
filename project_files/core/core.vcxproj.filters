@@ -128,6 +128,12 @@
     <Filter Include="Source Files\core\renderer\vcm">
       <UniqueIdentifier>{c8378561-379b-40ec-b4fa-95b2012d8fbd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\forward">
+      <UniqueIdentifier>{fe6f6d8b-0ad8-4219-a6ef-508307855349}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\opengl">
+      <UniqueIdentifier>{c4dc2b5b-e976-40a8-a5be-54ca66b6ac3c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -261,6 +267,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\vcm\cpu_vcm.cpp">
       <Filter>Source Files\core\renderer\vcm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\gl_forward.cpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp">
+      <Filter>Source Files\core\opengl</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -906,23 +918,20 @@
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\gl_forward.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\forward_params.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h">
+      <Filter>Source Files\core\memory</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

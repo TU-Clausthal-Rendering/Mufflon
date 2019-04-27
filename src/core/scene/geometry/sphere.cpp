@@ -37,7 +37,7 @@ Spheres::Spheres(const Spheres& sphere) :
 			attribBuffer.buffer = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
 		} else {
 			attribBuffer.buffer = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.size);
-			copy(attribBuffer.buffer, buffer.buffer, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.size);
+			copy(attribBuffer.buffer, buffer.buffer, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.size);
 		}
 	});
 }
@@ -195,7 +195,7 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 		std::vector<void*> cpuAttribs(attribs.size());
 		for(const char* name : attribs)
 			cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
-		copy(attribBuffer.buffer, cpuAttribs.data(), sizeof(const char*) * attribs.size());
+		copy(attribBuffer.buffer, cpuAttribs.data(), 0, sizeof(const char*) * attribs.size());
 	} else if(attribBuffer.size != 0) {
 		attribBuffer.buffer = Allocator<dev>::free(attribBuffer.buffer, attribBuffer.size);
 	}

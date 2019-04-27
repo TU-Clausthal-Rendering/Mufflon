@@ -19,7 +19,7 @@ namespace mufflon::cameras {
 			m_far,
 			ei::Vec<u16,2>{resolution}
 		};
-		copy(as<PinholeParams>(outBuffer), &buffer, sizeof(PinholeParams));
+		copy(as<PinholeParams>(outBuffer), &buffer, 0, sizeof(PinholeParams));
 	}
 
 	std::size_t Pinhole::get_parameter_pack_size() const {

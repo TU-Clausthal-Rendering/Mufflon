@@ -3205,6 +3205,10 @@ inline Boolean mufflon_initialize_opengl() {
 	// TODO right now the opengl display does the debug logging. should it be moved here?
 
 	logInfo("[", FUNCTION_NAME, "] initialized openGL");
+
+	// add opengl renderers
+	init_renderers<>();
+
 	return initialized = true;
 	CATCH_ALL(false)
 }

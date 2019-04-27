@@ -53,11 +53,11 @@ public:
 
 		if(lbvh.m_primIds.is_resident<Device::CPU>()) {
 			const char* primMem = lbvh.m_primIds.template acquire_const<Device::CPU>();
-			copy(m_primIds.template acquire<Device::CPU>(), primMem, lbvh.m_primIds.size());
+			copy(m_primIds.template acquire<Device::CPU>(), primMem, 0, lbvh.m_primIds.size());
 		}
 		if(lbvh.m_bvhNodes.is_resident<Device::CPU>()) {
 			const char* bvhMem = lbvh.m_bvhNodes.template acquire_const<Device::CPU>();
-			copy(m_bvhNodes.template acquire<Device::CPU>(), bvhMem, lbvh.m_bvhNodes.size());
+			copy(m_bvhNodes.template acquire<Device::CPU>(), bvhMem, 0, lbvh.m_bvhNodes.size());
 		}
 	}
 
