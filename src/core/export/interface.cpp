@@ -25,6 +25,7 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
+#include "glad/glad.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -3188,6 +3189,23 @@ Boolean mufflon_initialize() {
 		initialized = true;
 	}
 	return initialized;
+	CATCH_ALL(false)
+}
+
+inline Boolean mufflon_initialize_opengl() {
+	TRY
+	static bool initialized = false;
+	if(initialized) return true;
+
+	if (!gladLoadGL()) {
+		logError("[", FUNCTION_NAME, "] gladLoadGL failed");
+		return false;
+	}
+
+	// TODO right now the opengl display does the debug logging. should it be moved here?
+
+	logInfo("[", FUNCTION_NAME, "] initialized openGL");
+	return initialized = true;
 	CATCH_ALL(false)
 }
 

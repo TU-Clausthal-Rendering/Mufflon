@@ -241,6 +241,9 @@ namespace gui.Dll
             if (!OpenGlDisplay.opengldisplay_initialize())
                 throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
 
+            if (!Core.mufflon_initialize_opengl())
+                throw new Exception(Core.core_get_dll_error());
+
             // Set the logger callback
             m_logCallbackPointer = new Core.LogCallback(Logger.log);
             if (!Core.mufflon_set_logger(m_logCallbackPointer))

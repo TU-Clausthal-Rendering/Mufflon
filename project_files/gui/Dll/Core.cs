@@ -471,6 +471,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool mufflon_initialize();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool mufflon_initialize_opengl();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool mufflon_set_logger(LogCallback logCallback);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int mufflon_get_cuda_device_index();
