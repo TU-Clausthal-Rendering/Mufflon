@@ -237,12 +237,13 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		light.AddMember("type", "point", document.GetAllocator());
 
+		// TODO: animation
 		Vec3 position;
-		world_get_point_light_position(lightHandle, &position);
+		world_get_point_light_position(lightHandle, &position, 0u);
 		light.AddMember("position", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 intensity;
-		world_get_point_light_intensity(lightHandle, &intensity);
+		world_get_point_light_intensity(lightHandle, &intensity, 0u);
 		light.AddMember("intensity", store_in_array(intensity, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
@@ -262,12 +263,13 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		light.AddMember("type", "directional", document.GetAllocator());
 
+		// TODO: animation
 		Vec3 direction;
-		world_get_dir_light_direction(lightHandle, &direction);
+		world_get_dir_light_direction(lightHandle, &direction, 0u);
 		light.AddMember("direction", store_in_array(direction, document), document.GetAllocator());
 
 		Vec3 radiance;
-		world_get_dir_light_irradiance(lightHandle, &radiance);
+		world_get_dir_light_irradiance(lightHandle, &radiance, 0u);
 		light.AddMember("radiance", store_in_array(radiance, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
@@ -287,26 +289,27 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		light.AddMember("type", "spot", document.GetAllocator());
 
+		// TODO: animation
 		Vec3 position;
-		world_get_spot_light_position(lightHandle, &position);
+		world_get_spot_light_position(lightHandle, &position, 0u);
 		light.AddMember("position", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 direction;
-		world_get_spot_light_direction(lightHandle, &direction);
+		world_get_spot_light_direction(lightHandle, &direction, 0u);
 		light.AddMember("direction", store_in_array(direction, document), document.GetAllocator());
 
 		Vec3 intensity;
-		world_get_spot_light_intensity(lightHandle, &intensity);
+		world_get_spot_light_intensity(lightHandle, &intensity, 0u);
 		light.AddMember("intensity", store_in_array(intensity, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
 		float width;
-		world_get_spot_light_angle(lightHandle, &width);
+		world_get_spot_light_angle(lightHandle, &width, 0u);
 		light.AddMember("width", width, document.GetAllocator());
 
 		float falloffStart;
-		world_get_spot_light_falloff(lightHandle, &falloffStart);
+		world_get_spot_light_falloff(lightHandle, &falloffStart, 0u);
 		light.AddMember("falloffStart", falloffStart, document.GetAllocator());
 
 		rapidjson::Value lightName;

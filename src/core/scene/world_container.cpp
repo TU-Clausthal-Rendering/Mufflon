@@ -37,6 +37,7 @@ WorldContainer::Sanity WorldContainer::is_sane_world() const {
 		return Sanity::NO_INSTANCES;
 	if(m_objects.empty())
 		return Sanity::NO_OBJECTS;
+
 	// Check for lights
 	if(m_pointLights.empty() && m_spotLights.empty() && m_dirLights.empty() && m_envLights.empty()) {
 		// No explicit lights - check if any emitting materials exist
@@ -304,32 +305,40 @@ CameraHandle WorldContainer::get_camera(std::size_t index) {
 	return m_cameraHandles[index]->second.get();
 }
 
-std::optional<u32> WorldContainer::add_light(std::string name,
-											 lights::PointLight&& light) {
+std::optional<u32> WorldContainer::add_light(std::string name, const lights::PointLight& light,
+											 const u32 count) {
 	if(m_pointLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Point light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_pointLights.insert(std::move(name), std::move(light));
+	if(m_frameStart + count > m_frameEnd + 1u)
+		m_frameEnd = m_frameStart + count - 1u;
+	return m_pointLights.insert(std::move(name), std::vector<lights::PointLight>(count, light));
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
-											 lights::SpotLight&& light) {
+											 const lights::SpotLight& light,
+											 const u32 count) {
 	if(m_spotLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Spot light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_spotLights.insert(std::move(name), std::move(light));
+	if(m_frameStart + count > m_frameEnd + 1u)
+		m_frameEnd = m_frameStart + count - 1u;
+	return m_spotLights.insert(std::move(name), std::vector<lights::SpotLight>(count, light));
 
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
-											 lights::DirectionalLight&& light) {
+											 const lights::DirectionalLight& light,
+											 const u32 count) {
 	if(m_dirLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Directional light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	return m_dirLights.insert(std::move(name), std::move(light));
+	if(m_frameStart + count > m_frameEnd + 1u)
+		m_frameEnd = m_frameStart + count - 1u;
+	return m_dirLights.insert(std::move(name), std::vector<lights::DirectionalLight>(count, light));
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
@@ -371,25 +380,49 @@ std::optional<std::pair<u32, lights::LightType>> WorldContainer::find_light(cons
 	return std::nullopt;
 }
 
-lights::PointLight* WorldContainer::get_point_light(u32 index) {
+std::size_t WorldContainer::get_point_light_segment_count(u32 index) {
 	if(index >= m_pointLights.size())
 		throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
-									+ " >= " + std::to_string(m_pointLights.size()));
-	return &m_pointLights.get(index);
+								 + " >= " + std::to_string(m_pointLights.size()));
+	return m_pointLights.get(index).size();
 }
 
-lights::SpotLight* WorldContainer::get_spot_light(u32 index) {
+std::size_t WorldContainer::get_spot_light_segment_count(u32 index) {
 	if(index >= m_spotLights.size())
 		throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
-									+ " >= " + std::to_string(m_spotLights.size()));
-	return &m_spotLights.get(index);
+								 + " >= " + std::to_string(m_spotLights.size()));
+	return m_spotLights.get(index).size();
 }
 
-lights::DirectionalLight* WorldContainer::get_dir_light(u32 index) {
+std::size_t WorldContainer::get_dir_light_segment_count(u32 index) {
+	if(index >= m_dirLights.size())
+		throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_dirLights.size()));
+	return m_dirLights.get(index).size();
+}
+
+lights::PointLight* WorldContainer::get_point_light(u32 index, const u32 frame) {
+	if(index >= m_pointLights.size())
+		throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_pointLights.size()));
+	auto& animLight = m_pointLights.get(index);
+	return &animLight[std::min(frame, static_cast<u32>(animLight.size()) - 1u)];
+}
+
+lights::SpotLight* WorldContainer::get_spot_light(u32 index, const u32 frame) {
+	if(index >= m_spotLights.size())
+		throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
+								 + " >= " + std::to_string(m_spotLights.size()));
+	auto& animLight = m_spotLights.get(index);
+	return &animLight[std::min(frame, static_cast<u32>(animLight.size()) - 1u)];
+}
+
+lights::DirectionalLight* WorldContainer::get_dir_light(u32 index, const u32 frame) {
 	if(index >= m_dirLights.size())
 		throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
 									+ " >= " + std::to_string(m_dirLights.size()));
-	return &m_dirLights.get(index);
+	auto& animLight = m_dirLights.get(index);
+	return &animLight[std::min(frame, static_cast<u32>(animLight.size()) - 1u)];
 }
 
 lights::Background* WorldContainer::get_background(u32 index) {
@@ -402,23 +435,26 @@ lights::Background* WorldContainer::get_background(u32 index) {
 
 void WorldContainer::remove_light(u32 index, lights::LightType type) {
 	switch(type) {
-		case lights::LightType::POINT_LIGHT: {
+		case lights::LightType::POINT_LIGHT:
+		{
 			if(index >= m_pointLights.size())
 				throw std::runtime_error("Point light index out of bounds (" + std::to_string(index)
-										 + " >= " + std::to_string(m_pointLights.size()));
+											+ " >= " + std::to_string(m_pointLights.size()));
 			m_pointLights.erase(index);
 			for(auto& scenario : m_scenarios)
 				scenario.second.remove_point_light(index);
 		} break;
-		case lights::LightType::SPOT_LIGHT: {
+		case lights::LightType::SPOT_LIGHT:
+		{
 			if(index >= m_spotLights.size())
 				throw std::runtime_error("Spot light index out of bounds (" + std::to_string(index)
-										 + " >= " + std::to_string(m_spotLights.size()));
+											+ " >= " + std::to_string(m_spotLights.size()));
 			m_spotLights.erase(index);
 			for(auto& scenario : m_scenarios)
 				scenario.second.remove_spot_light(index);
 		} break;
-		case lights::LightType::DIRECTIONAL_LIGHT: {
+		case lights::LightType::DIRECTIONAL_LIGHT:
+		{
 			if(index >= m_dirLights.size())
 				throw std::runtime_error("Directional light index out of bounds (" + std::to_string(index)
 											+ " >= " + std::to_string(m_dirLights.size()));
@@ -426,10 +462,11 @@ void WorldContainer::remove_light(u32 index, lights::LightType type) {
 			for(auto& scenario : m_scenarios)
 				scenario.second.remove_dir_light(index);
 		} break;
-		case lights::LightType::ENVMAP_LIGHT: {
+		case lights::LightType::ENVMAP_LIGHT:
+		{
 			if(index >= m_envLights.size())
 				throw std::runtime_error("Envmap light index out of bounds (" + std::to_string(index)
-										 + " >= " + std::to_string(m_envLights.size()));
+											+ " >= " + std::to_string(m_envLights.size()));
 			this->unref_texture(m_envLights.get(index).get_envmap());
 			m_envLights.erase(index);
 			for(auto& scenario : m_scenarios) {
@@ -763,15 +800,24 @@ bool WorldContainer::load_scene_lights() {
 		// Add regular lights
 		for(u32 lightIndex : m_scenario->get_point_lights()) {
 			mAssert(lightIndex < m_pointLights.size());
-			posLights.push_back(lights::PositionalLights{ m_pointLights.get(lightIndex), PrimitiveHandle{} });
+			const auto& light = m_pointLights.get(lightIndex);
+			posLights.push_back(lights::PositionalLights{
+				light[std::min(m_frameCurrent - m_frameStart, static_cast<u32>(light.size()) - 1u)],
+				PrimitiveHandle{}
+			});
 		}
 		for(u32 lightIndex : m_scenario->get_spot_lights()) {
 			mAssert(lightIndex < m_spotLights.size());
-			posLights.push_back(lights::PositionalLights{ m_spotLights.get(lightIndex), PrimitiveHandle{} });
+			const auto& light = m_spotLights.get(lightIndex);
+			posLights.push_back(lights::PositionalLights{
+				light[std::min(m_frameCurrent - m_frameStart, static_cast<u32>(light.size()) - 1u)],
+				PrimitiveHandle{}
+			});
 		}
 		for(u32 lightIndex : m_scenario->get_dir_lights()) {
 			mAssert(lightIndex < m_dirLights.size());
-			dirLights.push_back(m_dirLights.get(lightIndex));
+			const auto& light = m_dirLights.get(lightIndex);
+			dirLights.push_back(light[std::min(m_frameCurrent - m_frameStart, static_cast<u32>(light.size()) - 1u)]);
 		}
 
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));

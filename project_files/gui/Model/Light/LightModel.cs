@@ -48,6 +48,8 @@ namespace gui.Model.Light
 
         public IntPtr Handle { get; }
 
+        public virtual uint PathSegments { get => 0u; }
+
         /// <summary>
         /// creates a new view model based on this model
         /// </summary>
