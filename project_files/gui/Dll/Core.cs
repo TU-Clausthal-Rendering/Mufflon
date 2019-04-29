@@ -324,19 +324,31 @@ namespace gui.Dll
         private static extern IntPtr world_get_camera_name_(IntPtr cam);
         internal static string world_get_camera_name(IntPtr cam) { return StringUtil.FromNativeUTF8(world_get_camera_name_(cam)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_camera_position(IntPtr cam, out Vec3 pos);
+        internal static extern bool world_get_camera_path_segment_count(IntPtr cam, out uint segments);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_camera_direction(IntPtr cam, out Vec3 dir);
+        internal static extern bool world_get_camera_position(IntPtr cam, out Vec3 pos, uint frame);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_camera_up(IntPtr cam, out Vec3 up);
+        internal static extern bool world_get_camera_current_position(IntPtr cam, out Vec3 pos);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_camera_direction(IntPtr cam, out Vec3 dir, uint frame);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_camera_current_direction(IntPtr cam, out Vec3 dir);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_camera_up(IntPtr cam, out Vec3 up, uint frame);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_camera_current_up(IntPtr cam, out Vec3 up);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_camera_near(IntPtr cam, out float near);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_camera_far(IntPtr cam, out float far);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_set_camera_position(IntPtr cam, Vec3 pos);
+        internal static extern bool world_set_camera_position(IntPtr cam, Vec3 pos, uint frame);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_set_camera_direction(IntPtr cam, Vec3 dir, Vec3 up);
+        internal static extern bool world_set_camera_current_position(IntPtr cam, Vec3 pos);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_camera_direction(IntPtr cam, Vec3 dir, Vec3 up, uint frame);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_camera_current_direction(IntPtr cam, Vec3 dir, Vec3 up);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_camera_near(IntPtr cam, float near);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

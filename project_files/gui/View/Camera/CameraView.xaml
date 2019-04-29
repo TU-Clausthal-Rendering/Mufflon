@@ -4,17 +4,23 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:gui.View.Camera"
+             xmlns:main="clr-namespace:gui"
              xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d" 
              d:DesignHeight="200" 
              d:DesignWidth="160"
              SizeChanged="OnSizeChanged">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <main:InvBooleanToVisibilityConverter x:Key="InvBooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <GroupBox>
         <GroupBox.Header>
             <Grid x:Name="GroupHeaderGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
@@ -28,10 +34,24 @@
                     Grid.Column="1"
                     HorizontalAlignment="Stretch"
                     Text="{Binding Name, FallbackValue=Name}"/>
-              
+
+                <Image Grid.Column="2"
+                       Margin="{StaticResource LeftPropertyMargin}"
+                       Source="../../Icons/animated.png"
+                       Width="16"
+                       Height="16"
+                       ToolTip="This camera has an animated path"
+                       Visibility="{Binding IsAnimated, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <Image Grid.Column="2"
+                       Margin="{StaticResource LeftPropertyMargin}"
+                       Source="../../Icons/not-animated.png"
+                       Width="16"
+                       Height="16"
+                       ToolTip="This camera does not have an animated path"
+                       Visibility="{Binding IsAnimated, Converter={StaticResource InvBooleanToVisibilityConverter}}"/>
                 <Button
-                    Grid.Column="2"
-                    Margin="5 0 0 0"
+                    Grid.Column="3"
+                    Margin="{StaticResource RightPropertyMargin}"
                     Command="{Binding ResetTransRotCommand}">
                   <Image
                       Source="../../Icons/restart.png"
