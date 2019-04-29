@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -15,11 +16,16 @@ namespace gui.Model.Camera
     /// </summary>
     public abstract class CameraModel : INotifyPropertyChanged
     {
-        private readonly Vec3<float> m_originalPosition;
-        private readonly Vec3<float> m_originalViewDirection;
-        private readonly Vec3<float> m_originalUp;
+        private struct OriginalData
+        {
+            public Vec3<float> position;
+            public Vec3<float> viewDirection;
+            public Vec3<float> up;
+        }
         private readonly float m_originalNear;
         private readonly float m_originalFar;
+
+        private readonly IList<OriginalData> m_originalData = new List<OriginalData>();
 
         public enum CameraType
         {
@@ -31,9 +37,26 @@ namespace gui.Model.Camera
         protected CameraModel(IntPtr handle)
         {
             Handle = handle;
-            m_originalPosition = Position;
-            m_originalViewDirection = ViewDirection;
-            m_originalUp = Up;
+            // We need to loop over all frames to get the camera positions for each one
+            uint frameStart, frameEnd;
+            if(!Core.world_get_frame_start(out frameStart))
+                throw new Exception(Core.core_get_dll_error());
+            if(!Core.world_get_frame_end(out frameEnd))
+                throw new Exception(Core.core_get_dll_error());
+
+            for (uint frame = frameStart; frame <= frameEnd; ++frame)
+            {
+                Core.Vec3 position, direction, up;
+                if (!(Core.world_get_camera_position(handle, out position, frame - frameStart)
+                    && Core.world_get_camera_direction(handle, out direction, frame - frameStart)
+                    && Core.world_get_camera_up(handle, out up, frame - frameStart)))
+                    throw new Exception(Core.core_get_dll_error());
+                m_originalData.Add(new OriginalData {
+                    position = Position,
+                    viewDirection = ViewDirection,
+                    up = Up
+                });
+            }
             m_originalNear = Near;
             m_originalFar = Far;
         }
@@ -46,7 +69,7 @@ namespace gui.Model.Camera
         {
             get
             { 
-                if(!Core.world_get_camera_position(Handle, out var pos))
+                if(!Core.world_get_camera_current_position(Handle, out var pos))
                     throw new Exception(Core.core_get_dll_error());
 
                 return pos.ToUtilityVec();
@@ -54,7 +77,7 @@ namespace gui.Model.Camera
             set
             {
                 if (Equals(Position, value)) return;
-                if(!Core.world_set_camera_position(Handle, new Core.Vec3(value)))
+                if(!Core.world_set_camera_current_position(Handle, new Core.Vec3(value)))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Position));
@@ -65,7 +88,7 @@ namespace gui.Model.Camera
         {
             get
             {
-                if(!Core.world_get_camera_direction(Handle, out var dir))
+                if(!Core.world_get_camera_current_direction(Handle, out var dir))
                     throw new Exception(Core.core_get_dll_error());
 
                 return dir.ToUtilityVec();
@@ -73,7 +96,7 @@ namespace gui.Model.Camera
             set
             {
                 if (Equals(ViewDirection, value)) return;
-                if(!Core.world_set_camera_direction(Handle, new Core.Vec3(value), new Core.Vec3(Up)))
+                if(!Core.world_set_camera_current_direction(Handle, new Core.Vec3(value), new Core.Vec3(Up)))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(ViewDirection));
@@ -84,7 +107,7 @@ namespace gui.Model.Camera
         {
             get
             {
-                if (!Core.world_get_camera_up(Handle, out var up))
+                if (!Core.world_get_camera_current_up(Handle, out var up))
                     throw new Exception(Core.core_get_dll_error());
 
                 return up.ToUtilityVec();
@@ -92,7 +115,7 @@ namespace gui.Model.Camera
             set
             {
                 if (Equals(Up, value)) return;
-                if (!Core.world_set_camera_direction(Handle, new Core.Vec3(ViewDirection), new Core.Vec3(value)))
+                if (!Core.world_set_camera_current_direction(Handle, new Core.Vec3(ViewDirection), new Core.Vec3(value)))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Up));
@@ -139,6 +162,17 @@ namespace gui.Model.Camera
 
         public IntPtr Handle { get; }
 
+        public uint PathSegments
+        {
+            get
+            {
+                uint segments;
+                if (!Core.world_get_camera_path_segment_count(Handle, out segments))
+                    throw new Exception(Core.core_get_dll_error());
+                return segments;
+            }
+        }
+
         public void Move(Vec3<float> offset)
         {
             if (!Core.scene_move_active_camera(offset.X, offset.Y, offset.Z))
@@ -155,11 +189,11 @@ namespace gui.Model.Camera
         }
 
         // Resets the camera's rotation and translation to how it was upon loading
-        public void Reset()
+        public void Reset(uint frame)
         {
-            Position = m_originalPosition;
-            ViewDirection = m_originalViewDirection;
-            Up = m_originalUp;
+            Position = m_originalData[(int)frame].position;
+            ViewDirection = m_originalData[(int)frame].viewDirection;
+            Up = m_originalData[(int)frame].up;
             Near = m_originalNear;
             Far = m_originalFar;
             ResetConcreteModel();

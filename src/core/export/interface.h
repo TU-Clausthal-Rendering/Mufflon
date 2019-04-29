@@ -388,12 +388,12 @@ CORE_API Boolean CDECL world_get_material_data(MaterialHdl material, MaterialPar
 // TODO: blended/fresnel materials
 // TODO: glass/opaque materials
 // TODO: add more cameras
-CORE_API CameraHdl CDECL world_add_pinhole_camera(const char* name, Vec3 position,
-											   Vec3 dir, Vec3 up, float near,
-											   float far, float vFov);
-CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
-												Vec3 up, float near, float far,
-												float focalLength, float focusDistance,
+CORE_API CameraHdl CDECL world_add_pinhole_camera(const char* name, const Vec3* position, const Vec3* dir,
+												  const Vec3* up, const uint32_t pathCount,
+												  float near, float far, float vFov);
+CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, const Vec3* position, const Vec3* dir,
+												const Vec3* up, const uint32_t pathCount, float near,
+												float far, float focalLength, float focusDistance,
 												float lensRad, float chipHeight);
 CORE_API Boolean CDECL world_remove_camera(CameraHdl hdl);
 CORE_API LightHdl CDECL world_add_light(const char* name, LightType type);
@@ -491,13 +491,19 @@ CORE_API Boolean CDECL world_get_texture_size(TextureHdl hdl, IVec2* size);
 // Camera interface
 CORE_API CameraType CDECL world_get_camera_type(ConstCameraHdl cam);
 CORE_API const char* CDECL world_get_camera_name(ConstCameraHdl cam);
-CORE_API Boolean CDECL world_get_camera_position(ConstCameraHdl cam, Vec3* pos);
-CORE_API Boolean CDECL world_get_camera_direction(ConstCameraHdl cam, Vec3* dir);
-CORE_API Boolean CDECL world_get_camera_up(ConstCameraHdl cam, Vec3* up);
+CORE_API Boolean CDECL world_get_camera_path_segment_count(ConstCameraHdl cam, uint32_t* segments);
+CORE_API Boolean CDECL world_get_camera_position(ConstCameraHdl cam, Vec3* pos, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_get_camera_current_position(ConstCameraHdl cam, Vec3* pos);
+CORE_API Boolean CDECL world_get_camera_direction(ConstCameraHdl cam, Vec3* dir, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_get_camera_current_direction(ConstCameraHdl cam, Vec3* dir);
+CORE_API Boolean CDECL world_get_camera_up(ConstCameraHdl cam, Vec3* up, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_get_camera_current_up(ConstCameraHdl cam, Vec3* up);
 CORE_API Boolean CDECL world_get_camera_near(ConstCameraHdl cam, float* near);
 CORE_API Boolean CDECL world_get_camera_far(ConstCameraHdl cam, float* far);
-CORE_API Boolean CDECL world_set_camera_position(CameraHdl cam, Vec3 pos);
-CORE_API Boolean CDECL world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up);
+CORE_API Boolean CDECL world_set_camera_position(CameraHdl cam, Vec3 pos, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_set_camera_current_position(CameraHdl cam, Vec3 pos);
+CORE_API Boolean CDECL world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_set_camera_current_direction(CameraHdl cam, Vec3 dir, Vec3 up);
 CORE_API Boolean CDECL world_set_camera_near(CameraHdl cam, float near);
 CORE_API Boolean CDECL world_set_camera_far(CameraHdl cam, float far);
 CORE_API Boolean CDECL world_get_pinhole_camera_fov(ConstCameraHdl cam, float* vFov);

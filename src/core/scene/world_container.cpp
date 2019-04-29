@@ -22,6 +22,15 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
+void WorldContainer::set_frame_current(const u32 frameCurrent) {
+	const u32 newFrame = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent));
+	if(newFrame != m_frameCurrent) {
+		m_frameCurrent = newFrame;
+		// Delete the current scene to make it clear to everyone that it needs to be refetched
+		m_scene.reset();
+	}
+}
+
 WorldContainer::Sanity WorldContainer::is_sane_world() const {
 	// Check for objects
 	if(m_instances.empty() && m_animatedInstances.empty())
@@ -557,7 +566,7 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
 	m_scenario = &scenario;
-	m_scene = std::make_unique<Scene>(scenario);
+	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart);
 	u32 instIdx = 0;
 	// TODO: unload LoDs that are not needed anymore?
 

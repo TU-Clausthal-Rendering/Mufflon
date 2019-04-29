@@ -27,8 +27,9 @@ class Scenario;
  */
 class Scene {
 public:
-	Scene(const Scenario& scenario) :
-		m_scenario(scenario)
+	Scene(const Scenario& scenario, const u32 animationPathIndex) :
+		m_scenario(scenario),
+		m_animationPathIndex(animationPathIndex)
 	{}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = default;
@@ -147,6 +148,7 @@ private:
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
 	const Scenario& m_scenario;		// Reference to the scenario which is presented by this scene
+	const u32 m_animationPathIndex;	// Path index for camera animation
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object

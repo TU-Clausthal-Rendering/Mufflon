@@ -15,11 +15,10 @@ namespace mufflon { namespace cameras {
 class Pinhole : public Camera {
 public:
 	Pinhole() = default;
-	Pinhole(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
-			Radians vFov, float near = 1e-10f,
+	Pinhole(const ei::Vec3* position, const ei::Vec3* dir, const ei::Vec3* up,
+			const u32 pathCount, Radians vFov, float near = 1e-10f,
 			float far = 1e10f) :
-		Camera(CameraModel::PINHOLE, std::move(position), std::move(dir),
-			   std::move(up), near, far),
+		Camera(CameraModel::PINHOLE, position, dir, up, pathCount, near, far),
 		m_vFov(vFov),
 		m_tanVFov(std::tan(m_vFov / 2.f))
 	{}
@@ -28,7 +27,7 @@ public:
 	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = std::tan(fov / 2); }
 
 	// Get the parameter bundle
-	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const final;
+	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution, const u32 pathIndex) const final;
 
 	// Get the required size of a parameter bundle.
 	std::size_t get_parameter_pack_size() const final;

@@ -5,17 +5,17 @@
 
 namespace mufflon::cameras {
 
-	void Pinhole::get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const {
+	void Pinhole::get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution, const u32 pathIndex) const {
 		PinholeParams buffer{
 			CameraParams{
 				CameraModel::PINHOLE,
 				std::numeric_limits<scene::materials::MediumHandle>::max() // Placeholder
 			}, 
-			m_position,
+			get_position(pathIndex),
 			m_tanVFov,
-			get_view_dir(),
+			get_view_dir(pathIndex),
 			m_near,
-			get_up_dir(),
+			get_up_dir(pathIndex),
 			m_far,
 			ei::Vec<u16,2>{resolution}
 		};

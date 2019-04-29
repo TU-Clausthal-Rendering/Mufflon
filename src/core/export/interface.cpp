@@ -1480,14 +1480,15 @@ Boolean world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
 }
 
 
-CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
-								   Vec3 up, float near, float far, float vFov) {
+CameraHdl world_add_pinhole_camera(const char* name, const Vec3* position, const Vec3* dir,
+								   const Vec3* up, const std::uint32_t pathCount, float near,
+								   float far, float vFov) {
 	TRY
 	CHECK_NULLPTR(name, "camera name", nullptr);
 	CameraHandle hdl = s_world.add_camera(name,
 		std::make_unique<cameras::Pinhole>(
-			util::pun<ei::Vec3>(position), util::pun<ei::Vec3>(dir),
-			util::pun<ei::Vec3>(up), vFov, near, far
+			reinterpret_cast<const ei::Vec3*>(position), reinterpret_cast<const ei::Vec3*>(dir),
+			reinterpret_cast<const ei::Vec3*>(up), pathCount, vFov, near, far
 	));
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating pinhole camera");
@@ -1497,16 +1498,16 @@ CameraHdl world_add_pinhole_camera(const char* name, Vec3 position, Vec3 dir,
 	CATCH_ALL(nullptr)
 }
 
-CameraHdl world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
-								 Vec3 up, float near, float far,
+CameraHdl world_add_focus_camera(const char* name, const Vec3* position, const Vec3* dir,
+								 const Vec3* up, const std::uint32_t pathCount, float near, float far,
 								 float focalLength, float focusDistance,
 								 float lensRad, float chipHeight) {
 	TRY
 	CHECK_NULLPTR(name, "camera name", nullptr);
 	CameraHandle hdl = s_world.add_camera(name,
 		std::make_unique<cameras::Focus>(
-			util::pun<ei::Vec3>(position), util::pun<ei::Vec3>(dir),
-			util::pun<ei::Vec3>(up), focalLength, focusDistance,
+			reinterpret_cast<const ei::Vec3*>(position), reinterpret_cast<const ei::Vec3*>(dir),
+			reinterpret_cast<const ei::Vec3*>(up), pathCount, focalLength, focusDistance,
 			lensRad, chipHeight, near, far
 		));
 	if(hdl == nullptr) {
@@ -1801,29 +1802,81 @@ const char* world_get_camera_name(ConstCameraHdl cam) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_get_camera_position(ConstCameraHdl cam, Vec3* pos) {
+Boolean world_get_camera_path_segment_count(ConstCameraHdl cam, uint32_t* segments) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", false);
-	if(pos != nullptr)
-		*pos = util::pun<Vec3>(static_cast<const cameras::Camera*>(cam)->get_position());
+	if(segments != nullptr) {
+		*segments = static_cast<const cameras::Camera*>(cam)->get_path_segment_count();
+	}
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_camera_direction(ConstCameraHdl cam, Vec3* dir) {
+Boolean world_get_camera_position(ConstCameraHdl cam, Vec3* pos, const std::uint32_t pathIndex) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", false);
-	if(dir != nullptr)
-		*dir = util::pun<Vec3>(static_cast<const cameras::Camera*>(cam)->get_view_dir());
+	if(pos != nullptr) {
+		const auto& camera = *static_cast<const cameras::Camera*>(cam);
+		*pos = util::pun<Vec3>(camera.get_position(std::min(pathIndex, camera.get_path_segment_count() - 1u)));
+	}
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_camera_up(ConstCameraHdl cam, Vec3* up) {
+Boolean world_get_camera_current_position(ConstCameraHdl cam, Vec3* pos) {
+	TRY
+		CHECK_NULLPTR(cam, "camera handle", false);
+	if(pos != nullptr) {
+		const auto& camera = *static_cast<const cameras::Camera*>(cam);
+		*pos = util::pun<Vec3>(camera.get_position(std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+															camera.get_path_segment_count() - 1u)));
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_direction(ConstCameraHdl cam, Vec3* dir, const std::uint32_t pathIndex) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", false);
-	if(up != nullptr)
-		*up = util::pun<Vec3>(static_cast<const cameras::Camera*>(cam)->get_up_dir());
+	if(dir != nullptr) {
+		const auto& camera = *static_cast<const cameras::Camera*>(cam);
+		*dir = util::pun<Vec3>(camera.get_view_dir(std::min(pathIndex, camera.get_path_segment_count() - 1u)));
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_current_direction(ConstCameraHdl cam, Vec3* dir) {
+	TRY
+		CHECK_NULLPTR(cam, "camera handle", false);
+	if(dir != nullptr) {
+		const auto& camera = *static_cast<const cameras::Camera*>(cam);
+		*dir = util::pun<Vec3>(camera.get_view_dir(std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+															camera.get_path_segment_count() - 1u)));
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_up(ConstCameraHdl cam, Vec3* up, const std::uint32_t pathIndex) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(up != nullptr) {
+		const auto& camera = *static_cast<const cameras::Camera*>(cam);
+		*up = util::pun<Vec3>(camera.get_up_dir(std::min(pathIndex, camera.get_path_segment_count() - 1u)));
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_camera_current_up(ConstCameraHdl cam, Vec3* up) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	if(up != nullptr) {
+		const auto& camera = *static_cast<const cameras::Camera*>(cam);
+		*up = util::pun<Vec3>(camera.get_up_dir(std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+															camera.get_path_segment_count() - 1u)));
+	}
 	return true;
 	CATCH_ALL(false)
 }
@@ -1846,21 +1899,47 @@ Boolean world_get_camera_far(ConstCameraHdl cam, float* far) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_camera_position(CameraHdl cam, Vec3 pos) {
+Boolean world_set_camera_position(CameraHdl cam, Vec3 pos, const std::uint32_t pathIndex) {
 	TRY
-		CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
-	camera.set_position(util::pun<scene::Point>(pos));
+	camera.set_position(util::pun<scene::Point>(pos), std::min(pathIndex, camera.get_path_segment_count() - 1u));
 	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up) {
+Boolean world_set_camera_current_position(CameraHdl cam, Vec3 pos) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
-	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up));
+	camera.set_position(util::pun<scene::Point>(pos), std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+															   camera.get_path_segment_count() - 1u));
+	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up, const std::uint32_t pathIndex) {
+	TRY
+	CHECK_NULLPTR(cam, "camera handle", false);
+	auto& camera = *static_cast<cameras::Camera*>(cam);
+	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up), pathIndex);
+	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up),
+						std::min(pathIndex, camera.get_path_segment_count() - 1u));
+	// TODO: compute proper rotation
+	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_camera_current_direction(CameraHdl cam, Vec3 dir, Vec3 up) {
+	TRY
+		CHECK_NULLPTR(cam, "camera handle", false);
+	auto& camera = *static_cast<cameras::Camera*>(cam);
+	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up),
+						std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+								 camera.get_path_segment_count() - 1u));
 	// TODO: compute proper rotation
 	s_world.mark_camera_dirty(static_cast<CameraHandle>(cam));
 	return true;
@@ -2038,12 +2117,9 @@ CameraHdl scenario_get_camera(ScenarioHdl scenario) {
 
 Boolean world_set_frame_current(const uint32_t animationFrame) {
 	TRY
-	const u32 currentFrame = s_world.get_frame_current();
+	// Necessary to lock because setting a new frame clears out the scene!
+	auto lock = std::scoped_lock(s_iterationMutex);
 	s_world.set_frame_current(animationFrame);
-	const u32 currentFrameAfter = s_world.get_frame_current();
-	// May need to reload scenario
-	if(currentFrameAfter != currentFrame)
-		world_load_scenario(s_world.get_current_scenario());
 	return true;
 	CATCH_ALL(false)
 }
@@ -2377,22 +2453,25 @@ Boolean scene_move_active_camera(float x, float y, float z) {
 		logError("[", FUNCTION_NAME, "] No scene loaded yet");
 		return false;
 	}
-	s_world.get_current_scenario()->get_camera()->move(x, y, z);
-	s_world.mark_camera_dirty(s_world.get_current_scenario()->get_camera());
+	auto& camera = *s_world.get_current_scenario()->get_camera();
+	camera.move(x, y, z, std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current() - s_world.get_frame_start()));
+	s_world.mark_camera_dirty(&camera);
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean scene_rotate_active_camera(float x, float y, float z) {
 	TRY
-		if(s_world.get_current_scene() == nullptr) {
-			logError("[", FUNCTION_NAME, "] No scene loaded yet");
-			return false;
-		}
-	s_world.get_current_scenario()->get_camera()->rotate_up_down(x);
-	s_world.get_current_scenario()->get_camera()->rotate_left_right(y);
-	s_world.get_current_scenario()->get_camera()->roll(z);
-	s_world.mark_camera_dirty(s_world.get_current_scenario()->get_camera());
+	if(s_world.get_current_scene() == nullptr) {
+		logError("[", FUNCTION_NAME, "] No scene loaded yet");
+		return false;
+	}
+	auto& camera = *s_world.get_current_scenario()->get_camera();
+	const u32 frame = std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current() - s_world.get_frame_start());
+	camera.rotate_up_down(x, frame);
+	camera.rotate_left_right(y, frame);
+	camera.roll(z, frame);
+	s_world.mark_camera_dirty(&camera);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2400,6 +2479,12 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 Boolean scene_is_sane() {
 	TRY
 	ConstSceneHandle sceneHdl = s_world.get_current_scene();
+	if(sceneHdl == nullptr) {
+		// Check if a rebuild was demanded
+		if(s_world.get_current_scenario() != nullptr)
+			world_load_scenario(s_world.get_current_scenario());
+	}
+
 	if(sceneHdl != nullptr)
 		return sceneHdl->is_sane();
 	return false;
@@ -2741,8 +2826,19 @@ Boolean render_iterate(ProcessTime* time) {
 		return false;
 	}
 	// Check if the scene needed a reload -> reset
-	if(s_world.reload_scene())
+	if(s_world.get_current_scene() == nullptr) {
+		if(s_world.get_current_scenario() == nullptr) {
+			logError("[", FUNCTION_NAME, "] Failed to load scenario");
+			return false;
+		}
+		SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(s_world.get_current_scenario()));
+		ei::IVec2 res = s_world.get_current_scenario()->get_resolution();
+		if(s_currentRenderer != nullptr)
+			s_currentRenderer->load_scene(hdl, res);
+		s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
+	} else if(s_world.reload_scene()) {
 		s_currentRenderer->reset();
+	}
 	s_currentRenderer->pre_iteration(*s_imageOutput);
 	if(time != nullptr) {
 		time->cycles = CpuProfileState::get_cpu_cycle();

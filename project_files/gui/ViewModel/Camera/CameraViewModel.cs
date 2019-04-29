@@ -21,11 +21,12 @@ namespace gui.ViewModel.Camera
         {
             m_world = models.World;
             m_parent = parent;
-            m_resetTransRotCommand = new ResetCameraCommand(models.Settings, parent);
+            m_resetTransRotCommand = new ResetCameraCommand(models, parent);
             parent.PropertyChanged += ModelOnPropertyChanged;
 
             m_world.CurrentScenario.PropertyChanged += CurrentScenarioOnPropertyChanged;
             m_world.PropertyChanged += WorldOnPropertyChanged;
+            OnPropertyChanged(nameof(IsAnimated));
         }
 
         private void WorldOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -36,6 +37,14 @@ namespace gui.ViewModel.Camera
                     m_world.PreviousScenario.PropertyChanged -= CurrentScenarioOnPropertyChanged;
                     m_world.CurrentScenario.PropertyChanged += CurrentScenarioOnPropertyChanged;
                     OnPropertyChanged(nameof(IsSelected));
+                    break;
+                case nameof(WorldModel.AnimationFrameCurrent):
+                    OnPropertyChanged(nameof(PositionX));
+                    OnPropertyChanged(nameof(PositionY));
+                    OnPropertyChanged(nameof(PositionZ));
+                    OnPropertyChanged(nameof(DirectionX));
+                    OnPropertyChanged(nameof(DirectionY));
+                    OnPropertyChanged(nameof(DirectionZ));
                     break;
             }
         }
@@ -70,12 +79,17 @@ namespace gui.ViewModel.Camera
                     OnPropertyChanged(nameof(DirectionY));
                     OnPropertyChanged(nameof(DirectionZ));
                     break;
+                case nameof(CameraModel.PathSegments):
+                    OnPropertyChanged(nameof(IsAnimated));
+                    break;
             }
         }
 
         public string Type => m_parent.Type.ToString();
 
         public string Name => m_parent.Name;
+
+        public bool IsAnimated { get => m_parent.PathSegments > 1u; }
 
         public bool IsSelected
         {

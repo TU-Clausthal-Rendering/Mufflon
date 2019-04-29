@@ -306,21 +306,19 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		if(type.compare("pinhole") == 0) {
 			// Pinhole camera
 			const float fovDegree = read_opt<float>(m_state, camera, "fov", 25.f);
-			// TODO: add entire path!
-			if(camPath.size() > 1u)
-				logWarning("[JsonLoader::load_cameras] Scene file: camera paths are not supported yet");
-			if(world_add_pinhole_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
-										util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
-										near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
+			if(world_add_pinhole_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
+										reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
+										static_cast<uint32_t>(camPath.size()), near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
 				throw std::runtime_error("Failed to add pinhole camera");
 		} else if(type.compare("focus") == 0) {
 			const float focalLength = read_opt<float>(m_state, camera, "focalLength", 35.f) / 1000.f;
 			const float focusDistance = read<float>(m_state, get(m_state, camera, "focusDistance"));
 			const float sensorHeight = read_opt<float>(m_state, camera, "chipHeight", 24.f) / 1000.f;
 			const float lensRadius = (focalLength / read_opt<float>(m_state, camera, "aperture", focalLength)) / 2.f;
-			if(world_add_focus_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
-									   util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
-									   near, far, focalLength, focusDistance, lensRadius, sensorHeight) == nullptr)
+			if(world_add_focus_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
+									  reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
+									  static_cast<uint32_t>(camPath.size()), near, far, focalLength, focusDistance,
+									  lensRadius, sensorHeight) == nullptr)
 				throw std::runtime_error("Failed to add focus camera");
 		} else if(type.compare("ortho") == 0) {
 			// TODO: Orthogonal camera

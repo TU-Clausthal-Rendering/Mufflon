@@ -174,11 +174,14 @@ public:
 		return m_scene.get();
 	}
 
-	// Sets/gets the current animation frame and min/max defined frames
+	// Gets the current animation frame and min/max defined frames
 	u32 get_frame_start() const noexcept { return m_frameStart; }
 	u32 get_frame_end() const noexcept { return m_frameEnd; }
 	u32 get_frame_current() const noexcept { return m_frameCurrent; }
-	void set_frame_current(const u32 frameCurrent) { m_frameCurrent = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent)); }
+
+	// Set the new animation frame. Caution: this invalidates the currently loaded scene
+	// which must thus be set for any active renderer!
+	void set_frame_current(const u32 frameCurrent);
 
 	// Performs a sanity check on the current world - has lights, cameras etc.
 	Sanity is_sane_world() const;

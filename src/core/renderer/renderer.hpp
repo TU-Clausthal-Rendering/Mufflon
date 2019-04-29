@@ -29,11 +29,9 @@ public:
 	}
 
 	void load_scene(mufflon::scene::SceneHandle scene, const ei::IVec2& resolution) {
-		if(scene != m_currentScene) {
-			m_currentScene = scene;
-			this->on_scene_load();
-			this->reset();
-		}
+		m_currentScene = scene;
+		this->on_scene_load();
+		this->reset();
 	}
 
 	bool has_scene() const noexcept {

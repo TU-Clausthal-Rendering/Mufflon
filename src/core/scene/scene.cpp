@@ -244,7 +244,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
-		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution);
+		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution,
+										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
 	}
 
 	// Light tree

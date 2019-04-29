@@ -15,6 +15,11 @@ namespace mff_loader::exprt {
 
 namespace {
 
+// Utility for comparing Vec3s
+bool operator!=(const Vec3& a, const Vec3& b) {
+	return (a.x != b.x) && (a.y != b.y) && (a.z != b.z);
+}
+
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
 	auto scope = mufflon::Profiler::instance().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
@@ -126,6 +131,10 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 	cameras.SetObject();
 	size_t cameraCount = world_get_camera_count();
 
+	std::uint32_t frameStart, frameEnd;
+	if(!world_get_frame_start(&frameStart) || !world_get_frame_end(&frameEnd))
+		throw std::runtime_error("Failed to acquire animation start and end frames");
+
 	for(size_t i = 0; i < cameraCount; i++) {
 		rapidjson::Value camera;
 		camera.SetObject();
@@ -165,27 +174,46 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 		}
 		rapidjson::Value v = rapidjson::Value();
 
+		// Export the paths (possibly animated)
+		bool animated = false;
+		std::vector<Vec3> positions, directions, ups;
+		for(std::uint32_t frame = frameStart; frame <= frameEnd; ++frame) {
+			Vec3 position;
+			world_get_camera_position(cameraHandle, &position, frame - frameStart);
 
-		Vec3 position; // TODO Animated
-		world_get_camera_position(cameraHandle, &position);
-		rapidjson::Value positionPath;
-		positionPath.SetArray();
-		positionPath.PushBack(store_in_array(position, document), document.GetAllocator());
-		camera.AddMember("path", positionPath, document.GetAllocator());
+			Vec3 viewDirection;
+			world_get_camera_direction(cameraHandle, &viewDirection, frame - frameStart);
 
-		Vec3 viewDirection; // TODO Animated
-		world_get_camera_direction(cameraHandle, &viewDirection);
-		rapidjson::Value  viewDirectionPath;
-		viewDirectionPath.SetArray();
-		viewDirectionPath.PushBack(store_in_array(viewDirection, document), document.GetAllocator());
-		camera.AddMember("viewDir", viewDirectionPath, document.GetAllocator());
+			Vec3 upDirection;
+			world_get_camera_direction(cameraHandle, &upDirection, frame - frameStart);
 
-		Vec3 upDirection; // TODO Animated
-		world_get_camera_direction(cameraHandle, &upDirection);
-		rapidjson::Value upDirectionPath;
-		upDirectionPath.SetArray();
-		upDirectionPath.PushBack(store_in_array(upDirection, document), document.GetAllocator());
-		camera.AddMember("up", upDirectionPath, document.GetAllocator());
+			// Check if there are differences
+			if(!animated && positions.size() > 1u && (positions.back() != position
+				|| directions.back() != viewDirection || ups.back() != upDirection))
+				animated = true;
+		
+			positions.push_back(position);
+			directions.push_back(viewDirection);
+			ups.push_back(upDirection);
+		}
+
+		// If we're not animated only export one frame
+		for(std::uint32_t frame = frameStart; frame <= (animated ? frameEnd : frameStart); ++frame) {
+			rapidjson::Value positionPath;
+			positionPath.SetArray();
+			positionPath.PushBack(store_in_array(positions[frame - frameStart], document), document.GetAllocator());
+			camera.AddMember("path", positionPath, document.GetAllocator());
+
+			rapidjson::Value  viewDirectionPath;
+			viewDirectionPath.SetArray();
+			viewDirectionPath.PushBack(store_in_array(directions[frame - frameStart], document), document.GetAllocator());
+			camera.AddMember("viewDir", viewDirectionPath, document.GetAllocator());
+
+			rapidjson::Value upDirectionPath;
+			upDirectionPath.SetArray();
+			upDirectionPath.PushBack(store_in_array(ups[frame - frameStart], document), document.GetAllocator());
+			camera.AddMember("up", upDirectionPath, document.GetAllocator());
+		}
 
 		rapidjson::Value cameraName;
 		cameraName.SetString(rapidjson::StringRef(world_get_camera_name(cameraHandle)));
