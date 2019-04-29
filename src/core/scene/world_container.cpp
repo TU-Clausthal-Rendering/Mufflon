@@ -72,25 +72,27 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 			break;
 		}
 	}
-	if(hdl->get_animation_frame() < m_animatedInstances.size() && m_animatedInstances[hdl->get_animation_frame()] != nullptr) {
-		// Check the instances from the scenario frame
-		for(const auto& instance : *m_animatedInstances[hdl->get_animation_frame()]) {
-			if(hdl->is_masked(instance.second.get()))
-				continue;
+	for(const auto& frameInstances : m_animatedInstances) {
+		if(frameInstances != nullptr) {
+			// Check the animated instances
+			for(const auto& instance : *frameInstances) {
+				if(hdl->is_masked(instance.second.get()))
+					continue;
 
-			hasObjects = true;
-			const Object& object = instance.second->get_object();
-			const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
-			if(object.has_lod_available(lodLevel)) {
-				const Lod& lod = object.get_lod(lodLevel);
-				if(lod.is_emissive(*hdl)) {
+				hasObjects = true;
+				const Object& object = instance.second->get_object();
+				const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
+				if(object.has_lod_available(lodLevel)) {
+					const Lod& lod = object.get_lod(lodLevel);
+					if(lod.is_emissive(*hdl)) {
+						hasEmitters = true;
+						break;
+					}
+				} else {
+					// TODO: how could we possibly check this?
 					hasEmitters = true;
 					break;
 				}
-			} else {
-				// TODO: how could we possibly check this?
-				hasEmitters = true;
-				break;
 			}
 		}
 	}
@@ -177,8 +179,17 @@ InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle ob
 		m_instances[nameRef] = std::move(instance);
 		return m_instances[nameRef].get();
 	} else {
+		// Check if it's the first instance ever and set start+end frames accordingly
+		if(m_animatedInstances.size() == 0u) {
+			m_frameCurrent = animationFrame;
+			m_frameStart = animationFrame;
+			m_frameEnd = animationFrame;
+		}
+
 		if(m_animatedInstances.size() <= animationFrame)
 			m_animatedInstances.resize(animationFrame + 1u);
+		m_frameStart = std::min(m_frameStart, animationFrame);
+		m_frameEnd = std::max(m_frameEnd, animationFrame);
 		if(m_animatedInstances[animationFrame] == nullptr)
 			m_animatedInstances[animationFrame] = std::make_unique<std::unordered_map<StringView, std::unique_ptr<Instance>>>();
 		(*m_animatedInstances[animationFrame])[nameRef] = std::move(instance);
@@ -587,9 +598,8 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	// Load non-animated and animated instances
 	for(auto& instance : m_instances)
 		addObjAndInstance(*instance.second);
-	if(m_animatedInstances.size() > scenario.get_animation_frame()
-	   && m_animatedInstances[scenario.get_animation_frame()] != nullptr)
-		for(auto& instance : *m_animatedInstances[scenario.get_animation_frame()])
+	if(m_animatedInstances.size() > m_frameCurrent && m_animatedInstances[m_frameCurrent] != nullptr)
+		for(auto& instance : *m_animatedInstances[m_frameCurrent])
 			addObjAndInstance(*instance.second);
 
 	// Check if the resulting scene has issues with size
@@ -610,7 +620,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	m_scene->set_camera(m_scenario->get_camera());
 
 	m_scenario->camera_dirty_reset();
-	m_scenario->animation_frame_dirty_reset();
 
 	// Assign the newly created scene and destroy the old one?
 	return m_scene.get();
@@ -626,7 +635,7 @@ bool WorldContainer::reload_scene() {
 	mAssert(m_scenario != nullptr);
 
 	// TODO: better differentiate what needs to be reloaded on animation change
-	if(m_scene == nullptr || m_scenario->animation_frame_dirty_reset()) {
+	if(m_scene == nullptr) {
 		(void) load_scene(*m_scenario);
 		return true;
 	}

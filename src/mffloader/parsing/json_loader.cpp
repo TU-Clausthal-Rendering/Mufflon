@@ -483,8 +483,6 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		auto lightIter = get(m_state, scenario, "lights", false);
 		u32 lod = read_opt<u32>(m_state, scenario, "lod", 0u);
 
-		const u32 animationFrame = read_opt<u32>(m_state, scenario, "frame", 0);
-
 		CameraHdl camHdl = world_get_camera(camera);
 		if(camHdl == nullptr)
 			throw std::runtime_error("Camera '" + std::string(camera) + "' does not exist");
@@ -492,8 +490,6 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(scenarioHdl == nullptr)
 			throw std::runtime_error("Failed to create scenario");
 
-		if(!scenario_set_animation_frame(scenarioHdl, animationFrame))
-			throw std::runtime_error("Failed to set animation frame");
 		if(!scenario_set_camera(scenarioHdl, camHdl))
 			throw std::runtime_error("Failed to set camera '" + std::string(camera) + "'");
 		if(!scenario_set_resolution(scenarioHdl, resolution.x, resolution.y))
@@ -563,18 +559,23 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				assertObject(m_state, instance);
 
 				// Set masking for both animated and non-animated instances
-				InstanceHdl animInstHdl = world_get_instance(&instName[0u], animationFrame);
-				if(animInstHdl == nullptr)
-					throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
-				// Read LoD
-				if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-					if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
-						throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-				// Read masking information
-				if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-					&& read<bool>(m_state, maskIter))
-					if(!scenario_mask_instance(scenarioHdl, animInstHdl))
-						throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				u32 frameStart, frameEnd;
+				world_get_frame_start(&frameStart);
+				world_get_frame_start(&frameEnd);
+				for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+					InstanceHdl animInstHdl = world_get_instance(&instName[0u], frame);
+					if(animInstHdl == nullptr)
+						throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
+					// Read LoD
+					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+						if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
+							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+					// Read masking information
+					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+					   && read<bool>(m_state, maskIter))
+						if(!scenario_mask_instance(scenarioHdl, animInstHdl))
+							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				}
 
 				InstanceHdl instHdl = world_get_instance(&instName[0u], 0xFFFFFFFF);
 				if(instHdl == nullptr)

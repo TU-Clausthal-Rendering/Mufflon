@@ -57,6 +57,47 @@ namespace gui.Model.Scene
             }
         }
 
+        public uint AnimationFrameStart
+        {
+            get
+            {
+                uint frame;
+                if (!Core.world_get_frame_start(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                return frame;
+            }
+        }
+
+        public uint AnimationFrameEnd
+        {
+            get
+            {
+                uint frame;
+                if (!Core.world_get_frame_end(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                return frame;
+            }
+        }
+
+        public uint AnimationFrameCurrent
+        {
+            set
+            {
+                if (value == AnimationFrameCurrent) return;
+                if (!Core.world_set_frame_current(value))
+                    throw new Exception(Core.core_get_dll_error());
+                // TODO: how to trigger all the propertychanged things?
+                OnPropertyChanged(nameof(AnimationFrameCurrent));
+            }
+            get
+            {
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                return frame;
+            }
+        }
+
         public bool IsSane => Core.scene_is_sane();
 
         private async void LoadScenarioAsync(ScenarioModel scenario)
@@ -75,6 +116,9 @@ namespace gui.Model.Scene
             OnPropertyChanged(nameof(CurrentScenario));
             OnPropertyChanged(nameof(BoundingBox));
             OnPropertyChanged(nameof(IsSane));
+            OnPropertyChanged(nameof(AnimationFrameCurrent));
+            OnPropertyChanged(nameof(AnimationFrameStart));
+            OnPropertyChanged(nameof(AnimationFrameEnd));
         }
 
         public BoundingBox BoundingBox

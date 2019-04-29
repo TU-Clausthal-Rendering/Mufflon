@@ -2023,22 +2023,38 @@ CameraHdl scenario_get_camera(ScenarioHdl scenario) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean scenario_set_animation_frame(ScenarioHdl scenario, const uint32_t animationFrame) {
+Boolean world_set_frame_current(const uint32_t animationFrame) {
 	TRY
-	CHECK_NULLPTR(scenario, "scenario handle", false);
-	static_cast<Scenario*>(scenario)->set_animation_frame(animationFrame);
-	// We may need to reload the scene
-	if(scenario == s_world.get_current_scenario())
-		world_load_scenario(scenario);
+	const u32 currentFrame = s_world.get_frame_current();
+	s_world.set_frame_current(animationFrame);
+	const u32 currentFrameAfter = s_world.get_frame_current();
+	// May need to reload scenario
+	if(currentFrameAfter != currentFrame)
+		world_load_scenario(s_world.get_current_scenario());
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean scenario_get_animation_frame(ConstScenarioHdl scenario, uint32_t* animationFrame) {
+Boolean world_get_frame_current(uint32_t* animationFrame) {
 	TRY
-	CHECK_NULLPTR(scenario, "scenario handle", false);
 	if(animationFrame != nullptr)
-		*animationFrame = static_cast<const Scenario*>(scenario)->get_animation_frame();
+		*animationFrame = s_world.get_frame_current();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_frame_start(uint32_t* frameStart) {
+	TRY
+	if(frameStart != nullptr)
+		*frameStart = s_world.get_frame_start();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_frame_end(uint32_t* frameEnd) {
+	TRY
+	if(frameEnd != nullptr)
+		*frameEnd = s_world.get_frame_end();
 	return true;
 	CATCH_ALL(false)
 }

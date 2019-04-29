@@ -412,6 +412,10 @@ CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
 CORE_API Boolean CDECL world_is_sane(const char** msg);
+CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
+CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
+CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
+CORE_API Boolean CDECL world_get_frame_end(uint32_t* animationFrame);
 
 // Scenario interface
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
@@ -421,8 +425,6 @@ CORE_API Boolean CDECL scenario_get_resolution(ScenarioHdl scenario, uint32_t* w
 CORE_API Boolean CDECL scenario_set_resolution(ScenarioHdl scenario, uint32_t width, uint32_t height);
 CORE_API CameraHdl CDECL scenario_get_camera(ScenarioHdl scenario);
 CORE_API Boolean CDECL scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
-CORE_API Boolean CDECL scenario_set_animation_frame(ScenarioHdl scenario, const uint32_t animationFrame);
-CORE_API Boolean CDECL scenario_get_animation_frame(ConstScenarioHdl scenario, uint32_t* animationFrame);
 CORE_API Boolean CDECL scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj);
 CORE_API Boolean CDECL scenario_mask_object(ScenarioHdl scenario, ObjectHdl inst);
 CORE_API Boolean CDECL scenario_mask_instance(ScenarioHdl scenario, InstanceHdl obj);

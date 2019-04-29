@@ -174,6 +174,12 @@ public:
 		return m_scene.get();
 	}
 
+	// Sets/gets the current animation frame and min/max defined frames
+	u32 get_frame_start() const noexcept { return m_frameStart; }
+	u32 get_frame_end() const noexcept { return m_frameEnd; }
+	u32 get_frame_current() const noexcept { return m_frameCurrent; }
+	void set_frame_current(const u32 frameCurrent) { m_frameCurrent = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent)); }
+
 	// Performs a sanity check on the current world - has lights, cameras etc.
 	Sanity is_sane_world() const;
 	// Performs a sanity check for a given scenario (respects object masking etc.)
@@ -238,6 +244,11 @@ private:
 	// Current scene
 	ScenarioHandle m_scenario = nullptr;
 	std::unique_ptr<Scene> m_scene = nullptr;
+
+	// Current animation frame and range
+	u32 m_frameStart = 0u;
+	u32 m_frameEnd = 0u;
+	u32 m_frameCurrent = 0u;
 
 };
 

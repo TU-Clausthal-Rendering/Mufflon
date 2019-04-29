@@ -23,22 +23,6 @@ namespace gui.Model.Scene
     {
         private readonly WorldModel m_parent;
         public IntPtr Handle { get; }
-        public uint AnimationFrame
-        {
-            get
-            {
-                uint frame;
-                if (!Core.scenario_get_animation_frame(Handle, out frame))
-                    throw new Exception(Core.core_get_dll_error());
-                return frame;
-            }
-            set
-            {
-                if (AnimationFrame == value) return;
-                if (!Core.scenario_set_animation_frame(Handle, value))
-                    throw new Exception(Core.core_get_dll_error());
-            }
-        }
 
         public ScenarioModel(WorldModel parent, IntPtr handle)
         {
