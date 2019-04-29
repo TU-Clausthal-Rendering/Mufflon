@@ -225,6 +225,44 @@
                                Height="16"/>
                     </Button>
                 </StatusBarItem>
+                <Separator Background="{StaticResource BorderBrush}"/>
+                <StatusBarItem>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock Text="Start: "/>
+                            <TextBlock MinWidth="30"
+                                       Text="{Binding AnimationFrames.Start, Mode=OneWay}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <Slider Width="100"
+                                    Minimum="{Binding AnimationFrames.Start, Mode=OneWay}"
+                                    Maximum="{Binding AnimationFrames.End, Mode=OneWay}"
+                                    Value="{Binding AnimationFrames.Current, Mode=TwoWay}"
+                                    TickPlacement="BottomRight"
+                                    TickFrequency="10"
+                                    IsSnapToTickEnabled="False"/>
+                            <helper:EnterTextBox MinWidth="30"
+                                                 Text="{Binding AnimationFrames.Current, Mode=TwoWay}"
+                                                 Margin="{StaticResource LeftPropertyMargin}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock Text="End: "/>
+                            <TextBlock MinWidth="30"
+                                       Text="{Binding AnimationFrames.End, Mode=OneWay}"/>
+                        </StackPanel>
+                    </Grid>
+                </StatusBarItem>
             </StatusBar>
 
             <Border
@@ -269,15 +307,8 @@
                                 <DataTemplate>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="30"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <helper:EnterTextBox Grid.Column="0"
-                                                    HorizontalContentAlignment="Left"
-                                                    HorizontalAlignment="Stretch"
-                                                    Text="{Binding AnimationFrame}"
-                                                    Margin="{StaticResource LeftPropertyMargin}"
-                                                    ToolTip="Animation frame"/>
                                         <TextBlock Grid.Column="1"
                                                     Margin="{StaticResource RightPropertyMargin}"
                                                     Text="{Binding Name}"/>

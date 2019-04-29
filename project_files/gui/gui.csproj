@@ -141,6 +141,7 @@
     <Compile Include="Utility\Vec2.cs" />
     <Compile Include="Utility\Vec3.cs" />
     <Compile Include="ViewModel\AddPropertyViewModel.cs" />
+    <Compile Include="ViewModel\AnimationFrameViewModel.cs" />
     <Compile Include="ViewModel\Camera\AddCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\CamerasViewModel.cs" />
     <Compile Include="ViewModel\Camera\CameraViewModel.cs" />

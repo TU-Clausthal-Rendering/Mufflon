@@ -29,11 +29,6 @@ namespace gui.ViewModel
     {
         public ScenarioModel Scenario { get; private set; }
         public string Name { get => Scenario.Name; }
-        public uint AnimationFrame
-        {
-            get => Scenario.AnimationFrame;
-            set => Scenario.AnimationFrame = value;
-        }
 
         public ScenarioListItem(ScenarioModel scenario)
         {

@@ -48,6 +48,7 @@ namespace gui.ViewModel
         public KeyGestureViewModel KeyGestures { get; }
 
         public LoadWorldViewModel LoadWorld { get; }
+        public AnimationFrameViewModel AnimationFrames { get; }
 
         public CameraController CameraController { get; }
 
@@ -83,6 +84,7 @@ namespace gui.ViewModel
             RenderTargetSelection = new RenderTargetSelectionViewModel(m_models, Toolbar.ResetCommand);
 
             LoadWorld = new LoadWorldViewModel(m_models);
+            AnimationFrames = new AnimationFrameViewModel(m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);
