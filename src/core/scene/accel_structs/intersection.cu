@@ -52,8 +52,6 @@ CUDA_FUNCTION bool intersect(const ei::Box& bb,
 	const float cmax = spanEndKepler(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, tmax);
 	return cmin <= cmax;
 #else
-	// return intersects(bb, ray, cmin) && (cmin < tmax);
-	// TODO: use the epsilon one? FastRay one?
 	float t0 = bb.min.x * ray.invDirection.x - ray.oDivDir.x;
 	float t1 = bb.max.x * ray.invDirection.x - ray.oDivDir.x;
 	cmin = ei::min(t0, t1);
@@ -76,6 +74,11 @@ CUDA_FUNCTION bool intersect(const ei::Box& bb,
 #endif // __CUDA_ARCH__
 }
 
+// Partial abs: Get the absolute value except for 0 (in case of -0, the result will be -0);
+CUDA_FUNCTION __forceinline__ float pabs(const float x) {
+	return x < 0.0f ? -x : x;
+}
+
 // Helper functions for the intersection test
 CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, const float A2,
 											 const float B1, const float B2, const float C1,
@@ -89,26 +92,36 @@ CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, cons
 }
 
 // Quad intersection test
-CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay& ray, ei::Vec2& uv) {
-	// Implementation from http://www.sci.utah.edu/~kpotter/publications/ramsey-2004-RBPI.pdf
-	const ei::Vec3& p00 = quad.v0;
-	const ei::Vec3& p10 = quad.v1;
-	const ei::Vec3& p01 = quad.v3;
-	const ei::Vec3& p11 = quad.v2;
+// Implementation from http://www.sci.utah.edu/~kpotter/publications/ramsey-2004-RBPI.pdf
+//CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay& ray, ei::Vec2& uv) {
+CUDA_FUNCTION float intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, const ei::Vec3& p11, const ei::Vec3& p01,
+								  const ei::FastRay& ray, ei::Vec2& uv) {
+	// The following equations may degenare if one or two components of the ray.direction
+	// are 0. To prevent this we choose the largest component and one other to setup the system.
+	// At least one is always greater 0.
+	i32 d0 = 0, d1 = 1, d2 = 2;
+	if(pabs(ray.direction.x) < pabs(ray.direction.y) ||
+		pabs(ray.direction.x) < pabs(ray.direction.z)) {
+		if(pabs(ray.direction.y) >= pabs(ray.direction.z)) {
+			d0 = 1; d1 = 0; d2 = 2;
+		} else {
+			d0 = 2; d1 = 1; d2 = 0;
+		}
+	}
 
 	const ei::Vec3 a = p11 - p10 - p01 + p00;
 	const ei::Vec3 b = p10 - p00;
 	const ei::Vec3 c = p01 - p00;
-	const ei::Vec3 d = p00;
+	const ei::Vec3 d = p00 - ray.origin;
 
-	const float A1 = a.y * ray.direction.x - a.x * ray.direction.y;
-	const float A2 = a.z * ray.direction.x - a.x * ray.direction.z;
-	const float B1 = b.y * ray.direction.x - b.x * ray.direction.y;
-	const float B2 = b.z * ray.direction.x - b.x * ray.direction.z;
-	const float C1 = c.y * ray.direction.x - c.x * ray.direction.y;
-	const float C2 = c.z * ray.direction.x - c.x * ray.direction.z;
-	const float D1 = (d.y - ray.origin.y) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.y;
-	const float D2 = (d.z - ray.origin.z) * ray.direction.x - (d.x - ray.origin.x) * ray.direction.z;
+	const float A1 = a[d1] * ray.direction[d0] - a[d0] * ray.direction[d1];
+	const float A2 = a[d2] * ray.direction[d0] - a[d0] * ray.direction[d2];
+	const float B1 = b[d1] * ray.direction[d0] - b[d0] * ray.direction[d1];
+	const float B2 = b[d2] * ray.direction[d0] - b[d0] * ray.direction[d2];
+	const float C1 = c[d1] * ray.direction[d0] - c[d0] * ray.direction[d1];
+	const float C2 = c[d2] * ray.direction[d0] - c[d0] * ray.direction[d2];
+	const float D1 = d[d1] * ray.direction[d0] - d[d0] * ray.direction[d1];
+	const float D2 = d[d2] * ray.direction[d0] - d[d0] * ray.direction[d2];
 
 	// Solve quadratic equ. for number of hitpoints
 	float t = -1.f;
@@ -118,17 +131,11 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay
 		float u0 = 0.0f, u1 = 0.0f;
 		float t0 = -1.f;
 		float t1 = -1.f;
-		// Use the component with largest ray direction component to avoid singularities
 		if(v0 >= 0.f && v0 <= 1.f) {
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
-				if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-				   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
-					t0 = (u0*v0*a.x + u0 * b.x + v0 * c.x + d.x) * ray.invDirection.x - ray.oDivDir.x;
-				else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
-					t0 = (u0*v0*a.y + u0 * b.y + v0 * c.y + d.y) * ray.invDirection.y - ray.oDivDir.y;
-				else
-					t0 = (u0*v0*a.z + u0 * b.z + v0 * c.z + d.z) * ray.invDirection.z - ray.oDivDir.z;
+				// Use the component with largest ray direction component to avoid singularities
+				t0 = (u0*v0 * a[d0] + u0 * b[d0] + v0 * c[d0] + d[d0]) * ray.invDirection[d0];
 			}
 		}
 		if(v1 == v0) {
@@ -139,13 +146,8 @@ CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay
 			if(v1 >= 0.f && v1 <= 1.f) {
 				u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
 				if(u1 >= 0.f && u1 <= 1.f) {
-					if(ei::abs(ray.direction.x) >= ei::abs(ray.direction.y) &&
-					   ei::abs(ray.direction.x) >= ei::abs(ray.direction.z))
-						t1 = (u1*v1*a.x + u1 * b.x + v1 * c.x + d.x) * ray.invDirection.x - ray.oDivDir.x;
-					else if(ei::abs(ray.direction.y) >= ei::abs(ray.direction.z))
-						t1 = (u1*v1*a.y + u1 * b.y + v1 * c.y + d.y) * ray.invDirection.y - ray.oDivDir.y;
-					else
-						t1 = (u1*v1*a.z + u1 * b.z + v1 * c.z + d.z) * ray.invDirection.z - ray.oDivDir.z;
+					// Use the component with largest ray direction component to avoid singularities
+					t1 = (u1*v1 * a[d0] + u1 * b[d0] + v1 * c[d0] + d[d0]) * ray.invDirection[d0];
 				}
 			}
 			if(t0 > 0.f) {
@@ -199,20 +201,12 @@ CUDA_FUNCTION bool intersects_primitve(
 		// Quad.
 		const i32 indexOffset = (primId - obj.polygon.numTriangles) * 4 + obj.polygon.numTriangles * 3;
 		const ei::Vec3* meshVertices = obj.polygon.vertices;
-
-		// if(startPrimId == primId) return false; // TODO: #78 Masking to avoid self intersections
-		const ei::IVec4 ids = { obj.polygon.vertexIndices[indexOffset],
-								obj.polygon.vertexIndices[indexOffset + 1],
-								obj.polygon.vertexIndices[indexOffset + 2],
-								obj.polygon.vertexIndices[indexOffset + 3] };
-		const ei::Tetrahedron quad = { meshVertices[ids[0]],
-										meshVertices[ids[1]],
-										meshVertices[ids[2]],
-										meshVertices[ids[3]] };
+		const u32* ids = obj.polygon.vertexIndices + indexOffset;
 		ei::Vec2 bilinear;
 		// There are up to two intersections with a quad. Since the closer one
 		// could be the self intersection move forward on the ray before testing.
-		const float t = intersectQuad(quad, ray, bilinear);
+		const float t = intersectQuad(meshVertices[ids[0]], meshVertices[ids[1]],
+									  meshVertices[ids[2]], meshVertices[ids[3]], ray, bilinear);
 
 		if(t > 0.0f && t < hitT) {
 			hitT = t;
