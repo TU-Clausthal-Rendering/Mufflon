@@ -120,10 +120,14 @@ public:
 	std::size_t get_dir_light_count() const noexcept { return m_dirLights.size(); }
 	std::size_t get_env_light_count() const noexcept { return m_envLights.size(); }
 
+	std::size_t get_point_light_segment_count(u32 index);
+	std::size_t get_spot_light_segment_count(u32 index);
+	std::size_t get_dir_light_segment_count(u32 index);
+
 	// Adds a new light to the scene
-	std::optional<u32> add_light(std::string name, lights::PointLight&& light);
-	std::optional<u32> add_light(std::string name, lights::SpotLight&& light);
-	std::optional<u32> add_light(std::string name, lights::DirectionalLight&& light);
+	std::optional<u32> add_light(std::string name, const lights::PointLight& light, const u32 count);
+	std::optional<u32> add_light(std::string name, const lights::SpotLight& light, const u32 count);
+	std::optional<u32> add_light(std::string name, const lights::DirectionalLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, TextureHandle env);
 
 	// Replaces the texture of an envmap light; also updates its summed area table
@@ -132,9 +136,9 @@ public:
 	// Finds a light by name
 	std::optional<std::pair<u32, lights::LightType>> find_light(const StringView& name);
 	// Access the lights properties
-	lights::PointLight* get_point_light(u32 index);
-	lights::SpotLight* get_spot_light(u32 index);
-	lights::DirectionalLight* get_dir_light(u32 index);
+	lights::PointLight* get_point_light(u32 index, const u32 frame);
+	lights::SpotLight* get_spot_light(u32 index, const u32 frame);
+	lights::DirectionalLight* get_dir_light(u32 index, const u32 frame);
 	lights::Background* get_background(u32 index);
 	// Delete a light using its handle
 	void remove_light(u32 index, lights::LightType type);
@@ -233,9 +237,9 @@ private:
 	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
 	std::unordered_map<ConstCameraHandle, u8> m_camerasDirty;
 	// All light sources of the scene
-	util::IndexedStringMap<lights::PointLight> m_pointLights;
-	util::IndexedStringMap<lights::SpotLight> m_spotLights;
-	util::IndexedStringMap<lights::DirectionalLight> m_dirLights;
+	util::IndexedStringMap<std::vector<lights::PointLight>> m_pointLights;
+	util::IndexedStringMap<std::vector<lights::SpotLight>> m_spotLights;
+	util::IndexedStringMap<std::vector<lights::DirectionalLight>> m_dirLights;
 	util::IndexedStringMap<lights::Background> m_envLights;
 	// Dirty flags to keep track of changed values
 	bool m_lightsDirty = true;

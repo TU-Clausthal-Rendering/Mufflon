@@ -1526,19 +1526,19 @@ Boolean world_remove_camera(CameraHdl hdl) {
 	CATCH_ALL(false)
 }
 
-LightHdl world_add_light(const char* name, LightType type) {
+LightHdl world_add_light(const char* name, LightType type, const uint32_t count) {
 	TRY
 	CHECK_NULLPTR(name, "pointlight name", (LightHdl{7, 0}));
 	std::optional<u32> hdl;
 	switch(type) {
 		case LIGHT_POINT: {
-			hdl = s_world.add_light(name, lights::PointLight{});
+			hdl = s_world.add_light(name, lights::PointLight{}, count);
 		} break;
 		case LIGHT_SPOT: {
-			hdl = s_world.add_light(name, lights::SpotLight{});
+			hdl = s_world.add_light(name, lights::SpotLight{}, count);
 		} break;
 		case LIGHT_DIRECTIONAL: {
-			hdl = s_world.add_light(name, lights::DirectionalLight{});
+			hdl = s_world.add_light(name, lights::DirectionalLight{}, count);
 		} break;
 		case LIGHT_ENVMAP: {
 			hdl = s_world.add_light(name, TextureHandle{});
@@ -2294,21 +2294,21 @@ Boolean scenario_add_light(ScenarioHdl scenario, LightHdl hdl) {
 
 	switch(hdl.type) {
 		case LightType::LIGHT_POINT: {
-			if(s_world.get_point_light(hdl.index) == nullptr) {
+			if(s_world.get_point_light(hdl.index, 0u) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid point light handle");
 				return false;
 			}
 			scen.add_point_light(hdl.index);
 		}	break;
 		case LightType::LIGHT_SPOT: {
-			if(s_world.get_spot_light(hdl.index) == nullptr) {
+			if(s_world.get_spot_light(hdl.index, 0u) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid spot light handle");
 				return false;
 			}
 			scen.add_spot_light(hdl.index);
 		}	break;
 		case LightType::LIGHT_DIRECTIONAL: {
-			if(s_world.get_dir_light(hdl.index) == nullptr) {
+			if(s_world.get_dir_light(hdl.index, 0u) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid directional light handle");
 				return false;
 			}
@@ -2491,10 +2491,10 @@ Boolean scene_is_sane() {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos) {
+Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	const lights::PointLight* light = s_world.get_point_light(hdl.index);
+	const lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	if(pos != nullptr)
 		*pos = util::pun<Vec3>(light->position);
@@ -2502,10 +2502,10 @@ Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
+Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	const lights::PointLight* light = s_world.get_point_light(hdl.index);
+	const lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	if(intensity != nullptr)
 		*intensity = util::pun<Vec3>(light->intensity);
@@ -2513,10 +2513,19 @@ Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos) {
+Boolean world_get_point_light_path_segments(ConstLightHdl hdl, uint32_t* segments) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	lights::PointLight* light = s_world.get_point_light(hdl.index);
+	if(segments != nullptr)
+		*segments = static_cast<uint32_t>(s_world.get_point_light_segment_count(hdl.index));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos, const uint32_t frame) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
+	lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	light->position = util::pun<ei::Vec3>(pos);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
@@ -2524,10 +2533,10 @@ Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
+Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	lights::PointLight* light = s_world.get_point_light(hdl.index);
+	lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	light->intensity = util::pun<ei::Vec3>(intensity);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
@@ -2535,10 +2544,19 @@ Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos) {
+Boolean world_get_spot_light_path_segments(ConstLightHdl hdl, uint32_t* segments) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	if(segments != nullptr)
+		*segments = static_cast<uint32_t>(s_world.get_spot_light_segment_count(hdl.index));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos, const uint32_t frame) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(pos != nullptr)
 		*pos = util::pun<Vec3>(light->position);
@@ -2546,10 +2564,10 @@ Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
+Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(intensity != nullptr)
 		*intensity = util::pun<Vec3>(light->intensity);
@@ -2557,10 +2575,10 @@ Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction) {
+Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(direction != nullptr)
 		*direction = util::pun<Vec3>(light->direction);
@@ -2568,10 +2586,10 @@ Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle) {
+Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(angle != nullptr)
 		*angle = std::acos(__half2float(light->cosThetaMax));
@@ -2579,10 +2597,10 @@ Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff) {
+Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(falloff != nullptr)
 		*falloff = std::acos(__half2float(light->cosFalloffStart));
@@ -2590,10 +2608,10 @@ Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
+Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	light->position = util::pun<ei::Vec3>(pos);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
@@ -2601,10 +2619,10 @@ Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
+Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	light->intensity = util::pun<ei::Vec3>(intensity);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));
@@ -2612,10 +2630,10 @@ Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
+Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
@@ -2628,10 +2646,10 @@ Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
+Boolean world_set_spot_light_angle(LightHdl hdl, float angle, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 
 	float actualAngle = std::fmod(angle, 2.f * ei::PI);
@@ -2647,10 +2665,10 @@ Boolean world_set_spot_light_angle(LightHdl hdl, float angle) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
+Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index);
+	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	// Clamp it to the opening angle!
 	float actualFalloff = std::fmod(falloff, 2.f * ei::PI);
@@ -2670,10 +2688,19 @@ Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction) {
+Boolean world_get_dir_light_path_segments(ConstLightHdl hdl, uint32_t* segments) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	if(segments != nullptr)
+		*segments = static_cast<uint32_t>(s_world.get_dir_light_segment_count(hdl.index));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction, const uint32_t frame) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
+	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
 	if(direction != nullptr)
 		*direction = util::pun<Vec3>(light->direction);
@@ -2681,10 +2708,10 @@ Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance) {
+Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
 	if(irradiance != nullptr)
 		*irradiance = util::pun<Vec3>(light->irradiance);
@@ -2692,10 +2719,10 @@ Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
+Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
@@ -2708,10 +2735,10 @@ Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance) {
+Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance, const uint32_t frame) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index);
+	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
 	light->irradiance = util::pun<ei::Vec3>(irradiance);
 	s_world.mark_light_dirty(hdl.index, static_cast<lights::LightType>(hdl.type));

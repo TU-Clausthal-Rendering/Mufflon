@@ -71,6 +71,8 @@ namespace gui.ViewModel.Light
             set => m_parent.Scale = value;
         }
 
+        public bool IsAnimated { get => m_parent.PathSegments > 1u; }
+
         public bool IsSelected
         {
             get => m_world.CurrentScenario.Lights.Contains(m_parent.Handle);

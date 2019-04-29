@@ -29,7 +29,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if(!Core.world_get_spot_light_position(Handle, out var res))
+                uint frame;
+                if(!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if(!Core.world_get_spot_light_position(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res.ToUtilityVec();
@@ -37,7 +40,10 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(Position, value)) return;
-                if(!Core.world_set_spot_light_position(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_spot_light_position(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Position));
@@ -48,7 +54,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if (!Core.world_get_spot_light_direction(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_spot_light_direction(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res.ToUtilityVec();
@@ -56,7 +65,10 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(Direction, value)) return;
-                if (!Core.world_set_spot_light_direction(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_spot_light_direction(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Direction));
@@ -67,7 +79,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if (!Core.world_get_spot_light_intensity(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_spot_light_intensity(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res.ToUtilityVec();
@@ -75,7 +90,10 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(Intensity, value)) return;
-                if (!Core.world_set_spot_light_intensity(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_spot_light_intensity(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Intensity));
@@ -86,7 +104,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if (!Core.world_get_spot_light_angle(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_spot_light_angle(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res;
@@ -94,7 +115,10 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(Width, value)) return;
-                if (!Core.world_set_spot_light_angle(Handle, value))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_spot_light_angle(Handle, value, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Width));
@@ -105,7 +129,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if (!Core.world_get_spot_light_falloff(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_spot_light_falloff(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res;
@@ -113,10 +140,24 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(Falloff, value)) return;
-                if (!Core.world_set_spot_light_falloff(Handle, value))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_spot_light_falloff(Handle, value, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Falloff));
+            }
+        }
+
+        public override uint PathSegments
+        {
+            get
+            {
+                uint count;
+                if (!Core.world_get_spot_light_path_segments(Handle, out count))
+                    throw new Exception(Core.core_get_dll_error());
+                return count;
             }
         }
     }

@@ -18,6 +18,7 @@ namespace gui.ViewModel.Light
         public PointLightViewModel(Models world, PointLightModel parent) : base(world, parent)
         {
             m_parent = parent;
+            world.World.PropertyChanged += ModelOnPropertyChanged;
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -31,6 +32,14 @@ namespace gui.ViewModel.Light
                     OnPropertyChanged(nameof(PositionZ));
                     break;
                 case nameof(PointLightModel.Intensity):
+                    OnPropertyChanged(nameof(IntensityX));
+                    OnPropertyChanged(nameof(IntensityY));
+                    OnPropertyChanged(nameof(IntensityZ));
+                    break;
+                case nameof(Models.World.AnimationFrameCurrent):
+                    OnPropertyChanged(nameof(PositionX));
+                    OnPropertyChanged(nameof(PositionY));
+                    OnPropertyChanged(nameof(PositionZ));
                     OnPropertyChanged(nameof(IntensityX));
                     OnPropertyChanged(nameof(IntensityY));
                     OnPropertyChanged(nameof(IntensityZ));

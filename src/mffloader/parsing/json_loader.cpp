@@ -362,53 +362,231 @@ bool JsonLoader::load_lights() {
 		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
-			ei::Vec3 intensity;
-			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
-				intensity = read<ei::Vec3>(m_state, intensityIter);
-			else
-				intensity = read<ei::Vec3>(m_state, get(m_state, light, "flux")) / (4.0f * ei::PI);
-			intensity *= read_opt<float>(m_state, light, "scale", 1.f);
+			std::vector<ei::Vec3> positions;
+			std::vector<ei::Vec3> intensities;
+			std::vector<float> scales;
+			// For backwards compatibility, we try to read a normal array as fallback
+			try {
+				read(m_state, get(m_state, light, "position"), positions);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
+			}
+			try {
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+					read(m_state, get(m_state, light, "intensity"), intensities);
+				} else {
+					read(m_state, get(m_state, light, "flux"), intensities);
+					for(auto& flux : intensities)
+						flux /= (4.0f * ei::PI);
+				}
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
+				else
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) / (4.0f * ei::PI) };
+			}
+			try {
+				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "scale"), scales);
+				else
+					scales = std::vector<float>{ 1.f };
+			} catch(const ParserException& pe) {
+				(void)pe;
+				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
+			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT); hdl.type == LIGHT_POINT) {
-				world_set_point_light_position(hdl, util::pun<Vec3>(position));
-				world_set_point_light_intensity(hdl, util::pun<Vec3>(intensity));
+			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(), scales.size()));
+			if(intensities.size() == 1u && (positions.size() != 1u || scales.size() != 1u))
+				intensities = std::vector<ei::Vec3>(maxSize, intensities.front());
+			if(positions.size() == 1u && (intensities.size() != 1u || scales.size() != 1u))
+				positions = std::vector<ei::Vec3>(maxSize, positions.front());
+			if(scales.size() == 1u && (positions.size() != 1u || intensities.size() != 1u))
+				scales = std::vector<float>(maxSize, scales.front());
+			if(positions.size() != intensities.size())
+				throw std::runtime_error("Mismatched light path size (intensities)");
+			if(positions.size() != scales.size())
+				throw std::runtime_error("Mismatched light path size (scales)");
+
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT, static_cast<uint32_t>(positions.size())); hdl.type == LIGHT_POINT) {
+				for(u32 i = 0u; i < static_cast<uint32_t>(positions.size()); ++i) {
+					world_set_point_light_position(hdl, util::pun<Vec3>(positions[i]), i);
+					world_set_point_light_intensity(hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
+				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
-			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
-			const ei::Vec3 intensity = read<ei::Vec3>(m_state, get(m_state, light, "intensity"))
-				* read_opt<float>(m_state, light, "scale", 1.f);
-			Radians angle;
-			Radians falloffStart;
-			if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
-				angle = std::acos(read<float>(m_state, angleIter));
-			else
-				angle = Radians(read<float>(m_state, get(m_state, light, "width")));
-			if(auto falloffIter = get(m_state, light, "cosFalloffStart", false);  falloffIter != light.MemberEnd())
-				falloffStart = std::acos(read<float>(m_state, falloffIter));
-			else
-				falloffStart = Radians(read_opt<float>(m_state, light, "falloffStart", angle));
+			std::vector<ei::Vec3> positions;
+			std::vector<ei::Vec3> directions;
+			std::vector<ei::Vec3> intensities;
+			std::vector<float> scales;
+			std::vector<float> angles;
+			std::vector<float> falloffStarts;
+			// For backwards compatibility, we try to read a normal array as fallback
+			try {
+				read(m_state, get(m_state, light, "position"), positions);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
+			}
+			try {
+				read(m_state, get(m_state, light, "direction"), directions);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				directions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "direction")) };
+			}
+			try {
+				read(m_state, get(m_state, light, "intensity"), intensities);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
+			}
+			try {
+				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "scale"), scales);
+				else
+					scales = std::vector<float>{ 1.f };
+			} catch(const ParserException& pe) {
+				(void)pe;
+				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
+			}
+			try {
+				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "cosWidth"), angles);
+				else
+					read(m_state, get(m_state, light, "width"), angles);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
+					angles = std::vector<float>{ std::acos(read<float>(m_state, angleIter)) };
+				else
+					angles = std::vector<float>{ read<float>(m_state, get(m_state, light, "width")) };
+			}
+			// This is a bit complex and may need refactoring; we have multiple scenarios to catch depending on what is
+			// and isn't given in the JSON but legal according to the file specs
+			try {
+				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd()) {
+					read(m_state, get(m_state, light, "cosFalloffStart"), falloffStarts);
+				} else {
+					if(get(m_state, light, "falloffStart", false) != light.MemberEnd()) {
+						read(m_state, get(m_state, light, "falloffStart"), falloffStarts);
+					} else {
+						falloffStarts.reserve(angles.size());
+						for(const auto& angle : angles)
+							falloffStarts.push_back(Radians{ angle });
+					}
+				}
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd())
+					falloffStarts = std::vector<float>{ std::acos(read<float>(m_state, falloffIter)) };
+				else
+					if(get(m_state, light, "falloffStart", false) != light.MemberEnd()) {
+						read(m_state, get(m_state, light, "falloffStart"), falloffStarts);
+					} else {
+						falloffStarts.reserve(angles.size());
+						for(const auto& angle : angles)
+							falloffStarts.push_back(angle);
+					}
+			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT); hdl.type == LIGHT_SPOT) {
-				world_set_spot_light_position(hdl, util::pun<Vec3>(position));
-				world_set_spot_light_intensity(hdl, util::pun<Vec3>(intensity));
-				world_set_spot_light_direction(hdl, util::pun<Vec3>(direction));
-				world_set_spot_light_angle(hdl, angle);
-				world_set_spot_light_falloff(hdl, falloffStart);
+			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(),
+												std::max(scales.size(), std::max(directions.size(),
+														std::max(angles.size(), falloffStarts.size())))));
+			if(intensities.size() == 1u && (positions.size() != 1u || scales.size() != 1u
+											|| directions.size() != 1u || angles.size() != 1u
+											|| falloffStarts.size() != 1u))
+				intensities = std::vector<ei::Vec3>(maxSize, intensities.front());
+			if(positions.size() == 1u && (intensities.size() != 1u || scales.size() != 1u
+										  || directions.size() != 1u || angles.size() != 1u
+										  || falloffStarts.size() != 1u))
+				positions = std::vector<ei::Vec3>(maxSize, positions.front());
+			if(scales.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
+									   || directions.size() != 1u || angles.size() != 1u
+									   || falloffStarts.size() != 1u))
+				scales = std::vector<float>(maxSize, scales.front());
+			if(directions.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
+									   || scales.size() != 1u || angles.size() != 1u
+									   || falloffStarts.size() != 1u))
+				directions = std::vector<ei::Vec3>(maxSize, directions.front());
+			if(angles.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
+										   || scales.size() != 1u || directions.size() != 1u
+										   || falloffStarts.size() != 1u))
+				angles = std::vector<float>(maxSize, angles.front());
+			if(falloffStarts.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
+									   || scales.size() != 1u || directions.size() != 1u
+									   || angles.size() != 1u))
+				falloffStarts = std::vector<float>(maxSize, falloffStarts.front());
+			if(positions.size() != intensities.size())
+				throw std::runtime_error("Mismatched light path size (intensities)");
+			if(positions.size() != directions.size())
+				throw std::runtime_error("Mismatched light path size (directions)");
+			if(positions.size() != scales.size())
+				throw std::runtime_error("Mismatched light path size (scales)");
+			if(positions.size() != angles.size())
+				throw std::runtime_error("Mismatched light path size (angles)");
+			if(positions.size() != falloffStarts.size())
+				throw std::runtime_error("Mismatched light path size (falloffStarts)");
+
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT,
+										  static_cast<u32>(positions.size())); hdl.type == LIGHT_SPOT) {
+				for(u32 i = 0u; i < static_cast<uint32_t>(positions.size()); ++i) {
+					world_set_spot_light_position(hdl, util::pun<Vec3>(positions[i]), i);
+					world_set_spot_light_intensity(hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
+					world_set_spot_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
+					world_set_spot_light_angle(hdl, angles[i], i);
+					world_set_spot_light_falloff(hdl, falloffStarts[i], i);
+				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
-			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
-			const ei::Vec3 irradiance = read<ei::Vec3>(m_state, get(m_state, light, "radiance"))
-				* read_opt<float>(m_state, light, "scale", 1.f);
+			std::vector<ei::Vec3> directions;
+			std::vector<ei::Vec3> radiances;
+			std::vector<float> scales;
+			// For backwards compatibility, we try to read a normal array as fallback
+			try {
+				read(m_state, get(m_state, light, "direction"), directions);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				directions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "direction")) };
+			}
+			try {
+				read(m_state, get(m_state, light, "radiance"), radiances);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				radiances = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "radiance")) };
+			}
+			try {
+				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "scale"), scales);
+				else
+					scales = std::vector<float>{ 1.f };
+			} catch(const ParserException& pe) {
+				(void)pe;
+				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
+			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL); hdl.type == LIGHT_DIRECTIONAL) {
-				world_set_dir_light_direction(hdl, util::pun<Vec3>(direction));
-				world_set_dir_light_irradiance(hdl, util::pun<Vec3>(irradiance));
+			const std::size_t maxSize = std::max(directions.size(), std::max(radiances.size(), scales.size()));
+			if(radiances.size() == 1u && (directions.size() != 1u || scales.size() != 1u))
+				radiances = std::vector<ei::Vec3>(maxSize, radiances.front());
+			if(directions.size() == 1u && (radiances.size() != 1u || scales.size() != 1u))
+				directions = std::vector<ei::Vec3>(maxSize, directions.front());
+			if(scales.size() == 1u && (directions.size() != 1u || radiances.size() != 1u))
+				scales = std::vector<float>(maxSize, scales.front());
+			if(directions.size() != radiances.size())
+				throw std::runtime_error("Mismatched light path size (radiances)");
+			if(directions.size() != scales.size())
+				throw std::runtime_error("Mismatched light path size (scales)");
+
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL,
+										  static_cast<u32>(directions.size())); hdl.type == LIGHT_DIRECTIONAL) {
+				for(u32 i = 0u; i < static_cast<uint32_t>(directions.size()); ++i) {
+					world_set_dir_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
+					world_set_dir_light_irradiance(hdl, util::pun<Vec3>(radiances[i]), i);
+				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
@@ -423,7 +601,7 @@ bool JsonLoader::load_lights() {
 					color = ei::Vec3{ read<float>(m_state, scaleIter) };
 			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP); hdl.type == LIGHT_ENVMAP) {
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP, 1u); hdl.type == LIGHT_ENVMAP) {
 				world_set_env_light_map(hdl, texture);
 				world_set_env_light_scale(hdl, util::pun<Vec3>(color));
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
