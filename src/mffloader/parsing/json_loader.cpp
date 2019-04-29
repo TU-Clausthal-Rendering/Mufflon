@@ -296,11 +296,21 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		std::vector<ei::Vec3> camUp;
 		read(m_state, get(m_state, camera, "path"), camPath);
 		read(m_state, get(m_state, camera, "viewDir"), camViewDir, camPath.size());
-		if(auto upIter = get(m_state, camera, "up", false); upIter != camera.MemberEnd()) {
+		if(auto upIter = get(m_state, camera, "up", false); upIter != camera.MemberEnd())
 			read(m_state, get(m_state, camera, "up"), camUp, camPath.size());
-		} else {
-			camUp.push_back(ei::Vec3{ 0, 1, 0 });
-		}
+		else
+			camUp = std::vector<ei::Vec3>{ ei::Vec3{ 0, 1, 0 } };
+		if(camViewDir.size() == 1u && (camPath.size() != 1u || camUp.size() != 1u))
+			camViewDir = std::vector<ei::Vec3>(camPath.size(), camViewDir.front());
+		if(camUp.size() == 1u && (camPath.size() != 1u || camViewDir.size() != 1u))
+			camUp = std::vector<ei::Vec3>(camPath.size(), camUp.front());
+		if(camPath.size() == 1u && (camViewDir.size() != 1u || camUp.size() != 1u))
+			camPath = std::vector<ei::Vec3>(camViewDir.size(), camUp.front());
+
+		if(camPath.size() != camViewDir.size())
+			throw std::runtime_error("Mismatched camera path size (view direction)");
+		if(camPath.size() != camUp.size())
+			throw std::runtime_error("Mismatched camera path size (up direction)");
 
 		// Per-camera-model values
 		if(type.compare("pinhole") == 0) {
