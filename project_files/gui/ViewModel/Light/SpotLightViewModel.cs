@@ -18,6 +18,7 @@ namespace gui.ViewModel.Light
         public SpotLightViewModel(Models world, SpotLightModel parent) : base(world, parent)
         {
             m_parent = parent;
+            world.World.PropertyChanged += ModelOnPropertyChanged;
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -44,6 +45,19 @@ namespace gui.ViewModel.Light
                     OnPropertyChanged(nameof(Width));
                     break;
                 case nameof(SpotLightModel.Falloff):
+                    OnPropertyChanged(nameof(FalloffStart));
+                    break;
+                case nameof(Models.World.AnimationFrameCurrent):
+                    OnPropertyChanged(nameof(PositionX));
+                    OnPropertyChanged(nameof(PositionY));
+                    OnPropertyChanged(nameof(PositionZ));
+                    OnPropertyChanged(nameof(DirectionX));
+                    OnPropertyChanged(nameof(DirectionY));
+                    OnPropertyChanged(nameof(DirectionZ));
+                    OnPropertyChanged(nameof(IntensityX));
+                    OnPropertyChanged(nameof(IntensityY));
+                    OnPropertyChanged(nameof(IntensityZ));
+                    OnPropertyChanged(nameof(Width));
                     OnPropertyChanged(nameof(FalloffStart));
                     break;
             }

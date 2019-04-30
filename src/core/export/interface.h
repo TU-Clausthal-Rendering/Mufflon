@@ -358,17 +358,20 @@ CORE_API Boolean CDECL object_get_id(ObjectHdl hdl, uint32_t* id);
 CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod);
+CORE_API Boolean CDECL instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame);
 
 // World container interface
 CORE_API void CDECL world_clear_all();
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
-CORE_API InstanceHdl CDECL world_get_instance(const char* name);
+CORE_API InstanceHdl CDECL world_get_instance(const char* name, const uint32_t animationFrame);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
-CORE_API InstanceHdl CDECL world_create_instance(const char* name, ObjectHdl obj);
+CORE_API InstanceHdl CDECL world_create_instance(const char* name, ObjectHdl obj, const uint32_t animationFrame);
 CORE_API Boolean CDECL world_apply_instance_transformation(InstanceHdl inst);
-CORE_API uint32_t CDECL world_get_instance_count();
-CORE_API InstanceHdl CDECL world_get_instance_by_index(uint32_t index);
+CORE_API uint32_t CDECL world_get_instance_count(uint32_t frame);
+CORE_API uint32_t CDECL world_get_highest_instance_frame();
+CORE_API uint32_t CDECL world_get_instance_frame_count(uint32_t index);
+CORE_API InstanceHdl CDECL world_get_instance_by_index(uint32_t index, const uint32_t animationFrame);
 CORE_API ScenarioHdl CDECL world_create_scenario(const char* name);
 CORE_API ScenarioHdl CDECL world_find_scenario(const char* name);
 CORE_API uint32_t CDECL world_get_scenario_count();
@@ -385,15 +388,15 @@ CORE_API Boolean CDECL world_get_material_data(MaterialHdl material, MaterialPar
 // TODO: blended/fresnel materials
 // TODO: glass/opaque materials
 // TODO: add more cameras
-CORE_API CameraHdl CDECL world_add_pinhole_camera(const char* name, Vec3 position,
-											   Vec3 dir, Vec3 up, float near,
-											   float far, float vFov);
-CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, Vec3 position, Vec3 dir,
-												Vec3 up, float near, float far,
-												float focalLength, float focusDistance,
+CORE_API CameraHdl CDECL world_add_pinhole_camera(const char* name, const Vec3* position, const Vec3* dir,
+												  const Vec3* up, const uint32_t pathCount,
+												  float near, float far, float vFov);
+CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, const Vec3* position, const Vec3* dir,
+												const Vec3* up, const uint32_t pathCount, float near,
+												float far, float focalLength, float focusDistance,
 												float lensRad, float chipHeight);
 CORE_API Boolean CDECL world_remove_camera(CameraHdl hdl);
-CORE_API LightHdl CDECL world_add_light(const char* name, LightType type);
+CORE_API LightHdl CDECL world_add_light(const char* name, LightType type, const uint32_t count);
 CORE_API Boolean CDECL world_set_light_name(LightHdl hdl, const char* newName);
 CORE_API Boolean CDECL world_remove_light(LightHdl hdl);
 CORE_API Boolean CDECL world_find_light(const char* name, LightHdl* hdl);
@@ -409,6 +412,10 @@ CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
 CORE_API Boolean CDECL world_is_sane(const char** msg);
+CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
+CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
+CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
+CORE_API Boolean CDECL world_get_frame_end(uint32_t* animationFrame);
 
 // Scenario interface
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
@@ -453,24 +460,27 @@ CORE_API Boolean CDECL scene_rotate_active_camera(float x, float y, float z);
 CORE_API Boolean CDECL scene_is_sane();
 
 // Light interface
-CORE_API Boolean CDECL world_get_point_light_position(ConstLightHdl hdl, Vec3* pos);
-CORE_API Boolean CDECL world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity);
-CORE_API Boolean CDECL world_set_point_light_position(LightHdl hdl, Vec3 pos);
-CORE_API Boolean CDECL world_set_point_light_intensity(LightHdl hdl, Vec3 intensity);
-CORE_API Boolean CDECL world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos);
-CORE_API Boolean CDECL world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity);
-CORE_API Boolean CDECL world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction);
-CORE_API Boolean CDECL world_get_spot_light_angle(ConstLightHdl hdl, float* angle);
-CORE_API Boolean CDECL world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff);
-CORE_API Boolean CDECL world_set_spot_light_position(LightHdl hdl, Vec3 pos);
-CORE_API Boolean CDECL world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity);
-CORE_API Boolean CDECL world_set_spot_light_direction(LightHdl hdl, Vec3 direction);
-CORE_API Boolean CDECL world_set_spot_light_angle(LightHdl hdl, float angle);
-CORE_API Boolean CDECL world_set_spot_light_falloff(LightHdl hdl, float fallof);
-CORE_API Boolean CDECL world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction);
-CORE_API Boolean CDECL world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance);
-CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction);
-CORE_API Boolean CDECL world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance);
+CORE_API Boolean CDECL world_get_point_light_path_segments(ConstLightHdl hdl, uint32_t* segments);
+CORE_API Boolean CDECL world_get_point_light_position(ConstLightHdl hdl, Vec3* pos, const uint32_t frame);
+CORE_API Boolean CDECL world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity, const uint32_t frame);
+CORE_API Boolean CDECL world_set_point_light_position(LightHdl hdl, Vec3 pos, const uint32_t frame);
+CORE_API Boolean CDECL world_set_point_light_intensity(LightHdl hdl, Vec3 intensity, const uint32_t frame);
+CORE_API Boolean CDECL world_get_spot_light_path_segments(ConstLightHdl hdl, uint32_t* segments);
+CORE_API Boolean CDECL world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos, const uint32_t frame);
+CORE_API Boolean CDECL world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity, const uint32_t frame);
+CORE_API Boolean CDECL world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction, const uint32_t frame);
+CORE_API Boolean CDECL world_get_spot_light_angle(ConstLightHdl hdl, float* angle, const uint32_t frame);
+CORE_API Boolean CDECL world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff, const uint32_t frame);
+CORE_API Boolean CDECL world_set_spot_light_position(LightHdl hdl, Vec3 pos, const uint32_t frame);
+CORE_API Boolean CDECL world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity, const uint32_t frame);
+CORE_API Boolean CDECL world_set_spot_light_direction(LightHdl hdl, Vec3 direction, const uint32_t frame);
+CORE_API Boolean CDECL world_set_spot_light_angle(LightHdl hdl, float angle, const uint32_t frame);
+CORE_API Boolean CDECL world_set_spot_light_falloff(LightHdl hdl, float fallof, const uint32_t frame);
+CORE_API Boolean CDECL world_get_dir_light_path_segments(ConstLightHdl hdl, uint32_t* segments);
+CORE_API Boolean CDECL world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction, const uint32_t frame);
+CORE_API Boolean CDECL world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance, const uint32_t frame);
+CORE_API Boolean CDECL world_set_dir_light_direction(LightHdl hdl, Vec3 direction, const uint32_t frame);
+CORE_API Boolean CDECL world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance, const uint32_t frame);
 CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
 CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color);
 CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
@@ -484,13 +494,19 @@ CORE_API Boolean CDECL world_get_texture_size(TextureHdl hdl, IVec2* size);
 // Camera interface
 CORE_API CameraType CDECL world_get_camera_type(ConstCameraHdl cam);
 CORE_API const char* CDECL world_get_camera_name(ConstCameraHdl cam);
-CORE_API Boolean CDECL world_get_camera_position(ConstCameraHdl cam, Vec3* pos);
-CORE_API Boolean CDECL world_get_camera_direction(ConstCameraHdl cam, Vec3* dir);
-CORE_API Boolean CDECL world_get_camera_up(ConstCameraHdl cam, Vec3* up);
+CORE_API Boolean CDECL world_get_camera_path_segment_count(ConstCameraHdl cam, uint32_t* segments);
+CORE_API Boolean CDECL world_get_camera_position(ConstCameraHdl cam, Vec3* pos, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_get_camera_current_position(ConstCameraHdl cam, Vec3* pos);
+CORE_API Boolean CDECL world_get_camera_direction(ConstCameraHdl cam, Vec3* dir, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_get_camera_current_direction(ConstCameraHdl cam, Vec3* dir);
+CORE_API Boolean CDECL world_get_camera_up(ConstCameraHdl cam, Vec3* up, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_get_camera_current_up(ConstCameraHdl cam, Vec3* up);
 CORE_API Boolean CDECL world_get_camera_near(ConstCameraHdl cam, float* near);
 CORE_API Boolean CDECL world_get_camera_far(ConstCameraHdl cam, float* far);
-CORE_API Boolean CDECL world_set_camera_position(CameraHdl cam, Vec3 pos);
-CORE_API Boolean CDECL world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up);
+CORE_API Boolean CDECL world_set_camera_position(CameraHdl cam, Vec3 pos, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_set_camera_current_position(CameraHdl cam, Vec3 pos);
+CORE_API Boolean CDECL world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up, const uint32_t pathIndex);
+CORE_API Boolean CDECL world_set_camera_current_direction(CameraHdl cam, Vec3 dir, Vec3 up);
 CORE_API Boolean CDECL world_set_camera_near(CameraHdl cam, float near);
 CORE_API Boolean CDECL world_set_camera_far(CameraHdl cam, float far);
 CORE_API Boolean CDECL world_get_pinhole_camera_fov(ConstCameraHdl cam, float* vFov);

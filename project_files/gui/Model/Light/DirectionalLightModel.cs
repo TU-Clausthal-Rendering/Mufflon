@@ -29,7 +29,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if(!Core.world_get_dir_light_direction(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_dir_light_direction(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res.ToUtilityVec();
@@ -37,7 +40,10 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(value, Direction)) return;
-                if(!Core.world_set_dir_light_direction(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_dir_light_direction(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Direction));
@@ -48,7 +54,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if(!Core.world_get_dir_light_irradiance(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_dir_light_irradiance(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res.ToUtilityVec();
@@ -56,10 +65,24 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(value, Irradiance)) return;
-                if(!Core.world_set_dir_light_irradiance(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_dir_light_irradiance(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Irradiance));
+            }
+        }
+
+        public override uint PathSegments
+        {
+            get
+            {
+                uint count;
+                if (!Core.world_get_dir_light_path_segments(Handle, out count))
+                    throw new Exception(Core.core_get_dll_error());
+                return count;
             }
         }
     }

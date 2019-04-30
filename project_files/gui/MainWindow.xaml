@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui"
         xmlns:view="clr-namespace:gui.View"
+        xmlns:helper="clr-namespace:gui.View.Helper"
         xmlns:renderer="clr-namespace:gui.View.Renderer"
         xmlns:camera="clr-namespace:gui.View.Camera"
         xmlns:viewmodel="clr-namespace:gui.ViewModel"
@@ -224,6 +225,44 @@
                                Height="16"/>
                     </Button>
                 </StatusBarItem>
+                <Separator Background="{StaticResource BorderBrush}"/>
+                <StatusBarItem>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock Text="Start: "/>
+                            <TextBlock MinWidth="30"
+                                       Text="{Binding AnimationFrames.Start, Mode=OneWay}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <Slider Width="100"
+                                    Minimum="{Binding AnimationFrames.Start, Mode=OneWay}"
+                                    Maximum="{Binding AnimationFrames.End, Mode=OneWay}"
+                                    Value="{Binding AnimationFrames.Current, Mode=TwoWay}"
+                                    TickPlacement="BottomRight"
+                                    TickFrequency="10"
+                                    IsSnapToTickEnabled="False"/>
+                            <helper:EnterTextBox MinWidth="30"
+                                                 Text="{Binding AnimationFrames.Current, Mode=TwoWay}"
+                                                 Margin="{StaticResource LeftPropertyMargin}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock Text="End: "/>
+                            <TextBlock MinWidth="30"
+                                       Text="{Binding AnimationFrames.End, Mode=OneWay}"/>
+                        </StackPanel>
+                    </Grid>
+                </StatusBarItem>
             </StatusBar>
 
             <Border
@@ -263,7 +302,20 @@
                              Width="Auto">
                         <ListBox 
                             ItemsSource="{Binding Scene.Scenarios}"
-                            SelectedItem="{Binding Scene.SelectedScenario}"/>
+                            SelectedItem="{Binding Scene.SelectedScenario}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="1"
+                                                    Margin="{StaticResource RightPropertyMargin}"
+                                                    Text="{Binding Name}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                     <TabItem Header="Profiler"
                              Width="Auto">

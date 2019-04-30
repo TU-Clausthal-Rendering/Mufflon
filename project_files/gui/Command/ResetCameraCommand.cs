@@ -10,15 +10,16 @@ namespace gui.Command
 {
     public class ResetCameraCommand : ICommand
     {
-        private readonly SettingsModel m_settings;
+        private readonly Models m_models;
+
         private CameraModel m_camera;
 
-        public ResetCameraCommand(SettingsModel settings, CameraModel camera)
+        public ResetCameraCommand(Models models, CameraModel camera)
         {
-            m_settings = settings;
+            m_models = models;
             m_camera = camera;
 
-            m_settings.PropertyChanged += SettingsPropertyChanged;
+            models.Settings.PropertyChanged += SettingsPropertyChanged;
         }
 
         private void SettingsPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -33,12 +34,12 @@ namespace gui.Command
 
         public bool CanExecute(object parameter)
         {
-            return m_settings.AllowCameraMovement;
+            return m_models.Settings.AllowCameraMovement;
         }
 
         public virtual void Execute(object parameter)
         {
-            m_camera.Reset();
+            m_camera.Reset(m_models.World.AnimationFrameCurrent);
         }
 
         public event EventHandler CanExecuteChanged;

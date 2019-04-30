@@ -173,7 +173,6 @@ CUDA_FUNCTION bool intersects_primitve(
 	const LodDescriptor<dev>& obj,
 	const ei::FastRay& ray,
 	const i32 primId,
-	int& hitPrimId,
 	float& hitT,				// In out: max hit distance before, if hit then returns the new distance
 	SurfaceParametrization& surfParams
 ) {
@@ -194,7 +193,6 @@ CUDA_FUNCTION bool intersects_primitve(
 		if(ei::intersects(ray, tri, t, barycentric) && t < hitT && t > 0.0f) {
 			hitT = t;
 			surfParams.barycentric = ei::Vec2{ barycentric.x, barycentric.y };
-			hitPrimId = primId;
 			return true;
 		}
 	} else if(primId < (i32)(obj.polygon.numTriangles + obj.polygon.numQuads)) {
@@ -211,7 +209,6 @@ CUDA_FUNCTION bool intersects_primitve(
 		if(t > 0.0f && t < hitT) {
 			hitT = t;
 			surfParams.bilinear = bilinear;
-			hitPrimId = primId;
 			return true;
 		}
 	} else {
@@ -225,7 +222,6 @@ CUDA_FUNCTION bool intersects_primitve(
 		float t;
 		if(ei::intersects(ray, sph, t) && t < hitT) {
 			hitT = t;
-			hitPrimId = primId;
 			// Barycentrics unused; TODO: get coordinates anyway?
 			return true;
 		}
@@ -248,16 +244,16 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 	ei::FastRay fray { transRay };
 	// Scale our current maximum intersection distance into the object space
 	// to avoid false negatives.
-	float objSpaceHitT = tmax * scale;
+	const float objSpaceTMax = tmax * scale;
 
 	// Intersect the ray against the object's bounding box.
 	float objSpaceT;
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
-	if(intersect(box, fray, objSpaceHitT, objSpaceT)) {
+	if(intersect(box, fray, objSpaceTMax, objSpaceT)) {
 		currentRay = fray;
 		rayScale = scale;
-		tmax = objSpaceHitT;
+		tmax = objSpaceTMax;
 		obj = &scene.lods[objId];
 		currentBvh = (const LBVH<dev>*)obj->accelStruct.accelParameters;
 		return true;
@@ -312,9 +308,11 @@ RayIntersectionResult first_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1)
+	if(scene.numInstances == 1) {
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
 			primCount = 0; // No hit of the entire scene, skip the upcoming loop
+		currentInstanceId = 0;
+	}
 
 	// Traversal loop.
 	while(stackIdx > 0 || primCount > 0) {
@@ -376,9 +374,9 @@ RayIntersectionResult first_intersection(
 			if(!obj) {		// Currently in scene BVH => go to object space.
 				if(world_to_object_space(scene, primId, fray, currentRay, currentTScale, hitT, obj, currentBvh)) {
 					if(obj->numPrimitives == 1) { // Fast path - no BVH
-						if(intersects_primitve(*obj, currentRay, 0,
-											   hitPrimId, hitT, surfParams)) {
+						if(intersects_primitve(*obj, currentRay, 0, hitT, surfParams)) {
 							hitInstanceId = primId;
+							hitPrimId = 0;
 						}
 						// Immediatelly leave the object space again
 						object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
@@ -397,18 +395,18 @@ RayIntersectionResult first_intersection(
 						currentInstanceId = primId;
 					}
 				}
-			} else if(intersects_primitve(*obj, currentRay, primId,
-										  hitPrimId, hitT, surfParams)) {
+			} else if(intersects_primitve(*obj, currentRay, primId, hitT, surfParams)) {
 				hitInstanceId = currentInstanceId;
+				hitPrimId = primId;
 			}
 		}
 	}
 
-	if(scene.numInstances == 1)
+	if(obj)
 		object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
 
 	// Nobody should update hitT if no primitive is hit
-	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || hitT == tmax);
+	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || ei::approx(hitT, tmax));
 
 	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
 	for(int i = 0; i < scene.numInstances; ++i) {
@@ -627,15 +625,13 @@ bool any_intersection(
 			++primOffset;
 			--primCount;
 
-			i32 hitPrimId;
 			SurfaceParametrization surfParams;
 
 			// Primitves can be instances or true primities.
 			if(!obj) {		// Currently in scene BVH => go to object space.
 				if(world_to_object_space(scene, primId, fray, currentRay, currentTScale, tmax, obj, currentBvh)) {
 					if(obj->numPrimitives == 1) { // Fast path - no BVH
-						if(intersects_primitve(*obj, currentRay, 0,
-											   hitPrimId, tmax, surfParams)) {
+						if(intersects_primitve(*obj, currentRay, 0, tmax, surfParams)) {
 							return true;
 						}
 						// Immediatelly leave the object space again
@@ -654,8 +650,7 @@ bool any_intersection(
 						primOffset = 0;
 					}
 				}
-			} else if(intersects_primitve(*obj, currentRay, primId,
-										  hitPrimId, tmax, surfParams)) {
+			} else if(intersects_primitve(*obj, currentRay, primId, tmax, surfParams)) {
 				return true;
 			}
 		}

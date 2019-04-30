@@ -4,6 +4,7 @@
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
 #include "core/scene/descriptors.hpp"
+#include <climits>
 
 namespace mufflon { namespace scene {
 
@@ -11,6 +12,8 @@ class Object;
 
 class Instance {
 public:
+	static constexpr u32 NO_ANIMATION_FRAME = std::numeric_limits<u32>::max();
+
 	// TODO: identity matrix
 	Instance(std::string name, Object& obj, ei::Mat3x4 trans = {
 				1.f, 0.f, 0.f, 0.f,
@@ -58,12 +61,20 @@ public:
 	}
 	void set_object(Object& object) noexcept;
 
+	u32 get_animation_frame() const noexcept {
+		return m_animationFrame;
+	}
+	void set_animation_frame(const u32 animationFrame) noexcept {
+		m_animationFrame = animationFrame;
+	}
+
 private:
 	std::string m_name;
 	Object* m_objRef;
 	ei::Mat3x4 m_transMat;
 	ei::Mat3x4 m_invTransMat;
 	ei::Vec3 m_scale;
+	u32 m_animationFrame;
 };
 
 }} // namespace mufflon::scene

@@ -5,8 +5,9 @@
 #include "core/math/sample_types.hpp"
 #include "util/assert.hpp"
 #include "util/string_view.hpp"
-#include <string>
 #include "core/scene/handles.hpp"
+#include <string>
+#include <vector>
 
 namespace mufflon {
 
@@ -41,9 +42,10 @@ struct CameraParams {
 class Camera {
 public:
 	Camera() = default;
-	Camera(CameraModel model, ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
-		   float near = 1e-4f, float far = 1e10f) :
-		m_position(std::move(position)),
+	Camera(CameraModel model, const ei::Vec3* position, const ei::Vec3* dir, const ei::Vec3* up,
+		   const u32 pathCount, float near = 1e-4f, float far = 1e10f) :
+		m_pathSegments(pathCount),
+		m_position(position, position + pathCount),
 		m_near(near),
 		m_far(far),
 		m_model(model)
@@ -51,7 +53,9 @@ public:
 		mAssert(near > 0.0f);
 		mAssert(far > near);
 
-		set_view_dir(dir, up);
+		m_viewSpace.resize(pathCount);
+		for(u32 pathIndex = 0u; pathIndex < pathCount; ++pathIndex)
+			set_view_dir(dir[pathIndex], up[pathIndex], pathIndex);
 	}
 	// Needs virtual destructor
 	virtual ~Camera() = default;
@@ -62,12 +66,20 @@ public:
 	}
 	void set_name(StringView name) { m_name = std::string(name); }
 
-	const scene::Direction get_x_dir() const noexcept { return {m_viewSpace.m00, m_viewSpace.m01, m_viewSpace.m02}; }
+	u32 get_path_segment_count() const noexcept { return m_pathSegments; }
+
+	const scene::Direction get_x_dir(const u32 pathIndex) const noexcept {
+		return {m_viewSpace[pathIndex].m00, m_viewSpace[pathIndex].m01, m_viewSpace[pathIndex].m02};
+	}
 	// The y-axis is up
-	const scene::Direction get_up_dir() const noexcept { return {m_viewSpace.m10, m_viewSpace.m11, m_viewSpace.m12}; }
+	const scene::Direction get_up_dir(const u32 pathIndex) const noexcept {
+		return {m_viewSpace[pathIndex].m10, m_viewSpace[pathIndex].m11, m_viewSpace[pathIndex].m12};
+	}
 	// The z-axis is the view direction
-	const scene::Direction get_view_dir() const noexcept { return {m_viewSpace.m20, m_viewSpace.m21, m_viewSpace.m22}; }
-	void set_view_dir(scene::Direction direction, scene::Direction up) {
+	const scene::Direction get_view_dir(const u32 pathIndex) const noexcept {
+		return {m_viewSpace[pathIndex].m20, m_viewSpace[pathIndex].m21, m_viewSpace[pathIndex].m22};
+	}
+	void set_view_dir(scene::Direction direction, scene::Direction up, const u32 pathIndex) {
 		direction = ei::normalize(direction);
 		up = ei::normalize(up);
 		float zDotY = dot(direction, up);
@@ -77,14 +89,14 @@ public:
 		// Create orthonormal basis to determine view matrix
 		const ei::Vec3 right = ei::normalize(ei::cross(direction, up));
 
-		m_viewSpace = ei::Mat3x3{
+		m_viewSpace[pathIndex] = ei::Mat3x3{
 			right.x, right.y, right.z,
 			up.x, up.y, up.z,
 			direction.x, direction.y, direction.z
 		};
 	}
-	const scene::Point& get_position() const noexcept { return m_position; }
-	void set_position(const scene::Point position) noexcept { m_position = position; }
+	const scene::Point& get_position(const u32 pathIndex) const noexcept { return m_position[pathIndex]; }
+	void set_position(const scene::Point position, const u32 pathIndex) noexcept { m_position[pathIndex] = position; }
 	// The near clipping distance (plane)
 	float get_near() const noexcept { return m_near; }
 	void set_near(float n) noexcept { m_near = n; }
@@ -98,23 +110,23 @@ public:
 	 * upDown: positive values to move up, negative values to move down (y-axis)
 	 * forBack: positive values to move forward, negative values to move backward (z-axis)
 	 */
-	void move(float leftRight, float upDown, float forBack) noexcept {
-		m_position += leftRight * get_x_dir()
-					+ upDown * get_up_dir()
-					+ forBack * get_view_dir();
+	void move(float leftRight, float upDown, float forBack, const u32 pathIndex) noexcept {
+		m_position[pathIndex] += leftRight * get_x_dir(pathIndex)
+					+ upDown * get_up_dir(pathIndex)
+					+ forBack * get_view_dir(pathIndex);
 	}
 
 	// Rotate around the x-axis.
-	void rotate_up_down(Radians a) noexcept {
-		m_viewSpace = ei::rotationX(a) * m_viewSpace;
+	void rotate_up_down(Radians a, const u32 pathIndex) noexcept {
+		m_viewSpace[pathIndex] = ei::rotationX(a) * m_viewSpace[pathIndex];
 	}
 	// Rotate around the up direction (y-axis).
-	void rotate_left_right(Radians a) noexcept {
-		m_viewSpace = m_viewSpace * ei::rotationY(a);
+	void rotate_left_right(Radians a, const u32 pathIndex) noexcept {
+		m_viewSpace[pathIndex] = m_viewSpace[pathIndex] * ei::rotationY(a);
 	}
 	// Rotate around the view direction (z-axis).
-	void roll(Radians a) noexcept {
-		m_viewSpace = ei::rotationZ(a) * m_viewSpace;
+	void roll(Radians a, const u32 pathIndex) noexcept {
+		m_viewSpace[pathIndex] = ei::rotationZ(a) * m_viewSpace[pathIndex];
 	}
 
 	CameraModel get_model() const noexcept { return m_model; }
@@ -126,18 +138,19 @@ public:
 	 * Each camera must implement a sample_ray and a project method (see cameras/sample.hpp
 	 * for details).
 	 */
-	virtual void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const = 0;
+	virtual void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution, const u32 pathIndex) const = 0;
 
 	// Get the required size of a parameter bundle.
 	virtual std::size_t get_parameter_pack_size() const = 0;
 protected:
-	ei::Mat3x3 m_viewSpace;		// Orthonormal world->camera matrix (rows are axis, view direction is the third axis)
-	scene::Point m_position;	// The central position for any projection
-	float m_near {1e-10f};		// Optional near clipping distance
-	float m_far {1e10f};		// Optional far clipping distance
+	std::vector<ei::Mat3x3> m_viewSpace;	// Orthonormal world->camera matrix (rows are axis, view direction is the third axis)
+	std::vector<scene::Point> m_position;	// The central position for any projection
+	float m_near {1e-10f};					// Optional near clipping distance
+	float m_far {1e10f};					// Optional far clipping distance
 private:
 	std::string m_name;
 	CameraModel m_model;
+	const u32 m_pathSegments;
 };
 
 struct Importon {

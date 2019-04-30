@@ -17,12 +17,11 @@ namespace cameras {
 class Focus : public Camera {
 public:
 	Focus() = default;
-	Focus(ei::Vec3 position, ei::Vec3 dir, ei::Vec3 up,
-			float focalLength, float focusDist, float lensRad,
-			float sensorHeight, float near = 1e-4f,
-			float far = 1e10f) :
-		Camera(CameraModel::FOCUS, std::move(position), std::move(dir),
-			   std::move(up), near, far),
+	Focus(const ei::Vec3* position, const ei::Vec3* dir, const ei::Vec3* up,
+		  const u32 pathCount, float focalLength, float focusDist, float lensRad,
+		  float sensorHeight, float near = 1e-4f,
+		  float far = 1e10f) :
+		Camera(CameraModel::FOCUS, position, dir, up, pathCount, near, far),
 		// TODO
 		m_vFov(2.f * std::atan(sensorHeight / (2.f * focalLength))),
 		m_tanVFov(std::tan(m_vFov / 2.f)),
@@ -42,7 +41,7 @@ public:
 	void set_sensor_height(float height) noexcept { m_sensorHeight = height; }
 
 	// Get the parameter bundle
-	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution) const final;
+	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution, const u32 pathIndex) const final;
 
 	// Get the required size of a parameter bundle.
 	std::size_t get_parameter_pack_size() const final;

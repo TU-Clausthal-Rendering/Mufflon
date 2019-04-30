@@ -34,6 +34,37 @@ std::string read_file(fs::path path) {
 	return fileString;
 }
 
+// Reads an optional array
+template < class T >
+std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name) {
+	std::vector<T> vec;
+	try {
+		read(state, get(state, parent, name), vec);
+	} catch(const ParserException& pe) {
+		(void)pe;
+		if(state.expected == ParserState::Value::NONE)
+			state.objectNames.pop_back();
+		vec = std::vector<T>{ read<T>(state, get(state, parent, name)) };
+	}
+	return vec;
+}
+template < class T >
+std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name, const T& optVal) {
+	std::vector<T> vec;
+	try {
+		if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+			read(state, valIter, vec);
+		else
+			vec = std::vector<T>{ optVal };
+	} catch(const ParserException& pe) {
+		(void)pe;
+		if(state.expected == ParserState::Value::NONE)
+			state.objectNames.pop_back();
+		vec = std::vector<T>{ read_opt<T>(state, parent, name, optVal) };
+	}
+	return vec;
+}
+
 } // namespace
 
 JsonException::JsonException(const std::string& str, rapidjson::ParseResult res) :
@@ -296,31 +327,47 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		std::vector<ei::Vec3> camUp;
 		read(m_state, get(m_state, camera, "path"), camPath);
 		read(m_state, get(m_state, camera, "viewDir"), camViewDir, camPath.size());
-		if(auto upIter = get(m_state, camera, "up", false); upIter != camera.MemberEnd()) {
+		if(auto upIter = get(m_state, camera, "up", false); upIter != camera.MemberEnd())
 			read(m_state, get(m_state, camera, "up"), camUp, camPath.size());
-		} else {
-			camUp.push_back(ei::Vec3{ 0, 1, 0 });
-		}
+		else
+			camUp = std::vector<ei::Vec3>{ ei::Vec3{ 0, 1, 0 } };
+		if(camViewDir.size() == 1u && (camPath.size() != 1u || camUp.size() != 1u))
+			camViewDir = std::vector<ei::Vec3>(camPath.size(), camViewDir.front());
+		if(camUp.size() == 1u && (camPath.size() != 1u || camViewDir.size() != 1u))
+			camUp = std::vector<ei::Vec3>(camPath.size(), camUp.front());
+		if(camPath.size() == 1u && (camViewDir.size() != 1u || camUp.size() != 1u))
+			camPath = std::vector<ei::Vec3>(camViewDir.size(), camUp.front());
+
+		if(camPath.size() != camViewDir.size())
+			throw std::runtime_error("Mismatched camera path size (view direction)");
+		if(camPath.size() != camUp.size())
+			throw std::runtime_error("Mismatched camera path size (up direction)");
+
+		const auto maxSize = std::max(camPath.size(), std::max(camViewDir.size(), camUp.size()));
+		if(camUp.size() == 1u && maxSize != 1u)
+			camUp = std::vector<ei::Vec3>(maxSize, camUp.front());
+		if(camViewDir.size() == 1u && maxSize != 1u)
+			camViewDir = std::vector<ei::Vec3>(maxSize, camViewDir.front());
+		if(camUp.size() == 1u && maxSize != 1u)
+			camUp = std::vector<ei::Vec3>(maxSize, camUp.front());
 
 		// Per-camera-model values
 		if(type.compare("pinhole") == 0) {
 			// Pinhole camera
 			const float fovDegree = read_opt<float>(m_state, camera, "fov", 25.f);
-			// TODO: add entire path!
-			if(camPath.size() > 1u)
-				logWarning("[JsonLoader::load_cameras] Scene file: camera paths are not supported yet");
-			if(world_add_pinhole_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
-										util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
-										near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
+			if(world_add_pinhole_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
+										reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
+										static_cast<uint32_t>(camPath.size()), near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
 				throw std::runtime_error("Failed to add pinhole camera");
 		} else if(type.compare("focus") == 0) {
 			const float focalLength = read_opt<float>(m_state, camera, "focalLength", 35.f) / 1000.f;
 			const float focusDistance = read<float>(m_state, get(m_state, camera, "focusDistance"));
 			const float sensorHeight = read_opt<float>(m_state, camera, "chipHeight", 24.f) / 1000.f;
 			const float lensRadius = (focalLength / read_opt<float>(m_state, camera, "aperture", focalLength)) / 2.f;
-			if(world_add_focus_camera(cameraIter->name.GetString(), util::pun<Vec3>(camPath[0u]),
-									   util::pun<Vec3>(camViewDir[0u]), util::pun<Vec3>(camUp[0u]),
-									   near, far, focalLength, focusDistance, lensRadius, sensorHeight) == nullptr)
+			if(world_add_focus_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
+									  reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
+									  static_cast<uint32_t>(camPath.size()), near, far, focalLength, focusDistance,
+									  lensRadius, sensorHeight) == nullptr)
 				throw std::runtime_error("Failed to add focus camera");
 		} else if(type.compare("ortho") == 0) {
 			// TODO: Orthogonal camera
@@ -354,53 +401,161 @@ bool JsonLoader::load_lights() {
 		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
-			ei::Vec3 intensity;
-			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
-				intensity = read<ei::Vec3>(m_state, intensityIter);
-			else
-				intensity = read<ei::Vec3>(m_state, get(m_state, light, "flux")) / (4.0f * ei::PI);
-			intensity *= read_opt<float>(m_state, light, "scale", 1.f);
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
+			// For backwards compatibility, we try to read a normal array as fallback
+			std::vector<ei::Vec3> intensities;
+			try {
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+					read(m_state, get(m_state, light, "intensity"), intensities);
+				} else {
+					read(m_state, get(m_state, light, "flux"), intensities);
+					for(auto& flux : intensities)
+						flux /= (4.0f * ei::PI);
+				}
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
+				else
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) / (4.0f * ei::PI) };
+			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT); hdl.type == LIGHT_POINT) {
-				world_set_point_light_position(hdl, util::pun<Vec3>(position));
-				world_set_point_light_intensity(hdl, util::pun<Vec3>(intensity));
+			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(), scales.size()));
+			if(intensities.size() == 1u && maxSize != 1u)
+				intensities = std::vector<ei::Vec3>(maxSize, intensities.front());
+			if(positions.size() == 1u && maxSize != 1u)
+				positions = std::vector<ei::Vec3>(maxSize, positions.front());
+			if(scales.size() == 1u && maxSize != 1u)
+				scales = std::vector<float>(maxSize, scales.front());
+			if(positions.size() != intensities.size())
+				throw std::runtime_error("Mismatched light path size (intensities)");
+			if(positions.size() != scales.size())
+				throw std::runtime_error("Mismatched light path size (scales)");
+
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT, static_cast<uint32_t>(positions.size())); hdl.type == LIGHT_POINT) {
+				for(u32 i = 0u; i < static_cast<uint32_t>(positions.size()); ++i) {
+					world_set_point_light_position(hdl, util::pun<Vec3>(positions[i]), i);
+					world_set_point_light_intensity(hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
+				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
-			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
-			const ei::Vec3 intensity = read<ei::Vec3>(m_state, get(m_state, light, "intensity"))
-				* read_opt<float>(m_state, light, "scale", 1.f);
-			Radians angle;
-			Radians falloffStart;
-			if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
-				angle = std::acos(read<float>(m_state, angleIter));
-			else
-				angle = Radians(read<float>(m_state, get(m_state, light, "width")));
-			if(auto falloffIter = get(m_state, light, "cosFalloffStart", false);  falloffIter != light.MemberEnd())
-				falloffStart = std::acos(read<float>(m_state, falloffIter));
-			else
-				falloffStart = Radians(read_opt<float>(m_state, light, "falloffStart", angle));
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> intensities = read_opt_array<ei::Vec3>(m_state, light, "intensity");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
+			std::vector<float> angles;
+			std::vector<float> falloffStarts;
+			// For backwards compatibility, we try to read a normal array as fallback
+			try {
+				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "cosWidth"), angles);
+				else
+					read(m_state, get(m_state, light, "width"), angles);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
+				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
+					angles = std::vector<float>{ std::acos(read<float>(m_state, angleIter)) };
+				else
+					angles = std::vector<float>{ read<float>(m_state, get(m_state, light, "width")) };
+			}
+			// This is a bit complex and may need refactoring; we have multiple scenarios to catch depending on what is
+			// and isn't given in the JSON but legal according to the file specs
+			try {
+				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd()) {
+					read(m_state, get(m_state, light, "cosFalloffStart"), falloffStarts);
+				} else {
+					if(get(m_state, light, "falloffStart", false) != light.MemberEnd()) {
+						read(m_state, get(m_state, light, "falloffStart"), falloffStarts);
+					} else {
+						falloffStarts.reserve(angles.size());
+						for(const auto& angle : angles)
+							falloffStarts.push_back(Radians{ angle });
+					}
+				}
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
+				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd())
+					falloffStarts = std::vector<float>{ std::acos(read<float>(m_state, falloffIter)) };
+				else
+					if(auto falloffIter = get(m_state, light, "falloffStart", false); falloffIter != light.MemberEnd()) {
+						falloffStarts = std::vector<float>{ read<float>(m_state, falloffIter) };
+					} else {
+						falloffStarts.reserve(angles.size());
+						for(const auto& angle : angles)
+							falloffStarts.push_back(angle);
+					}
+			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT); hdl.type == LIGHT_SPOT) {
-				world_set_spot_light_position(hdl, util::pun<Vec3>(position));
-				world_set_spot_light_intensity(hdl, util::pun<Vec3>(intensity));
-				world_set_spot_light_direction(hdl, util::pun<Vec3>(direction));
-				world_set_spot_light_angle(hdl, angle);
-				world_set_spot_light_falloff(hdl, falloffStart);
+			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(),
+												std::max(scales.size(), std::max(directions.size(),
+														std::max(angles.size(), falloffStarts.size())))));
+			if(intensities.size() == 1u && maxSize != 1u)
+				intensities = std::vector<ei::Vec3>(maxSize, intensities.front());
+			if(positions.size() == 1u && maxSize != 1u)
+				positions = std::vector<ei::Vec3>(maxSize, positions.front());
+			if(scales.size() == 1u && maxSize != 1u)
+				scales = std::vector<float>(maxSize, scales.front());
+			if(directions.size() == 1u && maxSize != 1u)
+				directions = std::vector<ei::Vec3>(maxSize, directions.front());
+			if(angles.size() == 1u && maxSize != 1u)
+				angles = std::vector<float>(maxSize, angles.front());
+			if(falloffStarts.size() == 1u && maxSize != 1u)
+				falloffStarts = std::vector<float>(maxSize, falloffStarts.front());
+			if(positions.size() != intensities.size())
+				throw std::runtime_error("Mismatched light path size (intensities)");
+			if(positions.size() != directions.size())
+				throw std::runtime_error("Mismatched light path size (directions)");
+			if(positions.size() != scales.size())
+				throw std::runtime_error("Mismatched light path size (scales)");
+			if(positions.size() != angles.size())
+				throw std::runtime_error("Mismatched light path size (angles)");
+			if(positions.size() != falloffStarts.size())
+				throw std::runtime_error("Mismatched light path size (falloffStarts)");
+
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT,
+										  static_cast<u32>(positions.size())); hdl.type == LIGHT_SPOT) {
+				for(u32 i = 0u; i < static_cast<uint32_t>(positions.size()); ++i) {
+					world_set_spot_light_position(hdl, util::pun<Vec3>(positions[i]), i);
+					world_set_spot_light_intensity(hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
+					world_set_spot_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
+					world_set_spot_light_angle(hdl, angles[i], i);
+					world_set_spot_light_falloff(hdl, falloffStarts[i], i);
+				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
-			const ei::Vec3 direction = read<ei::Vec3>(m_state, get(m_state, light, "direction"));
-			const ei::Vec3 irradiance = read<ei::Vec3>(m_state, get(m_state, light, "radiance"))
-				* read_opt<float>(m_state, light, "scale", 1.f);
+			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> radiances = read_opt_array<ei::Vec3>(m_state, light, "radiance");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL); hdl.type == LIGHT_DIRECTIONAL) {
-				world_set_dir_light_direction(hdl, util::pun<Vec3>(direction));
-				world_set_dir_light_irradiance(hdl, util::pun<Vec3>(irradiance));
+			const std::size_t maxSize = std::max(directions.size(), std::max(radiances.size(), scales.size()));
+			if(radiances.size() == 1u && maxSize != 1u)
+				radiances = std::vector<ei::Vec3>(maxSize, radiances.front());
+			if(directions.size() == 1u && maxSize != 1u)
+				directions = std::vector<ei::Vec3>(maxSize, directions.front());
+			if(scales.size() == 1u && maxSize != 1u)
+				scales = std::vector<float>(maxSize, scales.front());
+			if(directions.size() != radiances.size())
+				throw std::runtime_error("Mismatched light path size (radiances)");
+			if(directions.size() != scales.size())
+				throw std::runtime_error("Mismatched light path size (scales)");
+
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL,
+										  static_cast<u32>(directions.size())); hdl.type == LIGHT_DIRECTIONAL) {
+				for(u32 i = 0u; i < static_cast<uint32_t>(directions.size()); ++i) {
+					world_set_dir_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
+					world_set_dir_light_irradiance(hdl, util::pun<Vec3>(radiances[i]), i);
+				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
@@ -415,16 +570,16 @@ bool JsonLoader::load_lights() {
 					color = ei::Vec3{ read<float>(m_state, scaleIter) };
 			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP); hdl.type == LIGHT_ENVMAP) {
+			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP, 1u); hdl.type == LIGHT_ENVMAP) {
 				world_set_env_light_map(hdl, texture);
 				world_set_env_light_scale(hdl, util::pun<Vec3>(color));
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
-			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
 			// TODO: incorporate scale
 
 			logWarning("[JsonLoader::load_lights] Scene file: Goniometric lights are not supported yet");
@@ -474,7 +629,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(m_abort)
 			return false;
 		m_state.objectNames.push_back(scenarioIter->name.GetString());
-		const Value& scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
+		const Value scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
 		assertObject(m_state, scenario);
 
 		const char* camera = read<const char*>(m_state, get(m_state, scenario, "camera"));
@@ -519,8 +674,8 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		}
 
 		// Add objects
-		auto objectsIter = get(m_state, scenario, "objectProperties", false);
-		if(objectsIter != scenario.MemberEnd()) {
+		if(auto objectsIter = get(m_state, scenario, "objectProperties", false);
+		   objectsIter != scenario.MemberEnd()) {
 			if(m_abort)
 				return false;
 			m_state.objectNames.push_back(objectsIter->name.GetString());
@@ -548,27 +703,47 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		}
 
 		// Read Instance LOD and masking information
-		auto instancesIter = get(m_state, scenario, "instanceProperties", false);
-		if(instancesIter != scenario.MemberEnd()) {
+		if(auto instancesIter = get(m_state, scenario, "instanceProperties", false);
+		   instancesIter != scenario.MemberEnd()) {
 			m_state.objectNames.push_back(instancesIter->name.GetString());
-			assertObject(m_state, objectsIter->value);
+			assertObject(m_state, instancesIter->value);
 			for(auto instIter = instancesIter->value.MemberBegin(); instIter != instancesIter->value.MemberEnd(); ++instIter) {
 				StringView instName = instIter->name.GetString();
 				m_state.objectNames.push_back(&instName[0u]);
 				const Value& instance = instIter->value;
 				assertObject(m_state, instance);
-				InstanceHdl instHdl = world_get_instance(&instName[0u]);
-				if(instHdl == nullptr)
-					throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
-				// Read LoD
-				if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-					if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
-						throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-				// Read masking information
-				if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-					&& read<bool>(m_state, maskIter))
-					if(!scenario_mask_instance(scenarioHdl, instHdl))
-						throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+
+				// Set masking for both animated and non-animated instances
+				u32 frameStart, frameEnd;
+				world_get_frame_start(&frameStart);
+				world_get_frame_start(&frameEnd);
+				for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+					InstanceHdl animInstHdl = world_get_instance(&instName[0u], frame);
+					if(animInstHdl == nullptr)
+						continue;
+					// Read LoD
+					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+						if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
+							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+					// Read masking information
+					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+					   && read<bool>(m_state, maskIter))
+						if(!scenario_mask_instance(scenarioHdl, animInstHdl))
+							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				}
+
+				InstanceHdl instHdl = world_get_instance(&instName[0u], 0xFFFFFFFF);
+				if(instHdl != nullptr) {
+					// Read LoD
+					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+						if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
+							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+					// Read masking information
+					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+					   && read<bool>(m_state, maskIter))
+						if(!scenario_mask_instance(scenarioHdl, instHdl))
+							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				}
 				m_state.objectNames.pop_back();
 			}
 			m_state.objectNames.pop_back();
@@ -617,32 +792,36 @@ rapidjson::Value JsonLoader::load_scenario(const rapidjson::GenericMemberIterato
 	const Value& scenario = scenarioIter->value;
 	assertObject(m_state, scenario);
 
-	Value returnValue;
-	returnValue.SetObject();
-
-
 	if(auto parentIter = get(m_state, scenario, "parentScenario", false); parentIter != scenario.MemberEnd()) {
 		const char* parentScenario = read<const char*>(m_state, parentIter);
-		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd())
-			returnValue = load_scenario(parent, maxRecursionDepth-1);
-		else
+		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd()) {
+			Value returnValue = load_scenario(parent, maxRecursionDepth-1);
+			// returnValue is a deep copy => we can simply replace the
+			// diferences to the current scenario.
+			selective_replace_keys(scenario, returnValue);
+			return returnValue;
+		} else
 			throw std::runtime_error("Failed to find parent scenario: " + std::string(parentScenario));
 	}
-	selective_replace_keys(scenario, returnValue);
-	return returnValue;
+	// Deep copy :-( to satisfy the interfaces of value return (no shallow copy possible)
+	return Value(scenario, m_document.GetAllocator());
 }
 
 void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& target) {
 	using namespace rapidjson;
 	for(Value::ConstMemberIterator iter = objectToCopy.MemberBegin(); iter != objectToCopy.MemberEnd(); ++iter) {
 		auto member = target.FindMember(iter->name);
+		// Overwrite or add the value
 		if(member != target.MemberEnd()) {
-			if(iter->value.IsObject())
+			if(iter->value.IsObject()) {
+				// Recursion for objects
 				selective_replace_keys(iter->value, member->value);
-			else
-				target.EraseMember(member);
+			} else
+				member->value = Value(iter->value, m_document.GetAllocator());
+		} else {
+			// The target does not contain the key. Get a deep copy of whatever (objects/values).
+			target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
 		}
-		target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
 	}
 }
 
@@ -671,7 +850,8 @@ bool JsonLoader::load_file() {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
-		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0)
+		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
+		   && m_version.compare("1.1") != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");

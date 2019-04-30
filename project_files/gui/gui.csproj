@@ -98,6 +98,7 @@
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
     <Compile Include="Dll\OpenGlDisplay.cs" />
+    <Compile Include="InvBooleanToVisibilityConverter.cs" />
     <Compile Include="InvertVisibilityConverter.cs" />
     <Compile Include="Model\AppModel.cs" />
     <Compile Include="Model\Camera\CameraModel.cs" />
@@ -141,6 +142,7 @@
     <Compile Include="Utility\Vec2.cs" />
     <Compile Include="Utility\Vec3.cs" />
     <Compile Include="ViewModel\AddPropertyViewModel.cs" />
+    <Compile Include="ViewModel\AnimationFrameViewModel.cs" />
     <Compile Include="ViewModel\Camera\AddCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\CamerasViewModel.cs" />
     <Compile Include="ViewModel\Camera\CameraViewModel.cs" />
@@ -481,6 +483,12 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\eyedropper.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\animated.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\not-animated.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

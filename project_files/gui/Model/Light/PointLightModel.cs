@@ -29,7 +29,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if(!Core.world_get_point_light_position(Handle, out var pos))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_point_light_position(Handle, out var pos, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return pos.ToUtilityVec();
@@ -37,7 +40,10 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(Position, value)) return;
-                if(!Core.world_set_point_light_position(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_point_light_position(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
                 
                 OnPropertyChanged(nameof(Position));
@@ -48,7 +54,10 @@ namespace gui.Model.Light
         {
             get
             {
-                if(!Core.world_get_point_light_intensity(Handle, out var res))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_get_point_light_intensity(Handle, out var res, frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 return res.ToUtilityVec();
@@ -56,10 +65,24 @@ namespace gui.Model.Light
             set
             {
                 if (Equals(value, Intensity)) return;
-                if(!Core.world_set_point_light_intensity(Handle, new Core.Vec3(value)))
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                if (!Core.world_set_point_light_intensity(Handle, new Core.Vec3(value), frame))
                     throw new Exception(Core.core_get_dll_error());
 
                 OnPropertyChanged(nameof(Intensity));
+            }
+        }
+
+        public override uint PathSegments
+        {
+            get
+            {
+                uint count;
+                if (!Core.world_get_point_light_path_segments(Handle, out count))
+                    throw new Exception(Core.core_get_dll_error());
+                return count;
             }
         }
     }

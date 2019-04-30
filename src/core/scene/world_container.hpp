@@ -53,19 +53,28 @@ public:
 	// Find an instance by name (for some objects with only one
 	// instance both names are equal, but do not need to be).
 	// The returned handle is valid over the entire lifetime of the instance.
-	InstanceHandle get_instance(const StringView& name);
+	InstanceHandle get_instance(const StringView& name, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
+	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	// Creates a new instance.
-	InstanceHandle create_instance(std::string name, ObjectHandle hdl);
+	InstanceHandle create_instance(std::string name, ObjectHandle hdl, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	// This is for interfacing - get the number of instances and the name of each
-	std::size_t get_instance_count() const noexcept{ return m_instances.size(); };
+	std::size_t get_highest_instance_frame() const noexcept { return m_animatedInstances.size(); }
+	std::size_t get_instance_count(const u32 frame) const noexcept {
+		if(frame == Instance::NO_ANIMATION_FRAME)
+			return m_instances.size(); 
+		else if(frame >= m_animatedInstances.size())
+			return 0u;
+		if(m_animatedInstances[frame] == nullptr)
+			return 0u;
+		return m_animatedInstances[frame]->size();
+	};
 	// Gets the instance name - this reference invalidates when new instances are added!
-	InstanceHandle get_instance(std::size_t index);
 	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(std::string name);
 	// Finds a scenario by its name
 	ScenarioHandle get_scenario(const StringView& name);
 	// Get the scenario for which load_scene() was called last.
-	ConstScenarioHandle get_current_scenario() const noexcept { return m_scenario; }
+	ScenarioHandle get_current_scenario() const noexcept { return m_scenario; }
 	// This is for interfacing - get the number of scenarios and the name of each
 	std::size_t get_scenario_count() const noexcept { return m_scenarios.size(); }
 	// Gets the scenario name - this reference invalidates when new scenarios are added!
@@ -111,10 +120,14 @@ public:
 	std::size_t get_dir_light_count() const noexcept { return m_dirLights.size(); }
 	std::size_t get_env_light_count() const noexcept { return m_envLights.size(); }
 
+	std::size_t get_point_light_segment_count(u32 index);
+	std::size_t get_spot_light_segment_count(u32 index);
+	std::size_t get_dir_light_segment_count(u32 index);
+
 	// Adds a new light to the scene
-	std::optional<u32> add_light(std::string name, lights::PointLight&& light);
-	std::optional<u32> add_light(std::string name, lights::SpotLight&& light);
-	std::optional<u32> add_light(std::string name, lights::DirectionalLight&& light);
+	std::optional<u32> add_light(std::string name, const lights::PointLight& light, const u32 count);
+	std::optional<u32> add_light(std::string name, const lights::SpotLight& light, const u32 count);
+	std::optional<u32> add_light(std::string name, const lights::DirectionalLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, TextureHandle env);
 
 	// Replaces the texture of an envmap light; also updates its summed area table
@@ -123,9 +136,9 @@ public:
 	// Finds a light by name
 	std::optional<std::pair<u32, lights::LightType>> find_light(const StringView& name);
 	// Access the lights properties
-	lights::PointLight* get_point_light(u32 index);
-	lights::SpotLight* get_spot_light(u32 index);
-	lights::DirectionalLight* get_dir_light(u32 index);
+	lights::PointLight* get_point_light(u32 index, const u32 frame);
+	lights::SpotLight* get_spot_light(u32 index, const u32 frame);
+	lights::DirectionalLight* get_dir_light(u32 index, const u32 frame);
 	lights::Background* get_background(u32 index);
 	// Delete a light using its handle
 	void remove_light(u32 index, lights::LightType type);
@@ -165,6 +178,15 @@ public:
 		return m_scene.get();
 	}
 
+	// Gets the current animation frame and min/max defined frames
+	u32 get_frame_start() const noexcept { return m_frameStart; }
+	u32 get_frame_end() const noexcept { return m_frameEnd; }
+	u32 get_frame_current() const noexcept { return m_frameCurrent; }
+
+	// Set the new animation frame. Caution: this invalidates the currently loaded scene
+	// which must thus be set for any active renderer!
+	void set_frame_current(const u32 frameCurrent);
+
 	// Performs a sanity check on the current world - has lights, cameras etc.
 	Sanity is_sane_world() const;
 	// Performs a sanity check for a given scenario (respects object masking etc.)
@@ -203,6 +225,7 @@ private:
 	std::map<std::string, Object, std::less<>> m_objects;
 	// All instances of the world
 	std::unordered_map<StringView, std::unique_ptr<Instance>> m_instances;
+	std::vector<std::unique_ptr<std::unordered_map<StringView, std::unique_ptr<Instance>>>> m_animatedInstances;
 	// List of all scenarios available (mapped to their names)
 	std::map<std::string, Scenario, std::less<>> m_scenarios;
 	// All materials in the scene.
@@ -214,9 +237,9 @@ private:
 	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
 	std::unordered_map<ConstCameraHandle, u8> m_camerasDirty;
 	// All light sources of the scene
-	util::IndexedStringMap<lights::PointLight> m_pointLights;
-	util::IndexedStringMap<lights::SpotLight> m_spotLights;
-	util::IndexedStringMap<lights::DirectionalLight> m_dirLights;
+	util::IndexedStringMap<std::vector<lights::PointLight>> m_pointLights;
+	util::IndexedStringMap<std::vector<lights::SpotLight>> m_spotLights;
+	util::IndexedStringMap<std::vector<lights::DirectionalLight>> m_dirLights;
 	util::IndexedStringMap<lights::Background> m_envLights;
 	// Dirty flags to keep track of changed values
 	bool m_lightsDirty = true;
@@ -228,6 +251,11 @@ private:
 	// Current scene
 	ScenarioHandle m_scenario = nullptr;
 	std::unique_ptr<Scene> m_scene = nullptr;
+
+	// Current animation frame and range
+	u32 m_frameStart = 0u;
+	u32 m_frameEnd = 0u;
+	u32 m_frameCurrent = 0u;
 
 };
 

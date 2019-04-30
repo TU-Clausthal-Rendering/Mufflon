@@ -18,6 +18,7 @@ namespace gui.ViewModel.Light
         public DirectionalLightViewModel(Models world, DirectionalLightModel parent) : base(world, parent)
         {
             m_parent = parent;
+            world.World.PropertyChanged += ModelOnPropertyChanged;
         }
 
         protected override void ModelOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -31,6 +32,14 @@ namespace gui.ViewModel.Light
                     OnPropertyChanged(nameof(DirectionZ));
                     break;
                 case nameof(DirectionalLightModel.Irradiance):
+                    OnPropertyChanged(nameof(RadianceX));
+                    OnPropertyChanged(nameof(RadianceY));
+                    OnPropertyChanged(nameof(RadianceZ));
+                    break;
+                case nameof(Models.World.AnimationFrameCurrent):
+                    OnPropertyChanged(nameof(DirectionX));
+                    OnPropertyChanged(nameof(DirectionY));
+                    OnPropertyChanged(nameof(DirectionZ));
                     OnPropertyChanged(nameof(RadianceX));
                     OnPropertyChanged(nameof(RadianceY));
                     OnPropertyChanged(nameof(RadianceZ));

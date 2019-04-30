@@ -93,6 +93,29 @@ Medium MatBlend<LayerA, LayerB>::compute_medium() const {
 	return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
 }
 
+template<class LayerA, class LayerB>
+Emission MatBlendFresnel<LayerA, LayerB>::get_emission(const TextureHandle* texTable, int texOffset) const {
+	if constexpr(details::has_emission<LayerA>(0)) {
+		Emission em = layerA.get_emission(texTable, texOffset);
+		// TODO: attenuate with F, requires the directions!
+		return em;
+	} else if constexpr(details::has_emission<LayerB>(0)) {
+		// TODO: attenuate with 1-F, requires the directions!
+		Emission em = layerB.get_emission(texTable, texOffset+LayerA::TEX_COUNT);
+		return em;
+	} else return Emission{nullptr, Spectrum{0.0f}};
+}
+
+template<class LayerA, class LayerB>
+Medium MatBlendFresnel<LayerA, LayerB>::compute_medium() const {
+	Medium baseMedium;
+	if constexpr(details::has_dependent_medium<LayerA>(0))
+		baseMedium = layerA.compute_medium();
+	else if constexpr(details::has_dependent_medium<LayerB>(0))
+		baseMedium = layerB.compute_medium();
+	return Medium{nonTexParams.ior, baseMedium.get_absorption_coeff()};
+}
+
 
 
 

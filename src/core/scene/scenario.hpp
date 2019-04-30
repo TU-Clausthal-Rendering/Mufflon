@@ -183,7 +183,6 @@ private:
 	std::vector<u32> m_dirLights;
 	u32 m_background = 0u;
 
-
 	u32 m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution = {};
 	CameraHandle m_camera = nullptr;

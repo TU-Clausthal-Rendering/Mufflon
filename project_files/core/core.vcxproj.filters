@@ -933,6 +933,9 @@
     <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\blend_fresnel.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
