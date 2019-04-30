@@ -124,6 +124,15 @@ class DllInterface:
 
     def world_set_frame_current(self, frame):
         return self.dllHolder.core.world_set_frame_current(c_uint(frame))
+    
+    def world_get_frame_current(self, frame):
+        return self.dllHolder.core.world_get_frame_current(byref(frame))
+    
+    def world_get_frame_start(self, frame):
+        return self.dllHolder.core.world_get_frame_start(byref(frame))
+    
+    def world_get_frame_end(self, frame):
+        return self.dllHolder.core.world_get_frame_end(byref(frame))
 
     def world_find_scenario(self, name):
         return self.dllHolder.core.world_find_scenario(c_char_p(name.encode('utf-8')))
@@ -186,6 +195,24 @@ class RenderActions:
     def set_current_animation_frame(self, frame):
         if not self.dllInterface.world_set_frame_current(frame):
             raise Exception("Failed to set animation frame to '" + str(frame) + "'")
+
+    def get_current_animation_frame(self):
+        frame = c_uint(0)
+        if not self.dllInterface.world_get_frame_current(frame):
+            raise Exception("Failed to get current animation frame")
+        return frame.value
+
+    def get_start_animation_frame(self):
+        frame = c_uint(0)
+        if not self.dllInterface.world_get_frame_start(frame):
+            raise Exception("Failed to get start animation frame")
+        return frame.value
+
+    def get_end_animation_frame(self):
+        frame = c_uint(0)
+        if not self.dllInterface.world_get_frame_end(frame):
+            raise Exception("Failed to get end animation frame")
+        return frame.value
         
     def set_renderer_log_level(self, logLevel):
         if not self.dllInterface.core_set_log_level(logLevel):
