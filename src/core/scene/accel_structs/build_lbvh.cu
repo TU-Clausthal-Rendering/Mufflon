@@ -40,7 +40,7 @@ template<Device dev> struct desc_info<LodDescriptor<dev>> {
 	static constexpr ei::Vec3 PRIM_TRAVERSAL_COST = { 1.2f, 2.4f, 1.0f };
 };
 template<Device dev> struct desc_info<SceneDescriptor<dev>> {
-	using MortonCode = u32;
+	using MortonCode = u64;
 	using PrimCount = ei::Vec<i32, 1>;
 	using CostFactor = ei::Vec2;
 	static constexpr float NODE_TRAVERSAL_COST = 1.0f;
@@ -90,6 +90,9 @@ calculate_morton_code(const DescType& primitives, i32 idx,
 					  const ei::Box& sceneBB) {
 	const ei::Vec3 centroid = get_centroid(primitives, idx);
 	const ei::Vec3 normalizedPos = normalize_position(centroid, sceneBB);
+	mAssert(normalizedPos.x >= 0.0f && normalizedPos.x <= 1.0f
+		 && normalizedPos.y >= 0.0f && normalizedPos.y <= 1.0f
+		 && normalizedPos.z >= 0.0f && normalizedPos.z <= 1.0f);
 	return calculate_morton_code<MortonCode_t<DescType>>(normalizedPos);
 }
 
@@ -226,7 +229,7 @@ template <typename T> CUDA_FUNCTION void build_lbvh_tree(
 	parents[leftIndex] = ~idx;
 	parents[rightIndex] = idx;
 
-	// Set the parent of the root node to -1.
+	// Set the parent of the root node to a marker.
 	if(idx == 0)
 		parents[0] = TreeHead;
 }
@@ -504,7 +507,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 	const i32 node,
 	const i32 numInternalNodes,
 	const i32 numInternalNodesAfterCollapse,
-	ei::Vec4* __restrict__ collapsedBVH
+	BvhNode* __restrict__ collapsedBVH
 ) {
 	// Collapsed nodes do not exist anymore and do not write anything in the
 	// hierarchy
@@ -517,30 +520,30 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		if(parent < 0) { // Left child?
 			offset = 0;
 			parent = ~parent;
-		} else offset = 2;
+		} else offset = 1;
 
 		// The parent could be collapsed if the current node is a leaf.
 		// Search the first non-collapsed parent.
 		i32 finalNode = node;
 		if(finalNode >= numInternalNodes) {
 			while(is_collapsed(offsets, numInternalNodes, parent)) {
-				if(offset == 2) return; // Only the left-most child of the subtree may write the parent node.
+				if(offset == 1) return; // Only the left-most child of the subtree may write the parent node.
 				finalNode = parent;
 				parent = parents[parent];
 				if(parent < 0) { // Left child?
 					offset = 0;
 					parent = ~parent;
-				} else offset = 2;
+				} else offset = 1;
 			}
 		}
 
-		// Read the date of the current node (the highest collapsed or the leaf)
+		// Read the data of the current node (the highest collapsed or the leaf)
 		const ei::Vec4 boxMin_primCount = boundingBoxes[finalNode * 2];
 		const ei::Vec4 boxMax_primCost = boundingBoxes[finalNode * 2 + 1];
 		const i32 countCode = float_bits_as_int(boxMin_primCount.w);
 		const i32 primCount = ei::sum(extract_prim_counts<PrimCount_t<DescType>>(countCode));
 
-		const i32 outIdx = (offsets[parent] - 1) * 4;
+		const i32 outIdx = (offsets[parent] - 1) * 2;
 		const i32 outNode = (node >= numInternalNodes) ?
 			node - numInternalNodes + numInternalNodesAfterCollapse // Leaf. Offset address by number of collapsed nodes.
 			: offsets[node] - 1;	// Internal node. Get the new position from offset array.
@@ -548,8 +551,7 @@ CUDA_FUNCTION void copy_to_collapsed_bvh(
 		const ei::Vec3 center = (ei::Vec3{ boxMin_primCount } +ei::Vec3{ boxMax_primCost }) * 0.5f;
 		const ei::Vec3 bbMin = (ei::Vec3{ boxMin_primCount } -center) * 1.0001f + center;
 		const ei::Vec3 bbMax = (ei::Vec3{ boxMax_primCost } -center) * 1.0001f + center;
-		collapsedBVH[outIdx + offset] = ei::Vec4{ bbMin, int_bits_as_float(outNode) };
-		collapsedBVH[outIdx + offset + 1] = ei::Vec4{ bbMax, int_bits_as_float(primCount) };
+		collapsedBVH[outIdx + offset] = { {bbMin, bbMax}, outNode, primCount };
 	}
 }
 
@@ -561,7 +563,7 @@ __global__ void copy_to_collapsed_bvhD(
 	const ei::Vec4 * __restrict__ boundingBoxes,
 	const i32* __restrict__ parents,
 	const i32* __restrict__ offsets,
-	ei::Vec4* collapsedBVH
+	BvhNode* __restrict__ collapsedBVH
 ) {
 	i32 idx = threadIdx.x + blockIdx.x * blockDim.x + 1;
 
@@ -574,7 +576,7 @@ __global__ void copy_to_collapsed_bvhD(
 
 template < typename DescType >
 void LBVHBuilder::build_lbvh(const DescType& desc,
-							 const ei::Box& sceneBB,
+							 const ei::Box& currentBB,
 							 const i32 numPrimitives
 ) {
 	if(numPrimitives == 1) { // Not necessary to build anything - trace code will skip the BVH
@@ -633,7 +635,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			i32 numBlocks, numThreads;
 			get_maximum_occupancy(numBlocks, numThreads, numPrimitives, calculate_morton_codesD<DescType>);
 			calculate_morton_codesD <<< numBlocks, numThreads >>> (
-				deviceDesc.get(), sceneBB, numPrimitives, mortonCodes, primIdsUnsorted);
+				deviceDesc.get(), currentBB, numPrimitives, mortonCodes, primIdsUnsorted);
 			cuda::check_error(cudaGetLastError());
 
 			// Sort based on Morton codes.
@@ -643,7 +645,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		} else {
 #pragma PARALLEL_FOR
 			for(i32 idx = 0; idx < numPrimitives; idx++) {
-				sortedMortonCodes[idx] = calculate_morton_code<DescType>(desc, idx, sceneBB);
+				sortedMortonCodes[idx] = calculate_morton_code<DescType>(desc, idx, currentBB);
 				primIds[idx] = idx;
 			}
 
@@ -737,7 +739,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// Write the final compacted BVH
 	i32 numNodesInCollapsedBVH = (numInternalNodes - numRemovedInternalNodes);
 	m_bvhNodes.resize(numNodesInCollapsedBVH * sizeof(ei::Vec4) * 4);
-	ei::Vec4* collapsedBVH = as<ei::Vec4>(m_bvhNodes.acquire<DescType::DEVICE>());
+	BvhNode* collapsedBVH = as<BvhNode>(m_bvhNodes.acquire<DescType::DEVICE>());
 	if(DescType::DEVICE == Device::CUDA) {
 		i32 numBlocks, numThreads;
 		get_maximum_occupancy(numBlocks, numThreads, numNodes, copy_to_collapsed_bvhD<DescType>);
@@ -755,8 +757,8 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 }
 
 template < Device dev >
-void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& sceneBB) {
-	build_lbvh<LodDescriptor<dev>>(obj, sceneBB, obj.numPrimitives);
+void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB) {
+	build_lbvh<LodDescriptor<dev>>(obj, currentBB, obj.numPrimitives);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }

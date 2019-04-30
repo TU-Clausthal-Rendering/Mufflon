@@ -604,9 +604,25 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
+			std::vector<ei::Vec3> positions;
+			std::vector<float> scales;
+			// For backwards compatibility, we try to read a normal array as fallback
+			try {
+				read(m_state, get(m_state, light, "position"), positions);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
+			}
+			try {
+				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "scale"), scales);
+				else
+					scales = std::vector<float>{ 1.f };
+			} catch(const ParserException& pe) {
+				(void)pe;
+				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
+			}
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
-			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
 			// TODO: incorporate scale
 
 			logWarning("[JsonLoader::load_lights] Scene file: Goniometric lights are not supported yet");
@@ -656,7 +672,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(m_abort)
 			return false;
 		m_state.objectNames.push_back(scenarioIter->name.GetString());
-		const Value& scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
+		const Value scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
 		assertObject(m_state, scenario);
 
 		const char* camera = read<const char*>(m_state, get(m_state, scenario, "camera"));
@@ -701,8 +717,8 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		}
 
 		// Add objects
-		auto objectsIter = get(m_state, scenario, "objectProperties", false);
-		if(objectsIter != scenario.MemberEnd()) {
+		if(auto objectsIter = get(m_state, scenario, "objectProperties", false);
+		   objectsIter != scenario.MemberEnd()) {
 			if(m_abort)
 				return false;
 			m_state.objectNames.push_back(objectsIter->name.GetString());
@@ -730,10 +746,10 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		}
 
 		// Read Instance LOD and masking information
-		auto instancesIter = get(m_state, scenario, "instanceProperties", false);
-		if(instancesIter != scenario.MemberEnd()) {
+		if(auto instancesIter = get(m_state, scenario, "instanceProperties", false);
+		   instancesIter != scenario.MemberEnd()) {
 			m_state.objectNames.push_back(instancesIter->name.GetString());
-			assertObject(m_state, objectsIter->value);
+			assertObject(m_state, instancesIter->value);
 			for(auto instIter = instancesIter->value.MemberBegin(); instIter != instancesIter->value.MemberEnd(); ++instIter) {
 				StringView instName = instIter->name.GetString();
 				m_state.objectNames.push_back(&instName[0u]);
@@ -819,32 +835,36 @@ rapidjson::Value JsonLoader::load_scenario(const rapidjson::GenericMemberIterato
 	const Value& scenario = scenarioIter->value;
 	assertObject(m_state, scenario);
 
-	Value returnValue;
-	returnValue.SetObject();
-
-
 	if(auto parentIter = get(m_state, scenario, "parentScenario", false); parentIter != scenario.MemberEnd()) {
 		const char* parentScenario = read<const char*>(m_state, parentIter);
-		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd())
-			returnValue = load_scenario(parent, maxRecursionDepth-1);
-		else
+		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd()) {
+			Value returnValue = load_scenario(parent, maxRecursionDepth-1);
+			// returnValue is a deep copy => we can simply replace the
+			// diferences to the current scenario.
+			selective_replace_keys(scenario, returnValue);
+			return returnValue;
+		} else
 			throw std::runtime_error("Failed to find parent scenario: " + std::string(parentScenario));
 	}
-	selective_replace_keys(scenario, returnValue);
-	return returnValue;
+	// Deep copy :-( to satisfy the interfaces of value return (no shallow copy possible)
+	return Value(scenario, m_document.GetAllocator());
 }
 
 void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& target) {
 	using namespace rapidjson;
 	for(Value::ConstMemberIterator iter = objectToCopy.MemberBegin(); iter != objectToCopy.MemberEnd(); ++iter) {
 		auto member = target.FindMember(iter->name);
+		// Overwrite or add the value
 		if(member != target.MemberEnd()) {
-			if(iter->value.IsObject())
+			if(iter->value.IsObject()) {
+				// Recursion for objects
 				selective_replace_keys(iter->value, member->value);
-			else
-				target.EraseMember(member);
+			} else
+				member->value = Value(iter->value, m_document.GetAllocator());
+		} else {
+			// The target does not contain the key. Get a deep copy of whatever (objects/values).
+			target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
 		}
-		target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
 	}
 }
 
@@ -873,7 +893,8 @@ bool JsonLoader::load_file() {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
-		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0)
+		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
+		   && m_version.compare("1.1") != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");

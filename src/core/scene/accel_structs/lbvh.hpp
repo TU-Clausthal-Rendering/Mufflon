@@ -12,8 +12,13 @@ namespace mufflon { namespace scene { namespace accel_struct {
 // Structure specific descriptor
 // Necessary because CUDA and MSVC disagreed about the size
 #pragma pack(push, 1)
+struct BvhNode {
+	ei::Box bb;
+	i32 index;
+	i32 primCount;
+};
 struct LBVH {
-	const ei::Vec4* bvh;
+	const BvhNode* bvh;
 	const i32* primIds;
 	i32 numInternalNodes;
 };
@@ -57,7 +62,7 @@ public:
 	}
 
 	template < Device dev >
-	void build(LodDescriptor<dev>& obj, const ei::Box& sceneBB);
+	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB);
 
 	template < Device dev >
 	void build(const SceneDescriptor<dev>& scene);
@@ -71,7 +76,7 @@ public:
 		AccelDescriptor desc;
 		desc.type = AccelType::LBVH;
 		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
-		lbvhDesc.bvh = as<ei::Vec4>( m_bvhNodes.acquire_const<dev>() );
+		lbvhDesc.bvh = as<BvhNode>( m_bvhNodes.acquire_const<dev>() );
 		lbvhDesc.primIds = as<i32>( m_primIds.acquire_const<dev>() );
 		lbvhDesc.numInternalNodes = int(m_bvhNodes.size() / (4 * sizeof(ei::Vec4)));
 		return desc;

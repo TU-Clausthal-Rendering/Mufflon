@@ -260,6 +260,7 @@
     <ClInclude Include="..\..\src\core\scene\lod.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\blend.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\emissive.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\blend_fresnel.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\lambert.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material_concepts.hpp" />

@@ -17,7 +17,7 @@ Curly brackets are used to declare a choice of different possible strings (e.g. 
 In the case of multiple type choices, details on further mandatory properties will be given below.
 
     {
-        "version": "1.1",
+        "version": "1.2",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
@@ -115,31 +115,33 @@ Lights
 --
 
 This section lists the required attributes for the different types of light sources
+All arrays express an animation path starting at the first frame defined in the file (see 'Intances').
+They each must match in length or be of length one.
 
 `"type": "point"`
 
-    "position": [x,y,z],            // vec3 vec3 world space position in [m]
-    "flux" or "intensity: [a,b,c],  // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3)
-    "scale": float,                 // Multiplier for "flux"/"intensity"
+    "position": [[x,y,z], ...],           // vec3 vec3 world space position in [m]
+    "flux" or "intensity: [[a,b,c], ...], // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3)
+    "scale": [float, ...],                // Multiplier for "flux"/"intensity"
 
 `"type": "directional"`
 
-    "direction": [x,y,z],           // Direction in which the light travels (incident direction), not necessarily normalized
-    "radiance": [a,b,c],            // Radiance [W/m²sr]
-    "scale": float,                 // Multiplier for "radiance"
+    "direction": [[x,y,z], ...],          // Direction in which the light travels (incident direction), not necessarily normalized
+    "radiance": [[a,b,c], ...],           // Radiance [W/m²sr]
+    "scale": [float, ...],                // Multiplier for "radiance"
 
 `"type": "spot"`\
 PBRT type of spot light: "intensity" * clamp((cosθ - "cosWidth") / ("falloffStart" - "cosWidth"), 0, 1) ^ "exponent",
 where "exponent" is set to 2.
 
-    "position": [x,y,z],            // vec3 vec3 world space position in [m]
-    "direction": [x,y,z],           // Direction in which the light travels (incident direction), not necessarily normalized
-    "intensity": [a,b,c],           // Peak intensity [W/sr]
-    "scale": float,                 // Multiplier for "intensity"
-    "cosWidth" or "width": float,   // An angle "width" in radians for the half-opening angle or the
-                                    // cosine of this angle
-    "cosFalloffStart" or "falloffStart": float  // An angle "falloffStart" in radians for the angle up to
-                                                //which the peak intensity is used or the cosine of this angle
+    "position": [[x,y,z], ...],           // vec3 vec3 world space position in [m]
+    "direction": [[x,y,z], ...],          // Direction in which the light travels (incident direction), not necessarily normalized
+    "intensity": [[a,b,c], ...],          // Peak intensity [W/sr]
+    "scale": [float, ...],                // Multiplier for "intensity"
+    "cosWidth" or "width": [float, ...],  // An angle "width" in radians for the half-opening angle or the
+                                          // cosine of this angle
+    "cosFalloffStart" or "falloffStart": [float, ...]  // An angle "falloffStart" in radians for the angle up to
+                                                       //which the peak intensity is used or the cosine of this angle
 
 `"type": "envmap"`
 
@@ -149,9 +151,9 @@ where "exponent" is set to 2.
 `"type": "goniometric"`\
 A measured light source. Similar to a point light
 
-    "position": [x,y,z],            // vec3 world space position in [m]
-    "map": "<texture name>"         // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as intensity [W/sr],
-    "scale":, float,                // Multiplier for the "map"
+    "position": [[x,y,z], ...],           // vec3 world space position in [m]
+    "map": "<texture name>"               // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as intensity [W/sr],
+    "scale":, [float, ...],               // Multiplier for the "map"
 
 Materials
 --

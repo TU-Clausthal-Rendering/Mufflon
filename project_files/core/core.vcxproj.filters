@@ -1025,6 +1025,11 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\bpm\silhouette_bpm_common.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\blend_fresnel.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
