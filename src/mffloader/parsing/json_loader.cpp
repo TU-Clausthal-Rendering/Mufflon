@@ -763,7 +763,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 					InstanceHdl animInstHdl = world_get_instance(&instName[0u], frame);
 					if(animInstHdl == nullptr)
-						throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
+						continue;
 					// Read LoD
 					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
 						if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
@@ -776,17 +776,17 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				}
 
 				InstanceHdl instHdl = world_get_instance(&instName[0u], 0xFFFFFFFF);
-				if(instHdl == nullptr)
-					throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
-				// Read LoD
-				if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-					if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
-						throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-				// Read masking information
-				if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-				   && read<bool>(m_state, maskIter))
-					if(!scenario_mask_instance(scenarioHdl, instHdl))
-						throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				if(instHdl != nullptr) {
+					// Read LoD
+					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+						if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
+							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+					// Read masking information
+					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+					   && read<bool>(m_state, maskIter))
+						if(!scenario_mask_instance(scenarioHdl, instHdl))
+							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				}
 				m_state.objectNames.pop_back();
 			}
 			m_state.objectNames.pop_back();
