@@ -906,23 +906,11 @@
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\cpu\cpu_silhouette_decimater.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\cpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\gpu\gpu_silhouette_decimater.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\gpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_importance_gathering.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\materials\blend_fresnel.hpp">
+      <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

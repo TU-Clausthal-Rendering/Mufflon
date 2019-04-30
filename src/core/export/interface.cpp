@@ -1323,9 +1323,25 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 				return nullptr;
 			}
 		}	break;
-		case MATERIAL_FRESNEL:
-			logWarning("[", FUNCTION_NAME, "] Material type 'fresnel' not supported yet");
-			return nullptr;
+		case MATERIAL_FRESNEL: {
+			// Order materials to reduce the number of cases
+			const auto* layerA = mat->inner.fresnel.a;
+			const auto* layerB = mat->inner.fresnel.b;
+			if(layerA->innerType == MATERIAL_TORRANCE && layerB->innerType == MATERIAL_LAMBERT) {
+				newMaterial = std::make_unique<Material<Materials::FRESNEL_TORRANCE_LAMBERT>>(
+					util::pun<ei::Vec2>(mat->inner.fresnel.refractionIndex),
+					to_ctor_args(layerA->inner.torrance),
+					to_ctor_args(layerB->inner.lambert));
+			} else if(layerA->innerType == MATERIAL_TORRANCE && layerB->innerType == MATERIAL_WALTER) {
+				newMaterial = std::make_unique<Material<Materials::FRESNEL_TORRANCE_WALTER>>(
+					util::pun<ei::Vec2>(mat->inner.fresnel.refractionIndex),
+					to_ctor_args(layerA->inner.torrance),
+					to_ctor_args(layerB->inner.walter));
+			} else {
+				logWarning("[", FUNCTION_NAME, "] Unsupported 'fresnel' material. The combination of layers is not supported.");
+				return nullptr;
+			}
+		}	break;
 		default:
 			logWarning("[", FUNCTION_NAME, "] Unknown material type");
 	}

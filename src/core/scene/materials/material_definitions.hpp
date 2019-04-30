@@ -30,11 +30,11 @@ enum class Materials: u16 {
 	LAMBERT_EMISSIVE,			// BLEND [ LAMBERT, EMISSIVE ]
 	//ORENNAYAR_EMISSIVE,		// BLEND [ ORENNAYAR, EMISSIVE ]
 	TORRANCE_LAMBERT,			// BLEND [ TORRANCE, LAMBERT ]
-	//FRESNEL_TORRANCE_LAMBERT,	// FRESNEL [ TORRANCE, LAMBERT ]
+	FRESNEL_TORRANCE_LAMBERT,	// FRESNEL [ TORRANCE, LAMBERT ]
 	//TORRANCE_ORENNAYAR,		// BLEND [ TORRANCE, ORENNAYAR ]
 	//FRESNEL_TORRANCE_ORENNAYAR,	// FRESNEL [ TORRANCE, ORENNAYAR ]
 	WALTER_TORRANCE,			// BLEND [ WALTER, TORRANCE ]
-	//FRESNEL_WALTER_TORRANCE	// FRESNEL [ WALETR, TORRANCE ] = Specialization for glass
+	FRESNEL_TORRANCE_WALTER,	// FRESNEL [ TORRANCE, WALTER ]
 
 	NUM				// How many materials are there?
 };
@@ -268,6 +268,65 @@ private:
 };
 
 
+// ************************************************************************* //
+// BLEND - FRESNEL															 //
+// ************************************************************************* //
+template<class LayerASample, class LayerBSample>
+struct MatSampleBlendFresnel {
+	LayerASample a;
+	LayerBSample b;
+};
+
+// Definition of NonTexParams as non-dependent type. Otherwise the overload
+// resolution for fetch does not work.
+template<class LayerA, class LayerB>
+struct MatNTPBlendFresnel {
+	typename LayerA::NonTexParams a;
+	typename LayerB::NonTexParams b;
+	ei::Vec2 ior;
+	//float pReflect;	// Reflection probability constant for sampling
+};
+
+// Additive blending of two other layers using Dielectric Fresnel equations.
+// TODO: Conductor
+template<class LayerA, class LayerB>
+struct MatBlendFresnel {
+	static constexpr MaterialPropertyFlags PROPERTIES =
+		LayerA::PROPERTIES | LayerB::PROPERTIES;
+
+	enum Textures {
+		TEX_COUNT = LayerA::TEX_COUNT + LayerB::TEX_COUNT
+	};
+
+	using SampleType = MatSampleBlendFresnel<typename LayerA::SampleType, typename LayerB::SampleType>;
+
+	template<typename... AArgs, typename... BArgs>
+	MatBlendFresnel(TextureHandle* texTable, int texOffset, ei::Vec2 ior,
+			 std::tuple<AArgs...>&& aArgs, std::tuple<BArgs...>&& bArgs) :
+		layerA{ details::construct_layer<LayerA>(texTable, texOffset, std::forward<std::tuple<AArgs...>>(aArgs), std::make_index_sequence<sizeof...(AArgs)>()) },
+		layerB{ details::construct_layer<LayerB>(texTable, texOffset+LayerA::TEX_COUNT, std::forward<std::tuple<BArgs...>>(bArgs), std::make_index_sequence<sizeof...(BArgs)>()) }
+	{
+		nonTexParams.a = layerA.nonTexParams;
+		nonTexParams.b = layerB.nonTexParams;
+		nonTexParams.ior = ior;
+		// Compute a scalar average reflection factor.
+		// This is required for sampling (see sampling method).
+		//float f0 = ei::sq( (ior - 1.0f) / (ior + 1.0f) );
+		//nonTexParams.pReflect = 0.89176122288449f * f0 + 0.10823877711551f;
+	}
+
+	Emission get_emission(const TextureHandle* texTable, int texOffset) const;
+
+	Medium compute_medium() const;
+
+	using NonTexParams = MatNTPBlendFresnel<LayerA, LayerB>;
+	NonTexParams nonTexParams;
+private:
+	LayerA layerA;	// Reflection layer
+	LayerB layerB;	// Refraction layer
+};
+
+
 
 
 
@@ -281,7 +340,9 @@ template<> struct mat_info<Materials::TORRANCE> { using type = MatTorrance; };
 template<> struct mat_info<Materials::WALTER> { using type = MatWalter; };
 template<> struct mat_info<Materials::LAMBERT_EMISSIVE> { using type = MatBlend<MatLambert,MatEmissive>; };
 template<> struct mat_info<Materials::TORRANCE_LAMBERT> { using type = MatBlend<MatTorrance, MatLambert>; };
+template<> struct mat_info<Materials::FRESNEL_TORRANCE_LAMBERT> { using type = MatBlendFresnel<MatTorrance, MatLambert>; };
 template<> struct mat_info<Materials::WALTER_TORRANCE> { using type = MatBlend<MatWalter, MatTorrance>; };
+template<> struct mat_info<Materials::FRESNEL_TORRANCE_WALTER> { using type = MatBlendFresnel<MatTorrance, MatWalter>; };
 template<Materials M>
 using mat_type = typename mat_info<M>::type;
 
@@ -371,8 +432,16 @@ constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
 			using MatType = mat_type<Materials::TORRANCE_LAMBERT>;	\
 			expr;											\
 		}													\
+		case Materials::FRESNEL_TORRANCE_LAMBERT: {			\
+			using MatType = mat_type<Materials::FRESNEL_TORRANCE_LAMBERT>;	\
+			expr;											\
+		}													\
 		case Materials::WALTER_TORRANCE: {					\
 			using MatType = mat_type<Materials::WALTER_TORRANCE>;	\
+			expr;											\
+		}													\
+		case Materials::FRESNEL_TORRANCE_WALTER: {			\
+			using MatType = mat_type<Materials::FRESNEL_TORRANCE_WALTER>;	\
 			expr;											\
 		}													\
 		default:											\

@@ -10,6 +10,7 @@
 #include "lambert.hpp"
 #include "emissive.hpp"
 #include "blend.hpp"
+#include "blend_fresnel.hpp"
 #include "microfacet_specular.hpp"
 #include "microfacet_refractive.hpp"
 #include <cuda_runtime.h>
