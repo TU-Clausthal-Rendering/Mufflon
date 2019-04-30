@@ -16,6 +16,7 @@ def render():
     
     renderer.load_json(sceneJson="pathToScene.json")
     renderer.load_scenario("ScenarioName")
+    renderer.set_current_animation_frame(3)
 
     renderer.render_for_seconds(10)
     # Printing defaults to False

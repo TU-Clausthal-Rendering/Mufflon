@@ -43,7 +43,7 @@ class DllInterface:
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
-        self.dllHolder.core.scenario_set_animation_frame.argtypes = [c_void_p, c_uint]
+        self.dllHolder.core.world_set_frame_current.argtypes = [c_uint]
         self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
@@ -122,8 +122,8 @@ class DllInterface:
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
 
-    def scenario_set_animation_frame(self, scenario, frame):
-        return self.dllHolder.core.scenario_set_animation_frame(c_void_p(scenario), c_uint(frame))
+    def world_set_frame_current(self, frame):
+        return self.dllHolder.core.world_set_frame_current(c_uint(frame))
 
     def world_find_scenario(self, name):
         return self.dllHolder.core.world_find_scenario(c_char_p(name.encode('utf-8')))
@@ -183,12 +183,9 @@ class RenderActions:
         if not self.dllInterface.world_load_scenario(hdl):
             raise Exception("Failed to load scenario '" + scenarioName + "'")
 
-    def set_scenario_animation_frame(self, frame):
-        hdl = self.dllInterface.world_get_current_scenario()
-        if not hdl:
-            raise Exception("No scenario currently loaded")
-        if not self.dllInterface.scenario_set_animation_frame(hdl, frame):
-            raise Exception("Failed to set scenario animation frame to '" + str(frame) + "'")
+    def set_current_animation_frame(self, frame):
+        if not self.dllInterface.world_set_frame_current(frame):
+            raise Exception("Failed to set animation frame to '" + str(frame) + "'")
         
     def set_renderer_log_level(self, logLevel):
         if not self.dllInterface.core_set_log_level(logLevel):
