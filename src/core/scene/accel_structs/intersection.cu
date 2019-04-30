@@ -312,9 +312,11 @@ RayIntersectionResult first_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1)
+	if(scene.numInstances == 1) {
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
 			primCount = 0; // No hit of the entire scene, skip the upcoming loop
+		currentInstanceId = 0u;
+	}
 
 	// Traversal loop.
 	while(stackIdx > 0 || primCount > 0) {
