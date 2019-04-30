@@ -604,9 +604,25 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			const ei::Vec3 position = read<ei::Vec3>(m_state, get(m_state, light, "position"));
+			std::vector<ei::Vec3> positions;
+			std::vector<float> scales;
+			// For backwards compatibility, we try to read a normal array as fallback
+			try {
+				read(m_state, get(m_state, light, "position"), positions);
+			} catch(const ParserException& pe) {
+				(void)pe;
+				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
+			}
+			try {
+				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
+					read(m_state, get(m_state, light, "scale"), scales);
+				else
+					scales = std::vector<float>{ 1.f };
+			} catch(const ParserException& pe) {
+				(void)pe;
+				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
+			}
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
-			const float scale = read_opt<float>(m_state, light, "scale", 1.f);
 			// TODO: incorporate scale
 
 			logWarning("[JsonLoader::load_lights] Scene file: Goniometric lights are not supported yet");
