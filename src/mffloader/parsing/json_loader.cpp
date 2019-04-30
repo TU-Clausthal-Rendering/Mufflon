@@ -312,6 +312,14 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		if(camPath.size() != camUp.size())
 			throw std::runtime_error("Mismatched camera path size (up direction)");
 
+		const auto maxSize = std::max(camPath.size(), std::max(camViewDir.size(), camUp.size()));
+		if(camUp.size() == 1u && maxSize != 1u)
+			camUp = std::vector<ei::Vec3>(maxSize, camUp.front());
+		if(camViewDir.size() == 1u && maxSize != 1u)
+			camViewDir = std::vector<ei::Vec3>(maxSize, camViewDir.front());
+		if(camUp.size() == 1u && maxSize != 1u)
+			camUp = std::vector<ei::Vec3>(maxSize, camUp.front());
+
 		// Per-camera-model values
 		if(type.compare("pinhole") == 0) {
 			// Pinhole camera
@@ -398,11 +406,11 @@ bool JsonLoader::load_lights() {
 			}
 
 			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(), scales.size()));
-			if(intensities.size() == 1u && (positions.size() != 1u || scales.size() != 1u))
+			if(intensities.size() == 1u && maxSize != 1u)
 				intensities = std::vector<ei::Vec3>(maxSize, intensities.front());
-			if(positions.size() == 1u && (intensities.size() != 1u || scales.size() != 1u))
+			if(positions.size() == 1u && maxSize != 1u)
 				positions = std::vector<ei::Vec3>(maxSize, positions.front());
-			if(scales.size() == 1u && (positions.size() != 1u || intensities.size() != 1u))
+			if(scales.size() == 1u && maxSize != 1u)
 				scales = std::vector<float>(maxSize, scales.front());
 			if(positions.size() != intensities.size())
 				throw std::runtime_error("Mismatched light path size (intensities)");
@@ -495,29 +503,17 @@ bool JsonLoader::load_lights() {
 			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(),
 												std::max(scales.size(), std::max(directions.size(),
 														std::max(angles.size(), falloffStarts.size())))));
-			if(intensities.size() == 1u && (positions.size() != 1u || scales.size() != 1u
-											|| directions.size() != 1u || angles.size() != 1u
-											|| falloffStarts.size() != 1u))
+			if(intensities.size() == 1u && maxSize != 1u)
 				intensities = std::vector<ei::Vec3>(maxSize, intensities.front());
-			if(positions.size() == 1u && (intensities.size() != 1u || scales.size() != 1u
-										  || directions.size() != 1u || angles.size() != 1u
-										  || falloffStarts.size() != 1u))
+			if(positions.size() == 1u && maxSize != 1u)
 				positions = std::vector<ei::Vec3>(maxSize, positions.front());
-			if(scales.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
-									   || directions.size() != 1u || angles.size() != 1u
-									   || falloffStarts.size() != 1u))
+			if(scales.size() == 1u && maxSize != 1u)
 				scales = std::vector<float>(maxSize, scales.front());
-			if(directions.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
-									   || scales.size() != 1u || angles.size() != 1u
-									   || falloffStarts.size() != 1u))
+			if(directions.size() == 1u && maxSize != 1u)
 				directions = std::vector<ei::Vec3>(maxSize, directions.front());
-			if(angles.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
-										   || scales.size() != 1u || directions.size() != 1u
-										   || falloffStarts.size() != 1u))
+			if(angles.size() == 1u && maxSize != 1u)
 				angles = std::vector<float>(maxSize, angles.front());
-			if(falloffStarts.size() == 1u && (positions.size() != 1u || intensities.size() != 1u
-									   || scales.size() != 1u || directions.size() != 1u
-									   || angles.size() != 1u))
+			if(falloffStarts.size() == 1u && maxSize != 1u)
 				falloffStarts = std::vector<float>(maxSize, falloffStarts.front());
 			if(positions.size() != intensities.size())
 				throw std::runtime_error("Mismatched light path size (intensities)");
@@ -570,11 +566,11 @@ bool JsonLoader::load_lights() {
 			}
 
 			const std::size_t maxSize = std::max(directions.size(), std::max(radiances.size(), scales.size()));
-			if(radiances.size() == 1u && (directions.size() != 1u || scales.size() != 1u))
+			if(radiances.size() == 1u && maxSize != 1u)
 				radiances = std::vector<ei::Vec3>(maxSize, radiances.front());
-			if(directions.size() == 1u && (radiances.size() != 1u || scales.size() != 1u))
+			if(directions.size() == 1u && maxSize != 1u)
 				directions = std::vector<ei::Vec3>(maxSize, directions.front());
-			if(scales.size() == 1u && (directions.size() != 1u || radiances.size() != 1u))
+			if(scales.size() == 1u && maxSize != 1u)
 				scales = std::vector<float>(maxSize, scales.front());
 			if(directions.size() != radiances.size())
 				throw std::runtime_error("Mismatched light path size (radiances)");
