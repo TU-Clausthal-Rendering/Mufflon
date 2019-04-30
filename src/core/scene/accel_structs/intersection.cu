@@ -239,7 +239,7 @@ CUDA_FUNCTION bool intersects_primitve(
 template < Device dev > CUDA_FUNCTION
 bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instanceId,
 						   const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
-						   float& tmax, const LodDescriptor<dev>*& obj, const LBVH*& currentBvh) {
+						   float& tmax, const LodDescriptor<dev>*& obj, const LBVH<dev>*& currentBvh) {
 	// Transform the ray into instance-local coordinates
 	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
 	float scale = len(rayDir);
@@ -259,7 +259,7 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 		rayScale = scale;
 		tmax = objSpaceHitT;
 		obj = &scene.lods[objId];
-		currentBvh = (const LBVH*)obj->accelStruct.accelParameters;
+		currentBvh = (const LBVH<dev>*)obj->accelStruct.accelParameters;
 		return true;
 	}
 	return false;
@@ -269,7 +269,7 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 // state is already in scene space.
 template < Device dev > CUDA_FUNCTION
 void object_to_world_space(const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
-						   const LBVH& sceneBvh, const LBVH*& currentBvh, float& tmax,
+						   const LBVH<dev>& sceneBvh, const LBVH<dev>*& currentBvh, float& tmax,
 						   const LodDescriptor<dev>*& obj) {
 	currentRay = ray;
 	currentBvh = &sceneBvh;
@@ -290,7 +290,7 @@ RayIntersectionResult first_intersection(
 ) {
 	add_epsilon(ray.origin, ray.direction, geoNormal);
 	// Init scene wide properties
-	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
+	const LBVH<dev>& bvh = *(const LBVH<dev>*)scene.accelStruct.accelParameters;
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	SurfaceParametrization surfParams;
@@ -301,7 +301,7 @@ RayIntersectionResult first_intersection(
 	ei::FastRay currentRay = fray;
 	float currentTScale = 1.0f;
 	const LodDescriptor<dev>* obj = nullptr;
-	const LBVH* currentBvh = &bvh;
+	const LBVH<dev>* currentBvh = &bvh;
 	i32 currentInstanceId = IGNORE_ID;
 
 	// Setup traversal.
@@ -550,14 +550,14 @@ bool any_intersection(
 	float tmax = len(correctedDir);
 	const ei::Ray ray { a, correctedDir / tmax };
 	// Init scene wide properties
-	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
+	const LBVH<dev>& bvh = *(const LBVH<dev>*)scene.accelStruct.accelParameters;
 	const ei::FastRay fray { ray };
 
 	// Set the current traversal state
 	ei::FastRay currentRay = fray;
 	float currentTScale = 1.0f;
 	const LodDescriptor<dev>* obj = nullptr;
-	const LBVH* currentBvh = &bvh;
+	const LBVH<dev>* currentBvh = &bvh;
 
 	// Setup traversal.
 	i32 traversalStack[STACK_SIZE];

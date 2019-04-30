@@ -159,7 +159,7 @@ public:
 		// transfer data
 		if (Init) {
 			T prototype{ std::forward<Args>(args)... };
-			gl::clearBufferData(id, &prototype);
+			gl::clearBufferData(id, n, &prototype);
 		}
 		
 		return id;

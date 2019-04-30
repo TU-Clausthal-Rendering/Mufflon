@@ -22,7 +22,7 @@ namespace scene {
 namespace accel_struct {
 
 
-static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH),
+static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH<Device::CPU>),
 			  "Descriptor parameter block to small for this acceleration structure.");
 
 

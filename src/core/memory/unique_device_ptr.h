@@ -44,6 +44,9 @@ public:
 	bool operator==(std::nullptr_t) const noexcept {
 		return empty();
 	}
+	bool operator!=(std::nullptr_t) const noexcept {
+		return !empty();
+	}
 private:
 	gl::Handle m_handle = 0;
 	Deleter<Device::OPENGL> m_deleter;

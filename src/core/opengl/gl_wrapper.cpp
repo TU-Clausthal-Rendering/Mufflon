@@ -1,5 +1,6 @@
 #include "gl_wrapper.h"
 #include "glad/glad.h"
+#include <memory>
 
 namespace mufflon::gl {
 
@@ -29,7 +30,7 @@ namespace mufflon::gl {
 		glNamedBufferSubData(h, offset, size, data);
 	}
 
-	void clearBufferData(Handle h, size_t clearValueSize, const void* clearValue) {
+	void clearBufferData(Handle h, size_t clearValueSize, size_t numValues, const void* clearValue) {
 		GLenum format = 0;
 		GLenum internalFormat = 0;
 		GLenum type = 0;
@@ -77,7 +78,20 @@ namespace mufflon::gl {
 			break;
 		}
 
-		glClearNamedBufferData(h, internalFormat, format, type, clearValue);
+		if(format) {
+			// valid format found => use the fast method
+			glClearNamedBufferData(h, internalFormat, format, type, clearValue);
+		} else {
+			// create temporary buffer
+			auto tmp = std::make_unique<char[]>(clearValueSize * numValues);
+			// fill with clear value
+			for(size_t i = 0; i < numValues; ++i) {
+				memcpy(tmp.get() + i * clearValueSize, clearValue, clearValueSize);
+			}
+			// upload
+			bufferSubData(h, 0, clearValueSize * numValues, tmp.get());
+		}
+
 	}
 
 	void getBufferSubData(Handle h, size_t offset, size_t size, void* dstData){
