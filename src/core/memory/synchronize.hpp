@@ -62,8 +62,21 @@ void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
 }
 template < class T >
 void synchronize(ConstArrayDevHandle_t<Device::OPENGL, T> changed,
-				 ArrayDevHandle_t<Device::OPENGL, T>& sync, std::size_t length) {
-	gl::copyBufferSubData(changed, sync, 0, 0, length);
+				 ArrayDevHandle_t<Device::CPU, T>& sync, std::size_t length) {
+	if(sync == nullptr) {
+		sync = new T[length];
+	}
+	gl::getBufferSubData(changed, 0, length * sizeof(T), sync);
+}
+template < class T >
+void synchronize(ConstArrayDevHandle_t<Device::CPU, T> changed,
+	ArrayDevHandle_t<Device::OPENGL, T>& sync, std::size_t length) {
+	if (sync == 0) {
+		sync = gl::genBuffer();
+		gl::bindBuffer(gl::BufferType::ShaderStorage, sync);
+		gl::bufferStorage(sync, length * sizeof(T), nullptr, gl::StorageFlags::DynamicStorage);
+	}
+	gl::bufferSubData(sync, 0, length * sizeof(T), changed);
 }
 
 // Functions for unloading a handle from the device
@@ -98,6 +111,11 @@ inline void copy(gl::Handle dst, const T* src, std::size_t dstOffset, std::size_
 	static_assert(std::is_trivially_copyable<T>::value,
 		"Must be trivially copyable");
 	gl::bufferSubData(dst, dstOffset, size, src);
+}
+
+template < typename T >
+inline void copy(T* dst, gl::Handle src, std::size_t dstOffset, std::size_t size) {
+	gl::getBufferSubData(src, 0, size, dst + dstOffset);
 }
 
 template < Device dev >

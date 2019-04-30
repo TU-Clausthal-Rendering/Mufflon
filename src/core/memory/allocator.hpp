@@ -155,11 +155,11 @@ public:
 		const auto byteSize = n * sizeof(T);
 		const auto id = gl::genBuffer();
 		gl::bindBuffer(gl::BufferType::ShaderStorage, id);
+		gl::bufferStorage(id, byteSize, nullptr, gl::StorageFlags::DynamicStorage);
 		// transfer data
-		// TODO maybe if sizeof(args...) != 0 && init?
-		if (!std::is_fundamental<T>::value && Init) {
+		if (Init) {
 			T prototype{ std::forward<Args>(args)... };
-			gl::bufferStorage(id, byteSize, &prototype, gl::StorageFlags::DynamicStorage);
+			gl::clearBufferData(id, &prototype);
 		}
 		
 		return id;
