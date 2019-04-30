@@ -474,7 +474,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(m_abort)
 			return false;
 		m_state.objectNames.push_back(scenarioIter->name.GetString());
-		const Value& scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
+		const Value scenario = load_scenario(scenarioIter, m_scenarios->value.MemberCount());
 		assertObject(m_state, scenario);
 
 		const char* camera = read<const char*>(m_state, get(m_state, scenario, "camera"));
@@ -519,8 +519,8 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		}
 
 		// Add objects
-		auto objectsIter = get(m_state, scenario, "objectProperties", false);
-		if(objectsIter != scenario.MemberEnd()) {
+		if(auto objectsIter = get(m_state, scenario, "objectProperties", false);
+		   objectsIter != scenario.MemberEnd()) {
 			if(m_abort)
 				return false;
 			m_state.objectNames.push_back(objectsIter->name.GetString());
@@ -548,10 +548,10 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		}
 
 		// Read Instance LOD and masking information
-		auto instancesIter = get(m_state, scenario, "instanceProperties", false);
-		if(instancesIter != scenario.MemberEnd()) {
+		if(auto instancesIter = get(m_state, scenario, "instanceProperties", false);
+		   instancesIter != scenario.MemberEnd()) {
 			m_state.objectNames.push_back(instancesIter->name.GetString());
-			assertObject(m_state, objectsIter->value);
+			assertObject(m_state, instancesIter->value);
 			for(auto instIter = instancesIter->value.MemberBegin(); instIter != instancesIter->value.MemberEnd(); ++instIter) {
 				StringView instName = instIter->name.GetString();
 				m_state.objectNames.push_back(&instName[0u]);
@@ -617,32 +617,36 @@ rapidjson::Value JsonLoader::load_scenario(const rapidjson::GenericMemberIterato
 	const Value& scenario = scenarioIter->value;
 	assertObject(m_state, scenario);
 
-	Value returnValue;
-	returnValue.SetObject();
-
-
 	if(auto parentIter = get(m_state, scenario, "parentScenario", false); parentIter != scenario.MemberEnd()) {
 		const char* parentScenario = read<const char*>(m_state, parentIter);
-		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd())
-			returnValue = load_scenario(parent, maxRecursionDepth-1);
-		else
+		if(auto parent = scenarios.FindMember(parentScenario); parent != scenarios.MemberEnd()) {
+			Value returnValue = load_scenario(parent, maxRecursionDepth-1);
+			// returnValue is a deep copy => we can simply replace the
+			// diferences to the current scenario.
+			selective_replace_keys(scenario, returnValue);
+			return returnValue;
+		} else
 			throw std::runtime_error("Failed to find parent scenario: " + std::string(parentScenario));
 	}
-	selective_replace_keys(scenario, returnValue);
-	return returnValue;
+	// Deep copy :-( to satisfy the interfaces of value return (no shallow copy possible)
+	return Value(scenario, m_document.GetAllocator());
 }
 
 void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& target) {
 	using namespace rapidjson;
 	for(Value::ConstMemberIterator iter = objectToCopy.MemberBegin(); iter != objectToCopy.MemberEnd(); ++iter) {
 		auto member = target.FindMember(iter->name);
+		// Overwrite or add the value
 		if(member != target.MemberEnd()) {
-			if(iter->value.IsObject())
+			if(iter->value.IsObject()) {
+				// Recursion for objects
 				selective_replace_keys(iter->value, member->value);
-			else
-				target.EraseMember(member);
+			} else
+				member->value = Value(iter->value, m_document.GetAllocator());
+		} else {
+			// The target does not contain the key. Get a deep copy of whatever (objects/values).
+			target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
 		}
-		target.AddMember(Value(iter->name, m_document.GetAllocator()), Value(iter->value, m_document.GetAllocator()), m_document.GetAllocator());
 	}
 }
 
