@@ -893,7 +893,8 @@ bool JsonLoader::load_file() {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
-		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0)
+		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
+		   && m_version.compare("1.1") != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
