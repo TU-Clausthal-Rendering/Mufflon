@@ -34,6 +34,37 @@ std::string read_file(fs::path path) {
 	return fileString;
 }
 
+// Reads an optional array
+template < class T >
+std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name) {
+	std::vector<T> vec;
+	try {
+		read(state, get(state, parent, name), vec);
+	} catch(const ParserException& pe) {
+		(void)pe;
+		if(state.expected == ParserState::Value::NONE)
+			state.objectNames.pop_back();
+		vec = std::vector<T>{ read<T>(state, get(state, parent, name)) };
+	}
+	return vec;
+}
+template < class T >
+std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name, const T& optVal) {
+	std::vector<T> vec;
+	try {
+		if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+			read(state, valIter, vec);
+		else
+			vec = std::vector<T>{ optVal };
+	} catch(const ParserException& pe) {
+		(void)pe;
+		if(state.expected == ParserState::Value::NONE)
+			state.objectNames.pop_back();
+		vec = std::vector<T>{ read_opt<T>(state, parent, name, optVal) };
+	}
+	return vec;
+}
+
 } // namespace
 
 JsonException::JsonException(const std::string& str, rapidjson::ParseResult res) :
@@ -370,16 +401,10 @@ bool JsonLoader::load_lights() {
 		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
-			std::vector<ei::Vec3> positions;
-			std::vector<ei::Vec3> intensities;
-			std::vector<float> scales;
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "position"), positions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
-			}
+			std::vector<ei::Vec3> intensities;
 			try {
 				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
 					read(m_state, get(m_state, light, "intensity"), intensities);
@@ -390,19 +415,12 @@ bool JsonLoader::load_lights() {
 				}
 			} catch(const ParserException& pe) {
 				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
 				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
 					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
 				else
 					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) / (4.0f * ei::PI) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
 			}
 
 			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(), scales.size()));
@@ -426,40 +444,13 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
-			std::vector<ei::Vec3> positions;
-			std::vector<ei::Vec3> directions;
-			std::vector<ei::Vec3> intensities;
-			std::vector<float> scales;
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> intensities = read_opt_array<ei::Vec3>(m_state, light, "intensity");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			std::vector<float> angles;
 			std::vector<float> falloffStarts;
 			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "position"), positions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
-			}
-			try {
-				read(m_state, get(m_state, light, "direction"), directions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				directions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "direction")) };
-			}
-			try {
-				read(m_state, get(m_state, light, "intensity"), intensities);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
-			}
 			try {
 				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
 					read(m_state, get(m_state, light, "cosWidth"), angles);
@@ -467,6 +458,8 @@ bool JsonLoader::load_lights() {
 					read(m_state, get(m_state, light, "width"), angles);
 			} catch(const ParserException& pe) {
 				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
 				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
 					angles = std::vector<float>{ std::acos(read<float>(m_state, angleIter)) };
 				else
@@ -488,11 +481,13 @@ bool JsonLoader::load_lights() {
 				}
 			} catch(const ParserException& pe) {
 				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
 				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd())
 					falloffStarts = std::vector<float>{ std::acos(read<float>(m_state, falloffIter)) };
 				else
-					if(get(m_state, light, "falloffStart", false) != light.MemberEnd()) {
-						read(m_state, get(m_state, light, "falloffStart"), falloffStarts);
+					if(auto falloffIter = get(m_state, light, "falloffStart", false); falloffIter != light.MemberEnd()) {
+						falloffStarts = std::vector<float>{ read<float>(m_state, falloffIter) };
 					} else {
 						falloffStarts.reserve(angles.size());
 						for(const auto& angle : angles)
@@ -539,31 +534,9 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
-			std::vector<ei::Vec3> directions;
-			std::vector<ei::Vec3> radiances;
-			std::vector<float> scales;
-			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "direction"), directions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				directions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "direction")) };
-			}
-			try {
-				read(m_state, get(m_state, light, "radiance"), radiances);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				radiances = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "radiance")) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
-			}
+			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> radiances = read_opt_array<ei::Vec3>(m_state, light, "radiance");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 
 			const std::size_t maxSize = std::max(directions.size(), std::max(radiances.size(), scales.size()));
 			if(radiances.size() == 1u && maxSize != 1u)
@@ -604,24 +577,8 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			std::vector<ei::Vec3> positions;
-			std::vector<float> scales;
-			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "position"), positions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
-			}
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			// TODO: incorporate scale
 
