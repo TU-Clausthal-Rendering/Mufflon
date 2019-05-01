@@ -85,14 +85,18 @@ CpuProfileState::WallTimePoint CpuProfileState::get_wall_timepoint() {
 }
 
 void CpuProfileState::create_sample() {
-	m_currentSample.totalCpuCycles += get_cpu_cycle() - m_startCpuCycle;
-	m_currentSample.totalThreadTime += get_thread_time() - m_startThreadTime;
-	m_currentSample.totalProcessTime += get_process_time() - m_startProcessTime;
-	m_currentSample.totalWallTime += std::chrono::duration_cast<Microsecond>(WallClock::now() - m_startWallTimepoint);
-	m_totalSample.totalCpuCycles += m_currentSample.totalCpuCycles;
-	m_totalSample.totalThreadTime += m_currentSample.totalThreadTime;
-	m_totalSample.totalProcessTime += m_currentSample.totalProcessTime;
-	m_totalSample.totalWallTime += m_currentSample.totalWallTime;
+	const u64 cpuCycles = get_cpu_cycle() - m_startCpuCycle;
+	const Microsecond threadTime = get_thread_time() - m_startThreadTime;
+	const Microsecond processTime = get_process_time() - m_startProcessTime;
+	const Microsecond wallTime = std::chrono::duration_cast<Microsecond>(WallClock::now() - m_startWallTimepoint);
+	m_currentSample.totalCpuCycles += cpuCycles;
+	m_currentSample.totalThreadTime += threadTime;
+	m_currentSample.totalProcessTime += processTime;
+	m_currentSample.totalWallTime += wallTime;
+	m_totalSample.totalCpuCycles += cpuCycles;
+	m_totalSample.totalThreadTime += threadTime;
+	m_totalSample.totalProcessTime += processTime;
+	m_totalSample.totalWallTime += wallTime;
 	++m_currentSample.sampleCount;
 	++m_totalSample.sampleCount;
 }

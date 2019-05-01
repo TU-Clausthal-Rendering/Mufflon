@@ -42,18 +42,19 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(Models.World):
-                    // add scene subscription
+                    // Update loading profile data
+                    System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
+                        updateLoadingData();
+                    }));
                     if (m_models.World != null)
-                    {
                         m_models.World.PropertyChanged += SceneOnPropertyChanged;
-                    }
                     break;
             }
         }
 
         private void RendererOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
-            /*switch (args.PropertyName)
+            switch (args.PropertyName)
             {
                 case nameof(RendererModel.Iteration):
                     System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
@@ -66,14 +67,14 @@ namespace gui.ViewModel
                             updateRenderingData();
                         }));
                     break;
-            }*/
+            }
         }
 
         private void SceneOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
             switch (args.PropertyName)
             {
-                case nameof(WorldModel.FullPath):
+                case nameof(WorldModel.CurrentScenario):
                     System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                         updateLoadingData();
                     }));

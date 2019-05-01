@@ -3188,21 +3188,24 @@ Boolean profiling_save_total_and_snapshots(const char* path) {
 
 const char* profiling_get_current_state() {
 	TRY
-	static std::string str = Profiler::instance().save_current_state();
+	static thread_local std::string str;
+	str = Profiler::instance().save_current_state();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_snapshots() {
 	TRY
-	static std::string str = Profiler::instance().save_snapshots();
+	static thread_local std::string str;
+	str = Profiler::instance().save_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_total_and_snapshots() {
 	TRY
-	static std::string str = Profiler::instance().save_total_and_snapshots();
+	static thread_local std::string str;
+	str = Profiler::instance().save_total_and_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
