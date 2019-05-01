@@ -548,8 +548,7 @@ void LightTreeBuilder::update_media(const SceneDescriptor<dev>& scene) {
 		this->update_media_cpu(scene);
 	else if constexpr(dev == Device::CUDA)
 		update_media_cuda(scene, m_treeCuda->posLights);
-	else
-		default: mAssert(false); return;
+	else mAssert(false);
 }
 
 template < Device dev >
@@ -566,12 +565,12 @@ void LightTreeBuilder::unload() {
 
 template void LightTreeBuilder::synchronize<Device::CPU>(const ei::Box&);
 template void LightTreeBuilder::synchronize<Device::CUDA>(const ei::Box&);
-//template void LightTreeBuilder::synchronize<Device::OPENGL>();
+template void LightTreeBuilder::synchronize<Device::OPENGL>(const ei::Box&);
 template void LightTreeBuilder::unload<Device::CPU>();
 template void LightTreeBuilder::unload<Device::CUDA>();
-//template void LightTreeBuilder::unload<Device::OPENGL>();
+template void LightTreeBuilder::unload<Device::OPENGL>();
 template void LightTreeBuilder::update_media<Device::CPU>(const SceneDescriptor<Device::CPU>& descriptor);
 template void LightTreeBuilder::update_media<Device::CUDA>(const SceneDescriptor<Device::CUDA>& descriptor);
-//template void LightTreeBuilder::update_media<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>& descriptor);
+template void LightTreeBuilder::update_media<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>& descriptor);
 
 }}} // namespace mufflon::scene::lights

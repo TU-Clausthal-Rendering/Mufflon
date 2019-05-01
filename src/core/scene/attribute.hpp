@@ -139,9 +139,9 @@ public:
 		m_attributes[hdl.index].dirty.mark_changed(dev);
 		m_dirty.mark_changed(dev);
 		switch (dev) {
-			case Device::CPU: return reinterpret_cast<T*>(m_attributes[hdl.index].accessor(m_mesh));
-			case Device::CUDA: return reinterpret_cast<T*>(&m_cudaPool[m_attributes[hdl.index].poolOffset]);
-			default: return nullptr;
+			case Device::CPU: return reinterpret_cast<ArrayDevHandle_t<dev, T>>(m_attributes[hdl.index].accessor(m_mesh));
+			case Device::CUDA: return reinterpret_cast<ArrayDevHandle_t<dev, T>>(&m_cudaPool[m_attributes[hdl.index].poolOffset]);
+			default: return ArrayDevHandle_t<dev, T>(0);
 		}
 	}
 
@@ -150,9 +150,9 @@ public:
 		mAssert(hdl.index < m_attributes.size());
 		this->synchronize<dev>(hdl);
 		switch (dev) {
-			case Device::CPU: return reinterpret_cast<const T*>(m_attributes[hdl.index].accessor(m_mesh));
-			case Device::CUDA: return reinterpret_cast<const T*>(&m_cudaPool[m_attributes[hdl.index].poolOffset]);
-			default: return nullptr;
+			case Device::CPU: return reinterpret_cast<ConstArrayDevHandle_t<dev, T>>(m_attributes[hdl.index].accessor(m_mesh));
+			case Device::CUDA: return reinterpret_cast<ConstArrayDevHandle_t<dev, T>>(&m_cudaPool[m_attributes[hdl.index].poolOffset]);
+			default: return ConstArrayDevHandle_t<dev, T>(0);
 		}
 	}
 
@@ -378,8 +378,10 @@ private:
 	std::size_t m_attribElemCount = 0u;
 	std::size_t m_attribElemCapacity = 0u;
 	std::size_t m_poolSize = 0u;
-	util::TaggedTuple<PoolHandle<Device::CPU>, PoolHandle<Device::CUDA>> m_pools = {};
-	// TODO: OpenGL pool?
+	util::TaggedTuple<
+		PoolHandle<Device::CPU>, 
+		PoolHandle<Device::CUDA>,
+		PoolHandle<Device::OPENGL>> m_pools = {};
 
 	util::DirtyFlags<Device> m_dirty;
 	std::vector<AttribInfo> m_attributes;

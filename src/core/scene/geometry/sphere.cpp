@@ -37,7 +37,7 @@ Spheres::Spheres(const Spheres& sphere) :
 			attribBuffer.buffer = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
 		} else {
 			attribBuffer.buffer = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.size);
-			copy(attribBuffer.buffer, buffer.buffer, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.size);
+			copy<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(attribBuffer.buffer, buffer.buffer, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.size);
 		}
 	});
 }
@@ -61,7 +61,7 @@ Spheres::~Spheres() {
 	m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
 		if(buffer.size != 0)
-			Allocator<ChangedBuffer::DEVICE>::free(buffer.buffer, buffer.size);
+			Allocator<ChangedBuffer::DEVICE>::template free<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.buffer, buffer.size);
 	});
 }
 
@@ -187,17 +187,17 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 			if(attribBuffer.size == 0)
 				attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
 			else
-				attribBuffer.buffer = Allocator<dev>::template realloc(attribBuffer.buffer, attribBuffer.size,
+				attribBuffer.buffer = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size,
 																	   attribs.size());
 			attribBuffer.size = attribs.size();
 		}
 
 		std::vector<void*> cpuAttribs(attribs.size());
 		for(const char* name : attribs)
-			cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
+			cpuAttribs.push_back(m_attributes.acquire<Device::CPU, char>(name));
 		copy(attribBuffer.buffer, cpuAttribs.data(), 0, sizeof(const char*) * attribs.size());
 	} else if(attribBuffer.size != 0) {
-		attribBuffer.buffer = Allocator<dev>::free(attribBuffer.buffer, attribBuffer.size);
+		attribBuffer.buffer = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size);
 	}
 	descriptor.numAttributes = static_cast<u32>(attribs.size());
 	descriptor.attributes = attribBuffer.buffer;
@@ -205,10 +205,11 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 
 template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
 template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
+template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>();
 template void Spheres::update_attribute_descriptor<Device::CPU>(SpheresDescriptor<Device::CPU>& descriptor,
 																 const std::vector<const char*>&);
 template void Spheres::update_attribute_descriptor<Device::CUDA>(SpheresDescriptor<Device::CUDA>& descriptor,
 																 const std::vector<const char*>&);
-//template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>(const std::vector<const char*>&);
-
+template void Spheres::update_attribute_descriptor<Device::OPENGL>(SpheresDescriptor<Device::OPENGL>& descriptor,
+																 const std::vector<const char*>&);
 } // namespace mufflon::scene::geometry

@@ -262,7 +262,7 @@ AttributePool::AttributePool(const AttributePool& pool) :
 			pool.handle = ArrayDevHandle_t<ChangedBuffer::DEVICE, char>{};
 		} else {
 			pool.handle = Allocator<ChangedBuffer::DEVICE>::template alloc_array<char>(m_poolSize);
-			copy(pool.handle, elem.handle, 0, m_poolSize);
+			copy<char>(pool.handle, elem.handle, 0, m_poolSize);
 		}
 	});
 }
@@ -286,7 +286,7 @@ AttributePool::~AttributePool() {
 	m_pools.for_each([len = m_poolSize](auto& elem) {
 		using ChangedBuffer = std::decay_t<decltype(elem)>;
 		if(elem.handle)
-			elem.handle = Allocator<ChangedBuffer::DEVICE>::free(elem.handle, len);
+			elem.handle = Allocator<ChangedBuffer::DEVICE>::template free<char>(elem.handle, len);
 	});
 }
 
@@ -330,14 +330,14 @@ void AttributePool::shrink_to_fit() {
 		m_pools.for_each([bytes, prev = m_poolSize](auto& pool) {
 			using ChangedBuffer = std::decay_t<decltype(pool)>;
 			if(pool.handle)
-				pool.handle = Allocator<ChangedBuffer::DEVICE>::realloc(pool.handle, prev, bytes);
+				pool.handle = Allocator<ChangedBuffer::DEVICE>::template realloc<char>(pool.handle, prev, bytes);
 		});
 		m_poolSize = bytes;
 	} else {
 		m_pools.for_each([prev = m_poolSize](auto& pool) {
 			using ChangedBuffer = std::decay_t<decltype(pool)>;
 			if(pool.handle)
-				pool.handle = Allocator<ChangedBuffer::DEVICE>::free(pool.handle, prev);
+				pool.handle = Allocator<ChangedBuffer::DEVICE>::template free<char>(pool.handle, prev);
 		});
 		m_poolSize = 0u;
 	}

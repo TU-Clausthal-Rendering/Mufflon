@@ -110,12 +110,17 @@ template < typename T >
 inline void copy(gl::Handle dst, const T* src, std::size_t dstOffset, std::size_t size) {
 	static_assert(std::is_trivially_copyable<T>::value,
 		"Must be trivially copyable");
-	gl::bufferSubData(dst, dstOffset, size, src);
+	gl::bufferSubData(dst, dstOffset * sizeof(T), size, src);
 }
 
 template < typename T >
 inline void copy(T* dst, gl::Handle src, std::size_t dstOffset, std::size_t size) {
 	gl::getBufferSubData(src, 0, size, dst + dstOffset);
+}
+
+template < typename T >
+inline void copy(gl::Handle dst, gl::Handle src, std::size_t dstOffset, std::size_t size) {
+	gl::copyBufferSubData(src, dst, 0, dstOffset * sizeof(T), size);
 }
 
 template < Device dev >

@@ -154,6 +154,7 @@ public:
 	const LightTree<dev>& acquire_const(const ei::Box& sceneBounds) {
 		this->synchronize<dev>(sceneBounds);
 		if constexpr(dev == Device::CPU) return *m_treeCpu;
+		else if constexpr(dev == Device::OPENGL) return *m_treeOpengl;
 		else return *m_treeCuda;
 	}
 
@@ -171,6 +172,7 @@ public:
 	bool is_resident() const {
 		if constexpr(dev == Device::CPU) return m_treeCpu != nullptr;
 		if constexpr(dev == Device::CUDA) return m_treeCuda != nullptr;
+		if constexpr(dev == Device::OPENGL) return m_treeOpengl != nullptr;
 		return false;
 	}
 
@@ -187,6 +189,7 @@ private:
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;
 	std::unique_ptr<LightTree<Device::CUDA>> m_treeCuda;
+	std::unique_ptr<LightTree<Device::OPENGL>> m_treeOpengl;
 	HashMapManager<PrimitiveHandle, u32> m_primToNodePath;
 	GenericResource m_treeMemory;
 	// The tree is build on CPU side. For synchronization we need a possiblity to

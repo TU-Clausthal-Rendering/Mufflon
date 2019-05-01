@@ -32,6 +32,9 @@ public:
 		std::swap(m_deleter, o.m_deleter);
 		return *this;
 	}
+	unique_device_ptr(std::nullptr_t) :
+		unique_device_ptr()
+	{}
 	~unique_device_ptr() {
 		m_deleter.operator()<T>(m_handle);
 	}

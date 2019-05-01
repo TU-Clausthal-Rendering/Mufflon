@@ -86,19 +86,19 @@ public:
 	}
 
 	template < Device dev, class T >
-	T* acquire(SphereAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(SphereAttributeHandle hdl) {
 		return m_attributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(SphereAttributeHandle hdl) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(SphereAttributeHandle hdl) {
 		return m_attributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	T* acquire(StringView name) {
+	ArrayDevHandle_t<dev, T> acquire(StringView name) {
 		return m_attributes.acquire<dev, T>(name);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(StringView name) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
 		return m_attributes.acquire_const<dev, T>(name);
 	}
 
@@ -175,8 +175,10 @@ private:
 		std::size_t size = 0u;
 	};
 
-	using AttribBuffers = util::TaggedTuple<AttribBuffer<Device::CPU>,
-		AttribBuffer<Device::CUDA>>;
+	using AttribBuffers = util::TaggedTuple<AttribBuffer<
+		Device::CPU>,
+		AttribBuffer<Device::CUDA>,
+		AttribBuffer<Device::OPENGL>>;
 
 	// Make sure that spheres are tightly packed
 	static_assert(sizeof(ei::Sphere) == 4u * sizeof(float));

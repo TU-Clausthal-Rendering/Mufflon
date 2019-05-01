@@ -59,7 +59,7 @@ Polygons::Polygons(const Polygons& poly) :
 			idxBuffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
 		} else {
 			idxBuffer.indices = Allocator<ChangedBuffer::DEVICE>::template alloc_array<u32>(buffer.reserved);
-			copy(idxBuffer.indices, buffer.indices, 0, sizeof(u32) * buffer.reserved);
+			copy<u32>(idxBuffer.indices, buffer.indices, 0, sizeof(u32) * buffer.reserved);
 		}
 	});
 	poly.m_attribBuffer.for_each([&](auto& buffer) {
@@ -71,13 +71,13 @@ Polygons::Polygons(const Polygons& poly) :
 			attribBuffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
 		} else {
 			attribBuffer.vertex = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.vertSize);
-			copy(attribBuffer.vertex, buffer.vertex, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
+			copy<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(attribBuffer.vertex, buffer.vertex, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
 		}
 		if(buffer.faceSize == 0u || buffer.face == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
 			attribBuffer.face = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
 		} else {
 			attribBuffer.face = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.faceSize);
-			copy(attribBuffer.face, buffer.face, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
+			copy<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(attribBuffer.face, buffer.face, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
 		}
 	});
 }
@@ -117,14 +117,14 @@ Polygons::~Polygons() {
 	m_indexBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
 		if(buffer.reserved != 0)
-			Allocator<ChangedBuffer::DEVICE>::free(buffer.indices, buffer.reserved);
+			Allocator<ChangedBuffer::DEVICE>::template free<u32>(buffer.indices, buffer.reserved);
 	});
 	m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
 		if(buffer.vertSize != 0)
-			Allocator<ChangedBuffer::DEVICE>::free(buffer.vertex, buffer.vertSize);
+			Allocator<ChangedBuffer::DEVICE>::template free<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.vertex, buffer.vertSize);
 		if(buffer.faceSize != 0)
-			Allocator<ChangedBuffer::DEVICE>::free(buffer.face, buffer.faceSize);
+			Allocator<ChangedBuffer::DEVICE>::template free<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.face, buffer.faceSize);
 	});
 }
 
@@ -542,28 +542,28 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 	auto& buffer = m_attribBuffer.template get<AttribBuffer<dev>>();
 
 	if(vertexAttribs.size() == 0 && buffer.vertSize != 0) {
-		buffer.vertex = Allocator<dev>::free(buffer.vertex, buffer.vertSize);
+		buffer.vertex = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize);
 	} else {
 		if(buffer.vertSize == 0)
 			buffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(vertexAttribs.size());
 		else
-			buffer.vertex = Allocator<dev>::realloc(buffer.vertex, buffer.vertSize, vertexAttribs.size());
+			buffer.vertex = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize, vertexAttribs.size());
 	}
 	if(faceAttribs.size() == 0 && buffer.faceSize != 0) {
-		buffer.face = Allocator<dev>::free(buffer.face, buffer.faceSize);
+		buffer.face = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize);
 	} else {
 		if(buffer.faceSize == 0)
 			buffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(faceAttribs.size());
 		else
-			buffer.face = Allocator<dev>::realloc(buffer.face, buffer.faceSize, faceAttribs.size());
+			buffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize, faceAttribs.size());
 	}
 
 	std::vector<void*> cpuVertexAttribs(vertexAttribs.size());
 	std::vector<void*> cpuFaceAttribs(faceAttribs.size());
 	for(const char* name : vertexAttribs)
-		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
+		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<Device::CPU, void>(name));
 	for(const char* name : faceAttribs)
-		cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
+		cpuFaceAttribs.push_back(m_faceAttributes.acquire<Device::CPU, void>(name));
 	copy<void*>(buffer.vertex, cpuVertexAttribs.data(), 0, sizeof(void*) * vertexAttribs.size());
 	copy<void*>(buffer.face, cpuFaceAttribs.data(), 0, sizeof(void*) *faceAttribs.size());
 
@@ -581,7 +581,7 @@ void Polygons::reserve_index_buffer(std::size_t capacity) {
 		if(buffer.reserved == 0u)
 			buffer.indices = Allocator<dev>::template alloc_array<u32>(capacity);
 		else
-			buffer.indices = Allocator<Device::CPU>::realloc(buffer.indices, buffer.reserved,
+			buffer.indices = Allocator<dev>::template realloc<u32>(buffer.indices, buffer.reserved,
 															 capacity);
 		buffer.reserved = capacity;
 		m_indexFlags.mark_changed(dev);
@@ -615,14 +615,14 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 		if(attribBuffer.faceSize == 0)
 			attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(f);
 		else
-			attribBuffer.face = Allocator<dev>::realloc(attribBuffer.face, attribBuffer.faceSize, f);
+			attribBuffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.face, attribBuffer.faceSize, f);
 		attribBuffer.faceSize = f;
 	}
 	if(attribBuffer.vertSize < v) {
 		if(attribBuffer.vertSize == 0)
 			attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(v);
 		else
-			attribBuffer.vertex = Allocator<dev>::realloc(attribBuffer.vertex, attribBuffer.vertSize, v);
+			attribBuffer.vertex = Allocator<dev>::template realloc< ArrayDevHandle_t<dev, void>>(attribBuffer.vertex, attribBuffer.vertSize, v);
 		attribBuffer.vertSize = v;
 	}
 }
@@ -630,29 +630,31 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 // Explicit instantiations
 template void Polygons::reserve_index_buffer<Device::CPU>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::CUDA>(std::size_t capacity);
-//template void Polygons::reserve_index_buffer<Device::OPENGL>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL>(std::size_t capacity);
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::CUDA>();
-//template void Polygons::synchronize_index_buffer<Device::CPU, Device::OPENGL>();
+template void Polygons::synchronize_index_buffer<Device::CPU, Device::OPENGL>();
 template void Polygons::synchronize_index_buffer<Device::CUDA, Device::CPU>();
 //template void Polygons::synchronize_index_buffer<Device::CUDA, Device::OPENGL>();
 //template void Polygons::synchronize_index_buffer<Device::OPENGL, Device::CPU>();
 //template void Polygons::synchronize_index_buffer<Device::OPENGL, Device::CUDA>();
 template void Polygons::resizeAttribBuffer<Device::CPU>(std::size_t v, std::size_t f);
 template void Polygons::resizeAttribBuffer<Device::CUDA>(std::size_t v, std::size_t f);
-//template void Polygons::resizeAttribBuffer<Device::OPENGL>(std::size_t v, std::size_t f);
+template void Polygons::resizeAttribBuffer<Device::OPENGL>(std::size_t v, std::size_t f);
 template void Polygons::synchronize<Device::CPU>();
 template void Polygons::synchronize<Device::CUDA>();
-//template void Polygons::synchronize<Device::OPENGL>();
+template void Polygons::synchronize<Device::OPENGL>();
 template PolygonsDescriptor<Device::CPU> Polygons::get_descriptor<Device::CPU>();
 template PolygonsDescriptor<Device::CUDA> Polygons::get_descriptor<Device::CUDA>();
+template PolygonsDescriptor<Device::OPENGL> Polygons::get_descriptor<Device::OPENGL>();
 template void Polygons::update_attribute_descriptor<Device::CPU>(PolygonsDescriptor<Device::CPU>& descriptor,
 																  const std::vector<const char*>& vertexAttribs,
 																  const std::vector<const char*>& faceAttribs);
 template void Polygons::update_attribute_descriptor<Device::CUDA>(PolygonsDescriptor<Device::CUDA>& descriptor,
 																  const std::vector<const char*>& vertexAttribs,
 																  const std::vector<const char*>& faceAttribs);
-/*template PolygonsDescriptor<Device::OPENGL> Polygons::get_descriptor<Device::OPENGL>(const std::vector<const char*>& vertexAttribs,
-																					 const std::vector<const char*>& faceAttribs);*/
+template void Polygons::update_attribute_descriptor<Device::OPENGL>(PolygonsDescriptor<Device::OPENGL>& descriptor,
+																  const std::vector<const char*>& vertexAttribs,
+																  const std::vector<const char*>& faceAttribs);
 
 
 } // namespace mufflon::scene::geometry

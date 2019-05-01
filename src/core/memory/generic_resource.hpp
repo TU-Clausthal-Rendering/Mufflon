@@ -99,8 +99,8 @@ private:
 	util::DirtyFlags<Device> m_dirty;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, char[]>,
-		unique_device_ptr<Device::CUDA, char[]>> m_mem;
-	//unique_device_ptr<Device::OPENGL, char> m_openglMem;
+		unique_device_ptr<Device::CUDA, char[]>,
+		unique_device_ptr<Device::OPENGL, char[]>> m_mem;
 };
 template struct DeviceManagerConcept<GenericResource>;
 

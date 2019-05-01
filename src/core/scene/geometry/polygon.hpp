@@ -297,27 +297,27 @@ public:
 	}
 
 	template < Device dev, class T >
-	T* acquire(VertexAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(VertexAttributeHandle hdl) {
 		return m_vertexAttributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	T* acquire(FaceAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(FaceAttributeHandle hdl) {
 		return m_faceAttributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(VertexAttributeHandle hdl) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(VertexAttributeHandle hdl) {
 		return m_vertexAttributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(FaceAttributeHandle hdl) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(FaceAttributeHandle hdl) {
 		return m_faceAttributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T, bool face >
-	T* acquire(StringView name) {
+	ArrayDevHandle_t<dev, T> acquire(StringView name) {
 		return get_attributes<face>().acquire<dev, T>(name);
 	}
 	template < Device dev, class T, bool face >
-	const T* acquire_const(StringView name) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
 		return get_attributes<face>().acquire_const<dev, T>(name);
 	}
 
@@ -395,10 +395,16 @@ private:
 		std::size_t faceSize = 0u;
 	};
 
-	using IndexBuffers = util::TaggedTuple<IndexBuffer<Device::CPU>,
-		IndexBuffer<Device::CUDA>>;
-	using AttribBuffers = util::TaggedTuple<AttribBuffer<Device::CPU>,
-		AttribBuffer<Device::CUDA>>;
+	using IndexBuffers = util::TaggedTuple<
+		IndexBuffer<Device::CPU>,
+		IndexBuffer<Device::CUDA>,
+		IndexBuffer<Device::OPENGL>
+	>;
+	using AttribBuffers = util::TaggedTuple<
+		AttribBuffer<Device::CPU>,
+		AttribBuffer<Device::CUDA>,
+		AttribBuffer<Device::OPENGL>
+	>;
 
 	// Helper for deciding between vertex and face attributes
 	template < bool face >

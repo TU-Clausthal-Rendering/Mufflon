@@ -600,7 +600,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
 	// cannot allocate the other parts in bvh.
 	m_primIds.resize(numPrimitives * sizeof(i32));
-	i32* primIds = as<i32>(m_primIds.acquire<DescType::DEVICE>());
+	auto primIds = as<ArrayDevHandle_t<DescType::DEVICE, i32>, ArrayDevHandle_t<DescType::DEVICE, char>>(m_primIds.acquire<DescType::DEVICE>());
 	auto parents = make_udevptr_array<DescType::DEVICE, i32, false>(numNodes);
 
 	// To avoid unnecessary allocations we allocate the device counter array here already (usage in calculate_bounding_boxes)
@@ -765,6 +765,8 @@ void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB) {
 
 template void LBVHBuilder::build<Device::CPU>(LodDescriptor<Device::CPU>&, const ei::Box&);
 template void LBVHBuilder::build<Device::CUDA>(LodDescriptor<Device::CUDA>&, const ei::Box&);
+//template void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&);
+template<> void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&) {}
 
 template < Device dev >
 void LBVHBuilder::build(
@@ -779,6 +781,7 @@ void LBVHBuilder::build(
 template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&);
 template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&);
 //template void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&);
+template <> void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&);
 
 }
 }
