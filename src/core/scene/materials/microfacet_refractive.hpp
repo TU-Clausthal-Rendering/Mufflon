@@ -97,6 +97,8 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
+	bool isReflection = incidentTS.z * excidentTS.z > 0.0f;
+
 	// General terms. For refraction iDotH != eDotH!
 	Direction halfTS = boundary.get_halfTS(incidentTS, excidentTS);
 	float iDotH = dot(incidentTS, halfTS);
@@ -105,10 +107,11 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 	float n_e = boundary.otherMedium.get_refraction_index().x;
 
 	// Use snells law to check for total internal reflection
-	float t = 1.0f - ei::sq(n_i / n_e) * (1.0f - iDotH * iDotH);
-	bool isReflection = incidentTS.z * excidentTS.z;
-	bool needsReflection = (t <= 0.0f);
-	if(isReflection != needsReflection) return {}; // No contribution
+	if(isReflection) {
+		float t = ei::sq(n_i / n_e) * (1.0f - iDotH * iDotH);
+		// For TIR t must be >= 1 such that sqrt(1-t) would fail
+		if(t < 1.0f) return {};
+	}
 
 	// Geometry Term
 	float ge = geoshadowing_vcavity(eDotH, excidentTS.z, halfTS.z, params.roughness);
@@ -119,7 +122,7 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 
 	// Fresnel is done as layer blending...
 
-	if(incidentTS.z * excidentTS.z > 0.0f) { // Reflections are possible due to total internal reflection.
+	if(isReflection) { // Reflections are possible due to total internal reflection.
 		float g = geoshadowing_vcavity_reflection(gi, ge);
 		float common = sdiv(d, 4.0f * incidentTS.z * excidentTS.z);
 		return math::BidirSampleValue {
