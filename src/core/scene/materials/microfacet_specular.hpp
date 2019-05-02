@@ -51,7 +51,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 
 	// Copy the sign for two sided diffuse
 	return math::PathSample {
-		Spectrum{params.albedo} * sdiv(g,gi),
+		params.albedo * sdiv(g, gi),
 		math::PathEventType::REFLECTED,
 		excidentTS,
 		cavityTS.pdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),

@@ -275,6 +275,7 @@ template<class LayerASample, class LayerBSample>
 struct MatSampleBlendFresnel {
 	LayerASample a;
 	LayerBSample b;
+	//float pReflect;	// Reflection probability constant for sampling
 };
 
 // Definition of NonTexParams as non-dependent type. Otherwise the overload
@@ -284,7 +285,6 @@ struct MatNTPBlendFresnel {
 	typename LayerA::NonTexParams a;
 	typename LayerB::NonTexParams b;
 	ei::Vec2 ior;
-	//float pReflect;	// Reflection probability constant for sampling
 };
 
 // Additive blending of two other layers using Dielectric Fresnel equations.

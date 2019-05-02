@@ -11,13 +11,33 @@ struct Refraction {
 	float cosTAbs;
 };
 
-// Dielectric Fresnel for unpolarized light
+// Dielectric-Dielectric Fresnel for unpolarized light
 // etaSq: (n_i / n_t)^2
-CUDA_FUNCTION Refraction fresnel_dielectric(float n_i, float n_t, float etaSq, float cosIAbs) {
-	float cosTAbs = sqrt(ei::max(0.0f, 1.0f - etaSq * (1.0f - cosIAbs * cosIAbs)));
+CUDA_FUNCTION Refraction fresnel_dielectric(float n_i, float n_t, float cosIAbs) {
+	float eta = ei::sq(n_i / n_t);
+	float cosTAbs = sqrt(ei::max(0.0f, 1.0f - eta * (1.0f - cosIAbs * cosIAbs)));
 	float rParl = sdiv(n_t * cosIAbs - n_i * cosTAbs, n_t * cosIAbs + n_i * cosTAbs);
 	float rPerp = sdiv(n_t * cosTAbs - n_i * cosIAbs, n_t * cosTAbs + n_i * cosIAbs);
 	return {0.5f * (rParl * rParl + rPerp * rPerp), cosTAbs};
+}
+
+// Dielectric-Conductor Fresnel for unpolarized light
+// https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/#more-1921
+// TODO: compute per frequency? Requires RGB n_i and n_t
+CUDA_FUNCTION Refraction fresnel_conductor(ei::Vec2 n_i, ei::Vec2 n_t, float cosIAbs) {
+	mAssertMsg(n_i.y == 0.0f, "Incident medium must be dielectric.");
+	ei::Vec2 etaSq = sq(n_t / n_i.x);
+	float cosISq = cosIAbs * cosIAbs;
+	float sinISq = 1.0f - cosISq;
+	float t0 = etaSq.x - etaSq.y - sinISq;
+	float asq_bsq = sqrt(4.0f * etaSq.x * etaSq.y + t0 * t0);
+	float a = sqrt(0.5f * (asq_bsq + t0));
+	float t1 = 2.0f * a * cosIAbs;
+	float rPerp = (asq_bsq + cosISq - t1) / (asq_bsq + cosISq + t1);
+	t1 *= sinISq;
+	float t2 = cosISq * asq_bsq + sinISq * sinISq;
+	float rParl = rPerp * (t1 - t2) / (t1 + t2);
+	return {0.5f * (rParl + rPerp), 0.0f};
 }
 
 template<class LayerA, class LayerB>
@@ -44,47 +64,33 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlendFresnel<LayerASample, 
 	// A microfacet is not known yet.
 	float n_i = boundary.incidentMedium.get_refraction_index().x;
 	float n_t = boundary.otherMedium.get_refraction_index().x;
-	float etaSq = ei::sq(n_i / n_t);
-	float f = fresnel_dielectric(n_i, n_t, etaSq, ei::abs(incidentTS.z)).f;
-
-//	float fa = params.factorA * sum(albedo(params.a));
-//	float fb = params.factorB * sum(albedo(params.b));
-//	float p = fa / (fa + fb);
-	u64 probLayerA = math::percentage_of(std::numeric_limits<u64>::max() - 1, f);
+	u64 probLayerA = math::percentage_of(std::numeric_limits<u64>::max() - 1, 0.5f);
+	bool reflect = rndSet.i0 < probLayerA;
 
 	// Sample and get the pdfs of the second layer.
 	math::PathSample sampleVal;
 	math::BidirSampleValue otherVal;
-	float scaleS, scaleE;
-	if(rndSet.i0 < probLayerA) {
+	if(reflect) {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, 0, probLayerA-1);
 		sampleVal = sample(params.a, incidentTS, boundary, rndSet, adjoint);
 		if(sampleVal.pdf.forw.is_zero()) return sampleVal; // Discard
 		otherVal = evaluate(params.b, incidentTS, sampleVal.excident, boundary);
-		scaleS = float(sampleVal.pdf.forw) * f;
-		scaleE = 1.0f - f;
 	} else {
 		rndSet.i0 = math::rescale_sample(rndSet.i0, probLayerA, std::numeric_limits<u64>::max());
 		sampleVal = sample(params.b, incidentTS, boundary, rndSet, adjoint);
 		if(sampleVal.pdf.forw.is_zero()) return sampleVal; // Discard
 		otherVal = evaluate(params.a, incidentTS, sampleVal.excident, boundary);
-		scaleS = float(sampleVal.pdf.forw) * (1.0f - f);
-		scaleE = f;
-		f = 1.0f - f;
 	}
-	scaleE *= ei::abs(sampleVal.excident.z);
-	// The Fresnel probability in the backward direction is different than that from
-	// forward (term depents on the selected direction).
-	if(incidentTS.z * sampleVal.excident.z < 0) {
-		float t = n_i; n_i = n_t; n_t = t;
-		etaSq = 1.0f / etaSq;
-	}
-	float fB = fresnel_dielectric(n_i, n_t, etaSq, ei::abs(sampleVal.excident.z)).f;
+	const float iDotHabs = ei::abs(dot(incidentTS, boundary.get_halfTS(incidentTS, sampleVal.excident)));
+	const float f = fresnel_dielectric(n_i, n_t, iDotHabs).f;
+	float scaleS = float(sampleVal.pdf.forw);
+	float scaleE = ei::abs(sampleVal.excident.z);
+	if(reflect) { scaleS *= f; scaleE *= 1.0f - f; }
+	else { scaleS *= 1.0f - f; scaleE *= f; }
 
 	// Blend values and pdfs.
-	float origPdf = float(sampleVal.pdf.forw);
-	sampleVal.pdf.forw = AngularPdf{ ei::lerp(float(otherVal.pdf.forw), float(sampleVal.pdf.forw), f) };
-	sampleVal.pdf.back = AngularPdf{ ei::lerp(float(otherVal.pdf.back), float(sampleVal.pdf.back), fB) };
+	sampleVal.pdf.forw = AngularPdf{ (float(otherVal.pdf.forw) + float(sampleVal.pdf.forw)) * 0.5f };
+	sampleVal.pdf.back = AngularPdf{ (float(otherVal.pdf.back) + float(sampleVal.pdf.back)) * 0.5f };
 	sampleVal.throughput = (sampleVal.throughput * scaleS + otherVal.value * scaleE)
 						  / float(sampleVal.pdf.forw);
 	return sampleVal;
@@ -102,20 +108,12 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlendFresnel<LayerA
 	// Determine the probability from Fresnel. It differs for both directions due to the sampling algorithm.
 	float n_i = boundary.incidentMedium.get_refraction_index().x;
 	float n_t = boundary.otherMedium.get_refraction_index().x;
-	float etaSq = ei::sq(n_i / n_t);
-	float fF = fresnel_dielectric(n_i, n_t, etaSq, ei::abs(incidentTS.z)).f;
-	if(incidentTS.z * excidentTS.z < 0) {
-		float t = n_i; n_i = n_t; n_t = t;
-		etaSq = 1.0f / etaSq;
-	}
-	float fB = fresnel_dielectric(n_i, n_t, etaSq, ei::abs(excidentTS.z)).f;
-/*	float fa = params.factorA * sum(albedo(params.a));
-	float fb = params.factorB * sum(albedo(params.b));
-	float p = fa / (fa + fb);// TODO: precompute in fetch?*/
+	float iDotHabs = ei::abs(dot(incidentTS, boundary.get_halfTS(incidentTS, excidentTS)));
+	float f = fresnel_dielectric(n_i, n_t, iDotHabs).f;
 	// Blend their results
-	valA.value = ei::lerp(valB.value, valA.value, fF);
-	valA.pdf.forw = AngularPdf{ ei::lerp(float(valB.pdf.forw), float(valA.pdf.forw), fF) };
-	valA.pdf.back = AngularPdf{ ei::lerp(float(valB.pdf.back), float(valA.pdf.back), fB) };
+	valA.value = ei::lerp(valB.value, valA.value, f);
+	valA.pdf.forw = AngularPdf{ (float(valB.pdf.forw) + float(valA.pdf.forw)) * 0.5f };
+	valA.pdf.back = AngularPdf{ (float(valB.pdf.back) + float(valA.pdf.back)) * 0.5f };
 	return valA;
 }
 
@@ -139,8 +137,7 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleBlendFresnel<LayerASampl
 	float cosIAbs = ei::abs(dot(geoN, excident));
 	// TODO: needs media for correct evaluation
 	float n_i = 1.0f; float n_t = 1.3f;
-	float etaSq = ei::sq(n_i / n_t);
-	float f = fresnel_dielectric(n_i, n_t, etaSq, cosIAbs).f;
+	float f = fresnel_dielectric(n_i, n_t, cosIAbs).f;
 	valA.value = ei::lerp(valB.value, valA.value, f);
 	valA.pdf += valB.pdf;
 	return valA;

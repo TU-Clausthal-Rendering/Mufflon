@@ -124,11 +124,10 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 
 	if(isReflection) { // Reflections are possible due to total internal reflection.
 		float g = geoshadowing_vcavity_reflection(gi, ge);
-		float common = sdiv(d, 4.0f * incidentTS.z * excidentTS.z);
 		return math::BidirSampleValue {
-			Spectrum{ g * common },
-			AngularPdf{ gi * common },
-			AngularPdf{ ge * common }
+			Spectrum{ sdiv(g * d, 4.0f * incidentTS.z * excidentTS.z) },
+			AngularPdf{ sdiv(gi * d, 4.0f * ei::abs(incidentTS.z)) },
+			AngularPdf{ sdiv(ge * d, 4.0f * ei::abs(excidentTS.z)) }
 		};
 	}
 
