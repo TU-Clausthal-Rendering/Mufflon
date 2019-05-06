@@ -28,6 +28,8 @@ namespace gui.Dll
 
         [DllImport("user32.dll", EntryPoint = "GetDC", CharSet = CharSet.Unicode)]
         internal static extern IntPtr GetDC(IntPtr hWnd);
+        [DllImport("user32.dll", EntryPoint = "ReleaseDC", CharSet = CharSet.Unicode)]
+        internal static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
         [DllImport("user32.dll", EntryPoint = "DestroyWindow", CharSet = CharSet.Unicode)]
         internal static extern bool DestroyWindow(IntPtr hwnd);

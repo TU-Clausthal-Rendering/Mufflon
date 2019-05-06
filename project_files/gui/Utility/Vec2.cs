@@ -20,7 +20,7 @@ namespace gui.Utility
             Y = v;
         }
 
-        public T X { get; }
-        public T Y { get; }
+        public T X { get; set; }
+        public T Y { get; set; }
     }
 }

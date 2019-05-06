@@ -133,6 +133,11 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_get_target_image(UInt32 index, Boolean variance,
             OpenGlDisplay.TextureFormat format, bool sRgb, out IntPtr ptr);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool core_copy_screen_texture_rgb(IntPtr ptr, float gammaFactor);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool core_get_pixel_info(uint x, uint y, Boolean borderClamp, out float r,
+            out float g, out float b, out float a);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_dll_error")]
         private static extern IntPtr core_get_dll_error_();

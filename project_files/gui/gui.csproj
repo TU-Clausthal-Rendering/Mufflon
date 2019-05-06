@@ -46,12 +46,13 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>x64</PlatformTarget>
     <DebugType>pdbonly</DebugType>
-    <Optimize>false</Optimize>
+    <Optimize>true</Optimize>
     <OutputPath>..\..\build\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>Icons\logo1.ico</ApplicationIcon>
@@ -94,7 +95,8 @@
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Command\SetDialogResultCommand.cs" />
-    <Compile Include="Controller\CameraController.cs" />
+    <Compile Include="Controller\Renderer\RenderCameraController.cs" />
+    <Compile Include="Controller\Renderer\RendererController.cs" />
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
     <Compile Include="Dll\OpenGlDisplay.cs" />
@@ -107,6 +109,8 @@
     <Compile Include="Model\Camera\OrthoCameraModel.cs" />
     <Compile Include="Model\Camera\PinholeCameraModel.cs" />
     <Compile Include="Model\Controller\ScenarioChangedController.cs" />
+    <Compile Include="Model\Display\DisplayModel.cs" />
+    <Compile Include="Model\Display\RenderCameraModel.cs" />
     <Compile Include="Model\Events\LoadEvent.cs" />
     <Compile Include="Model\Light\DirectionalLightModel.cs" />
     <Compile Include="Model\Light\EnvmapLightModel.cs" />
@@ -131,7 +135,6 @@
     <Compile Include="Model\SettingsModel.cs" />
     <Compile Include="Model\StatusbarModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
-    <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\BoundingBox.cs" />
@@ -149,9 +152,9 @@
     <Compile Include="ViewModel\Camera\FocusCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
-    <Compile Include="ViewModel\ConsoleInputViewModel.cs" />
     <Compile Include="ViewModel\ConsoleOutputViewModel.cs" />
     <Compile Include="ViewModel\Dialog\LoadWorldViewModel.cs" />
+    <Compile Include="ViewModel\Display\DisplayViewModel.cs" />
     <Compile Include="ViewModel\KeyGestureViewModel.cs" />
     <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
     <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
@@ -182,7 +185,6 @@
     <Compile Include="ViewModel\StatusbarViewModel.cs" />
     <Compile Include="ViewModel\ToolbarViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
-    <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
     <Compile Include="View\Camera\CameraView.xaml.cs">
       <DependentUpon>CameraView.xaml</DependentUpon>
@@ -468,9 +470,7 @@
     <Resource Include="Icons\camera_nomove.png" />
     <Resource Include="Icons\logo1.ico" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Controller\Renderer\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Resource Include="Icons\iterate_ten.png" />
   </ItemGroup>

@@ -111,11 +111,10 @@ namespace gui.Model
     {
         private bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
-        private UInt32 m_rendererCount = 0u;
 
         public RendererModel()
         {
-            // Initial state: renderer paused
+            // Initial state: renderer paused (this will always be in the main UI thread)
             RenderLock.WaitOne();
             PropertyChanged += OnRendererChanged;
 
@@ -158,16 +157,6 @@ namespace gui.Model
             UpdateIterationData();
         }
 
-        public void UpdateDisplayTexture()
-        {
-            // TODO: this belongs somewhere else for sure
-            if(!IsRendering)
-            {
-                RenderLock.Release();
-                RenderLock.WaitOne();
-            }
-        }
-
         // This iterates by leveraging the GUI and includes texture updates etc
         public void Iterate(uint times)
         {
@@ -203,16 +192,7 @@ namespace gui.Model
             OnPropertyChanged(nameof(Iteration));
         }
 
-        public UInt32 RendererCount
-        {
-            get => m_rendererCount;
-            set
-            {
-                if (m_rendererCount == value) return;
-                m_rendererCount = value;
-                OnPropertyChanged(nameof(RendererCount));
-            }
-        }
+        public UInt32 RendererCount { get => Core.render_get_renderer_count(); }
 
         public UInt32 RendererIndex
         {

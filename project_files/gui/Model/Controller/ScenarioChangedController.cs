@@ -1,4 +1,5 @@
-﻿using System;
+﻿using gui.Utility;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -25,8 +26,7 @@ namespace gui.Model.Controller
             switch (args.PropertyName)
             {
                 case nameof(Models.World):
-                    if (m_models.World != null)
-                    {
+                    if (m_models.World != null) {
                         AdjustScenarioViewport();
                     }
                     break;
@@ -35,8 +35,8 @@ namespace gui.Model.Controller
 
         void AdjustScenarioViewport()
         {
-            m_models.Viewport.RenderWidth = (int)m_models.World.CurrentScenario.Resolution.X;
-            m_models.Viewport.RenderHeight = (int)m_models.World.CurrentScenario.Resolution.Y;
+            m_models.Display.RenderSize = new Vec2<int>((int)m_models.World.CurrentScenario.Resolution.X,
+                (int)m_models.World.CurrentScenario.Resolution.Y);
         }
     }
 }

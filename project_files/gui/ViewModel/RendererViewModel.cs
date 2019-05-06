@@ -204,6 +204,7 @@ namespace gui.ViewModel
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += rendererChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
+            m_models.App.Loaded += OnFinishedLoading;
 
             // Renderer initialization is deferred until the render DLL is initialized
         }
@@ -241,32 +242,6 @@ namespace gui.ViewModel
                 case nameof(Models.Renderer.RendererIndex):
                     rendererTypeChanged();
                     break;
-                case nameof(Models.Renderer.RendererCount):
-                {
-                    // Enable the renderers
-                    Renderers.Clear();
-                    for (UInt32 i = 0u; i < m_models.Renderer.RendererCount; ++i)
-                    {
-                        Renderers.Add(new RendererItem() { Index = i });
-                    }
-                    // Enable the last selected renderer
-                    uint lastSelected = m_models.Settings.LastSelectedRenderer;
-                    if (lastSelected >= Renderers.Count)
-                    {
-                        lastSelected = 0;
-                        m_models.Settings.LastSelectedRenderer = 0;
-                    }
-                    SelectedRenderer = Renderers[(int)m_models.Settings.LastSelectedRenderer];
-                    if (m_models.Renderer.RendererIndex == SelectedRenderer.Index)
-                        rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.RendererIndex)));
-                    else
-                        m_models.Renderer.RendererIndex = SelectedRenderer.Index;
-
-                    // Load the parameter values from settings
-                    
-
-                    OnPropertyChanged(nameof(Renderers));
-                    }   break;
                 case nameof(Models.Renderer.IsRendering):
                     OnPropertyChanged(nameof(IsRendering));
                     break;
@@ -336,6 +311,31 @@ namespace gui.ViewModel
                 (prop as RendererPropertyInt).Value = (int)param.Value;
             else if (prop is RendererPropertyFloat)
                 (prop as RendererPropertyFloat).Value = (float)param.Value;
+        }
+
+        // We may now obtain the proper renderers
+        private void OnFinishedLoading(object sender, EventArgs args)
+        {
+            // Enable the renderers
+            Renderers.Clear();
+            var rendererCount = m_models.Renderer.RendererCount;
+            for (UInt32 i = 0u; i < rendererCount; ++i)
+                Renderers.Add(new RendererItem() { Index = i });
+            // Enable the last selected renderer
+            uint lastSelected = m_models.Settings.LastSelectedRenderer;
+            if (lastSelected >= Renderers.Count)
+            {
+                lastSelected = 0;
+                m_models.Settings.LastSelectedRenderer = 0;
+            }
+            SelectedRenderer = Renderers[(int)m_models.Settings.LastSelectedRenderer];
+            if (m_models.Renderer.RendererIndex == SelectedRenderer.Index)
+                rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.RendererIndex)));
+            else
+                m_models.Renderer.RendererIndex = SelectedRenderer.Index;
+
+            // Load the parameter values from settings
+            OnPropertyChanged(nameof(Renderers));
         }
 
         #region PropertyChanged

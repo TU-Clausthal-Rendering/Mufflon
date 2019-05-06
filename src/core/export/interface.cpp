@@ -2,6 +2,7 @@
 #include "plugin/texture_plugin.hpp"
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
+#include "util/parallel.hpp"
 #include "util/punning.hpp"
 #include "util/degrad.hpp"
 #include "ei/vector.hpp"
@@ -100,6 +101,7 @@ int s_cudaDevIndex = -1;
 std::string s_lastError;
 // Mutex for exclusive renderer access: during an iteration no other thread may change renderer properties
 std::mutex s_iterationMutex{};
+std::mutex s_screenTextureMutex{};
 // Log file
 std::ofstream s_logFile;
 
@@ -309,33 +311,66 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
-	std::scoped_lock lock{ s_iterationMutex };
-	if(ptr != nullptr) {
-		const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
-		const renderer::OutputValue targetFlags{ flags };
-		if(!s_outputTargets.is_set(targetFlags)) {
-			logError("[", FUNCTION_NAME, "] Specified render target is not active");
-			return false;
-		}
+	std::scoped_lock iterLock{ s_iterationMutex };
+	std::scoped_lock screenLock{ s_screenTextureMutex };
+	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
+	const renderer::OutputValue targetFlags{ flags };
+	if(!s_outputTargets.is_set(targetFlags)) {
+		logError("[", FUNCTION_NAME, "] Specified render target is not active");
+		return false;
+	}
 		
-		// If there's no output yet, we "return" a nullptr
-		if(s_imageOutput != nullptr) {
-			if(format >= TextureFormat::FORMAT_NUM)
-				(void)core_get_target_format(index, &format);
-			s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+	// If there's no output yet, we "return" a nullptr
+	if(s_imageOutput != nullptr) {
+		if(format >= TextureFormat::FORMAT_NUM)
+			(void)core_get_target_format(index, &format);
+		s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+		if(ptr != nullptr)
 			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
-		} else {
-			*ptr = nullptr;
+	} else if(ptr != nullptr) {
+		*ptr = nullptr;
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean core_copy_screen_texture_rgb(unsigned char* ptr, const float gammaFactor) {
+	TRY
+	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+	std::scoped_lock lock{ s_screenTextureMutex };
+	if(ptr != nullptr) {
+		const int WIDTH = s_screenTexture->get_width();
+		const int PIXELS = WIDTH * s_screenTexture->get_height();
+#pragma PARALLEL_FOR
+		for(int i = 0; i < PIXELS; ++i) {
+		/*for(int y = 0; y < s_screenTexture->get_height(); ++y) {
+			for(int x = 0; x < s_screenTexture->get_width(); ++x) {*/
+			const Pixel pixel{ i % WIDTH, i / WIDTH };
+			ei::Vec4 value = s_screenTexture->read(pixel);
+			ptr[3 * i + 0] = static_cast<unsigned char>(std::min(1.f, std::max(0.f, ei::sRgbToRgb(gammaFactor * value.x))) * 255.f);
+			ptr[3 * i + 1] = static_cast<unsigned char>(std::min(1.f, std::max(0.f, ei::sRgbToRgb(gammaFactor * value.y))) * 255.f);
+			ptr[3 * i + 2] = static_cast<unsigned char>(std::min(1.f, std::max(0.f, ei::sRgbToRgb(gammaFactor * value.z))) * 255.f);
 		}
 	}
 	return true;
 	CATCH_ALL(false)
 }
 
-void execute_command(const char* command) {
+Boolean core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r, float* g, float* b, float* a) {
 	TRY
-	// TODO
-	CATCH_ALL(;)
+	CHECK(borderClamp || ((int)x < s_imageOutput->get_width() && (int)y >= s_imageOutput->get_height()),
+		  "Pixel coordinates are out of bounds", false);
+	if(s_screenTexture) {
+		const ei::Vec4 val = s_screenTexture->read(Pixel{ x, y });
+		*r = val.r;
+		*g = val.g;
+		*b = val.b;
+		*a = val.a;
+	} else {
+		*r = *g = *b = *a = 0.f;
+	}
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads) {

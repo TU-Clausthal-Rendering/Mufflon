@@ -1,21 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Input;
-using gui.Annotations;
+﻿using System.Windows.Input;
 using gui.Command;
-using gui.Controller;
 using gui.Model;
-using gui.Model.Camera;
-using gui.Model.Light;
-using gui.Model.Material;
-using gui.Utility;
-using gui.View;
+using gui.ViewModel.Display;
 using gui.ViewModel.Camera;
 using gui.ViewModel.Dialog;
 using gui.ViewModel.Light;
@@ -29,9 +15,8 @@ namespace gui.ViewModel
     public class ViewModels
     {
         public ConsoleOutputViewModel ConsoleOutput { get; }
-        public ConsoleInputViewModel ConsoleInput { get; }
 
-        public ViewportViewModel Viewport { get; }
+        public DisplayViewModel Display { get; }
         public CamerasViewModel Cameras { get; }
         public LightsViewModel Lights { get; }
         public MaterialsViewModel Materials { get; }
@@ -50,8 +35,6 @@ namespace gui.ViewModel
         public LoadWorldViewModel LoadWorld { get; }
         public AnimationFrameViewModel AnimationFrames { get; }
 
-        public CameraController CameraController { get; }
-
         public ICommand AddLightCommand { get; }
         public ICommand LoadSceneCommand { get; }
         public ICommand SaveSceneCommand { get; }
@@ -66,9 +49,7 @@ namespace gui.ViewModel
 
             // view model initialization
             ConsoleOutput = new ConsoleOutputViewModel(m_models);
-            ConsoleInput = new ConsoleInputViewModel(m_models, m_models.App.Window.ConsoleInputBox, ConsoleOutput);
-            Viewport = new ViewportViewModel(m_models, m_models.App.Window.BorderHost);
-            CameraController = new CameraController(m_models, m_models.App.Window.BorderHost);
+            Display = new DisplayViewModel(m_models, m_models.App.Window.RenderCanvasScroller);
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);
             Materials = new MaterialsViewModel(m_models);

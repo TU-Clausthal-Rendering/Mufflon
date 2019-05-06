@@ -13,6 +13,7 @@
         Title="Mufflon GUI" 
         Height="600" 
         Width="800"
+        SnapsToDevicePixels="True"
         WindowState="Maximized">
     <Window.Resources>
         <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
@@ -336,43 +337,38 @@
                     Background="{StaticResource BorderBrush}"/>
 
                 <!-- Renderer with scroll bars -->
-                <Grid
-                    Grid.Column="2">
+                <Grid Grid.Column="2">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="0"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
 
                     <Border 
+                        Grid.Row="0"
                         x:Name="BorderHost"
                         DockPanel.Dock="Bottom"
                         Background="Black"
                         Focusable="True"
-                        MaxWidth="{Binding Viewport.DesiredWidth}"
-                        MaxHeight="{Binding Viewport.DesiredHeight}">
+                        Visibility="Hidden"
+                        MaxWidth="0"
+                        MaxHeight="0">
                     </Border>
 
-                    <ScrollBar 
-                        Grid.Row="0"
-                        Grid.Column="1"
-                        Minimum="0"
-                        Maximum="{Binding Viewport.ScrollMaximumY}"
-                        Value="{Binding Viewport.OffsetY}"
-                        ViewportSize="{Binding Viewport.ScrollHeight}"/>
-
-                    <ScrollBar
-                        Grid.Row="1"
-                        Grid.Column="0"
-                        Orientation="Horizontal"
-                        Minimum="0"
-                        Maximum="{Binding Viewport.ScrollMaximumX}"
-                        Value="{Binding Viewport.OffsetX}"
-                        ViewportSize="{Binding Viewport.ScrollWidth}"/>
-
+                    <ScrollViewer Grid.Row="1"
+                                  x:Name="RenderCanvasScroller"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Focusable="False">
+                        <Image x:Name="RenderCanvas"
+                               Stretch="None"
+                               LayoutTransform="{Binding Display.BitmapScaling}"
+                               Source="{Binding Display.RenderImageSource}"
+                               Focusable="True"/>
+                    </ScrollViewer>
                 </Grid>
 
 
@@ -490,29 +486,10 @@
                 Background="{StaticResource BorderBrush}"/>
 
             <!-- console -->
-            <Grid Grid.Row="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <view:ConsoleView 
-                    Grid.Row="0"
-                    DataContext="{Binding ConsoleOutput}"
-                    x:Name="ConsoleOutput"/>
-
-                <TextBox
-                    Grid.Row="1"
-                    HorizontalAlignment="Stretch"
-                    Height="Auto"
-                    Background="{StaticResource ConsoleBrush}"
-                    Foreground="{StaticResource ConsoleFontBrush}"
-                    Text="{Binding ConsoleInput.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    FontFamily="Consolas"
-                    BorderBrush="{x:Null}"
-                    SelectionBrush="{x:Null}"
-                    x:Name="ConsoleInputBox"/>
-            </Grid>
+            <view:ConsoleView 
+                Grid.Row="2"
+                DataContext="{Binding ConsoleOutput}"
+                x:Name="ConsoleOutput"/>
 
             <!-- status bar -->
             <StatusBar
@@ -540,7 +517,7 @@
                                RenderOptions.BitmapScalingMode="LowQuality"
                                Width="16"
                                Height="16"/>
-                        <TextBlock Text="{Binding Statusbar.CursorPos}"/>
+                        <TextBlock Text="{Binding Display.CursorPos}"/>
                     </StackPanel>
                 </StatusBarItem>
                 <Separator Background="{StaticResource BorderBrush}"/>
@@ -551,10 +528,10 @@
                                RenderOptions.BitmapScalingMode="LowQuality"
                                Width="16"
                                Height="16"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorRed}" Width="45"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorGreen}" Width="45"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorBlue}" Width="45"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorAlpha}" Width="45"/>
+                        <TextBlock Text="{Binding Display.PixelColorRed}" Width="45"/>
+                        <TextBlock Text="{Binding Display.PixelColorGreen}" Width="45"/>
+                        <TextBlock Text="{Binding Display.PixelColorBlue}" Width="45"/>
+                        <TextBlock Text="{Binding Display.PixelColorAlpha}" Width="45"/>
                     </StackPanel>
                 </StatusBarItem>
                 <Separator Background="{StaticResource BorderBrush}"/>
