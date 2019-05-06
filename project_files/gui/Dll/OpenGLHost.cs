@@ -63,13 +63,13 @@ namespace gui.Dll
         /// <summary>
         /// asynch thread: openGL initialization (pixel format and wgl context)
         /// </summary>
-        public void StartRenderLoop(Core.LogCallback callback) {
+        public void StartRenderLoop() {
             // Start our render loop which will have the OpenGL context bound
-            m_renderThread = new Thread(new ParameterizedThreadStart(InitializeOpenGl));
-            m_renderThread.Start(callback);
+            m_renderThread = new Thread(new ThreadStart(InitializeOpenGl));
+            m_renderThread.Start();
         }
 
-        private void InitializeOpenGl(object callback) {
+        private void InitializeOpenGl() {
             IntPtr m_deviceContext = User32.GetDC(m_hWnd);
 
             var pfd = new Gdi32.PIXELFORMATDESCRIPTOR();
@@ -108,15 +108,14 @@ namespace gui.Dll
                 }
 
                 // Initialize the OpenGL display DLL
-                OpenGlContextCreated = OpenGlDisplay.opengldisplay_initialize((Core.LogCallback)callback);
+                OpenGlContextCreated = Core.mufflon_initialize_opengl();
             }
 
             // Start the render loop
             Render();
 
-            // Unload the display DLL
             if (OpenGlContextCreated)
-                OpenGlDisplay.opengldisplay_destroy();
+                Core.mufflon_destroy_opengl();
 
             // Release the contexts
             if(m_renderContext != IntPtr.Zero)

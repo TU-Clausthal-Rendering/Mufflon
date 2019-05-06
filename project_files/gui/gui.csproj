@@ -99,7 +99,6 @@
     <Compile Include="Controller\Renderer\RendererController.cs" />
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
-    <Compile Include="Dll\OpenGlDisplay.cs" />
     <Compile Include="InvBooleanToVisibilityConverter.cs" />
     <Compile Include="InvertVisibilityConverter.cs" />
     <Compile Include="Model\AppModel.cs" />

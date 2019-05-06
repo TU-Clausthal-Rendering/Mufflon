@@ -20,6 +20,7 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/material.hpp"
 #include "mffloader/interface/interface.h"
+#include <glad/glad.h>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <type_traits>
@@ -1411,6 +1412,19 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 
 	return move(newMaterial);
 }
+
+// Callback function for OpenGL debug context
+void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
+							  GLenum severity, GLsizei length,
+							  const GLchar* message, const void* userParam) {
+	switch(severity) {
+		case GL_DEBUG_SEVERITY_HIGH: logError(message); break;
+		case GL_DEBUG_SEVERITY_MEDIUM: logWarning(message); break;
+		case GL_DEBUG_SEVERITY_LOW: logInfo(message); break;
+		default: logPedantic(message); break;
+	}
+}
+
 } // namespace ::
 
 MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
@@ -3425,6 +3439,35 @@ Boolean mufflon_initialize() {
 	CATCH_ALL(false)
 }
 
+Boolean mufflon_initialize_opengl() {
+	TRY
+	static bool initialized = false;
+
+	if(!initialized) {
+		if(!gladLoadGL()) {
+			logError("[", FUNCTION_NAME, "] gladLoadGL failed; continuing without OpenGL support");
+			return false;
+		}
+
+		// Check if we satisfy our minimal version requirements
+		// TODO: this should really go into 'core' at some point since we don't use the displaying capabilities anymore!
+		if(GLVersion.major < 4 || (GLVersion.major == 4 && GLVersion.minor < 6)) {
+			logWarning("[", FUNCTION_NAME, "] Insufficient OpenGL version (found ", GLVersion.major, ".", GLVersion.minor,
+						", required 4.6); continuing without OpenGL support");
+			return false;
+		}
+
+		glDebugMessageCallback(opengl_callback, nullptr);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+
+		logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
+
+		initialized = true;
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
 int32_t mufflon_get_cuda_device_index() {
 	TRY
 	return s_cudaDevIndex;
@@ -3446,6 +3489,11 @@ Boolean mufflon_is_cuda_available() {
 	return false;
 	CATCH_ALL(false)
 }
+
+void mufflon_destroy_opengl() {
+	// TODO
+}
+
 
 void mufflon_destroy() {
 	TRY

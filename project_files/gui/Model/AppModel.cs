@@ -50,7 +50,7 @@ namespace gui.Model
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
-            GlHost.StartRenderLoop(m_logCallbackPointer);
+            GlHost.StartRenderLoop();
             Loaded(this, null);
         }
 

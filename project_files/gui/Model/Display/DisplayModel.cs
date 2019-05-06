@@ -103,7 +103,7 @@ namespace gui.Model.Display
             stopwatch.Restart();
             // Renew the display texture (we don't really care)
             IntPtr targetPtr = IntPtr.Zero;
-            if(!Core.core_get_target_image(targetIndex, paintVariance, OpenGlDisplay.TextureFormat.RGBA32F, true, out targetPtr))
+            if(!Core.core_get_target_image(targetIndex, paintVariance, Core.TextureFormat.RGBA32F, true, out targetPtr))
                 throw new Exception(Core.core_get_dll_error());
 
             System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
@@ -117,16 +117,6 @@ namespace gui.Model.Display
 
             Repainted(this, null);
         }
-
-        public void UpdateCurrentPixelColor() {
-            float r, g, b, a;
-            if (!OpenGlDisplay.opengldisplay_get_pixel_value((UInt32)CursorPos.X, (UInt32)CursorPos.Y,
-                out r, out g, out b, out a))
-                throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
-            CurrentPixelColor = new Vec4<float>(r, g, b, a);
-        }
-
-        // TODO: on pixel changed to update color
 
 
         #region PropertyChanged

@@ -17,7 +17,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "project_files\core\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gui", "project_files\gui\gui.csproj", "{92CEF99E-51BB-4733-9AC2-A8E0DBB37E18}"
 	ProjectSection(ProjectDependencies) = postProject
-		{8F6C4123-D6BB-43D5-B168-A7FB74002905} = {8F6C4123-D6BB-43D5-B168-A7FB74002905}
 		{15E94C26-7D49-421A-8CE4-7D697349FB79} = {15E94C26-7D49-421A-8CE4-7D697349FB79}
 		{5169EDD3-83D8-4C39-A6F0-E6D606352372} = {5169EDD3-83D8-4C39-A6F0-E6D606352372}
 	EndProjectSection
@@ -27,8 +26,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gliloader", "project_files\gliloader\gliloader.vcxproj", "{BD9F8A1A-98CC-4801-B55D-47891B0006A0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pfmloader", "project_files\pfmloader\pfmloader.vcxproj", "{6B07BBEF-D99B-4180-A00B-C89FBA673E96}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "opengldisplay", "project_files\opengldisplay\opengldisplay.vcxproj", "{8F6C4123-D6BB-43D5-B168-A7FB74002905}"
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "pythonbinding", "project_files\pythonbinding\pythonbinding.pyproj", "{A55ED0AA-5B4E-48C6-BFB0-5E46551A1C32}"
 EndProject
@@ -62,10 +59,6 @@ Global
 		{6B07BBEF-D99B-4180-A00B-C89FBA673E96}.Debug|x64.Build.0 = Debug|x64
 		{6B07BBEF-D99B-4180-A00B-C89FBA673E96}.Release|x64.ActiveCfg = Release|x64
 		{6B07BBEF-D99B-4180-A00B-C89FBA673E96}.Release|x64.Build.0 = Release|x64
-		{8F6C4123-D6BB-43D5-B168-A7FB74002905}.Debug|x64.ActiveCfg = Debug|x64
-		{8F6C4123-D6BB-43D5-B168-A7FB74002905}.Debug|x64.Build.0 = Debug|x64
-		{8F6C4123-D6BB-43D5-B168-A7FB74002905}.Release|x64.ActiveCfg = Release|x64
-		{8F6C4123-D6BB-43D5-B168-A7FB74002905}.Release|x64.Build.0 = Release|x64
 		{A55ED0AA-5B4E-48C6-BFB0-5E46551A1C32}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{A55ED0AA-5B4E-48C6-BFB0-5E46551A1C32}.Debug|x64.Build.0 = Debug|Any CPU
 		{A55ED0AA-5B4E-48C6-BFB0-5E46551A1C32}.Release|x64.ActiveCfg = Release|Any CPU

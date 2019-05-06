@@ -570,10 +570,12 @@ CORE_API size_t CDECL profiling_get_used_gpu_memory();
 
 // Interface for initialization and destruction
 CORE_API Boolean CDECL mufflon_initialize();
+CORE_API Boolean CDECL mufflon_initialize_opengl();
 CORE_API Boolean CDECL mufflon_set_logger(void(*logCallback)(const char*, int));
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API void CDECL mufflon_destroy();
+CORE_API void CDECL mufflon_destroy_opengl();
 
 
 CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* format);
