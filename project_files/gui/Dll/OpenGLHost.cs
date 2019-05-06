@@ -65,7 +65,7 @@ namespace gui.Dll
         /// </summary>
         public void StartRenderLoop() {
             // Start our render loop which will have the OpenGL context bound
-            m_renderThread = new Thread(new ThreadStart(InitializeOpenGl));
+            m_renderThread = new Thread(new ThreadStart(InitializeOpenGl)) { Name = "RenderThread" };
             m_renderThread.Start();
         }
 

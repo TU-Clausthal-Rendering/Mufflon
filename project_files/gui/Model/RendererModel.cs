@@ -121,6 +121,10 @@ namespace gui.Model
             RendererIndex = 0u;
         }
 
+        // There are really only two places this should be touched: in IsRendering and the primary render loop
+        // Its purpose is to send the render thread to sleep when we don't want to render, NOT do enforce
+        // no-rendering when we change attributes (camera, lights, render targets etc.); this is
+        // done in the core-dll itself via a mutex (actually two, but lets not split hairs).
         public Semaphore RenderLock = new Semaphore(1, 1);
 
         public bool IsRendering
