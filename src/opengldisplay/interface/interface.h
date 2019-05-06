@@ -30,7 +30,7 @@ OPENGLDISPLAY_API const char* CDECL opengldisplay_get_dll_error();
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_display(int left, int right, int bottom, int top, uint32_t width, uint32_t height);
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_resize_screen(uint32_t width, uint32_t height, TextureFormat format);
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_write(const char* data);
-OPENGLDISPLAY_API Boolean CDECL opengldisplay_initialize();
+OPENGLDISPLAY_API Boolean CDECL opengldisplay_initialize(void(*logCallback)(const char*, int));
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_set_logger(void(*logCallback)(const char*, int));
 OPENGLDISPLAY_API void CDECL opengldisplay_destroy();
 OPENGLDISPLAY_API Boolean CDECL opengldisplay_set_log_level(LogLevel level);

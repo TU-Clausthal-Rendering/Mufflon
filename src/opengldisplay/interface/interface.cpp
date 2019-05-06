@@ -61,7 +61,7 @@ GLint s_uvUniform;
 std::unique_ptr<VertexArray> s_vao = nullptr;
 std::unique_ptr<Texture2D> s_screenTexture = nullptr;
 std::string s_lastError;
-static void(*s_logCallback)(const char*, int);
+static void(*s_logCallback)(const char*, int) = nullptr;
 
 
 // Function delegating the logger output to the applications handle, if applicable
@@ -198,13 +198,27 @@ Boolean opengldisplay_write(const char* data) {
 }
 
 
-Boolean opengldisplay_initialize() {
+Boolean opengldisplay_initialize(void(*logCallback)(const char*, int)) {
 	static bool initialized = false;
 
 	if(!initialized) {
 		try {
+			if(logCallback != nullptr) {
+				registerMessageHandler(delegateLog);
+				disableStdHandler();
+				s_logCallback = logCallback;
+			}
+
 			if(!gladLoadGL()) {
-				logError("[", FUNCTION_NAME, "] gladLoadGL failed");
+				logError("[", FUNCTION_NAME, "] gladLoadGL failed; continuing without OpenGL support");
+				return false;
+			}
+
+			// Check if we satisfy our minimal version requirements
+			// TODO: this should really go into 'core' at some point since we don't use the displaying capabilities anymore!
+			if(GLVersion.major < 4 || (GLVersion.major == 4 && GLVersion.minor < 6)) {
+				logWarning("[", FUNCTION_NAME, "] Insufficient OpenGL version (found ", GLVersion.major, ".", GLVersion.minor,
+						   ", required 4.6); continuing without OpenGL support");
 				return false;
 			}
 
@@ -248,6 +262,8 @@ Boolean opengldisplay_initialize() {
 
 			s_vao = std::make_unique<VertexArray>();
 			s_screenTexture = std::make_unique<Texture2D>();
+
+			logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
 
 			initialized = true;
 		} catch(const std::exception& e) {

@@ -86,7 +86,6 @@ namespace gui.Dll
             // Create initial context for extension loading
             IntPtr m_renderContext = OpenGl32.wglCreateContext(m_deviceContext);
             if (m_renderContext != IntPtr.Zero) {
-                OpenGlContextCreated = true;
                 if (!OpenGl32.wglMakeCurrent(m_deviceContext, m_renderContext))
                     throw new Win32Exception(Marshal.GetLastWin32Error());
 
@@ -109,10 +108,7 @@ namespace gui.Dll
                 }
 
                 // Initialize the OpenGL display DLL
-                if (!OpenGlDisplay.opengldisplay_initialize())
-                    throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
-                if (!OpenGlDisplay.opengldisplay_set_logger((Core.LogCallback) callback))
-                    throw new Exception(OpenGlDisplay.opengldisplay_get_dll_error());
+                OpenGlContextCreated = OpenGlDisplay.opengldisplay_initialize((Core.LogCallback)callback);
             }
 
             // Start the render loop

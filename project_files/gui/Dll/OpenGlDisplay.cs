@@ -49,7 +49,7 @@ namespace gui.Dll
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern Boolean opengldisplay_set_log_level(Core.Severity level);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern Boolean opengldisplay_initialize();
+        internal static extern Boolean opengldisplay_initialize(Core.LogCallback callback);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern Boolean opengldisplay_set_logger(Core.LogCallback callback);
         [DllImport("opengldisplay.dll", CallingConvention = CallingConvention.Cdecl)]
