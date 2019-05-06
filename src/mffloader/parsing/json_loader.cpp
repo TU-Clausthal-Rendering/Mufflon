@@ -186,9 +186,12 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else
 				throw std::runtime_error("Invalid type for albedo.");
 
-		} else if(type.compare("walter") == 0) {
-			// Walter material
-			mat->innerType = MaterialParamType::MATERIAL_WALTER;
+		} else if(type.compare("walter") == 0 || type.compare("microfacet") == 0) {
+			// Walter and Microfacet materials have the same parametrization (load as
+			// Walter pack, but modify the enum accordingly).
+			mat->innerType = type.compare("walter") == 0
+								? MaterialParamType::MATERIAL_WALTER
+								: MaterialParamType::MATERIAL_MICROFACET;
 			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;

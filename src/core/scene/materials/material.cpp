@@ -113,7 +113,7 @@ Medium MatBlendFresnel<LayerA, LayerB>::compute_medium() const {
 		baseMedium = layerA.compute_medium();
 	else if constexpr(details::has_dependent_medium<LayerB>(0))
 		baseMedium = layerB.compute_medium();
-	return Medium{nonTexParams.ior, baseMedium.get_absorption_coeff()};
+	return Medium{ior, baseMedium.get_absorption_coeff()};
 }
 
 

@@ -120,6 +120,7 @@ typedef enum {
 	MATERIAL_WALTER,
 	MATERIAL_BLEND,
 	MATERIAL_FRESNEL,
+	MATERIAL_MICROFACET,
 	// MATERIAL_FRESNEL_CONDUCTOR	// Maybe reintroduce
 	MATERIAL_NUM,
 } MaterialParamType;
@@ -211,7 +212,7 @@ typedef struct {
 	NormalDistFunction ndf;
 	Vec3 absorption;
 	float refractionIndex;
-} WalterParams;
+} WalterParams;	// Used for Walter AND Microfacet model
 typedef struct {
 	TextureHdl radiance;
 	Vec3 scale;

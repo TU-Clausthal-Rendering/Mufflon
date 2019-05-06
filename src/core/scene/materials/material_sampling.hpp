@@ -13,6 +13,7 @@
 #include "blend_fresnel.hpp"
 #include "microfacet_specular.hpp"
 #include "microfacet_refractive.hpp"
+#include "microfacet_full.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace materials {
@@ -102,7 +103,7 @@ sample(const TangentSpace& tangentSpace,
 	);
 
 	// Early out if result is discarded anyway
-	if(res.throughput == 0.0f) return res;
+	if(res.throughput == 0.0f) return math::PathSample{};
 
 	// Transform local sample direction into global one.
 	Direction globalDir = res.excident.x * tangentSpace.shadingTX
@@ -113,7 +114,8 @@ sample(const TangentSpace& tangentSpace,
 	// Cancel the path if shadowed shading normal (excident)
 	float eDotG = dot(globalDir, tangentSpace.geoN);
 	float eDotN = res.excident.z;
-	if(eDotG * eDotN <= 0.0f) res.throughput = Spectrum{0.0f};
+	if(eDotG * eDotN <= 0.0f)
+		return math::PathSample{};
 	res.excident = globalDir;
 
 	// Make sure the PDFs do not overflow in MIS

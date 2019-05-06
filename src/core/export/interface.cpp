@@ -1306,6 +1306,11 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			newMaterial = std::make_unique<Material<Materials::WALTER>>(
 				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
 		}	break;
+		case MATERIAL_MICROFACET: {
+			auto p = to_ctor_args(mat->inner.walter);	// Uses same parametrization as Walter
+			newMaterial = std::make_unique<Material<Materials::MICROFACET>>(
+				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
+		}	break;
 		case MATERIAL_EMISSIVE: {
 			auto p = to_ctor_args(mat->inner.emissive);
 			newMaterial = std::make_unique<Material<Materials::EMISSIVE>>( get<0>(p), get<1>(p) );

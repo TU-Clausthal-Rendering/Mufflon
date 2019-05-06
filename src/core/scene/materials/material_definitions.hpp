@@ -35,6 +35,7 @@ enum class Materials: u16 {
 	//FRESNEL_TORRANCE_ORENNAYAR,	// FRESNEL [ TORRANCE, ORENNAYAR ]
 	WALTER_TORRANCE,			// BLEND [ WALTER, TORRANCE ]
 	FRESNEL_TORRANCE_WALTER,	// FRESNEL [ TORRANCE, WALTER ]
+	MICROFACET,					// MICROFACET (effecient FRESNEL [ TORRANCE, WALTER ])
 
 	NUM				// How many materials are there?
 };
@@ -148,6 +149,47 @@ struct MatWalter {
 	using SampleType = MatSampleWalter;
 
 	MatWalter(TextureHandle* texTable, int texOffset, Spectrum absorption, float refractionIndex, TextureHandle roughness, NDF ndf) :
+		refractionIndex(refractionIndex)
+	{
+		texTable[ROUGHNESS+texOffset] = roughness;
+		nonTexParams.absorption = absorption;
+		nonTexParams.ndf = ndf;
+	}
+
+	struct NonTexParams {
+		Spectrum absorption;
+		NDF ndf;
+	} nonTexParams;
+	float refractionIndex;
+
+	Medium compute_medium() const {
+		return Medium{ei::Vec2{refractionIndex, 0.0f}, nonTexParams.absorption};
+	}
+};
+
+// ************************************************************************* //
+// MICROFACET REFRACTION: TORRANCE + WALTER									 //
+// ************************************************************************* //
+struct MatSampleMicrofacet {
+	Spectrum absorption; // Absorption λ per meter (transmission = exp(-λ*d))
+	float angle;
+	ei::Vec2 roughness;
+	NDF ndf;
+};
+
+// Class for the handling of the Walter microfacet refraction model.
+struct MatMicrofacet {
+	static constexpr MaterialPropertyFlags PROPERTIES =
+		MaterialPropertyFlags::REFLECTIVE | MaterialPropertyFlags::REFRACTIVE | MaterialPropertyFlags::HALFVECTOR_BASED;
+
+	enum Textures {
+		ROUGHNESS,
+		TEX_COUNT
+	};
+
+	using SampleType = MatSampleMicrofacet;
+
+	MatMicrofacet(TextureHandle* texTable, int texOffset, Spectrum absorption, float refractionIndex, TextureHandle roughness, NDF ndf) :
 		refractionIndex(refractionIndex)
 	{
 		texTable[ROUGHNESS+texOffset] = roughness;
@@ -284,7 +326,6 @@ template<class LayerA, class LayerB>
 struct MatNTPBlendFresnel {
 	typename LayerA::NonTexParams a;
 	typename LayerB::NonTexParams b;
-	ei::Vec2 ior;
 };
 
 // Additive blending of two other layers using Dielectric Fresnel equations.
@@ -303,12 +344,12 @@ struct MatBlendFresnel {
 	template<typename... AArgs, typename... BArgs>
 	MatBlendFresnel(TextureHandle* texTable, int texOffset, ei::Vec2 ior,
 			 std::tuple<AArgs...>&& aArgs, std::tuple<BArgs...>&& bArgs) :
+		ior{ ior },
 		layerA{ details::construct_layer<LayerA>(texTable, texOffset, std::forward<std::tuple<AArgs...>>(aArgs), std::make_index_sequence<sizeof...(AArgs)>()) },
 		layerB{ details::construct_layer<LayerB>(texTable, texOffset+LayerA::TEX_COUNT, std::forward<std::tuple<BArgs...>>(bArgs), std::make_index_sequence<sizeof...(BArgs)>()) }
 	{
 		nonTexParams.a = layerA.nonTexParams;
 		nonTexParams.b = layerB.nonTexParams;
-		nonTexParams.ior = ior;
 		// Compute a scalar average reflection factor.
 		// This is required for sampling (see sampling method).
 		//float f0 = ei::sq( (ior - 1.0f) / (ior + 1.0f) );
@@ -321,6 +362,7 @@ struct MatBlendFresnel {
 
 	using NonTexParams = MatNTPBlendFresnel<LayerA, LayerB>;
 	NonTexParams nonTexParams;
+	ei::Vec2 ior;
 private:
 	LayerA layerA;	// Reflection layer
 	LayerB layerB;	// Refraction layer
@@ -343,6 +385,7 @@ template<> struct mat_info<Materials::TORRANCE_LAMBERT> { using type = MatBlend<
 template<> struct mat_info<Materials::FRESNEL_TORRANCE_LAMBERT> { using type = MatBlendFresnel<MatTorrance, MatLambert>; };
 template<> struct mat_info<Materials::WALTER_TORRANCE> { using type = MatBlend<MatWalter, MatTorrance>; };
 template<> struct mat_info<Materials::FRESNEL_TORRANCE_WALTER> { using type = MatBlendFresnel<MatTorrance, MatWalter>; };
+template<> struct mat_info<Materials::MICROFACET> { using type = MatMicrofacet; };
 template<Materials M>
 using mat_type = typename mat_info<M>::type;
 
@@ -442,6 +485,10 @@ constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
 		}													\
 		case Materials::FRESNEL_TORRANCE_WALTER: {			\
 			using MatType = mat_type<Materials::FRESNEL_TORRANCE_WALTER>;	\
+			expr;											\
+		}													\
+		case Materials::MICROFACET: {						\
+			using MatType = mat_type<Materials::MICROFACET>;	\
 			expr;											\
 		}													\
 		default:											\

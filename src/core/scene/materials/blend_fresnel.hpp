@@ -59,12 +59,11 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlendFresnel<LayerASample, 
 									  Boundary& boundary,
 									  math::RndSet2_1 rndSet,
 									  bool adjoint) {
-	// Determine a probability for each layer.
-	// Note that f is determined with respect to the macroscopic normal.
-	// A microfacet is not known yet.
+	// The sampling probability cannot use Fresnel equation, because the
+	// microfacet is not known yet.
 	float n_i = boundary.incidentMedium.get_refraction_index().x;
 	float n_t = boundary.otherMedium.get_refraction_index().x;
-	u64 probLayerA = math::percentage_of(std::numeric_limits<u64>::max() - 1, 0.5f);
+	u64 probLayerA = math::percentage_of(std::numeric_limits<u64>::max(), 0.5f);
 	bool reflect = rndSet.i0 < probLayerA;
 
 	// Sample and get the pdfs of the second layer.
