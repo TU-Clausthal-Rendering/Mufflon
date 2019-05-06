@@ -26,8 +26,6 @@ void CpuPathTracer::iterate() {
 		Pixel coord { pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		pt_sample(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel]);
 	}
-
-	Profiler::instance().create_snapshot_all();
 }
 
 void CpuPathTracer::on_reset() {

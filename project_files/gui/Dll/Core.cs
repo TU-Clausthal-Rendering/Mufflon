@@ -497,6 +497,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_snapshots")]
         private static extern IntPtr profiling_get_snapshots_();
         internal static string profiling_get_snapshots() { return StringUtil.FromNativeUTF8(profiling_get_snapshots_()); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_total")]
+        private static extern IntPtr profiling_get_total_();
+        internal static string profiling_get_total() { return StringUtil.FromNativeUTF8(profiling_get_total_()); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_total_and_snapshots")]
         private static extern IntPtr profiling_get_total_and_snapshots_();
         internal static string profiling_get_total_and_snapshots() { return StringUtil.FromNativeUTF8(profiling_get_total_and_snapshots_()); }

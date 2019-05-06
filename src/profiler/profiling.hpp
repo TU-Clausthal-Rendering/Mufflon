@@ -41,6 +41,7 @@ public:
 	void create_snapshot_all();
 	std::ostream& save_current_state(std::ostream& stream) const;
 	std::ostream& save_snapshots(std::ostream& stream) const;
+	std::ostream& save_total(std::ostream& stream) const;
 	std::ostream& save_total_and_snapshots(std::ostream& stream) const;
 
 	ProfileState* find_child(StringView name);
@@ -50,6 +51,7 @@ protected:
 	virtual void start_sample() = 0;
 	virtual void create_sample() = 0;
 	virtual std::ostream& save_profiler_snapshots(std::ostream& stream) const = 0;
+	virtual std::ostream& save_profiler_total(std::ostream& stream) const = 0;
 	virtual std::ostream& save_profiler_current_state(std::ostream& stream) const = 0;
 	virtual std::ostream& save_profiler_total_and_snapshots(std::ostream& stream) const = 0;
 
@@ -100,6 +102,7 @@ public:
 	void save_total_and_snapshots(StringView path) const;
 	std::string save_current_state() const;
 	std::string save_snapshots() const;
+	std::string save_total() const;
 	std::string save_total_and_snapshots() const;
 
 	// Sets the level of profiling

@@ -129,6 +129,15 @@ std::ostream& CpuProfileState::save_profiler_snapshots(std::ostream& stream) con
 	return stream;
 }
 
+std::ostream& CpuProfileState::save_profiler_total(std::ostream& stream) const {
+	// Stores the snapshots as a CSV
+	stream << ",type:cpu\n";
+	stream << m_totalSample.totalCpuCycles << ',' << m_totalSample.totalThreadTime.count() << ','
+		<< m_totalSample.totalProcessTime.count() << ',' << m_totalSample.totalWallTime.count() << ','
+		<< m_totalSample.sampleCount << '\n';
+	return stream;
+}
+
 std::ostream& CpuProfileState::save_profiler_current_state(std::ostream& stream) const {
 	// Stores the current state as a CSV
 	stream << ",type:cpu\n" << m_currentSample.totalCpuCycles << ',' << m_currentSample.totalThreadTime.count() << ','

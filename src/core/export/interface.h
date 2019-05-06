@@ -559,6 +559,7 @@ CORE_API Boolean CDECL profiling_save_snapshots(const char* path);
 CORE_API Boolean CDECL profiling_save_total_and_snapshots(const char* path);
 CORE_API const char* CDECL profiling_get_current_state();
 CORE_API const char* CDECL profiling_get_snapshots();
+CORE_API const char* CDECL profiling_get_total();
 CORE_API const char* CDECL profiling_get_total_and_snapshots();
 CORE_API void CDECL profiling_reset();
 CORE_API size_t CDECL profiling_get_total_cpu_memory();

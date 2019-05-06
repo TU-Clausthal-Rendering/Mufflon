@@ -320,13 +320,30 @@
                     </TabItem>
                     <TabItem Header="Profiler"
                              Width="Auto">
-                        <TreeView Grid.Row="2"
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <StackPanel Grid.Row="0"
+                                        HorizontalAlignment="Right"
+                                        Margin="{StaticResource DialogMargin}"
+                                        Orientation="Horizontal">
+                                <TextBlock Text="Show snapshots"
+                                           Margin="{StaticResource LeftPropertyMargin}"
+                                           ToolTip="Warning: this may cost additional performance when many iterations have been performed"/>
+                                <CheckBox IsChecked="{Binding Profiler.DisplaySnapshots, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="{StaticResource RightPropertyMargin}"/>
+                            </StackPanel>
+                            
+                            <TreeView Grid.Row="1"
                                   Name="ProfilerTreeView">
-                            <TreeViewItem Header="Rendering"
+                                <TreeViewItem Header="Rendering"
                                           FontFamily="Courier New"/>
-                            <TreeViewItem Header="Loading"
+                                <TreeViewItem Header="Loading"
                                           FontFamily="Courier New"/>
-                        </TreeView>
+                            </TreeView>
+                        </Grid>
                     </TabItem>
                 </TabControl>
 

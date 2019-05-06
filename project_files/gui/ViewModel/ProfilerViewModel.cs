@@ -21,6 +21,21 @@ namespace gui.ViewModel
         private TreeViewItem m_renderTree;
         private TreeViewItem m_loaderTree;
 
+        // Checks whether to display snapshots or not
+        private bool m_displaySnapshots = false;
+        public bool DisplaySnapshots
+        {
+            get => m_displaySnapshots;
+            set
+            {
+                if (value == m_displaySnapshots) return;
+                m_displaySnapshots = value;
+                updateRenderingData();
+                updateLoadingData();
+                OnPropertyChanged(nameof(DisplaySnapshots));
+            }
+        }
+
         public ProfilerViewModel(Models models)
         {
             m_models = models;
@@ -97,7 +112,11 @@ namespace gui.ViewModel
 
             // Renderer
             {
-                string csv = Core.profiling_get_total_and_snapshots();
+                string csv;
+                if (DisplaySnapshots)
+                    csv = Core.profiling_get_total_and_snapshots();
+                else
+                    csv = Core.profiling_get_total();
                 string[] lines = csv?.Split('\n');
 
                 // Parse the top-level items
@@ -134,7 +153,11 @@ namespace gui.ViewModel
 
             // Renderer
             {
-                string csv = Loader.loader_profiling_get_total_and_snapshots();
+                string csv;
+                if (DisplaySnapshots)
+                    csv = Loader.loader_profiling_get_total_and_snapshots();
+                else
+                    csv = Loader.loader_profiling_get_total();
                 string[] lines = csv?.Split('\n');
 
                 // Parse the top-level items

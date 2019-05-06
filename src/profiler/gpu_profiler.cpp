@@ -50,6 +50,15 @@ std::ostream& GpuProfileState::save_profiler_snapshots(std::ostream& stream) con
 	return stream;
 }
 
+std::ostream& GpuProfileState::save_profiler_total(std::ostream& stream) const {
+	// Stores the snapshots as a CSV
+	stream << ",type:gpu\n";
+	stream << m_totalSample.totalWallTime.count() << ','
+		<< m_totalSample.totalGpuTime.count() << ","
+		<< m_totalSample.sampleCount << '\n';
+	return stream;
+}
+
 std::ostream& GpuProfileState::save_profiler_current_state(std::ostream& stream) const {
 	// Stores the current state as a CSV
 	stream << ",type:gpu\n" << m_currentSample.totalWallTime.count() << ','

@@ -654,8 +654,6 @@ void CpuNextEventBacktracking::iterate() {
 								  1.0f, emission);
 	}//*/
 
-	Profiler::instance().create_snapshot_all();
-
 	logPedantic("[NEB] Memory occupation | View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),
 				"% | Photons: ", m_photonMap.size() * 100.0f / float(m_photonMap.capacity()),
 				"% | Octree: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");

@@ -2931,6 +2931,7 @@ Boolean render_iterate(ProcessTime* time) {
 		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
 	}
 	s_currentRenderer->post_iteration(*s_imageOutput);
+	Profiler::instance().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3252,6 +3253,14 @@ const char* profiling_get_snapshots() {
 	TRY
 	static thread_local std::string str;
 	str = Profiler::instance().save_snapshots();
+	return str.c_str();
+	CATCH_ALL(nullptr)
+}
+
+const char* profiling_get_total() {
+	TRY
+	static thread_local std::string str;
+	str = Profiler::instance().save_total();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
