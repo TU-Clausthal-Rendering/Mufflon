@@ -18,8 +18,8 @@ CUDA_FUNCTION MatSampleMicrofacet fetch(const textures::ConstTextureDevHandle_t<
 		roughness.y = texValues[MatMicrofacet::ROUGHNESS+texOffset].y;
 	return MatSampleMicrofacet{
 		params.absorption,
-		texValues[MatMicrofacet::ROUGHNESS+texOffset].z,
-		roughness, params.ndf
+		params.ndf,
+		roughness
 	};
 }
 
@@ -38,10 +38,8 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 	math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
 
 	// Find the visible half vector.
-	//math::RndSet2 r2 { rndSet.i0 };
 	u64 rnd = rndSet.i0;
 	auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
-	// TODO rotate half vector
 	boundary.set_halfTS(h.halfTS);
 
 	// Compute Fresnel term and refracted cosine
@@ -75,12 +73,8 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 	// Get geometry and common factors for PDF and throughput computation
 	float ge = geoshadowing_vcavity(eDotH, excidentTS.z, h.halfTS.z, params.roughness);
 	float gi = geoshadowing_vcavity(h.cosI, incidentTS.z, h.halfTS.z, params.roughness);
-	if(ge == 0.0f || gi == 0.0f) {// Completely nullyfy the invalid result
-		auto test = evaluate(params, incidentTS, excidentTS, boundary);
-		//if(reflect) mAssert(test.value == 0.0f);
-		//if(!reflect) mAssert(test.value == 0.0f);
+	if(ge == 0.0f || gi == 0.0f)
 		return math::PathSample {};
-	}
 
 	float throughput;
 	AngularPdf pdfForw, pdfBack;
@@ -100,11 +94,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		pdfForw = common * sdiv(gi * n_t * n_t, ei::abs(incidentTS.z));
 		pdfBack = common * sdiv(ge * n_i * n_i, ei::abs(excidentTS.z));
 	}
-	auto test = evaluate(params, incidentTS, excidentTS, boundary);
-	float t2 = test.value.x * ei::abs(excidentTS.z) / float(test.pdf.forw);
-	mAssert(ei::approx(float(test.pdf.forw), float(pdfForw), 1e-4f));
-	mAssert(ei::approx(float(test.pdf.back), float(pdfBack), 1e-4f));
-	mAssert(ei::approx(t2, throughput, 1e-4f));
 
 	return math::PathSample {
 		Spectrum { throughput },

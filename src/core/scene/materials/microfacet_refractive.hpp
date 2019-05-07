@@ -17,8 +17,8 @@ CUDA_FUNCTION MatSampleWalter fetch(const textures::ConstTextureDevHandle_t<CURR
 		roughness.y = texValues[MatWalter::ROUGHNESS+texOffset].y;
 	return MatSampleWalter{
 		params.absorption,
-		texValues[MatWalter::ROUGHNESS+texOffset].z,
-		roughness, params.ndf
+		params.ndf,
+		roughness
 	};
 }
 
@@ -34,7 +34,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 	// Find the visible half vector.
 	u64 rnd = rndSet.i0;
 	auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
-	// TODO rotate half vector
 
 	boundary.set_halfTS(h.halfTS);
 

@@ -17,8 +17,8 @@ CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CU
 		roughness.y = texValues[MatTorrance::ROUGHNESS+texOffset].y;
 	return MatSampleTorrance{
 		Spectrum{texValues[MatTorrance::ALBEDO+texOffset]},
-		texValues[MatTorrance::ROUGHNESS+texOffset].z,
-		roughness, params.ndf
+		params.ndf,
+		roughness
 	};
 }
 
@@ -35,7 +35,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 	// Find the visible half vector.
 	u64 rnd = rndSet.i0;
 	auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
-	// TODO rotate half vector
 
 	boundary.set_halfTS(h.halfTS);
 
@@ -75,8 +74,6 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 	if(ge == 0.0f || gi == 0.0f)
 		return math::BidirSampleValue {};
 	float g = geoshadowing_vcavity_reflection(gi, ge);
-
-	// TODO: rotate halfTS
 
 	// Normal Density Term
 	float d = eval_ndf(params.ndf, params.roughness, halfTS);

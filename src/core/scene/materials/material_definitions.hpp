@@ -97,9 +97,8 @@ struct MatLambert {
 // ************************************************************************* //
 struct MatSampleTorrance {
 	Spectrum albedo;
-	float angle;
-	ei::Vec2 roughness;
 	NDF ndf;
+	ei::Vec2 roughness;
 };
 
 // Class for the handling of the Torrance-Sparrow microfacet reflection model.
@@ -131,9 +130,8 @@ struct MatTorrance {
 // ************************************************************************* //
 struct MatSampleWalter {
 	Spectrum absorption; // Absorption λ per meter (transmission = exp(-λ*d))
-	float angle;
-	ei::Vec2 roughness;
 	NDF ndf;
+	ei::Vec2 roughness;
 };
 
 // Class for the handling of the Walter microfacet refraction model.
@@ -172,9 +170,8 @@ struct MatWalter {
 // ************************************************************************* //
 struct MatSampleMicrofacet {
 	Spectrum absorption; // Absorption λ per meter (transmission = exp(-λ*d))
-	float angle;
-	ei::Vec2 roughness;
 	NDF ndf;
+	ei::Vec2 roughness;
 };
 
 // Class for the handling of the Walter microfacet refraction model.

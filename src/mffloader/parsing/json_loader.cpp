@@ -168,8 +168,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 			auto roughnessIter = get(m_state, material, "roughness");
 			if(roughnessIter->value.IsArray()) {
-				ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
-				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
+				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else if(roughnessIter->value.IsNumber()) {
 				float alpha = read<float>(m_state, roughnessIter);
 				mat->inner.torrance.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
@@ -209,8 +209,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else if(roughnessIter->value.IsString()) {
 				mat->inner.walter.roughness = load_texture(read<const char*>(m_state, roughnessIter));
 			} else if(roughnessIter->value.IsArray()) {
-				ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
-				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
+				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else
 				throw std::runtime_error("Invalid type for roughness");
 
