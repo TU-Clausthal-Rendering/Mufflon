@@ -23,9 +23,10 @@ namespace gui.ViewModel.Display
         // These may not be modified by settings and are only available when the reference element is focused
         private Dictionary<Key, ICommand> m_keybindings = new Dictionary<Key, ICommand>();
 
-        public DisplayViewModel(Models models, ScrollViewer scrollView) {
+        public DisplayViewModel(Models models) {
             m_models = models;
-            m_referenceElement = models.App.Window.RenderCanvas;
+            // Mouse position etc. will be computed relative to the canvas (where one would expect it to be)
+            m_referenceElement = models.App.Window.RenderDisplay.RenderCanvas;
 
             AdjustGammaUp = new AdjustGammaUpCommand(m_models);
             AdjustGammaDown = new AdjustGammaDownCommand(m_models);
@@ -36,10 +37,10 @@ namespace gui.ViewModel.Display
             m_keybindings.Add(Key.OemMinus, AdjustGammaDown);
             m_keybindings.Add(Key.Subtract, AdjustGammaDown);
 
-            scrollView.ScrollChanged += OnScrollChanged;
+            models.App.Window.RenderDisplay.RenderDisplayScroller.ScrollChanged += OnScrollChanged;
             m_models.App.Window.MouseMove += OnMouseMove;
             m_referenceElement.MouseWheel += OnMouseWheel;
-            m_referenceElement.KeyDown += OnKeyDown;
+            models.App.Window.RenderDisplay.KeyDown += OnKeyDown;
 
             RenderImageSource = m_models.Display.RenderBitmap;
             m_models.Display.PropertyChanged += OnDisplayChanged;

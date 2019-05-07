@@ -49,7 +49,7 @@ namespace gui.ViewModel
 
             // view model initialization
             ConsoleOutput = new ConsoleOutputViewModel(m_models);
-            Display = new DisplayViewModel(m_models, m_models.App.Window.RenderCanvasScroller);
+            Display = new DisplayViewModel(m_models);
             Cameras = new CamerasViewModel(m_models);
             Lights = new LightsViewModel(m_models);
             Materials = new MaterialsViewModel(m_models);

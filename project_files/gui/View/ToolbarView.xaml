@@ -1,0 +1,74 @@
+﻿<UserControl x:Class="gui.View.ToolbarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:gui.View"
+             mc:Ignorable="d"
+             d:DesignStyle="{StaticResource DesignerStyle}"
+             d:DesignHeight="30" d:DesignWidth="270">
+    <UserControl.Resources>
+        <Style TargetType="Button">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Margin" Value="{StaticResource ToolbarButtonMargin}"/>
+        </Style>
+        <Style TargetType="Image">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="SnapsToDevicePixels" Value="False"/>
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="LowQuality"/>
+        </Style>
+    </UserControl.Resources>
+    <StackPanel Orientation="Horizontal">
+        <Button Command="{Binding PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}"
+                ToolTip="Play/pause the renderer">
+            <StackPanel>
+                <Image Source="../Icons/play.png"
+                        Visibility="{Binding PlayIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
+                <Image Source="../Icons/pause.png"
+                        Visibility="{Binding PauseIconVisibility, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+        </Button>
+        <Button Command="{Binding ResetCommand}"
+                ToolTip="Reset the rendering progress">
+            <Image Source="../Icons/restart.png"/>
+        </Button>
+        <Button ToolTip="Inspect object instance">
+            <Image Source="../Icons/inspect_instance.png"/>
+        </Button>
+        <Button ToolTip="Inspect material">
+            <Image Source="../Icons/inspect_material.png"/>
+        </Button>
+        <Button ToolTip="Inspect light source">
+            <Image Source="../Icons/inspect_light.png"/>
+        </Button>
+        <Button Command="{Binding SaveScreenShotCommand}"
+                ToolTip="Take a screenshot">
+            <Image Source="../Icons/screenshot.png"/>
+        </Button>
+        <Button Command="{Binding ToggleCameraMovementCommand}"
+                ToolTip="Allow/disallow camera movement">
+            <StackPanel>
+                <Image Source="../Icons/camera_move.png"
+                        Visibility="{Binding CameraMoveIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
+                <Image Source="../Icons/camera_nomove.png"
+                        Visibility="{Binding CameraMoveIconVisibility, Converter={StaticResource visinverter}, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+        </Button>
+    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" HorizontalAlignment="Center"/>
+        <Button Command="{Binding OneIterationCommand}"
+                ToolTip="Advance rendering by one iteration">
+            <Image Source="../Icons/iterate_one.png"/>
+        </Button>
+        <Button Command="{Binding TenIterationsCommand}"
+                ToolTip="Advance rendering by ten iterations">
+            <Image Source="../Icons/iterate_ten.png"/>
+        </Button>
+        <Button Command="{Binding HundredIterationsCommand}"
+                ToolTip="Advance rendering by one hundred iterations">
+            <Image Source="../Icons/iterate_hundred.png"/>
+        </Button>
+    </StackPanel>
+</UserControl>

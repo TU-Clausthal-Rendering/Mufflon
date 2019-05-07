@@ -77,7 +77,7 @@ namespace gui.Model
 
             // init controller last
             ScenarioChangedController = new ScenarioChangedController(this);
-            RendererCameraController = new RendererCameraController(this, window.RenderCanvas);// window.BorderHost);
+            RendererCameraController = new RendererCameraController(this, window.RenderDisplay);
             RendererController = new RendererController(this);
         }
 

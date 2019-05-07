@@ -45,7 +45,7 @@ namespace gui.Model
 
         private void OnWindowLoaded(object sender, EventArgs args)
         {
-            Window.BorderHost.Child = GlHost;
+            Window.RenderDisplay.BorderHost.Child = GlHost;
             if (!Core.mufflon_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_logger(m_logCallbackPointer))
