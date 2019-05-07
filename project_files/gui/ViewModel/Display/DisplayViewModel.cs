@@ -62,6 +62,8 @@ namespace gui.ViewModel.Display
         public string PixelColorBlue { get => m_models.Display.CurrentPixelColor.Z.ToString("0.####"); }
         public string PixelColorAlpha { get => m_models.Display.CurrentPixelColor.W.ToString("0.####"); }
 
+        public float GammaFactor { get => m_models.Display.GammaFactor; }
+
         private void OnKeyDown(object sender, KeyEventArgs args) {
             ICommand cmd;
             if (m_keybindings.TryGetValue(args.Key, out cmd) && cmd.CanExecute(null))
@@ -84,8 +86,7 @@ namespace gui.ViewModel.Display
         private void OnDisplayChanged(object sender, PropertyChangedEventArgs args) {
             switch(args.PropertyName) {
                 case nameof(DisplayModel.GammaFactor):
-                    m_models.Display.Repaint(m_models.RenderTargetSelection.VisibleTarget.TargetIndex,
-                        m_models.RenderTargetSelection.IsVarianceVisible);
+                    OnPropertyChanged(nameof(GammaFactor));
                     break;
                 case nameof(DisplayModel.Zoom):
                     BitmapScaling = new ScaleTransform(m_models.Display.Zoom, -m_models.Display.Zoom);

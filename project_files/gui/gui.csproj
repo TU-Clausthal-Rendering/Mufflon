@@ -209,6 +209,7 @@
     <Compile Include="View\Display\DisplayView.xaml.cs">
       <DependentUpon>DisplayView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Display\GammaEffect.cs" />
     <Compile Include="View\ToolbarView.xaml.cs">
       <DependentUpon>ToolbarView.xaml</DependentUpon>
     </Compile>
@@ -480,6 +481,7 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <Resource Include="View\Display\GammaEffect.fx.ps" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -515,7 +517,6 @@
     <Resource Include="Icons\camera_nomove.png" />
     <Resource Include="Icons\logo1.ico" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <Resource Include="Icons\iterate_ten.png" />
   </ItemGroup>

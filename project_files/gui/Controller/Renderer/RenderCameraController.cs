@@ -112,7 +112,7 @@ namespace gui.Controller.Renderer
 
             // Check if the camera turned
             if (m_models.RendererCamera.MouseOffset.X != 0f || m_models.RendererCamera.MouseOffset.Y != 0f) {
-                Vec2<float> mouseOffset = new Vec2<float>(-(float)m_models.RendererCamera.MouseOffset.Y * m_models.RendererCamera.MouseSpeed,
+                Vec2<float> mouseOffset = new Vec2<float>((float)m_models.RendererCamera.MouseOffset.Y * m_models.RendererCamera.MouseSpeed,
                                                           -(float)m_models.RendererCamera.MouseOffset.X * m_models.RendererCamera.MouseSpeed);
                 m_models.World.CurrentScenario.Camera.Rotate(mouseOffset);
             }

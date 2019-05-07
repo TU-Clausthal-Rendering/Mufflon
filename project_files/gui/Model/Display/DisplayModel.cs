@@ -23,7 +23,7 @@ namespace gui.Model.Display
 
         // Image to be displayed as render result
         public WriteableBitmap RenderBitmap { get; private set; } = new WriteableBitmap(INITIAL_WIDTH, INITIAL_HEIGHT, 96, 96,
-            PixelFormats.Rgb24, null);
+            PixelFormats.Rgb128Float, null);
 
         // Zoom of the display
         private float m_zoom = 1f;
@@ -60,7 +60,7 @@ namespace gui.Model.Display
                 if (value == m_renderSize) return;
                 m_renderSize = value;
                 RenderBitmap = new WriteableBitmap(RenderSize.X, RenderSize.Y, 96, 96,
-                    PixelFormats.Rgb24, null);
+                    PixelFormats.Rgb128Float, null);
                 OnPropertyChanged(nameof(RenderSize));
             }
         }
@@ -99,8 +99,6 @@ namespace gui.Model.Display
         }
 
         public void Repaint(uint targetIndex, bool paintVariance) {
-            var stopwatch = new System.Diagnostics.Stopwatch();
-            stopwatch.Restart();
             // Renew the display texture (we don't really care)
             IntPtr targetPtr = IntPtr.Zero;
             if(!Core.core_get_target_image(targetIndex, paintVariance, Core.TextureFormat.RGBA32F, true, out targetPtr))
@@ -108,8 +106,10 @@ namespace gui.Model.Display
 
             System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {
                 // Update the display bitmap
+                // BitmapSource, while it seems like it should be faster, actually isn't; I guess BitmapSource.Create
+                // actually copies the memory instead of just using it, so our copy is simply faster
                 RenderBitmap.Lock();
-                if(!Core.core_copy_screen_texture_rgb(RenderBitmap.BackBuffer, GammaFactor))
+                if(!Core.core_copy_screen_texture_rgba32(RenderBitmap.BackBuffer, GammaFactor))
                     throw new Exception(Core.core_get_dll_error());
                 RenderBitmap.AddDirtyRect(new System.Windows.Int32Rect(0, 0, RenderSize.X, RenderSize.Y));
                 RenderBitmap.Unlock();

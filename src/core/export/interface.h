@@ -582,7 +582,7 @@ CORE_API void CDECL mufflon_destroy_opengl();
 CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* format);
 CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, TextureFormat format,
 											 bool sRgb,const char** ptr);
-CORE_API Boolean CDECL core_copy_screen_texture_rgb(unsigned char* ptr,const float gammaFactor);
+CORE_API Boolean CDECL core_copy_screen_texture_rgba32(float* ptr,const float gammaFactor);
 CORE_API Boolean CDECL core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r,
 										   float* g, float* b, float* a);
 CORE_API const char* CDECL core_get_dll_error();

@@ -27,13 +27,20 @@ namespace gui.Model.Controller
             {
                 case nameof(Models.World):
                     if (m_models.World != null) {
+                        m_models.World.PropertyChanged += OnScenarioChanged;
                         AdjustScenarioViewport();
                     }
                     break;
             }
         }
 
-        void AdjustScenarioViewport()
+        private void OnScenarioChanged(object sender, PropertyChangedEventArgs args)
+        {
+            if(args.PropertyName == nameof(Models.World.CurrentScenario))
+                AdjustScenarioViewport();
+        }
+
+        private void AdjustScenarioViewport()
         {
             m_models.Display.RenderSize = new Vec2<int>((int)m_models.World.CurrentScenario.Resolution.X,
                 (int)m_models.World.CurrentScenario.Resolution.Y);

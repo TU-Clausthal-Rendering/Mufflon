@@ -335,23 +335,13 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	CATCH_ALL(false)
 }
 
-Boolean core_copy_screen_texture_rgb(unsigned char* ptr, const float gammaFactor) {
+Boolean core_copy_screen_texture_rgba32(float* ptr, const float gammaFactor) {
 	TRY
-	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+		CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	std::scoped_lock lock{ s_screenTextureMutex };
-	if(ptr != nullptr) {
-		const int WIDTH = s_screenTexture->get_width();
-		const int PIXELS = WIDTH * s_screenTexture->get_height();
-#pragma PARALLEL_FOR
-		for(int i = 0; i < PIXELS; ++i) {
-		/*for(int y = 0; y < s_screenTexture->get_height(); ++y) {
-			for(int x = 0; x < s_screenTexture->get_width(); ++x) {*/
-			const Pixel pixel{ i % WIDTH, i / WIDTH };
-			ei::Vec4 value = s_screenTexture->read(pixel);
-			ptr[3 * i + 0] = static_cast<unsigned char>(std::min(1.f, std::max(0.f, ei::sRgbToRgb(gammaFactor * value.x))) * 255.f);
-			ptr[3 * i + 1] = static_cast<unsigned char>(std::min(1.f, std::max(0.f, ei::sRgbToRgb(gammaFactor * value.y))) * 255.f);
-			ptr[3 * i + 2] = static_cast<unsigned char>(std::min(1.f, std::max(0.f, ei::sRgbToRgb(gammaFactor * value.z))) * 255.f);
-		}
+	if(ptr != nullptr && s_screenTexture != nullptr) {
+		const int PIXELS = s_screenTexture->get_width() * s_screenTexture->get_height();
+		std::memcpy(ptr, s_screenTexture->data(), 4u * sizeof(float) * PIXELS);
 	}
 	return true;
 	CATCH_ALL(false)
