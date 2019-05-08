@@ -560,17 +560,12 @@ TextureHandle WorldContainer::find_texture(StringView name) {
 	return nullptr;
 }
 
-TextureHandle WorldContainer::add_texture(StringView path, u16 width,
-										  u16 height, u16 numLayers,
-										  textures::Format format, textures::SamplingMode mode,
-										  bool sRgb, std::unique_ptr<u8[]> data) {
-	mAssertMsg(m_textures.find(path) == m_textures.end(), "Duplicate texture entry");
+TextureHandle WorldContainer::add_texture(std::unique_ptr<textures::Texture> texture) {
 	// TODO: ensure that we have at least 1x1 pixels?
-	auto tex = std::make_unique<textures::Texture>(move(to_string(path)),
-						width, height, numLayers, format, mode, sRgb, move(data));
-	StringView nameRef = tex->get_name();
-	TextureHandle texHdl = tex.get();
-	m_textures.emplace(nameRef, move(tex));
+	StringView nameRef = texture->get_name();
+	mAssertMsg(m_textures.find(nameRef) == m_textures.end(), "Duplicate texture entry");
+	TextureHandle texHdl = texture.get();
+	m_textures.emplace(nameRef, move(texture));
 	m_texRefCount[texHdl] = 1u;
 	return texHdl;
 }

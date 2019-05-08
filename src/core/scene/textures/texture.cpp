@@ -240,7 +240,7 @@ void Texture::create_texture_cuda() {
 		texDesc.readMode = cudaReadModeElementType;
 		texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
 	} else {
-		if(channelDesc.x <= 16 && channelDesc.y <= 16 && channelDesc.z < 16 && channelDesc.w <= 16) {
+		if(channelDesc.x <= 16 && channelDesc.y <= 16 && channelDesc.z <= 16 && channelDesc.w <= 16) {
 			texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
 			texDesc.readMode = cudaReadModeNormalizedFloat;
 		} else {

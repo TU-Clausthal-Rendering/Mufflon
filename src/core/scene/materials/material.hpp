@@ -83,6 +83,15 @@ public:
 		//m_dirty = true;
 	}
 
+	// Get the alpha texture
+	TextureHandle get_alpha_texture() const noexcept {
+		return m_alpha;
+	}
+	void set_alpha_texture(TextureHandle alpha) {
+		m_alpha = alpha;
+		//m_dirty = true;
+	}
+
 	virtual Medium compute_medium() const = 0;
 
 	Materials get_type() const { return m_type; }
@@ -97,6 +106,8 @@ public:
 protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;
+	TextureHandle m_alpha = nullptr;		// This is not part of the material descriptor, but rather
+											// separately stored in the scene descriptor
 	//mutable bool m_dirty = true;			// Any property of the material changed
 
 private:

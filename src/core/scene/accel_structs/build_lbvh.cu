@@ -580,10 +580,11 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 							 const i32 numPrimitives
 ) {
 	if(numPrimitives == 1) { // Not necessary to build anything - trace code will skip the BVH
-		m_primIds.resize(1); // Make sure there is some memory (needs_rebuild depends on that) TODO: store simple bool instead?
+		m_primIds.resize(4); // Make sure there is some memory (needs_rebuild depends on that) TODO: store simple bool instead?
 		m_bvhNodes.resize(1);
-		m_primIds.acquire<DescType::DEVICE>();
+		mem_set<DescType::DEVICE>(m_primIds.acquire<DescType::DEVICE>(), 0, sizeof(u32));
 		m_bvhNodes.acquire<DescType::DEVICE>();
+		// It is indeed necessary to have a zero here in case of 1 instance and 1 primitive only
 		return;
 	}
 

@@ -152,9 +152,7 @@ public:
 	// Add new textures to the scene
 	bool has_texture(StringView name) const;
 	TextureHandle find_texture(StringView name);
-	TextureHandle add_texture(StringView name, u16 width, u16 height, u16 numLayers,
-							   textures::Format format, textures::SamplingMode mode,
-							   bool sRgb, std::unique_ptr<u8[]> data);
+	TextureHandle add_texture(std::unique_ptr<textures::Texture> texture);
 	void ref_texture(TextureHandle hdl);
 	void unref_texture(TextureHandle hdl);
 

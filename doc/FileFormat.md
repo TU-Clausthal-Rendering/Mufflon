@@ -51,6 +51,8 @@ In the case of multiple type choices, details on further mandatory properties wi
                                                         // OR complex number (vec2, for conductor)
                     "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
                 },
+				"alpha" : <texture>   // OPTIONAL: if red channel is < 0.5, the ray will continue as if unperturbed
+				                      // IMPORTANT: not valid for emissive materials!
                 ...
             } ...
         },

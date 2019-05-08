@@ -19,6 +19,7 @@
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/textures/interface.hpp"
 #include "mffloader/interface/interface.h"
 #include <glad/glad.h>
 #include <cuda_runtime.h>
@@ -1399,6 +1400,8 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 		{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 			util::pun<Spectrum>(mat->outerMedium.absorption)}) );
 	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
+	if(mat->alpha != nullptr)
+		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
 
 	return move(newMaterial);
 }
@@ -1761,10 +1764,72 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 		return nullptr;
 	}
 	// The texture will take ownership of the pointer
-	hdl = s_world.add_texture(path, texData.width, texData.height,
-												 texData.layers, static_cast<textures::Format>(texData.format),
-												 static_cast<textures::SamplingMode>(sampling),
-												 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+	auto texture = std::make_unique<textures::Texture>(path, texData.width, texData.height,
+													   texData.layers, static_cast<textures::Format>(texData.format),
+													   static_cast<textures::SamplingMode>(sampling),
+													   texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+	hdl = s_world.add_texture(std::move(texture));
+	return static_cast<TextureHdl>(hdl);
+	CATCH_ALL(nullptr)
+}
+
+TextureHdl world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat) {
+	TRY
+	CHECK_NULLPTR(path, "texture path", nullptr);
+
+	// Give the texture a special name to avoid conflicts with regularly loaded textures
+	std::string textureName = std::string(path) + std::string("##CONVERTED_TO_")
+		+ std::string(textures::FORMAT_NAME(static_cast<textures::Format>(targetFormat)))
+		+ std::string("##");
+
+	// Check if the texture is already loaded
+	auto hdl = s_world.find_texture(textureName);
+	if(hdl != nullptr) {
+		s_world.ref_texture(hdl);
+		return static_cast<TextureHdl>(hdl);
+	}
+
+	// Use the plugins to load the texture
+	fs::path filePath(path);
+	TextureData texData{};
+	for(auto& plugin : s_plugins) {
+		if(plugin.is_loaded()) {
+			if(plugin.can_load_format(filePath.extension().string())) {
+				if(plugin.load(filePath.string(), &texData))
+					break;
+			}
+		}
+	}
+	if(texData.data == nullptr) {
+		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
+				 filePath.string(), "'");
+		return nullptr;
+	}
+
+	// Create a texture which will serve as a copy mechanism
+	textures::CpuTexture tempTex(texData.width, texData.height, texData.layers,
+								 static_cast<textures::Format>(texData.format),
+								 static_cast<textures::SamplingMode>(sampling),
+								 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+	// Create an empty texture that we'll fill with the desired format
+	auto finalTex = std::make_unique<textures::Texture>(std::move(textureName), texData.width, texData.height, texData.layers,
+														static_cast<textures::Format>(targetFormat),
+														static_cast<textures::SamplingMode>(sampling),
+														texData.sRgb);
+	auto cpuFinalTex = finalTex->template acquire<Device::CPU>();
+
+	for(u32 layer = 0u; layer < texData.layers; ++layer) {
+		for(u32 y = 0u; y < texData.height; ++y) {
+			for(u32 x = 0u; x < texData.width; ++x) {
+				const Pixel texel{ x, y };
+				textures::write(cpuFinalTex, texel, layer, tempTex.read(texel, layer));
+			}
+		}
+	}
+	finalTex->mark_changed(Device::CPU);
+
+	// The texture will take ownership of the pointer
+	hdl = s_world.add_texture(std::move(finalTex));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
@@ -1800,9 +1865,10 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	memcpy(&paddedVal, value, num * sizeof(float));
 	std::unique_ptr<u8[]> data = std::make_unique<u8[]>(textures::PIXEL_SIZE(format));
 	memcpy(data.get(), &paddedVal, textures::PIXEL_SIZE(format));
-	hdl = s_world.add_texture(name, 1, 1, 1, format,
-							  static_cast<textures::SamplingMode>(sampling),
-							  false, move(data));
+	auto texture = std::make_unique<textures::Texture>(name, 1, 1, 1, format,
+													   static_cast<textures::SamplingMode>(sampling),
+													   false, move(data));
+	hdl = s_world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }

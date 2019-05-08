@@ -106,6 +106,7 @@ struct SceneDescriptor {
 	lights::LightTree<dev> lightTree;
 	ConstArrayDevHandle_t<dev, materials::Medium> media;
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
+	ConstArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>> alphaTextures;
 
 
 	CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
@@ -122,6 +123,21 @@ struct SceneDescriptor {
 	}
 	CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(PrimitiveHandle primitive) const {
 		return get_material(get_material_index(primitive));
+	}
+
+
+	CUDA_FUNCTION textures::ConstTextureDevHandle_t<dev> get_alpha_texture(MaterialIndex matIdx) const {
+		return alphaTextures[matIdx];
+	}
+	CUDA_FUNCTION textures::ConstTextureDevHandle_t<dev> get_alpha_texture(PrimitiveHandle primitive) const {
+		return get_alpha_texture(get_material_index(primitive));
+	}
+
+	CUDA_FUNCTION bool has_alpha(MaterialIndex matIdx) const {
+		return alphaTextures[matIdx] != textures::ConstTextureDevHandle_t<dev>{};
+	}
+	CUDA_FUNCTION bool has_alpha(PrimitiveHandle primitive) const {
+		return has_alpha(get_material_index(primitive));
 	}
 };
 
