@@ -162,6 +162,13 @@ namespace gui.Model
             UpdateIterationData();
         }
 
+        // Updates the rendering bitmap without actually rendering anything; should be used
+        // e.g. when selecting a different render target to display
+        public void UpdateRenderBitmap()
+        {
+            RenderLock.Set();
+        }
+
         // This iterates by leveraging the GUI and includes texture updates etc
         public void Iterate(uint times)
         {
