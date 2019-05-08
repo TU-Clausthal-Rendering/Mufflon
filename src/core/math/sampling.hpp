@@ -41,23 +41,51 @@ CUDA_FUNCTION __forceinline__ u64 percentage_of(u64 num, float p) {
 	// Multiplying with 2^32 would cause an overflow for p=1.
 	u64 pfix = u64(p * 2147483648.0f);
 	// Multiply low and high part independently and shift the results.
-	return (pfix * (num & 0x7fffffff)) >> 31	// Low 31 bits
-		  | pfix * (num >> 31);					// High 33 bits
+	return ((pfix * (num & 0x7fffffff)) >> 31)	// Low 31 bits
+		  + (pfix * (num >> 31));				// High 33 bits
 }
+
+/*CUDA_FUNCTION __forceinline__ u64 mul32_3232(u32 a, u32 b0, u32 b1) {
+	return u64(a) * b0 + ((u64(a) * b1) >> 32ull);
+}
+// BUGGY!
+// Integer rounding of the second terms looses too much...
+CUDA_FUNCTION __forceinline__ u64 div64_3232(u64 a, u32 b0, u32 b1) {
+	return a / b0 - ((a * b1) >> 32ull) / mul32_3232(b0, b0, b1);
+}
+CUDA_FUNCTION u64 div128_64(u64 a0, u64 a1, u64 b) {
+	u32 b0 = b >> 32ull;
+	u32 b1 = b & 0xffffffffull;
+	u64 hi = div64_3232(a0, b0, b1);
+	mAssert(hi < 0x100000000);
+	u64 r = a0 - mul32_3232(hi, b0, b1);
+	mAssert(r < 0x100000000);
+	u64 am = (r << 32ull) | (a1 >> 32ull);
+	u32 lo = div64_3232(am, b0, b1);
+	r = am - mul32_3232(lo, b0, b1);
+	u64 al = (r << 32ull) | (a1 & 0xffffffffull);
+	lo += div64_3232(al, b0, b1) >> 32ull;
+	return hi << 32ull | lo;
+}*/
 
 // Rescale a random number inside the interval [pLeft, pRight] to [0,u64::max]
 CUDA_FUNCTION __forceinline__ u64 rescale_sample(u64 x, u64 pLeft, u64 pRight) {
 	u64 interval = pRight - pLeft;
 	u64 xrel = x - pLeft;
+	u64 uMax = std::numeric_limits<u64>::max();
 	// Problem: (xrel * u64::max) / interval leaves the 64 bit range
 	//			 xrel * (u64::max / interval) is imprecise (up to a factor of 2)
-	// Number 3: compensate parts of the lost precision
-	//return xrel * (std::numeric_limits<u64>::max() / interval)
-	//	 + u64(xrel * float(std::numeric_limits<u64>::max() % interval) / interval);
-	// Number 4: always round up - only reliable to guarantee a new independent
-	// random number.
-	return xrel * (std::numeric_limits<u64>::max() / interval
-		+ (std::numeric_limits<u64>::max() % interval) == 0 ? 0 : 1);
+	// To correctly rescale we would need to compute (xrel * uMax) / interval which
+	// requires a 128 multiplication and a 128/64 division. This seems far more expensive
+	// than the double solution. Although, the double solution looses some bits in the
+	// conversion.
+	//return u64(double(xrel) / double(interval) * uMax);
+	// Solution with a double which looses less bits
+	return xrel * (uMax / interval) + u64(xrel * double(uMax % interval) / interval);
+	//return xrel * (uMax / interval) + u64(xrel * float(uMax % interval) / interval);
+	// For the log (at least commited once) here the other tried solutions
+	//u64 res = div128_64(xrel, 0, interval);
+	//return res;
 }
 
 // Sample a cosine distributed direction from two random numbers in [0,1)

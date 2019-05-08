@@ -4,6 +4,10 @@
              xmlns:local="clr-namespace:gui"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
+        <!-- Converters for binding -->
+        <local:NegateBooleanConverter x:Key="inverter"/>
+        <local:InvertVisibilityConverter x:Key="visinverter"/>
+        
         <!-- general window styling-->
         <SolidColorBrush x:Key="BorderBrush" Color="#999999"/>
         <SolidColorBrush x:Key="BackgroundBrush" Color="#eee"/>
@@ -12,6 +16,8 @@
         <Thickness x:Key="LeftPropertyMargin" Bottom="2" Right="3"/>
         <Thickness x:Key="RightPropertyMargin" Bottom="2"/>
         <Thickness x:Key="SinglePropertyMargin" Bottom="2"/>
+        <Thickness x:Key="ToolbarButtonMargin" Left="3" Right="3"/>
+        <Thickness x:Key="ThinBorder" Bottom="1"/>
 
         <!-- Dialog Styling -->
         <Thickness x:Key="DialogMargin" Top="5" Bottom="5" Left="5" Right="5"/>
@@ -22,5 +28,9 @@
         <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
         <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
 
+        <!-- Designer Styling -->
+        <Style x:Key="DesignerStyle" TargetType="UserControl">
+            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"/>
+        </Style>
     </Application.Resources>
 </Application>

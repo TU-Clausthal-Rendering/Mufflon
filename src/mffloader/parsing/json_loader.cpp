@@ -168,8 +168,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 			auto roughnessIter = get(m_state, material, "roughness");
 			if(roughnessIter->value.IsArray()) {
-				ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
-				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
+				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else if(roughnessIter->value.IsNumber()) {
 				float alpha = read<float>(m_state, roughnessIter);
 				mat->inner.torrance.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
@@ -186,9 +186,12 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else
 				throw std::runtime_error("Invalid type for albedo.");
 
-		} else if(type.compare("walter") == 0) {
-			// Walter material
-			mat->innerType = MaterialParamType::MATERIAL_WALTER;
+		} else if(type.compare("walter") == 0 || type.compare("microfacet") == 0) {
+			// Walter and Microfacet materials have the same parametrization (load as
+			// Walter pack, but modify the enum accordingly).
+			mat->innerType = type.compare("walter") == 0
+								? MaterialParamType::MATERIAL_WALTER
+								: MaterialParamType::MATERIAL_MICROFACET;
 			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;
@@ -206,8 +209,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else if(roughnessIter->value.IsString()) {
 				mat->inner.walter.roughness = load_texture(read<const char*>(m_state, roughnessIter));
 			} else if(roughnessIter->value.IsArray()) {
-				ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
-				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
+				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else
 				throw std::runtime_error("Invalid type for roughness");
 

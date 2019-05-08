@@ -202,6 +202,12 @@ public:
 	// exportFormat: The format of the pixels in the vector (includes elementary type and number of channels).
 	// exportSRgb: Convert the values from linear to sRGB before packing the data into the exportFormat.
 	scene::textures::CpuTexture get_data(OutputValue which, scene::textures::Format exportFormat, bool exportSRgb);
+	// Does the same as the above, but directly copies it into a provided buffer as RGB8U
+	// The use case here is e.g. a Win32-API bitmap
+	void get_data_rgb(OutputValue which, unsigned char* rgbBuffer, const bool exportSRgb, const float gammaFactor);
+
+	// Returns the value of a pixel as a Vec4, regardless of the underlying format
+	ei::Vec4 get_pixel_value(OutputValue which, Pixel pixel);
 
 	int get_current_iteration() const noexcept { return m_iteration; }
 

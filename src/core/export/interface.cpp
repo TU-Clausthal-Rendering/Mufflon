@@ -2,6 +2,7 @@
 #include "plugin/texture_plugin.hpp"
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
+#include "util/parallel.hpp"
 #include "util/punning.hpp"
 #include "util/degrad.hpp"
 #include "ei/vector.hpp"
@@ -19,6 +20,7 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/material.hpp"
 #include "mffloader/interface/interface.h"
+#include <glad/glad.h>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <type_traits>
@@ -101,6 +103,7 @@ int s_cudaDevIndex = -1;
 std::string s_lastError;
 // Mutex for exclusive renderer access: during an iteration no other thread may change renderer properties
 std::mutex s_iterationMutex{};
+std::mutex s_screenTextureMutex{};
 // Log file
 std::ofstream s_logFile;
 
@@ -310,33 +313,56 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
-	std::scoped_lock lock{ s_iterationMutex };
-	if(ptr != nullptr) {
-		const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
-		const renderer::OutputValue targetFlags{ flags };
-		if(!s_outputTargets.is_set(targetFlags)) {
-			logError("[", FUNCTION_NAME, "] Specified render target is not active");
-			return false;
-		}
+	std::scoped_lock iterLock{ s_iterationMutex };
+	std::scoped_lock screenLock{ s_screenTextureMutex };
+	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
+	const renderer::OutputValue targetFlags{ flags };
+	if(!s_outputTargets.is_set(targetFlags)) {
+		logError("[", FUNCTION_NAME, "] Specified render target is not active");
+		return false;
+	}
 		
-		// If there's no output yet, we "return" a nullptr
-		if(s_imageOutput != nullptr) {
-			if(format >= TextureFormat::FORMAT_NUM)
-				(void)core_get_target_format(index, &format);
-			s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+	// If there's no output yet, we "return" a nullptr
+	if(s_imageOutput != nullptr) {
+		if(format >= TextureFormat::FORMAT_NUM)
+			(void)core_get_target_format(index, &format);
+		s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+		if(ptr != nullptr)
 			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
-		} else {
-			*ptr = nullptr;
-		}
+	} else if(ptr != nullptr) {
+		*ptr = nullptr;
 	}
 	return true;
 	CATCH_ALL(false)
 }
 
-void execute_command(const char* command) {
+Boolean core_copy_screen_texture_rgba32(float* ptr, const float gammaFactor) {
 	TRY
-	// TODO
-	CATCH_ALL(;)
+		CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+	std::scoped_lock lock{ s_screenTextureMutex };
+	if(ptr != nullptr && s_screenTexture != nullptr) {
+		const int PIXELS = s_screenTexture->get_width() * s_screenTexture->get_height();
+		std::memcpy(ptr, s_screenTexture->data(), 4u * sizeof(float) * PIXELS);
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r, float* g, float* b, float* a) {
+	TRY
+	CHECK(borderClamp || ((int)x < s_imageOutput->get_width() && (int)y >= s_imageOutput->get_height()),
+		  "Pixel coordinates are out of bounds", false);
+	if(s_screenTexture) {
+		const ei::Vec4 val = s_screenTexture->read(Pixel{ x, y });
+		*r = val.r;
+		*g = val.g;
+		*b = val.b;
+		*a = val.a;
+	} else {
+		*r = *g = *b = *a = 0.f;
+	}
+	return true;
+	CATCH_ALL(false)
 }
 
 Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads) {
@@ -1307,6 +1333,11 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			newMaterial = std::make_unique<Material<Materials::WALTER>>(
 				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
 		}	break;
+		case MATERIAL_MICROFACET: {
+			auto p = to_ctor_args(mat->inner.walter);	// Uses same parametrization as Walter
+			newMaterial = std::make_unique<Material<Materials::MICROFACET>>(
+				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
+		}	break;
 		case MATERIAL_EMISSIVE: {
 			auto p = to_ctor_args(mat->inner.emissive);
 			newMaterial = std::make_unique<Material<Materials::EMISSIVE>>( get<0>(p), get<1>(p) );
@@ -1372,6 +1403,19 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 
 	return move(newMaterial);
 }
+
+// Callback function for OpenGL debug context
+void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
+							  GLenum severity, GLsizei length,
+							  const GLchar* message, const void* userParam) {
+	switch(severity) {
+		case GL_DEBUG_SEVERITY_HIGH: logError(message); break;
+		case GL_DEBUG_SEVERITY_MEDIUM: logWarning(message); break;
+		case GL_DEBUG_SEVERITY_LOW: logInfo(message); break;
+		default: logPedantic(message); break;
+	}
+}
+
 } // namespace ::
 
 MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
@@ -2878,6 +2922,7 @@ Boolean render_iterate(ProcessTime* time) {
 		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
 	}
 	s_currentRenderer->post_iteration(*s_imageOutput);
+	Profiler::instance().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3189,21 +3234,32 @@ Boolean profiling_save_total_and_snapshots(const char* path) {
 
 const char* profiling_get_current_state() {
 	TRY
-	static std::string str = Profiler::instance().save_current_state();
+	static thread_local std::string str;
+	str = Profiler::instance().save_current_state();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_snapshots() {
 	TRY
-	static std::string str = Profiler::instance().save_snapshots();
+	static thread_local std::string str;
+	str = Profiler::instance().save_snapshots();
+	return str.c_str();
+	CATCH_ALL(nullptr)
+}
+
+const char* profiling_get_total() {
+	TRY
+	static thread_local std::string str;
+	str = Profiler::instance().save_total();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* profiling_get_total_and_snapshots() {
 	TRY
-	static std::string str = Profiler::instance().save_total_and_snapshots();
+	static thread_local std::string str;
+	str = Profiler::instance().save_total_and_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3383,24 +3439,32 @@ Boolean mufflon_initialize() {
 	CATCH_ALL(false)
 }
 
-inline Boolean mufflon_initialize_opengl() {
+Boolean mufflon_initialize_opengl() {
 	TRY
 	static bool initialized = false;
-	if(initialized) return true;
 
-	if (!gladLoadGL()) {
-		logError("[", FUNCTION_NAME, "] gladLoadGL failed");
-		return false;
+	if(!initialized) {
+		if(!gladLoadGL()) {
+			logError("[", FUNCTION_NAME, "] gladLoadGL failed; continuing without OpenGL support");
+			return false;
+		}
+
+		// Check if we satisfy our minimal version requirements
+		// TODO: this should really go into 'core' at some point since we don't use the displaying capabilities anymore!
+		if(GLVersion.major < 4 || (GLVersion.major == 4 && GLVersion.minor < 6)) {
+			logWarning("[", FUNCTION_NAME, "] Insufficient OpenGL version (found ", GLVersion.major, ".", GLVersion.minor,
+						", required 4.6); continuing without OpenGL support");
+			return false;
+		}
+
+		glDebugMessageCallback(opengl_callback, nullptr);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+
+		logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
+
+		initialized = true;
 	}
-
-	// TODO right now the opengl display does the debug logging. should it be moved here?
-
-	logInfo("[", FUNCTION_NAME, "] initialized openGL");
-
-	// add opengl renderers
-	init_renderers<>();
-
-	return initialized = true;
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -3425,6 +3489,11 @@ Boolean mufflon_is_cuda_available() {
 	return false;
 	CATCH_ALL(false)
 }
+
+void mufflon_destroy_opengl() {
+	// TODO
+}
+
 
 void mufflon_destroy() {
 	TRY

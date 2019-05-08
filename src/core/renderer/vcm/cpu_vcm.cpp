@@ -175,8 +175,6 @@ void CpuVcm::iterate() {
 		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
 					 pixel, numPhotons, currentMergeRadius);
 	}
-
-	Profiler::instance().create_snapshot_all();
 }
 
 void CpuVcm::on_reset() {

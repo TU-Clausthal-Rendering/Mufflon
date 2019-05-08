@@ -41,20 +41,39 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>true</UseVSHostingProcess>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>x64</PlatformTarget>
     <DebugType>pdbonly</DebugType>
-    <Optimize>false</Optimize>
+    <Optimize>true</Optimize>
     <OutputPath>..\..\build\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>Icons\logo1.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <PlatformTarget>x64</PlatformTarget>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <OutputPath>..\..\build\Release\</OutputPath>
+    <LangVersion>latest</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <OutputPath>..\..\build\Debug\</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <LangVersion>latest</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <DebugType>full</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -94,10 +113,10 @@
     <Compile Include="Command\ResetCommand.cs" />
     <Compile Include="Command\SelectTextureCommand.cs" />
     <Compile Include="Command\SetDialogResultCommand.cs" />
-    <Compile Include="Controller\CameraController.cs" />
+    <Compile Include="Controller\Renderer\RenderCameraController.cs" />
+    <Compile Include="Controller\Renderer\RendererController.cs" />
     <Compile Include="Dll\Loader.cs" />
     <Compile Include="Dll\Logger.cs" />
-    <Compile Include="Dll\OpenGlDisplay.cs" />
     <Compile Include="InvBooleanToVisibilityConverter.cs" />
     <Compile Include="InvertVisibilityConverter.cs" />
     <Compile Include="Model\AppModel.cs" />
@@ -107,6 +126,8 @@
     <Compile Include="Model\Camera\OrthoCameraModel.cs" />
     <Compile Include="Model\Camera\PinholeCameraModel.cs" />
     <Compile Include="Model\Controller\ScenarioChangedController.cs" />
+    <Compile Include="Model\Display\DisplayModel.cs" />
+    <Compile Include="Model\Display\RenderCameraModel.cs" />
     <Compile Include="Model\Events\LoadEvent.cs" />
     <Compile Include="Model\Light\DirectionalLightModel.cs" />
     <Compile Include="Model\Light\EnvmapLightModel.cs" />
@@ -131,7 +152,6 @@
     <Compile Include="Model\SettingsModel.cs" />
     <Compile Include="Model\StatusbarModel.cs" />
     <Compile Include="Model\ToolbarModel.cs" />
-    <Compile Include="Model\ViewportModel.cs" />
     <Compile Include="NegateBooleanConverter.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\BoundingBox.cs" />
@@ -149,9 +169,9 @@
     <Compile Include="ViewModel\Camera\FocusCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\OrthoCameraViewModel.cs" />
     <Compile Include="ViewModel\Camera\PinholeCameraViewModel.cs" />
-    <Compile Include="ViewModel\ConsoleInputViewModel.cs" />
     <Compile Include="ViewModel\ConsoleOutputViewModel.cs" />
     <Compile Include="ViewModel\Dialog\LoadWorldViewModel.cs" />
+    <Compile Include="ViewModel\Display\DisplayViewModel.cs" />
     <Compile Include="ViewModel\KeyGestureViewModel.cs" />
     <Compile Include="ViewModel\Light\DirectionalLightViewModel.cs" />
     <Compile Include="ViewModel\Light\EnvmapLightViewModel.cs" />
@@ -182,8 +202,17 @@
     <Compile Include="ViewModel\StatusbarViewModel.cs" />
     <Compile Include="ViewModel\ToolbarViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
-    <Compile Include="ViewModel\ViewportViewModel.cs" />
     <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
+    <Compile Include="View\AnimationFrameView.xaml.cs">
+      <DependentUpon>AnimationFrameView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Display\DisplayView.xaml.cs">
+      <DependentUpon>DisplayView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Display\GammaEffect.cs" />
+    <Compile Include="View\ToolbarView.xaml.cs">
+      <DependentUpon>ToolbarView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\Camera\CameraView.xaml.cs">
       <DependentUpon>CameraView.xaml</DependentUpon>
     </Compile>
@@ -276,6 +305,9 @@
     <Compile Include="View\SceneLoadStatus.xaml.cs">
       <DependentUpon>SceneLoadStatus.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\StatusbarView.xaml.cs">
+      <DependentUpon>StatusbarView.xaml</DependentUpon>
+    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -293,6 +325,18 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="View\AnimationFrameView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Display\DisplayView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\ToolbarView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="View\Camera\CameraView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -409,6 +453,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="View\StatusbarView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Model\Models.cs" />
@@ -433,6 +481,7 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <Resource Include="View\Display\GammaEffect.fx.ps" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -467,9 +516,6 @@
     <Resource Include="Icons\camera_move.png" />
     <Resource Include="Icons\camera_nomove.png" />
     <Resource Include="Icons\logo1.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Controller\Renderer\" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\iterate_ten.png" />

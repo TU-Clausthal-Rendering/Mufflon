@@ -1,0 +1,46 @@
+﻿<UserControl x:Class="gui.View.AnimationFrameView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:gui.View"
+             xmlns:helper="clr-namespace:gui.View.Helper"
+             mc:Ignorable="d"
+             d:DesignStyle="{StaticResource DesignerStyle}"
+             d:DesignHeight="28" d:DesignWidth="250">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+            <TextBlock Text="Start: "/>
+            <TextBlock MinWidth="30"
+                       Text="{Binding Start, Mode=OneWay}"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+            <Slider Width="100"
+                    Minimum="{Binding Start, Mode=OneWay}"
+                    Maximum="{Binding End, Mode=OneWay}"
+                    Value="{Binding Current, Mode=TwoWay}"
+                    TickPlacement="BottomRight"
+                    TickFrequency="10"
+                    IsSnapToTickEnabled="False"/>
+            <helper:EnterTextBox MinWidth="30"
+                                 Text="{Binding Current, Mode=TwoWay}"
+                                 Margin="{StaticResource LeftPropertyMargin}"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+            <TextBlock Text="End: "/>
+            <TextBlock MinWidth="30"
+                       Text="{Binding End, Mode=OneWay}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -165,9 +165,9 @@ Materials
 
 `"type": "torrance"`
 
-    "roughness": float | [α_x,α_y,r]    // isotropic roughness value [0,1] (except Beckmann [0,inf])
-                | <texture>,            // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
-                                        // OR a texture with one or three channels (relative path)
+    "roughness": float | [α_x,α_y]      // isotropic roughness value [0,1] (except Beckmann [0,inf])
+                | <texture>,            // OR anisotropic roughness [0,1]^2
+                                        // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
@@ -175,9 +175,9 @@ Materials
 
 `"type": "walter"`
 
-    "roughness": float | [α_x,α_y,r]    // isotropic roughness value [0,1] (except Beckmann [0,inf])
-                 | <texture>,           // OR anisotropic roughness and angle in radiant [0,1]^2 x [0,π]
-                                        // OR a texture with one or three channels (relative path)
+    "roughness": float | [α_x,α_y]      // isotropic roughness value [0,1] (except Beckmann [0,inf])
+                 | <texture>,           // OR anisotropic roughness [0,1]^2
+                                        // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "absorption": [r,g,b],              // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
@@ -220,11 +220,17 @@ Angular dependent blending of two layers (dielectric-dielectric DD or dielectric
         <recursive material>        // A different material beginning with "type"...
     }
 
-Alias types:
-* "glass" = "fresnel"["torrance", "walter"]
+`"type": "microfacet"`\
+Full microfacet model "fresnel"["torrance", "walter"] with more compact parametrization.
+Prefer for optimal sampling. Assumes dielectric surfaces only.
 
-  prefer for optimal sampling
-
+    "roughness": float | [α_x,α_y]      // isotropic roughness value [0,1] (except Beckmann [0,inf])
+                 | <texture>,           // OR anisotropic roughness [0,1]^2
+                                        // OR a texture with one or two channels (relative path)
+                                        // DEFAULT: 0.5
+    "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
+    "absorption": [r,g,b],              // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
+    "ior": float                        // Dielectric index of refraction
 
 
 ---

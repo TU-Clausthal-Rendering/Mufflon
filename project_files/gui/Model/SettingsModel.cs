@@ -31,6 +31,7 @@ namespace gui.Model
 
             LoadGestures();
             SetLogLevel(LogLevel);
+            SetProfilerLevels();
 
             if (string.IsNullOrEmpty(Settings.Default.ScreenshotFolder))
                 Settings.Default.ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
@@ -69,8 +70,15 @@ namespace gui.Model
                 throw new Exception(Core.core_get_dll_error());
             if (!Loader.loader_set_log_level(severity))
                 throw new Exception(Loader.loader_get_dll_error());
-            // TODO redundant?
             Logger.LogLevel = LogLevel;
+        }
+
+        private void SetProfilerLevels()
+        {
+            if (!Core.profiling_set_level((Core.ProfilingLevel)CoreProfileLevel))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)LoaderProfileLevel))
+                throw new Exception(Loader.loader_get_dll_error());
         }
 
         /// <summary>

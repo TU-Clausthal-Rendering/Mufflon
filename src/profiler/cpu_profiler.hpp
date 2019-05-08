@@ -78,6 +78,7 @@ protected:
 	virtual void create_sample() override;
 	// Save the created snapshots
 	virtual std::ostream& save_profiler_snapshots(std::ostream& stream) const override;
+	virtual std::ostream& save_profiler_total(std::ostream& stream) const override;
 	// Save the current profiler state
 	virtual std::ostream& save_profiler_current_state(std::ostream& stream) const override;
 	virtual std::ostream& save_profiler_total_and_snapshots(std::ostream& stream) const override;

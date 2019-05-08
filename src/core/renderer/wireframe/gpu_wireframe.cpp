@@ -43,8 +43,6 @@ void GpuWireframe::iterate() {
 
 	cuda::check_error(gpuwireframe_detail::call_kernel(gridDims, blockDims, std::move(m_outputBuffer),
 													   m_sceneDesc.get(), m_seedsPtr.get(), m_params));
-
-	//Profiler::instance().create_snapshot_all();
 }
 
 } // namespace mufflon::renderer

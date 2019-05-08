@@ -42,6 +42,7 @@ cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						const u32* seeds, const WireframeParameters& params) {
 	wireframe_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene, seeds, params);
+	cudaDeviceSynchronize();
 	return cudaGetLastError();
 }
 

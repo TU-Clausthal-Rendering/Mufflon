@@ -126,13 +126,35 @@ namespace gui.Dll
             OpenGL = 4
         };
 
+        public enum TextureFormat
+        {
+            R8U,
+            RG8U,
+            RGBA8U,
+            R16U,
+            RG16U,
+            RGBA16U,
+            R16F,
+            RG16F,
+            RGBA16F,
+            R32F,
+            RG32F,
+            RGBA32F,
+            Invalid
+        };
+
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_format(UInt32 index, out OpenGlDisplay.TextureFormat format);
+        internal static extern bool core_get_target_format(UInt32 index, out TextureFormat format);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_get_target_image(UInt32 index, Boolean variance,
-            OpenGlDisplay.TextureFormat format, bool sRgb, out IntPtr ptr);
+            TextureFormat format, bool sRgb, out IntPtr ptr);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool core_copy_screen_texture_rgba32(IntPtr ptr, float gammaFactor);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool core_get_pixel_info(uint x, uint y, Boolean borderClamp, out float r,
+            out float g, out float b, out float a);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_dll_error")]
         private static extern IntPtr core_get_dll_error_();
@@ -475,6 +497,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_snapshots")]
         private static extern IntPtr profiling_get_snapshots_();
         internal static string profiling_get_snapshots() { return StringUtil.FromNativeUTF8(profiling_get_snapshots_()); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_total")]
+        private static extern IntPtr profiling_get_total_();
+        internal static string profiling_get_total() { return StringUtil.FromNativeUTF8(profiling_get_total_()); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "profiling_get_total_and_snapshots")]
         private static extern IntPtr profiling_get_total_and_snapshots_();
         internal static string profiling_get_total_and_snapshots() { return StringUtil.FromNativeUTF8(profiling_get_total_and_snapshots_()); }
@@ -506,6 +531,8 @@ namespace gui.Dll
         internal static extern bool mufflon_is_cuda_available();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void mufflon_destroy();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void mufflon_destroy_opengl();
 
         //[DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "get_teststring")]
         //private static extern IntPtr get_teststring_();

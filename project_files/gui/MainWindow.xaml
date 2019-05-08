@@ -8,19 +8,14 @@
         xmlns:helper="clr-namespace:gui.View.Helper"
         xmlns:renderer="clr-namespace:gui.View.Renderer"
         xmlns:camera="clr-namespace:gui.View.Camera"
+        xmlns:display="clr-namespace:gui.View.Display"
         xmlns:viewmodel="clr-namespace:gui.ViewModel"
         mc:Ignorable="d"
         Title="Mufflon GUI" 
         Height="600" 
         Width="800"
+        SnapsToDevicePixels="True"
         WindowState="Maximized">
-    <Window.Resources>
-        <SolidColorBrush x:Key="ConsoleBrush" Color="Black"/>
-        <SolidColorBrush x:Key="ConsoleFontBrush" Color="White"/>
-        <Thickness x:Key="ThinBorder" Bottom="1"/>
-        <local:NegateBooleanConverter x:Key="inverter"/>
-        <local:InvertVisibilityConverter x:Key="visinverter"/>
-    </Window.Resources>
     <DockPanel Background="{StaticResource BackgroundBrush}">
         <!-- Menu Bar and Status bar grid -->
         <Grid
@@ -61,7 +56,7 @@
                             </Style>
                         </MenuItem.ItemContainerStyle>
                     </MenuItem>
-                    <Separator Background="{StaticResource BorderBrush}"/>
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
                     <MenuItem Header="Auto-start on load"
                               IsCheckable="True"
                               IsChecked="{Binding Renderer.AutoStartOnLoad}"/>
@@ -73,195 +68,39 @@
                 </MenuItem>
             </Menu>
 
-            <StatusBar 
-                Grid.Column="1"
-                HorizontalAlignment="Stretch"
-                BorderThickness="{StaticResource ThinBorder}"
-                BorderBrush="{StaticResource BorderBrush}"
-                HorizontalContentAlignment="Center">
+            <StatusBar Grid.Column="1"
+                       HorizontalAlignment="Stretch"
+                       BorderThickness="{StaticResource ThinBorder}"
+                       BorderBrush="{StaticResource BorderBrush}"
+                       HorizontalContentAlignment="Center">
+                <!-- Renderer selection -->
                 <StatusBarItem HorizontalAlignment="Left">
-                    <ComboBox Name="RendererSelectionBox"
-                              ItemsSource="{Binding Renderer.Renderers}"
-                              SelectedItem="{Binding Renderer.SelectedRenderer}"
+                    <ComboBox Grid.Column="0"
+                              x:Name="RendererSelectionBox"
+                              DataContext="{Binding Renderer}"
+                              ItemsSource="{Binding Renderers}"
+                              SelectedItem="{Binding SelectedRenderer}"
                               DisplayMemberPath="Name"
                               SelectedValuePath="Index"
-                              IsEnabled="{Binding Renderer.IsRendering, Converter={StaticResource inverter}}"/>
+                              IsEnabled="{Binding IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+
+                <!-- Toolbar -->
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.PlayPauseCommand, UpdateSourceTrigger=PropertyChanged}"
-                            ToolTip="Play/pause the renderer"
-                            SnapsToDevicePixels="True">
-                        <StackPanel>
-                            <Image 
-                                Source="Icons/play.png"
-                                RenderOptions.BitmapScalingMode="LowQuality"
-                                SnapsToDevicePixels="True"
-                                Width="16"
-                                Height="16"
-                                Visibility="{Binding Toolbar.PlayIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
-                            <Image 
-                                Source="Icons/pause.png"
-                                SnapsToDevicePixels="True"
-                                RenderOptions.BitmapScalingMode="LowQuality"
-                                Width="16"
-                                Height="16"
-                                Visibility="{Binding Toolbar.PauseIconVisibility, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
-                        </StackPanel>
-                    </Button>
+                    <view:ToolbarView Grid.Column="1"
+                                      x:Name="Toolbar"
+                                      DataContext="{Binding Toolbar}"/>
                 </StatusBarItem>
+
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+
+                <!-- Animation Frame Controls -->
                 <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.ResetCommand}"
-                            ToolTip="Reset the rendering progress"
-                            SnapsToDevicePixels="True">
-                        <Image 
-                            Source="Icons/restart.png"
-                            RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                            Width="16"
-                            Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button
-                            ToolTip="Inspect object instance"
-                            SnapsToDevicePixels="True">
-                        <Image 
-                            Source="Icons/inspect_instance.png"
-                            RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                            Width="16"
-                            Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button
-                            ToolTip="Inspect material"
-                            SnapsToDevicePixels="True">
-                        <Image 
-                            Source="Icons/inspect_material.png"
-                            RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                            Width="16"
-                            Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button
-                            ToolTip="Inspect light source"
-                            SnapsToDevicePixels="True">
-                        <Image 
-                            Source="Icons/inspect_light.png"
-                            RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                            Width="16"
-                            Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.SaveScreenShotCommand}"
-                            ToolTip="Take a screenshot"
-                            SnapsToDevicePixels="True">
-                        <Image
-                            Source="Icons/screenshot.png"
-                            RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                            Width="16"
-                            Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.ToggleCameraMovementCommand}"
-                            ToolTip="Allow/disallow camera movement"
-                            SnapsToDevicePixels="True">
-                        <StackPanel>
-                            <Image 
-                                Source="Icons/camera_move.png"
-                                RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                                Width="16"
-                                Height="16"
-                                Visibility="{Binding Toolbar.CameraMoveIconVisibility, UpdateSourceTrigger=PropertyChanged}"/>
-                            <Image 
-                                Source="Icons/camera_nomove.png"
-                                RenderOptions.BitmapScalingMode="LowQuality"
-                            SnapsToDevicePixels="True"
-                                Width="16"
-                                Height="16"
-                                Visibility="{Binding Toolbar.CameraMoveIconVisibility, Converter={StaticResource visinverter}, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
-                        </StackPanel>
-                    </Button>
-                </StatusBarItem>
-                <Separator HorizontalAlignment="Center"/>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.OneIterationCommand}"
-                            ToolTip="Advance rendering by one iteration"
-                            SnapsToDevicePixels="True">
-                        <Image Source="Icons/iterate_one.png"
-                               RenderOptions.BitmapScalingMode="LowQuality"
-                               SnapsToDevicePixels="True"
-                               Width="16"
-                               Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.TenIterationsCommand}"
-                            ToolTip="Advance rendering by ten iterations"
-                            SnapsToDevicePixels="True">
-                        <Image Source="Icons/iterate_ten.png"
-                               RenderOptions.BitmapScalingMode="LowQuality"
-                               SnapsToDevicePixels="True"
-                               Width="16"
-                               Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <Button Command="{Binding Toolbar.HundredIterationsCommand}"
-                            ToolTip="Advance rendering by one hundred iterations"
-                            SnapsToDevicePixels="True">
-                        <Image Source="Icons/iterate_hundred.png"
-                               RenderOptions.BitmapScalingMode="LowQuality"
-                               SnapsToDevicePixels="True"
-                               Width="16"
-                               Height="16"/>
-                    </Button>
-                </StatusBarItem>
-                <Separator Background="{StaticResource BorderBrush}"/>
-                <StatusBarItem>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0"
-                                    VerticalAlignment="Center"
-                                    Orientation="Horizontal">
-                            <TextBlock Text="Start: "/>
-                            <TextBlock MinWidth="30"
-                                       Text="{Binding AnimationFrames.Start, Mode=OneWay}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1"
-                                    VerticalAlignment="Center"
-                                    Orientation="Horizontal">
-                            <Slider Width="100"
-                                    Minimum="{Binding AnimationFrames.Start, Mode=OneWay}"
-                                    Maximum="{Binding AnimationFrames.End, Mode=OneWay}"
-                                    Value="{Binding AnimationFrames.Current, Mode=TwoWay}"
-                                    TickPlacement="BottomRight"
-                                    TickFrequency="10"
-                                    IsSnapToTickEnabled="False"/>
-                            <helper:EnterTextBox MinWidth="30"
-                                                 Text="{Binding AnimationFrames.Current, Mode=TwoWay}"
-                                                 Margin="{StaticResource LeftPropertyMargin}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2"
-                                    VerticalAlignment="Center"
-                                    Orientation="Horizontal">
-                            <TextBlock Text="End: "/>
-                            <TextBlock MinWidth="30"
-                                       Text="{Binding AnimationFrames.End, Mode=OneWay}"/>
-                        </StackPanel>
-                    </Grid>
+                    <view:AnimationFrameView Grid.Column="2"
+                                             x:Name="AnimationFrames"
+                                             DataContext="{Binding AnimationFrames}"/>
                 </StatusBarItem>
             </StatusBar>
 
@@ -319,13 +158,30 @@
                     </TabItem>
                     <TabItem Header="Profiler"
                              Width="Auto">
-                        <TreeView Grid.Row="2"
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <StackPanel Grid.Row="0"
+                                        HorizontalAlignment="Right"
+                                        Margin="{StaticResource DialogMargin}"
+                                        Orientation="Horizontal">
+                                <TextBlock Text="Show snapshots"
+                                           Margin="{StaticResource LeftPropertyMargin}"
+                                           ToolTip="Warning: this may cost additional performance when many iterations have been performed"/>
+                                <CheckBox IsChecked="{Binding Profiler.DisplaySnapshots, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="{StaticResource RightPropertyMargin}"/>
+                            </StackPanel>
+                            
+                            <TreeView Grid.Row="1"
                                   Name="ProfilerTreeView">
-                            <TreeViewItem Header="Rendering"
+                                <TreeViewItem Header="Rendering"
                                           FontFamily="Courier New"/>
-                            <TreeViewItem Header="Loading"
+                                <TreeViewItem Header="Loading"
                                           FontFamily="Courier New"/>
-                        </TreeView>
+                            </TreeView>
+                        </Grid>
                     </TabItem>
                 </TabControl>
 
@@ -335,46 +191,11 @@
                     HorizontalAlignment="Stretch"
                     Background="{StaticResource BorderBrush}"/>
 
-                <!-- Renderer with scroll bars -->
-                <Grid
-                    Grid.Column="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Border 
-                        x:Name="BorderHost"
-                        DockPanel.Dock="Bottom"
-                        Background="Black"
-                        Focusable="True"
-                        MaxWidth="{Binding Viewport.DesiredWidth}"
-                        MaxHeight="{Binding Viewport.DesiredHeight}">
-                    </Border>
-
-                    <ScrollBar 
-                        Grid.Row="0"
-                        Grid.Column="1"
-                        Minimum="0"
-                        Maximum="{Binding Viewport.ScrollMaximumY}"
-                        Value="{Binding Viewport.OffsetY}"
-                        ViewportSize="{Binding Viewport.ScrollHeight}"/>
-
-                    <ScrollBar
-                        Grid.Row="1"
-                        Grid.Column="0"
-                        Orientation="Horizontal"
-                        Minimum="0"
-                        Maximum="{Binding Viewport.ScrollMaximumX}"
-                        Value="{Binding Viewport.OffsetX}"
-                        ViewportSize="{Binding Viewport.ScrollWidth}"/>
-
-                </Grid>
-
+                <!-- Main viewport -->
+                <display:DisplayView Grid.Column="2"
+                                     x:Name="RenderDisplay"
+                                     Focusable="True"
+                                     DataContext="{Binding Display}"/>
 
                 <GridSplitter
                     Grid.Column="3"
@@ -392,7 +213,7 @@
                                     BorderThickness="1">
                                 <renderer:RenderTargetSelectionView/>
                             </Border>
-                            <Separator Background="{StaticResource BorderBrush}"/>
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
                             <renderer:RendererParams x:Name="RendererPropertiesControl"/>
                         </StackPanel>
                     </TabItem>
@@ -490,118 +311,13 @@
                 Background="{StaticResource BorderBrush}"/>
 
             <!-- console -->
-            <Grid Grid.Row="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <view:ConsoleView 
-                    Grid.Row="0"
-                    DataContext="{Binding ConsoleOutput}"
-                    x:Name="ConsoleOutput"/>
-
-                <TextBox
-                    Grid.Row="1"
-                    HorizontalAlignment="Stretch"
-                    Height="Auto"
-                    Background="{StaticResource ConsoleBrush}"
-                    Foreground="{StaticResource ConsoleFontBrush}"
-                    Text="{Binding ConsoleInput.Input, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    FontFamily="Consolas"
-                    BorderBrush="{x:Null}"
-                    SelectionBrush="{x:Null}"
-                    x:Name="ConsoleInputBox"/>
-            </Grid>
+            <view:ConsoleView Grid.Row="2"
+                              DataContext="{Binding ConsoleOutput}"
+                              x:Name="ConsoleOutput"/>
 
             <!-- status bar -->
-            <StatusBar
-                Grid.Row="3"
-                Height="22">
-
-                <StatusBarItem
-                    HorizontalAlignment="Left"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Stretch"
-                    ToolTip="Total/Used/Free"
-                    Content="{Binding Statusbar.CpuMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <StatusBarItem
-                    HorizontalAlignment="Left"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Stretch"
-                    ToolTip="Total/Used/Free"
-                    Content="{Binding Statusbar.CudaMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <Separator Background="{StaticResource BorderBrush}"/>
-                <StatusBarItem HorizontalAlignment="Left"
-                               Width="85">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="Icons/cross_arrow.png"
-                               SnapsToDevicePixels="True"
-                               RenderOptions.BitmapScalingMode="LowQuality"
-                               Width="16"
-                               Height="16"/>
-                        <TextBlock Text="{Binding Statusbar.CursorPos}"/>
-                    </StackPanel>
-                </StatusBarItem>
-                <Separator Background="{StaticResource BorderBrush}"/>
-                <StatusBarItem HorizontalAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="Icons/eyedropper.png"
-                               SnapsToDevicePixels="True"
-                               RenderOptions.BitmapScalingMode="LowQuality"
-                               Width="16"
-                               Height="16"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorRed}" Width="45"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorGreen}" Width="45"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorBlue}" Width="45"/>
-                        <TextBlock Text="{Binding Statusbar.PixelColorAlpha}" Width="45"/>
-                    </StackPanel>
-                </StatusBarItem>
-                <Separator Background="{StaticResource BorderBrush}"/>
-                <StatusBarItem
-                    HorizontalAlignment="Right"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Stretch">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="40"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="150"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="Iteration: "/>
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding Renderer.Iteration, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        <Rectangle Grid.Column="2"
-                                       VerticalAlignment="Stretch"
-                                       Width="1"
-                                       Margin="2"
-                                       Stroke="{StaticResource BorderBrush}"/>
-                        <TextBlock Grid.Column="3"
-                                   Text="{Binding Renderer.CurrentIterationTime, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
-                                   ToolTip="Current iteration's time/gigacycles (process time)"/>
-                        <Rectangle Grid.Column="2"
-                                       VerticalAlignment="Stretch"
-                                       Width="1"
-                                       Margin="2"
-                                       Stroke="{StaticResource BorderBrush}"/>
-                        <TextBlock Grid.Column="4"
-                                   Text="{Binding Renderer.AverageIterationTime, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
-                                   ToolTip="Average iteration time/gigacycles (process time)"/>
-                        <Rectangle Grid.Column="2"
-                                       VerticalAlignment="Stretch"
-                                       Width="1"
-                                       Margin="2"
-                                       Stroke="{StaticResource BorderBrush}"/>
-                        <TextBlock Grid.Column="5"
-                                   Text="{Binding Renderer.TotalIterationTime, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
-                                   ToolTip="Total iteration time/gigacycles (process time)"/>
-                    </Grid>
-                </StatusBarItem>
-            </StatusBar>
+            <view:StatusbarView Grid.Row="3"
+                                x:Name="Statusbar"/>
         </Grid>
 
     </DockPanel>

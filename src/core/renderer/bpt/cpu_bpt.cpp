@@ -157,8 +157,6 @@ void CpuBidirPathTracer::iterate() {
 		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
 			pixel, m_outputBuffer, pathMem[get_current_thread_idx()]);
 	}
-
-	Profiler::instance().create_snapshot_all();
 }
 
 void CpuBidirPathTracer::on_reset() {

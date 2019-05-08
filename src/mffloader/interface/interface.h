@@ -29,6 +29,7 @@ LOADER_API Boolean CDECL loader_profiling_save_snapshots(const char* path);
 LOADER_API Boolean CDECL loader_profiling_save_total_and_snapshots(const char* path);
 LOADER_API const char* CDECL loader_profiling_get_current_state();
 LOADER_API const char* CDECL loader_profiling_get_snapshots();
+LOADER_API const char* CDECL loader_profiling_get_total();
 LOADER_API const char* CDECL loader_profiling_get_total_and_snapshots();
 LOADER_API void CDECL loader_profiling_reset();
 
