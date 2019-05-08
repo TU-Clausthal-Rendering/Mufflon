@@ -131,6 +131,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 		if(!scene::accel_struct::any_intersection(
 				scene, connection.v0, path1.get_position(connection.v0),
 				path0.get_geometric_normal(), path1.get_geometric_normal(), connection.dir)) {
+			bxdfProd *= scene.media[path0.get_medium(connection.dir)].get_transmission(connection.distance);
 			float mis = get_mis_weight(path0, val0.pdf, path1, val1.pdf, connection);
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}
@@ -169,7 +170,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	// Trace a light path
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	u64 lightTreeSeed = m_rngs[idx].next();
-	scene::lights::Photon p = scene::lights::emit(m_sceneDesc, idx, outputBuffer.get_num_pixels(),
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, outputBuffer.get_num_pixels(),
 		lightTreeSeed, rndStart);
 	BptPathVertex::create_light(&path[0], nullptr, p, m_rngs[idx]);
 	math::Throughput throughput;

@@ -8,7 +8,7 @@ namespace mufflon { namespace scene { namespace lights {
 namespace lighttree_detail {
 
 // Helper to adjust PDF by the chance to pick light type
-CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
+CUDA_FUNCTION __forceinline__ Emitter adjustPdf(Emitter&& sample, float chance) {
 	sample.pos.pdf *= chance;
 	sample.intensity /= chance;
 	return sample;
@@ -21,9 +21,9 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&
 
 
 // Converts the typeless memory into the given light type and samples it
-CUDA_FUNCTION Photon sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
-								  LightType type, const char* light,
-								  const math::RndSet2& rnd) {
+CUDA_FUNCTION Emitter sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
+								   LightType type, const char* light,
+								   const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
 		case LightType::POINT_LIGHT: return sample_light_pos(*reinterpret_cast<const PointLight*>(light), rnd);
@@ -77,10 +77,10 @@ CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
  * until it cannot uniquely identify a subtree (ie. index 1 for interval [0,2]
  * and flux distribution of 50/50).
  */
-CUDA_FUNCTION Photon emit(const SceneDescriptor<CURRENT_DEV>& scene,
-						  const LightSubTree& tree, u64 left, u64 right,
-						  u64 rndChoice, float treeProb,
-						  const math::RndSet2& rnd) {
+CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
+						   const LightSubTree& tree, u64 left, u64 right,
+						   u64 rndChoice, float treeProb,
+						   const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -129,9 +129,9 @@ CUDA_FUNCTION Photon emit(const SceneDescriptor<CURRENT_DEV>& scene,
  * seed: A random seed to randomize the dicision. All events (enumerated by indices)
  *		must use the same number.
  */
-CUDA_FUNCTION Photon emit(const SceneDescriptor<CURRENT_DEV>& scene,
-						  u64 index, u64 numIndices, u64 seed,
-						  const math::RndSet2_1& rnd) {
+CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
+						   u64 index, u64 numIndices, u64 seed,
+						   const math::RndSet2_1& rnd) {
 	using namespace lighttree_detail;
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// See connect() for details on the rndChoice

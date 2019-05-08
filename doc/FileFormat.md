@@ -47,9 +47,9 @@ In the case of multiple type choices, details on further mandatory properties wi
                 "type": "{lambert, torrance, walter, emissive, orennayar, blend, fresnel, glass}",
                 "outerMedium": {      // OPTIONAL, the inner medium is always specified by the other material parameters
                                       // If not given the outer medium is assumed to be vacuum (index 1, absorption 0)
-                    "refractionIndex": float | [n,k],   // The real part of the refraction index (for dielectric)
-                                                        // OR complex number (vec2, for conductor)
-                    "absorption": [r,g,b]               // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
+                    "ior": float | [n,k],       // The real part of the refraction index (for dielectric)
+                                                // OR complex number (vec2, for conductor)
+                    "absorption": [r,g,b]       // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
                 },
 				"alpha" : <texture>   // OPTIONAL: if red channel is < 0.5, the ray will continue as if unperturbed
 				                      // IMPORTANT: not valid for emissive materials!

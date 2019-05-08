@@ -330,7 +330,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
-	scene::lights::Photon p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	NebPathVertex vertex[2];
 	NebPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	math::Throughput throughput;
