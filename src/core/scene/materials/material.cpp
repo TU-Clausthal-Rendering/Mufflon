@@ -51,15 +51,6 @@ char* Material<M>::get_descriptor(Device device, char* outBuffer) const {
 }
 
 template<Materials M>
-Emission Material<M>::get_emission() const {
-	if constexpr(details::has_emission<SubMaterial>(0)) {
-		return m_material.get_emission(m_textures, 0);
-	} else {
-		return IMaterial::get_emission();
-	}
-}
-
-template<Materials M>
 Medium Material<M>::compute_medium() const {
 	if constexpr(details::has_dependent_medium<SubMaterial>(0)) {
 		return m_material.compute_medium();
@@ -69,20 +60,7 @@ Medium Material<M>::compute_medium() const {
 	}
 }
 
-// C++14 incompatible member functions of blend models
-template<class LayerA, class LayerB>
-Emission MatBlend<LayerA, LayerB>::get_emission(const TextureHandle* texTable, int texOffset) const {
-	if constexpr(details::has_emission<LayerA>(0)) {
-		Emission em = layerA.get_emission(texTable, texOffset);
-		em.scale *= nonTexParams.factorA;
-		return em;
-	} else if constexpr(details::has_emission<LayerB>(0)) {
-		Emission em = layerB.get_emission(texTable, texOffset+LayerA::TEX_COUNT);
-		em.scale *= nonTexParams.factorB;
-		return em;
-	} else return Emission{nullptr, Spectrum{0.0f}};
-}
-
+// C++14 incompatible member functions of blend models (if constexpr -> not in header)
 template<class LayerA, class LayerB>
 Medium MatBlend<LayerA, LayerB>::compute_medium() const {
 	if constexpr(details::has_dependent_medium<LayerA>(0))
@@ -91,19 +69,6 @@ Medium MatBlend<LayerA, LayerB>::compute_medium() const {
 		return layerB.compute_medium();
 	// Use some average dielectric refraction index and a maximum absorption
 	return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
-}
-
-template<class LayerA, class LayerB>
-Emission MatBlendFresnel<LayerA, LayerB>::get_emission(const TextureHandle* texTable, int texOffset) const {
-	if constexpr(details::has_emission<LayerA>(0)) {
-		Emission em = layerA.get_emission(texTable, texOffset);
-		// TODO: attenuate with F, requires the directions!
-		return em;
-	} else if constexpr(details::has_emission<LayerB>(0)) {
-		// TODO: attenuate with 1-F, requires the directions!
-		Emission em = layerB.get_emission(texTable, texOffset+LayerA::TEX_COUNT);
-		return em;
-	} else return Emission{nullptr, Spectrum{0.0f}};
 }
 
 template<class LayerA, class LayerB>
@@ -131,7 +96,6 @@ constexpr void instanciate_materials() {
 	p->get_properties();
 	p->get_parameter_pack_size();
 	p->get_descriptor(Device::CPU, nullptr);
-	p->get_emission();
 	p->compute_medium();
 	//(void)std::declval<Material<PREV_MAT>>();
 	instanciate_materials<PREV_MAT>();

@@ -2,6 +2,8 @@
 #include "core/math/rng.hpp"
 #include "core/math/sampling.hpp"
 #include "core/scene/textures/interface.hpp"
+#include "core/memory/dyntype_memory.hpp"
+#include "core/scene/materials/material_sampling.hpp"
 
 namespace mufflon::scene::lights {
 
@@ -18,7 +20,8 @@ Spectrum get_flux(const SpotLight& light) {
 }
 
 
-Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light) {
+Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light, const int* materials) {
+	auto* mat = as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[light.material]);
 	float area = len(cross(light.posV[1u], light.posV[2u])) / 2.0f;
 	// Sample the radiance over the entire triangle region.
 	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
@@ -27,14 +30,17 @@ Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light) {
 		const ei::Vec2 u = math::sample_uniform(gen.next());
 		const ei::Vec2 bary = math::sample_barycentric(u.x, u.y);
 		const UvCoordinate uv = light.uvV[0u] + light.uvV[1u] * bary.x + light.uvV[2u] * bary.y;
-		radianceSum += Spectrum{sample(light.radianceTex, uv)};
+		materials::ParameterPack matParams;
+		materials::fetch(*mat, uv, &matParams);
+		radianceSum += materials::emission(matParams, Direction{0.0f, 0.0f, 1.0f}, Direction{0.0f, 0.0f, 1.0f}).value;
 	}
 	radianceSum /= 128;
 	return radianceSum * area * 2 * ei::PI;
 }
 
 
-Spectrum get_flux(const AreaLightQuad<Device::CPU>& light) {
+Spectrum get_flux(const AreaLightQuad<Device::CPU>& light, const int* materials) {
+	auto* mat = as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[light.material]);
 	// Sample the radiance over the entire triangle region.
 	math::GoldenRatio2D gen((u32)reinterpret_cast<u64>(&light));	// Use different seeds per light
 	Spectrum intensitySum { 0.0f };
@@ -44,14 +50,17 @@ Spectrum get_flux(const AreaLightQuad<Device::CPU>& light) {
 		const ei::Vec3 tangentX = light.posV[1u] + u.x * light.posV[3u];
 		const ei::Vec3 tangentY = light.posV[2u] + u.y * light.posV[3u];
 		const float area = len(cross(tangentY, tangentX));
-		intensitySum += area * Spectrum{sample(light.radianceTex, uv)};
+		materials::ParameterPack matParams;
+		materials::fetch(*mat, uv, &matParams);
+		intensitySum += area * materials::emission(matParams, Direction{0.0f, 0.0f, 1.0f}, Direction{0.0f, 0.0f, 1.0f}).value;
 	}
 	intensitySum /= 128;
 	return intensitySum * 2 * ei::PI;
 }
 
 
-Spectrum get_flux(const AreaLightSphere<Device::CPU>& light) {
+Spectrum get_flux(const AreaLightSphere<Device::CPU>& light, const int* materials) {
+	auto* mat = as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[light.material]);
 	float area = ei::surface(ei::Sphere{ light.position, light.radius });
 	// Sample the radiance over the entire triangle region.
 	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
@@ -61,7 +70,9 @@ Spectrum get_flux(const AreaLightSphere<Device::CPU>& light) {
 		// Get lon-lat, but in domain [0,1]
 		float theta = acos(u.x * 2.0f - 1.0f) / ei::PI;
 		float phi = u.y;
-		radianceSum += Spectrum{sample(light.radianceTex, UvCoordinate{phi, theta})};
+		materials::ParameterPack matParams;
+		materials::fetch(*mat, UvCoordinate{phi, theta}, &matParams);
+		radianceSum += materials::emission(matParams, Direction{0.0f, 0.0f, 1.0f}, Direction{0.0f, 0.0f, 1.0f}).value;
 	}
 	radianceSum /= 128;
 	return radianceSum * area * 2 * ei::PI;

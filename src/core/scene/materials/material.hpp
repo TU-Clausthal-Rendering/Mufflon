@@ -66,9 +66,6 @@ public:
 	 */
 	virtual char* get_descriptor(Device device, char* outBuffer) const = 0;
 
-	// Get only the texture for emissive materials
-	virtual Emission get_emission() const { return {nullptr, Spectrum{0.0f}}; }
-
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {
 		return m_outerMedium;
@@ -128,7 +125,6 @@ public:
 	}
 	std::size_t get_parameter_pack_size() const final;
 	char* get_descriptor(Device device, char* outBuffer) const final;
-	Emission get_emission() const final;
 	Medium compute_medium() const final;
 
 private:

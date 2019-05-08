@@ -239,8 +239,12 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.lods = lodDevDesc.get();
 	}
 
+	// Materials
 	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<dev>())
 		load_materials<dev>();
+	// This query should be cheap. The above if already made the information resident.
+	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
+	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
 
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
@@ -253,10 +257,6 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
 		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
-
-	// TODO: query media/materials only if needed?
-	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
-	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
 
 	// Rebuild Instance BVH?
 	if(geometryChanged) {
@@ -283,8 +283,13 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 					   std::vector<lights::DirectionalLight>&& dirLights) {
+	// Need the materials for area lights
+	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<Device::CPU>())
+		load_materials<Device::CPU>();
+	const int* materials = as<int>(m_materials.template acquire_const<Device::CPU>());
+
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
-					  m_boundingBox);
+					  m_boundingBox, materials);
 	m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });
 	m_lightTreeNeedsMediaUpdate.for_each([](auto &elem) { elem.changed = true; });
 }

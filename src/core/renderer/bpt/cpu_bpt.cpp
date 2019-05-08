@@ -169,8 +169,8 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	// Trace a light path
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	u64 lightTreeSeed = m_rngs[idx].next();
-	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, outputBuffer.get_num_pixels(),
-		lightTreeSeed, m_sceneDesc.aabb, rndStart);
+	scene::lights::Photon p = scene::lights::emit(m_sceneDesc, idx, outputBuffer.get_num_pixels(),
+		lightTreeSeed, rndStart);
 	BptPathVertex::create_light(&path[0], nullptr, p, m_rngs[idx]);
 	math::Throughput throughput;
 	VertexSample sample;

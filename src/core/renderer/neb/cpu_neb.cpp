@@ -231,9 +231,8 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			// vertex for later use.
 			u64 neeSeed = m_rngs[pixelIdx].next();
 			math::RndSet2 neeRnd = m_rngs[pixelIdx].next();
-			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-								vertex.get_position(), m_sceneDesc.aabb, neeRnd);
-			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;			
+			auto nee = scene::lights::connect(m_sceneDesc, 0, 1, neeSeed, vertex.get_position(), neeRnd);
+			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
 			bool anyhit = scene::accel_struct::any_intersection(
 								m_sceneDesc, vertex.get_position(), nee.position,
 								vertex.get_geometric_normal(), nee.geoNormal, nee.dir.direction);
@@ -331,8 +330,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
-	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
-		m_sceneDesc.aabb, rndStart);
+	scene::lights::Photon p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	NebPathVertex vertex[2];
 	NebPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	math::Throughput throughput;

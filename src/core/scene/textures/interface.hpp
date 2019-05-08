@@ -116,6 +116,14 @@ CUDA_FUNCTION Point cubemap_uv_to_surface(UvCoordinate uv, int layer) {
 	}
 }
 
+// Get the uv coordinate of a direction by using polar coordinates.
+CUDA_FUNCTION __forceinline__ UvCoordinate direction_to_uv(const Direction& direction) {
+	// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
+	float v = acos(direction.y) / ei::PI;
+	const float u = atan2(direction.z, direction.x) / (ei::PI * 2.0f);
+	return UvCoordinate{ u, 1.0f-v };
+}
+
 // Samples an environment map and returns the uv-coordinate too
 CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
 #ifndef __CUDA_ARCH__
@@ -134,15 +142,14 @@ CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const
 		return sample(envmap, uvOut, layer);
 	} else {
 		// Spherical map
-		// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
-		float v = acos(direction.y) / ei::PI;
-		const float u = atan2(direction.z, direction.x) / (ei::PI * 2.f);
+		uvOut = direction_to_uv(direction);
 		// Clamp (no wrapping in v direction)
 		const Pixel texSize = textures::get_texture_size(envmap);
-		v = ei::min(v, (texSize.y - 0.5f) / texSize.y);
-		uvOut = UvCoordinate{ u, 1.f-v };
+		float halfTexel = 0.5f / texSize.y;
+		uvOut.v = ei::clamp(uvOut.v, halfTexel, 1.0f - halfTexel);
 		return sample(envmap, uvOut);
 	}
 }
+
 
 }}} // namespace mufflon::scene::textures

@@ -187,8 +187,7 @@ void CpuVcm::on_reset() {
 void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
-	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
-		m_sceneDesc.aabb, rndStart);
+	scene::lights::Photon p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	VcmPathVertex vertex;
 	VcmPathVertex::create_light(&vertex, nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	const VcmPathVertex* previous = m_photonMap.insert(p.pos.position, vertex);

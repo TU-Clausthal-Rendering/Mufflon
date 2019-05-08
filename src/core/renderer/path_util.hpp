@@ -276,7 +276,7 @@ public:
 										proj.pdf, AngularPdf{ 0.0f } };
 			}
 			case Interaction::SURFACE: {
-				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.mat(),
+				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.material,
 										   m_incident, excident, media, adjoint, lightNormal);
 			}
 		}
@@ -334,7 +334,7 @@ public:
 			}
 			case Interaction::SURFACE: {
 				return VertexSample{ scene::materials::sample(
-										m_desc.surface.tangentSpace, m_desc.surface.mat(),
+										m_desc.surface.tangentSpace, m_desc.surface.material,
 										m_incident, media, rndSet, adjoint),
 									 m_position, scene::materials::MediumHandle{} };
 			}
@@ -419,7 +419,7 @@ public:
 				return EmissionValue{};
 			}
 			case Interaction::SURFACE: {
-				math::SampleValue matValue = scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
+				math::SampleValue matValue = scene::materials::emission(m_desc.surface.material, m_desc.surface.tangentSpace.geoN, -m_incident);
 				scene::lights::LightPdfs startPdf { AreaPdf{0.0f}, AreaPdf{0.0f} };
 				if(matValue.value != 0.0f) {
 					startPdf = scene::lights::light_pdf(scene.lightTree, m_desc.surface.primitiveId,
@@ -433,7 +433,7 @@ public:
 
 	CUDA_FUNCTION Spectrum get_albedo() const {
 		if(m_type == Interaction::SURFACE) {
-			return scene::materials::albedo(m_desc.surface.mat());
+			return scene::materials::albedo(m_desc.surface.material);
 		}
 		// Area light source vertices are on surfaces with an albedo too.
 		// However, it is likely that they are never asked for their albedo().
@@ -461,7 +461,7 @@ public:
 	// TODO: for other vertices than surfaces
 	CUDA_FUNCTION float get_pdf_max() const {
 		if(m_type == Interaction::SURFACE) {
-			return pdf_max(m_desc.surface.mat());
+			return pdf_max(m_desc.surface.material);
 		}
 		return 0.0f;
 	}
@@ -607,7 +607,7 @@ public:
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
 						 incidentPdf.pdf, -incidentPdf.geoFactor, incidentThrougput);
-		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.mat());
+		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.material);
 		return (int)round_to_align<8u>( round_to_align<8u>(this_size() + sizeof(scene::TangentSpace)
 			+ sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization))
 			+ size);
@@ -648,10 +648,7 @@ private:
 		scene::TangentSpace tangentSpace; // TODO: use packing?
 		scene::PrimitiveHandle primitiveId;
 		ei::Vec2 surfaceParams;
-		//scene::materials::ParameterPack params;
-		alignas(8) u8 matParams[scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
-		CUDA_FUNCTION const scene::materials::ParameterPack& mat() const { return *as<scene::materials::ParameterPack>(matParams); }
-		CUDA_FUNCTION scene::materials::ParameterPack& mat() { return *as<scene::materials::ParameterPack>(matParams); }
+		scene::materials::ParameterPack material;
 	};
 
 	// The previous vertex on the path or nullptr.

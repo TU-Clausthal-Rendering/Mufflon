@@ -1484,8 +1484,7 @@ int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
 	switch(hdl->get_type()) {
 		case Materials::EMISSIVE:
 			buffer->innerType = MATERIAL_EMISSIVE;
-			buffer->inner.emissive.radiance = hdl->get_emission().texture;
-			buffer->inner.emissive.scale = util::pun<Vec3>(hdl->get_emission().scale);
+			// TODO
 			break;
 		case Materials::LAMBERT:
 			buffer->innerType = MATERIAL_LAMBERT;

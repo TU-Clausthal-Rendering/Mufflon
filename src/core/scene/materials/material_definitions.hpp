@@ -55,14 +55,6 @@ struct alignas(8) MaterialDescriptorBase {
 	}
 };
 
-struct ParameterPack: public MaterialDescriptorBase {};
-
-struct Emission {
-	TextureHandle texture;
-	Spectrum scale;
-};
-
-
 
 // ************************************************************************* //
 // LAMBERT																	 //
@@ -231,10 +223,6 @@ struct MatEmissive {
 		nonTexParams.scale = scale;
 	}
 
-	Emission get_emission(const TextureHandle* texTable, int texOffset) const {
-		return {texTable[EMISSION+texOffset], nonTexParams.scale};
-	}
-
 	struct NonTexParams {
 		Spectrum scale;
 	} nonTexParams;
@@ -295,8 +283,6 @@ struct MatBlend {
 		nonTexParams.factorB = factorB;
 	}
 
-	Emission get_emission(const TextureHandle* texTable, int texOffset) const;
-
 	Medium compute_medium() const;
 
 	using NonTexParams = MatNTPBlend<LayerA, LayerB>;
@@ -353,8 +339,6 @@ struct MatBlendFresnel {
 		//nonTexParams.pReflect = 0.89176122288449f * f0 + 0.10823877711551f;
 	}
 
-	Emission get_emission(const TextureHandle* texTable, int texOffset) const;
-
 	Medium compute_medium() const;
 
 	using NonTexParams = MatNTPBlendFresnel<LayerA, LayerB>;
@@ -395,6 +379,12 @@ constexpr std::size_t get_material_descriptor_size() {
 		+ (std::is_empty<typename mat_type<M>::NonTexParams>::value ? 0 : sizeof(typename mat_type<M>::NonTexParams)));
 }
 
+// Get the full param size of a material
+template < Materials M >
+constexpr std::size_t get_material_param_size() {
+	return sizeof(MaterialDescriptorBase) + sizeof(mat_type<M>::SampleType);
+}
+
 
 namespace details {
 	template<typename T, int N>
@@ -419,6 +409,13 @@ namespace details {
 		return {{ei::max(get_material_descriptor_size<Device::CPU, Materials(Is)>(),
 						 get_material_descriptor_size<Device::CUDA, Materials(Is)>())...}};
 	}
+
+	// Automatic detection of the maximum possible param size
+	template<std::size_t... Is>
+	constexpr Array<std::size_t, sizeof...(Is)> enumerate_param_sizes(
+		std::integer_sequence<std::size_t, Is...>) {
+		return {{get_material_param_size<Materials(Is)>()...}};
+	}
 }
 //constexpr auto MAT_TEX_COUNT = details::enumerate_tex_counts( std::make_integer_sequence<int, int(Materials::NUM)>{} );*/
 
@@ -438,6 +435,20 @@ constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
 		if(DESC_SIZES[i] > maxSize) maxSize = DESC_SIZES[i];
 	return maxSize;
 }
+
+constexpr std::size_t MAX_MATERIAL_PARAM_SIZE() {
+	auto PARAM_SIZES = details::enumerate_param_sizes( std::make_integer_sequence<std::size_t, int(Materials::NUM)>{} );
+	std::size_t maxSize = 0;
+	for(int i = 0; i < int(Materials::NUM); ++i)
+		if(PARAM_SIZES[i] > maxSize) maxSize = PARAM_SIZES[i];
+	return maxSize;
+}
+
+
+struct ParameterPack: public MaterialDescriptorBase {
+	u8 subParams[MAX_MATERIAL_PARAM_SIZE() - sizeof(MaterialDescriptorBase)];
+};
+
 
 // Conversion of a runtime parameter 'mat' into a consexpr 'MatType'.
 // WARNING: this is a switch -> need to return or to break; at the end

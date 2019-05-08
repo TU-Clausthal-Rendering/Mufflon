@@ -34,7 +34,7 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	else
 		matIdx = object.spheres.matIndices[primitiveId - faceCount];
 
-	return scene.get_material(matIdx).get_medium(ei::dot(dir, res.normal));
+	return scene.get_material(matIdx).get_medium(-ei::dot(dir, res.normal));
 }
 
 }}} // namespace mufflon::scene::materials

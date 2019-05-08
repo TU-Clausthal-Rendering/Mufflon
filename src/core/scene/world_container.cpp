@@ -733,12 +733,9 @@ bool WorldContainer::load_scene_lights() {
 				for(const auto& face : polygons.faces()) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
 					if(mat->get_properties().is_emissive()) {
-						auto emission = mat->get_emission();
-						mAssert(emission.texture != nullptr);
 						if(std::distance(face.begin(), face.end()) == 3) {
 							lights::AreaLightTriangleDesc al;
-							al.radianceTex = emission.texture;
-							al.scale = ei::packRGB9E5(emission.scale);
+							al.material = materials[primIdx];
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
@@ -752,8 +749,7 @@ bool WorldContainer::load_scene_lights() {
 							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
 						} else {
 							lights::AreaLightQuadDesc al;
-							al.radianceTex = emission.texture;
-							al.scale = emission.scale;
+							al.material = materials[primIdx];
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
@@ -778,13 +774,11 @@ bool WorldContainer::load_scene_lights() {
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
 					if(mat->get_properties().is_emissive()) {
-						auto emission = mat->get_emission();
-						mAssert(emission.texture != nullptr);
 						mAssert(ei::approx(inst->get_scale().x, inst->get_scale().y) && ei::approx(inst->get_scale().x, inst->get_scale().z));
 						lights::AreaLightSphereDesc al{
 							transform(spheresData[i].center, inst->get_transformation_matrix()),
 							inst->get_scale().x * spheresData[i].radius,
-							emission.texture, emission.scale
+							materials[i]
 						};
 						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });
 					}
