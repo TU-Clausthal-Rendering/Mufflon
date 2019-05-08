@@ -119,7 +119,7 @@ public:
 		static_assert(std::is_trivially_destructible<T>::value,
 					  "Must be trivially destructible");
 		T* newPtr = alloc_array<T>(next);
-		copy(newPtr, ptr, 0, prev);
+		copy(newPtr, ptr, prev);
 		free(ptr, prev);
 		return newPtr;
 	}
@@ -142,12 +142,12 @@ public:
 	static constexpr Device DEVICE = Device::OPENGL;
 
 	template < class T, typename... Args >
-	static gl::Handle alloc(Args... args) {
+	static gl::BufferHandle<T> alloc(Args... args) {
 		return alloc_array<T>(1, std::forward<Args>(args)...);
 	}
 
 	template < class T, bool Init = true, typename... Args >
-	static gl::Handle alloc_array(std::size_t n, Args... args) {
+	static gl::BufferHandle<T> alloc_array(std::size_t n, Args... args) {
 		static_assert(std::is_trivially_copyable<T>::value,
 			"Must be trivially copyable");
 
@@ -162,29 +162,30 @@ public:
 			gl::clearBufferData(id, n, &prototype);
 		}
 		
-		return id;
+		return gl::BufferHandle<T>{id, 0};
 	}
 
 	template < class T >
-	static gl::Handle realloc(gl::Handle handle, std::size_t prev, std::size_t next) {
+	static gl::BufferHandle<T> realloc(gl::BufferHandle<T> handle, std::size_t prev, std::size_t next) {
 		// create new buffer and copy contents of old buffer
 		mAssert(next > prev);
+		mAssert(handle.offset == 0);
 
 		const auto newHandle = gl::genBuffer();
 		gl::bindBuffer(gl::BufferType::ShaderStorage, newHandle);
 		gl::bufferStorage(newHandle, next, nullptr, gl::StorageFlags::DynamicStorage);
 		// transfer data
-		gl::copyBufferSubData(handle, newHandle, 0, 0, prev);
+		gl::copyBufferSubData(handle.id, newHandle, 0, 0, prev);
 		// cleanup
 		gl::deleteBuffer(handle);
-		return newHandle;
+		return gl::BufferHandle<T>{newHandle, 0};
 	}
 
 	template < class T >
-	static gl::Handle free(gl::Handle handle, std::size_t n) {
-		if(handle != 0)
-			gl::deleteBuffer(handle);
-		return 0;
+	static gl::BufferHandle<T> free(gl::BufferHandle<T> handle, std::size_t n) {
+		if(handle.id != 0)
+			gl::deleteBuffer(handle.id);
+		return gl::BufferHandle<T>{0, 0};
 	}
 };
 
@@ -215,7 +216,7 @@ public:
 	std::size_t get_size() const noexcept { return m_n; }
 
 	template < typename T >
-	void operator () (ArrayDevHandle_t<Device::OPENGL, T> p) const {
+	void operator () (gl::BufferHandle<T> p) const {
 		Allocator<Device::OPENGL>::template free<T>(p, m_n);
 	}
 private:

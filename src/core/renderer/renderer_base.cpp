@@ -18,7 +18,7 @@ bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
 		auto desc = m_currentScene->get_descriptor<dev>({}, {}, {}, outputBuffer.get_resolution());
-		copy(m_sceneDesc.get(), &desc, 0, sizeof(desc));
+		copy(m_sceneDesc.get(), &desc, sizeof(desc));
 		this->on_descriptor_requery();
 		this->on_reset();
 		m_reset = false;

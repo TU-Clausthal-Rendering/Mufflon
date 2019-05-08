@@ -7,6 +7,43 @@ namespace mufflon {
 namespace gl {
 	using Handle = uint32_t;
 
+	template<class T>
+	struct BufferHandle
+	{
+		Handle id;
+		// element offset
+		size_t offset;
+
+		size_t get_byte_offset() const
+		{
+			return offset * sizeof(T);
+		}
+		// pointer arithmetic helper
+		BufferHandle& operator+=(size_t o)
+		{
+			offset += o;
+			return *this;
+		}
+		BufferHandle& operator-=(size_t o)
+		{
+			offset -= o;
+			return *this;
+		}
+		BufferHandle operator+(size_t o)
+		{
+			return BufferHandle(*this) += o;
+		}
+		BufferHandle operator-(size_t o)
+		{
+			return BufferHandle(*this) -= o;
+		}
+		// bool conversion
+		operator bool() const
+		{
+			return id != 0;
+		}
+	};
+
 	enum class BufferType
 	{
 		ShaderStorage = 0x90D2

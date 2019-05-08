@@ -15,7 +15,7 @@ template <typename T>
 class unique_device_ptr<Device::OPENGL, T> {
 public:
 	unique_device_ptr() = default;
-	unique_device_ptr(gl::Handle handle, Deleter<Device::OPENGL> deleter) :
+	unique_device_ptr(gl::BufferHandle<T> handle, Deleter<Device::OPENGL> deleter) :
 		m_handle(handle), 
 		m_deleter(deleter)
 	{}
@@ -25,7 +25,7 @@ public:
 		m_handle(o.m_handle),
 		m_deleter(o.m_deleter)
 	{
-		o.m_handle = 0;
+		o.m_handle = {0, 0};
 	}
 	unique_device_ptr<Device::OPENGL, T>& operator=(unique_device_ptr<Device::OPENGL, T>&& o) noexcept {
 		std::swap(m_handle, o.m_handle);
@@ -36,9 +36,12 @@ public:
 		unique_device_ptr()
 	{}
 	~unique_device_ptr() {
-		m_deleter.operator()<T>(m_handle);
+		m_deleter.operator()(m_handle);
 	}
-	gl::Handle get() const {
+	gl::BufferHandle<T> get() const {
+		return m_handle;
+	}
+	gl::BufferHandle<T> get() {
 		return m_handle;
 	}
 	bool empty() const noexcept {
@@ -51,7 +54,7 @@ public:
 		return !empty();
 	}
 private:
-	gl::Handle m_handle = 0;
+	gl::BufferHandle<T> m_handle = {0, 0};
 	Deleter<Device::OPENGL> m_deleter;
 };
 

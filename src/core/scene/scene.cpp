@@ -66,14 +66,14 @@ void Scene::load_materials() {
 	// Allocate the memory
 	m_materials.resize(offset);
 	auto mem = m_materials.acquire<dev>();
-	copy(mem, as<char>(offsets.data()), 0, sizeof(int) * m_scenario.get_num_material_slots());
+	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
 		ConstMaterialHandle mat = m_scenario.get_assigned_material(i);
 		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_DESCRIPTOR_SIZE());
 		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
-		copy(mem, buffer, offsets[i], size);
+		copy(mem + offsets[i], buffer, size);
 	}
 	m_materials.mark_synced(dev); // Avoid overwrites with data from different devices.
 }
@@ -177,23 +177,23 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		// Allocate the device memory and copy over the descriptors
 		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
 		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
-		copy(lodDevDesc.get(), lodDescs.data(), 0, lodDescs.size() * sizeof(LodDescriptor<dev>));
+		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
 		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
-		copy(instTransformsDesc.get(), instanceTransformations.data(), 0, sizeof(ei::Mat3x4) * instanceTransformations.size());
+		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
 		auto& invInstTransformsDesc = m_invInstTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 		invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(invInstanceTransformations.size());
-		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), 0, sizeof(ei::Mat3x4) * invInstanceTransformations.size());
+		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), sizeof(ei::Mat3x4) * invInstanceTransformations.size());
 
 		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
 		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
-		copy(instLodIndicesDesc.get(), lodIndices.data(), 0, sizeof(u32) * lodIndices.size());
+		copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
-		copy(lodAabbsDesc.get(), lodAabbs.data(), 0, sizeof(ei::Box) * lodAabbs.size());
+		copy(lodAabbsDesc.get(), lodAabbs.data(), sizeof(ei::Box) * lodAabbs.size());
 
 		sceneDescriptor.numLods = static_cast<u32>(lodDescs.size());
 		sceneDescriptor.numInstances = static_cast<i32>(instanceCount);
@@ -234,7 +234,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		// Allocate the device memory and copy over the descriptors
 		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
 		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
-		copy(lodDevDesc.get(), lodDescs.data(), 0, lodDescs.size() * sizeof(LodDescriptor<dev>));
+		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
 		sceneDescriptor.lods = lodDevDesc.get();
 	}

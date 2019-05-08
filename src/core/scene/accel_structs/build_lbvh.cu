@@ -594,7 +594,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	unique_device_ptr<DescType::DEVICE, DescType> deviceDesc;
 	if(DescType::DEVICE != Device::CPU) {
 		deviceDesc = make_udevptr<DescType::DEVICE, DescType>();
-		copy(deviceDesc.get(), &desc, 0, sizeof(DescType));
+		copy(deviceDesc.get(), &desc, sizeof(DescType));
 	}
 
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
@@ -726,7 +726,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	i32 numRemovedInternalNodes;
 	if (DescType::DEVICE == Device::CUDA) {
 		CuLib::DeviceInclusiveSum(numInternalNodes, collapseOffsets.get(), collapseOffsets.get());
-		copy(&numRemovedInternalNodes, collapseOffsets.get() + numInternalNodes - 1, 0, sizeof(i32));
+		copy(&numRemovedInternalNodes, collapseOffsets.get() + numInternalNodes - 1, sizeof(i32));
 		numRemovedInternalNodes = numInternalNodes - numRemovedInternalNodes;
 	} else {
 		// Scan to get values for offsets.

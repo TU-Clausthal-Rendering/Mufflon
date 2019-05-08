@@ -59,7 +59,7 @@ Polygons::Polygons(const Polygons& poly) :
 			idxBuffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
 		} else {
 			idxBuffer.indices = Allocator<ChangedBuffer::DEVICE>::template alloc_array<u32>(buffer.reserved);
-			copy<u32>(idxBuffer.indices, buffer.indices, 0, sizeof(u32) * buffer.reserved);
+			copy(idxBuffer.indices, buffer.indices, sizeof(u32) * buffer.reserved);
 		}
 	});
 	poly.m_attribBuffer.for_each([&](auto& buffer) {
@@ -71,13 +71,13 @@ Polygons::Polygons(const Polygons& poly) :
 			attribBuffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
 		} else {
 			attribBuffer.vertex = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.vertSize);
-			copy<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(attribBuffer.vertex, buffer.vertex, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
+			copy(attribBuffer.vertex, buffer.vertex, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
 		}
 		if(buffer.faceSize == 0u || buffer.face == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
 			attribBuffer.face = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
 		} else {
 			attribBuffer.face = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.faceSize);
-			copy<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(attribBuffer.face, buffer.face, 0, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
+			copy(attribBuffer.face, buffer.face, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
 		}
 	});
 }
@@ -558,14 +558,14 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 			buffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize, faceAttribs.size());
 	}
 
-	std::vector<void*> cpuVertexAttribs(vertexAttribs.size());
-	std::vector<void*> cpuFaceAttribs(faceAttribs.size());
+	std::vector<ArrayDevHandle_t<dev, void>> cpuVertexAttribs(vertexAttribs.size());
+	std::vector<ArrayDevHandle_t<dev, void>> cpuFaceAttribs(faceAttribs.size());
 	for(const char* name : vertexAttribs)
-		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<Device::CPU, void>(name));
+		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
 	for(const char* name : faceAttribs)
-		cpuFaceAttribs.push_back(m_faceAttributes.acquire<Device::CPU, void>(name));
-	copy<void*>(buffer.vertex, cpuVertexAttribs.data(), 0, sizeof(void*) * vertexAttribs.size());
-	copy<void*>(buffer.face, cpuFaceAttribs.data(), 0, sizeof(void*) *faceAttribs.size());
+		cpuFaceAttribs.push_back(m_faceAttributes.acquire<dev, void>(name));
+	copy(buffer.vertex, cpuVertexAttribs.data(), sizeof(void*) * vertexAttribs.size());
+	copy(buffer.face, cpuFaceAttribs.data(), sizeof(void*) *faceAttribs.size());
 
 	descriptor.numVertexAttributes = static_cast<u32>(vertexAttribs.size());
 	descriptor.numFaceAttributes = static_cast<u32>(faceAttribs.size());
@@ -601,7 +601,7 @@ void Polygons::synchronize_index_buffer() {
 				this->reserve_index_buffer<sync>(3u * m_triangles + 4u * m_quads);
 
 			if(changedBuffer.reserved != 0u)
-				copy(syncBuffer.indices, changedBuffer.indices, 0, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
+				copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
 			m_indexFlags.mark_synced(sync);
 		}
 	}

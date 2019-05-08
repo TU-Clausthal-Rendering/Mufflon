@@ -115,8 +115,8 @@ struct ArrayDevHandle<Device::CUDA, T> : public DeviceHandle<Device::CUDA> {
 
 template < class T >
 struct ArrayDevHandle<Device::OPENGL, T> : public DeviceHandle<Device::OPENGL> {
-	using HandleType = gl::Handle;
-	using ConstHandleType = gl::Handle;
+	using HandleType = gl::BufferHandle<T>;
+	using ConstHandleType = gl::BufferHandle<T>;
 	using Type = T;
 };
 

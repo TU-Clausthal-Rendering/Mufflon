@@ -195,7 +195,7 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 		std::vector<void*> cpuAttribs(attribs.size());
 		for(const char* name : attribs)
 			cpuAttribs.push_back(m_attributes.acquire<Device::CPU, char>(name));
-		copy(attribBuffer.buffer, cpuAttribs.data(), 0, sizeof(const char*) * attribs.size());
+		copy<void>(attribBuffer.buffer, cpuAttribs.data(), sizeof(const char*) * attribs.size());
 	} else if(attribBuffer.size != 0) {
 		attribBuffer.buffer = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size);
 	}
