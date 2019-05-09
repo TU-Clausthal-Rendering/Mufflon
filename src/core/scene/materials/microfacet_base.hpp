@@ -101,7 +101,9 @@ CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity_reflection(float Gi, fl
 
 // Get a normal of the cavity proportional to their visibility.
 // Also returns iDotH for the new half vector.
-CUDA_FUNCTION __forceinline__ struct { Direction halfTS; float cosI; }
+struct VCavitySampleResult { Direction halfTS; float cosI; };
+
+CUDA_FUNCTION __forceinline__ VCavitySampleResult
 sample_visible_normal_vcavity(const Direction& incidentTS, const Direction& cavityTS, u64& rndChoice) {
 	// Transform to tangent space and produce V-cavity adjoint normal.
 	// See "Importance Sampling Microfacet-Based BSDFs using the Distribution of Visible Normals".

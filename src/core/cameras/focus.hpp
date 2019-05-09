@@ -113,7 +113,6 @@ focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 	// Go to world space
 	const ei::Vec3 xAxis = ei::cross(params.viewDir, params.up);
 	const ei::Vec3 yAxis = ei::cross(params.viewDir, xAxis);
-	const ei::Vec3 pixelPos = params.position + nPos.x * xAxis + nPos.y * yAxis;
 
 	// Compute the point where the ray shoots towards
 	// For this, we use the lens formula G = (g/f - 1) * B,

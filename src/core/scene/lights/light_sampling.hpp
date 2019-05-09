@@ -229,7 +229,8 @@ CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const DirectionalLight& l
 
 // *** ENVMAP ***
 // Samples a direction and evaluates the envmap's radiance in that direction
-CUDA_FUNCTION struct { math::DirectionSample dir; Spectrum radiance; }
+struct LightDirSampleResult{ math::DirectionSample dir; Spectrum radiance; };
+CUDA_FUNCTION LightDirSampleResult
 sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 				 const float u0, const float u1) {
 	if(light.type == BackgroundType::COLORED) return {};

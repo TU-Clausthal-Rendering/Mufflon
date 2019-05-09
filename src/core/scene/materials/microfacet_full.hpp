@@ -65,6 +65,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		excidentTS = ei::sgn(h.cosI) * (eta * iDotHabs - eDotHabs) * h.halfTS - eta * incidentTS;
 
 		Direction htest = boundary.get_halfTS(incidentTS, excidentTS);
+		(void)htest;
 		mAssert(ei::approx(htest, h.halfTS));
 	}
 	mAssert(ei::approx(dot(excidentTS, h.halfTS), eDotH));

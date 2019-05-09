@@ -103,7 +103,8 @@ int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, const Neb
 	return ei::ceil(maxFlux / (smoothness * params.targetFlux));
 }
 
-struct { float toFlux; int photonCount; }
+struct PhotonConversionFactors { float toFlux; int photonCount; };
+PhotonConversionFactors
 get_photon_conversion_factors(const NebPathVertex& vertex,
 							  const NebVertexExt& ext, const NebParameters& params) {
 	float toFlux = ei::abs(vertex.get_geometric_factor(ext.neeDirection)) / ext.density;

@@ -199,7 +199,8 @@ public:
 
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
-	CUDA_FUNCTION struct { AreaPdf pdf; float geoFactor; }
+	struct PdfConversionResult{ AreaPdf pdf; float geoFactor; };
+	CUDA_FUNCTION PdfConversionResult
 	convert_pdf(Interaction sourceType, AngularPdf samplePdf,
 				const ConnectionDir& connection) const {
 		if(sourceType == Interaction::VIRTUAL)

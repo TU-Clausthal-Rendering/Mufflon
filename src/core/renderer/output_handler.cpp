@@ -169,7 +169,6 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
 
 	const int PIXELS = m_width * m_height;
-#pragma PARALLEL_FOR
 	for(int i = 0; i < PIXELS; ++i) {
 		const Pixel pixel{ i % m_width, i / m_width };
 		ei::Vec4 value = read(tex, pixel);
