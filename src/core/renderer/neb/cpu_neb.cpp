@@ -522,8 +522,9 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float neeMergeArea, float p
 		AngularPdf pdfBack = emission.samplePdf;
 		ConnectionDir connection { emission.incident, emission.incidentDistSq };
 		for(int i = n-1; i > 0; --i) {
+			Interaction itype = connection.distanceSq == 0.0f ? Interaction::LIGHT_ENVMAP : Interaction::SURFACE;
 			incidentF[i] = vert->ext().incidentPdf;
-			incidentB[i] = vert->convert_pdf(Interaction::SURFACE, pdfBack, connection).pdf;
+			incidentB[i] = vert->convert_pdf(itype, pdfBack, connection).pdf;
 			pdfBack = vert->ext().pdfBack;
 			connection = ConnectionDir{ vert->get_incident_direction(), ei::sq(vert->ext().incidentDist) };
 			vert = vert->previous();
