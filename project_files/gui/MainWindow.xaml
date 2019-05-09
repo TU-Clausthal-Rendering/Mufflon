@@ -53,6 +53,41 @@
                                         Value="{Binding Path=Path}"/>
                                 <Setter Property="IsCheckable"
                                         Value="False"/>
+                                <Setter Property="ContextMenu">
+                                    <Setter.Value>
+                                        <ContextMenu>
+                                            <MenuItem Command="{Binding Path=DeleteCommand}">
+                                                <MenuItem.Header>
+                                                    <TextBlock>
+                                                        <Underline>D</Underline>elete
+                                                    </TextBlock>
+                                                </MenuItem.Header>
+                                            </MenuItem>
+                                            <MenuItem Command="{Binding Path=OpenFileCommand}">
+                                                <MenuItem.Header>
+                                                    <TextBlock>
+                                                        Open <Underline>f</Underline>ile
+                                                    </TextBlock>
+                                                </MenuItem.Header>
+                                            </MenuItem>
+                                            <MenuItem Command="{Binding Path=OpenFileLocationCommand}">
+                                                <MenuItem.Header>
+                                                    <TextBlock>
+                                                        Open file <Underline>l</Underline>ocation
+                                                    </TextBlock>
+                                                </MenuItem.Header>
+                                            </MenuItem>
+                                            <ContextMenu.InputBindings>
+                                                <KeyBinding Key="D"
+                                                            Command="{Binding Path=DeleteCommand}"/>
+                                                <KeyBinding Key="F"
+                                                            Command="{Binding Path=OpenFileCommand}"/>
+                                                <KeyBinding Key="L"
+                                                            Command="{Binding Path=OpenFileLocationCommand}"/>
+                                            </ContextMenu.InputBindings>
+                                        </ContextMenu>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                         </MenuItem.ItemContainerStyle>
                     </MenuItem>

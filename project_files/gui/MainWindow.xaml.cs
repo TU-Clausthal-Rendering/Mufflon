@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Windows;
 using gui.Model;
 using gui.ViewModel;
@@ -15,6 +16,7 @@ namespace gui
 
         public MainWindow()
         {
+            ViewModels.NotInDesignMode = !DesignerProperties.GetIsInDesignMode(this);
             InitializeComponent();
 
             m_models = new Models(this);

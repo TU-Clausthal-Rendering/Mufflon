@@ -45,11 +45,46 @@ namespace gui.ViewModel
             public string Filename { get; set; }
             public string Path { get; set; }
             public ICommand Command { get; }
+            public ICommand DeleteCommand { get; }
+            public ICommand OpenFileCommand { get; }
+            public ICommand OpenFileLocationCommand { get; }
 
             public SceneMenuItem(Models models) : base(models)
             {
                 m_models = models;
                 Command = this;
+                DeleteCommand = new ActionCommand(new Action(() => {
+                    int index = m_models.Settings.LastWorlds.IndexOf(Path);
+                    if (index >= 0)
+                        m_models.Settings.LastWorlds.RemoveAt(index);
+                }));
+                OpenFileCommand = new ActionCommand(new Action(() => {
+                    if(!File.Exists(Path)) {
+                        if (MessageBox.Show("World file does not exist anymore; should it " +
+                                            "be removed from the list of recent scenes?", "Unable to open scene file", MessageBoxButton.YesNo,
+                                MessageBoxImage.Error) == MessageBoxResult.Yes) {
+                            int index = m_models.Settings.LastWorlds.IndexOf(Path);
+                            if (index >= 0)
+                                m_models.Settings.LastWorlds.RemoveAt(index);
+                        }
+                    } else {
+                        Process.Start(Path);
+                    }
+                }));
+                OpenFileLocationCommand = new ActionCommand(new Action(() => {
+                    var dir = System.IO.Path.GetDirectoryName(Path);
+                    if (!Directory.Exists(dir)) {
+                        if (MessageBox.Show("World file directory does not exist anymore; should it " +
+                                            "be removed from the list of recent scenes?", "Unable to open scene file", MessageBoxButton.YesNo,
+                                MessageBoxImage.Error) == MessageBoxResult.Yes) {
+                            int index = m_models.Settings.LastWorlds.IndexOf(Path);
+                            if (index >= 0)
+                                m_models.Settings.LastWorlds.RemoveAt(index);
+                        }
+                    } else {
+                        Process.Start(dir);
+                    }
+                }));
             }
 
             public override void Execute(object parameter) => m_models.LoadSceneAsynch(Path);
