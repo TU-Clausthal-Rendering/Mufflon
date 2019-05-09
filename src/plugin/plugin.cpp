@@ -68,9 +68,9 @@ bool Plugin::has_function(StringView name) const {
 
 void* Plugin::load_procedure(const char* name) const {
 #ifdef _WIN32
-	return ::GetProcAddress(static_cast<HandleType>(m_handle), name);
+	return reinterpret_cast<void*>(::GetProcAddress(static_cast<HandleType>(m_handle), name));
 #else // _WIN32
-	return ::dlsym(static_cast<HandleType>(m_handle), name);
+	return reinterpret_cast<void*>(::dlsym(static_cast<HandleType>(m_handle), name));
 #endif // _WIN32
 }
 

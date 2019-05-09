@@ -149,7 +149,7 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 	// Is the current flag, and in case of variance its basic value, set?
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
 		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return std::move(CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb});
+		return CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb};
 	}
 
 	// Allocate the memory for the output and get basic properties of the quantity to export.
@@ -177,7 +177,7 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 		data.write(value, pixel);
 	}
 
-	return std::move(data);
+	return data;
 }
 
 void OutputHandler::get_data_rgb(OutputValue which, unsigned char* rgbBuffer, bool exportSRgb,
@@ -186,10 +186,6 @@ void OutputHandler::get_data_rgb(OutputValue which, unsigned char* rgbBuffer, bo
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
 		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
 		return;
-	}
-
-	if(m_iteration == 0) {
-		const int v = 0;
 	}
 
 	// Allocate the memory for the output and get basic properties of the quantity to export.

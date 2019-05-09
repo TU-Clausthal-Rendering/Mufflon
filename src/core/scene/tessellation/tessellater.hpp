@@ -34,10 +34,10 @@ protected:
 	};
 
 	// Get the outer tessellation level (ie. the number of new vertices) for the given edge of the given face
-	virtual u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const = 0u;
+	virtual u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const = 0;
 
 	// Get the inner tessellation level (ie. the number of new vertices) for the given face
-	virtual u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0u;
+	virtual u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0;
 
 	// Set the vertex properties (position, normals etc.) for the newly created outer vertex.
 	// The coordinate x is the linear coordinate between the two edge vertices

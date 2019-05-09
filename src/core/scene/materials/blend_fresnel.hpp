@@ -148,7 +148,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleBlendFresnel<LayerASample, LayerBSamp
 	return ei::max(pdf_max(params.a), pdf_max(params.b));
 }
 
-template MaterialSampleConcept<MatSampleBlendFresnel<MatSampleLambert, MatSampleLambert>>;
-template MaterialConcept<MatBlendFresnel<MatLambert, MatLambert>>;
+template class MaterialSampleConcept<MatSampleBlendFresnel<MatSampleLambert, MatSampleLambert>>;
+template class MaterialConcept<MatBlendFresnel<MatLambert, MatLambert>>;
 
 }}} // namespace mufflon::scene::materials

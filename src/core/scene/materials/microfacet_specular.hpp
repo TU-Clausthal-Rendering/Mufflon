@@ -100,7 +100,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
 	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
 }
 
-template MaterialSampleConcept<MatSampleTorrance>;
-template MaterialConcept<MatTorrance>;
+template class MaterialSampleConcept<MatSampleTorrance>;
+template class MaterialConcept<MatTorrance>;
 
 }}} // namespace mufflon::scene::materials

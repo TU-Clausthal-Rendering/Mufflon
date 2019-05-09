@@ -717,7 +717,6 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHd
 	}
 
 	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrReader](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
 		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl,
 										 PolyVHdl{ static_cast<int>(startVertex) },
@@ -759,7 +758,6 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl*
 	}
 
 	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrReader](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
 		FaceAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
 																 count, *attrReader);
@@ -1011,7 +1009,6 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 	}
 
 	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrReader](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Spheres>().add_bulk(hdl,
 																SphereVHdl{ static_cast<size_t>(startSphere) },
@@ -1203,7 +1200,7 @@ InstanceHdl world_create_instance(const char* name, ObjectHdl obj, const uint32_
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(move(std::string(name)), hdl, animationFrame));
+	return static_cast<InstanceHdl>(s_world.create_instance(std::string(name), hdl, animationFrame));
 	CATCH_ALL(nullptr)
 }
 
@@ -1403,7 +1400,7 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 	if(mat->alpha != nullptr)
 		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
 
-	return move(newMaterial);
+	return newMaterial;
 }
 
 // Callback function for OpenGL debug context
@@ -1589,6 +1586,9 @@ LightHdl world_add_light(const char* name, LightType type, const uint32_t count)
 		case LIGHT_ENVMAP: {
 			hdl = s_world.add_light(name, TextureHandle{});
 		} break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown light type");
+			return LightHdl{ 7, 0 };
 	}
 	if(!hdl.has_value()) {
 		logError("[", FUNCTION_NAME, "] Error adding a light");
@@ -1725,7 +1725,7 @@ Boolean world_is_sane(const char** msg) {
 
 TextureHdl world_get_texture(const char* path) {
 	TRY
-	CHECK_NULLPTR(path, "texture path", false);
+	CHECK_NULLPTR(path, "texture path", nullptr);
 	auto hdl = s_world.find_texture(path);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find texture ",
@@ -2353,7 +2353,7 @@ Boolean scenario_has_envmap_light(ScenarioHdl scenario) {
 }
 
 LightHdl scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightType type) {
-	const LightHdl invalid{ LightType::LIGHT_COUNT, std::numeric_limits<u32>::max() };
+	const LightHdl invalid{ LightType::LIGHT_COUNT, 0x1FFFFFFF };
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", invalid);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);

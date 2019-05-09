@@ -130,8 +130,6 @@ class LightTreeBuilder {
 public:
 	LightTreeBuilder();
 	~LightTreeBuilder();
-	LightTreeBuilder(LightTreeBuilder&&) = default;
-	LightTreeBuilder& operator=(LightTreeBuilder&&) = default;
 
 	// Builds the light tree from lists of positional and directional lights and
 	// resets the envmap light to black

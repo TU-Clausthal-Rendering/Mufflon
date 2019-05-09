@@ -28,7 +28,7 @@ MaterialPropertyFlags Material<M>::get_properties() const noexcept {
 
 template<Materials M>
 std::size_t Material<M>::get_parameter_pack_size() const {
-	return sizeof(MaterialDescriptorBase) + sizeof(SubMaterial::SampleType);
+	return sizeof(MaterialDescriptorBase) + sizeof(typename SubMaterial::SampleType);
 }
 
 template<Materials M>
@@ -42,10 +42,10 @@ char* Material<M>::get_descriptor(Device device, char* outBuffer) const {
 	device_switch(device,
 		textures::ConstTextureDevHandle_t<dev>* tex = as<textures::ConstTextureDevHandle_t<dev>>(desc + 1);
 		for(int i = 0; i < int(SubMaterial::TEX_COUNT); ++i)
-			tex[i] = m_textures[i]->acquire_const<dev>();
+			tex[i] = m_textures[i]->template acquire_const<dev>();
 		char* subParams = as<char>(desc + 1) + sizeof(textures::ConstTextureDevHandle_t<dev>) * int(SubMaterial::TEX_COUNT);
-		*as<SubMaterial::NonTexParams>(subParams) = m_material.nonTexParams;
-		return subParams + (std::is_empty<SubMaterial::NonTexParams>::value ? 0 : sizeof(SubMaterial::NonTexParams));
+		*as<typename SubMaterial::NonTexParams>(subParams) = m_material.nonTexParams;
+		return subParams + (std::is_empty<typename SubMaterial::NonTexParams>::value ? 0 : sizeof(typename SubMaterial::NonTexParams));
 	);
 	return as<char>(desc + 1);
 }
@@ -85,6 +85,8 @@ Medium MatBlendFresnel<LayerA, LayerB>::compute_medium() const {
 
 
 // Automatic instanciation of all defined materials
+// Notice: this only works for MSVC (for e.g. clang-cl, they need to be explicitly instantiated;
+// if necessary, update the list below)
 template<Materials M>
 constexpr void instanciate_materials() {
 	constexpr Materials PREV_MAT = Materials(int(M)-1);
@@ -104,6 +106,16 @@ template<>
 constexpr void instanciate_materials<Materials(0)>() {}
 template void instanciate_materials<Materials::NUM>();
 
-//template Material<Materials::LAMBERT>;
+/*template class Material<Materials::EMISSIVE>;
+template class Material<Materials::LAMBERT>;
+template class Material<Materials::ORENNAYAR>;
+template class Material<Materials::TORRANCE>;
+template class Material<Materials::WALTER>;
+template class Material<Materials::LAMBERT_EMISSIVE>;
+template class Material<Materials::TORRANCE_LAMBERT>;
+template class Material<Materials::FRESNEL_TORRANCE_LAMBERT>;
+template class Material<Materials::WALTER_TORRANCE>;
+template class Material<Materials::FRESNEL_TORRANCE_WALTER>;
+template class Material<Materials::MICROFACET>;*/
 
 } // namespace mufflon::scene::materials

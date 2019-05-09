@@ -41,14 +41,13 @@ struct CameraParams {
  */
 class Camera {
 public:
-	Camera() = default;
 	Camera(CameraModel model, const ei::Vec3* position, const ei::Vec3* dir, const ei::Vec3* up,
 		   const u32 pathCount, float near = 1e-4f, float far = 1e10f) :
-		m_pathSegments(pathCount),
 		m_position(position, position + pathCount),
 		m_near(near),
 		m_far(far),
-		m_model(model)
+		m_model(model),
+		m_pathSegments(pathCount)
 	{
 		mAssert(near > 0.0f);
 		mAssert(far > near);

@@ -109,7 +109,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleBlend<LayerASample, LayerBSample>& pa
 	return ei::max(pdf_max(params.a), pdf_max(params.b));
 }
 
-template MaterialSampleConcept<MatSampleBlend<MatSampleLambert, MatSampleLambert>>;
-template MaterialConcept<MatBlend<MatLambert, MatLambert>>;
+template class MaterialSampleConcept<MatSampleBlend<MatSampleLambert, MatSampleLambert>>;
+template class MaterialConcept<MatBlend<MatLambert, MatLambert>>;
 
 }}} // namespace mufflon::scene::materials

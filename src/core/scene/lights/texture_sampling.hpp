@@ -107,7 +107,7 @@ inline std::unique_ptr<textures::Texture> create_summed_area_table(TextureHandle
 			textures::write(sumTex, Pixel{ width - 1, y }, ei::Vec4{ accumLumY, 0.f, 0.f, 0.f });
 		}
 	}
-	return std::move(res);
+	return res;
 }
 #endif // __CUDACC__
 

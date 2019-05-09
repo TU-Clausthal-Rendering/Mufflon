@@ -58,7 +58,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleLambert& params) {
 	return 1.0f / ei::PI;
 }
 
-template MaterialSampleConcept<MatSampleLambert>;
-template MaterialConcept<MatLambert>;
+template class MaterialSampleConcept<MatSampleLambert>;
+template class MaterialConcept<MatLambert>;
 
 }}} // namespace mufflon::scene::materials

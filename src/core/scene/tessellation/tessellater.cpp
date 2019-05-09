@@ -416,11 +416,6 @@ void Tessellater::tessellate_inner_quads(const u32 innerLevel, const OpenMesh::F
 			const OpenMesh::VertexHandle& v2 = m_innerVertices[(y + 1u) * innerLevel + x + 1u];
 			const OpenMesh::VertexHandle& v3 = m_innerVertices[(y + 1u) * innerLevel + x];
 
-			const ei::Vec3 p0 = util::pun<ei::Vec3>(m_mesh->point(v0));
-			const ei::Vec3 p1 = util::pun<ei::Vec3>(m_mesh->point(v1));
-			const ei::Vec3 p2 = util::pun<ei::Vec3>(m_mesh->point(v2));
-			const ei::Vec3 p3 = util::pun<ei::Vec3>(m_mesh->point(v3));
-
 			const OpenMesh::FaceHandle newFace = m_mesh->add_face(v0, v1, v2, v3);
 			this->set_quad_face_inner(original, newFace);
 		}
@@ -476,8 +471,8 @@ void Tessellater::spawn_inner_triangle_vertices(const u32 innerLevel,
 														const OpenMesh::FaceHandle face,
 														const OpenMesh::VertexHandle(&vertices)[4u]) {
 	for(u32 y = 0u; y < innerLevel; ++y) {
-		const float edgeBaryZ = (y + 1u) / static_cast<float>(innerLevel + 1u);
-		const float edgeBaryX = 1.f - edgeBaryZ;
+		//const float edgeBaryZ = (y + 1u) / static_cast<float>(innerLevel + 1u);
+		//const float edgeBaryX = 1.f - edgeBaryZ;
 		const float bZ = (y + 1u) / static_cast<float>(innerLevel + 2u);
 		for(u32 x = 0u; x < innerLevel - y; ++x) {
 			const OpenMesh::VertexHandle newVertex = m_mesh->add_vertex(OpenMesh::Vec3f{});
@@ -486,8 +481,8 @@ void Tessellater::spawn_inner_triangle_vertices(const u32 innerLevel,
 			m_innerVertices.push_back(newVertex);
 			const float bX = ((innerLevel - y) - x) / static_cast<float>(innerLevel + 2u);
 
-			const float baryX = edgeBaryX - edgeBaryX * (x + 1u) / static_cast<float>(innerLevel - y + 1u);
-			const float baryY = 1.f - edgeBaryZ - baryX;
+			//const float baryX = edgeBaryX - edgeBaryX * (x + 1u) / static_cast<float>(innerLevel - y + 1u);
+			//const float baryY = 1.f - edgeBaryZ - baryX;
 			this->set_triangle_inner_vertex(bX, 1.f - bZ - bX, newVertex, face, vertices);
 		}
 	}

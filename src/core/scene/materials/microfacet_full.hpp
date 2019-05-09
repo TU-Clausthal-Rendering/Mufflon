@@ -163,7 +163,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleMicrofacet& params) {
 	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
 }
 
-template MaterialSampleConcept<MatSampleMicrofacet>;
-template MaterialConcept<MatMicrofacet>;
+template class MaterialSampleConcept<MatSampleMicrofacet>;
+template class MaterialConcept<MatMicrofacet>;
 
 }}} // namespace mufflon::scene::materials

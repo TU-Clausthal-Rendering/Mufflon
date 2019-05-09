@@ -65,6 +65,7 @@ void Texture::synchronize() {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
 				//case Device::OPENGL: create_texture_opengl(); break;
+				default: mAssert(false);
 			}
 		}
 		// Copy the memory (wherever it changed)
@@ -92,6 +93,7 @@ void Texture::synchronize() {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
 				//case Device::OPENGL: create_texture_opengl(); break;
+				default: mAssert(false);
 			}
 		}
 	}

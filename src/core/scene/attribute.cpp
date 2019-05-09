@@ -364,7 +364,7 @@ void AttributePool::synchronize() {
 	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
 	bool hadNoMemory = !syncPool;
 	if(hadNoMemory)
-		syncPool = Allocator<dev>::alloc_array<char>(m_poolSize);
+		syncPool = Allocator<dev>::template alloc_array<char>(m_poolSize);
 
 	if(!m_dirty.has_changes())
 		return;

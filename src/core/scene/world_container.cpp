@@ -539,12 +539,14 @@ void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 				   != m_scenario->get_dir_lights().cend())
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
-			case lights::LightType::ENVMAP_LIGHT:
+			case lights::LightType::ENVMAP_LIGHT: {
 				// Check if the envmap is the current one
 				const lights::Background& background = m_envLights.get(m_scenario->get_background());
 				if(&background == &m_envLights.get(index))
 					m_envLightDirty = true;
-				break;
+			}	break;
+			default:
+				logWarning("[WorldContainer::mark_light_dirty]: Ignoring unknown light type");
 		}
 	}
 }
@@ -599,7 +601,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
 	m_scenario = &scenario;
 	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart);
-	u32 instIdx = 0;
 	// TODO: unload LoDs that are not needed anymore?
 
 	auto addObjAndInstance = [this, &scenario](Instance& inst) {

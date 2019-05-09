@@ -16,7 +16,6 @@ namespace cameras {
  */
 class Focus : public Camera {
 public:
-	Focus() = default;
 	Focus(const ei::Vec3* position, const ei::Vec3* dir, const ei::Vec3* up,
 		  const u32 pathCount, float focalLength, float focusDist, float lensRad,
 		  float sensorHeight, float near = 1e-4f,

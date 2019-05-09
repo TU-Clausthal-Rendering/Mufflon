@@ -382,7 +382,7 @@ constexpr std::size_t get_material_descriptor_size() {
 // Get the full param size of a material
 template < Materials M >
 constexpr std::size_t get_material_param_size() {
-	return sizeof(MaterialDescriptorBase) + sizeof(mat_type<M>::SampleType);
+	return sizeof(MaterialDescriptorBase) + sizeof(typename mat_type<M>::SampleType);
 }
 
 

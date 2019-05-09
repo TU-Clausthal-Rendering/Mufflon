@@ -368,17 +368,17 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
 		for(const PositionalLights& light : posLights) {
 			std::visit(overloaded{
-				[&mem,this](const AreaLightTriangleDesc& desc) {
+				[&mem](const AreaLightTriangleDesc& desc) {
 					auto* dst = as<AreaLightTriangle<Device::CPU>>(mem);
 					mem += sizeof(*dst);
 					*dst = desc;
 				},
-				[&mem,this](const AreaLightQuadDesc& desc) {
+				[&mem](const AreaLightQuadDesc& desc) {
 					auto* dst = as<AreaLightQuad<Device::CPU>>(mem);
 					mem += sizeof(*dst);
 					*dst = desc;
 				},
-				[&mem,this](const AreaLightSphereDesc& desc) {
+				[&mem](const AreaLightSphereDesc& desc) {
 					auto* dst = as<AreaLightSphere<Device::CPU>>(mem);
 					mem += sizeof(*dst);
 					*dst = desc;
@@ -498,7 +498,7 @@ void LightTreeBuilder::update_media(const SceneDescriptor<dev>& scene) {
 	else if constexpr(dev == Device::CUDA)
 		update_media_cuda(scene, m_treeCuda->posLights);
 	else
-		default: mAssert(false); return;
+		mAssert(false);
 }
 
 template < Device dev >

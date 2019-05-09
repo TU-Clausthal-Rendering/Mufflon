@@ -32,9 +32,9 @@ public:
 		m_animationPathIndex(animationPathIndex)
 	{}
 	Scene(const Scene&) = delete;
-	Scene(Scene&&) = default;
+	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;
-	Scene& operator=(Scene&&) = default;
+	Scene& operator=(Scene&&) = delete;
 	~Scene() = default;
 
 	// Add an instance to be rendered
