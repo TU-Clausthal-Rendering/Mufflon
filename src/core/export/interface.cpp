@@ -336,9 +336,9 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	CATCH_ALL(false)
 }
 
-Boolean core_copy_screen_texture_rgba32(float* ptr, const float gammaFactor) {
+Boolean core_copy_screen_texture_rgba32(float* ptr) {
 	TRY
-		CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	std::scoped_lock lock{ s_screenTextureMutex };
 	if(ptr != nullptr && s_screenTexture != nullptr) {
 		const int PIXELS = s_screenTexture->get_width() * s_screenTexture->get_height();
