@@ -8,6 +8,7 @@
 #include "util/assert.hpp"
 #include "microfacet_base.hpp"
 #include "lambert.hpp"
+#include "oren_nayar.hpp"
 #include "emissive.hpp"
 #include "blend.hpp"
 #include "blend_fresnel.hpp"

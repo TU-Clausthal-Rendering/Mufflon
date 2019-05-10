@@ -238,6 +238,7 @@
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_full.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_refractive.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_specular.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\oren_nayar.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\point_medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />

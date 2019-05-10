@@ -85,6 +85,40 @@ struct MatLambert {
 };
 
 // ************************************************************************* //
+// OREN-NAYAR																 //
+// ************************************************************************* //
+// Sample of Oren-Nayar diffuse material
+struct MatSampleOrenNayar {
+	Spectrum albedo;
+	float a, b;
+};
+
+// Management layer of the Oren-Nayar material
+struct MatOrenNayar {
+	static constexpr MaterialPropertyFlags PROPERTIES =
+		MaterialPropertyFlags::REFLECTIVE;
+
+	enum Textures {
+		ALBEDO,
+		TEX_COUNT
+	};
+
+	using SampleType = MatSampleOrenNayar;
+
+	MatOrenNayar(TextureHandle* texTable, int texOffset, TextureHandle albedo, float roughness) {
+		texTable[ALBEDO+texOffset] = albedo;
+		float ssq = roughness * roughness;
+		nonTexParams.a = 1.0f - ssq / (2*ssq + 0.66f);
+		nonTexParams.b = 0.45f * ssq / (ssq + 0.09f);
+	}
+
+	struct NonTexParams {
+		float a;
+		float b;
+	} nonTexParams;
+};
+
+// ************************************************************************* //
 // MICROFACET REFLECTION: TORRANCE											 //
 // ************************************************************************* //
 struct MatSampleTorrance {
@@ -358,7 +392,7 @@ private:
 template<Materials M> struct mat_info {};
 template<> struct mat_info<Materials::EMISSIVE> { using type = MatEmissive; };
 template<> struct mat_info<Materials::LAMBERT> { using type = MatLambert; };
-template<> struct mat_info<Materials::ORENNAYAR> { using type = MatLambert; };
+template<> struct mat_info<Materials::ORENNAYAR> { using type = MatOrenNayar; };
 template<> struct mat_info<Materials::TORRANCE> { using type = MatTorrance; };
 template<> struct mat_info<Materials::WALTER> { using type = MatWalter; };
 template<> struct mat_info<Materials::LAMBERT_EMISSIVE> { using type = MatBlend<MatLambert,MatEmissive>; };

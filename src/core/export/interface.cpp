@@ -1294,6 +1294,9 @@ materials::NDF convertNdf(NormalDistFunction ndf) {
 std::tuple<TextureHandle> to_ctor_args(const LambertParams& params) {
 	return {static_cast<TextureHandle>(params.albedo)};
 }
+std::tuple<TextureHandle, float> to_ctor_args(const OrennayarParams& params) {
+	return {static_cast<TextureHandle>(params.albedo), params.roughness};
+}
 std::tuple<TextureHandle, Spectrum> to_ctor_args(const EmissiveParams& params) {
 	return {static_cast<TextureHandle>(params.radiance),
 			util::pun<Spectrum>(params.scale)};
@@ -1339,9 +1342,10 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			auto p = to_ctor_args(mat->inner.emissive);
 			newMaterial = std::make_unique<Material<Materials::EMISSIVE>>( get<0>(p), get<1>(p) );
 		}	break;
-		case MATERIAL_ORENNAYAR:
-			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
-			return nullptr;
+		case MATERIAL_ORENNAYAR: {
+			auto p = to_ctor_args(mat->inner.orennayar);
+			newMaterial = std::make_unique<Material<Materials::ORENNAYAR>>( get<0>(p), get<1>(p) );
+		}	break;
 		case MATERIAL_BLEND: {
 			// Order materials to reduce the number of cases
 			const auto* layerA = &mat->inner.blend.a;
