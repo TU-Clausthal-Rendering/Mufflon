@@ -10,6 +10,7 @@
 #include "material_concepts.hpp"
 #include "microfacet_base.hpp"
 #include "core/scene/handles.hpp"
+#include "core/math/tabulated_function.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -110,12 +111,40 @@ struct MatOrenNayar {
 		float ssq = roughness * roughness;
 		nonTexParams.a = 1.0f - ssq / (2*ssq + 0.66f);
 		nonTexParams.b = 0.45f * ssq / (ssq + 0.09f);
+		// Rescale to decrease energy loss
+		nonTexParams.a /= ALBEDO_AVG(roughness);
+		nonTexParams.b /= ALBEDO_AVG(roughness);
 	}
 
 	struct NonTexParams {
 		float a;
 		float b;
 	} nonTexParams;
+
+	// Lookup tables for energy compensation
+	// Table1: maximum directional albedo.
+	//		Use for a physical plausible model with respect to all directions.
+	static constexpr mufflon::math::TabulatedFunction<33> ALBEDO_MAX { 0.0f, ei::PI/2.0f,
+		{ 1.0f, 1.0075758798f, 1.0151743809f, 1.0063538621f, 0.9828398736f,		  0.9528022529f, 0.9223891535f, 0.8946505486f, 0.8706137643f, 0.8502976999f,		  0.8333128438f, 0.8191573529f, 0.8073450181f, 0.7974512353f, 0.7891224362f,
+		  0.7820709339f, 0.7760651278f, 0.7709192682f, 0.76648434f, 0.7626404831f,
+		  0.7592908962f, 0.7563570202f, 0.7537747609f, 0.7514915367f, 0.7494639705f,
+		  0.747656081f, 0.7460378603f, 0.7445841511f, 0.7432737558f, 0.7420887262f,
+		  0.7410137942f, 0.7400359135f, 0.7391438884f
+		}
+	};
+	// Table2: average albedo.
+	//		Prefer for artistic reasons.
+	//		This model is energy preserving in total, but not for individual directions.
+	static constexpr mufflon::math::TabulatedFunction<33> ALBEDO_AVG { 0.0f, ei::PI/2.0f,
+		{ 1.0f, 0.9984515433f, 0.9868863928f, 0.9600609238f, 0.9232777349f,
+		  0.8841291491f, 0.8474927155f, 0.8154250323f, 0.7883002593f, 0.7657241714f,
+		  0.7470450606f, 0.7315916234f, 0.7187656605f, 0.7080666669f, 0.6990884661f,
+		  0.6915061377f, 0.6850612128f, 0.6795481399f, 0.6748032291f, 0.6706953859f,
+		  0.6671192049f, 0.6639894329f, 0.6612367028f, 0.658804242f, 0.6566453051f,
+		  0.6547211818f, 0.6529996354f, 0.6514536737f, 0.6500605773f, 0.648802979f,
+		  0.6476608432f, 0.6466202214f, 0.6456728566f
+		}
+	};
 };
 
 // ************************************************************************* //

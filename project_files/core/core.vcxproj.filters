@@ -918,6 +918,9 @@
     <ClInclude Include="..\..\src\core\scene\materials\oren_nayar.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\math\tabulated_function.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
