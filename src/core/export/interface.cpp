@@ -3033,7 +3033,7 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
-		if(!fs::create_directory(directory))
+		if(!fs::create_directories(directory))
 			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
 					   "; the screenshot possibly may not be created");
 

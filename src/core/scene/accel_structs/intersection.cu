@@ -625,6 +625,8 @@ bool any_intersection(
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, tmax, obj, currentBvh))
 			return false; // No hit of the entire scene
 		currentInstanceId = 0;
+		if(obj != nullptr && obj->numPrimitives == 1)
+			primCount = 1;
 	}
 
 	// Traversal loop.

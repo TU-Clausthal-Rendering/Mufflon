@@ -271,7 +271,8 @@ CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<camera
 		return nullptr;
 	iter.first->second->set_name(iter.first->first);
 	m_cameraHandles.push_back(iter.first);
-	m_camerasDirty.emplace(camera.get(), true);
+	m_camerasDirty.emplace(iter.first->second.get(), true);
+	m_frameEnd = std::max(m_frameEnd, m_frameStart + iter.first->second->get_path_segment_count() - 1u);
 	return iter.first->second.get();
 }
 
