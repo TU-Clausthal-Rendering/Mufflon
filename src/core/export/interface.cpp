@@ -3023,9 +3023,11 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	fs::path fileName = std::string(filename);
 	if(fileName.extension() != ".pfm")
 		fileName += ".pfm";
+	if(!fileName.is_absolute())
+		fileName = fs::absolute(fileName);
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
-	const fs::path directory = fileName.parent_path();
+	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
 		if(!fs::create_directory(directory))
 			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
