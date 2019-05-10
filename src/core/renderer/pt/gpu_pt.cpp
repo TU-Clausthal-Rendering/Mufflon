@@ -9,8 +9,7 @@ namespace mufflon::renderer {
 
 namespace gpupt_detail {
 
-cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
-						RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const PtParameters& params);
 
@@ -27,16 +26,7 @@ void GpuPathTracer::iterate() {
 	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 
 	copy(&m_sceneDesc->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
-	 
-	// TODO: pass scene data to kernel!
-	dim3 blockDims{ 16u, 16u, 1u };
-	dim3 gridDims{
-		1u + static_cast<u32>(m_outputBuffer.get_width() - 1) / blockDims.x,
-		1u + static_cast<u32>(m_outputBuffer.get_height() - 1) / blockDims.y,
-		1u
-	};
-
-	cuda::check_error(gpupt_detail::call_kernel(gridDims, blockDims, std::move(m_outputBuffer),
+	cuda::check_error(gpupt_detail::call_kernel(std::move(m_outputBuffer),
 												m_sceneDesc.get(), m_rngs.get(), m_params));
 }
 

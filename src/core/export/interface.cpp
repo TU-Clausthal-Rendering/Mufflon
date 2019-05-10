@@ -3019,7 +3019,17 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 		return false;
 	}
 
-	fs::path fileName = std::string(filename) + ".pfm";
+	// Make the image a PFM by default
+	fs::path fileName = std::string(filename);
+	if(fileName.extension() != ".pfm")
+		fileName += ".pfm";
+
+	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
+	const fs::path directory = fileName.parent_path();
+	if(!fs::exists(directory))
+		if(!fs::create_directory(directory))
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+					   "; the screenshot possibly may not be created");
 
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
 	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags },
@@ -3037,17 +3047,15 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	texData.sRgb = false;
 	texData.layers = data.get_num_layers();
 
-	fs::path filePath(filename);
-	filePath.replace_extension(".pfm");
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_store_format(filePath.extension().string())) {
-				if(plugin.store(filePath.string(), &texData))
+			if(plugin.can_store_format(fileName.extension().string())) {
+				if(plugin.store(fileName.string(), &texData))
 					break;
 			}
 		}
 	}
-	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", filename, "'");
+	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.string(), "'");
 
 	return true;
 	CATCH_ALL(false)

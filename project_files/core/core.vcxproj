@@ -416,7 +416,7 @@ xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToo
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>
