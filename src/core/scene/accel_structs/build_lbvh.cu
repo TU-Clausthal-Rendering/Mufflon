@@ -81,7 +81,7 @@ __forceinline__ __host__ __device__ u64 calculate_morton_code<u64>(const ei::Vec
 __forceinline__ __host__ __device__
 ei::Vec3 normalize_position(ei::Vec3 pos, const ei::Box& box) {
 	ei::Vec3 span = box.max - box.min;
-	return (pos - box.min) / span;
+	return sdiv(pos - box.min, span);
 }
 
 template<typename DescType>
