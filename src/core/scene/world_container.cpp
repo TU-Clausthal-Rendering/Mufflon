@@ -22,13 +22,15 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
-void WorldContainer::set_frame_current(const u32 frameCurrent) {
+bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	const u32 newFrame = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent));
 	if(newFrame != m_frameCurrent) {
 		m_frameCurrent = newFrame;
 		// Delete the current scene to make it clear to everyone that it needs to be refetched
 		m_scene.reset();
+		return true;
 	}
+	return false;
 }
 
 WorldContainer::Sanity WorldContainer::is_sane_world() const {

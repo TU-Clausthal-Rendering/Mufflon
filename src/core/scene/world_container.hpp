@@ -183,7 +183,7 @@ public:
 
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
-	void set_frame_current(const u32 frameCurrent);
+	bool set_frame_current(const u32 frameCurrent);
 
 	// Performs a sanity check on the current world - has lights, cameras etc.
 	Sanity is_sane_world() const;

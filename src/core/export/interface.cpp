@@ -2235,7 +2235,9 @@ Boolean world_set_frame_current(const uint32_t animationFrame) {
 	TRY
 	// Necessary to lock because setting a new frame clears out the scene!
 	auto lock = std::scoped_lock(s_iterationMutex);
-	s_world.set_frame_current(animationFrame);
+	if(s_world.set_frame_current(animationFrame))
+		for(auto& renderer : s_renderers)
+			renderer->on_scene_unload();
 	return true;
 	CATCH_ALL(false)
 }
