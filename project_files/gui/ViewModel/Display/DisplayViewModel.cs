@@ -105,7 +105,7 @@ namespace gui.ViewModel.Display
             }
         }
 
-        private void OnRepainted(object sender, EventArgs args) {
+        private void OnRepainted(object sender) {
             m_referenceElement.Dispatcher.Invoke(new Action(() => {
                 RenderImageSource = m_models.Display.RenderBitmap;
                 OnPropertyChanged(nameof(RenderImageSource));

@@ -87,7 +87,7 @@ public:
 
 	// Operations
 	constexpr size_type copy(pointer dest, size_type count, size_type pos = 0) const {
-		traits_type::copy(dest, data(), std::min(count, size() - pos));
+		return traits_type::copy(dest, data(), std::min(count, size() - pos));
 	}
 	constexpr BasicStringView substr(size_type pos = 0, size_type count = npos) const {
 		return BasicStringView{ m_data + pos, std::min(count == npos ? m_size : count, size() - pos) };

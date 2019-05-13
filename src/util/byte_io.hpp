@@ -22,7 +22,7 @@ public:
 	ArrayStreamBuffer(const ArrayStreamBuffer&) = delete;
 	ArrayStreamBuffer(ArrayStreamBuffer&&) = default;
 	ArrayStreamBuffer& operator=(const ArrayStreamBuffer&) = delete;
-	ArrayStreamBuffer& operator=(ArrayStreamBuffer&&) = default;
+	ArrayStreamBuffer& operator=(ArrayStreamBuffer&&) = delete;
 	~ArrayStreamBuffer() = default;
 
 private:
@@ -34,10 +34,12 @@ private:
 // Interface abstracting C++ iostream/FILE descriptor into common type
 class IByteReader {
 public:
+	virtual ~IByteReader() {}
 	virtual std::size_t read(char* mem, std::size_t bytes) = 0;
 };
 class IByteWriter {
 public:
+	virtual ~IByteWriter() {}
 	virtual std::size_t write(const char* mem, std::size_t bytes) = 0;
 };
 class IByteIO : public IByteReader, public IByteWriter {};

@@ -20,9 +20,9 @@ public:
 
 	virtual void iterate() = 0;
 	virtual IParameterHandler& get_parameters() = 0;
-	virtual StringView get_name() const noexcept = 0u;
-	virtual StringView get_short_name() const noexcept = 0u;
-	virtual bool uses_device(Device dev) noexcept = 0u;
+	virtual StringView get_name() const noexcept = 0;
+	virtual StringView get_short_name() const noexcept = 0;
+	virtual bool uses_device(Device dev) noexcept = 0;
 	
 	void reset() {
 		m_reset = true;

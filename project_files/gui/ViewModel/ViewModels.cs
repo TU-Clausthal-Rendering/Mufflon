@@ -41,6 +41,9 @@ namespace gui.ViewModel
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
 
+        // For designer only
+        public static bool NotInDesignMode { get; set; }
+
         private readonly Models m_models;
 
         public ViewModels(Models models)

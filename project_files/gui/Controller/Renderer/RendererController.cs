@@ -21,6 +21,9 @@ namespace gui.Controller.Renderer
         // Track if the thread should terminate
         private bool m_shouldExit = false;
 
+        // Keep track of the number of consecutive iterations performed
+        private int m_iterationsPerformed = 0;
+
         public RendererController(Models models)
         {
             m_models = models;
@@ -43,20 +46,27 @@ namespace gui.Controller.Renderer
 
             UpdateRenderTargets();
 
-            // This is necessary to avoid race conditions
-            bool repaint = m_models.Renderer.IsRendering;
-
-            if(repaint) {
-                // Update camera movements and enter the render DLL
-                if (m_models.Settings.AllowCameraMovement)
-                    m_models.RendererCamera.MoveCamera();
-                m_models.Renderer.Iterate();
+            if(m_models.Renderer.IsRendering) {
+                if(m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
+                {
+                    // Update camera movements and enter the render DLL
+                    if (m_models.Settings.AllowCameraMovement)
+                        m_models.RendererCamera.MoveCamera();
+                    m_models.Renderer.Iterate();
+                    ++m_iterationsPerformed;
+                } else
+                {
+                    // No more iterations left -> we're done
+                    m_iterationsPerformed = 0;
+                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                    m_models.Renderer.RenderLock.Reset();
+                }
+            } else {
+                m_models.Renderer.RenderLock.Reset();
             }
 
             // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
-            m_models.Renderer.RenderLock.Release();
-            if(repaint)
-                m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
+            m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
         }
 
         // Handles changes in viewport size and render targets
@@ -101,7 +111,7 @@ namespace gui.Controller.Renderer
             m_shouldExit = true;
             // This needs to happen in the main UI thread
             //if(!m_models.Renderer.IsRendering)
-            m_models.Renderer.RenderLock.Release();
+            m_models.Renderer.RenderLock.Set();
         }
     }
 }

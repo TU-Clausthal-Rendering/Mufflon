@@ -14,7 +14,6 @@ namespace mufflon { namespace cameras {
  */
 class Pinhole : public Camera {
 public:
-	Pinhole() = default;
 	Pinhole(const ei::Vec3* position, const ei::Vec3* dir, const ei::Vec3* up,
 			const u32 pathCount, Radians vFov, float near = 1e-10f,
 			float far = 1e10f) :

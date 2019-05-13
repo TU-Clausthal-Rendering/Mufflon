@@ -65,7 +65,8 @@ struct LightSubTree {
 		Node(const char* base,
 			 u32 leftOffset, u16 leftType,
 			 u32 rightOffset, u16 rightType,
-			 const ei::Vec3& bounds);
+			 const ei::Vec3& bounds,
+			 const int* materials);
 
 		// Layout: [4,4,2]=10, [2,4,4]=10, [4,4,4]=12 bytes
 		// Necessary duplication due to memory layout (2x32+16 and 16+2x32 bits)
@@ -129,14 +130,13 @@ class LightTreeBuilder {
 public:
 	LightTreeBuilder();
 	~LightTreeBuilder();
-	LightTreeBuilder(LightTreeBuilder&&) = default;
-	LightTreeBuilder& operator=(LightTreeBuilder&&) = default;
 
 	// Builds the light tree from lists of positional and directional lights and
 	// resets the envmap light to black
 	void build(std::vector<PositionalLights>&& posLights,
 			   std::vector<DirectionalLight>&& dirLights,
-			   const ei::Box& boundingBox);
+			   const ei::Box& boundingBox,
+			   const int* materials);
 	// Updates (read replaces) the envmap light only
 	void set_envLight(Background& envLight) {
 		m_envLight = &envLight;
@@ -181,7 +181,6 @@ public:
 //	static GuideFunction get_guide_fptr(bool posGuide);
 private:
 	void update_media_cpu(const SceneDescriptor<Device::CPU>& scene);
-	void remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem);
 
 	// Keep track of the light count (positional and directional combined)
 	u32 m_lightCount = 0u;
@@ -192,9 +191,6 @@ private:
 	std::unique_ptr<LightTree<Device::OPENGL>> m_treeOpengl;
 	HashMapManager<PrimitiveHandle, u32> m_primToNodePath;
 	GenericResource m_treeMemory;
-	// The tree is build on CPU side. For synchronization we need a possiblity to
-	// find the CUDA textures.
-	std::unordered_map<textures::ConstTextureDevHandle_t<Device::CPU>, TextureHandle> m_textureMap;
 	// Environment light model, may be black, a texture or an analytic model
 	lights::Background* m_envLight{ nullptr };
 };

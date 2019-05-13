@@ -120,8 +120,7 @@
                 <Grid
                         Grid.Column="1"
                         Grid.Row="2"
-                        Margin="{StaticResource RightPropertyMargin}"
-                        Visibility="{Binding RadianceVisibility, FallbackValue=Visible}">
+                        Margin="{StaticResource RightPropertyMargin}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>

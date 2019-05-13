@@ -47,7 +47,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleEmissive& params) {
 	return 0.0f;
 }
 
-template MaterialSampleConcept<MatSampleEmissive>;
-template MaterialConcept<MatEmissive>;
+template class MaterialSampleConcept<MatSampleEmissive>;
+template class MaterialConcept<MatEmissive>;
 
 }}} // namespace mufflon::scene::materials

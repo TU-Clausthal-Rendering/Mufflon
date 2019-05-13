@@ -41,7 +41,7 @@ namespace gui.ViewModel.Dialog
                     m_cancelDialog?.Close();
                     m_cancelDialog = null;
 
-                    if (hasCancelled && m_models.Settings.LastWorlds.Contains(loadingPath))
+                    if (!hasCancelled && m_models.Settings.LastWorlds.Contains(loadingPath))
                     {
                         if (MessageBox.Show("World file could not be loaded: " + args.Message + "; should it " +
                                             "be removed from the list of recent scenes?", "Unable to load scene", MessageBoxButton.YesNo,

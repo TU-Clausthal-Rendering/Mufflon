@@ -430,8 +430,8 @@ void Polygons::tessellate(tessellation::Tessellater& tessellater) {
 		}
 		for(auto vertexIter = face.begin(); vertexIter != face.end(); ++vertexIter) {
 			*(currIndices++) = static_cast<u32>(vertexIter->idx());
-			ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
-			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) } };
+			const ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
+			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ pt } };
 		}
 	}
 

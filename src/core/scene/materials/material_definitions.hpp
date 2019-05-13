@@ -10,6 +10,7 @@
 #include "material_concepts.hpp"
 #include "microfacet_base.hpp"
 #include "core/scene/handles.hpp"
+#include "core/math/tabulated_function.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -55,14 +56,6 @@ struct alignas(8) MaterialDescriptorBase {
 	}
 };
 
-struct ParameterPack: public MaterialDescriptorBase {};
-
-struct Emission {
-	TextureHandle texture;
-	Spectrum scale;
-};
-
-
 
 // ************************************************************************* //
 // LAMBERT																	 //
@@ -90,6 +83,68 @@ struct MatLambert {
 
 	struct NonTexParams {
 	} nonTexParams;
+};
+
+// ************************************************************************* //
+// OREN-NAYAR																 //
+// ************************************************************************* //
+// Sample of Oren-Nayar diffuse material
+struct MatSampleOrenNayar {
+	Spectrum albedo;
+	float a, b;
+};
+
+// Management layer of the Oren-Nayar material
+struct MatOrenNayar {
+	static constexpr MaterialPropertyFlags PROPERTIES =
+		MaterialPropertyFlags::REFLECTIVE;
+
+	enum Textures {
+		ALBEDO,
+		TEX_COUNT
+	};
+
+	using SampleType = MatSampleOrenNayar;
+
+	MatOrenNayar(TextureHandle* texTable, int texOffset, TextureHandle albedo, float roughness) {
+		texTable[ALBEDO+texOffset] = albedo;
+		float ssq = roughness * roughness;
+		nonTexParams.a = 1.0f - ssq / (2*ssq + 0.66f);
+		nonTexParams.b = 0.45f * ssq / (ssq + 0.09f);
+		// Rescale to decrease energy loss
+		nonTexParams.a /= ALBEDO_AVG(roughness);
+		nonTexParams.b /= ALBEDO_AVG(roughness);
+	}
+
+	struct NonTexParams {
+		float a;
+		float b;
+	} nonTexParams;
+
+	// Lookup tables for energy compensation
+	// Table1: maximum directional albedo.
+	//		Use for a physical plausible model with respect to all directions.
+	static constexpr mufflon::math::TabulatedFunction<33> ALBEDO_MAX { 0.0f, ei::PI/2.0f,
+		{ 1.0f, 1.0075758798f, 1.0151743809f, 1.0063538621f, 0.9828398736f,		  0.9528022529f, 0.9223891535f, 0.8946505486f, 0.8706137643f, 0.8502976999f,		  0.8333128438f, 0.8191573529f, 0.8073450181f, 0.7974512353f, 0.7891224362f,
+		  0.7820709339f, 0.7760651278f, 0.7709192682f, 0.76648434f, 0.7626404831f,
+		  0.7592908962f, 0.7563570202f, 0.7537747609f, 0.7514915367f, 0.7494639705f,
+		  0.747656081f, 0.7460378603f, 0.7445841511f, 0.7432737558f, 0.7420887262f,
+		  0.7410137942f, 0.7400359135f, 0.7391438884f
+		}
+	};
+	// Table2: average albedo.
+	//		Prefer for artistic reasons.
+	//		This model is energy preserving in total, but not for individual directions.
+	static constexpr mufflon::math::TabulatedFunction<33> ALBEDO_AVG { 0.0f, ei::PI/2.0f,
+		{ 1.0f, 0.9984515433f, 0.9868863928f, 0.9600609238f, 0.9232777349f,
+		  0.8841291491f, 0.8474927155f, 0.8154250323f, 0.7883002593f, 0.7657241714f,
+		  0.7470450606f, 0.7315916234f, 0.7187656605f, 0.7080666669f, 0.6990884661f,
+		  0.6915061377f, 0.6850612128f, 0.6795481399f, 0.6748032291f, 0.6706953859f,
+		  0.6671192049f, 0.6639894329f, 0.6612367028f, 0.658804242f, 0.6566453051f,
+		  0.6547211818f, 0.6529996354f, 0.6514536737f, 0.6500605773f, 0.648802979f,
+		  0.6476608432f, 0.6466202214f, 0.6456728566f
+		}
+	};
 };
 
 // ************************************************************************* //
@@ -231,10 +286,6 @@ struct MatEmissive {
 		nonTexParams.scale = scale;
 	}
 
-	Emission get_emission(const TextureHandle* texTable, int texOffset) const {
-		return {texTable[EMISSION+texOffset], nonTexParams.scale};
-	}
-
 	struct NonTexParams {
 		Spectrum scale;
 	} nonTexParams;
@@ -295,8 +346,6 @@ struct MatBlend {
 		nonTexParams.factorB = factorB;
 	}
 
-	Emission get_emission(const TextureHandle* texTable, int texOffset) const;
-
 	Medium compute_medium() const;
 
 	using NonTexParams = MatNTPBlend<LayerA, LayerB>;
@@ -353,8 +402,6 @@ struct MatBlendFresnel {
 		//nonTexParams.pReflect = 0.89176122288449f * f0 + 0.10823877711551f;
 	}
 
-	Emission get_emission(const TextureHandle* texTable, int texOffset) const;
-
 	Medium compute_medium() const;
 
 	using NonTexParams = MatNTPBlendFresnel<LayerA, LayerB>;
@@ -374,7 +421,7 @@ private:
 template<Materials M> struct mat_info {};
 template<> struct mat_info<Materials::EMISSIVE> { using type = MatEmissive; };
 template<> struct mat_info<Materials::LAMBERT> { using type = MatLambert; };
-template<> struct mat_info<Materials::ORENNAYAR> { using type = MatLambert; };
+template<> struct mat_info<Materials::ORENNAYAR> { using type = MatOrenNayar; };
 template<> struct mat_info<Materials::TORRANCE> { using type = MatTorrance; };
 template<> struct mat_info<Materials::WALTER> { using type = MatWalter; };
 template<> struct mat_info<Materials::LAMBERT_EMISSIVE> { using type = MatBlend<MatLambert,MatEmissive>; };
@@ -393,6 +440,12 @@ constexpr std::size_t get_material_descriptor_size() {
 	return round_to_align<8u>(sizeof(MaterialDescriptorBase)
 		+ int(mat_type<M>::Textures::TEX_COUNT) * sizeof(textures::ConstTextureDevHandle_t<dev>)
 		+ (std::is_empty<typename mat_type<M>::NonTexParams>::value ? 0 : sizeof(typename mat_type<M>::NonTexParams)));
+}
+
+// Get the full param size of a material
+template < Materials M >
+constexpr std::size_t get_material_param_size() {
+	return sizeof(MaterialDescriptorBase) + sizeof(typename mat_type<M>::SampleType);
 }
 
 
@@ -419,6 +472,13 @@ namespace details {
 		return {{ei::max(get_material_descriptor_size<Device::CPU, Materials(Is)>(),
 						 get_material_descriptor_size<Device::CUDA, Materials(Is)>())...}};
 	}
+
+	// Automatic detection of the maximum possible param size
+	template<std::size_t... Is>
+	constexpr Array<std::size_t, sizeof...(Is)> enumerate_param_sizes(
+		std::integer_sequence<std::size_t, Is...>) {
+		return {{get_material_param_size<Materials(Is)>()...}};
+	}
 }
 //constexpr auto MAT_TEX_COUNT = details::enumerate_tex_counts( std::make_integer_sequence<int, int(Materials::NUM)>{} );*/
 
@@ -438,6 +498,20 @@ constexpr std::size_t MAX_MATERIAL_DESCRIPTOR_SIZE() {
 		if(DESC_SIZES[i] > maxSize) maxSize = DESC_SIZES[i];
 	return maxSize;
 }
+
+constexpr std::size_t MAX_MATERIAL_PARAM_SIZE() {
+	auto PARAM_SIZES = details::enumerate_param_sizes( std::make_integer_sequence<std::size_t, int(Materials::NUM)>{} );
+	std::size_t maxSize = 0;
+	for(int i = 0; i < int(Materials::NUM); ++i)
+		if(PARAM_SIZES[i] > maxSize) maxSize = PARAM_SIZES[i];
+	return maxSize;
+}
+
+
+struct ParameterPack: public MaterialDescriptorBase {
+	u8 subParams[MAX_MATERIAL_PARAM_SIZE() - sizeof(MaterialDescriptorBase)];
+};
+
 
 // Conversion of a runtime parameter 'mat' into a consexpr 'MatType'.
 // WARNING: this is a switch -> need to return or to break; at the end

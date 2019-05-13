@@ -124,8 +124,7 @@ void CpuBidirPhotonMapper::on_reset() {
 
 void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
-	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
-		m_sceneDesc.aabb, rndStart);
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	BpmPathVertex vertex[2];
 	BpmPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	math::Throughput throughput;

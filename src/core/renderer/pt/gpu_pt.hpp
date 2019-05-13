@@ -23,7 +23,7 @@ public:
 	// This is just a test method, don't use this as an actual interface
 	void iterate() override;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept { return "Pathtracer"; }
+	StringView get_name() const noexcept final { return "Pathtracer"; }
 	StringView get_short_name() const noexcept final { return "PT"; }
 	void on_reset() final;
 	void on_descriptor_requery() final;

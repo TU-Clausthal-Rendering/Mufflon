@@ -242,6 +242,7 @@ typedef struct {
 typedef struct MaterialParamsStruct {
 	Medium outerMedium;
 	MaterialParamType innerType;
+	TextureHdl alpha;
 	union {
 		LambertParams lambert;
 		TorranceParams torrance;
@@ -488,6 +489,7 @@ CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
+CORE_API TextureHdl CDECL world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
 CORE_API const char* CDECL world_get_texture_name(TextureHdl hdl);
 CORE_API Boolean CDECL world_get_texture_size(TextureHdl hdl, IVec2* size);
@@ -582,7 +584,8 @@ CORE_API void CDECL mufflon_destroy_opengl();
 CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* format);
 CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, TextureFormat format,
 											 bool sRgb,const char** ptr);
-CORE_API Boolean CDECL core_copy_screen_texture_rgba32(float* ptr,const float gammaFactor);
+CORE_API Boolean CDECL core_get_target_image_rgba32(uint32_t index, Boolean variance, float* ptr);
+CORE_API Boolean CDECL core_copy_screen_texture_rgba32(float* ptr);
 CORE_API Boolean CDECL core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r,
 										   float* g, float* b, float* a);
 CORE_API const char* CDECL core_get_dll_error();

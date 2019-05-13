@@ -8,7 +8,7 @@ namespace mufflon { namespace scene { namespace lights {
 namespace lighttree_detail {
 
 // Helper to adjust PDF by the chance to pick light type
-CUDA_FUNCTION __forceinline__ Photon adjustPdf(Photon&& sample, float chance) {
+CUDA_FUNCTION __forceinline__ Emitter adjustPdf(Emitter&& sample, float chance) {
 	sample.pos.pdf *= chance;
 	sample.intensity /= chance;
 	return sample;
@@ -21,34 +21,34 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&
 
 
 // Converts the typeless memory into the given light type and samples it
-CUDA_FUNCTION Photon sample_light(LightType type, const char* light,
-								  const ei::Box& sceneBounds,
-								  const math::RndSet2& rnd) {
+CUDA_FUNCTION Emitter sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
+								   LightType type, const char* light,
+								   const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
 		case LightType::POINT_LIGHT: return sample_light_pos(*reinterpret_cast<const PointLight*>(light), rnd);
 		case LightType::SPOT_LIGHT: return sample_light_pos(*reinterpret_cast<const SpotLight*>(light), rnd);
-		case LightType::AREA_LIGHT_TRIANGLE: return sample_light_pos(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
-		case LightType::AREA_LIGHT_QUAD: return sample_light_pos(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
-		case LightType::AREA_LIGHT_SPHERE: return sample_light_pos(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
-		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), sceneBounds, rnd);
+		case LightType::AREA_LIGHT_TRIANGLE: return sample_light_pos(scene, *reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
+		case LightType::AREA_LIGHT_QUAD: return sample_light_pos(scene, *reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
+		case LightType::AREA_LIGHT_SPHERE: return sample_light_pos(scene, *reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
+		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), scene.aabb, rnd);
 		default: mAssert(false); return {};
 	}
 }
 
 // Converts the typeless memory into the given light type and samples it
-CUDA_FUNCTION NextEventEstimation connect_light(LightType type, const char* light,
+CUDA_FUNCTION NextEventEstimation connect_light(const SceneDescriptor<CURRENT_DEV>& scene,
+												LightType type, const char* light,
 												const ei::Vec3& position,
-												const ei::Box& sceneBounds,
 												const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
 	switch(type) {
-		case LightType::POINT_LIGHT: return connect_light(*reinterpret_cast<const PointLight*>(light), position, rnd);
-		case LightType::SPOT_LIGHT: return connect_light(*reinterpret_cast<const SpotLight*>(light), position, rnd);
-		case LightType::AREA_LIGHT_TRIANGLE: return connect_light(*reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), position, rnd);
-		case LightType::AREA_LIGHT_QUAD: return connect_light(*reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), position, rnd);
-		case LightType::AREA_LIGHT_SPHERE: return connect_light(*reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), position, rnd);
-		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, sceneBounds);
+		case LightType::POINT_LIGHT: return connect_light(scene, *reinterpret_cast<const PointLight*>(light), position, rnd);
+		case LightType::SPOT_LIGHT: return connect_light(scene, *reinterpret_cast<const SpotLight*>(light), position, rnd);
+		case LightType::AREA_LIGHT_TRIANGLE: return connect_light(scene, *reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), position, rnd);
+		case LightType::AREA_LIGHT_QUAD: return connect_light(scene, *reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), position, rnd);
+		case LightType::AREA_LIGHT_SPHERE: return connect_light(scene, *reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), position, rnd);
+		case LightType::DIRECTIONAL_LIGHT: return connect_light(*reinterpret_cast<const DirectionalLight*>(light), position, scene.aabb);
 		default: mAssert(false); return {};
 	}
 }
@@ -77,9 +77,10 @@ CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
  * until it cannot uniquely identify a subtree (ie. index 1 for interval [0,2]
  * and flux distribution of 50/50).
  */
-CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
-								u64 rndChoice, float treeProb, const ei::Box& bounds,
-								const math::RndSet2& rnd) {
+CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
+						   const LightSubTree& tree, u64 left, u64 right,
+						   u64 rndChoice, float treeProb,
+						   const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -115,8 +116,8 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
-	return adjustPdf(sample_light(static_cast<LightType>(type),
-							 tree.memory + offset, bounds, rnd), lightProb);
+	return adjustPdf(sample_light(scene, static_cast<LightType>(type),
+							 tree.memory + offset, rnd), lightProb);
 }
 
 /**
@@ -128,10 +129,11 @@ CUDA_FUNCTION Photon emit(const LightSubTree& tree, u64 left, u64 right,
  * seed: A random seed to randomize the dicision. All events (enumerated by indices)
  *		must use the same number.
  */
-CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
-								u64 numIndices, u64 seed, const ei::Box& bounds,
-								const math::RndSet2_1& rnd) {
+CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
+						   u64 index, u64 numIndices, u64 seed,
+						   const math::RndSet2_1& rnd) {
 	using namespace lighttree_detail;
+	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// See connect() for details on the rndChoice
 	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
 								   : seed;
@@ -147,7 +149,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
 		// Sample background
-		auto photon = sample_light_pos(tree.background, bounds, rnd);
+		auto photon = sample_light_pos(tree.background, scene.aabb, rnd);
 		// Adjust pdf (but apply the probability to the directional pdf and NOT the pos.pdf)
 		photon.intensity /= envProb;
 		photon.source_param.dir.dirPdf *= envProb;
@@ -167,7 +169,7 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
 		subTree = &tree.posLights;
 		p = posProb;
 	}
-	return emit(*subTree, left, right, rndChoice, p, bounds, rnd);
+	return emit(scene, *subTree, left, right, rndChoice, p, rnd);
 }
 
 
@@ -175,9 +177,10 @@ CUDA_FUNCTION Photon emit(const LightTree<CURRENT_DEV>& tree, u64 index,
  * Shared code for connecting to a subtree.
  * Takes the light tree, initial interval limits, and RNG number as inputs.
  */
-CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u64 right,
+CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene,
+										  const LightSubTree& tree, u64 left, u64 right,
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
-										  const ei::Box& bounds, const math::RndSet2& rnd,
+										  const math::RndSet2& rnd,
 										  bool posGuide) {
 	using namespace lighttree_detail;
 
@@ -222,8 +225,8 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
-	return adjustPdf(connect_light(static_cast<LightType>(type), tree.memory + offset,
-							 position, bounds, rnd), lightProb);
+	return adjustPdf(connect_light(scene, static_cast<LightType>(type), tree.memory + offset,
+							 position, rnd), lightProb);
 }
 
 /*
@@ -243,10 +246,11 @@ CUDA_FUNCTION NextEventEstimation connect(const LightSubTree& tree, u64 left, u6
  *		Ready to use implementations: guide_flux (ignores the reference position)
  *		or guide_flux_pos
  */
-CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u64 index,
+CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
-										  const ei::Box& bounds, const math::RndSet2& rnd) {
+										  const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
+	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// Scale the indices such that they sample the u64-intervall equally.
 	// The (modulu) addition with the seed randomizes the choice.
 	// Since the distance between samples is constant this will lead to a
@@ -266,7 +270,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 	// First is envmap...
 	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
-		return adjustPdf(connect_light(tree.background, position, bounds, rnd), envProb);
+		return adjustPdf(connect_light(tree.background, position, scene.aabb, rnd), envProb);
 	}
 	// ...then the directional lights come...
 	u64 right = math::percentage_of(std::numeric_limits<u64>::max(), envProb + dirProb);
@@ -282,7 +286,7 @@ CUDA_FUNCTION NextEventEstimation connect(const LightTree<CURRENT_DEV>& tree, u6
 		subTree = &tree.posLights;
 		p = posProb;
 	}
-	return connect(*subTree, left, right, rndChoice, p, position, bounds, rnd, tree.posGuide);
+	return connect(scene, *subTree, left, right, rndChoice, p, position, rnd, tree.posGuide);
 }
 
 /*

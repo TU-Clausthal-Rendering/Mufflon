@@ -109,13 +109,12 @@ namespace gui.Model
     /// </summary>
     public class RendererModel : INotifyPropertyChanged
     {
-        private bool m_isRendering = false;
+        private volatile bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
 
         public RendererModel()
         {
             // Initial state: renderer paused (this will always be in the main UI thread)
-            RenderLock.WaitOne();
             PropertyChanged += OnRendererChanged;
 
             RendererIndex = 0u;
@@ -125,7 +124,9 @@ namespace gui.Model
         // Its purpose is to send the render thread to sleep when we don't want to render, NOT do enforce
         // no-rendering when we change attributes (camera, lights, render targets etc.); this is
         // done in the core-dll itself via a mutex (actually two, but lets not split hairs).
-        public Semaphore RenderLock = new Semaphore(1, 1);
+        public ManualResetEvent RenderLock = new ManualResetEvent(false);
+        private volatile int m_remainingIterations = -1;
+        public int RemainingIterations { get => m_remainingIterations; }
 
         public bool IsRendering
         {
@@ -134,10 +135,10 @@ namespace gui.Model
             {
                 if(m_isRendering == value) return;
                 m_isRendering = value;
-                if (value)
-                    RenderLock.Release();
+                if(value)
+                    RenderLock.Set();
                 else
-                    RenderLock.WaitOne();
+                    m_remainingIterations = -1;
                 OnPropertyChanged(nameof(IsRendering));
             }
         }
@@ -161,14 +162,18 @@ namespace gui.Model
             UpdateIterationData();
         }
 
+        // Updates the rendering bitmap without actually rendering anything; should be used
+        // e.g. when selecting a different render target to display
+        public void UpdateRenderBitmap()
+        {
+            RenderLock.Set();
+        }
+
         // This iterates by leveraging the GUI and includes texture updates etc
         public void Iterate(uint times)
         {
-            for(uint i = 0u; i < times; ++i)
-            {
-                IsRendering = true;
-                IsRendering = false;
-            }
+            m_remainingIterations = (int)times;
+            IsRendering = true;
         }
 
         // This iterates ONLY the renderer (and updates some data like times and iteration count), so this

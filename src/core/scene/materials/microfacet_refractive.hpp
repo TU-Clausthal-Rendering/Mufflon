@@ -157,7 +157,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleWalter& params) {
 	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
 }
 
-template MaterialSampleConcept<MatSampleWalter>;
-template MaterialConcept<MatWalter>;
+template class MaterialSampleConcept<MatSampleWalter>;
+template class MaterialConcept<MatWalter>;
 
 }}} // namespace mufflon::scene::materials

@@ -40,7 +40,7 @@ class DllInterface:
         self.dllHolder.core.render_get_renderer_name.restype = c_char_p
         self.dllHolder.core.render_get_renderer_short_name.restype = c_char_p
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
-        self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
+        self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
         self.dllHolder.core.world_set_frame_current.argtypes = [c_uint]
@@ -77,7 +77,7 @@ class DllInterface:
         iterateTime = ProcessTime(0,0)
         preTime = ProcessTime(0,0)
         postTime = ProcessTime(0,0)
-        self.dllHolder.core.render_iterate(byref(iterateTime), byref(preTime), byref(postTime))
+        self.dllHolder.core.render_iterate(byref(iterateTime))
         return iterateTime, preTime, postTime
 
     def render_reset(self):
@@ -257,7 +257,7 @@ class RenderActions:
         accumPostTime = ProcessTime(0,0)
         for i in range(iterationCount):
             if printProgress and (i % progressSteps == 0):
-                print("--- ", (i + 1), " of ", iterationCount, " ---")
+                print("--- ", (i + 1), " of ", iterationCount, " ---", flush=True)
             [iterateTime, preTime, postTime] = self.dllInterface.render_iterate()
             accumIterateTime.microseconds += iterateTime.microseconds
             accumIterateTime.cycles += iterateTime.cycles

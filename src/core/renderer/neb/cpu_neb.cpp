@@ -103,7 +103,8 @@ int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, const Neb
 	return ei::ceil(maxFlux / (smoothness * params.targetFlux));
 }
 
-struct { float toFlux; int photonCount; }
+struct PhotonConversionFactors { float toFlux; int photonCount; };
+PhotonConversionFactors
 get_photon_conversion_factors(const NebPathVertex& vertex,
 							  const NebVertexExt& ext, const NebParameters& params) {
 	float toFlux = ei::abs(vertex.get_geometric_factor(ext.neeDirection)) / ext.density;
@@ -231,9 +232,8 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			// vertex for later use.
 			u64 neeSeed = m_rngs[pixelIdx].next();
 			math::RndSet2 neeRnd = m_rngs[pixelIdx].next();
-			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-								vertex.get_position(), m_sceneDesc.aabb, neeRnd);
-			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;			
+			auto nee = scene::lights::connect(m_sceneDesc, 0, 1, neeSeed, vertex.get_position(), neeRnd);
+			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
 			bool anyhit = scene::accel_struct::any_intersection(
 								m_sceneDesc, vertex.get_position(), nee.position,
 								vertex.get_geometric_normal(), nee.geoNormal, nee.dir.direction);
@@ -331,8 +331,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
-	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
-		m_sceneDesc.aabb, rndStart);
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	NebPathVertex vertex[2];
 	NebPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	math::Throughput throughput;
@@ -524,8 +523,9 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float neeMergeArea, float p
 		AngularPdf pdfBack = emission.samplePdf;
 		ConnectionDir connection { emission.incident, emission.incidentDistSq };
 		for(int i = n-1; i > 0; --i) {
+			Interaction itype = connection.distanceSq == 0.0f ? Interaction::LIGHT_ENVMAP : Interaction::SURFACE;
 			incidentF[i] = vert->ext().incidentPdf;
-			incidentB[i] = vert->convert_pdf(Interaction::SURFACE, pdfBack, connection).pdf;
+			incidentB[i] = vert->convert_pdf(itype, pdfBack, connection).pdf;
 			pdfBack = vert->ext().pdfBack;
 			connection = ConnectionDir{ vert->get_incident_direction(), ei::sq(vert->ext().incidentDist) };
 			vert = vert->previous();

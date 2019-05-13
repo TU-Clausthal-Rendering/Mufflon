@@ -66,9 +66,6 @@ public:
 	 */
 	virtual char* get_descriptor(Device device, char* outBuffer) const = 0;
 
-	// Get only the texture for emissive materials
-	virtual Emission get_emission() const { return {nullptr, Spectrum{0.0f}}; }
-
 	// Get the medium on the side of the normal.
 	MediumHandle get_outer_medium() const {
 		return m_outerMedium;
@@ -86,6 +83,15 @@ public:
 		//m_dirty = true;
 	}
 
+	// Get the alpha texture
+	TextureHandle get_alpha_texture() const noexcept {
+		return m_alpha;
+	}
+	void set_alpha_texture(TextureHandle alpha) {
+		m_alpha = alpha;
+		//m_dirty = true;
+	}
+
 	virtual Medium compute_medium() const = 0;
 
 	Materials get_type() const { return m_type; }
@@ -100,6 +106,8 @@ public:
 protected:
 	MediumHandle m_innerMedium;
 	MediumHandle m_outerMedium;
+	TextureHandle m_alpha = nullptr;		// This is not part of the material descriptor, but rather
+											// separately stored in the scene descriptor
 	//mutable bool m_dirty = true;			// Any property of the material changed
 
 private:
@@ -128,7 +136,6 @@ public:
 	}
 	std::size_t get_parameter_pack_size() const final;
 	char* get_descriptor(Device device, char* outBuffer) const final;
-	Emission get_emission() const final;
 	Medium compute_medium() const final;
 
 private:

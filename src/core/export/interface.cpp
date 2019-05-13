@@ -19,6 +19,7 @@
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/textures/interface.hpp"
 #include "mffloader/interface/interface.h"
 #include <glad/glad.h>
 #include <cuda_runtime.h>
@@ -336,9 +337,9 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	CATCH_ALL(false)
 }
 
-Boolean core_copy_screen_texture_rgba32(float* ptr, const float gammaFactor) {
+Boolean core_copy_screen_texture_rgba32(float* ptr) {
 	TRY
-		CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
+	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	std::scoped_lock lock{ s_screenTextureMutex };
 	if(ptr != nullptr && s_screenTexture != nullptr) {
 		const int PIXELS = s_screenTexture->get_width() * s_screenTexture->get_height();
@@ -717,7 +718,6 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHd
 	}
 
 	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrReader](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
 		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl,
 										 PolyVHdl{ static_cast<int>(startVertex) },
@@ -759,7 +759,6 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl*
 	}
 
 	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrReader](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
 		FaceAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
 																 count, *attrReader);
@@ -1011,7 +1010,6 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 	}
 
 	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrReader](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Spheres>().add_bulk(hdl,
 																SphereVHdl{ static_cast<size_t>(startSphere) },
@@ -1203,7 +1201,7 @@ InstanceHdl world_create_instance(const char* name, ObjectHdl obj, const uint32_
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(move(std::string(name)), hdl, animationFrame));
+	return static_cast<InstanceHdl>(s_world.create_instance(std::string(name), hdl, animationFrame));
 	CATCH_ALL(nullptr)
 }
 
@@ -1297,6 +1295,9 @@ materials::NDF convertNdf(NormalDistFunction ndf) {
 std::tuple<TextureHandle> to_ctor_args(const LambertParams& params) {
 	return {static_cast<TextureHandle>(params.albedo)};
 }
+std::tuple<TextureHandle, float> to_ctor_args(const OrennayarParams& params) {
+	return {static_cast<TextureHandle>(params.albedo), params.roughness};
+}
 std::tuple<TextureHandle, Spectrum> to_ctor_args(const EmissiveParams& params) {
 	return {static_cast<TextureHandle>(params.radiance),
 			util::pun<Spectrum>(params.scale)};
@@ -1342,9 +1343,10 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 			auto p = to_ctor_args(mat->inner.emissive);
 			newMaterial = std::make_unique<Material<Materials::EMISSIVE>>( get<0>(p), get<1>(p) );
 		}	break;
-		case MATERIAL_ORENNAYAR:
-			logWarning("[", FUNCTION_NAME, "] Material type 'orennayar' not supported yet");
-			return nullptr;
+		case MATERIAL_ORENNAYAR: {
+			auto p = to_ctor_args(mat->inner.orennayar);
+			newMaterial = std::make_unique<Material<Materials::ORENNAYAR>>( get<0>(p), get<1>(p) );
+		}	break;
 		case MATERIAL_BLEND: {
 			// Order materials to reduce the number of cases
 			const auto* layerA = &mat->inner.blend.a;
@@ -1400,8 +1402,10 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 		{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 			util::pun<Spectrum>(mat->outerMedium.absorption)}) );
 	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
+	if(mat->alpha != nullptr)
+		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
 
-	return move(newMaterial);
+	return newMaterial;
 }
 
 // Callback function for OpenGL debug context
@@ -1485,8 +1489,7 @@ int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
 	switch(hdl->get_type()) {
 		case Materials::EMISSIVE:
 			buffer->innerType = MATERIAL_EMISSIVE;
-			buffer->inner.emissive.radiance = hdl->get_emission().texture;
-			buffer->inner.emissive.scale = util::pun<Vec3>(hdl->get_emission().scale);
+			// TODO
 			break;
 		case Materials::LAMBERT:
 			buffer->innerType = MATERIAL_LAMBERT;
@@ -1588,6 +1591,9 @@ LightHdl world_add_light(const char* name, LightType type, const uint32_t count)
 		case LIGHT_ENVMAP: {
 			hdl = s_world.add_light(name, TextureHandle{});
 		} break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown light type");
+			return LightHdl{ 7, 0 };
 	}
 	if(!hdl.has_value()) {
 		logError("[", FUNCTION_NAME, "] Error adding a light");
@@ -1724,7 +1730,7 @@ Boolean world_is_sane(const char** msg) {
 
 TextureHdl world_get_texture(const char* path) {
 	TRY
-	CHECK_NULLPTR(path, "texture path", false);
+	CHECK_NULLPTR(path, "texture path", nullptr);
 	auto hdl = s_world.find_texture(path);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find texture ",
@@ -1763,10 +1769,72 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 		return nullptr;
 	}
 	// The texture will take ownership of the pointer
-	hdl = s_world.add_texture(path, texData.width, texData.height,
-												 texData.layers, static_cast<textures::Format>(texData.format),
-												 static_cast<textures::SamplingMode>(sampling),
-												 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+	auto texture = std::make_unique<textures::Texture>(path, texData.width, texData.height,
+													   texData.layers, static_cast<textures::Format>(texData.format),
+													   static_cast<textures::SamplingMode>(sampling),
+													   texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+	hdl = s_world.add_texture(std::move(texture));
+	return static_cast<TextureHdl>(hdl);
+	CATCH_ALL(nullptr)
+}
+
+TextureHdl world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat) {
+	TRY
+	CHECK_NULLPTR(path, "texture path", nullptr);
+
+	// Give the texture a special name to avoid conflicts with regularly loaded textures
+	std::string textureName = std::string(path) + std::string("##CONVERTED_TO_")
+		+ std::string(textures::FORMAT_NAME(static_cast<textures::Format>(targetFormat)))
+		+ std::string("##");
+
+	// Check if the texture is already loaded
+	auto hdl = s_world.find_texture(textureName);
+	if(hdl != nullptr) {
+		s_world.ref_texture(hdl);
+		return static_cast<TextureHdl>(hdl);
+	}
+
+	// Use the plugins to load the texture
+	fs::path filePath(path);
+	TextureData texData{};
+	for(auto& plugin : s_plugins) {
+		if(plugin.is_loaded()) {
+			if(plugin.can_load_format(filePath.extension().string())) {
+				if(plugin.load(filePath.string(), &texData))
+					break;
+			}
+		}
+	}
+	if(texData.data == nullptr) {
+		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
+				 filePath.string(), "'");
+		return nullptr;
+	}
+
+	// Create a texture which will serve as a copy mechanism
+	textures::CpuTexture tempTex(texData.width, texData.height, texData.layers,
+								 static_cast<textures::Format>(texData.format),
+								 static_cast<textures::SamplingMode>(sampling),
+								 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+	// Create an empty texture that we'll fill with the desired format
+	auto finalTex = std::make_unique<textures::Texture>(std::move(textureName), texData.width, texData.height, texData.layers,
+														static_cast<textures::Format>(targetFormat),
+														static_cast<textures::SamplingMode>(sampling),
+														texData.sRgb);
+	auto cpuFinalTex = finalTex->template acquire<Device::CPU>();
+
+	for(u32 layer = 0u; layer < texData.layers; ++layer) {
+		for(u32 y = 0u; y < texData.height; ++y) {
+			for(u32 x = 0u; x < texData.width; ++x) {
+				const Pixel texel{ x, y };
+				textures::write(cpuFinalTex, texel, layer, tempTex.read(texel, layer));
+			}
+		}
+	}
+	finalTex->mark_changed(Device::CPU);
+
+	// The texture will take ownership of the pointer
+	hdl = s_world.add_texture(std::move(finalTex));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
@@ -1802,9 +1870,10 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	memcpy(&paddedVal, value, num * sizeof(float));
 	std::unique_ptr<u8[]> data = std::make_unique<u8[]>(textures::PIXEL_SIZE(format));
 	memcpy(data.get(), &paddedVal, textures::PIXEL_SIZE(format));
-	hdl = s_world.add_texture(name, 1, 1, 1, format,
-							  static_cast<textures::SamplingMode>(sampling),
-							  false, move(data));
+	auto texture = std::make_unique<textures::Texture>(name, 1, 1, 1, format,
+													   static_cast<textures::SamplingMode>(sampling),
+													   false, move(data));
+	hdl = s_world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
@@ -2289,7 +2358,7 @@ Boolean scenario_has_envmap_light(ScenarioHdl scenario) {
 }
 
 LightHdl scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightType type) {
-	const LightHdl invalid{ LightType::LIGHT_COUNT, std::numeric_limits<u32>::max() };
+	const LightHdl invalid{ LightType::LIGHT_COUNT, 0x1FFFFFFF };
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", invalid);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);
@@ -2955,7 +3024,19 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 		return false;
 	}
 
-	fs::path fileName = std::string(filename) + ".pfm";
+	// Make the image a PFM by default
+	fs::path fileName = std::string(filename);
+	if(fileName.extension() != ".pfm")
+		fileName += ".pfm";
+	if(!fileName.is_absolute())
+		fileName = fs::absolute(fileName);
+
+	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
+	fs::path directory = fileName.parent_path();
+	if(!fs::exists(directory))
+		if(!fs::create_directories(directory))
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+					   "; the screenshot possibly may not be created");
 
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
 	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags },
@@ -2973,17 +3054,15 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 	texData.sRgb = false;
 	texData.layers = data.get_num_layers();
 
-	fs::path filePath(filename);
-	filePath.replace_extension(".pfm");
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_store_format(filePath.extension().string())) {
-				if(plugin.store(filePath.string(), &texData))
+			if(plugin.can_store_format(fileName.extension().string())) {
+				if(plugin.store(fileName.string(), &texData))
 					break;
 			}
 		}
 	}
-	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", filename, "'");
+	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.string(), "'");
 
 	return true;
 	CATCH_ALL(false)

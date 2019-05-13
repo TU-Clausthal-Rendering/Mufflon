@@ -140,6 +140,7 @@ ConnectionValue connect(const VcmPathVertex& path0, const VcmPathVertex& path1,
 		if(!scene::accel_struct::any_intersection(
 				scene,connection.v0, path1.get_position(connection.v0),
 				path0.get_geometric_normal(),  path1.get_geometric_normal(), connection.dir)) {
+			bxdfProd *= scene.media[path0.get_medium(connection.dir)].get_transmission(connection.distance);
 			float mis = get_mis_weight(path0, val0.pdf, path1, val1.pdf, connection, numPhotons, area);
 			return {bxdfProd * (mis / connection.distanceSq), cosProd};
 		}
@@ -187,8 +188,7 @@ void CpuVcm::on_reset() {
 void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
-	scene::lights::Photon p = emit(m_sceneDesc.lightTree, idx, numPhotons, seed,
-		m_sceneDesc.aabb, rndStart);
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	VcmPathVertex vertex;
 	VcmPathVertex::create_light(&vertex, nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
 	const VcmPathVertex* previous = m_photonMap.insert(p.pos.position, vertex);

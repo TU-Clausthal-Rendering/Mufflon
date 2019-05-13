@@ -149,7 +149,7 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 	// Is the current flag, and in case of variance its basic value, set?
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
 		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return std::move(CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb});
+		return CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb};
 	}
 
 	// Allocate the memory for the output and get basic properties of the quantity to export.
@@ -177,49 +177,7 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 		data.write(value, pixel);
 	}
 
-	return std::move(data);
-}
-
-void OutputHandler::get_data_rgb(OutputValue which, unsigned char* rgbBuffer, bool exportSRgb,
-								 const float gammaFactor) {
-	// Is the current flag, and in case of variance its basic value, set?
-	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
-		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return;
-	}
-
-	if(m_iteration == 0) {
-		const int v = 0;
-	}
-
-	// Allocate the memory for the output and get basic properties of the quantity to export.
-	// TODO: if format has the same pixel size it is possible to avoid one memcopy by directly
-	// syncing into the new texture (and then convert if necessary).
-	//Texture data(m_width, m_height, 1, exportFormat, SamplingMode::NEAREST, exportSRgb);
-	int quantity = which.is_variance() ? ei::ilog2(which >> 8) : ei::ilog2(int(which));
-	bool isNormalized = !which.is_variance() && m_targets.is_set(which << 8);
-	float normalizer = isNormalized ? 1.0f : ((which & 0xff) ?
-											  1.0f / ei::max(1, m_iteration + 1) :
-											  1.0f / ei::max(1, m_iteration));
-
-	// Upload to CPU / synchronize if necessary
-	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
-		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
-		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
-
-	// TODO: openmp
-	for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x) {
-		ei::Vec4 value = read(tex, Pixel{ x,y });
-		value *= normalizer * gammaFactor;
-		if(exportSRgb) {
-			value.x = ei::sRgbToRgb(value.x);
-			value.y = ei::sRgbToRgb(value.y);
-			value.z = ei::sRgbToRgb(value.z);
-		}
-		*(rgbBuffer++) = static_cast<unsigned char>(std::min(1.f, std::max(0.f, value.x)) * 255.f);
-		*(rgbBuffer++) = static_cast<unsigned char>(std::min(1.f, std::max(0.f, value.y)) * 255.f);
-		*(rgbBuffer++) = static_cast<unsigned char>(std::min(1.f, std::max(0.f, value.z)) * 255.f);
-	}
+	return data;
 }
 
 ei::Vec4 OutputHandler::get_pixel_value(OutputValue which, Pixel pixel) {

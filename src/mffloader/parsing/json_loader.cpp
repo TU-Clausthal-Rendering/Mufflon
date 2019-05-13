@@ -95,7 +95,8 @@ void JsonLoader::clear_state() {
 	m_materialMap.clear();
 }
 
-TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling) {
+TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling,
+									std::optional<TextureFormat> targetFormat) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
@@ -105,7 +106,11 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling) 
 	if (!fs::exists(path))
 		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
 	path = fs::canonical(path);
-	TextureHdl tex = world_add_texture(path.string().c_str(), sampling);
+	TextureHdl tex;
+	if(targetFormat.has_value())
+		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value());
+	else
+		tex = world_add_texture(path.string().c_str(), sampling);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -140,6 +145,9 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			mat->outerMedium.absorption = Vec3{ 0.0f };
 			mat->outerMedium.refractionIndex = Vec2{ 1.0f, 0.0f };
 		}
+
+		// Read an optional alpha texture
+		const char* alphaPath = read_opt<const char*>(m_state, material, "alpha", nullptr);
 
 		StringView type = read<const char*>(m_state, get(m_state, material, "type"));
 		if(type.compare("lambert") == 0) {
@@ -190,8 +198,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			// Walter and Microfacet materials have the same parametrization (load as
 			// Walter pack, but modify the enum accordingly).
 			mat->innerType = type.compare("walter") == 0
-								? MaterialParamType::MATERIAL_WALTER
-								: MaterialParamType::MATERIAL_MICROFACET;
+				? MaterialParamType::MATERIAL_WALTER
+				: MaterialParamType::MATERIAL_MICROFACET;
 			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;
@@ -218,8 +226,12 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 
 		} else if(type.compare("emissive") == 0) {
 			// Emissive material
+			if(alphaPath != nullptr) {
+				logWarning("[JsonLoader::load_material] Found alpha texture for emissive material; will be ignored");
+				alphaPath = nullptr;
+			}
 			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
-			mat->inner.emissive.scale = util::pun<Vec3>(read_opt<ei::Vec3>(m_state, material, "scale", ei::Vec3{1.0f, 1.0f, 1.0f}));
+			mat->inner.emissive.scale = util::pun<Vec3>(read_opt<ei::Vec3>(m_state, material, "scale", ei::Vec3{ 1.0f, 1.0f, 1.0f }));
 			auto radianceIter = get(m_state, material, "radiance");
 			if(radianceIter->value.IsArray()) {
 				ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);
@@ -268,6 +280,13 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			// TODO: opaque material
 		} else {
 			throw std::runtime_error("Unknown material type '" + std::string(type) + "'");
+		}
+
+		// We load the alpha texture last to give emissive materials to deny it, if present
+		if(alphaPath != nullptr) {
+			mat->alpha = load_texture(alphaPath, TextureSampling::SAMPLING_LINEAR, TextureFormat::FORMAT_R8U);
+		} else {
+			mat->alpha = nullptr;
 		}
 	} catch(const std::exception&) {
 		free_material(mat);

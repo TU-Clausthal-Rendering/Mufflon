@@ -60,8 +60,8 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			u64 neeSeed = rng.next();
 			for(int i = 0; i < params.neeCount; ++i) {
 				math::RndSet2 neeRnd = rng.next();
-				auto nee = connect(scene.lightTree, i, params.neeCount, neeSeed,
-								   vertex.get_position(), scene.aabb, neeRnd);
+				auto nee = scene::lights::connect(scene, i, params.neeCount,
+								   neeSeed, vertex.get_position(), neeRnd);
 				Pixel outCoord;
 				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;

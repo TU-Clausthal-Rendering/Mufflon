@@ -19,7 +19,8 @@ namespace gui.Model.Display
         private static readonly int INITIAL_WIDTH = 800;
         private static readonly int INITIAL_HEIGHT = 600;
 
-        public event EventHandler Repainted;
+        public delegate void RepaintEventHandler(object sender);
+        public event RepaintEventHandler Repainted;
 
         // Image to be displayed as render result
         public WriteableBitmap RenderBitmap { get; private set; } = new WriteableBitmap(INITIAL_WIDTH, INITIAL_HEIGHT, 96, 96,
@@ -109,13 +110,13 @@ namespace gui.Model.Display
                 // BitmapSource, while it seems like it should be faster, actually isn't; I guess BitmapSource.Create
                 // actually copies the memory instead of just using it, so our copy is simply faster
                 RenderBitmap.Lock();
-                if(!Core.core_copy_screen_texture_rgba32(RenderBitmap.BackBuffer, GammaFactor))
+                if(!Core.core_copy_screen_texture_rgba32(RenderBitmap.BackBuffer))
                     throw new Exception(Core.core_get_dll_error());
                 RenderBitmap.AddDirtyRect(new System.Windows.Int32Rect(0, 0, RenderSize.X, RenderSize.Y));
                 RenderBitmap.Unlock();
             }));
 
-            Repainted(this, null);
+            Repainted(this);
         }
 
 
