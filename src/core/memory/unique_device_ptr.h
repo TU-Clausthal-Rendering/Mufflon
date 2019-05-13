@@ -14,8 +14,10 @@ class unique_device_ptr : public std::unique_ptr<T, Deleter<dev>> {
 template <typename T>
 class unique_device_ptr<Device::OPENGL, T> {
 public:
+	using TType = std::remove_pointer_t<std::decay_t<T>>;
+
 	unique_device_ptr() = default;
-	unique_device_ptr(gl::BufferHandle<T> handle, Deleter<Device::OPENGL> deleter) :
+	unique_device_ptr(gl::BufferHandle<TType> handle, Deleter<Device::OPENGL> deleter) :
 		m_handle(handle), 
 		m_deleter(deleter)
 	{}
@@ -38,10 +40,10 @@ public:
 	~unique_device_ptr() {
 		m_deleter.operator()(m_handle);
 	}
-	gl::BufferHandle<T> get() const {
+	gl::BufferHandle<TType> get() const {
 		return m_handle;
 	}
-	gl::BufferHandle<T> get() {
+	gl::BufferHandle<TType> get() {
 		return m_handle;
 	}
 	bool empty() const noexcept {
@@ -54,7 +56,7 @@ public:
 		return !empty();
 	}
 private:
-	gl::BufferHandle<T> m_handle = {0, 0};
+	gl::BufferHandle<TType> m_handle = {0, 0};
 	Deleter<Device::OPENGL> m_deleter;
 };
 

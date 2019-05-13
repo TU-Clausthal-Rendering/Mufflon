@@ -177,7 +177,7 @@ public:
 		// transfer data
 		gl::copyBufferSubData(handle.id, newHandle, 0, 0, prev);
 		// cleanup
-		gl::deleteBuffer(handle);
+		gl::deleteBuffer(handle.id);
 		return gl::BufferHandle<T>{newHandle, 0};
 	}
 

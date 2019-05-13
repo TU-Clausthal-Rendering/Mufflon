@@ -781,7 +781,7 @@ void LBVHBuilder::build(
 template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&);
 template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&);
 //template void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&);
-template <> void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&);
+template <> void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&) {}
 
 }
 }
