@@ -182,6 +182,7 @@
     <ClInclude Include="..\..\src\core\math\sample_types.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
     <ClInclude Include="..\..\src\core\math\sfcurves.hpp" />
+    <ClInclude Include="..\..\src\core\math\tabulated_function.hpp" />
     <ClInclude Include="..\..\src\core\memory\allocator.hpp" />
     <ClInclude Include="..\..\src\core\memory\dyntype_memory.hpp" />
     <ClInclude Include="..\..\src\core\memory\generic_resource.hpp" />
@@ -268,8 +269,10 @@
     <ClInclude Include="..\..\src\core\scene\materials\medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\material_sampling.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_base.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\microfacet_full.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_refractive.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\microfacet_specular.hpp" />
+    <ClInclude Include="..\..\src\core\scene\materials\oren_nayar.hpp" />
     <ClInclude Include="..\..\src\core\scene\materials\point_medium.hpp" />
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
@@ -450,7 +453,7 @@ xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToo
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>

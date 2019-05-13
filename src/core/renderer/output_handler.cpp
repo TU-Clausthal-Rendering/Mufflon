@@ -1,5 +1,6 @@
 #include "output_handler.hpp"
 #include "util/log.hpp"
+#include "util/parallel.hpp"
 
 
 using namespace mufflon::scene::textures;
@@ -148,7 +149,7 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 	// Is the current flag, and in case of variance its basic value, set?
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
 		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return std::move(CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb});
+		return CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb};
 	}
 
 	// Allocate the memory for the output and get basic properties of the quantity to export.
@@ -167,14 +168,36 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
 		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
 
-	// TODO: openmp
-	for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x) {
-		ei::Vec4 value = read(tex, Pixel{x,y});
+	const int PIXELS = m_width * m_height;
+#pragma PARALLEL_FOR
+	for(int i = 0; i < PIXELS; ++i) {
+		const Pixel pixel{ i % m_width, i / m_width };
+		ei::Vec4 value = read(tex, pixel);
 		value *= normalizer;
-		data.write(value, Pixel{x,y});
+		data.write(value, pixel);
 	}
 
-	return std::move(data);
+	return data;
+}
+
+ei::Vec4 OutputHandler::get_pixel_value(OutputValue which, Pixel pixel) {
+	// Is the current flag, and in case of variance its basic value, set?
+	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
+		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
+		return ei::Vec4{};
+	}
+
+	int quantity = which.is_variance() ? ei::ilog2(which >> 8) : ei::ilog2(int(which));
+	bool isNormalized = !which.is_variance() && m_targets.is_set(which << 8);
+	float normalizer = isNormalized ? 1.0f : ((which & 0xff) ?
+											  1.0f / ei::max(1, m_iteration + 1) :
+											  1.0f / ei::max(1, m_iteration));
+	// Upload to CPU / synchronize if necessary
+	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
+		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
+		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
+
+	return read(tex, pixel) * normalizer;
 }
 
 } // namespace mufflon::renderer

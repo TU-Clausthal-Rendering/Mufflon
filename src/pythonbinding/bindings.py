@@ -43,7 +43,7 @@ class DllInterface:
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
-        self.dllHolder.core.scenario_set_animation_frame.argtypes = [c_void_p, c_uint]
+        self.dllHolder.core.world_set_frame_current.argtypes = [c_uint]
         self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
@@ -77,7 +77,7 @@ class DllInterface:
         iterateTime = ProcessTime(0,0)
         preTime = ProcessTime(0,0)
         postTime = ProcessTime(0,0)
-        self.dllHolder.core.render_iterate(byref(iterateTime), byref(preTime), byref(postTime))
+        self.dllHolder.core.render_iterate(byref(iterateTime), byref(postTime), byref(postTime))
         return iterateTime, preTime, postTime
 
     def render_reset(self):
@@ -122,8 +122,17 @@ class DllInterface:
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
 
-    def scenario_set_animation_frame(self, scenario, frame):
-        return self.dllHolder.core.scenario_set_animation_frame(c_void_p(scenario), c_uint(frame))
+    def world_set_frame_current(self, frame):
+        return self.dllHolder.core.world_set_frame_current(c_uint(frame))
+    
+    def world_get_frame_current(self, frame):
+        return self.dllHolder.core.world_get_frame_current(byref(frame))
+    
+    def world_get_frame_start(self, frame):
+        return self.dllHolder.core.world_get_frame_start(byref(frame))
+    
+    def world_get_frame_end(self, frame):
+        return self.dllHolder.core.world_get_frame_end(byref(frame))
 
     def world_find_scenario(self, name):
         return self.dllHolder.core.world_find_scenario(c_char_p(name.encode('utf-8')))
@@ -183,12 +192,27 @@ class RenderActions:
         if not self.dllInterface.world_load_scenario(hdl):
             raise Exception("Failed to load scenario '" + scenarioName + "'")
 
-    def set_scenario_animation_frame(self, frame):
-        hdl = self.dllInterface.world_get_current_scenario()
-        if not hdl:
-            raise Exception("No scenario currently loaded")
-        if not self.dllInterface.scenario_set_animation_frame(hdl, frame):
-            raise Exception("Failed to set scenario animation frame to '" + str(frame) + "'")
+    def set_current_animation_frame(self, frame):
+        if not self.dllInterface.world_set_frame_current(frame):
+            raise Exception("Failed to set animation frame to '" + str(frame) + "'")
+
+    def get_current_animation_frame(self):
+        frame = c_uint(0)
+        if not self.dllInterface.world_get_frame_current(frame):
+            raise Exception("Failed to get current animation frame")
+        return frame.value
+
+    def get_start_animation_frame(self):
+        frame = c_uint(0)
+        if not self.dllInterface.world_get_frame_start(frame):
+            raise Exception("Failed to get start animation frame")
+        return frame.value
+
+    def get_end_animation_frame(self):
+        frame = c_uint(0)
+        if not self.dllInterface.world_get_frame_end(frame):
+            raise Exception("Failed to get end animation frame")
+        return frame.value
         
     def set_renderer_log_level(self, logLevel):
         if not self.dllInterface.core_set_log_level(logLevel):
@@ -233,7 +257,7 @@ class RenderActions:
         accumPostTime = ProcessTime(0,0)
         for i in range(iterationCount):
             if printProgress and (i % progressSteps == 0):
-                print("--- ", (i + 1), " of ", iterationCount, " ---")
+                print("--- ", (i + 1), " of ", iterationCount, " ---", flush=True)
             [iterateTime, preTime, postTime] = self.dllInterface.render_iterate()
             accumIterateTime.microseconds += iterateTime.microseconds
             accumIterateTime.cycles += iterateTime.cycles

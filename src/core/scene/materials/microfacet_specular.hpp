@@ -17,8 +17,8 @@ CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CU
 		roughness.y = texValues[MatTorrance::ROUGHNESS+texOffset].y;
 	return MatSampleTorrance{
 		Spectrum{texValues[MatTorrance::ALBEDO+texOffset]},
-		texValues[MatTorrance::ROUGHNESS+texOffset].z,
-		roughness, params.ndf
+		params.ndf,
+		roughness
 	};
 }
 
@@ -33,29 +33,28 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 	math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
 
 	// Find the visible half vector.
-	float iDotH;
-	Direction halfTS = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rndSet.i0, iDotH);
-	// TODO rotate half vector
+	u64 rnd = rndSet.i0;
+	auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
 
-	boundary.set_halfTS(halfTS);
+	boundary.set_halfTS(h.halfTS);
 
 	// Reflect the vector 
-	Direction excidentTS = (2.0f * iDotH) * halfTS - incidentTS;
+	Direction excidentTS = (2.0f * h.cosI) * h.halfTS - incidentTS;
 
 	// Get geometry factors for PDF and throughput computation
-	float ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
-	float gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
-	float g = geoshadowing_vcavity_reflection(gi, ge);
-	if(ge == 0.0f || gi == 0.0f) // Completely nullyfy the invalid result
+	float ge = geoshadowing_vcavity(h.cosI, excidentTS.z, h.halfTS.z, params.roughness);
+	float gi = geoshadowing_vcavity(h.cosI, incidentTS.z, h.halfTS.z, params.roughness);
+	if(ge == 0.0f || gi == 0.0f)
 		return math::PathSample {};
+	float g = geoshadowing_vcavity_reflection(gi, ge);
 
 	// Copy the sign for two sided diffuse
 	return math::PathSample {
-		Spectrum{params.albedo} * sdiv(g,gi),
+		params.albedo * sdiv(g, gi),
 		math::PathEventType::REFLECTED,
 		excidentTS,
-		cavityTS.pdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),
-		cavityTS.pdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z))
+		cavityTS.pdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * h.halfTS.z)),
+		cavityTS.pdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * h.halfTS.z))
 	};
 }
 
@@ -72,9 +71,9 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 	float iDotH = dot(incidentTS, halfTS);
 	float ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
 	float gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+	if(ge == 0.0f || gi == 0.0f)
+		return math::BidirSampleValue {};
 	float g = geoshadowing_vcavity_reflection(gi, ge);
-
-	// TODO: rotate halfTS
 
 	// Normal Density Term
 	float d = eval_ndf(params.ndf, params.roughness, halfTS);
@@ -101,7 +100,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
 	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
 }
 
-template MaterialSampleConcept<MatSampleTorrance>;
-template MaterialConcept<MatTorrance>;
+template class MaterialSampleConcept<MatSampleTorrance>;
+template class MaterialConcept<MatTorrance>;
 
 }}} // namespace mufflon::scene::materials

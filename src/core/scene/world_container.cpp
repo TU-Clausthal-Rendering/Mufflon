@@ -271,7 +271,8 @@ CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<camera
 		return nullptr;
 	iter.first->second->set_name(iter.first->first);
 	m_cameraHandles.push_back(iter.first);
-	m_camerasDirty.emplace(camera.get(), true);
+	m_camerasDirty.emplace(iter.first->second.get(), true);
+	m_frameEnd = std::max(m_frameEnd, m_frameStart + iter.first->second->get_path_segment_count() - 1u);
 	return iter.first->second.get();
 }
 
@@ -539,12 +540,14 @@ void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 				   != m_scenario->get_dir_lights().cend())
 					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
 				break;
-			case lights::LightType::ENVMAP_LIGHT:
+			case lights::LightType::ENVMAP_LIGHT: {
 				// Check if the envmap is the current one
 				const lights::Background& background = m_envLights.get(m_scenario->get_background());
 				if(&background == &m_envLights.get(index))
 					m_envLightDirty = true;
-				break;
+			}	break;
+			default:
+				logWarning("[WorldContainer::mark_light_dirty]: Ignoring unknown light type");
 		}
 	}
 }
@@ -560,17 +563,12 @@ TextureHandle WorldContainer::find_texture(StringView name) {
 	return nullptr;
 }
 
-TextureHandle WorldContainer::add_texture(StringView path, u16 width,
-										  u16 height, u16 numLayers,
-										  textures::Format format, textures::SamplingMode mode,
-										  bool sRgb, std::unique_ptr<u8[]> data) {
-	mAssertMsg(m_textures.find(path) == m_textures.end(), "Duplicate texture entry");
+TextureHandle WorldContainer::add_texture(std::unique_ptr<textures::Texture> texture) {
 	// TODO: ensure that we have at least 1x1 pixels?
-	auto tex = std::make_unique<textures::Texture>(move(to_string(path)),
-						width, height, numLayers, format, mode, sRgb, move(data));
-	StringView nameRef = tex->get_name();
-	TextureHandle texHdl = tex.get();
-	m_textures.emplace(nameRef, move(tex));
+	StringView nameRef = texture->get_name();
+	mAssertMsg(m_textures.find(nameRef) == m_textures.end(), "Duplicate texture entry");
+	TextureHandle texHdl = texture.get();
+	m_textures.emplace(nameRef, move(texture));
 	m_texRefCount[texHdl] = 1u;
 	return texHdl;
 }
@@ -604,7 +602,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
 	m_scenario = &scenario;
 	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart);
-	u32 instIdx = 0;
 	// TODO: unload LoDs that are not needed anymore?
 
 	auto addObjAndInstance = [this, &scenario](Instance& inst) {
@@ -733,12 +730,9 @@ bool WorldContainer::load_scene_lights() {
 				for(const auto& face : polygons.faces()) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
 					if(mat->get_properties().is_emissive()) {
-						auto emission = mat->get_emission();
-						mAssert(emission.texture != nullptr);
 						if(std::distance(face.begin(), face.end()) == 3) {
 							lights::AreaLightTriangleDesc al;
-							al.radianceTex = emission.texture;
-							al.scale = ei::packRGB9E5(emission.scale);
+							al.material = materials[primIdx];
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
@@ -752,8 +746,7 @@ bool WorldContainer::load_scene_lights() {
 							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
 						} else {
 							lights::AreaLightQuadDesc al;
-							al.radianceTex = emission.texture;
-							al.scale = emission.scale;
+							al.material = materials[primIdx];
 							int i = 0;
 							for(auto vHdl : face) {
 								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
@@ -778,13 +771,11 @@ bool WorldContainer::load_scene_lights() {
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
 					if(mat->get_properties().is_emissive()) {
-						auto emission = mat->get_emission();
-						mAssert(emission.texture != nullptr);
 						mAssert(ei::approx(inst->get_scale().x, inst->get_scale().y) && ei::approx(inst->get_scale().x, inst->get_scale().z));
 						lights::AreaLightSphereDesc al{
 							transform(spheresData[i].center, inst->get_transformation_matrix()),
 							inst->get_scale().x * spheresData[i].radius,
-							emission.texture, emission.scale
+							materials[i]
 						};
 						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });
 					}

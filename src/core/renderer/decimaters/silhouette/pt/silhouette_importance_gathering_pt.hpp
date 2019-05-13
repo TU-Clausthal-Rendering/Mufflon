@@ -227,9 +227,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 		if(pathLen > 0 && pathLen + 1 <= params.maxPathLength) {
 			u64 neeSeed = rng.next();
 			math::RndSet2 neeRnd = rng.next();
-			auto nee = connect(scene.lightTree, 0, 1, neeSeed,
-							   vertices[pathLen].get_position(), scene.aabb,
-							   neeRnd);
+			auto nee = scene::lights::connect(scene, 0, 1, neeSeed, vertices[pathLen].get_position(), neeRnd);
 			Pixel projCoord;
 			auto value = vertices[pathLen].evaluate(nee.dir.direction, scene.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));

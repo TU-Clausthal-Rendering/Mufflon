@@ -32,7 +32,7 @@ protected:
 	FunctionPtr<R, Args...> load_function(StringView name) const {
 		using FunctionType = FunctionPtr<R, Args...>;
 		if(is_loaded()) {
-			FunctionType proc = static_cast<FunctionType>(this->load_procedure(&name[0u]));
+			FunctionType proc = reinterpret_cast<FunctionType>(this->load_procedure(&name[0u]));
 			if(proc == nullptr)
 				logError("[Plugin::resolve_function] Failed to load function address '",
 						 name, "': ", get_last_error_message());

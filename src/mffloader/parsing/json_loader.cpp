@@ -34,6 +34,37 @@ std::string read_file(fs::path path) {
 	return fileString;
 }
 
+// Reads an optional array
+template < class T >
+std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name) {
+	std::vector<T> vec;
+	try {
+		read(state, get(state, parent, name), vec);
+	} catch(const ParserException& pe) {
+		(void)pe;
+		if(state.expected == ParserState::Value::NONE)
+			state.objectNames.pop_back();
+		vec = std::vector<T>{ read<T>(state, get(state, parent, name)) };
+	}
+	return vec;
+}
+template < class T >
+std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name, const T& optVal) {
+	std::vector<T> vec;
+	try {
+		if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+			read(state, valIter, vec);
+		else
+			vec = std::vector<T>{ optVal };
+	} catch(const ParserException& pe) {
+		(void)pe;
+		if(state.expected == ParserState::Value::NONE)
+			state.objectNames.pop_back();
+		vec = std::vector<T>{ read_opt<T>(state, parent, name, optVal) };
+	}
+	return vec;
+}
+
 } // namespace
 
 JsonException::JsonException(const std::string& str, rapidjson::ParseResult res) :
@@ -64,7 +95,8 @@ void JsonLoader::clear_state() {
 	m_materialMap.clear();
 }
 
-TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling) {
+TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling,
+									std::optional<TextureFormat> targetFormat) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
@@ -74,7 +106,11 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling) 
 	if (!fs::exists(path))
 		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
 	path = fs::canonical(path);
-	TextureHdl tex = world_add_texture(path.string().c_str(), sampling);
+	TextureHdl tex;
+	if(targetFormat.has_value())
+		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value());
+	else
+		tex = world_add_texture(path.string().c_str(), sampling);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -110,6 +146,9 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			mat->outerMedium.refractionIndex = Vec2{ 1.0f, 0.0f };
 		}
 
+		// Read an optional alpha texture
+		const char* alphaPath = read_opt<const char*>(m_state, material, "alpha", nullptr);
+
 		StringView type = read<const char*>(m_state, get(m_state, material, "type"));
 		if(type.compare("lambert") == 0) {
 			// Lambert material
@@ -137,8 +176,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				throw std::runtime_error("Unknown normal distribution function '" + std::string(ndf) + "'");
 			auto roughnessIter = get(m_state, material, "roughness");
 			if(roughnessIter->value.IsArray()) {
-				ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
-				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
+				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else if(roughnessIter->value.IsNumber()) {
 				float alpha = read<float>(m_state, roughnessIter);
 				mat->inner.torrance.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
@@ -155,9 +194,12 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else
 				throw std::runtime_error("Invalid type for albedo.");
 
-		} else if(type.compare("walter") == 0) {
-			// Walter material
-			mat->innerType = MaterialParamType::MATERIAL_WALTER;
+		} else if(type.compare("walter") == 0 || type.compare("microfacet") == 0) {
+			// Walter and Microfacet materials have the same parametrization (load as
+			// Walter pack, but modify the enum accordingly).
+			mat->innerType = type.compare("walter") == 0
+				? MaterialParamType::MATERIAL_WALTER
+				: MaterialParamType::MATERIAL_MICROFACET;
 			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;
@@ -175,8 +217,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			} else if(roughnessIter->value.IsString()) {
 				mat->inner.walter.roughness = load_texture(read<const char*>(m_state, roughnessIter));
 			} else if(roughnessIter->value.IsArray()) {
-				ei::Vec3 xyr = read<ei::Vec3>(m_state, roughnessIter);
-				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xyr), 3, TextureSampling::SAMPLING_NEAREST);
+				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
+				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else
 				throw std::runtime_error("Invalid type for roughness");
 
@@ -184,8 +226,12 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 
 		} else if(type.compare("emissive") == 0) {
 			// Emissive material
+			if(alphaPath != nullptr) {
+				logWarning("[JsonLoader::load_material] Found alpha texture for emissive material; will be ignored");
+				alphaPath = nullptr;
+			}
 			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
-			mat->inner.emissive.scale = util::pun<Vec3>(read_opt<ei::Vec3>(m_state, material, "scale", ei::Vec3{1.0f, 1.0f, 1.0f}));
+			mat->inner.emissive.scale = util::pun<Vec3>(read_opt<ei::Vec3>(m_state, material, "scale", ei::Vec3{ 1.0f, 1.0f, 1.0f }));
 			auto radianceIter = get(m_state, material, "radiance");
 			if(radianceIter->value.IsArray()) {
 				ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);
@@ -234,6 +280,13 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			// TODO: opaque material
 		} else {
 			throw std::runtime_error("Unknown material type '" + std::string(type) + "'");
+		}
+
+		// We load the alpha texture last to give emissive materials to deny it, if present
+		if(alphaPath != nullptr) {
+			mat->alpha = load_texture(alphaPath, TextureSampling::SAMPLING_LINEAR, TextureFormat::FORMAT_R8U);
+		} else {
+			mat->alpha = nullptr;
 		}
 	} catch(const std::exception&) {
 		free_material(mat);
@@ -370,16 +423,10 @@ bool JsonLoader::load_lights() {
 		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
-			std::vector<ei::Vec3> positions;
-			std::vector<ei::Vec3> intensities;
-			std::vector<float> scales;
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "position"), positions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
-			}
+			std::vector<ei::Vec3> intensities;
 			try {
 				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
 					read(m_state, get(m_state, light, "intensity"), intensities);
@@ -390,19 +437,12 @@ bool JsonLoader::load_lights() {
 				}
 			} catch(const ParserException& pe) {
 				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
 				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
 					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
 				else
 					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) / (4.0f * ei::PI) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
 			}
 
 			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(), scales.size()));
@@ -426,40 +466,13 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
-			std::vector<ei::Vec3> positions;
-			std::vector<ei::Vec3> directions;
-			std::vector<ei::Vec3> intensities;
-			std::vector<float> scales;
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> intensities = read_opt_array<ei::Vec3>(m_state, light, "intensity");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			std::vector<float> angles;
 			std::vector<float> falloffStarts;
 			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "position"), positions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
-			}
-			try {
-				read(m_state, get(m_state, light, "direction"), directions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				directions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "direction")) };
-			}
-			try {
-				read(m_state, get(m_state, light, "intensity"), intensities);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
-			}
 			try {
 				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
 					read(m_state, get(m_state, light, "cosWidth"), angles);
@@ -467,6 +480,8 @@ bool JsonLoader::load_lights() {
 					read(m_state, get(m_state, light, "width"), angles);
 			} catch(const ParserException& pe) {
 				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
 				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
 					angles = std::vector<float>{ std::acos(read<float>(m_state, angleIter)) };
 				else
@@ -488,11 +503,13 @@ bool JsonLoader::load_lights() {
 				}
 			} catch(const ParserException& pe) {
 				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
 				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd())
 					falloffStarts = std::vector<float>{ std::acos(read<float>(m_state, falloffIter)) };
 				else
-					if(get(m_state, light, "falloffStart", false) != light.MemberEnd()) {
-						read(m_state, get(m_state, light, "falloffStart"), falloffStarts);
+					if(auto falloffIter = get(m_state, light, "falloffStart", false); falloffIter != light.MemberEnd()) {
+						falloffStarts = std::vector<float>{ read<float>(m_state, falloffIter) };
 					} else {
 						falloffStarts.reserve(angles.size());
 						for(const auto& angle : angles)
@@ -539,31 +556,9 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
-			std::vector<ei::Vec3> directions;
-			std::vector<ei::Vec3> radiances;
-			std::vector<float> scales;
-			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "direction"), directions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				directions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "direction")) };
-			}
-			try {
-				read(m_state, get(m_state, light, "radiance"), radiances);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				radiances = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "radiance")) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
-			}
+			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> radiances = read_opt_array<ei::Vec3>(m_state, light, "radiance");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 
 			const std::size_t maxSize = std::max(directions.size(), std::max(radiances.size(), scales.size()));
 			if(radiances.size() == 1u && maxSize != 1u)
@@ -604,24 +599,8 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add environment light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			std::vector<ei::Vec3> positions;
-			std::vector<float> scales;
-			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				read(m_state, get(m_state, light, "position"), positions);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				positions = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "position")) };
-			}
-			try {
-				if(auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "scale"), scales);
-				else
-					scales = std::vector<float>{ 1.f };
-			} catch(const ParserException& pe) {
-				(void)pe;
-				scales = std::vector<float>{ read_opt<float>(m_state, light, "scale", 1.f) };
-			}
+			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			// TODO: incorporate scale
 
@@ -763,7 +742,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 					InstanceHdl animInstHdl = world_get_instance(&instName[0u], frame);
 					if(animInstHdl == nullptr)
-						throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
+						continue;
 					// Read LoD
 					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
 						if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
@@ -776,17 +755,17 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				}
 
 				InstanceHdl instHdl = world_get_instance(&instName[0u], 0xFFFFFFFF);
-				if(instHdl == nullptr)
-					throw std::runtime_error("Failed to find instance '" + std::string(instName) + "'");
-				// Read LoD
-				if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-					if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
-						throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-				// Read masking information
-				if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-				   && read<bool>(m_state, maskIter))
-					if(!scenario_mask_instance(scenarioHdl, instHdl))
-						throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				if(instHdl != nullptr) {
+					// Read LoD
+					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+						if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
+							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+					// Read masking information
+					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+					   && read<bool>(m_state, maskIter))
+						if(!scenario_mask_instance(scenarioHdl, instHdl))
+							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+				}
 				m_state.objectNames.pop_back();
 			}
 			m_state.objectNames.pop_back();

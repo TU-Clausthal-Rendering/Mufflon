@@ -261,58 +261,33 @@ Boolean loader_profiling_save_total_and_snapshots(const char* path) {
 
 const char* loader_profiling_get_current_state() {
 	TRY
-	std::string str = Profiler::instance().save_current_state();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, str.c_str(), str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
+		static thread_local std::string str;
+	str = Profiler::instance().save_current_state();
+	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* loader_profiling_get_snapshots() {
 	TRY
-	std::string str = Profiler::instance().save_snapshots();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, str.c_str(), str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
+	static thread_local std::string str;
+	str = Profiler::instance().save_snapshots();
+	return str.c_str();
+	CATCH_ALL(nullptr)
+}
+
+const char* loader_profiling_get_total() {
+	TRY
+	static thread_local std::string str;
+	str = Profiler::instance().save_total();
+	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 const char* loader_profiling_get_total_and_snapshots() {
 	TRY
-	std::string str = Profiler::instance().save_total_and_snapshots();
-#ifdef _WIN32
-	// For C# interop
-	char* buffer = reinterpret_cast<char*>(::CoTaskMemAlloc(str.size() + 1u));
-#else // _WIN32
-	char* buffer = new char[str.size() + 1u];
-#endif // _WIN32
-	if(buffer == nullptr) {
-		logError("[", FUNCTION_NAME, "] Failed to allocate state buffer");
-		return nullptr;
-	}
-	std::memcpy(buffer, str.c_str(), str.size());
-	buffer[str.size()] = '\0';
-	return buffer;
+	static thread_local std::string str;
+	str = Profiler::instance().save_total_and_snapshots();
+	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 

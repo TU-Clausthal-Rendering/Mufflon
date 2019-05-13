@@ -2,6 +2,7 @@
 #include "accel_structs_commons.hpp"
 #include "lbvh.hpp"
 #include "util/types.hpp"
+#include "core/scene/textures/interface.hpp"
 
 #include <cuda_runtime_api.h>
 #include <ei/3dtypes.hpp>
@@ -30,16 +31,16 @@ enum : i32 {
 };
 
 // Experimentally determined best mix of float/i32/video minmax instructions for Kepler.
-__device__ __inline__ i32   min_min(i32 a, i32 b, i32 c) { i32 v; asm("vmin.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ i32   min_max(i32 a, i32 b, i32 c) { i32 v; asm("vmin.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ i32   max_min(i32 a, i32 b, i32 c) { i32 v; asm("vmax.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ i32   max_max(i32 a, i32 b, i32 c) { i32 v; asm("vmax.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
-__device__ __inline__ float fmin_fmin(float a, float b, float c) { return __int_as_float(min_min(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
-__device__ __inline__ float fmin_fmax(float a, float b, float c) { return __int_as_float(min_max(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
-__device__ __inline__ float fmax_fmin(float a, float b, float c) { return __int_as_float(max_min(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
-__device__ __inline__ float fmax_fmax(float a, float b, float c) { return __int_as_float(max_max(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
-__device__ __inline__ float spanBeginKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmax_fmax(fminf(a0, a1), fminf(b0, b1), fmin_fmax(c0, c1, d)); }
-__device__ __inline__ float spanEndKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmin_fmin(fmaxf(a0, a1), fmaxf(b0, b1), fmax_fmin(c0, c1, d)); }
+__device__ __forceinline__ i32   min_min(i32 a, i32 b, i32 c) { i32 v; asm("vmin.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __forceinline__ i32   min_max(i32 a, i32 b, i32 c) { i32 v; asm("vmin.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __forceinline__ i32   max_min(i32 a, i32 b, i32 c) { i32 v; asm("vmax.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __forceinline__ i32   max_max(i32 a, i32 b, i32 c) { i32 v; asm("vmax.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c)); return v; }
+__device__ __forceinline__ float fmin_fmin(float a, float b, float c) { return __int_as_float(min_min(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
+__device__ __forceinline__ float fmin_fmax(float a, float b, float c) { return __int_as_float(min_max(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
+__device__ __forceinline__ float fmax_fmin(float a, float b, float c) { return __int_as_float(max_min(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
+__device__ __forceinline__ float fmax_fmax(float a, float b, float c) { return __int_as_float(max_max(__float_as_int(a), __float_as_int(b), __float_as_int(c))); }
+__device__ __forceinline__ float spanBeginKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmax_fmax(fminf(a0, a1), fminf(b0, b1), fmin_fmax(c0, c1, d)); }
+__device__ __forceinline__ float spanEndKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmin_fmin(fmaxf(a0, a1), fmaxf(b0, b1), fmax_fmin(c0, c1, d)); }
 
 
 CUDA_FUNCTION bool intersect(const ei::Box& bb,
@@ -169,12 +170,13 @@ CUDA_FUNCTION float intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, cons
 	return t;
 }
 
-template < Device dev >
+template < Device dev, bool alphatesting >
 CUDA_FUNCTION bool intersects_primitve(
+	const SceneDescriptor<dev>& scene,
 	const LodDescriptor<dev>& obj,
 	const ei::FastRay& ray,
+	const i32 instanceId,
 	const i32 primId,
-	int& hitPrimId,
 	float& hitT,				// In out: max hit distance before, if hit then returns the new distance
 	SurfaceParametrization& surfParams
 ) {
@@ -193,9 +195,23 @@ CUDA_FUNCTION bool intersects_primitve(
 		float t;
 		ei::Vec3 barycentric;
 		if(ei::intersects(ray, tri, t, barycentric) && t < hitT && t > 0.0f) {
+			// Perform alpha test
+			if(alphatesting) {
+				MaterialIndex matIdx = obj.polygon.matIndices[primId];
+				if(scene.has_alpha(matIdx)) {
+					// Compute UV coordinates
+					const ei::Vec2 uvV[3] = { obj.polygon.uvs[ids.x], obj.polygon.uvs[ids.y], obj.polygon.uvs[ids.z] };
+					const auto uv = uvV[0] * barycentric.x + uvV[1] * barycentric.y +
+						uvV[2] * (1.f - barycentric.x - barycentric.y);
+
+					// < 0.5 is the threshold for transparency (binary decision)
+					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f)
+						return false;
+				}
+			}
+
 			hitT = t;
 			surfParams.barycentric = ei::Vec2{ barycentric.x, barycentric.y };
-			hitPrimId = primId;
 			return true;
 		}
 	} else if(primId < (i32)(obj.polygon.numTriangles + obj.polygon.numQuads)) {
@@ -210,9 +226,22 @@ CUDA_FUNCTION bool intersects_primitve(
 									  meshVertices[ids[2]], meshVertices[ids[3]], ray, bilinear);
 
 		if(t > 0.0f && t < hitT) {
+			// Perform alpha test
+			if(alphatesting) {
+				MaterialIndex matIdx = obj.polygon.matIndices[primId];
+				if(scene.has_alpha(matIdx)) {
+					// Compute UV coordinates
+					const ei::Vec2 uvV[4] = { obj.polygon.uvs[ids[0]], obj.polygon.uvs[ids[1]], obj.polygon.uvs[ids[2]], obj.polygon.uvs[ids[3]] };
+					const ei::Vec2 uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], bilinear.x, bilinear.y);
+
+					// < 0.5 is the threshold for transparency (binary decision)
+					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f)
+						return false;
+				}
+			}
+
 			hitT = t;
 			surfParams.bilinear = bilinear;
-			hitPrimId = primId;
 			return true;
 		}
 	} else {
@@ -225,8 +254,28 @@ CUDA_FUNCTION bool intersects_primitve(
 		// to modify the ray beforehand. Testing for tmin afterwards is buggy.
 		float t;
 		if(ei::intersects(ray, sph, t) && t < hitT) {
+			// Perform alpha test
+			if(alphatesting) {
+				MaterialIndex matIdx = obj.spheres.matIndices[primId];
+				if(scene.has_alpha(matIdx)) {
+					// Compute UV coordinates
+					const i32 sphId = primId - (obj.polygon.numTriangles + obj.polygon.numQuads);
+					const ei::Vec3 hitPoint = transform(ray.origin + t * ray.direction, scene.instanceToWorld[instanceId]);
+					const Point center = transform(obj.spheres.spheres[sphId].center, scene.instanceToWorld[instanceId]);
+					const ei::Vec3 geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
+					const ei::Vec3 localN = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[instanceId] }) * geoNormal);
+					const ei::Vec2 uv{
+						atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f,
+						acosf(-localN.z) / ei::PI
+					};
+
+					// < 0.5 is the threshold for transparency (binary decision)
+					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f)
+						return false;
+				}
+			}
+
 			hitT = t;
-			hitPrimId = primId;
 			// Barycentrics unused; TODO: get coordinates anyway?
 			return true;
 		}
@@ -249,16 +298,16 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 	ei::FastRay fray { transRay };
 	// Scale our current maximum intersection distance into the object space
 	// to avoid false negatives.
-	float objSpaceHitT = tmax * scale;
+	const float objSpaceTMax = tmax * scale;
 
 	// Intersect the ray against the object's bounding box.
 	float objSpaceT;
 	const i32 objId = scene.lodIndices[instanceId];
 	const ei::Box& box = scene.aabbs[objId];
-	if(intersect(box, fray, objSpaceHitT, objSpaceT)) {
+	if(intersect(box, fray, objSpaceTMax, objSpaceT)) {
 		currentRay = fray;
 		rayScale = scale;
-		tmax = objSpaceHitT;
+		tmax = objSpaceTMax;
 		obj = &scene.lods[objId];
 		currentBvh = (const LBVH*)obj->accelStruct.accelParameters;
 		return true;
@@ -282,7 +331,7 @@ void object_to_world_space(const ei::FastRay& ray, ei::FastRay& currentRay, floa
 } // namespace ::
 
 
-template < Device dev > __host__ __device__
+template < Device dev, bool alphatest > __host__ __device__
 RayIntersectionResult first_intersection(
 	const SceneDescriptor<dev>& scene,
 	ei::Ray& ray,
@@ -316,7 +365,9 @@ RayIntersectionResult first_intersection(
 	if(scene.numInstances == 1) {
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
 			primCount = 0; // No hit of the entire scene, skip the upcoming loop
-		currentInstanceId = 0u;
+		currentInstanceId = 0;
+		if(obj && obj->numPrimitives == 1)
+			primCount = 1;
 	}
 
 	// Traversal loop.
@@ -379,9 +430,9 @@ RayIntersectionResult first_intersection(
 			if(!obj) {		// Currently in scene BVH => go to object space.
 				if(world_to_object_space(scene, primId, fray, currentRay, currentTScale, hitT, obj, currentBvh)) {
 					if(obj->numPrimitives == 1) { // Fast path - no BVH
-						if(intersects_primitve(*obj, currentRay, 0,
-											   hitPrimId, hitT, surfParams)) {
+						if(intersects_primitve<dev, alphatest>(scene, *obj, currentRay, primId, 0, hitT, surfParams)) {
 							hitInstanceId = primId;
+							hitPrimId = 0;
 						}
 						// Immediatelly leave the object space again
 						object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
@@ -400,18 +451,18 @@ RayIntersectionResult first_intersection(
 						currentInstanceId = primId;
 					}
 				}
-			} else if(intersects_primitve(*obj, currentRay, primId,
-										  hitPrimId, hitT, surfParams)) {
+			} else if(intersects_primitve<dev, alphatest>(scene, *obj, currentRay, currentInstanceId, primId, hitT, surfParams)) {
 				hitInstanceId = currentInstanceId;
+				hitPrimId = primId;
 			}
 		}
 	}
 
-	if(scene.numInstances == 1)
+	if(obj)
 		object_to_world_space(fray, currentRay, currentTScale, bvh, currentBvh, hitT, obj);
 
 	// Nobody should update hitT if no primitive is hit
-	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || hitT == tmax);
+	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || ei::approx(hitT, tmax));
 
 	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
 	for(int i = 0; i < scene.numInstances; ++i) {
@@ -419,7 +470,7 @@ RayIntersectionResult first_intersection(
 		ei::Ray transRay = { transform(ray.origin, scene.worldToInstance[i]),
 							 normalize(transformDir(ray.direction, scene.worldToInstance[i])) };
 		for(int p = 0; p < obj.numPrimitives; ++p) {
-			if(intersects_primitve(obj, transRay, p, -1, hitPrimId, hitT, surfParams))
+			if(intersects_primitve(scene, obj, transRay, p, -1, i, hitPrimId, hitT, surfParams))
 				hitInstanceId = i;
 		}
 	}*/
@@ -561,6 +612,7 @@ bool any_intersection(
 	float currentTScale = 1.0f;
 	const LodDescriptor<dev>* obj = nullptr;
 	const LBVH* currentBvh = &bvh;
+	i32 currentInstanceId = IGNORE_ID;
 
 	// Setup traversal.
 	i32 traversalStack[STACK_SIZE];
@@ -570,9 +622,13 @@ bool any_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1)
+	if(scene.numInstances == 1) {
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, tmax, obj, currentBvh))
 			return false; // No hit of the entire scene
+		currentInstanceId = 0;
+		if(obj != nullptr && obj->numPrimitives == 1)
+			primCount = 1;
+	}
 
 	// Traversal loop.
 	while(stackIdx > 0 || primCount > 0) {
@@ -630,15 +686,13 @@ bool any_intersection(
 			++primOffset;
 			--primCount;
 
-			i32 hitPrimId;
 			SurfaceParametrization surfParams;
 
 			// Primitves can be instances or true primities.
 			if(!obj) {		// Currently in scene BVH => go to object space.
 				if(world_to_object_space(scene, primId, fray, currentRay, currentTScale, tmax, obj, currentBvh)) {
 					if(obj->numPrimitives == 1) { // Fast path - no BVH
-						if(intersects_primitve(*obj, currentRay, 0,
-											   hitPrimId, tmax, surfParams)) {
+						if(intersects_primitve<dev, true>(scene, *obj, currentRay, primId, 0, tmax, surfParams)) {
 							return true;
 						}
 						// Immediatelly leave the object space again
@@ -655,10 +709,10 @@ bool any_intersection(
 						nodeAddr = 0;
 						primCount = 2;
 						primOffset = 0;
+						currentInstanceId = primId;
 					}
 				}
-			} else if(intersects_primitve(*obj, currentRay, primId,
-										  hitPrimId, tmax, surfParams)) {
+			} else if(intersects_primitve<dev, true>(scene, *obj, currentRay, currentInstanceId, primId, tmax, surfParams)) {
 				return true;
 			}
 		}
@@ -679,14 +733,22 @@ template __host__ __device__ bool any_intersection(
 	const scene::Direction&
 );
 
-template __host__ __device__ RayIntersectionResult first_intersection(
+template __host__ __device__ RayIntersectionResult first_intersection<Device::CUDA, true>(
 	const SceneDescriptor<Device::CUDA>&, ei::Ray&, 
 	const ei::Vec3&, const float
 );
+template __host__ __device__ RayIntersectionResult first_intersection<Device::CUDA, false>(
+	const SceneDescriptor<Device::CUDA>&, ei::Ray&,
+	const ei::Vec3&, const float
+	);
 
-template __host__ __device__ RayIntersectionResult first_intersection(
+template __host__ __device__ RayIntersectionResult first_intersection<Device::CPU, true>(
 	const SceneDescriptor<Device::CPU>&, ei::Ray&,
 	const ei::Vec3&, const float
 );
+template __host__ __device__ RayIntersectionResult first_intersection<Device::CPU, false>(
+	const SceneDescriptor<Device::CPU>&, ei::Ray&,
+	const ei::Vec3&, const float
+	);
 
 }}} // namespace mufflon::scene::accel_struct

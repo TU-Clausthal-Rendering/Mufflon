@@ -1,6 +1,6 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Windows;
-using gui.Dll;
 using gui.Model;
 using gui.ViewModel;
 
@@ -16,10 +16,8 @@ namespace gui
 
         public MainWindow()
         {
+            ViewModels.NotInDesignMode = !DesignerProperties.GetIsInDesignMode(this);
             InitializeComponent();
-
-            if (!Core.mufflon_initialize())
-                throw new Exception(Core.core_get_dll_error());
 
             m_models = new Models(this);
             m_viewModels = new ViewModels(m_models);

@@ -20,7 +20,8 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	const float length = ei::len(dir);
 	dir /= length;
 	ei::Ray ray{ pos, dir };
-	auto res = accel_struct::first_intersection(scene, ray, ei::Vec3{0.0f}, length + 1.f);
+	// Ignore alpha testing
+	auto res = accel_struct::first_intersection<CURRENT_DEV, false>(scene, ray, ei::Vec3{0.0f}, length + 1.f);
 	mAssert(res.hitId.instanceId != -1l);
 	// From the intersection we get the primitive, from which we can look up the material
 	const i32 instanceId = res.hitId.instanceId;
@@ -34,7 +35,7 @@ CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::Scene
 	else
 		matIdx = object.spheres.matIndices[primitiveId - faceCount];
 
-	return scene.get_material(matIdx).get_medium(ei::dot(dir, res.normal));
+	return scene.get_material(matIdx).get_medium(-ei::dot(dir, res.normal));
 }
 
 }}} // namespace mufflon::scene::materials

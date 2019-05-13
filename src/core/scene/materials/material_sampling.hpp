@@ -8,11 +8,13 @@
 #include "util/assert.hpp"
 #include "microfacet_base.hpp"
 #include "lambert.hpp"
+#include "oren_nayar.hpp"
 #include "emissive.hpp"
 #include "blend.hpp"
 #include "blend_fresnel.hpp"
 #include "microfacet_specular.hpp"
 #include "microfacet_refractive.hpp"
+#include "microfacet_full.hpp"
 #include <cuda_runtime.h>
 
 namespace mufflon { namespace scene { namespace materials {
@@ -39,9 +41,10 @@ CUDA_FUNCTION int fetch(const MaterialDescriptorBase& desc, const UvCoordinate& 
 	outBuffer->flags = desc.flags;
 	outBuffer->innerMedium = desc.innerMedium;
 	outBuffer->outerMedium = desc.outerMedium;
-	const char* subParams = as<char>(&desc + 1) + sizeof(textures::ConstTextureDevHandle_t<CURRENT_DEV>) * MAT_TEX_COUNT[int(desc.type)];
+	const char* subDesc = as<char>(&desc + 1) + sizeof(textures::ConstTextureDevHandle_t<CURRENT_DEV>) * MAT_TEX_COUNT[int(desc.type)];
 	material_switch(desc.type,
-		*as<typename MatType::SampleType>(outBuffer+1) = fetch(tex, texels, 0, *as<typename MatType::NonTexParams>(subParams));
+		*as<typename MatType::SampleType>(outBuffer->subParams)
+			= fetch(tex, texels, 0, *as<typename MatType::NonTexParams>(subDesc));
 		return sizeof(MaterialDescriptorBase) + sizeof(MatType::SampleType);
 	);
 	return sizeof(MaterialDescriptorBase);
@@ -94,15 +97,14 @@ sample(const TangentSpace& tangentSpace,
 	Boundary boundary { media[params.get_medium(incidentTS.z)], media[params.get_medium(-incidentTS.z)] };
 
 	// Use model specific subroutine
-	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	math::PathSample res;
 	material_switch(params.type,
-		res = sample(*as<typename MatType::SampleType>(subParams), incidentTS, boundary, rndSet, adjoint);
+		res = sample(*as<typename MatType::SampleType>(params.subParams), incidentTS, boundary, rndSet, adjoint);
 		break;
 	);
 
 	// Early out if result is discarded anyway
-	if(res.throughput == 0.0f) return res;
+	if(res.throughput == 0.0f) return math::PathSample{};
 
 	// Transform local sample direction into global one.
 	Direction globalDir = res.excident.x * tangentSpace.shadingTX
@@ -113,7 +115,8 @@ sample(const TangentSpace& tangentSpace,
 	// Cancel the path if shadowed shading normal (excident)
 	float eDotG = dot(globalDir, tangentSpace.geoN);
 	float eDotN = res.excident.z;
-	if(eDotG * eDotN <= 0.0f) res.throughput = Spectrum{0.0f};
+	if(eDotG * eDotN <= 0.0f)
+		return math::PathSample{};
 	res.excident = globalDir;
 
 	// Make sure the PDFs do not overflow in MIS
@@ -192,10 +195,9 @@ evaluate(const TangentSpace& tangentSpace,
 	}
 
 	// Call material implementation
-	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	math::BidirSampleValue res;
 	material_switch(params.type,
-		res = evaluate(*as<typename MatType::SampleType>(subParams),
+		res = evaluate(*as<typename MatType::SampleType>(params.subParams),
 			incidentTS, excidentTS, boundary);
 		break;
 	);
@@ -234,9 +236,8 @@ evaluate(const TangentSpace& tangentSpace,
  */
 CUDA_FUNCTION Spectrum
 albedo(const ParameterPack& params) {
-	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	material_switch(params.type,
-		return albedo(*as<typename MatType::SampleType>(subParams));
+		return albedo(*as<typename MatType::SampleType>(params.subParams));
 	);
 	return Spectrum{0.0f};
 }
@@ -246,9 +247,8 @@ albedo(const ParameterPack& params) {
  */
 CUDA_FUNCTION math::SampleValue
 emission(const ParameterPack& params, const scene::Direction& geoN, const scene::Direction& excident) {
-	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	material_switch(params.type,
-		return emission(*as<typename MatType::SampleType>(subParams), geoN, excident);
+		return emission(*as<typename MatType::SampleType>(params.subParams), geoN, excident);
 	);
 	return math::SampleValue{};
 }
@@ -259,9 +259,8 @@ emission(const ParameterPack& params, const scene::Direction& geoN, const scene:
  */
 CUDA_FUNCTION float
 pdf_max(const ParameterPack& params) {
-	const char* subParams = as<char>(&params) + sizeof(ParameterPack);
 	material_switch(params.type,
-		return pdf_max(*as<typename MatType::SampleType>(subParams));
+		return pdf_max(*as<typename MatType::SampleType>(params.subParams));
 	);
 	return 0.0f;
 }

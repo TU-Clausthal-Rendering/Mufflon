@@ -227,8 +227,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 										   const u64 photonSeed, const float mergeRadius,
 										   math::Rng& rng) {
 	math::RndSet2_1 rndStart{ rng.next(), rng.next() };
-	scene::lights::Photon p = emit(scene.lightTree, idx, photonCount, photonSeed,
-								   scene.aabb, rndStart);
+	scene::lights::Emitter p = scene::lights::emit(scene, idx, photonCount, photonSeed, rndStart);
 	SilPathVertex vertex[2];
 	SilPathVertex::create_light(&vertex[0], nullptr, p, rng);	// TODO: check why there is an (unused) Rng reference
 	math::Throughput throughput;

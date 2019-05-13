@@ -8,61 +8,90 @@
 namespace mufflon { namespace scene { namespace textures {
 
 // Read a CPU or CUDA texture
-CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer = 0) {
-#ifndef __CUDA_ARCH__
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer = 0) {
 	return texture->read(texel, layer);
-#else
+}
+CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer = 0) {
+#ifdef __CUDA_ARCH__
 	// CUDA textures cannot switch linear filtering on/off, so we assume always-on and normalized coordinates.
 	// This means that 1. we need to add 0.5 to the coordinate to get to the center of the texel
 	// and 2. we need to normalize the coordinates into range [0, 1]
 	return ei::details::hard_cast<ei::Vec4>(tex2DLayered<float4>(texture.handle, (texel.x + 0.5f) / static_cast<float>(texture.width),
-																 (texel.y + 0.5f) / static_cast<float>(texture.height), layer));
-#endif
+		(texel.y + 0.5f) / static_cast<float>(texture.height), layer));
+#else // __CUDA_ARCH__
+	return {};
+#endif // __CUDA_ARCH__
 }
 
-CUDA_FUNCTION ei::Vec4 read(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer = 0) {
-#ifndef __CUDA_ARCH__
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+CUDA_FUNCTION ei::Vec4 read(TextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer = 0) {
 	return texture->read(texel, layer);
-#else
+}
+CUDA_FUNCTION ei::Vec4 read(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer = 0) {
+#ifdef __CUDA_ARCH__
 	// Unlike textures, surfaces are NEVER filtered and do not offer normalized coordinates either.
 	// Additionally, surface indices are byte-based (in x-direction, anyway) and thus need to
 	// be multiplied with the texel size
 	return ei::details::hard_cast<ei::Vec4>(
 		surf2DLayeredread<float4>(texture.handle, texel.x * PIXEL_SIZE(texture.format),
 								  texel.y, layer));
-#endif
+#else // __CUDA_ARCH__
+	return {};
+#endif // __CUDA_ARCH__
 }
 
 
 // Write a CPU or CUDA texture
-CUDA_FUNCTION void write(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, const ei::Vec4& value) {
-#ifndef __CUDA_ARCH__
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+CUDA_FUNCTION void write(TextureDevHandle_t<Device::CPU> texture, const Pixel& texel, const ei::Vec4& value) {
 	texture->write(value, texel, 0);
-#else
+}
+CUDA_FUNCTION void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, const ei::Vec4& value) {
+#ifdef __CUDA_ARCH__
 	float4 v = ei::details::hard_cast<float4>(value);
 	surf2DLayeredwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y, 0);
-#endif
+#endif // __CUDA_ARCH__
 }
-CUDA_FUNCTION void write(TextureDevHandle_t<CURRENT_DEV> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
-#ifndef __CUDA_ARCH__
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+CUDA_FUNCTION void write(TextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
 	texture->write(value, texel, layer);
-#else
+}
+CUDA_FUNCTION void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
+#ifdef __CUDA_ARCH__
 	float4 v = ei::details::hard_cast<float4>(value);
 	surf2DLayeredwrite<float4>(v, texture.handle, texel.x * PIXEL_SIZE(texture.format), texel.y, layer);
-#endif
+#endif // __CUDA_ARCH__
 }
 
 
 // Sample a CPU or CUDA texture
-CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> texture, const UvCoordinate& uv, int layer = 0u) {
-#ifndef __CUDA_ARCH__
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CPU> texture, const UvCoordinate& uv, int layer = 0u) {
 	return texture->sample(uv, layer);
-#else
+}
+
+// Sample a CPU or CUDA texture
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CUDA> texture, const UvCoordinate& uv, int layer = 0u) {
 	// TODO: layer
 	// UV coordinates need to be scaled, so that we 
+#ifdef __CUDA_ARCH__
 	auto texel = tex2DLayered<float4>(texture.handle, uv.x, uv.y, layer);
 	return ei::details::hard_cast<ei::Vec4>(texel);
-#endif
+#else // __CUDA_ARCH__
+	return {};
+#endif // __CUDA_ARCH__
 }
 
 
@@ -116,33 +145,56 @@ CUDA_FUNCTION Point cubemap_uv_to_surface(UvCoordinate uv, int layer) {
 	}
 }
 
-// Samples an environment map and returns the uv-coordinate too
-CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<CURRENT_DEV> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
-#ifndef __CUDA_ARCH__
-	int layers = envmap->get_num_layers();
-#else // __CUDA_ARCH__
-	int layers = envmap.depth;
-#endif // __CUDA_ARCH__
-	if(layers == 6) {
-		// Cubemap
-		// Find out which face by elongating the direction
-		ei::Vec3 projDir = direction / ei::max(ei::abs(direction));
-		projDir.z = -projDir.z;
-		// Set the layer and UV coordinates
-		int layer;
-		uvOut = cubemap_surface_to_uv(projDir, layer);
-		return sample(envmap, uvOut, layer);
-	} else {
-		// Spherical map
-		// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
-		float v = acos(direction.y) / ei::PI;
-		const float u = atan2(direction.z, direction.x) / (ei::PI * 2.f);
-		// Clamp (no wrapping in v direction)
-		const Pixel texSize = textures::get_texture_size(envmap);
-		v = ei::min(v, (texSize.y - 0.5f) / texSize.y);
-		uvOut = UvCoordinate{ u, 1.f-v };
-		return sample(envmap, uvOut);
-	}
+// Get the uv coordinate of a direction by using polar coordinates.
+CUDA_FUNCTION __forceinline__ UvCoordinate direction_to_uv(const Direction& direction) {
+	// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
+	float v = acos(direction.y) / ei::PI;
+	const float u = atan2(direction.z, direction.x) / (ei::PI * 2.0f);
+	return UvCoordinate{ u, 1.0f-v };
 }
+
+template < Device dev >
+CUDA_FUNCTION ei::Vec4 sample_cubemap(ConstTextureDevHandle_t<dev> cubemap, const ei::Vec3& direction, UvCoordinate& uvOut) {
+	// Find out which face by elongating the direction
+	ei::Vec3 projDir = direction / ei::max(ei::abs(direction));
+	projDir.z = -projDir.z;
+	// Set the layer and UV coordinates
+	int layer;
+	uvOut = cubemap_surface_to_uv(projDir, layer);
+	return sample(cubemap, uvOut, layer);
+}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+template < Device dev >
+CUDA_FUNCTION ei::Vec4 sample_polar_map(ConstTextureDevHandle_t<dev> polarmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
+	// Convert the direction into UVs (convention: phi ~ u, theta ~ v)
+	uvOut = direction_to_uv(direction);
+	// Clamp (no wrapping in v direction)
+	const Pixel texSize = textures::get_texture_size(polarmap);
+	float halfTexel = 0.5f / texSize.y;
+	uvOut.v = ei::clamp(uvOut.v, halfTexel, 1.0f - halfTexel);
+	return sample(polarmap, uvOut);
+}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // _CUDACC__
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CPU> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
+	int layers = envmap->get_num_layers();
+	if(layers == 6)
+		return sample_cubemap<Device::CPU>(envmap, direction, uvOut);
+	else
+		return sample_polar_map<Device::CPU>(envmap, direction, uvOut);
+}
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CUDA> envmap, const ei::Vec3& direction, UvCoordinate& uvOut) {
+	int layers = envmap.depth;
+	if(layers == 6)
+		return sample_cubemap<Device::CUDA>(envmap, direction, uvOut);
+	else
+		return sample_polar_map<Device::CUDA>(envmap, direction, uvOut);
+}
+
 
 }}} // namespace mufflon::scene::textures

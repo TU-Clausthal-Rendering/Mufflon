@@ -32,9 +32,9 @@ public:
 		m_animationPathIndex(animationPathIndex)
 	{}
 	Scene(const Scene&) = delete;
-	Scene(Scene&&) = default;
+	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;
-	Scene& operator=(Scene&&) = default;
+	Scene& operator=(Scene&&) = delete;
 	~Scene() = default;
 
 	// Add an instance to be rendered
@@ -147,15 +147,16 @@ private:
 	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
-	const Scenario& m_scenario;		// Reference to the scenario which is presented by this scene
-	const u32 m_animationPathIndex;	// Path index for camera animation
+	const Scenario& m_scenario;			// Reference to the scenario which is presented by this scene
+	const u32 m_animationPathIndex;		// Path index for camera animation
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
 	std::map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
-	GenericResource m_media;		// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
+	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
-	GenericResource m_materials;	// Device instanciation of Material parameter packs and an offset table (first table then data).
+	GenericResource m_materials;		// Device instanciation of Material parameter packs and an offset table (first table then data).
+	GenericResource m_alphaTextures;	// Alpha texture handles, one for each material
 
 	// Light tree containing all light sources enabled for the scene
 	lights::LightTreeBuilder m_lightTree;

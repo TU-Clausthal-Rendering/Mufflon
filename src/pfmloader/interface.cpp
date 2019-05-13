@@ -31,6 +31,13 @@ void(*s_logCallback)(const char*, int);
 template < class T >
 T read(std::istream& stream) {
 	T val;
+	stream >> val;
+	return val;
+}
+
+template < class T >
+T read_bytes(std::istream& stream) {
+	T val;
 	stream.read(reinterpret_cast<char*>(&val), sizeof(T));
 	return val;
 }
@@ -146,7 +153,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		if(std::strncmp(bands, "Pf", 2u) == 0) {
 			for(std::uint32_t y = 0u; y < texData->height; ++y) {
 				for(std::uint32_t x = 0u; x < texData->width; ++x) {
-					float val = read<float>(stream);
+					float val = read_bytes<float>(stream);
 					if(needsByteSwap)
 						val = swap_bytes(val);
 					data[y * texData->width + x] = val;
@@ -155,9 +162,9 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		} else if(std::strncmp(bands, "PF", 2u) == 0) {
 			for(std::uint32_t y = 0u; y < texData->height; ++y) {
 				for(std::uint32_t x = 0u; x < texData->width; ++x) {
-					float r = read<float>(stream);
-					float g = read<float>(stream);
-					float b = read<float>(stream);
+					float r = read_bytes<float>(stream);
+					float g = read_bytes<float>(stream);
+					float b = read_bytes<float>(stream);
 					if(needsByteSwap) {
 						r = swap_bytes(r);
 						g = swap_bytes(g);

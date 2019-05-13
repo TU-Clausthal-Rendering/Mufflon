@@ -65,6 +65,7 @@ void Texture::synchronize() {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
 				//case Device::OPENGL: create_texture_opengl(); break;
+				default: mAssert(false);
 			}
 		}
 		// Copy the memory (wherever it changed)
@@ -92,6 +93,7 @@ void Texture::synchronize() {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
 				//case Device::OPENGL: create_texture_opengl(); break;
+				default: mAssert(false);
 			}
 		}
 	}
@@ -240,7 +242,7 @@ void Texture::create_texture_cuda() {
 		texDesc.readMode = cudaReadModeElementType;
 		texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
 	} else {
-		if(channelDesc.x <= 16 && channelDesc.y <= 16 && channelDesc.z < 16 && channelDesc.w <= 16) {
+		if(channelDesc.x <= 16 && channelDesc.y <= 16 && channelDesc.z <= 16 && channelDesc.w <= 16) {
 			texDesc.filterMode = m_mode == SamplingMode::NEAREST ? cudaFilterModePoint : cudaFilterModeLinear;
 			texDesc.readMode = cudaReadModeNormalizedFloat;
 		} else {

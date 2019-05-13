@@ -199,7 +199,8 @@ public:
 
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
-	CUDA_FUNCTION struct { AreaPdf pdf; float geoFactor; }
+	struct PdfConversionResult{ AreaPdf pdf; float geoFactor; };
+	CUDA_FUNCTION PdfConversionResult
 	convert_pdf(Interaction sourceType, AngularPdf samplePdf,
 				const ConnectionDir& connection) const {
 		if(sourceType == Interaction::VIRTUAL)
@@ -276,7 +277,7 @@ public:
 										proj.pdf, AngularPdf{ 0.0f } };
 			}
 			case Interaction::SURFACE: {
-				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.mat(),
+				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.material,
 										   m_incident, excident, media, adjoint, lightNormal);
 			}
 		}
@@ -299,44 +300,45 @@ public:
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction,
 									   {lout.dir.pdf, AngularPdf{0.0f}} },
-									 m_position, scene::materials::MediumHandle{} };
+									 m_position, m_desc.pointLight.medium };
 			}
 			case Interaction::LIGHT_DIRECTIONAL:
 			case Interaction::LIGHT_ENVMAP: {
 				// TODO: sample new positions on a boundary?
 				return VertexSample{ math::PathSample{ m_desc.dirLight.flux, math::PathEventType::REFLECTED,
 									   m_incident, {m_desc.dirLight.areaPdfConverted, AngularPdf{0.0f}} },
-									 m_position, scene::materials::MediumHandle{} };
+									 m_position, m_desc.dirLight.medium };
 			}
 			case Interaction::LIGHT_SPOT: {
 				auto lout = sample_light_dir_spot(m_desc.spotLight.intensity, m_incident, m_desc.spotLight.cosThetaMax, m_desc.spotLight.cosFalloffStart, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, {lout.dir.pdf, AngularPdf{0.0f}} },
-									 m_position, scene::materials::MediumHandle{} };
+									 m_position, m_desc.spotLight.medium };
 			}
 			case Interaction::LIGHT_AREA: {
 				auto lout = sample_light_dir_area(m_desc.areaLight.intensity, m_incident, rndSet);
 				return VertexSample{ math::PathSample{ lout.flux, math::PathEventType::REFLECTED,
 									   lout.dir.direction, {lout.dir.pdf, AngularPdf{0.0f}} },
-									 m_position, scene::materials::MediumHandle{} };
+									 m_position, m_desc.areaLight.medium };
 			}
 			case Interaction::CAMERA_PINHOLE: {
 				cameras::Importon importon = pinholecam_sample_ray(m_desc.pinholeCam, Pixel{ m_incident }, rndSet);
 				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, {importon.dir.pdf, AngularPdf{0.0f}} },
-									 m_position, scene::materials::MediumHandle{} };
+									 m_position, m_desc.pinholeCam.mediumIndex };
 			}
 			case Interaction::CAMERA_FOCUS: {
 				cameras::Importon importon = focuscam_sample_ray(m_desc.focusCam, m_position, Pixel{ m_incident }, rndSet);
 				return VertexSample{ math::PathSample{ Spectrum{1.0f}, math::PathEventType::REFLECTED,
 									   importon.dir.direction, {importon.dir.pdf, AngularPdf{0.0f}} },
-									 m_position, scene::materials::MediumHandle{} };
+									 m_position, m_desc.focusCam.mediumIndex };
 			}
 			case Interaction::SURFACE: {
-				return VertexSample{ scene::materials::sample(
-										m_desc.surface.tangentSpace, m_desc.surface.mat(),
-										m_incident, media, rndSet, adjoint),
-									 m_position, scene::materials::MediumHandle{} };
+				math::PathSample s = scene::materials::sample(
+										m_desc.surface.tangentSpace, m_desc.surface.material,
+										m_incident, media, rndSet, adjoint);
+				float side = dot(s.excident, m_desc.surface.tangentSpace.geoN);
+				return VertexSample{ s, m_position, m_desc.surface.material.get_medium(side) };
 			}
 		}
 		return VertexSample{};
@@ -419,7 +421,7 @@ public:
 				return EmissionValue{};
 			}
 			case Interaction::SURFACE: {
-				math::SampleValue matValue = scene::materials::emission(m_desc.surface.mat(), m_desc.surface.tangentSpace.geoN, -m_incident);
+				math::SampleValue matValue = scene::materials::emission(m_desc.surface.material, m_desc.surface.tangentSpace.geoN, -m_incident);
 				scene::lights::LightPdfs startPdf { AreaPdf{0.0f}, AreaPdf{0.0f} };
 				if(matValue.value != 0.0f) {
 					startPdf = scene::lights::light_pdf(scene.lightTree, m_desc.surface.primitiveId,
@@ -433,12 +435,30 @@ public:
 
 	CUDA_FUNCTION Spectrum get_albedo() const {
 		if(m_type == Interaction::SURFACE) {
-			return scene::materials::albedo(m_desc.surface.mat());
+			return scene::materials::albedo(m_desc.surface.material);
 		}
 		// Area light source vertices are on surfaces with an albedo too.
 		// However, it is likely that they are never asked for their albedo().
 		mAssert(m_type != Interaction::LIGHT_AREA);
 		return Spectrum{0.0f};
+	}
+
+	CUDA_FUNCTION scene::materials::MediumHandle get_medium(const scene::Direction& dir) const {
+		switch(m_type) {
+			case Interaction::VOID: return scene::materials::MediumHandle{};
+			case Interaction::LIGHT_POINT: return m_desc.pointLight.medium;
+			case Interaction::LIGHT_DIRECTIONAL:
+			case Interaction::LIGHT_ENVMAP: return m_desc.dirLight.medium;
+			case Interaction::LIGHT_SPOT: return m_desc.spotLight.medium;
+			case Interaction::LIGHT_AREA: return m_desc.areaLight.medium;
+			case Interaction::CAMERA_PINHOLE: return m_desc.pinholeCam.mediumIndex;
+			case Interaction::CAMERA_FOCUS: return m_desc.focusCam.mediumIndex;
+			case Interaction::SURFACE: {
+				float side = dot(dir, m_desc.surface.tangentSpace.geoN);
+				return m_desc.surface.material.get_medium(side);
+			}
+		}
+		return scene::materials::MediumHandle{};
 	}
 
 	CUDA_FUNCTION scene::PrimitiveHandle get_primitive_id() const {
@@ -461,7 +481,7 @@ public:
 	// TODO: for other vertices than surfaces
 	CUDA_FUNCTION float get_pdf_max() const {
 		if(m_type == Interaction::SURFACE) {
-			return pdf_max(m_desc.surface.mat());
+			return pdf_max(m_desc.surface.material);
 		}
 		return 0.0f;
 	}
@@ -523,7 +543,7 @@ public:
 	}
 
 	CUDA_FUNCTION static int create_light(void* mem, const void* previous,
-		const scene::lights::Photon& lightSample,	// Positional sample for the starting point on a light source
+		const scene::lights::Emitter& lightSample,	// Positional sample for the starting point on a light source
 		math::Rng& rng								// Only used for the incomplete vertices (env-map)
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
@@ -535,6 +555,7 @@ public:
 			case scene::lights::LightType::POINT_LIGHT: {
 				vert->m_type = Interaction::LIGHT_POINT;
 				vert->m_incident = lightSample.intensity;
+				vert->m_desc.pointLight.medium = lightSample.mediumIndex;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, 1.0f, math::Throughput{});
 				return this_size();
 			}
@@ -544,6 +565,7 @@ public:
 				vert->m_desc.spotLight.intensity = lightSample.intensity;
 				vert->m_desc.spotLight.cosThetaMax = lightSample.source_param.spot.cosThetaMax;
 				vert->m_desc.spotLight.cosFalloffStart = lightSample.source_param.spot.cosFalloffStart;
+				vert->m_desc.spotLight.medium = lightSample.mediumIndex;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(SpotLightDesc) );
 			}
@@ -553,6 +575,7 @@ public:
 				vert->m_type = Interaction::LIGHT_AREA;
 				vert->m_incident = lightSample.source_param.area.normal;
 				vert->m_desc.areaLight.intensity = lightSample.intensity;
+				vert->m_desc.areaLight.medium = lightSample.mediumIndex;
 				vert->ext().init(*vert, scene::Direction{0.0f}, 0.0f, lightSample.pos.pdf, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
 			}
@@ -565,6 +588,7 @@ public:
 				// the view for MIS computation where the usage order is reverted.
 				// Scale the pdfs to make sure later conversions lead to the original pdf.
 				vert->m_desc.dirLight.areaPdfConverted = AngularPdf{float(lightSample.pos.pdf)};
+				vert->m_desc.dirLight.medium = lightSample.mediumIndex;
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, 0.0f,
 					AreaPdf{float(lightSample.source_param.dir.dirPdf)}, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
@@ -574,6 +598,7 @@ public:
 				vert->m_incident = lightSample.source_param.dir.direction;
 				vert->m_desc.dirLight.flux = lightSample.intensity;
 				vert->m_desc.dirLight.areaPdfConverted = AngularPdf{float(lightSample.pos.pdf)};
+				vert->m_desc.dirLight.medium = lightSample.mediumIndex;
 				vert->ext().init(*vert, lightSample.source_param.dir.direction, 0.0f,
 					AreaPdf{float(lightSample.source_param.dir.dirPdf)}, 1.0f, math::Throughput{});
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
@@ -607,7 +632,7 @@ public:
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
 		vert->ext().init(*vert, incident, incidentDistance,
 						 incidentPdf.pdf, -incidentPdf.geoFactor, incidentThrougput);
-		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.mat());
+		int size = scene::materials::fetch(material, hit.uv, &vert->m_desc.surface.material);
 		return (int)round_to_align<8u>( round_to_align<8u>(this_size() + sizeof(scene::TangentSpace)
 			+ sizeof(scene::PrimitiveHandle) + sizeof(scene::accel_struct::SurfaceParametrization))
 			+ size);
@@ -634,24 +659,27 @@ public:
 private:
 	struct AreaLightDesc {
 		scene::Direction intensity;
+		scene::materials::MediumHandle medium;
 	};
 	struct SpotLightDesc {
 		ei::Vec3 intensity;
 		half cosThetaMax;
 		half cosFalloffStart;
+		scene::materials::MediumHandle medium;
+	};
+	struct PointLightDesc {
+		scene::materials::MediumHandle medium;
 	};
 	struct DirLightDesc {
 		Spectrum flux;
 		AngularPdf areaPdfConverted;
+		scene::materials::MediumHandle medium;
 	};
 	struct SurfaceDesc {
 		scene::TangentSpace tangentSpace; // TODO: use packing?
 		scene::PrimitiveHandle primitiveId;
 		ei::Vec2 surfaceParams;
-		//scene::materials::ParameterPack params;
-		alignas(8) u8 matParams[scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
-		CUDA_FUNCTION const scene::materials::ParameterPack& mat() const { return *as<scene::materials::ParameterPack>(matParams); }
-		CUDA_FUNCTION scene::materials::ParameterPack& mat() { return *as<scene::materials::ParameterPack>(matParams); }
+		scene::materials::ParameterPack material;
 	};
 
 	// The previous vertex on the path or nullptr.
@@ -692,6 +720,7 @@ private:
 		CUDA_FUNCTION Desc() {}
 		AreaLightDesc areaLight;
 		SpotLightDesc spotLight;
+		PointLightDesc pointLight;
 		DirLightDesc dirLight;
 		SurfaceDesc surface;
 		cameras::PinholeParams pinholeCam;

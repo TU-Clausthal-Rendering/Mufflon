@@ -165,8 +165,6 @@ Boolean store_texture(const char* path, const TextureData* texData) {
 		CHECK_NULLPTR(path, "texture path", false);
 		CHECK_NULLPTR(path, "texture return data", false);
 
-		const int numChannels = texData->components;
-
 		if(texData->format == TextureFormat::FORMAT_R32F || texData->format == TextureFormat::FORMAT_RG32F
 			|| texData->format == TextureFormat::FORMAT_RGBA32F) {
 			const float* data = reinterpret_cast<const float*>(texData->data);

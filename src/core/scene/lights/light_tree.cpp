@@ -19,13 +19,13 @@ namespace mufflon { namespace scene { namespace lights {
 
 namespace {
 
-float get_flux(const void* light, u16 type, const ei::Vec3& aabbDiag) {
+float get_flux(const void* light, u16 type, const ei::Vec3& aabbDiag, const int* materials) {
 	switch(type) {
 		case u16(LightType::POINT_LIGHT): return ei::sum(get_flux(*as<PointLight>(light)));
 		case u16(LightType::SPOT_LIGHT): return ei::sum(get_flux(*as<SpotLight>(light)));
-		case u16(LightType::AREA_LIGHT_TRIANGLE): return ei::sum(get_flux(*as<AreaLightTriangle<Device::CPU>>(light)));
-		case u16(LightType::AREA_LIGHT_QUAD): return ei::sum(get_flux(*as<AreaLightQuad<Device::CPU>>(light)));
-		case u16(LightType::AREA_LIGHT_SPHERE): return ei::sum(get_flux(*as<AreaLightSphere<Device::CPU>>(light)));
+		case u16(LightType::AREA_LIGHT_TRIANGLE): return ei::sum(get_flux(*as<AreaLightTriangle<Device::CPU>>(light), materials));
+		case u16(LightType::AREA_LIGHT_QUAD): return ei::sum(get_flux(*as<AreaLightQuad<Device::CPU>>(light), materials));
+		case u16(LightType::AREA_LIGHT_SPHERE): return ei::sum(get_flux(*as<AreaLightSphere<Device::CPU>>(light), materials));
 		case u16(LightType::DIRECTIONAL_LIGHT): return ei::sum(get_flux(*as<DirectionalLight>(light), aabbDiag));
 		case u16(LightType::ENVMAP_LIGHT): return ei::sum(as<BackgroundDesc<Device::CPU>>(light)->flux);
 		case LightSubTree::Node::INTERNAL_NODE_TYPE: return as<LightSubTree::Node>(light)->left.flux + as<LightSubTree::Node>(light)->right.flux;
@@ -110,7 +110,8 @@ private:
 
 template < class LightT >
 void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
-					   const ei::Vec3& aabbDiag) {
+					   const ei::Vec3& aabbDiag,
+					   const int* materials) {
 	using Node = LightSubTree::Node;
 
 	tree.lightCount = lightOffsets.light_count();
@@ -120,7 +121,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 	// Only one light -> no actual tree, only light
 	if(lightOffsets.light_count() == 1u) {
 		tree.root.type = static_cast<u16>(lightOffsets.type(0));
-		tree.root.flux = get_flux(tree.memory + lightOffsets[0], lightOffsets.type(0), aabbDiag);
+		tree.root.flux = get_flux(tree.memory + lightOffsets[0], lightOffsets.type(0), aabbDiag, materials);
 		return;
 	}
 
@@ -153,7 +154,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 			Node& interiorNode = as<Node>(tree.memory)[startNode + i];
 
 			interiorNode = Node{ tree.memory, lightOffsets[left], lightOffsets.type(left),
-								 lightOffsets[right], lightOffsets.type(right), aabbDiag };
+								 lightOffsets[right], lightOffsets.type(right), aabbDiag, materials };
 		}
 
 		// To ensure we can later uniformly create all remaining internal nodes, we also form
@@ -167,7 +168,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 			Node& node = as<Node>(tree.memory)[startInnerNode + i];
 
 			node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
-						 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag };
+						 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag, materials };
 		}
 
 		// Create the one possible internal node that has another internal node as left child
@@ -180,7 +181,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 			Node& node = as<Node>(tree.memory)[startInnerNode + extraNodes / 2u];
 
 			node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
-						 lightOffsets[right], lightOffsets.type(right), aabbDiag };
+						 lightOffsets[right], lightOffsets.type(right), aabbDiag, materials };
 		}
 	}
 
@@ -204,7 +205,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 		Node& node = as<Node>(tree.memory)[startNodeIndex + i];
 
 		node = Node{ tree.memory, lightOffsets[left], lightOffsets.type(left),
-			lightOffsets[right], lightOffsets.type(right), aabbDiag };
+			lightOffsets[right], lightOffsets.type(right), aabbDiag, materials };
 	}
 
 	// Now for the rest of the levels (ie. inner nodes, no more lights nowhere)
@@ -222,7 +223,7 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 				Node& node = as<Node>(tree.memory)[innerNode + i];
 
 				node = Node{ tree.memory, u32(left * sizeof(Node)), Node::INTERNAL_NODE_TYPE,
-							 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag };
+							 u32(right * sizeof(Node)), Node::INTERNAL_NODE_TYPE, aabbDiag, materials };
 			}
 		}
 	}
@@ -277,9 +278,10 @@ using namespace lighttree_detail;
 LightSubTree::Node::Node(const char* base,
 						 u32 leftOffset, u16 leftType,
 						 u32 rightOffset, u16 rightType,
-						 const ei::Vec3& bounds) :
-	left{ get_flux(base + leftOffset, leftType, bounds), leftOffset, leftType },
-	right{ rightType, rightOffset, get_flux(base + rightOffset, rightType, bounds) },
+						 const ei::Vec3& aabbDiag,
+						 const int* materials) :
+	left{ get_flux(base + leftOffset, leftType, aabbDiag, materials), leftOffset, leftType },
+	right{ rightType, rightOffset, get_flux(base + rightOffset, rightType, aabbDiag, materials) },
 	center{ (get_center(base + leftOffset, leftType) + get_center(base + rightOffset, rightType)) / 2.0f }
 {}
 
@@ -295,7 +297,8 @@ LightTreeBuilder::~LightTreeBuilder() {
 
 void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 					  std::vector<DirectionalLight>&& dirLights,
-					  const ei::Box& boundingBox) {
+					  const ei::Box& boundingBox,
+					  const int* materials) {
 	logInfo("[LightTreeBuilder::build] Start building light tree.");
 	// Make sure the hashmap memory is allocated
 	m_primToNodePath.resize(int(posLights.size()));
@@ -365,26 +368,20 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 		char* mem = m_treeCpu->posLights.memory + posLightOffsets[0];
 		for(const PositionalLights& light : posLights) {
 			std::visit(overloaded{
-				[&mem,this](const AreaLightTriangleDesc& desc) {
+				[&mem](const AreaLightTriangleDesc& desc) {
 					auto* dst = as<AreaLightTriangle<Device::CPU>>(mem);
 					mem += sizeof(*dst);
 					*dst = desc;
-					// Remember texture for synchronization
-					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
 				},
-				[&mem,this](const AreaLightQuadDesc& desc) {
+				[&mem](const AreaLightQuadDesc& desc) {
 					auto* dst = as<AreaLightQuad<Device::CPU>>(mem);
 					mem += sizeof(*dst);
 					*dst = desc;
-					// Remember texture for synchronization
-					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
 				},
-				[&mem,this](const AreaLightSphereDesc& desc) {
+				[&mem](const AreaLightSphereDesc& desc) {
 					auto* dst = as<AreaLightSphere<Device::CPU>>(mem);
 					mem += sizeof(*dst);
 					*dst = desc;
-					// Remember texture for synchronization
-					m_textureMap.emplace(dst->radianceTex, desc.radianceTex);
 				},
 				[&mem](const auto& desc) {
 					std::memcpy(mem, &desc, sizeof(desc));
@@ -395,57 +392,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	}
 
 	// Now we gotta construct the proper nodes by recursively merging them together
-	create_light_tree(dirLightOffsets, m_treeCpu->dirLights, scale);
-	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale);
+	create_light_tree(dirLightOffsets, m_treeCpu->dirLights, scale, materials);
+	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale, materials);
 	fill_map(posLights, m_treeCpu->primToNodePath);
 	m_primToNodePath.mark_changed(Device::CPU);
 	m_dirty.mark_changed(Device::CPU);
 
 	m_lightCount = static_cast<u32>(posLights.size() + dirLights.size());
-}
-
-void LightTreeBuilder::remap_textures(const char* cpuMem, u32 offset, u16 type, char* cudaMem) {
-	switch(type) {
-		case LightSubTree::Node::INTERNAL_NODE_TYPE: {
-			cudaMemcpy(cudaMem + offset, cpuMem + offset, sizeof(LightSubTree::Node), cudaMemcpyDefault);
-			// Recursive implementation necessary, because the type is stored at the parents and not known to the node itself
-			const auto* node = as<LightSubTree::Node>(cpuMem + offset);
-			remap_textures(cpuMem, node->left.offset, node->left.type, cudaMem);
-			remap_textures(cpuMem, node->right.offset, node->right.type, cudaMem);
-		} break;
-		case u16(LightType::AREA_LIGHT_TRIANGLE): {
-			const auto* light = as<AreaLightTriangle<Device::CPU>>(cpuMem + offset);
-			AreaLightTriangle<Device::CUDA> cudaLight;
-			for(int i = 0; i < 3; ++i) {
-				cudaLight.posV[i] = light->posV[i];
-				cudaLight.uvV[i] = light->uvV[i];
-			}
-			cudaLight.scale = light->scale;
-			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			cudaMemcpy(cudaMem + offset, &cudaLight, sizeof(cudaLight), cudaMemcpyDefault);
-		} break;
-		case u16(LightType::AREA_LIGHT_QUAD): {
-			const auto* light = as<AreaLightQuad<Device::CPU>>(cpuMem + offset);
-			AreaLightQuad<Device::CUDA> cudaLight;
-			for(int i = 0; i < 4; ++i) {
-				cudaLight.posV[i] = light->posV[i];
-				cudaLight.uvV[i] = light->uvV[i];
-			}
-			cudaLight.scale = light->scale;
-			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			cudaMemcpy(cudaMem + offset, &cudaLight, sizeof(cudaLight), cudaMemcpyDefault);
-		} break;
-		case u16(LightType::AREA_LIGHT_SPHERE): {
-			const auto* light = as<AreaLightSphere<Device::CPU>>(cpuMem + offset);
-			AreaLightSphere<Device::CUDA> cudaLight;
-			cudaLight.position = light->position;
-			cudaLight.radius = light->radius;
-			cudaLight.scale = light->scale;
-			cudaLight.radianceTex = m_textureMap.find(light->radianceTex)->second->acquire_const<Device::CUDA>();
-			cudaMemcpy(cudaMem + offset, &cudaLight, sizeof(cudaLight), cudaMemcpyDefault);
-		} break;
-		default:; // Other light type - nothing to do
-	}
 }
 
 //__device__ GuideFunction cudaGuideFlux = guide_flux;
@@ -474,10 +427,6 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		m_treeCuda->dirLights.memory = lightMem;
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = lightMem + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
-
-		// Replace all texture handles inside the tree's data and
-		// synchronize all the remaining tree memory.
-		remap_textures(m_treeCpu->posLights.memory, 0, m_treeCpu->posLights.root.type, m_treeCuda->posLights.memory);
 
 		m_dirty.mark_synced(dev);
 	} 
@@ -549,7 +498,7 @@ void LightTreeBuilder::update_media(const SceneDescriptor<dev>& scene) {
 	else if constexpr(dev == Device::CUDA)
 		update_media_cuda(scene, m_treeCuda->posLights);
 	else
-		default: mAssert(false); return;
+		mAssert(false);
 }
 
 template < Device dev >

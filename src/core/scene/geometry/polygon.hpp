@@ -445,12 +445,6 @@ private:
 	template < Device dev >
 	void resizeAttribBuffer(std::size_t v, std::size_t f);
 
-	// Inserts loop (for vertex split)
-	OpenMesh::HalfedgeHandle insert_loop(const OpenMesh::HalfedgeHandle hh);
-	// Inserts edge (for vertex split)
-	OpenMesh::HalfedgeHandle insert_edge(const OpenMesh::VertexHandle vh, const OpenMesh::HalfedgeHandle h0,
-										 const OpenMesh::HalfedgeHandle h1);
-
 	// It's a unique pointer so we have one fixed address we can reference in OmAttributePool
 	// TODO: does that degrade performance? probably not, since attributes aren't aquired often
 	std::unique_ptr<PolygonMeshType> m_meshData;

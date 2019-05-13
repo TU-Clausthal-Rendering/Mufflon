@@ -56,7 +56,8 @@ void Scene::load_materials() {
 	// the offset and to upload less materials in total.
 	std::vector<int> offsets;
 	// Store in one block -> table size is offset of first material and align the offset to the required alignment of material descriptors 
-	std::size_t offset = round_to_align<alignof(materials::MaterialDescriptorBase)>(sizeof(int) * m_scenario.get_num_material_slots());
+	const std::size_t MAT_SLOTS = m_scenario.get_num_material_slots();
+	std::size_t offset = round_to_align<alignof(materials::MaterialDescriptorBase)>(sizeof(int) * MAT_SLOTS);
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
 		mAssert(offset <= std::numeric_limits<i32>::max());
 		offsets.push_back(i32(offset));
@@ -65,16 +66,31 @@ void Scene::load_materials() {
 	}
 	// Allocate the memory
 	m_materials.resize(offset);
+	m_alphaTextures.resize(sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
+
+	// Temporary storage to only copy once
+	auto cpuTexHdlBuffer = std::make_unique<textures::ConstTextureDevHandle_t<dev>[]>(MAT_SLOTS);
+
 	char* mem = m_materials.acquire<dev>();
 	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
-	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
+	for(MaterialIndex i = 0; i < MAT_SLOTS; ++i) {
 		ConstMaterialHandle mat = m_scenario.get_assigned_material(i);
 		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_DESCRIPTOR_SIZE());
 		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
 		copy(mem + offsets[i], buffer, size);
+		if(mat->get_alpha_texture() != nullptr)
+			cpuTexHdlBuffer[i] = mat->get_alpha_texture()->template acquire_const<dev>();
+		else
+			cpuTexHdlBuffer[i] = textures::ConstTextureDevHandle_t<dev>{};
 	}
+
+	// Coyp the alpha texture handles
+	copy(as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.acquire<dev>()),
+		 cpuTexHdlBuffer.get(), sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
+
+	m_alphaTextures.mark_synced(dev);
 	m_materials.mark_synced(dev); // Avoid overwrites with data from different devices.
 }
 
@@ -239,9 +255,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.lods = lodDevDesc.get();
 	}
 
+	// Materials
 	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<dev>())
 		load_materials<dev>();
-
+	// This query should be cheap. The above if already made the information resident.
+	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
+	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
+	sceneDescriptor.alphaTextures = as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.template acquire_const<dev>());
+	
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
 		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution,
@@ -253,10 +274,6 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
 		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
-
-	// TODO: query media/materials only if needed?
-	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
-	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
 
 	// Rebuild Instance BVH?
 	if(geometryChanged) {
@@ -283,8 +300,13 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 					   std::vector<lights::DirectionalLight>&& dirLights) {
+	// Need the materials for area lights
+	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<Device::CPU>())
+		load_materials<Device::CPU>();
+	const int* materials = as<int>(m_materials.template acquire_const<Device::CPU>());
+
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
-					  m_boundingBox);
+					  m_boundingBox, materials);
 	m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });
 	m_lightTreeNeedsMediaUpdate.for_each([](auto &elem) { elem.changed = true; });
 }

@@ -244,9 +244,9 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		if(pathLen > 0 && pathLen + 1 <= m_params.maxPathLength) {
 			u64 neeSeed = m_rngs[pixel].next();
 			math::RndSet2 neeRnd = m_rngs[pixel].next();
-			auto nee = connect(m_sceneDesc.lightTree, 0, 1, neeSeed,
-							   vertices[pathLen].get_position(), m_currentScene->get_bounding_box(),
-							   neeRnd);
+			auto nee = scene::lights::connect(m_sceneDesc, 0, 1, neeSeed,
+											  vertices[pathLen].get_position(),
+											  neeRnd);
 			Pixel projCoord;
 			auto value = vertices[pathLen].evaluate(nee.dir.direction, m_sceneDesc.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
@@ -352,8 +352,8 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 			u64 neeSeed = rng.next();
 			for(int i = 0; i < m_params.neeCount; ++i) {
 				math::RndSet2 neeRnd = rng.next();
-				auto nee = connect(m_sceneDesc.lightTree, i, m_params.neeCount, neeSeed,
-								   vertex.get_position(), m_sceneDesc.aabb, neeRnd);
+				auto nee = scene::lights::connect(m_sceneDesc, i, m_params.neeCount, neeSeed,
+												  vertex.get_position(), neeRnd);
 				Pixel outCoord;
 				auto value = vertex.evaluate(nee.dir.direction, m_sceneDesc.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;

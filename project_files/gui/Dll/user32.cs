@@ -28,6 +28,8 @@ namespace gui.Dll
 
         [DllImport("user32.dll", EntryPoint = "GetDC", CharSet = CharSet.Unicode)]
         internal static extern IntPtr GetDC(IntPtr hWnd);
+        [DllImport("user32.dll", EntryPoint = "ReleaseDC", CharSet = CharSet.Unicode)]
+        internal static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
         [DllImport("user32.dll", EntryPoint = "DestroyWindow", CharSet = CharSet.Unicode)]
         internal static extern bool DestroyWindow(IntPtr hwnd);
@@ -86,5 +88,17 @@ namespace gui.Dll
             WS_EX_COMPOSITED            = 0x02000000,
             WS_EX_NOACTIVATE            = 0x08000000
         }
+
+        internal enum MapVirtualKeyMapTypes : uint
+        {
+            MAPVK_VK_TO_VSC = 0x00,
+            MAPVK_VSC_TO_VK = 0x01,
+            MAPVK_VK_TO_CHAR = 0x02,
+            MAPVK_VSC_TO_VK_EX = 0x03,
+            MAPVK_VK_TO_VSC_EX = 0x04
+        }
+
+        [DllImport("user32.dll")]
+        internal static extern uint MapVirtualKeyA(uint uCode, MapVirtualKeyMapTypes uMapType);
     }
 }

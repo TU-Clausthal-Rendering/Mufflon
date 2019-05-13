@@ -101,23 +101,28 @@ CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity_reflection(float Gi, fl
 
 // Get a normal of the cavity proportional to their visibility.
 // Also returns iDotH for the new half vector.
-CUDA_FUNCTION __forceinline__ Direction sample_visible_normal_vcavity(const Direction& incidentTS, const Direction& cavityTS, u64 rndChoice, float& iDotHOut) {
+struct VCavitySampleResult { Direction halfTS; float cosI; };
+
+CUDA_FUNCTION __forceinline__ VCavitySampleResult
+sample_visible_normal_vcavity(const Direction& incidentTS, const Direction& cavityTS, u64& rndChoice) {
 	// Transform to tangent space and produce V-cavity adjoint normal.
 	// See "Importance Sampling Microfacet-Based BSDFs using the Distribution of Visible Normals".
 	Direction adjHalf { -cavityTS.x, -cavityTS.y, cavityTS.z };
-	iDotHOut = dot(incidentTS, cavityTS);
+	float iDotHOut = dot(incidentTS, cavityTS);
 	float iDotHadj = dot(incidentTS, adjHalf);
 	// Choose one of the normals randomly
 	float t = incidentTS.z > 0.0f ? ei::max(0.0f, iDotHadj) / (ei::max(0.0f, iDotHOut) + ei::max(0.0f, iDotHadj))
 								  : ei::max(0.0f,-iDotHadj) / (ei::max(0.0f,-iDotHOut) + ei::max(0.0f,-iDotHadj));
-	constexpr float MAX_RND = float(std::numeric_limits<u64>::max()); // TODO: successor
-	float rnd = rndChoice / MAX_RND;
-	if(rnd < t) {
+	u64 probAdj = math::percentage_of(std::numeric_limits<u64>::max(), t);
+	if(rndChoice < probAdj) {
+		rndChoice = math::rescale_sample(rndChoice, 0, probAdj-1);
 		// Use adjoint half vector instead
 		iDotHOut = iDotHadj;
-		return adjHalf;
-	} else
-		return cavityTS;
+		return { adjHalf, iDotHadj };
+	} else {
+		rndChoice = math::rescale_sample(rndChoice, probAdj, std::numeric_limits<u64>::max());
+		return { cavityTS, iDotHOut };
+	}
 }
 
 

@@ -1,5 +1,6 @@
 #include "util/flag.hpp"
 #include "core/math/sample_types.hpp"
+#include "core/math/sampling.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
 
@@ -61,7 +62,7 @@ public:
  */
 template<class T>
 class MaterialConcept {
-	template<class T, typename = typename std::is_same< T::NonTexParams,
+	template<class T, typename = typename std::is_same< typename T::NonTexParams,
 		decltype(std::declval<const T>().nonTexParams)>::type >
 		static constexpr bool has_params(int) { return true; }
 	template<class T> static constexpr bool has_params(...) { return false; }
@@ -75,14 +76,14 @@ class MaterialConcept {
 	template<class T> static constexpr bool has_fetch(...) { return false; }
 public:
 	// Must define non-texture parameters
-	static_assert(std::is_trivially_copyable<T::NonTexParams>::value, "Must contain an internal type 'NonTexParams' which is trivially copyable.");
+	static_assert(std::is_trivially_copyable<typename T::NonTexParams>::value, "Must contain an internal type 'NonTexParams' which is trivially copyable.");
 	static_assert(alignof(typename T::NonTexParams) <= 4, "Must contain an internal type 'NonTexParams' which is at most 4 byte alignable.");
 	static_assert(alignof(typename T::SampleType) <= 4, "Must contain an internal type 'SampleType' which is at most 4 byte alignable.");
 	static constexpr MaterialSampleConcept<typename T::SampleType> SampleTypeOK {}; // The internal SampleType must fulfil the MaterialSampleConcept
 	static_assert(has_params<T>(0), "Must have a member get_non_texture_parameters() const -> NonTexParams.");
 
 	// Must define meta infomation for texture parameters
-	static_assert(std::is_enum<T::Textures>::value, "Must define a Textures enum.");
+	static_assert(std::is_enum<typename T::Textures>::value, "Must define a Textures enum.");
 	static_assert(T::Textures::TEX_COUNT >= 0, "Must define an enum member NUM for the number of textures");
 	//static_assert(T::Textures::LAST >= T::Textures::NUM, "Must define an enum member LAST for the offset of textures from the next layer.");
 
@@ -109,8 +110,8 @@ struct MaterialPropertyFlags : public util::Flags<u16> {
 
 namespace details {
 	// Helper to compiletime check for a parameter dependent medium
-	template<class T, typename = std::is_same< Medium,
-		decltype( std::declval<const T>().compute_medium() ) >::type >
+	template<class T, typename = typename std::is_same< Medium,
+		 decltype( std::declval<const T>().compute_medium() ) >::type >
 		static constexpr bool has_dependent_medium(int) { return true; }
 	template<class T> static constexpr bool has_dependent_medium(...) { return false; }
 

@@ -120,6 +120,7 @@ typedef enum {
 	MATERIAL_WALTER,
 	MATERIAL_BLEND,
 	MATERIAL_FRESNEL,
+	MATERIAL_MICROFACET,
 	// MATERIAL_FRESNEL_CONDUCTOR	// Maybe reintroduce
 	MATERIAL_NUM,
 } MaterialParamType;
@@ -211,7 +212,7 @@ typedef struct {
 	NormalDistFunction ndf;
 	Vec3 absorption;
 	float refractionIndex;
-} WalterParams;
+} WalterParams;	// Used for Walter AND Microfacet model
 typedef struct {
 	TextureHdl radiance;
 	Vec3 scale;
@@ -241,6 +242,7 @@ typedef struct {
 typedef struct MaterialParamsStruct {
 	Medium outerMedium;
 	MaterialParamType innerType;
+	TextureHdl alpha;
 	union {
 		LambertParams lambert;
 		TorranceParams torrance;
@@ -487,6 +489,7 @@ CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling);
+CORE_API TextureHdl CDECL world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
 CORE_API const char* CDECL world_get_texture_name(TextureHdl hdl);
 CORE_API Boolean CDECL world_get_texture_size(TextureHdl hdl, IVec2* size);
@@ -558,6 +561,7 @@ CORE_API Boolean CDECL profiling_save_snapshots(const char* path);
 CORE_API Boolean CDECL profiling_save_total_and_snapshots(const char* path);
 CORE_API const char* CDECL profiling_get_current_state();
 CORE_API const char* CDECL profiling_get_snapshots();
+CORE_API const char* CDECL profiling_get_total();
 CORE_API const char* CDECL profiling_get_total_and_snapshots();
 CORE_API void CDECL profiling_reset();
 CORE_API size_t CDECL profiling_get_total_cpu_memory();
@@ -569,15 +573,21 @@ CORE_API size_t CDECL profiling_get_used_gpu_memory();
 
 // Interface for initialization and destruction
 CORE_API Boolean CDECL mufflon_initialize();
+CORE_API Boolean CDECL mufflon_initialize_opengl();
 CORE_API Boolean CDECL mufflon_set_logger(void(*logCallback)(const char*, int));
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API void CDECL mufflon_destroy();
+CORE_API void CDECL mufflon_destroy_opengl();
 
 
 CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* format);
 CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, TextureFormat format,
 											 bool sRgb,const char** ptr);
+CORE_API Boolean CDECL core_get_target_image_rgba32(uint32_t index, Boolean variance, float* ptr);
+CORE_API Boolean CDECL core_copy_screen_texture_rgba32(float* ptr);
+CORE_API Boolean CDECL core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r,
+										   float* g, float* b, float* a);
 CORE_API const char* CDECL core_get_dll_error();
 CORE_API Boolean CDECL core_set_log_level(LogLevel level);
 CORE_API Boolean CDECL core_set_lod_loader(Boolean (CDECL *func)(ObjectHdl, uint32_t));

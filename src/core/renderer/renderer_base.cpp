@@ -8,7 +8,9 @@ template < Device dev >
 RendererBase<dev>::RendererBase() {
 	m_sceneDesc = make_udevptr<dev, mufflon::scene::SceneDescriptor<dev>>();
 }
-RendererBase<Device::CPU>::RendererBase() = default;
+
+template <>
+RendererBase<Device::CPU>::RendererBase() {};
 
 template < Device dev >
 bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
@@ -28,6 +30,7 @@ bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 	return false;
 }
 
+template <>
 bool RendererBase<Device::CPU>::pre_iteration(OutputHandler& outputBuffer) {
 	m_outputBuffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
 	m_currentIteration = outputBuffer.get_current_iteration();

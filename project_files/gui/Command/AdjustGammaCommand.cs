@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Input;
-using gui.Dll;
 using gui.Model;
 
 namespace gui.Command
@@ -26,8 +21,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            OpenGlDisplay.opengldisplay_set_factor(OpenGlDisplay.opengldisplay_get_factor() * Factor);
-            m_models.Renderer.UpdateDisplayTexture();
+            m_models.Display.GammaFactor *= Factor;
         }
 
         public event EventHandler CanExecuteChanged
@@ -54,8 +48,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            OpenGlDisplay.opengldisplay_set_factor(OpenGlDisplay.opengldisplay_get_factor() / Factor);
-            m_models.Renderer.UpdateDisplayTexture();
+            m_models.Display.GammaFactor /= Factor;
         }
 
         public event EventHandler CanExecuteChanged

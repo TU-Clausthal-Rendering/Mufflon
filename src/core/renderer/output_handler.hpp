@@ -207,6 +207,9 @@ public:
 	// exportSRgb: Convert the values from linear to sRGB before packing the data into the exportFormat.
 	scene::textures::CpuTexture get_data(OutputValue which, scene::textures::Format exportFormat, bool exportSRgb);
 
+	// Returns the value of a pixel as a Vec4, regardless of the underlying format
+	ei::Vec4 get_pixel_value(OutputValue which, Pixel pixel);
+
 	int get_current_iteration() const noexcept { return m_iteration; }
 
 	int get_width() const { return m_width; }

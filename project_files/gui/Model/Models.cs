@@ -9,9 +9,11 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using gui.Annotations;
+using gui.Controller.Renderer;
 using gui.Dll;
 using gui.Model.Camera;
 using gui.Model.Controller;
+using gui.Model.Display;
 using gui.Model.Events;
 using gui.Model.Light;
 using gui.Model.Material;
@@ -35,7 +37,8 @@ namespace gui.Model
         public SettingsModel Settings { get; }
 
         public RendererModel Renderer { get; }
-        public ViewportModel Viewport { get; }
+        public RenderCameraModel RendererCamera { get; }
+        public DisplayModel Display { get; }
 
         private WorldModel m_world = null;
         public WorldModel World
@@ -56,22 +59,26 @@ namespace gui.Model
         // model controller 
 
         public ScenarioChangedController ScenarioChangedController { get; }
+        public RendererCameraController RendererCameraController { get; }
+        public RendererController RendererController{ get; }
 
         public StatusbarModel Statusbar { get; }
 
-        public Models(MainWindow window)
-        {
+        public Models(MainWindow window) {
             // init models first
+            App = new AppModel(window);
             Settings = new SettingsModel();
-            Viewport = new ViewportModel();
+            Display = new DisplayModel();
             Renderer = new RendererModel();
+            RendererCamera = new RenderCameraModel();
             RenderTargetSelection = new RenderTargetSelectionModel();
             Toolbar = new ToolbarModel();
             Statusbar = new StatusbarModel();
-            App = new AppModel(window, Viewport, Renderer, RenderTargetSelection, Statusbar, Settings);
 
             // init controller last
             ScenarioChangedController = new ScenarioChangedController(this);
+            RendererCameraController = new RendererCameraController(this, window.RenderDisplay);
+            RendererController = new RendererController(this);
         }
 
         public async void LoadSceneAsynch(string path)

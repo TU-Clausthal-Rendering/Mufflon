@@ -47,7 +47,7 @@ bool any_intersection(
 	const scene::Direction& connectionDirAtoB
 );
 
-template < Device dev = CURRENT_DEV >
+template < Device dev = CURRENT_DEV, bool alphatest = true >
 __host__ __device__
 RayIntersectionResult first_intersection(
 	const SceneDescriptor<dev>& scene,

@@ -27,7 +27,7 @@ public:
 	Lod(const Object* parent) : m_parent{parent} {}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
-	Lod(Lod&& obj) = default;
+	Lod(Lod&& obj) = delete;
 	Lod& operator=(const Lod&) = delete;
 	Lod& operator=(Lod&&) = default;
 	~Lod() = default;
