@@ -7,6 +7,8 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
+//#define ONLAMBERT_SAMPLING
+
 CUDA_FUNCTION MatSampleOrenNayar
 fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 	  const ei::Vec4* texValues,
@@ -16,6 +18,11 @@ fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 		Spectrum{texValues[MatOrenNayar::ALBEDO + texOffset]},
 		params.a, params.b
 	};
+}
+
+// sinθ -> cosθ or cosθ -> sinθ
+CUDA_FUNCTION __forceinline__ float adjTrig(float x) {
+	return sqrt(ei::max(0.0f, (1.0f - x) * (1.0f + x)));
 }
 
 CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& params,
@@ -28,26 +35,33 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& params,
 	// Two sided diffuse (therefore the abs())
 	float cosThetaI = ei::abs(incidentTS.z);
 	float cosThetaO = ei::abs(excidentTS.z);
-	float sinThetaI = sqrt(ei::max(0.0f, (1.0f - cosThetaI) * (1.0f + cosThetaI)));
-	float sinThetaO = sqrt(ei::max(0.0f, (1.0f - cosThetaO) * (1.0f + cosThetaO)));
-	float cosPhi = 0.0f;
-	if(sinThetaI > 1e-4f && sinThetaO > 1e-4f)
-	{
+	float sinThetaI = adjTrig(cosThetaI);
+	float sinThetaO = adjTrig(cosThetaO);
+	float cosDeltaPhi = 0.0f;
+	if(sinThetaI > 1e-4f && sinThetaO > 1e-4f) {
 		// cos(φ_i-φ_o) = cos(φ_i)cos(φ_o) + sin(φ_i)sin(φ_o)
 		float cosPhiI = incidentTS.x / sinThetaI;
 		float sinPhiI = incidentTS.y / sinThetaI;
 		float cosPhiO = excidentTS.x / sinThetaO;
 		float sinPhiO = excidentTS.y / sinThetaO;
-		cosPhi = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
-		cosPhi = ei::max(0.0f, cosPhi);
+		cosDeltaPhi = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+		cosDeltaPhi = ei::max(0.0f, cosDeltaPhi);
 	}
 	// sin(α) * tan(β) = sin(α) * sin(β) / cos(β)
-	float sinTan = sinThetaI * sinThetaO
-		/ ei::max(cosThetaI, cosThetaO);
+	float sinTan = sinThetaI * sinThetaO / ei::max(cosThetaI, cosThetaO);
+#ifndef ONLAMBERT_SAMPLING
+	float pF = params.a / (params.a + params.b * sinThetaI);
+	float pB = params.a / (params.a + params.b * sinThetaO);
+#endif // ONLAMBERT_SAMPLING
 	return math::BidirSampleValue {
-		params.albedo * ((params.a + params.b * cosPhi * sinTan) / ei::PI),
-		AngularPdf(cosThetaO / ei::PI),
-		AngularPdf(cosThetaI / ei::PI)
+		params.albedo * ((params.a + params.b * cosDeltaPhi * sinTan) / ei::PI),
+#ifdef ONLAMBERT_SAMPLING
+		AngularPdf{ cosThetaO / ei::PI },
+		AngularPdf{ cosThetaI / ei::PI }
+#else // ONLAMBERT_SAMPLING
+		AngularPdf{ (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO },
+		AngularPdf{ (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI }
+#endif // ONLAMBERT_SAMPLING
 	};
 }
 
@@ -56,16 +70,70 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleOrenNayar& params,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
 									  bool adjoint) {
+#ifdef ONLAMBERT_SAMPLING
 	// Importance sampling for lambert: BRDF * cos(theta)
 	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1).direction;
 	auto eval = evaluate(params, incidentTS, excidentTS, boundary);
 	// Copy the sign for two sided diffuse
 	return math::PathSample {
-		eval.value * (ei::abs(excidentTS.z) / float(eval.pdf.forw)),
+		eval.value * (excidentTS.z / float(eval.pdf.forw)),
 		math::PathEventType::REFLECTED,
 		excidentTS * ei::sgn(incidentTS.z),
 		eval.pdf
 	};
+
+#else // ONLAMBERT_SAMPLING
+
+	// New sampling method from Johannes' PHD:
+	// Get all the incident sizes which we also need for the evaluation.
+	const float cosThetaI = ei::abs(incidentTS.z);
+	const float sinThetaI = adjTrig(cosThetaI);
+	float sinPhiI = 0.0f, cosPhiI = 1.0f;
+	if(sinThetaI > 1e-4f) {
+		cosPhiI = incidentTS.x / sinThetaI;
+		sinPhiI = incidentTS.y / sinThetaI;
+	}
+	float cosDeltaPhi, sinThetaO, cosThetaO, sinPhiO, cosPhiO;
+	// Decide between Lambert and second-term sampling
+	const float pF = params.a / (params.a + params.b * sinThetaI);
+	const float rnd = rndSet.i0 / 1.844674407e19f;
+	if(rnd < pF) {
+		// Sample using cosine (Lambert term)
+		cosThetaO = sqrt(rndSet.u0);			// cos(acos(sqrt(x))) = sqrt(x)
+		sinThetaO = sqrt(1.0f - rndSet.u0);		// sqrt(1-cos(theta)^2)
+		const float phi = rndSet.u1 * 2 * ei::PI;
+		sinPhiO = sin(phi);
+		cosPhiO = cos(phi);
+		// Compute missing excident terms for evaluation
+		// cos(φ_i-φ_o) = cos(φ_i)cos(φ_o) + sin(φ_i)sin(φ_o)
+		cosDeltaPhi = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+		cosDeltaPhi = ei::max(0.0f, cosDeltaPhi);
+	} else {
+		// Sample excident quantities
+		sinThetaO = powf(rndSet.u0, 1.0f / 3.0f);
+		const float sinDeltaPhi = 2.0f * rndSet.u1 - 1.0f;
+		cosThetaO = adjTrig(sinThetaO);
+		cosDeltaPhi = adjTrig(sinDeltaPhi);
+		// Transform local Δφ into tangent space cosφ/sinφ.
+		cosPhiO = cosPhiI * cosDeltaPhi - sinPhiI * sinDeltaPhi;
+		sinPhiO = sinPhiI * cosDeltaPhi + cosPhiI * sinDeltaPhi;
+	}
+	Direction excidentTS { sinThetaO * cosPhiO, sinThetaO * sinPhiO, cosThetaO };
+	// BRDF value
+	const float sinTan = sinThetaI * sinThetaO / ei::max(cosThetaI, cosThetaO);
+	const float brdf = (params.a + params.b * cosDeltaPhi * sinTan) / ei::PI;
+	// PDFs
+	const float pB = params.a / (params.a + params.b * sinThetaO);
+	const float pdfF = (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO;
+	const float pdfB = (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI;
+	return math::PathSample {
+		params.albedo * (brdf * cosThetaO / pdfF),
+		math::PathEventType::REFLECTED,
+		excidentTS * ei::sgn(incidentTS.z),
+		{AngularPdf{pdfF}, AngularPdf{pdfB}}
+	};
+
+#endif ONLAMBERT_SAMPLING
 }
 
 CUDA_FUNCTION Spectrum albedo(const MatSampleOrenNayar& params) {
@@ -82,5 +150,7 @@ CUDA_FUNCTION float pdf_max(const MatSampleOrenNayar& params) {
 
 template MaterialSampleConcept<MatSampleOrenNayar>;
 template MaterialConcept<MatOrenNayar>;
+
+#undef ONLAMBERT_SAMPLING
 
 }}} // namespace mufflon::scene::materials
