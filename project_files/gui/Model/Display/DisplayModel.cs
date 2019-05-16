@@ -110,7 +110,7 @@ namespace gui.Model.Display
                 // BitmapSource, while it seems like it should be faster, actually isn't; I guess BitmapSource.Create
                 // actually copies the memory instead of just using it, so our copy is simply faster
                 RenderBitmap.Lock();
-                if(!Core.core_copy_screen_texture_rgba32(RenderBitmap.BackBuffer))
+                if(!Core.core_copy_screen_texture_rgba32(RenderBitmap.BackBuffer, GammaFactor))
                     throw new Exception(Core.core_get_dll_error());
                 RenderBitmap.AddDirtyRect(new System.Windows.Int32Rect(0, 0, RenderSize.X, RenderSize.Y));
                 RenderBitmap.Unlock();

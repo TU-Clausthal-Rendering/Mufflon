@@ -336,13 +336,17 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	CATCH_ALL(false)
 }
 
-Boolean core_copy_screen_texture_rgba32(float* ptr) {
+Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	std::scoped_lock lock{ s_screenTextureMutex };
 	if(ptr != nullptr && s_screenTexture != nullptr) {
 		const int PIXELS = s_screenTexture->get_width() * s_screenTexture->get_height();
-		std::memcpy(ptr, s_screenTexture->data(), 4u * sizeof(float) * PIXELS);
+
+		const Vec4* texData = reinterpret_cast<const Vec4*>(s_screenTexture->data());
+#pragma PARALLEL_FOR
+		for(int i = 0; i < PIXELS; ++i)
+			ptr[i] = util::pun<Vec4>(factor * util::pun<ei::Vec4>(texData[i]));
 	}
 	return true;
 	CATCH_ALL(false)
@@ -2599,8 +2603,10 @@ Boolean scene_is_sane() {
 	ConstSceneHandle sceneHdl = s_world.get_current_scene();
 	if(sceneHdl == nullptr) {
 		// Check if a rebuild was demanded
-		if(s_world.get_current_scenario() != nullptr)
+		if(s_world.get_current_scenario() != nullptr) {
 			world_load_scenario(s_world.get_current_scenario());
+			sceneHdl = s_world.get_current_scene();
+		}
 	}
 
 	if(sceneHdl != nullptr)
@@ -2966,10 +2972,6 @@ Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTi
 		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 		return false;
 	}
-	if(!s_currentRenderer->has_scene()) {
-		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
-		return false;
-	}
 	// Check if the scene needed a reload -> reset
 	if(s_world.get_current_scene() == nullptr) {
 		if(s_world.get_current_scenario() == nullptr) {
@@ -2983,6 +2985,10 @@ Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTi
 		s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
 	} else if(s_world.reload_scene()) {
 		s_currentRenderer->reset();
+	}
+	if(!s_currentRenderer->has_scene()) {
+		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
+		return false;
 	}
 	if(preTime != nullptr) {
 		preTime->cycles = CpuProfileState::get_cpu_cycle();
