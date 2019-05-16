@@ -1397,10 +1397,12 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 
 	// Set common properties and add to scene
 	newMaterial->set_name(name);
-	newMaterial->set_outer_medium( s_world.add_medium(
-		{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
-			util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
+	materials::Medium outerMedium {
+		util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
+		util::pun<Spectrum>(mat->outerMedium.absorption)
+	};
+	newMaterial->set_outer_medium( s_world.add_medium(outerMedium) );
+	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium(outerMedium)) );
 	if(mat->alpha != nullptr)
 		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
 

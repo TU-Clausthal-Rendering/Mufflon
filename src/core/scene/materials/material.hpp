@@ -92,7 +92,7 @@ public:
 		//m_dirty = true;
 	}
 
-	virtual Medium compute_medium() const = 0;
+	virtual Medium compute_medium(const Medium& outerMedium) const = 0;
 
 	Materials get_type() const { return m_type; }
 
@@ -136,7 +136,7 @@ public:
 	}
 	std::size_t get_parameter_pack_size() const final;
 	char* get_descriptor(Device device, char* outBuffer) const final;
-	Medium compute_medium() const final;
+	Medium compute_medium(const Medium& outerMedium) const final;
 
 private:
 	TextureHandle m_textures[int(SubMaterial::Textures::TEX_COUNT)];

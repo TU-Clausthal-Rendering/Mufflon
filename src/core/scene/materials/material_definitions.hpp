@@ -348,7 +348,7 @@ struct MatBlend {
 		nonTexParams.factorB = factorB;
 	}
 
-	Medium compute_medium() const;
+	Medium compute_medium(const Medium& outerMedium) const;
 
 	using NonTexParams = MatNTPBlend<LayerA, LayerB>;
 	NonTexParams nonTexParams;
@@ -404,7 +404,7 @@ struct MatBlendFresnel {
 		//nonTexParams.pReflect = 0.89176122288449f * f0 + 0.10823877711551f;
 	}
 
-	Medium compute_medium() const;
+	Medium compute_medium(const Medium& outerMedium) const;
 
 	using NonTexParams = MatNTPBlendFresnel<LayerA, LayerB>;
 	NonTexParams nonTexParams;
