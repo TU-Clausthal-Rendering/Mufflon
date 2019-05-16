@@ -585,7 +585,7 @@ CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* for
 CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, TextureFormat format,
 											 bool sRgb,const char** ptr);
 CORE_API Boolean CDECL core_get_target_image_rgba32(uint32_t index, Boolean variance, float* ptr);
-CORE_API Boolean CDECL core_copy_screen_texture_rgba32(float* ptr);
+CORE_API Boolean CDECL core_copy_screen_texture_rgba32(Vec4* ptr, const float factor);
 CORE_API Boolean CDECL core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r,
 										   float* g, float* b, float* a);
 CORE_API const char* CDECL core_get_dll_error();

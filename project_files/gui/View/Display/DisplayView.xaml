@@ -7,17 +7,6 @@
              mc:Ignorable="d" 
              d:DesignStyle="{StaticResource DesignerStyle}"
              d:DesignHeight="600" d:DesignWidth="800">
-    <UserControl.Resources>
-        <local:GammaEffect x:Key="GammaShader" Factor="{Binding GammaFactor, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
-        <Style x:Key="GammaFactorImage" TargetType="{x:Type Image}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}, Path=DataContext.NotInDesignMode}" Value="True">
-                    <Setter Property="Effect" Value="{StaticResource GammaShader}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="0"/>
@@ -42,7 +31,6 @@
                       VerticalScrollBarVisibility="Auto"
                       Focusable="False">
             <Image x:Name="RenderCanvas"
-                   Style="{StaticResource GammaFactorImage}"
                    Stretch="None"
                    LayoutTransform="{Binding BitmapScaling}"
                    Source="{Binding RenderImageSource}"
