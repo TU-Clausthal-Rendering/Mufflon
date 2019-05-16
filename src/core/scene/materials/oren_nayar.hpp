@@ -59,8 +59,10 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& params,
 		AngularPdf{ cosThetaO / ei::PI },
 		AngularPdf{ cosThetaI / ei::PI }
 #else // ONLAMBERT_SAMPLING
-		AngularPdf{ (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO },
-		AngularPdf{ (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI }
+		//AngularPdf{ (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO },
+		//AngularPdf{ (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI }
+		AngularPdf{ (pF / ei::PI * cosThetaO + (1-pF) * 0.40596962562901f * cosDeltaPhi * powf(acosf(cosThetaO), 1.4f) / sinThetaO) },
+		AngularPdf{ (pB / ei::PI * cosThetaI + (1-pB) * 0.40596962562901f * cosDeltaPhi * powf(acosf(cosThetaI), 1.4f) / sinThetaI) }
 #endif // ONLAMBERT_SAMPLING
 	};
 }
@@ -110,9 +112,11 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleOrenNayar& params,
 		cosDeltaPhi = ei::max(0.0f, cosDeltaPhi);
 	} else {
 		// Sample excident quantities
-		sinThetaO = powf(rndSet.u0, 1.0f / 3.0f);
+		const float thetaO = ei::PI / 2.0f * powf(rndSet.u0, 1.0f / 2.4f);
+		sinThetaO = sin(thetaO);
+		cosThetaO = cos(thetaO);
+		//sinThetaO = powf(rndSet.u0, 1.0f / 3.0f);
 		const float sinDeltaPhi = 2.0f * rndSet.u1 - 1.0f;
-		cosThetaO = adjTrig(sinThetaO);
 		cosDeltaPhi = adjTrig(sinDeltaPhi);
 		// Transform local Δφ into tangent space cosφ/sinφ.
 		cosPhiO = cosPhiI * cosDeltaPhi - sinPhiI * sinDeltaPhi;
@@ -124,8 +128,10 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleOrenNayar& params,
 	const float brdf = (params.a + params.b * cosDeltaPhi * sinTan) / ei::PI;
 	// PDFs
 	const float pB = params.a / (params.a + params.b * sinThetaO);
-	const float pdfF = (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO;
-	const float pdfB = (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI;
+	//const float pdfF = (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO;
+	//const float pdfB = (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI;
+	const float pdfF = (pF / ei::PI * cosThetaO + (1-pF) * 0.40596962562901f * cosDeltaPhi * powf(acosf(cosThetaO), 1.4f) / sinThetaO);
+	const float pdfB = (pB / ei::PI * cosThetaI + (1-pB) * 0.40596962562901f * cosDeltaPhi * powf(acosf(cosThetaI), 1.4f) / sinThetaI);
 	return math::PathSample {
 		params.albedo * (brdf * cosThetaO / pdfF),
 		math::PathEventType::REFLECTED,
