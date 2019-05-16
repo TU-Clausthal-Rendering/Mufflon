@@ -111,7 +111,7 @@ struct MaterialPropertyFlags : public util::Flags<u16> {
 namespace details {
 	// Helper to compiletime check for a parameter dependent medium
 	template<class T, typename = typename std::is_same< Medium,
-		 decltype( std::declval<const T>().compute_medium() ) >::type >
+		decltype( std::declval<const T>().compute_medium(std::declval<Medium>()) ) >::type >
 		static constexpr bool has_dependent_medium(int) { return true; }
 	template<class T> static constexpr bool has_dependent_medium(...) { return false; }
 

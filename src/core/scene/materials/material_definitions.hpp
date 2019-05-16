@@ -257,7 +257,7 @@ struct MatMicrofacet {
 	} nonTexParams;
 	float refractionIndex;
 
-	Medium compute_medium() const {
+	Medium compute_medium(const Medium& outerMedium) const {
 		return Medium{ei::Vec2{refractionIndex, 0.0f}, nonTexParams.absorption};
 	}
 };

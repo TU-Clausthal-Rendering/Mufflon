@@ -53,7 +53,7 @@ char* Material<M>::get_descriptor(Device device, char* outBuffer) const {
 template<Materials M>
 Medium Material<M>::compute_medium(const Medium& outerMedium) const {
 	if constexpr(details::has_dependent_medium<SubMaterial>(0)) {
-		return m_material.compute_medium();
+		return m_material.compute_medium(outerMedium);
 	} else {
 		// Since it is possible that thin objects exist (only a plane: e.g. leaves)
 		// the medium on the 'inner side' must be the same as on the outer side.
