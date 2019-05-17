@@ -76,9 +76,9 @@ template<class LayerA, class LayerB>
 Medium MatBlendFresnel<LayerA, LayerB>::compute_medium(const Medium& outerMedium) const {
 	Medium baseMedium;
 	if constexpr(details::has_dependent_medium<LayerA>(0))
-		baseMedium = layerA.compute_medium();
+		baseMedium = layerA.compute_medium(outerMedium);
 	else if constexpr(details::has_dependent_medium<LayerB>(0))
-		baseMedium = layerB.compute_medium();
+		baseMedium = layerB.compute_medium(outerMedium);
 	return Medium{ior, baseMedium.get_absorption_coeff()};
 }
 
