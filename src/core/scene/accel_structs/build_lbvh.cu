@@ -36,15 +36,15 @@ template<Device dev> struct desc_info<LodDescriptor<dev>> {
 	using MortonCode = u64;
 	using PrimCount = ei::IVec3;
 	using CostFactor = ei::Vec4;
-	static constexpr float NODE_TRAVERSAL_COST = 3.0f;
-	static constexpr ei::Vec3 PRIM_TRAVERSAL_COST = { 1.2f, 2.4f, 1.0f };
+	static constexpr float NODE_TRAVERSAL_COST = 2.0f;
+	static constexpr ei::Vec3 PRIM_TRAVERSAL_COST = { 1.2f, 4.0f, 1.0f };
 };
 template<Device dev> struct desc_info<SceneDescriptor<dev>> {
 	using MortonCode = u64;
 	using PrimCount = ei::Vec<i32, 1>;
 	using CostFactor = ei::Vec2;
 	static constexpr float NODE_TRAVERSAL_COST = 1.0f;
-	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST{ 200000.0f };// TODO: find value for this.
+	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST{ 8.5f };
 };
 template<typename Desc>
 using MortonCode_t = typename desc_info<Desc>::MortonCode;

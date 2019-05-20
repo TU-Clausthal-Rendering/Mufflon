@@ -51,33 +51,34 @@ char* Material<M>::get_descriptor(Device device, char* outBuffer) const {
 }
 
 template<Materials M>
-Medium Material<M>::compute_medium() const {
+Medium Material<M>::compute_medium(const Medium& outerMedium) const {
 	if constexpr(details::has_dependent_medium<SubMaterial>(0)) {
-		return m_material.compute_medium();
+		return m_material.compute_medium(outerMedium);
 	} else {
-		// Use some average dielectric refraction index and a maximum absorption
-		return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
+		// Since it is possible that thin objects exist (only a plane: e.g. leaves)
+		// the medium on the 'inner side' must be the same as on the outer side.
+		return outerMedium;
 	}
 }
 
 // C++14 incompatible member functions of blend models (if constexpr -> not in header)
 template<class LayerA, class LayerB>
-Medium MatBlend<LayerA, LayerB>::compute_medium() const {
+Medium MatBlend<LayerA, LayerB>::compute_medium(const Medium& outerMedium) const {
 	if constexpr(details::has_dependent_medium<LayerA>(0))
-		return layerA.compute_medium();
+		return layerA.compute_medium(outerMedium);
 	else if constexpr(details::has_dependent_medium<LayerB>(0))
-		return layerB.compute_medium();
-	// Use some average dielectric refraction index and a maximum absorption
-	return Medium{ei::Vec2{1.3f, 0.0f}, Spectrum{std::numeric_limits<float>::infinity()}};
+		return layerB.compute_medium(outerMedium);
+	// Fallback is again the outer medium
+	return outerMedium;
 }
 
 template<class LayerA, class LayerB>
-Medium MatBlendFresnel<LayerA, LayerB>::compute_medium() const {
+Medium MatBlendFresnel<LayerA, LayerB>::compute_medium(const Medium& outerMedium) const {
 	Medium baseMedium;
 	if constexpr(details::has_dependent_medium<LayerA>(0))
-		baseMedium = layerA.compute_medium();
+		baseMedium = layerA.compute_medium(outerMedium);
 	else if constexpr(details::has_dependent_medium<LayerB>(0))
-		baseMedium = layerB.compute_medium();
+		baseMedium = layerB.compute_medium(outerMedium);
 	return Medium{ior, baseMedium.get_absorption_coeff()};
 }
 
@@ -98,7 +99,7 @@ constexpr void instanciate_materials() {
 	p->get_properties();
 	p->get_parameter_pack_size();
 	p->get_descriptor(Device::CPU, nullptr);
-	p->compute_medium();
+	p->compute_medium(Medium{});
 	//(void)std::declval<Material<PREV_MAT>>();
 	instanciate_materials<PREV_MAT>();
 }

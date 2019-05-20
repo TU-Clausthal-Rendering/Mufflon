@@ -13,7 +13,8 @@ __global__ void update_variance_kernel(TextureDevHandle_t<Device::CUDA> iterTex,
 #ifdef __CUDA_ARCH__
 	int x = int(blockIdx.x * blockDim.x + threadIdx.x);
 	int y = int(blockIdx.y * blockDim.y + threadIdx.y);
-	OutputHandler::update_variance(iterTex, cumTex, varTex, x, y, iteration);
+	if(x < iterTex.width && y < iterTex.height)
+		OutputHandler::update_variance(iterTex, cumTex, varTex, x, y, iteration);
 #endif
 }
 
