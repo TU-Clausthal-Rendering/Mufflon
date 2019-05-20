@@ -37,7 +37,7 @@ CUDA_FUNCTION void lt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 
 	int pathLen = 0;
 	do {
-		if(pathLen > 0 && pathLen+1 >= params.minPathLength && pathLen+1 <= params.maxPathLength) {
+		if(pathLen+1 >= params.minPathLength && pathLen+1 <= params.maxPathLength) {
 			// Connect to the camera. An MIS is not necessary, because this connection is the
 			// only event in this renderer
 			auto connection = LtPathVertex::get_connection(camera, vertex);
