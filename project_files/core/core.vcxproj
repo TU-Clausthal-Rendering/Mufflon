@@ -22,6 +22,8 @@
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\lt\gpu_lt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\neb\cpu_neb.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
@@ -184,6 +186,10 @@
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\gpu_lt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\lt_common.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\lt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\neb\cpu_neb.hpp" />
     <ClInclude Include="..\..\src\core\renderer\neb\density_octree.hpp" />
     <ClInclude Include="..\..\src\core\renderer\neb\neb_params.hpp" />
@@ -276,6 +282,7 @@
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu" />
     <ClCompile Include="..\..\src\core\renderer\output_handler.cpp" />
     <CudaCompile Include="..\..\src\core\memory\allocator.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />
