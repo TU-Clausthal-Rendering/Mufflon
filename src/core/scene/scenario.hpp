@@ -153,6 +153,10 @@ public:
 		return m_background;
 	}
 
+	bool has_displacement_mapped_material() const noexcept {
+		return m_hasDisplacement;
+	}
+
 private:
 	struct MaterialDesc {
 		std::string binaryName;
@@ -186,6 +190,8 @@ private:
 	u32 m_globalLodLevel = 0u;
 	ei::IVec2 m_resolution = {};
 	CameraHandle m_camera = nullptr;
+	// Keep track of whether any assigned material has a displacement map
+	bool m_hasDisplacement = false;
 
 	// Object blacklisting and other custom traits
 	std::map<ConstObjectHandle, CustomProperty > m_perObjectCustomization;

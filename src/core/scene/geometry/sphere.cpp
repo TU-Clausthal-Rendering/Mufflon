@@ -1,5 +1,7 @@
 #include "sphere.hpp"
 #include "core/scene/descriptors.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
+#include "core/scene/scenario.hpp"
 #include <cuda_runtime.h>
 #include "util/punning.hpp"
 
@@ -201,6 +203,13 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 	}
 	descriptor.numAttributes = static_cast<u32>(attribs.size());
 	descriptor.attributes = attribBuffer.buffer;
+}
+
+
+void Spheres::displace(tessellation::Tessellater& tessellater, const Scenario& scenario) {
+	(void)tessellater;
+	(void)scenario;
+	// There is no displacement we can perform for a perfect sphere (yet)
 }
 
 template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();

@@ -1,8 +1,8 @@
 #include "scenario.hpp"
 #include "world_container.hpp"
 #include "util/log.hpp"
-//#include "core/scene/materials/material.hpp"
 #include "core/scene/lights/lights.hpp"
+#include "core/scene/materials/material.hpp"
 #include <algorithm>
 
 namespace mufflon::scene {
@@ -24,7 +24,7 @@ MaterialIndex Scenario::declare_material_slot(StringView binaryName) {
 	MaterialIndex newIndex = static_cast<MaterialIndex>(m_materialAssignment.size());
 	m_materialAssignment.push_back(MaterialDesc{
 		std::string{binaryName}, nullptr
-								   });
+	});
 	m_materialIndices.emplace(m_materialAssignment.back().binaryName, newIndex);
 	return newIndex;
 }
@@ -45,8 +45,19 @@ const std::string& Scenario::get_material_slot_name(MaterialIndex slotIdx) const
 
 void Scenario::assign_material(MaterialIndex index, MaterialHandle material) {
 	// TODO: check if a renderer is active?
+	if(m_materialAssignment[index].material != nullptr && m_materialAssignment[index].material->get_displacement_map() != nullptr) {
+		// Since the overwritten material might have been the only displaced one we gotta update the flag
+		m_hasDisplacement = false;
+		for(std::size_t i = 0u; i < get_num_material_slots(); ++i) {
+			if(m_materialAssignment[i].material->get_displacement_map() != nullptr) {
+				m_hasDisplacement = true;
+				break;
+			}
+		}
+	}
 	m_materialAssignment[index].material = material;
 	m_materialAssignmentChanged = true;
+	m_hasDisplacement |= material->get_displacement_map() != nullptr;
 }
 
 MaterialHandle Scenario::get_assigned_material(MaterialIndex index) const {

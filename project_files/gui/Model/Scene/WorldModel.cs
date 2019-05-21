@@ -57,6 +57,12 @@ namespace gui.Model.Scene
             }
         }
 
+        public uint MaxTessellationLevel
+        {
+            get => Core.world_get_max_tessellation_level();
+            set => Core.world_set_max_tessellation_level(value);
+        }
+
         public uint AnimationFrameStart
         {
             get

@@ -7,6 +7,11 @@ namespace mufflon::scene::tessellation {
 class Uniform : public Tessellater {
 public:
 	Uniform() = default;
+	Uniform(const u32 level) :
+		Uniform(level, level) {}
+	Uniform(const u32 innerLevel, const u32 outerLevel) :
+		m_innerLevel(innerLevel),
+		m_outerLevel(outerLevel) {}
 	Uniform(const Uniform&) = delete;
 	Uniform(Uniform&&) = delete;
 	Uniform& operator=(const Uniform&) = delete;
@@ -31,8 +36,8 @@ protected:
 	}
 
 private:
-	u32 m_innerLevel;
-	u32 m_outerLevel;
+	u32 m_innerLevel = 0u;
+	u32 m_outerLevel = 0u;
 };
 
 } // namespace mufflon::scene::tessellation 

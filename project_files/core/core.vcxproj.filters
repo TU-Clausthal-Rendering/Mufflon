@@ -942,6 +942,9 @@
     <ClInclude Include="..\..\src\core\renderer\lt\lt_params.hpp">
       <Filter>Source Files\core\renderer\lt</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\tessellation\cam_dist.hpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">

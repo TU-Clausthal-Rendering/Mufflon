@@ -257,6 +257,7 @@ namespace gui.Dll
         internal static extern bool world_get_frame_start(out uint frame);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_frame_end(out uint frame);
+
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_set_camera(IntPtr scenario, IntPtr cam);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -344,6 +345,10 @@ namespace gui.Dll
         internal static string world_get_env_light_map(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_map_(hdl)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_env_light_map(IntPtr hdl, IntPtr tex);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void world_set_max_tessellation_level(uint level);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint world_get_max_tessellation_level();
 
         // Camera API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -409,6 +414,8 @@ namespace gui.Dll
         internal static extern bool scene_is_sane();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scene_get_bounding_box(IntPtr scene, out Vec3 min, out Vec3 max);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool scene_request_retessellation();
 
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

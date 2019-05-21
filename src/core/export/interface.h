@@ -243,6 +243,11 @@ typedef struct MaterialParamsStruct {
 	Medium outerMedium;
 	MaterialParamType innerType;
 	TextureHdl alpha;
+	struct {
+		TextureHdl map;
+		float bias;
+		float scale;
+	} displacement;
 	union {
 		LambertParams lambert;
 		TorranceParams torrance;
@@ -418,6 +423,8 @@ CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
 CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_end(uint32_t* animationFrame);
+CORE_API void CDECL world_set_max_tessellation_level(const uint32_t maxTessLevel);
+CORE_API uint32_t CDECL world_get_max_tessellation_level();
 
 // Scenario interface
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
@@ -460,6 +467,7 @@ CORE_API ConstCameraHdl CDECL scene_get_camera(SceneHdl scene);
 CORE_API Boolean CDECL scene_move_active_camera(float x, float y, float z);
 CORE_API Boolean CDECL scene_rotate_active_camera(float x, float y, float z);
 CORE_API Boolean CDECL scene_is_sane();
+CORE_API Boolean CDECL scene_request_retessellation();
 
 // Light interface
 CORE_API Boolean CDECL world_get_point_light_path_segments(ConstLightHdl hdl, uint32_t* segments);

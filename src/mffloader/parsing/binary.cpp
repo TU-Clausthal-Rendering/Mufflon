@@ -666,7 +666,9 @@ void BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	// Remember where we were in the file
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
 	// Jump to the object
+	const std::ifstream::off_type test0 = m_fileStream.tellg() - m_fileStart;
 	m_fileStream.seekg(object.offset + sizeof(u32), std::ifstream::beg);
+	const std::ifstream::off_type test1 = m_fileStream.tellg() - m_fileStart;
 	// Skip the object name + find the jump table
 	m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
 	// Jump to the LoD
@@ -868,12 +870,12 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		if(m_fileStream.bad() || m_fileStream.fail())
 			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
+		m_fileStart = m_fileStream.tellg();
 
 		// Skip over the materials header
 		if(read<u32>() != MATERIALS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid materials header magic constant");
 
-		m_fileStart = m_fileStream.tellg();
 
 		const u64 objectStart = read<u64>();
 		m_fileStream.seekg(objectStart, std::ifstream::beg);

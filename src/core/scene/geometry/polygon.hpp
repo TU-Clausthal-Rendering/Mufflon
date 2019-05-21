@@ -22,7 +22,7 @@ namespace OpenMesh::Subdivider::Adaptive {
 template < class Mesh >
 class CompositeT;
 } // namespace OpenMesh::Sudivider::Uniform
-namespace OpenMesh::Decimater{
+namespace OpenMesh::Decimater {
 template < class Mesh >
 class DecimaterT;
 } // namespace OpenMesh::Decimater
@@ -35,6 +35,8 @@ namespace mufflon { namespace scene {
 
 template < Device dev >
 struct PolygonsDescriptor;
+
+class Scenario;
 
 namespace tessellation {
 
@@ -267,9 +269,20 @@ public:
 
 	// Implements tessellation for the mesh
 	void tessellate(tessellation::Tessellater& tessellater);
+	// Implements displacement mapping for the mesh
+	void displace(tessellation::Tessellater& tessellater, const Scenario& scenario);
+
+	// Creates a decimater 
+	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
 	// Implements decimation.
-	void create_lod(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-					std::size_t target_vertices);
+	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+						 std::size_t targetVertices, bool garbageCollect);
+
+	// Splits a vertex
+	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,
+												   const VertexHandle vl, const VertexHandle vr);
+	// Garbage-collects the mesh and the index buffer
+	void garbage_collect();
 
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
@@ -371,6 +384,21 @@ public:
 		return m_uniqueMaterials;
 	}
 
+	PolygonMeshType& get_mesh() noexcept {
+		return *m_meshData;
+	}
+
+	const PolygonMeshType& get_mesh() const noexcept {
+		return *m_meshData;
+	}
+
+	// Returns whether any polygon has a displacement map associated with the given material assignment
+	bool has_displacement_mapping(const Scenario& scenario) const noexcept;
+
+	bool was_displacement_mapping_applied() const noexcept {
+		return m_wasDisplaced;
+	}
+
 private:
 	static constexpr const char MAT_INDICES_NAME[] = "material-indices";
 
@@ -412,6 +440,8 @@ private:
 	// Reserves more space for the index buffer
 	template < Device dev >
 	void reserve_index_buffer(std::size_t capacity);
+	// Rebuilds the index buffer from scratch
+	void rebuild_index_buffer();
 	// Synchronizes two device index buffers
 	template < Device changed, Device sync >
 	void synchronize_index_buffer();
@@ -445,6 +475,9 @@ private:
 	// materials will be updated. Assumption: a material reference
 	// will not change afterwards.
 	std::unordered_set<MaterialIndex> m_uniqueMaterials;
+
+	// Keeps track of whether displacement mapping was already applied or not
+	bool m_wasDisplaced = false;
 };
 
 }}} // namespace mufflon::scene::geometry

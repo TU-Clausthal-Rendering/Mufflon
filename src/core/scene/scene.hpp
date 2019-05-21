@@ -88,6 +88,9 @@ public:
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights);
 	void set_background(lights::Background& envLightTexture);
+	// Discards any already applied tessellation/displacement and re-tessellates/-displaces
+	// with the current max. tessellation level
+	bool retessellate(const u32 maxTessLevel);
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
@@ -112,6 +115,8 @@ public:
 	 * It needs to be passed up to three tuples, each coupling names and types for
 	 * vertex, face, and sphere attributes which the renderer wants to have
 	 * access to.
+	 * The max. tessellation level determines the max. inner and outer tessellation
+	 * level of any face. It may be 0 if no (re-)tessellation is desired.
 	 *
 	 * Usage example:
 	 * scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(
@@ -131,6 +136,7 @@ public:
 	const std::map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
 		return m_objects;
 	}
+
 private:
 	template < Device dev >
 	struct ChangedFlag {

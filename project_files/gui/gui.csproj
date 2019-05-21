@@ -200,6 +200,7 @@
     <Compile Include="ViewModel\Settings\KeybindingsViewModel.cs" />
     <Compile Include="ViewModel\Settings\OtherViewModel.cs" />
     <Compile Include="ViewModel\StatusbarViewModel.cs" />
+    <Compile Include="ViewModel\TessellationViewModel.cs" />
     <Compile Include="ViewModel\ToolbarViewModel.cs" />
     <Compile Include="ViewModel\ViewModels.cs" />
     <Compile Include="ViewModel\Light\AddLightViewModel.cs" />
@@ -208,6 +209,9 @@
     </Compile>
     <Compile Include="View\Display\DisplayView.xaml.cs">
       <DependentUpon>DisplayView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\TessellationView.xaml.cs">
+      <DependentUpon>TessellationView.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\ToolbarView.xaml.cs">
       <DependentUpon>ToolbarView.xaml</DependentUpon>
@@ -329,6 +333,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Display\DisplayView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\TessellationView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -533,6 +541,9 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\not-animated.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\tessellate.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

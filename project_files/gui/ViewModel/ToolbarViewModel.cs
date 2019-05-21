@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using gui.Annotations;
 using gui.Command;
+using gui.Dll;
 using gui.Model;
 
 namespace gui.ViewModel

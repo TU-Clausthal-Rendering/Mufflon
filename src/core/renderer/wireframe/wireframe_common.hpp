@@ -49,8 +49,8 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURR
 	const auto& vertices = scene.lods[scene.lodIndices[instanceId]].polygon.vertices;
 	const auto A = transform(vertices[indices.x], scene.instanceToWorld[instanceId]);
 	const auto B = transform(vertices[indices.y], scene.instanceToWorld[instanceId]);
-	const auto C = transform(vertices[indices.z], scene.instanceToWorld[instanceId]);
-	const auto D = transform(vertices[indices.w], scene.instanceToWorld[instanceId]);
+	const auto C = transform(vertices[indices.w], scene.instanceToWorld[instanceId]);
+	const auto D = transform(vertices[indices.z], scene.instanceToWorld[instanceId]);
 	const auto AB = B - A;
 	const auto AC = C - A;
 	const auto BD = D - B;
@@ -107,7 +107,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 
 	while(true) {
 		scene::accel_struct::RayIntersectionResult nextHit =
-			scene::accel_struct::first_intersection(scene, ray, vertex.get_geometric_normal(), scene::MAX_SCENE_SIZE);
+			scene::accel_struct::first_intersection<CURRENT_DEV, false>(scene, ray, vertex.get_geometric_normal(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
 			auto background = evaluate_background(scene.lightTree.background, ray.direction);
 			if(any(greater(background.value, 0.0f))) {

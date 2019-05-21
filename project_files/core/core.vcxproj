@@ -250,6 +250,7 @@
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\cam_dist.hpp" />
     <ClInclude Include="..\..\src\core\scene\tessellation\tessellater.hpp" />
     <ClInclude Include="..\..\src\core\scene\tessellation\uniform.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
