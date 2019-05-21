@@ -1,4 +1,4 @@
-#include "gl_wrapper.h"
+#include "gl_wrapper.hpp"
 #include "glad/glad.h"
 #include <memory>
 

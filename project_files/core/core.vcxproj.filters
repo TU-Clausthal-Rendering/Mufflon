@@ -927,9 +927,6 @@
     <ClInclude Include="..\..\src\core\renderer\forward\forward_params.hpp">
       <Filter>Source Files\core\renderer\forward</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h">
       <Filter>Source Files\core\memory</Filter>
     </ClInclude>
@@ -944,6 +941,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\math\tabulated_function.hpp">
       <Filter>Source Files\core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\textures\format.hpp">
+      <Filter>Source Files\core\scene\textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp">
+      <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

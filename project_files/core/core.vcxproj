@@ -183,7 +183,9 @@
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h" />
-    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.h" />
+    <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
@@ -254,6 +256,7 @@
     <ClInclude Include="..\..\src\core\scene\tessellation\uniform.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\format.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
     <ClInclude Include="..\..\src\core\scene\types.hpp" />

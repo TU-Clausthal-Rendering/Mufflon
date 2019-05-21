@@ -2,6 +2,8 @@
 
 #include "residency.hpp"
 #include "core/cuda/error.hpp"
+#include "core/opengl/gl_texture.hpp"
+#include "core/opengl/gl_buffer.hpp"
 #include "util/flag.hpp"
 
 namespace mufflon { // There is no memory namespace on purpose
@@ -124,6 +126,11 @@ inline void copy(gl::BufferHandle<T> dst, gl::BufferHandle<T> src, std::size_t s
 	gl::copyBufferSubData(src.id, dst.id, src.get_byte_offset(), dst.get_byte_offset(), size);
 }
 
+template < typename T >
+inline void copy(gl::TextureHandle dst, gl::BufferHandle<T> src, std::size_t size) {
+	// TODO gl
+}
+
 template < Device dev >
 inline void mem_set(void* mem, int value, std::size_t size) {
 	memset(mem, value, size);
@@ -132,6 +139,7 @@ template <>
 inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
 	cudaMemset(mem, value, size);
 }
+
 //template <>
 //inline void mem_set<Device::OPENGL>(gl::Handle handle, int value, std::size_t size) {
 //	

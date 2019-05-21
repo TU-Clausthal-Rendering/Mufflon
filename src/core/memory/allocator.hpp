@@ -3,7 +3,7 @@
 #include "residency.hpp"
 #include "util/assert.hpp"
 #include "core/cuda/error.hpp"
-#include "core/opengl/gl_wrapper.h"
+#include "core/opengl/gl_buffer.hpp"
 #include <stdexcept>
 
 namespace mufflon { // There is no memory namespace on purpose

@@ -2,7 +2,7 @@
 #include "residency.hpp"
 #include <memory>
 #include "allocator.hpp"
-#include "core/opengl/gl_wrapper.h"
+#include "core/opengl/gl_buffer.hpp"
 
 namespace mufflon {
 template < Device dev, typename T >

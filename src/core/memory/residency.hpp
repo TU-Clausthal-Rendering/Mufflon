@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "core/opengl/gl_wrapper.h"
+#include "core/opengl/gl_buffer.hpp"
 
 namespace mufflon { // There is no memory namespace on purpose
 
