@@ -130,11 +130,18 @@
                 </StatusBarItem>
 
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+                
+                <!-- Tessellation settings -->
+                <StatusBarItem HorizontalAlignment="Left">
+                    <view:TessellationView x:Name="Tessellation"
+                                           DataContext="{Binding Tessellation}"/>
+                </StatusBarItem>
+                
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 
                 <!-- Animation Frame Controls -->
                 <StatusBarItem HorizontalAlignment="Left">
-                    <view:AnimationFrameView Grid.Column="2"
-                                             x:Name="AnimationFrames"
+                    <view:AnimationFrameView x:Name="AnimationFrames"
                                              DataContext="{Binding AnimationFrames}"/>
                 </StatusBarItem>
             </StatusBar>

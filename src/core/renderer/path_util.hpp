@@ -78,8 +78,8 @@ struct Connection : public ConnectionDir {
 	scene::Point v0;			// Origin / reference location of the first vertex
 	float distance;				// Distance between v0 and v1 or MAX_SCENE_SIZE for orthographic connections
 
-	Connection(const scene::Direction& dir, float distanceSq,
-			   const scene::Point& v0, float distance) :
+	CUDA_FUNCTION Connection(const scene::Direction& dir, float distanceSq,
+							 const scene::Point& v0, float distance) :
 		ConnectionDir{dir, distanceSq},
 		v0{v0},
 		distance{distance}
@@ -543,8 +543,7 @@ public:
 	}
 
 	CUDA_FUNCTION static int create_light(void* mem, const void* previous,
-		const scene::lights::Emitter& lightSample,	// Positional sample for the starting point on a light source
-		math::Rng& rng								// Only used for the incomplete vertices (env-map)
+		const scene::lights::Emitter& lightSample	// Positional sample for the starting point on a light source
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = lightSample.pos.position;

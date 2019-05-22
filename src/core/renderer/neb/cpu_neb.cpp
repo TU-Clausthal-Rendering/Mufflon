@@ -333,7 +333,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	NebPathVertex vertex[2];
-	NebPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
+	NebPathVertex::create_light(&vertex[0], nullptr, p);
 	math::Throughput throughput;
 	scene::Direction prevNormal = vertex[0].get_geometric_normal();
 

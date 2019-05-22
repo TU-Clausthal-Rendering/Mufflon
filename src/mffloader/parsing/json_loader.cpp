@@ -288,6 +288,19 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		} else {
 			mat->alpha = nullptr;
 		}
+
+		// Load optional displacement map
+		if(const auto dispIter = get(m_state, material, "displacement", false); dispIter != material.MemberEnd()) {
+			// Parse the outer medium of the material
+			m_state.objectNames.push_back(dispIter->name.GetString());
+			mat->displacement.bias = read_opt<float>(m_state, dispIter->value, "bias", 0.f);
+			mat->displacement.scale = read_opt<float>(m_state, dispIter->value, "scale", 1.f);
+			mat->displacement.map = load_texture(read<const char*>(m_state, get(m_state, dispIter->value, "map")),
+												 TextureSampling::SAMPLING_LINEAR, TextureFormat::FORMAT_R32F);
+			m_state.objectNames.pop_back();
+		} else {
+			mat->displacement.map = nullptr;
+		}
 	} catch(const std::exception&) {
 		free_material(mat);
 		throw;
@@ -873,7 +886,7 @@ bool JsonLoader::load_file() {
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
 		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
-		   && m_version.compare("1.1") != 0)
+		   && m_version.compare("1.1") != 0 && m_version.compare("1.2"))
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
@@ -891,7 +904,8 @@ bool JsonLoader::load_file() {
 				 m_binaryFile.string(), "'");
 		throw std::runtime_error("Binary file '" + m_binaryFile.string() + "' does not exist");
 	}
-
+	// Tessellation level
+	const u32 initTessLevel = read_opt<u32>(m_state, document, "initMaxTessellationLevel", 0u);
 	if(m_abort)
 		return false;
 
@@ -992,6 +1006,11 @@ bool JsonLoader::load_file() {
 		auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
+		// Check if we should tessellate initially, indicated by a non-zero max. level
+		if(initTessLevel > 0u) {
+			world_set_max_tessellation_level(initTessLevel);
+			scene_request_retessellation();
+		}
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());
 	}

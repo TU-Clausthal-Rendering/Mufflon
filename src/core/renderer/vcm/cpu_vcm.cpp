@@ -190,7 +190,7 @@ void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeR
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	VcmPathVertex vertex;
-	VcmPathVertex::create_light(&vertex, nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
+	VcmPathVertex::create_light(&vertex, nullptr, p);
 	const VcmPathVertex* previous = m_photonMap.insert(p.pos.position, vertex);
 	math::Throughput throughput;
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;

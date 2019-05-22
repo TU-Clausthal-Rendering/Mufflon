@@ -3,6 +3,7 @@
 #include "scenario.hpp"
 #include "materials/material.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
 
 namespace mufflon::scene {
 
@@ -39,6 +40,12 @@ LodDescriptor<dev> Lod::get_descriptor() {
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();
 	return desc;
+}
+
+void Lod::displace(tessellation::Tessellater& tessellater, const Scenario& scenario) {
+	m_geometry.for_each([&tessellater, &scenario](auto& elem) {
+		elem.displace(tessellater, scenario);
+	});
 }
 
 template < Device dev >

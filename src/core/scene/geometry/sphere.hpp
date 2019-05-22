@@ -20,6 +20,12 @@ namespace mufflon { namespace scene {
 template < Device dev >
 struct SpheresDescriptor;
 
+class Scenario;
+
+namespace tessellation {
+class Tessellater;
+} // namespace tessellation
+
 namespace geometry {
 
 /**
@@ -166,6 +172,17 @@ public:
 	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
 		return m_uniqueMaterials;
 	}
+
+	// Returns whether any polygon has a displacement map associated with the given material assignment
+	bool has_displacement_mapping(const Scenario& scenario) const noexcept {
+		return false;
+	}
+
+	bool was_displacement_mapping_applied() const noexcept {
+		return true;
+	}
+
+	void displace(tessellation::Tessellater& tessellater, const Scenario& scenario);
 
 private:
 	template < Device dev >

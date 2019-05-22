@@ -1410,6 +1410,9 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium(outerMedium)) );
 	if(mat->alpha != nullptr)
 		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
+	if(mat->displacement.map != nullptr)
+		newMaterial->set_displacement(static_cast<TextureHandle>(mat->displacement.map), mat->displacement.scale,
+									  mat->displacement.bias);
 
 	return newMaterial;
 }
@@ -2268,6 +2271,14 @@ Boolean world_get_frame_end(uint32_t* frameEnd) {
 	CATCH_ALL(false)
 }
 
+void world_set_max_tessellation_level(const uint32_t maxTessLevel) {
+	s_world.set_max_tessellation_level(maxTessLevel);
+}
+
+uint32_t world_get_max_tessellation_level() {
+	return s_world.get_max_tessellation_level();
+}
+
 Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
@@ -2586,12 +2597,14 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 		logError("[", FUNCTION_NAME, "] No scene loaded yet");
 		return false;
 	}
+	printf("Rotating camera\n"); fflush(stdout);
 	auto& camera = *s_world.get_current_scenario()->get_camera();
 	const u32 frame = std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current() - s_world.get_frame_start());
 	camera.rotate_up_down(x, frame);
 	camera.rotate_left_right(y, frame);
 	camera.roll(z, frame);
 	s_world.mark_camera_dirty(&camera);
+	printf("Rotated camera\n"); fflush(stdout);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2610,6 +2623,16 @@ Boolean scene_is_sane() {
 	if(sceneHdl != nullptr)
 		return sceneHdl->is_sane();
 	return false;
+	CATCH_ALL(false)
+}
+
+Boolean scene_request_retessellation() {
+	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
+	s_world.retessellate();
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -2961,6 +2984,7 @@ Boolean render_enable_renderer(uint32_t index) {
 
 Boolean render_iterate(ProcessTime* time) {
 	TRY
+	printf("Iterating\n"); fflush(stdout);
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
@@ -2988,17 +3012,21 @@ Boolean render_iterate(ProcessTime* time) {
 		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 		return false;
 	}
+	printf("Pre-iter\n"); fflush(stdout);
 	s_currentRenderer->pre_iteration(*s_imageOutput);
 	if(time != nullptr) {
 		time->cycles = CpuProfileState::get_cpu_cycle();
 		time->microseconds = CpuProfileState::get_process_time().count();
 	}
+	printf("Iter\n"); fflush(stdout);
 	s_currentRenderer->iterate();
 	if(time != nullptr) {
 		time->cycles = CpuProfileState::get_cpu_cycle() - time->cycles;
 		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
 	}
+	printf("Post-iter\n"); fflush(stdout);
 	s_currentRenderer->post_iteration(*s_imageOutput);
+	printf("Done\n"); fflush(stdout);
 	Profiler::instance().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
