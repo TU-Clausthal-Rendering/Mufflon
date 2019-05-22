@@ -302,7 +302,6 @@ Boolean core_get_target_image(uint32_t index, Boolean variance, const float** pt
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	std::scoped_lock iterLock{ s_iterationMutex };
-	std::scoped_lock screenLock{ s_screenTextureMutex };
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
 	const renderer::OutputValue targetFlags{ flags };
 	if(!s_outputTargets.is_set(targetFlags)) {
@@ -312,7 +311,9 @@ Boolean core_get_target_image(uint32_t index, Boolean variance, const float** pt
 		
 	// If there's no output yet, we "return" a nullptr
 	if(s_imageOutput != nullptr) {
-		s_screenTexture = s_imageOutput->get_data(targetFlags);
+		auto data = s_imageOutput->get_data(targetFlags);
+		std::scoped_lock screenLock{ s_screenTextureMutex };
+		s_screenTexture = std::move(data);
 		s_screenTextureNumChannels = renderer::RenderTargets::NUM_CHANNELS[index];
 		if(ptr != nullptr)
 			*ptr = reinterpret_cast<const float*>(s_screenTexture.get());
