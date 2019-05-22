@@ -22,7 +22,8 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPathTracer,
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
-	CpuVcm//, GlForward
+	CpuVcm, 
+	GlForward
 >;
 
 } // namespace mufflon::renderer
