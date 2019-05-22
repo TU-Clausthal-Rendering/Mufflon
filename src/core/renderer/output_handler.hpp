@@ -98,7 +98,8 @@ struct RenderBuffer {
 										const math::Throughput& lightThroughput,
 										float cosines, const ei::Vec3& value
 	) {
-		using namespace scene::textures;
+		if(pixel.x < 0 || pixel.x >= m_resolution.x || pixel.y < 0 || pixel.y >= m_resolution.y)
+			return;
 		if(m_targets[RenderTargets::RADIANCE]) {
 			ei::Vec3 newVal = viewThroughput.weight * lightThroughput.weight * value * cosines;
 			newVal = check_nan(newVal);
@@ -124,7 +125,8 @@ struct RenderBuffer {
 										const ei::Vec3& normal,
 										const ei::Vec3& albedo
 	) {
-		using namespace scene::textures;
+		if(pixel.x < 0 || pixel.x >= m_resolution.x || pixel.y < 0 || pixel.y >= m_resolution.y)
+			return;
 		if(m_targets[RenderTargets::RADIANCE]) {
 			ei::Vec3 newVal = viewThroughput.weight * radiance;
 			newVal = check_nan(newVal);
@@ -166,7 +168,8 @@ struct RenderBuffer {
 	}
 
 	__host__ __device__ void contribute(Pixel pixel, u32 target, const ei::Vec3& value) {
-		using namespace scene::textures;
+		if(pixel.x < 0 || pixel.x >= m_resolution.x || pixel.y < 0 || pixel.y >= m_resolution.y)
+			return;
 		if(m_targets[target]) {
 			ei::Vec3 newVal = check_nan(value);
 			if(target == RenderTargets::LIGHTNESS) {
@@ -182,7 +185,8 @@ struct RenderBuffer {
 	}
 
 	__host__ __device__ void set(Pixel pixel, u32 target, const ei::Vec3& value) {
-		using namespace scene::textures;
+		if(pixel.x < 0 || pixel.x >= m_resolution.x || pixel.y < 0 || pixel.y >= m_resolution.y)
+			return;
 		if(m_targets[target]) {
 			ei::Vec3 newVal = check_nan(value);
 			if(target == RenderTargets::LIGHTNESS) {
