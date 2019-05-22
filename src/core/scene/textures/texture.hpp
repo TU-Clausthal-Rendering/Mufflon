@@ -80,7 +80,7 @@ struct TextureDevHandle<Device::OPENGL> : public DeviceHandle<Device::OPENGL> {
 	using ConstHandleType = gl::TextureHandle;
 };
 __host__ constexpr bool is_valid(typename TextureDevHandle<Device::OPENGL>::HandleType handle) noexcept {
-	return handle.id != 0u;
+	return handle != 0u;
 }
 
 
@@ -166,7 +166,7 @@ public:
 	Texture(std::string name, u16 width, u16 height, u16 numLayers, Format format,
 			SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data = nullptr);
 	Texture(const Texture&) = delete;
-	Texture(Texture&&);
+	Texture(Texture&&) noexcept;
 	Texture& operator=(const Texture&) = delete;
 	Texture& operator=(Texture&&) = delete;
 	~Texture();
@@ -226,12 +226,16 @@ private:
 	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<CpuTexture> m_cpuTexture;
 	cudaArray_t m_cudaTexture;
+	gl::Handle m_glHandle = 0;
+	gl::TextureHandle m_glTexture = 0;
+	gl::TextureFormat m_glFormat = {};
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
 	std::string m_name;
 
 	void create_texture_cpu(std::unique_ptr<u8[]> data = nullptr);
 	void create_texture_cuda();
+	void create_texture_opengl();
 };
 
 }}} // namespace mufflon::scene::textures

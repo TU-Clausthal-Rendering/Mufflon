@@ -1,23 +1,55 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
-
 // soft wrapper for opengl that avoids the windows include
 
 namespace mufflon {
 namespace gl {
 	using Handle = uint32_t;
+	using TextureHandle = uint64_t;
 
-	enum class BufferType
-	{
+	enum class BufferType {
 		ShaderStorage = 0x90D2
 	};
 
-	enum class StorageFlags
-	{
+    enum class TextureType {
+        Texture2DArray = 0x8C1A,
+    };
+
+	enum class StorageFlags {
 		None = 0,
 		DynamicStorage = 0x0100,
 	};
+
+    enum class TextureInternal {
+        R8U = 0x8229,
+        RG8U = 0x822B,
+        RGBA8U = 0x8058,
+        R16U = 0x822A,
+        RG16U = 0x822C,
+        RGBA16U = 0x805B,
+        R16F = 0x822D,
+        RG16F = 0x822F,
+        RGBA16F = 0x881A,
+        R32F = 0x822E,
+        RG32F = 0x8230,
+        RGBA32F = 0x8814,
+
+        SRGBA8U = 0x8C43,
+    };
+
+    enum class TextureSetFormat {
+        R = 0x1903,
+        RG = 0x8227,
+        RGBA = 0x1908
+    };
+
+    enum class TextureSetType {
+        U8 = 0x1401, // unsigned byte
+        U16 = 0x1403, // unsigned short
+        F16 = 0x140B, // half float
+        F32 = 0x1406, // float
+    };
 
 	Handle genBuffer();
 	void bindBuffer(BufferType target, Handle id);
@@ -37,4 +69,14 @@ namespace gl {
 		clearBufferData(h, sizeof(T), numValues, clearValue);
 	}
 	void getBufferSubData(Handle h, size_t offset, size_t size, void* dstData);
+
+	Handle genTexture();
+	void bindTexture(TextureType type, Handle id);
+	void deleteTexture(Handle h);
+	void clearTexImage(Handle h, int level);
+	void texStorage3D(Handle h, int levels, TextureInternal format, size_t width, size_t height, size_t depth);
+	void texSubImage3D(Handle h, int level, size_t offsetX, size_t offsetY, size_t offsetZ, size_t width, size_t height, size_t depth, TextureSetFormat setFormat, TextureSetType setType, const void* data);
+	TextureHandle getTextureHandle(Handle h);
+	void makeTextureHandleResident(TextureHandle h);
+	void makeTextureHandleNonResident(TextureHandle h);
 }}

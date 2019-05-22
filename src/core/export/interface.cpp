@@ -3579,6 +3579,9 @@ Boolean mufflon_initialize_opengl() {
 
 		glDebugMessageCallback(opengl_callback, nullptr);
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 		logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
 

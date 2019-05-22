@@ -27,7 +27,7 @@ Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, Format 
 	}
 }
 
-Texture::Texture(Texture&& tex) :
+Texture::Texture(Texture&& tex) noexcept :
 	m_width(tex.m_width),
 	m_height(tex.m_height),
 	m_numLayers(tex.m_numLayers),
@@ -37,11 +37,16 @@ Texture::Texture(Texture&& tex) :
 	m_dirty(tex.m_dirty),
 	m_cpuTexture(std::move(tex.m_cpuTexture)),
 	m_cudaTexture(tex.m_cudaTexture),
+	m_glHandle(tex.m_glHandle),
+	m_glTexture(tex.m_glTexture),
+    m_glFormat(tex.m_glFormat),
 	m_handles(tex.m_handles),
-	m_constHandles(tex.m_constHandles),
-	m_name(std::move(tex.m_name))
+    m_constHandles(tex.m_constHandles),
+    m_name(std::move(tex.m_name))
 {
-	m_cudaTexture = nullptr;
+	tex.m_cudaTexture = nullptr;
+	tex.m_glHandle = 0;
+	tex.m_glTexture = 0;
 }
 
 Texture::~Texture() {
@@ -52,6 +57,10 @@ Texture::~Texture() {
 		cuda::check_error(cudaFreeArray(m_cudaTexture));
 		m_cudaTexture = nullptr;
 	}
+    if(m_glHandle) {
+		gl::deleteTexture(m_glHandle);
+		m_glHandle = 0;
+    }
 }
 
 template < Device dev >
@@ -64,7 +73,7 @@ void Texture::synchronize() {
 			switch(dev) {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
-				//case Device::OPENGL: create_texture_opengl(); break;
+				case Device::OPENGL: create_texture_opengl(); break;
 				default: mAssert(false);
 			}
 		}
@@ -85,6 +94,9 @@ void Texture::synchronize() {
 			copyParams.kind = cudaMemcpyDefault;
 			cuda::check_error(cudaMemcpy3D(&copyParams));
 		}
+        if((dev == Device::OPENGL) && m_dirty.has_changes(Device::CPU)) {
+			gl::texSubImage3D(m_glHandle, 0, 0, 0, 0, m_width, m_height, m_numLayers, m_glFormat.setFormat, m_glFormat.setType, m_cpuTexture->data());
+        }
 	} else {
 		// Alternative: might be that we weren't allocated yet
 		// Create texture resources if necessary
@@ -92,7 +104,7 @@ void Texture::synchronize() {
 			switch(dev) {
 				case Device::CPU: create_texture_cpu(); break;
 				case Device::CUDA: create_texture_cuda(); break;
-				//case Device::OPENGL: create_texture_opengl(); break;
+				case Device::OPENGL: create_texture_opengl(); break;
 				default: mAssert(false);
 			}
 		}
@@ -102,8 +114,6 @@ void Texture::synchronize() {
 template void Texture::synchronize<Device::CPU>();
 template void Texture::synchronize<Device::CUDA>();
 template void Texture::synchronize<Device::OPENGL>();
-
-
 
 template < Device dev >
 void Texture::unload() {
@@ -131,7 +141,11 @@ void Texture::unload() {
 			}
 		} break;
 		case Device::OPENGL: {
-			// TODO
+			if(m_glHandle) {
+				gl::deleteTexture(m_glHandle);
+				m_glHandle = 0;
+				m_glTexture = 0;
+			}
 		} break;
 	}
 }
@@ -139,8 +153,6 @@ void Texture::unload() {
 template void Texture::unload<Device::CPU>();
 template void Texture::unload<Device::CUDA>();
 template void Texture::unload<Device::OPENGL>();
-
-
 
 template < Device dev >
 void Texture::clear() {
@@ -174,7 +186,11 @@ void Texture::clear() {
 			}
 		} break;
 		case Device::OPENGL: {
-			// TODO
+			if(!m_glHandle)
+				logError("[Texture::zero] Trying to clear a OPENGL texture without memory.");
+			else {
+				gl::clearTexImage(m_glHandle, 0);
+			}
 		} break;
 	}
 }
@@ -182,7 +198,6 @@ void Texture::clear() {
 template void Texture::clear<Device::CPU>();
 template void Texture::clear<Device::CUDA>();
 template void Texture::clear<Device::OPENGL>();
-
 
 
 
@@ -271,6 +286,18 @@ void Texture::create_texture_cuda() {
 		surfHdl.depth = m_numLayers;
 		surfHdl.format = m_format;
 	}
+}
+
+void Texture::create_texture_opengl() {
+	mAssert(m_glHandle == 0);
+	m_glHandle = gl::genTexture();
+	gl::bindTexture(gl::TextureType::Texture2DArray, m_glHandle);
+	m_glFormat = gl::convertFormat(m_format, m_sRgb);
+    // TODO mipmaps?
+	gl::texStorage3D(m_glHandle, 1, m_glFormat.internal, m_width, m_height, m_numLayers);
+    // create bindless texture
+	m_glTexture = gl::getTextureHandle(m_glHandle);
+    // TODO create sampler?
 }
 
 } // namespace mufflon::scene::textures

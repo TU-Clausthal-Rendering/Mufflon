@@ -425,6 +425,10 @@ void AttributePool::synchronize(AttributeHandle hdl) {
 			// We know that we're dirty from CPU (since no OpenGL yet)
 			changedPool = &m_pools.template get<PoolHandle<Device::CPU>>().handle;
 			break;
+		case Device::OPENGL:
+            // I think we're dirty from CPU since we do not associate with CUDA?
+			changedPool = &m_pools.template get<PoolHandle<Device::CPU>>().handle;
+			break;
 	}
 
 	const std::size_t offset = m_attributes[hdl.index].poolOffset;
