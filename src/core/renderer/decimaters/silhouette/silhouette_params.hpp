@@ -5,14 +5,14 @@
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
 
 struct PImportanceIterations {
-	int importanceIterations{ 1 };
+	int importanceIterations{ 100 };
 	static ParamDesc get_desc() noexcept {
 		return { "Importance iterations", ParameterTypes::INT };
 	}
 };
 
 struct PTargetReduction {
-	float reduction{ 0.875f };
+	float reduction{ 0.9f };
 	static ParamDesc get_desc() noexcept {
 		return { "Target mesh reduction", ParameterTypes::FLOAT };
 	}
@@ -33,7 +33,7 @@ struct PVertexThreshold {
 };
 
 struct PDecimationIterations {
-	int decimationIterations{ 10 };
+	int decimationIterations{ 1 };
 	static ParamDesc get_desc() noexcept {
 		return { "Decimation iterations", ParameterTypes::INT };
 	}
