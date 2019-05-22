@@ -76,7 +76,7 @@ void Scene::load_materials() {
 	// Temporary storage to only copy once
 	auto cpuTexHdlBuffer = std::make_unique<textures::ConstTextureDevHandle_t<dev>[]>(MAT_SLOTS);
 
-	char* mem = m_materials.acquire<dev>();
+	auto mem = m_materials.acquire<dev>();
 	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
@@ -84,7 +84,7 @@ void Scene::load_materials() {
 		ConstMaterialHandle mat = m_scenario.get_assigned_material(i);
 		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_DESCRIPTOR_SIZE());
 		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
-		copy(mem + offsets[i], buffer, size);
+		copy(mem + size_t(offsets[i]), buffer, size);
 		if(mat->get_alpha_texture() != nullptr)
 			cpuTexHdlBuffer[i] = mat->get_alpha_texture()->template acquire_const<dev>();
 		else
@@ -92,7 +92,7 @@ void Scene::load_materials() {
 	}
 
 	// Coyp the alpha texture handles
-	copy(as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.acquire<dev>()),
+	copy((ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.acquire<dev>()),
 		 cpuTexHdlBuffer.get(), sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
 
 	m_alphaTextures.mark_synced(dev);
@@ -152,7 +152,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged || !sceneDescriptor.lodIndices) {
+	if(geometryChanged || sceneDescriptor.lodIndices != nullptr) {
 		// Invalidate other descriptors
 		if(geometryChanged)
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
@@ -230,7 +230,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
 		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
-		copy(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+		copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
@@ -288,9 +288,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<dev>())
 		load_materials<dev>();
 	// This query should be cheap. The above if already made the information resident.
-	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
-	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
-	sceneDescriptor.alphaTextures = as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.template acquire_const<dev>());
+	sceneDescriptor.media = (ArrayDevHandle_t<dev, materials::Medium>)(m_media.template acquire_const<dev>());
+	sceneDescriptor.materials = (ArrayDevHandle_t<dev, int>)(m_materials.template acquire_const<dev>());
+	sceneDescriptor.alphaTextures = (ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.template acquire_const<dev>());
 	
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
@@ -430,10 +430,10 @@ bool Scene::retessellate(const u32 maxTessLevel) {
 
 template void Scene::load_materials<Device::CPU>();
 template void Scene::load_materials<Device::CUDA>();
-//template void Scene::load_materials<Device::OPENGL>();
+template void Scene::load_materials<Device::OPENGL>();
 template void Scene::update_camera_medium<Device::CPU>(SceneDescriptor<Device::CPU>& descriptor);
 template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::CUDA>& descriptor);
-//template void update_camera_medium< Device::OPENGL>(const SceneDescriptor<Device::OPENGL>& descriptor);
+template void Scene::update_camera_medium<Device::OPENGL>(SceneDescriptor<Device::OPENGL>& descriptor);
 template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<const char*>&,
 																				const std::vector<const char*>&,
 																				const std::vector<const char*>&,
@@ -442,9 +442,9 @@ template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA
 																				  const std::vector<const char*>&,
 																				  const std::vector<const char*>&,
 																				  const ei::IVec2&);
-/*template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
+template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
 																			const std::vector<const char*>&,
 																			const std::vector<const char*>&,
-																			const ei::IVec2&);*/
+																			const ei::IVec2&);
 
 }} // namespace mufflon::scene

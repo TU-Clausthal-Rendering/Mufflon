@@ -52,5 +52,6 @@ void RendererBase<dev>::post_iteration(OutputHandler& outputBuffer) {
 
 template class RendererBase<Device::CPU>;
 template class RendererBase<Device::CUDA>;
+template class RendererBase<Device::OPENGL>;
 
 } // namespace mufflon::renderer

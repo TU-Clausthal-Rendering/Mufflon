@@ -80,8 +80,7 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 
 template RenderBuffer<Device::CPU> OutputHandler::begin_iteration<Device::CPU>(bool reset);
 template RenderBuffer<Device::CUDA> OutputHandler::begin_iteration<Device::CUDA>(bool reset);
-
-
+template RenderBuffer<Device::OPENGL> OutputHandler::begin_iteration<Device::OPENGL>(bool reset);
 
 template < Device dev >
 void OutputHandler::end_iteration() {
@@ -115,6 +114,7 @@ void OutputHandler::end_iteration() {
 
 template void OutputHandler::end_iteration<Device::CPU>();
 template void OutputHandler::end_iteration<Device::CUDA>();
+template void OutputHandler::end_iteration<Device::OPENGL>();
 
 
 void OutputHandler::set_targets(OutputValue targets) {

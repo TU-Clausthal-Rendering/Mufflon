@@ -11,6 +11,7 @@
 #include "core/renderer/bpm/cpu_bpm.hpp"
 #include "core/renderer/neb/cpu_neb.hpp"
 #include "core/renderer/vcm/cpu_vcm.hpp"
+#include "core/renderer/forward/gl_forward.hpp"
 
 namespace mufflon::renderer {
 
@@ -21,7 +22,8 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPathTracer,
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
-	CpuVcm
+	CpuVcm, 
+	GlForward
 >;
 
 } // namespace mufflon::renderer

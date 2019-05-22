@@ -15,6 +15,7 @@
 #include <type_traits>
 #include <map>
 #include <vector>
+#include "core/memory/dyntype_memory.hpp"
 
 namespace mufflon { namespace scene {
 	// TODO: move to geometry namespace?
@@ -51,6 +52,48 @@ struct SphereAttributeHandle : public AttributeHandle {
  */
 template < bool IsFace >
 class OpenMeshAttributePool {
+	template < Device dev >
+	struct AcquireHelper {};
+
+	template <> 
+	struct AcquireHelper< Device::CPU > {
+		AcquireHelper(OpenMeshAttributePool<IsFace>& parent) : parent(parent) {}
+
+		template <class T>
+		ArrayDevHandle_t<Device::CPU, T> acquire(size_t index) {
+			return as<T*, char*>(parent.m_attributes[index].accessor(parent.m_mesh));
+		}
+
+		OpenMeshAttributePool<IsFace>& parent;
+	};
+
+	template <>
+	struct AcquireHelper< Device::CUDA > {
+		AcquireHelper(OpenMeshAttributePool<IsFace>& parent) : parent(parent) {}
+
+		template <class T>
+		ArrayDevHandle_t<Device::CUDA, T> acquire(size_t index) {
+			return as<T*, char*>(&parent.m_cudaPool[parent.m_attributes[index].poolOffset]);
+		}
+
+		OpenMeshAttributePool<IsFace>& parent;
+	};
+
+	template <>
+	struct AcquireHelper< Device::OPENGL > {
+		AcquireHelper(OpenMeshAttributePool<IsFace>& parent) : parent(parent) {}
+
+		template <class T>
+		ArrayDevHandle_t<Device::OPENGL, T> acquire(size_t index) {
+			return ArrayDevHandle_t<Device::OPENGL, T>(0);
+		}
+
+		OpenMeshAttributePool<IsFace>& parent;
+	};
+
+	friend AcquireHelper < Device::CPU >;
+	friend AcquireHelper < Device::CUDA >;
+	friend AcquireHelper < Device::OPENGL >;
 public:
 	static constexpr bool IS_FACE = IsFace;
 	template < class T >
@@ -138,22 +181,26 @@ public:
 		// Mark both the specific attribute flags and the flags that indicate a change is present
 		m_attributes[hdl.index].dirty.mark_changed(dev);
 		m_dirty.mark_changed(dev);
-		switch (dev) {
-			case Device::CPU: return reinterpret_cast<T*>(m_attributes[hdl.index].accessor(m_mesh));
-			case Device::CUDA: return reinterpret_cast<T*>(&m_cudaPool[m_attributes[hdl.index].poolOffset]);
-			default: return nullptr;
-		}
+		AcquireHelper<dev> helper(*this);
+		return helper.template acquire<T>(hdl.index);
+		/*switch (dev) {
+			case Device::CPU: return reinterpret_cast<ArrayDevHandle_t<dev, T>>((void*)m_attributes[hdl.index].accessor(m_mesh));
+			case Device::CUDA: return reinterpret_cast<ArrayDevHandle_t<dev, T>>((void*)&m_cudaPool[m_attributes[hdl.index].poolOffset]);
+			default: return ArrayDevHandle_t<dev, T>(0);
+		}*/
 	}
 
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
 		this->synchronize<dev>(hdl);
-		switch (dev) {
-			case Device::CPU: return reinterpret_cast<const T*>(m_attributes[hdl.index].accessor(m_mesh));
-			case Device::CUDA: return reinterpret_cast<const T*>(&m_cudaPool[m_attributes[hdl.index].poolOffset]);
-			default: return nullptr;
-		}
+		AcquireHelper<dev> helper(*const_cast<OpenMeshAttributePool<IsFace>*>(this));
+		return helper.template acquire<T>(hdl.index);
+		/*switch (dev) {
+			case Device::CPU: return reinterpret_cast<ConstArrayDevHandle_t<dev, T>>((void*)m_attributes[hdl.index].accessor(m_mesh));
+			case Device::CUDA: return reinterpret_cast<ConstArrayDevHandle_t<dev, T>>((void*)&m_cudaPool[m_attributes[hdl.index].poolOffset]);
+			default: return ConstArrayDevHandle_t<dev, T>(0);
+		}*/
 	}
 
 	template < Device dev, class T >
@@ -290,14 +337,16 @@ public:
 		// Mark both the specific attribute flags and the flags that indicate a change is present
 		m_attributes[hdl.index].dirty.mark_changed(dev);
 		m_dirty.mark_changed(dev);
-		return reinterpret_cast<T*>(&m_pools.template get<PoolHandle<dev>>().handle[m_attributes[hdl.index].poolOffset]);
+		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
+			m_pools.template get<PoolHandle<dev>>().handle + m_attributes[hdl.index].poolOffset);
 	}
 
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
 		this->synchronize<dev>(hdl);
-		return reinterpret_cast<const T*>(&m_pools.template get<PoolHandle<dev>>().handle[m_attributes[hdl.index].poolOffset]);
+		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
+			m_pools.template get<PoolHandle<dev>>().handle + m_attributes[hdl.index].poolOffset);
 	}
 
 	template < Device dev, class T >
@@ -378,8 +427,10 @@ private:
 	std::size_t m_attribElemCount = 0u;
 	std::size_t m_attribElemCapacity = 0u;
 	std::size_t m_poolSize = 0u;
-	util::TaggedTuple<PoolHandle<Device::CPU>, PoolHandle<Device::CUDA>> m_pools = {};
-	// TODO: OpenGL pool?
+	util::TaggedTuple<
+		PoolHandle<Device::CPU>, 
+		PoolHandle<Device::CUDA>,
+		PoolHandle<Device::OPENGL>> m_pools = {};
 
 	util::DirtyFlags<Device> m_dirty;
 	std::vector<AttribInfo> m_attributes;

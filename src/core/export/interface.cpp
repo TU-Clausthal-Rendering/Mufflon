@@ -28,6 +28,7 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
+#include "glad/glad.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -234,16 +235,21 @@ inline std::size_t get_attr_size(const AttribDesc& desc) {
 }
 
 // Initializes all renderers
-template < std::size_t I = 0u >
+template < bool initOpenGL, std::size_t I = 0u >
 inline void init_renderers() {
-	if constexpr(I == 0u)
+	if constexpr(I == 0u && !initOpenGL)
 		s_renderers.clear();
 	using RendererType = typename renderer::Renderers::Type<I>;
+	// Only initialize opengl renderers if requested (because of deferred context init)
+	if constexpr(RendererType::may_use_device(Device::OPENGL)) {
+		if(initOpenGL) // deferred init
+			s_renderers.push_back(std::make_unique<RendererType>());
+	}
 	// Only initialize CUDA renderers if CUDA is enabled
-	if(s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))
+	else if(s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))
 		s_renderers.push_back(std::make_unique<RendererType>());
 	if constexpr(I + 1u < renderer::Renderers::size)
-		init_renderers<I + 1u>();
+		init_renderers<initOpenGL, I + 1u>();
 }
 
 // Function delegating the logger output to the applications handle, if applicable
@@ -3538,7 +3544,7 @@ Boolean mufflon_initialize() {
 		}
 
 		// Initialize renderers
-		init_renderers<>();
+		init_renderers<false>();
 
 		initialized = true;
 	}
@@ -3569,6 +3575,9 @@ Boolean mufflon_initialize_opengl() {
 
 		logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
 
+        // initialize remaining opengl renderer
+		init_renderers<true>();
+
 		initialized = true;
 	}
 	return true;
@@ -3598,7 +3607,12 @@ Boolean mufflon_is_cuda_available() {
 }
 
 void mufflon_destroy_opengl() {
-	// TODO
+    // destroy opengl renderers
+    TRY
+	for (auto& r : s_renderers)
+		if (r->uses_device(Device::OPENGL))
+			r.reset();
+	CATCH_ALL(;)
 }
 
 

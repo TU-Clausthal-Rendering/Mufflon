@@ -59,7 +59,7 @@ void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
 
 template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>();
 template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>();
-//template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
+template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
 template void Lod::update_attribute_descriptor<Device::CPU>(LodDescriptor<Device::CPU>&,
 															   const std::vector<const char*>&,
 															   const std::vector<const char*>&,
@@ -68,8 +68,8 @@ template void Lod::update_attribute_descriptor<Device::CUDA>(LodDescriptor<Devic
 																const std::vector<const char*>&,
 																const std::vector<const char*>&,
 																const std::vector<const char*>&);
-/*template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
-																				 const std::vector<const char*>&,
-																				 const std::vector<const char*>&);*/
-
+template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Device::OPENGL>&,
+																const std::vector<const char*>&,
+																const std::vector<const char*>&,
+																const std::vector<const char*>&);
 } // namespace mufflon::scene

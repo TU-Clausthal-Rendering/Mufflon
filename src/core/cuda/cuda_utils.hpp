@@ -18,6 +18,9 @@ template < Device dev, class T >
 struct AtomicValue { using Type = T; };
 template < class T >
 struct AtomicValue<Device::CPU, T> { using Type = std::atomic<T>; };
+// TODO GL
+template < class T > 
+struct AtomicValue<Device::OPENGL, T> { using Type = std::atomic<T>; };
 
 // Implementations of atomic-exchange
 template < Device dev, class T >
@@ -112,6 +115,34 @@ struct AtomicOps<Device::CUDA, T> {
 #ifdef __CUDA_ARCH__
 		return atom;
 #endif // __CUDA_ARCH__
+	}
+};
+
+// TODO GL
+template <  class T >
+struct AtomicOps<Device::OPENGL, T> {
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static T exchange(typename AtomicValue<Device::OPENGL, T>::Type& atom, const T value) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		return std::atomic_exchange_explicit(&atom, value, std::memory_order::memory_order_relaxed);
+	}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static void add(typename AtomicValue<Device::OPENGL, T>::Type& atom, const T value) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		T expected = atom.load();
+		T desired;
+		do {
+			desired = expected + value;
+		} while (!atom.compare_exchange_weak(expected, desired));
 	}
 };
 

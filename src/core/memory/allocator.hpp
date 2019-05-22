@@ -3,6 +3,7 @@
 #include "residency.hpp"
 #include "util/assert.hpp"
 #include "core/cuda/error.hpp"
+#include "core/opengl/gl_buffer.hpp"
 #include <stdexcept>
 
 namespace mufflon { // There is no memory namespace on purpose
@@ -135,6 +136,59 @@ public:
 	}
 };
 
+template <>
+class Allocator<Device::OPENGL> {
+public:
+	static constexpr Device DEVICE = Device::OPENGL;
+
+	template < class T, typename... Args >
+	static gl::BufferHandle<T> alloc(Args... args) {
+		return alloc_array<T>(1, std::forward<Args>(args)...);
+	}
+
+	template < class T, bool Init = true, typename... Args >
+	static gl::BufferHandle<T> alloc_array(std::size_t n, Args... args) {
+		static_assert(std::is_trivially_copyable<T>::value,
+			"Must be trivially copyable");
+
+		// create handle
+		const auto byteSize = n * sizeof(T);
+		const auto id = gl::genBuffer();
+		gl::bindBuffer(gl::BufferType::ShaderStorage, id);
+		gl::bufferStorage(id, byteSize, nullptr, gl::StorageFlags::DynamicStorage);
+		// transfer data
+		if (Init) {
+			T prototype{ std::forward<Args>(args)... };
+			gl::clearBufferData(id, n, &prototype);
+		}
+		
+		return gl::BufferHandle<T>{id, 0};
+	}
+
+	template < class T >
+	static gl::BufferHandle<T> realloc(gl::BufferHandle<T> handle, std::size_t prev, std::size_t next) {
+		// create new buffer and copy contents of old buffer
+		mAssert(next > prev);
+		mAssert(handle.offset == 0);
+
+		const auto newHandle = gl::genBuffer();
+		gl::bindBuffer(gl::BufferType::ShaderStorage, newHandle);
+		gl::bufferStorage(newHandle, next, nullptr, gl::StorageFlags::DynamicStorage);
+		// transfer data
+		gl::copyBufferSubData(handle.id, newHandle, 0, 0, prev);
+		// cleanup
+		gl::deleteBuffer(handle.id);
+		return gl::BufferHandle<T>{newHandle, 0};
+	}
+
+	template < class T >
+	static gl::BufferHandle<T> free(gl::BufferHandle<T> handle, std::size_t n) {
+		if(handle.id != 0)
+			gl::deleteBuffer(handle.id);
+		return gl::BufferHandle<T>{0, 0};
+	}
+};
+
 // Deleter for the above custom allocated memories.
 template < Device dev >
 class Deleter {
@@ -145,33 +199,29 @@ public:
 	std::size_t get_size() const noexcept { return m_n; }
 
 	template < typename T >
-	void operator () (T * p) const {
+	//void operator () (ArrayDevHandle_t<dev, T> p) const {
+	void operator () (T* p) const {
 		Allocator<dev>::template free<T>(p, m_n);
 	}
 private:
 	std::size_t m_n;
 };
 
-// Helper alias to simplyfy the construction of managed (unique_ptr) memory with the
-// custom allocator.
-template < Device dev, typename T >
-using unique_device_ptr = std::unique_ptr<T, Deleter<dev>>;
+template <>
+class Deleter<Device::OPENGL> {
+public:
+	Deleter() : m_n(0) {}
+	Deleter(std::size_t n) : m_n(n) {}
 
-template < Device dev, typename T, typename... Args > inline unique_device_ptr<dev,T>
-make_udevptr(Args... args) {
-	return unique_device_ptr<dev,T>(
-		Allocator<dev>::template alloc<T>(std::forward<Args>(args)...),
-		Deleter<dev>(1)
-	);
+	std::size_t get_size() const noexcept { return m_n; }
+
+	template < typename T >
+	void operator () (gl::BufferHandle<T> p) const {
+		Allocator<Device::OPENGL>::template free<T>(p, m_n);
+	}
+private:
+	std::size_t m_n;
+};
 }
-
-template < Device dev, typename T, bool Init = true, typename... Args > inline unique_device_ptr<dev,T[]>
-make_udevptr_array(std::size_t n, Args... args) {
-	return unique_device_ptr<dev, T[]>(
-		Allocator<dev>::template alloc_array<std::remove_pointer_t<std::decay_t<T>>, Init>(n, std::forward<Args>(args)...),
-		Deleter<dev>(n)
-	);
-}
-
-
-} // namespace mufflon::util
+// TODO remove include from this place
+#include "unique_device_ptr.h"

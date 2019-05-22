@@ -131,6 +131,12 @@
     <Filter Include="Source Files\core\renderer\lt">
       <UniqueIdentifier>{6ea9f8ec-050c-46b1-8b41-98e344dabb74}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\forward">
+      <UniqueIdentifier>{fe6f6d8b-0ad8-4219-a6ef-508307855349}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\opengl">
+      <UniqueIdentifier>{c4dc2b5b-e976-40a8-a5be-54ca66b6ac3c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -270,6 +276,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp">
       <Filter>Source Files\core\renderer\lt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\gl_forward.cpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp">
+      <Filter>Source Files\core\opengl</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -918,6 +930,15 @@
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\gl_forward.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\forward_params.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h">
+      <Filter>Source Files\core\memory</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\blend_fresnel.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
@@ -944,6 +965,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\tessellation\cam_dist.hpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\textures\format.hpp">
+      <Filter>Source Files\core\scene\textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp">
+      <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

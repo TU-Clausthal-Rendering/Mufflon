@@ -144,7 +144,7 @@ void OpenMeshAttributePool<face>::synchronize() {
 			for(auto& attrib : m_attributes) {
 				if(copyAll || attrib.dirty.needs_sync(dev)) {
 					const char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(&m_cudaPool[currOffset], cpuData, attrib.elemSize * m_attribElemCount);
+					::mufflon::copy(m_cudaPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
 					currOffset += attrib.elemSize * m_attribElemCount;
 				}
 				attrib.dirty.mark_synced(dev);
@@ -282,8 +282,8 @@ AttributePool::AttributePool(AttributePool&& pool) :
 AttributePool::~AttributePool() {
 	m_pools.for_each([len = m_poolSize](auto& elem) {
 		using ChangedBuffer = std::decay_t<decltype(elem)>;
-		if(elem.handle)
-			elem.handle = Allocator<ChangedBuffer::DEVICE>::free(elem.handle, len);
+		if(elem.handle != nullptr)
+			elem.handle = Allocator<ChangedBuffer::DEVICE>::template free<char>(elem.handle, len);
 	});
 }
 
@@ -326,15 +326,15 @@ void AttributePool::shrink_to_fit() {
 		std::size_t bytes = m_attribElemCount * m_poolSize / m_attribElemCapacity;
 		m_pools.for_each([bytes, prev = m_poolSize](auto& pool) {
 			using ChangedBuffer = std::decay_t<decltype(pool)>;
-			if(pool.handle)
-				pool.handle = Allocator<ChangedBuffer::DEVICE>::realloc(pool.handle, prev, bytes);
+			if(pool.handle != nullptr)
+				pool.handle = Allocator<ChangedBuffer::DEVICE>::template realloc<char>(pool.handle, prev, bytes);
 		});
 		m_poolSize = bytes;
 	} else {
 		m_pools.for_each([prev = m_poolSize](auto& pool) {
 			using ChangedBuffer = std::decay_t<decltype(pool)>;
-			if(pool.handle)
-				pool.handle = Allocator<ChangedBuffer::DEVICE>::free(pool.handle, prev);
+			if(pool.handle != nullptr)
+				pool.handle = Allocator<ChangedBuffer::DEVICE>::template free<char>(pool.handle, prev);
 		});
 		m_poolSize = 0u;
 	}
@@ -359,7 +359,7 @@ void AttributePool::synchronize() {
 		return;
 	// Always allocate memory (copies can and will only be done if there is a dirty memory)
 	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
-	bool hadNoMemory = !syncPool;
+	bool hadNoMemory = syncPool == nullptr;
 	if(hadNoMemory)
 		syncPool = Allocator<dev>::template alloc_array<char>(m_poolSize);
 
@@ -408,7 +408,7 @@ template < Device dev >
 void AttributePool::synchronize(AttributeHandle hdl) {
 	mAssert(hdl.index < m_attributes.size());
 	ArrayDevHandle_t<dev, char>& syncPool = m_pools.template get<PoolHandle<dev>>().handle;
-	if(!syncPool) { // If memory is missing all attributes need to be synced
+	if(syncPool == nullptr) { // If memory is missing all attributes need to be synced
 		this->synchronize<dev>();
 	}
 
@@ -435,7 +435,7 @@ template < Device dev >
 void AttributePool::unload() {
 	// TODO: detect if we unload last pool
 	auto& pool = m_pools.template get<PoolHandle<dev>>().handle;
-	if(pool)
+	if(pool != nullptr)
 		pool = Allocator<dev>::free(pool, m_poolSize);
 	m_dirty.redact_change(dev);
 }
@@ -481,34 +481,34 @@ AttributeHandle AttributePool::get_attribute_handle(StringView name) {
 // Explicit instantiations
 template void AttributePool::synchronize<Device::CPU>();
 template void AttributePool::synchronize<Device::CUDA>();
-//template void AttributePool::synchronize<Device::OPENGL>();
+template void AttributePool::synchronize<Device::OPENGL>();
 template void AttributePool::synchronize<Device::CPU>(AttributeHandle hdl);
 template void AttributePool::synchronize<Device::CUDA>(AttributeHandle hdl);
-//template void AttributePool::synchronize<Device::OPENGL>(AttributeHandle hdl);
+template void AttributePool::synchronize<Device::OPENGL>(AttributeHandle hdl);
 template void AttributePool::unload<Device::CPU>();
 template void AttributePool::unload<Device::CUDA>();
-//template void AttributePool::unload<Device::OPENGL>();
+template void AttributePool::unload<Device::OPENGL>();
 template class OpenMeshAttributePool<true>;
 template class OpenMeshAttributePool<false>;
 template void OpenMeshAttributePool<true>::copy(const OpenMeshAttributePool<true>& pool);
 template void OpenMeshAttributePool<false>::copy(const OpenMeshAttributePool<false>& pool);
 template void OpenMeshAttributePool<true>::synchronize<Device::CPU>();
 template void OpenMeshAttributePool<true>::synchronize<Device::CUDA>();
-//template void OpenMeshAttributePool<true>::synchronize<Device::OPENGL>();
+template void OpenMeshAttributePool<true>::synchronize<Device::OPENGL>();
 template void OpenMeshAttributePool<true>::synchronize<Device::CPU>(AttributeHandle hdl);
 template void OpenMeshAttributePool<true>::synchronize<Device::CUDA>(AttributeHandle hdl);
-//template void OpenMeshAttributePool<true>::synchronize<Device::OPENGL>(AttributeHandle hdl);
+template void OpenMeshAttributePool<true>::synchronize<Device::OPENGL>(AttributeHandle hdl);
 template void OpenMeshAttributePool<true>::unload<Device::CPU>();
 template void OpenMeshAttributePool<true>::unload<Device::CUDA>();
-//template void OpenMeshAttributePool<true>::unload<Device::OPENGL>();
+template void OpenMeshAttributePool<true>::unload<Device::OPENGL>();
 template void OpenMeshAttributePool<false>::synchronize<Device::CPU>();
 template void OpenMeshAttributePool<false>::synchronize<Device::CUDA>();
-//template void OpenMeshAttributePool<false>::synchronize<Device::OPENGL>();
+template void OpenMeshAttributePool<false>::synchronize<Device::OPENGL>();
 template void OpenMeshAttributePool<false>::synchronize<Device::CPU>(AttributeHandle hdl);
 template void OpenMeshAttributePool<false>::synchronize<Device::CUDA>(AttributeHandle hdl);
-//template void OpenMeshAttributePool<false>::synchronize<Device::OPENGL>(AttributeHandle hdl);
+template void OpenMeshAttributePool<false>::synchronize<Device::OPENGL>(AttributeHandle hdl);
 template void OpenMeshAttributePool<false>::unload<Device::CPU>();
 template void OpenMeshAttributePool<false>::unload<Device::CUDA>();
-//template void OpenMeshAttributePool<false>::unload<Device::OPENGL>();
+template void OpenMeshAttributePool<false>::unload<Device::OPENGL>();
 
 }} // namespace mufflon::scene

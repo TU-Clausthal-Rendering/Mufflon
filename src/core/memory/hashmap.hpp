@@ -185,6 +185,10 @@ private:
 	friend class HashMapManager;
 };
 
+// TODO GL same as cpu right now
+template < typename K, typename V >
+class HashMap<Device::OPENGL, K, V> : public HashMap<Device::CPU, K, V> {};
+
 
 /*
  * Management layer to support hashmap functionallity on all devices.
