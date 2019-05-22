@@ -2596,14 +2596,12 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 		logError("[", FUNCTION_NAME, "] No scene loaded yet");
 		return false;
 	}
-	printf("Rotating camera\n"); fflush(stdout);
 	auto& camera = *s_world.get_current_scenario()->get_camera();
 	const u32 frame = std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current() - s_world.get_frame_start());
 	camera.rotate_up_down(x, frame);
 	camera.rotate_left_right(y, frame);
 	camera.roll(z, frame);
 	s_world.mark_camera_dirty(&camera);
-	printf("Rotated camera\n"); fflush(stdout);
 	return true;
 	CATCH_ALL(false)
 }
@@ -2983,7 +2981,6 @@ Boolean render_enable_renderer(uint32_t index) {
 
 Boolean render_iterate(ProcessTime* time) {
 	TRY
-	printf("Iterating\n"); fflush(stdout);
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
@@ -3011,21 +3008,17 @@ Boolean render_iterate(ProcessTime* time) {
 		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 		return false;
 	}
-	printf("Pre-iter\n"); fflush(stdout);
 	s_currentRenderer->pre_iteration(*s_imageOutput);
 	if(time != nullptr) {
 		time->cycles = CpuProfileState::get_cpu_cycle();
 		time->microseconds = CpuProfileState::get_process_time().count();
 	}
-	printf("Iter\n"); fflush(stdout);
 	s_currentRenderer->iterate();
 	if(time != nullptr) {
 		time->cycles = CpuProfileState::get_cpu_cycle() - time->cycles;
 		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
 	}
-	printf("Post-iter\n"); fflush(stdout);
 	s_currentRenderer->post_iteration(*s_imageOutput);
-	printf("Done\n"); fflush(stdout);
 	Profiler::instance().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
