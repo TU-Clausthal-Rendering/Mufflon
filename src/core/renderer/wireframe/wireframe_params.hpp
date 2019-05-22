@@ -11,6 +11,13 @@ struct PWireframeLinewidth {
 	}
 };
 
-using WireframeParameters = ParameterHandler<PWireframeLinewidth>;
+struct PWireframeMaxTraceDepth {
+	int maxTraceDepth = 1000;
+	static ParamDesc get_desc() noexcept {
+		return { "Maximum trace depth", ParameterTypes::INT };
+	}
+};
+
+using WireframeParameters = ParameterHandler<PWireframeLinewidth, PWireframeMaxTraceDepth>;
 
 }} // namespace mufflon::renderer
