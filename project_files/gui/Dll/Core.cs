@@ -146,10 +146,9 @@ namespace gui.Dll
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_format(UInt32 index, out TextureFormat format);
+        internal static extern bool core_get_target_image(UInt32 index, Boolean variance, out IntPtr ptr);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_image(UInt32 index, Boolean variance,
-            TextureFormat format, bool sRgb, out IntPtr ptr);
+        internal static extern bool core_get_target_image_num_channels(IntPtr numChannels);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_copy_screen_texture_rgba32(IntPtr ptr, float factor);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
