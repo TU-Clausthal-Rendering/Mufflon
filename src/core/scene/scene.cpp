@@ -87,7 +87,7 @@ void Scene::load_materials() {
 	}
 
 	// Coyp the alpha texture handles
-	copy(as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.acquire<dev>()),
+	copy((ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.acquire<dev>()),
 		 cpuTexHdlBuffer.get(), sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
 
 	m_alphaTextures.mark_synced(dev);
@@ -259,9 +259,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<dev>())
 		load_materials<dev>();
 	// This query should be cheap. The above if already made the information resident.
-	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
-	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
-	sceneDescriptor.alphaTextures = as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.template acquire_const<dev>());
+	sceneDescriptor.media = (ArrayDevHandle_t<dev, materials::Medium>)(m_media.template acquire_const<dev>());
+	sceneDescriptor.materials = (ArrayDevHandle_t<dev, int>)(m_materials.template acquire_const<dev>());
+	sceneDescriptor.alphaTextures = (ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.template acquire_const<dev>());
 	
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {

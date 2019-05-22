@@ -1,5 +1,6 @@
 #pragma once
 #include "gl_wrapper.hpp"
+#include "util/assert.hpp"
 
 namespace mufflon {
 namespace gl {
@@ -16,6 +17,13 @@ namespace gl {
 			id(id),
 			offset(offset)
 		{}
+		template<class U>
+		explicit BufferHandle(const BufferHandle<U>& other) :
+			id(other.id),
+			offset(other.offset * sizeof(U) / sizeof(T))
+		{
+			mAssert((other.offset * sizeof(U)) % sizeof(T) == 0);
+		}
 		size_t get_byte_offset() const {
 			return offset * sizeof(T);
 		}
