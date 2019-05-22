@@ -845,7 +845,7 @@ void WorldContainer::retessellate() {
 	if(m_scene == nullptr || m_scenario == nullptr)
 		return;
 
-	if(m_scene->retessellate(m_maxTessLevel)) {
+	if(m_scene->retessellate(m_tessLevel)) {
 		// Gotta rebuild the light tree
 		m_lightsDirty = true;
 		(void)this->load_scene_lights();

@@ -2277,12 +2277,12 @@ Boolean world_get_frame_end(uint32_t* frameEnd) {
 	CATCH_ALL(false)
 }
 
-void world_set_max_tessellation_level(const uint32_t maxTessLevel) {
-	s_world.set_max_tessellation_level(maxTessLevel);
+void world_set_tessellation_level(const float maxTessLevel) {
+	s_world.set_tessellation_level(maxTessLevel);
 }
 
-uint32_t world_get_max_tessellation_level() {
-	return s_world.get_max_tessellation_level();
+float world_get_tessellation_level() {
+	return s_world.get_tessellation_level();
 }
 
 Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {

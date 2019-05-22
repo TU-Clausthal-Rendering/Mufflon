@@ -345,9 +345,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_env_light_map(IntPtr hdl, IntPtr tex);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void world_set_max_tessellation_level(uint level);
+        internal static extern void world_set_tessellation_level(float level);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern uint world_get_max_tessellation_level();
+        internal static extern float world_get_tessellation_level();
 
         // Camera API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

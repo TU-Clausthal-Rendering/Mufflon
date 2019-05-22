@@ -22,7 +22,7 @@ class Object;
 class Scenario;
 
 namespace tessellation {
-class Tessellater;
+class TessLevelOracle;
 } // namespace tessellation
 
 class Lod {
@@ -119,7 +119,7 @@ public:
 	}
 
 	// Applies displacement mapping (if not already performed) to the LoD's geometry
-	void displace(tessellation::Tessellater& tessellater, const Scenario& scenario);
+	void displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario);
 
 private:
 	// Geometry data

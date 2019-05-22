@@ -102,8 +102,7 @@ void Scene::load_materials() {
 template < Device dev >
 const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>& vertexAttribs,
 												  const std::vector<const char*>& faceAttribs,
-												  const std::vector<const char*>& sphereAttribs,
-												  const ei::IVec2& resolution) {
+												  const std::vector<const char*>& sphereAttribs) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
 
@@ -294,7 +293,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
-		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution,
+		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), m_scenario.get_resolution(),
 										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
 	}
 
@@ -375,7 +374,7 @@ void Scene::update_camera_medium_cpu(SceneDescriptor<Device::CPU>& scene) {
 	}
 }
 
-bool Scene::retessellate(const u32 maxTessLevel) {
+bool Scene::retessellate(const float tessLevel) {
 	if(!m_scenario.has_displacement_mapped_material())
 		return false;
 
@@ -405,8 +404,8 @@ bool Scene::retessellate(const u32 maxTessLevel) {
 				// Then we may adaptively tessellate
 
 				// TODO: more adequate tessellation level and more adequate tessellator
-				tessellation::CameraDistanceTessellater tess(maxTessLevel, get_camera()->get_position(m_animationPathIndex),
-															 instTrans);
+				tessellation::CameraDistanceOracle tess(tessLevel, get_camera(), m_animationPathIndex,
+														m_scenario.get_resolution(), instTrans);
 				// Check if we need to load the LoD back from disk (and hope it got cached)
 				// TODO: would it be preferential to keep the untessellated LoD in memory as well?
 				if(lod->was_displacement_mapping_applied()) {
@@ -436,15 +435,12 @@ template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::
 template void Scene::update_camera_medium<Device::OPENGL>(SceneDescriptor<Device::OPENGL>& descriptor);
 template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<const char*>&,
 																				const std::vector<const char*>&,
-																				const std::vector<const char*>&,
-																				const ei::IVec2&);
+																				const std::vector<const char*>&);
 template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<const char*>&,
 																				  const std::vector<const char*>&,
-																				  const std::vector<const char*>&,
-																				  const ei::IVec2&);
+																				  const std::vector<const char*>&);
 template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const ei::IVec2&);
+																					  const std::vector<const char*>&,
+																					  const std::vector<const char*>&);
 
 }} // namespace mufflon::scene

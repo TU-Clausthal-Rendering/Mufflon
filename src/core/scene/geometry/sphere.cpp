@@ -206,8 +206,8 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 }
 
 
-void Spheres::displace(tessellation::Tessellater& tessellater, const Scenario& scenario) {
-	(void)tessellater;
+void Spheres::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
+	(void)oracle;
 	(void)scenario;
 	// There is no displacement we can perform for a perfect sphere (yet)
 }

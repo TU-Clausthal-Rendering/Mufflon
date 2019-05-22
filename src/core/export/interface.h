@@ -423,8 +423,8 @@ CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
 CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_end(uint32_t* animationFrame);
-CORE_API void CDECL world_set_max_tessellation_level(const uint32_t maxTessLevel);
-CORE_API uint32_t CDECL world_get_max_tessellation_level();
+CORE_API void CDECL world_set_tessellation_level(const float maxTessLevel);
+CORE_API float CDECL world_get_tessellation_level();
 
 // Scenario interface
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);

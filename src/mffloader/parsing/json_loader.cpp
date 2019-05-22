@@ -905,7 +905,7 @@ bool JsonLoader::load_file() {
 		throw std::runtime_error("Binary file '" + m_binaryFile.string() + "' does not exist");
 	}
 	// Tessellation level
-	const u32 initTessLevel = read_opt<u32>(m_state, document, "initMaxTessellationLevel", 0u);
+	const float initTessLevel = read_opt<float>(m_state, document, "initTessellationLevel", 0u);
 	if(m_abort)
 		return false;
 
@@ -1008,7 +1008,7 @@ bool JsonLoader::load_file() {
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level
 		if(initTessLevel > 0u) {
-			world_set_max_tessellation_level(initTessLevel);
+			world_set_tessellation_level(initTessLevel);
 			scene_request_retessellation();
 		}
 	} catch(const std::runtime_error& e) {

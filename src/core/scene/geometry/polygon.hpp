@@ -41,6 +41,7 @@ class Scenario;
 namespace tessellation {
 
 class Tessellater;
+class TessLevelOracle;
 
 } // namespace tessellation
 
@@ -270,7 +271,7 @@ public:
 	// Implements tessellation for the mesh
 	void tessellate(tessellation::Tessellater& tessellater);
 	// Implements displacement mapping for the mesh
-	void displace(tessellation::Tessellater& tessellater, const Scenario& scenario);
+	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
 
 	// Creates a decimater 
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();

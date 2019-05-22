@@ -23,7 +23,7 @@ struct SpheresDescriptor;
 class Scenario;
 
 namespace tessellation {
-class Tessellater;
+class TessLevelOracle;
 } // namespace tessellation
 
 namespace geometry {
@@ -182,7 +182,7 @@ public:
 		return true;
 	}
 
-	void displace(tessellation::Tessellater& tessellater, const Scenario& scenario);
+	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
 
 private:
 	template < Device dev >

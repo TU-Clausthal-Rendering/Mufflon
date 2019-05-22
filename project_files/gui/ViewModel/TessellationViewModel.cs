@@ -29,9 +29,9 @@ namespace gui.ViewModel
 
         public ICommand RequestRetessellationCommand { get; }
 
-        public uint? MaxTessellationLevel
+        public float? MaxTessellationLevel
         {
-            get => m_models.World == null ? default(uint?) : m_models.World.MaxTessellationLevel;
+            get => m_models.World == null ? default(float?) : m_models.World.MaxTessellationLevel;
             set
             {
                 if (m_models.World != null && value.HasValue)
