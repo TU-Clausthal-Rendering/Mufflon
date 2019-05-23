@@ -445,7 +445,7 @@ private:
 	}
 
 	// Reserves more space for the index buffer
-	template < Device dev >
+	template < Device dev, bool markChanged = true >
 	void reserve_index_buffer(std::size_t capacity);
 	// Rebuilds the index buffer from scratch
 	void rebuild_index_buffer();

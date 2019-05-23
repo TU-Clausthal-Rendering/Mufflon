@@ -497,6 +497,7 @@ void Polygons::synchronize() {
 			using ChangedBuffer = std::decay_t<decltype(buffer)>;
 			this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
 		});
+		m_indexFlags.mark_synced(dev);
 	}
 }
 
@@ -568,7 +569,7 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 }
 
 // Reserves more space for the index buffer
-template < Device dev >
+template < Device dev, bool markChanged >
 void Polygons::reserve_index_buffer(std::size_t capacity) {
 	auto& buffer = m_indexBuffer.get<IndexBuffer<dev>>();
 	if(capacity > buffer.reserved) {
@@ -576,9 +577,10 @@ void Polygons::reserve_index_buffer(std::size_t capacity) {
 			buffer.indices = Allocator<dev>::template alloc_array<u32>(capacity);
 		else
 			buffer.indices = Allocator<dev>::template realloc<u32>(buffer.indices, buffer.reserved,
-															 capacity);
+																   capacity);
 		buffer.reserved = capacity;
-		m_indexFlags.mark_changed(dev);
+		if constexpr(markChanged)
+			m_indexFlags.mark_changed(dev);
 	}
 }
 
@@ -653,7 +655,7 @@ void Polygons::synchronize_index_buffer() {
 
 			// Check if we need to realloc
 			if(syncBuffer.reserved < m_triangles + m_quads)
-				this->reserve_index_buffer<sync>(3u * m_triangles + 4u * m_quads);
+				this->reserve_index_buffer<sync, false>(3u * m_triangles + 4u * m_quads);
 
 			if(changedBuffer.reserved != 0u)
 				copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
@@ -683,9 +685,12 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 }
 
 // Explicit instantiations
-template void Polygons::reserve_index_buffer<Device::CPU>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::CUDA>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::OPENGL>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CUDA, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CUDA, false>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::CUDA>();
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::OPENGL>();
 template void Polygons::synchronize_index_buffer<Device::CUDA, Device::CPU>();

@@ -151,7 +151,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged || sceneDescriptor.lodIndices != nullptr) {
+	if(geometryChanged || sceneDescriptor.lodIndices == nullptr) {
 		// Invalidate other descriptors
 		if(geometryChanged)
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
