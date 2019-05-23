@@ -110,7 +110,7 @@ void CpuShadowSilhouettesPT::iterate() {
 
 		// We need to update the importance density
 		this->update_reduction_factors();
-		compute_max_importance();
+		//compute_max_importance();
 
 		logInfo("Finished importance gathering (",
 					std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
@@ -119,9 +119,9 @@ void CpuShadowSilhouettesPT::iterate() {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 			for(auto& decimater : m_decimaters)
 				decimater->copy_back_normalized_importance();
-			compute_max_importance();
+			//compute_max_importance();
 		}
-		display_importance();
+		//display_importance();
 	}
 }
 

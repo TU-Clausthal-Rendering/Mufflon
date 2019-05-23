@@ -1,4 +1,6 @@
 #pragma once
+#include <cstdint>
+#include "core/opengl/gl_buffer.hpp"
 
 namespace mufflon { // There is no memory namespace on purpose
 
@@ -111,7 +113,16 @@ struct ArrayDevHandle<Device::CUDA, T> : public DeviceHandle<Device::CUDA> {
 	using Type = T;
 };
 
+template < class T >
+struct ArrayDevHandle<Device::OPENGL, T> : public DeviceHandle<Device::OPENGL> {
+	using HandleType = gl::BufferHandle<T>;
+	using ConstHandleType = gl::BufferHandle<T>;
+	using Type = T;
+};
+
 // Short type alias
+//template < Device dev, class T >
+//using ArrayDevType_t = typename ArrayDevHandle<dev, T>::Type;
 template < Device dev, class T >
 using ArrayDevHandle_t = typename ArrayDevHandle<dev, T>::HandleType;
 template < Device dev, class T >

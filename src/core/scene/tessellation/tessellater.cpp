@@ -1,6 +1,7 @@
 #include "tessellater.hpp"
 #include "util/punning.hpp"
 #include "util/log.hpp"
+#include "profiler/cpu_profiler.hpp"
 
 namespace mufflon::scene::tessellation {
 
@@ -21,7 +22,11 @@ constexpr inline u32 get_inner_vertex_index(const u32 edgeIndex, const u32 index
 } // namespace
 
 void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
+	auto profilerTimer = Profiler::instance().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
 	m_mesh = &mesh;
+	m_tessLevelOracle.set_mesh(&mesh);
+
+	this->pre_tessellate();
 
 	// Store the vertex handles of the newly created vertices per edge
 	m_edgeVertexHandles.clear();
@@ -37,7 +42,6 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	if (!m_addedVertexProp.is_valid())
 		throw std::runtime_error("Failed to add edge vertex property to mesh");
 
-
 	for(auto edge : m_mesh->edges()) {
 		mAssert(edge.is_valid());
 
@@ -45,7 +49,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0));
 
 		// Ask how many new vertices this edge should get
-		u32 newVertices = this->get_edge_tessellation_level(edge);
+		u32 newVertices = m_tessLevelOracle.get_edge_tessellation_level(edge);
 		m_mesh->property(m_addedVertexProp, edge) = AddedVertices{
 			from, to,
 			static_cast<u32>(m_edgeVertexHandles.size()),
@@ -88,10 +92,16 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		// Check if we're in a triangle or quad
 		const std::size_t vertexCount = std::distance(m_mesh->cfv_ccwbegin(face), m_mesh->cfv_ccwend(face));
 		// Find out the inner tessellation level
-		const u32 innerLevel = this->get_inner_tessellation_level(face);
+		u32 innerLevel = m_tessLevelOracle.get_inner_tessellation_level(face);
+		// TODO: remove this, for now it ensures that we always have inner tessellation if we have outer
+		if(innerLevel == 0u && m_edgeVertexHandles.size() > 0u)
+			innerLevel = 1u;
+
 
 		// Case distinction: do we have inner tessellation at all
 		if(innerLevel == 0u) {
+			if(m_edgeVertexHandles.size() == 0u)
+				continue;
 			m_innerVertices.clear();
 			// Fetch the additional vertices from the edges
 			auto fhIter = m_mesh->cfh_ccwbegin(face);
@@ -116,7 +126,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 				// TODO: define a better tessellation pattern?
 				// Copy over the properties and remove the face
 				m_mesh->copy_all_properties(face, tempFace, false);
-				m_mesh->delete_face(face);
+				m_mesh->delete_face(face, false);
 
 				const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices);
 				if(!newFace.is_valid())
@@ -142,7 +152,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 
 			// Copy over the properties and remove the face
 			m_mesh->copy_all_properties(face, tempFace, false);
-			m_mesh->delete_face(face);
+			m_mesh->delete_face(face, false);
 
 			// Create the faces for the inner vertices
 			if(vertexCount == 3u) {
@@ -241,7 +251,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 
 							// Create as many good-looking quads as possible
 							const u32 outerQuadCount = this->spawn_outer_quads(innerLevel, outerVertices.count, startInner,
-																			   startOuter,outerVertices.offset, edgeIndex,
+																			   startOuter, outerVertices.offset, edgeIndex,
 																			   from != outerVertices.from, tempFace);
 
 							// The rest just gets triangulated
@@ -274,18 +284,19 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		}
 
 	}
-
+	
 	// Clean up
 	m_mesh->remove_property(m_addedVertexProp);
 	m_mesh->delete_face(tempFace, true);
 	m_mesh->garbage_collection();
 	m_mesh->release_face_status();
 	m_mesh->release_vertex_status();
+
+	this->post_tessellate();
 }
 
-void Tessellater::set_edge_vertex(const float x,
-										  const OpenMesh::EdgeHandle edge,
-										  const OpenMesh::VertexHandle vertex) {
+void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge,
+								  const OpenMesh::VertexHandle vertex) {
 	mAssert(x >= 0.f && x <= 1.f);
 	const OpenMesh::VertexHandle from = m_mesh->from_vertex_handle(m_mesh->halfedge_handle(edge, 0u));
 	const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0u));
@@ -522,11 +533,11 @@ u32 Tessellater::spawn_outer_quads(const u32 innerLevel, const u32 outerLevel,
 }
 
 void Tessellater::spawn_outer_corner_triangles(const u32 innerLevel, const u32 startInner,
-													   const u32 startOuter, const u32 outerQuadCount,
-													   const u32 edgeIndex, const AddedVertices& outerVertices,
-													   const OpenMesh::VertexHandle from,
-													   const OpenMesh::VertexHandle to,
-													   const OpenMesh::FaceHandle face) {
+											   const u32 startOuter, const u32 outerQuadCount,
+											   const u32 edgeIndex, const AddedVertices& outerVertices,
+											   const OpenMesh::VertexHandle from,
+											   const OpenMesh::VertexHandle to,
+											   const OpenMesh::FaceHandle face) {
 	// Left corner vertices (all that are not part of the quads)
 	m_stripVertices.clear();
 	m_stripVertices.push_back(from);
@@ -540,7 +551,9 @@ void Tessellater::spawn_outer_corner_triangles(const u32 innerLevel, const u32 s
 	}
 	for(u32 i = 0u; i < startInner + 1u; ++i)
 		m_stripVertices.push_back(m_innerVertices[get_inner_vertex_index(edgeIndex, startInner - i, innerLevel)]);
-	this->triangulate_strip(startOuter + 1u, startInner + 1u, face);
+	if(m_stripVertices.size() != startOuter + startInner + 4u)
+		const int iasdf = 0;
+	this->triangulate_strip(startOuter, startInner + 1u, face);
 	// Right corner vertices (all that are not part of the quads)
 	m_stripVertices.clear();
 	if(from != outerVertices.from) {
@@ -556,7 +569,7 @@ void Tessellater::spawn_outer_corner_triangles(const u32 innerLevel, const u32 s
 	for(u32 i = startIndexInner; i < innerLevel; ++i)
 		m_stripVertices.push_back(m_innerVertices[get_inner_vertex_index(edgeIndex, innerLevel - i - 1u + startIndexInner, innerLevel)]);
 	if(m_stripVertices.size() >= 3u)
-		this->triangulate_strip(outerVertices.count - startOuter - outerQuadCount, innerLevel - startIndexInner, face);
+		this->triangulate_strip(outerVertices.count - startOuter - outerQuadCount - 1u, innerLevel - startIndexInner, face);
 }
 
 void Tessellater::triangulate_strip(const u32 outerLevel, const u32 innerLevel,
@@ -568,13 +581,17 @@ void Tessellater::triangulate_strip(const u32 outerLevel, const u32 innerLevel,
 
 	// Handle the various special cases upfront
 	if(outerLevel == 0u) {
+		// Only two vertices on the outside: left and right
 		if(innerLevel == 1u) {
+			// Only a single triangle
 			const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices);
 			if(!newFace.is_valid())
 				throw std::runtime_error("Any: failed to add tessellated outer face (strip; outerLevel == 0u, innerLevel == 1)");
 			this->set_triangle_face_outer(original, newFace);
 		} else {
 			// Connect until the distance to the other corner is smaller, then connect to other corner
+			// Keep in mind that we have at least 2 inner vertices; we'll get innerLevel triangles
+			// TODO: determine proper order: left to right or right to left? should depend on vertex proximity
 			u32 i = 0u;
 			while(i + 1u < innerLevel) {
 				const float distSqLeft = ei::lensq(util::pun<ei::Vec3>(m_mesh->point(m_stripVertices[2u + i])) -
@@ -588,7 +605,17 @@ void Tessellater::triangulate_strip(const u32 outerLevel, const u32 innerLevel,
 					if(!newFace.is_valid())
 						throw std::runtime_error("Any: failed to add tessellated outer face (strip)");
 					this->set_triangle_face_outer(original, newFace);
-					break;
+
+					// Add the right-vertex triangles
+					while(i + 1u < innerLevel) {
+						const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices[2u + i + 1u], m_stripVertices[0u],
+																			  m_stripVertices[2u + i]);
+						if(!newFace.is_valid())
+							throw std::runtime_error("Any: failed to add tessellated outer face (strip)");
+						this->set_triangle_face_outer(original, newFace);
+						++i;
+					}
+					return;
 				}
 
 				const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices[1u], m_stripVertices[2u + i],
@@ -598,15 +625,14 @@ void Tessellater::triangulate_strip(const u32 outerLevel, const u32 innerLevel,
 				this->set_triangle_face_outer(original, newFace);
 				++i;
 			}
-			// Connect to the other side - always shorter
-			while(i + 1u < innerLevel) {
-				const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices[2u + i + 1u], m_stripVertices[0u],
-																	  m_stripVertices[2u + i]);
-				if(!newFace.is_valid())
-					throw std::runtime_error("Any: failed to add tessellated outer face (strip)");
-				this->set_triangle_face_outer(original, newFace);
-				++i;
-			}
+
+			// One last connection: all other inner vertices have been connected to the left outer vertex,
+			// leaves the "middle" triangle
+			const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices[0u], m_stripVertices[1u],
+																  m_stripVertices[2u + i]);
+			if(!newFace.is_valid())
+				throw std::runtime_error("Any: failed to add tessellated outer face (strip)");
+			this->set_triangle_face_outer(original, newFace);
 		}
 	} else if(innerLevel == 1u) {
 		// Only one inner -> all edge points connect against it

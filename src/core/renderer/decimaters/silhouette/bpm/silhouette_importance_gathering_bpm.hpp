@@ -229,7 +229,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 	math::RndSet2_1 rndStart{ rng.next(), rng.next() };
 	scene::lights::Emitter p = scene::lights::emit(scene, idx, photonCount, photonSeed, rndStart);
 	SilPathVertex vertex[2];
-	SilPathVertex::create_light(&vertex[0], nullptr, p, rng);	// TODO: check why there is an (unused) Rng reference
+	SilPathVertex::create_light(&vertex[0], nullptr, p);
 	math::Throughput throughput;
 	float mergeArea = ei::PI * mergeRadius * mergeRadius;
 
@@ -362,7 +362,7 @@ CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& ou
 			importance += importances[lodIdx][vertexIndex].fluxImportance;
 		}
 
-		outputBuffer.contribute(coord, RenderTargets::RADIANCE, ei::Vec4{ importance / maxImportance });
+		outputBuffer.contribute(coord, RenderTargets::RADIANCE, ei::Vec3{ importance / maxImportance });
 	}
 }
 

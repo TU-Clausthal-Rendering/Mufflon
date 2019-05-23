@@ -152,6 +152,12 @@
     <Filter Include="Source Files\core\renderer\decimaters\silhouette\bpm">
       <UniqueIdentifier>{9fd8a5d1-9ff7-4916-a02e-0ecbe1455f67}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\lt">
+      <UniqueIdentifier>{69fd0905-fe7d-4f0b-89e7-a8f20e25c139}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\opengl">
+      <UniqueIdentifier>{69fd0905-fe7d-4f0b-89e7-a8f20e25c139}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -313,6 +319,24 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\decimation_common_bpm.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp">
+      <Filter>Source Files\core\renderer\lt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp">
+      <Filter>Source Files\core\renderer\lt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\lt\gpu_lt.cpp">
+      <Filter>Source Files\core\renderer\lt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\gl_forward.cpp">
+      <Filter>Source Files\core\renderer\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\tessellation\cam_dist.cpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\tessellation\displacement_mapper.cpp">
+      <Filter>Source Files\core\scene\tessellation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -465,10 +489,7 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\conversions.hpp">
       <Filter>Source Files\deps\epsilon</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp">
-      <Filter>Source Files\core\scene\lights</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\textures\interface.hpp">
+    <ClInclude Include="..\..\src\core\scene\textures\format.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp">
@@ -1025,7 +1046,7 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\bpm\silhouette_bpm_common.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
@@ -1041,6 +1062,20 @@
     <ClInclude Include="..\..\src\core\math\tabulated_function.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h" />
+    <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\gpu_lt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\lt_common.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\lt_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\forward\forward_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\forward\gl_forward.hpp" />
+    <ClInclude Include="..\..\src\core\scene\lights\light_sampling.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\cam_dist.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\displacement_mapper.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\interface.hpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1079,5 +1114,6 @@
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\gpu_silhouette_bpm.cu">
       <Filter>Source Files\core\renderer\decimaters\silhouette\bpm</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu" />
   </ItemGroup>
 </Project>

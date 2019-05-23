@@ -22,7 +22,7 @@ namespace scene {
 namespace accel_struct {
 
 
-static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH),
+static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH<Device::CPU>),
 			  "Descriptor parameter block to small for this acceleration structure.");
 
 
@@ -36,15 +36,15 @@ template<Device dev> struct desc_info<LodDescriptor<dev>> {
 	using MortonCode = u64;
 	using PrimCount = ei::IVec3;
 	using CostFactor = ei::Vec4;
-	static constexpr float NODE_TRAVERSAL_COST = 3.0f;
-	static constexpr ei::Vec3 PRIM_TRAVERSAL_COST = { 1.2f, 2.4f, 1.0f };
+	static constexpr float NODE_TRAVERSAL_COST = 2.0f;
+	static constexpr ei::Vec3 PRIM_TRAVERSAL_COST = { 1.2f, 4.0f, 1.0f };
 };
 template<Device dev> struct desc_info<SceneDescriptor<dev>> {
 	using MortonCode = u64;
 	using PrimCount = ei::Vec<i32, 1>;
 	using CostFactor = ei::Vec2;
 	static constexpr float NODE_TRAVERSAL_COST = 1.0f;
-	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST{ 200000.0f };// TODO: find value for this.
+	static constexpr ei::Vec<float, 1> PRIM_TRAVERSAL_COST{ 8.5f };
 };
 template<typename Desc>
 using MortonCode_t = typename desc_info<Desc>::MortonCode;
@@ -601,7 +601,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
 	// cannot allocate the other parts in bvh.
 	m_primIds.resize(numPrimitives * sizeof(i32));
-	i32* primIds = as<i32>(m_primIds.acquire<DescType::DEVICE>());
+	auto primIds = as<ArrayDevHandle_t<DescType::DEVICE, i32>, ArrayDevHandle_t<DescType::DEVICE, char>>(m_primIds.acquire<DescType::DEVICE>());
 	auto parents = make_udevptr_array<DescType::DEVICE, i32, false>(numNodes);
 
 	// To avoid unnecessary allocations we allocate the device counter array here already (usage in calculate_bounding_boxes)
@@ -707,7 +707,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	}
 
 	// Find out which nodes can be collapsed according to SAH.
-	if(DescType::DEVICE == Device::CUDA) {
+	if (DescType::DEVICE == Device::CUDA) {
 		i32 numBlocks, numThreads;
 		get_maximum_occupancy(numBlocks, numThreads, numPrimitives, mark_nodesD<DescType>);
 		mark_nodesD<DescType> <<< numBlocks, numThreads >>> (numInternalNodes,
@@ -725,7 +725,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 	// Scan to get values for offsets.
 	i32 numRemovedInternalNodes;
-	if(DescType::DEVICE == Device::CUDA) {
+	if (DescType::DEVICE == Device::CUDA) {
 		CuLib::DeviceInclusiveSum(numInternalNodes, collapseOffsets.get(), collapseOffsets.get());
 		copy(&numRemovedInternalNodes, collapseOffsets.get() + numInternalNodes - 1, sizeof(i32));
 		numRemovedInternalNodes = numInternalNodes - numRemovedInternalNodes;
@@ -766,6 +766,8 @@ void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB) {
 
 template void LBVHBuilder::build<Device::CPU>(LodDescriptor<Device::CPU>&, const ei::Box&);
 template void LBVHBuilder::build<Device::CUDA>(LodDescriptor<Device::CUDA>&, const ei::Box&);
+//template void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&);
+template<> void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&) {}
 
 template < Device dev >
 void LBVHBuilder::build(
@@ -779,6 +781,8 @@ void LBVHBuilder::build(
 
 template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&);
 template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&);
+//template void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&);
+template <> void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&) {}
 
 }
 }

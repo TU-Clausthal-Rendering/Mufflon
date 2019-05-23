@@ -5,40 +5,14 @@
 #include "util/tagged_tuple.hpp"
 #include "util/flag.hpp"
 #include "util/string_view.hpp"
+#include "format.hpp"
+#include "core/opengl/gl_texture.hpp"
 #include <array>
 #include <cuda_runtime.h>
 #include <memory>
 #include <string>
 
 namespace mufflon { namespace scene { namespace textures {
-
-/*
- * A list of supported texture formats for this renderer.
- * While Hardware and texture formats may support many more, this list is rather short
- * because each format must also be implemented in the CpuTexture.
- * A loader must choose the most appropriate target format which is supported internally.
- * Also, some of the formats cannot be aquired for write mode (the RGB ones) on GPU side.
- *
- * Format semantics:
- * ...XU	Unsigned int per channel with X bits
- * ...XF	Float with X bits
- */
-enum class Format : u16 {
-	R8U,
-	RG8U,
-	RGBA8U,
-	R16U,
-	RG16U,
-	RGBA16U,
-	R16F,
-	RG16F,
-	RGBA16F,
-	R32F,
-	RG32F,
-	RGBA32F,
-
-	NUM
-};
 
 class CpuTexture;
 
@@ -102,11 +76,11 @@ __host__ __device__ constexpr bool is_valid(typename TextureDevHandle<Device::CU
 // OPENGL
 template<>
 struct TextureDevHandle<Device::OPENGL> : public DeviceHandle<Device::OPENGL> {
-	using HandleType = u64;
-	using ConstHandleType = u64;
+	using HandleType = gl::TextureHandle;
+	using ConstHandleType = gl::TextureHandle;
 };
 __host__ constexpr bool is_valid(typename TextureDevHandle<Device::OPENGL>::HandleType handle) noexcept {
-	return handle != 0u;
+	return handle.id != 0u;
 }
 
 

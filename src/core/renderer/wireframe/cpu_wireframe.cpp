@@ -18,10 +18,12 @@ void CpuWireframe::iterate() {
 	// TODO: call sample in a parallel way for each output pixel
 	// TODO: better pixel order?
 	// TODO: different scheduling?
+	printf("Wireframe iter\n"); fflush(stdout);
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
 		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() });
 	}
+	printf("Post wireframe iter\n"); fflush(stdout);
 }
 
 void CpuWireframe::sample(const Pixel coord) {

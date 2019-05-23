@@ -19,6 +19,12 @@ template < Device dev >
 struct LodDescriptor;
 class Object;
 
+class Scenario;
+
+namespace tessellation {
+class TessLevelOracle;
+} // namespace tessellation
+
 class Lod {
 public:
 	// Available geometry types - extend if necessary
@@ -93,6 +99,28 @@ public:
 	void set_parent(const Object* parent) noexcept {
 		m_parent = parent;
 	}
+
+	// Returns whether any geometry has a displacement map associated with the given material assignment
+	bool has_displacement_mapping(const Scenario& scenario) const noexcept {
+		bool hasDisplacementMapping = false;
+		m_geometry.for_each([&hasDisplacementMapping, &scenario](auto& elem) {
+			hasDisplacementMapping |= elem.has_displacement_mapping(scenario);
+		});
+		return hasDisplacementMapping;
+	}
+
+	// Checks if displacement mapping was applied to all of the LoD's geometry
+	bool was_displacement_mapping_applied() const noexcept {
+		bool wasDisplacementApplied = true;
+		m_geometry.for_each([&wasDisplacementApplied](auto& elem) {
+			wasDisplacementApplied &= elem.was_displacement_mapping_applied();
+		});
+		return wasDisplacementApplied;
+	}
+
+	// Applies displacement mapping (if not already performed) to the LoD's geometry
+	void displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario);
+
 private:
 	// Geometry data
 	GeometryTuple m_geometry;

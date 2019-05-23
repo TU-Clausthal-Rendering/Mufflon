@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
+    <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.cpp" />
@@ -31,6 +32,9 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\cpu_silhouette_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\decimation_common_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\lt\gpu_lt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\forward\gl_forward.cpp" />
     <ClCompile Include="..\..\src\core\renderer\neb\cpu_neb.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
@@ -50,6 +54,8 @@
     <ClCompile Include="..\..\src\core\scene\object.cpp" />
     <ClCompile Include="..\..\src\core\scene\scenario.cpp" />
     <ClCompile Include="..\..\src\core\scene\scene.cpp" />
+    <ClCompile Include="..\..\src\core\scene\tessellation\cam_dist.cpp" />
+    <ClCompile Include="..\..\src\core\scene\tessellation\displacement_mapper.cpp" />
     <ClCompile Include="..\..\src\core\scene\tessellation\tessellater.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\cputexture.cpp" />
     <ClCompile Include="..\..\src\core\scene\textures\texture.cpp" />
@@ -189,6 +195,10 @@
     <ClInclude Include="..\..\src\core\memory\hashmap.hpp" />
     <ClInclude Include="..\..\src\core\memory\residency.hpp" />
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
+    <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h" />
+    <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
@@ -217,6 +227,12 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\gpu_lt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\lt_common.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\lt\lt_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\forward\forward_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\forward\gl_forward.hpp" />
     <ClInclude Include="..\..\src\core\renderer\neb\cpu_neb.hpp" />
     <ClInclude Include="..\..\src\core\renderer\neb\density_octree.hpp" />
     <ClInclude Include="..\..\src\core\renderer\neb\neb_params.hpp" />
@@ -277,10 +293,13 @@
     <ClInclude Include="..\..\src\core\scene\object.hpp" />
     <ClInclude Include="..\..\src\core\scene\scenario.hpp" />
     <ClInclude Include="..\..\src\core\scene\scene.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\cam_dist.hpp" />
+    <ClInclude Include="..\..\src\core\scene\tessellation\displacement_mapper.hpp" />
     <ClInclude Include="..\..\src\core\scene\tessellation\tessellater.hpp" />
     <ClInclude Include="..\..\src\core\scene\tessellation\uniform.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cputexture.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\cubemap.hpp" />
+    <ClInclude Include="..\..\src\core\scene\textures\format.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp" />
     <ClInclude Include="..\..\src\core\scene\textures\texture.hpp" />
     <ClInclude Include="..\..\src\core\scene\types.hpp" />
@@ -311,6 +330,7 @@
     <CudaCompile Include="..\..\src\core\memory\allocator.cu" />
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\gpu_silhouette_bpm.cu" />
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />

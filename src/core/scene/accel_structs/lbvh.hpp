@@ -17,9 +17,10 @@ struct BvhNode {
 	i32 index;
 	i32 primCount;
 };
+template < Device dev >
 struct LBVH {
-	const BvhNode* bvh;
-	const i32* primIds;
+	ConstArrayDevHandle_t<dev, BvhNode> bvh;
+	ConstArrayDevHandle_t<dev, i32> primIds;
 	i32 numInternalNodes;
 };
 #pragma pack(pop)
@@ -75,9 +76,9 @@ public:
 
 		AccelDescriptor desc;
 		desc.type = AccelType::LBVH;
-		LBVH& lbvhDesc = *as<LBVH>(desc.accelParameters);
-		lbvhDesc.bvh = as<BvhNode>( m_bvhNodes.acquire_const<dev>() );
-		lbvhDesc.primIds = as<i32>( m_primIds.acquire_const<dev>() );
+		LBVH<dev>& lbvhDesc = *as<LBVH<dev>>(desc.accelParameters);
+		lbvhDesc.bvh = as<ConstArrayDevHandle_t<dev, BvhNode>, ConstArrayDevHandle_t<dev, char>>( m_bvhNodes.acquire_const<dev>() );
+		lbvhDesc.primIds = as<ConstArrayDevHandle_t<dev, i32>, ConstArrayDevHandle_t<dev, char>>( m_primIds.acquire_const<dev>() );
 		lbvhDesc.numInternalNodes = int(m_bvhNodes.size() / (4 * sizeof(ei::Vec4)));
 		return desc;
 	}

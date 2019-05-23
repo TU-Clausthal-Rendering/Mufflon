@@ -34,6 +34,7 @@ namespace gui.ViewModel
 
         public LoadWorldViewModel LoadWorld { get; }
         public AnimationFrameViewModel AnimationFrames { get; }
+        public TessellationViewModel Tessellation { get; }
 
         public ICommand AddLightCommand { get; }
         public ICommand LoadSceneCommand { get; }
@@ -69,6 +70,7 @@ namespace gui.ViewModel
 
             LoadWorld = new LoadWorldViewModel(m_models);
             AnimationFrames = new AnimationFrameViewModel(m_models);
+            Tessellation = new TessellationViewModel(m_models);
 
             // command initialization
             AddLightCommand = new AddLightCommand(m_models);

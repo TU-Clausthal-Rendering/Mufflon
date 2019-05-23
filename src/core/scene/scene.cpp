@@ -1,6 +1,7 @@
 #include "scene.hpp"
 #include "descriptors.hpp"
 #include "scenario.hpp"
+#include "world_container.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
@@ -12,7 +13,11 @@
 #include "core/scene/geometry/polygon.hpp"
 #include "core/scene/geometry/sphere.hpp"
 #include "core/scene/lights/background.hpp"
+#include "core/scene/tessellation/cam_dist.hpp"
+#include "core/scene/tessellation/uniform.hpp"
+#include "mffloader/interface/interface.h"
 #include "profiler/cpu_profiler.hpp"
+#include <ei/3dintersection.hpp>
 
 namespace mufflon { namespace scene {
 
@@ -71,7 +76,7 @@ void Scene::load_materials() {
 	// Temporary storage to only copy once
 	auto cpuTexHdlBuffer = std::make_unique<textures::ConstTextureDevHandle_t<dev>[]>(MAT_SLOTS);
 
-	char* mem = m_materials.acquire<dev>();
+	auto mem = m_materials.acquire<dev>();
 	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
@@ -79,7 +84,7 @@ void Scene::load_materials() {
 		ConstMaterialHandle mat = m_scenario.get_assigned_material(i);
 		mAssert(mat->get_descriptor_size(dev) <= materials::MAX_MATERIAL_DESCRIPTOR_SIZE());
 		std::size_t size = mat->get_descriptor(dev, buffer) - buffer;
-		copy(mem + offsets[i], buffer, size);
+		copy(mem + size_t(offsets[i]), buffer, size);
 		if(mat->get_alpha_texture() != nullptr)
 			cpuTexHdlBuffer[i] = mat->get_alpha_texture()->template acquire_const<dev>();
 		else
@@ -87,7 +92,7 @@ void Scene::load_materials() {
 	}
 
 	// Coyp the alpha texture handles
-	copy(as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.acquire<dev>()),
+	copy((ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.acquire<dev>()),
 		 cpuTexHdlBuffer.get(), sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
 
 	m_alphaTextures.mark_synced(dev);
@@ -97,8 +102,7 @@ void Scene::load_materials() {
 template < Device dev >
 const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>& vertexAttribs,
 												  const std::vector<const char*>& faceAttribs,
-												  const std::vector<const char*>& sphereAttribs,
-												  const ei::IVec2& resolution) {
+												  const std::vector<const char*>& sphereAttribs) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
 
@@ -136,10 +140,18 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 
 	// Check if we need to update the object descriptors
+	// This part is affected by e.g. camera movement due to displacement mapping
+	// (which uses tessellation), thus we may need to rebuild some BVHs even
+	// if the geometry itself is unchanged
+	// But since this is pretty expensive we only perform this if really necessary
+	// (ie. some material actually has displacement mapping)
+	// TODO: abstract the displacement heuristic and let it decide on which changes
+	// it needs to be re-evaluated
+
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged || !sceneDescriptor.lodIndices) {
+	if(geometryChanged || sceneDescriptor.lodIndices != nullptr) {
 		// Invalidate other descriptors
 		if(geometryChanged)
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
@@ -156,38 +168,50 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		// Create the object and instance descriptors
 		std::size_t instanceCount = 0u;
 		u32 lodCount = 0u;
+		// This keeps track of instances for a given LoD
+		std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
+
 		for(auto& obj : m_objects) {
 			mAssert(obj.first != nullptr);
 			mAssert(obj.second.size() != 0u);
-			// First determine which LoDs are actually needed
-			std::vector<u8> lods(obj.first->get_lod_slot_count(), 0u);
 
-			u32 prevLevel = std::numeric_limits<u32>::max();
+			// First gather which LoDs have which instance
+			lodMapping.clear();
 			for(InstanceHandle inst : obj.second) {
 				mAssert(inst != nullptr);
 				const u32 instanceLod = m_scenario.get_effective_lod(inst);
-				if(!lods[instanceLod]) {
-					mAssert(instanceLod < obj.first->get_lod_slot_count());
-					if(prevLevel != std::numeric_limits<u32>::max())
-						lodDescs.back().next = instanceLod;
-					Lod& lod = obj.first->get_lod(instanceLod);
-					lodDescs.push_back(lod.template get_descriptor<dev>());
-					lodDescs.back().previous = prevLevel;
-					lodAabbs.push_back(lod.get_bounding_box());
-					if(!sameAttribs)
-						lod.update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
-					lods[instanceLod] = true;
-				}
+				mAssert(instanceLod < obj.first->get_lod_slot_count());
+				lodMapping[instanceLod].push_back(inst);
+
 				instanceTransformations.push_back(inst->get_transformation_matrix());
 				invInstanceTransformations.push_back(inst->get_inverse_transformation_matrix());
-				lodIndices.push_back(lodCount);
-				// Also expand scene bounding box
-				m_boundingBox = ei::Box(m_boundingBox, inst->get_bounding_box(instanceLod));
+			}
+
+			// Now that we know all instances a LoD has we can create the descriptors uniquely
+			// and also perform displacement mapping if necessary
+			u32 prevLevel = std::numeric_limits<u32>::max();
+			for(const auto& mapping : lodMapping) {
+				// Now we can do the per-LoD things like dispalcement mapping and fetching descriptors
+				if(prevLevel != std::numeric_limits<u32>::max())
+					lodDescs.back().next = mapping.first;
+				Lod* lod = &obj.first->get_lod(mapping.first);
+
+				lodDescs.push_back(lod->template get_descriptor<dev>());
+				lodDescs.back().previous = prevLevel;
+				lodAabbs.push_back(lod->get_bounding_box());
+				if(!sameAttribs)
+					lod->update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+
+				// Gotta expand the scene bounding box
+				for(InstanceHandle inst : mapping.second) {
+					m_boundingBox = ei::Box(m_boundingBox, inst->get_bounding_box(mapping.first));
+					lodIndices.push_back(lodCount);
+				}
+				++lodCount;
 			}
 			lodDescs.back().previous = prevLevel;
 
 			instanceCount += obj.second.size();
-			++lodCount;
 		}
 
 		// Allocate the device memory and copy over the descriptors
@@ -205,7 +229,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
 		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
-		copy(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+		copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
@@ -223,35 +247,39 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them
 		std::vector<LodDescriptor<dev>> lodDescs;
+		// This keeps track of instances for a given LoD
+		std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
+
 		for(auto& obj : m_objects) {
 			mAssert(obj.first != nullptr);
 			mAssert(obj.second.size() != 0u);
 
-			// First determine which LoDs are actually used
-			std::vector<u8> lods(obj.first->get_lod_slot_count(), 0u);
-
-			u32 prevLevel = std::numeric_limits<u32>::max();
+			// First gather which LoDs have which instance
+			lodMapping.clear();
 			for(InstanceHandle inst : obj.second) {
-				const u32 instanceLod = m_scenario.get_effective_lod(inst);
 				mAssert(inst != nullptr);
-				if(!lods[instanceLod]) {
-					mAssert(instanceLod < obj.first->get_lod_slot_count());
-					if(prevLevel != std::numeric_limits<u32>::max())
-						lodDescs.back().next = instanceLod;
-					Lod& lod = obj.first->get_lod(instanceLod);
-					lodDescs.push_back(lod.template get_descriptor<dev>());
-					lodDescs.back().previous = prevLevel;
-					lod.update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
-				}
+				const u32 instanceLod = m_scenario.get_effective_lod(inst);
+				mAssert(instanceLod < obj.first->get_lod_slot_count());
+				lodMapping[instanceLod].push_back(inst);
 			}
 
+			// Now that we know all instances a LoD has we can create the descriptors uniquely
+			u32 prevLevel = std::numeric_limits<u32>::max();
+			for(const auto& mapping : lodMapping) {
+				// Now we can do per-LoD things like displacement mapping
+				if(prevLevel != std::numeric_limits<u32>::max())
+					lodDescs.back().next = mapping.first;
+				Lod& lod = obj.first->get_lod(mapping.first);
+				lodDescs.push_back(lod.template get_descriptor<dev>());
+				if(!sameAttribs)
+					lod.update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+			}
 			lodDescs.back().previous = prevLevel;
 		}
 		// Allocate the device memory and copy over the descriptors
 		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
 		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
 		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
-
 		sceneDescriptor.lods = lodDevDesc.get();
 	}
 
@@ -259,24 +287,25 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<dev>())
 		load_materials<dev>();
 	// This query should be cheap. The above if already made the information resident.
-	sceneDescriptor.media = as<materials::Medium>(m_media.template acquire_const<dev>());
-	sceneDescriptor.materials = as<int>(m_materials.template acquire_const<dev>());
-	sceneDescriptor.alphaTextures = as<textures::ConstTextureDevHandle_t<dev>>(m_alphaTextures.template acquire_const<dev>());
+	sceneDescriptor.media = (ArrayDevHandle_t<dev, materials::Medium>)(m_media.template acquire_const<dev>());
+	sceneDescriptor.materials = (ArrayDevHandle_t<dev, int>)(m_materials.template acquire_const<dev>());
+	sceneDescriptor.alphaTextures = (ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.template acquire_const<dev>());
 	
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
-		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), resolution,
+		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), m_scenario.get_resolution(),
 										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
 	}
 
 	// Light tree
+	// TODO: rebuild light tree if area light got tessellated
 	if(m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
 		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
 		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
 
 	// Rebuild Instance BVH?
-	if(geometryChanged) {
+	if(m_accelStruct.needs_rebuild()) {
 		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 		m_accelStruct.build(sceneDescriptor);
 		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
@@ -345,23 +374,73 @@ void Scene::update_camera_medium_cpu(SceneDescriptor<Device::CPU>& scene) {
 	}
 }
 
+bool Scene::retessellate(const float tessLevel) {
+	if(!m_scenario.has_displacement_mapped_material())
+		return false;
+
+	// Track if we did perform tessellation and if we need to rebuild the light tree
+	bool performedTessellation = false;
+	bool needLighttreeRebuild = false;
+	std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
+	std::vector<ei::Mat3x4> instTrans;
+	for(auto& obj : m_objects) {
+		lodMapping.clear();
+
+		// First gather the instance-LoD-mapping
+		for(InstanceHandle inst : obj.second) {
+			const u32 instanceLod = m_scenario.get_effective_lod(inst);
+			lodMapping[instanceLod].push_back(inst);
+		}
+
+		for(const auto& mapping : lodMapping) {
+			// Check if we have displacement
+			Lod* lod = &obj.first->get_lod(mapping.first);
+
+			if(lod->has_displacement_mapping(m_scenario)) {
+				// First get the relevant instance transformations
+				instTrans.clear();
+				for(InstanceHandle inst : mapping.second)
+					instTrans.push_back(inst->get_transformation_matrix());
+				// Then we may adaptively tessellate
+
+				// TODO: more adequate tessellation level and more adequate tessellator
+				tessellation::CameraDistanceOracle tess(tessLevel, get_camera(), m_animationPathIndex,
+														m_scenario.get_resolution(), instTrans);
+				// Check if we need to load the LoD back from disk (and hope it got cached)
+				// TODO: would it be preferential to keep the untessellated LoD in memory as well?
+				if(lod->was_displacement_mapping_applied()) {
+					obj.first->remove_lod(mapping.first);
+					if(!WorldContainer::instance().load_lod(*obj.first, mapping.first))
+						throw std::runtime_error("Failed to re-load LoD for displacement map tessellation");
+					lod = &obj.first->get_lod(mapping.first);
+				}
+				lod->displace(tess, m_scenario);
+				lod->clear_accel_structure();
+				performedTessellation = true;
+				needLighttreeRebuild |= lod->is_emissive(m_scenario);
+			}
+		}
+	}
+	if(performedTessellation)
+		m_accelStruct.mark_invalid();
+
+	return needLighttreeRebuild;
+}
+
 template void Scene::load_materials<Device::CPU>();
 template void Scene::load_materials<Device::CUDA>();
-//template void Scene::load_materials<Device::OPENGL>();
+template void Scene::load_materials<Device::OPENGL>();
 template void Scene::update_camera_medium<Device::CPU>(SceneDescriptor<Device::CPU>& descriptor);
 template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::CUDA>& descriptor);
-//template void update_camera_medium< Device::OPENGL>(const SceneDescriptor<Device::OPENGL>& descriptor);
+template void Scene::update_camera_medium<Device::OPENGL>(SceneDescriptor<Device::OPENGL>& descriptor);
 template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const ei::IVec2&);
+																				const std::vector<const char*>&,
+																				const std::vector<const char*>&);
 template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const ei::IVec2&);
-/*template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const std::vector<const char*>&,
-																			const ei::IVec2&);*/
+																				  const std::vector<const char*>&,
+																				  const std::vector<const char*>&);
+template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
+																					  const std::vector<const char*>&,
+																					  const std::vector<const char*>&);
 
 }} // namespace mufflon::scene

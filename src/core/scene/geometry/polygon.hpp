@@ -23,7 +23,7 @@ namespace OpenMesh::Subdivider::Adaptive {
 template < class Mesh >
 class CompositeT;
 } // namespace OpenMesh::Sudivider::Uniform
-namespace OpenMesh::Decimater{
+namespace OpenMesh::Decimater {
 template < class Mesh >
 class DecimaterT;
 } // namespace OpenMesh::Decimater
@@ -37,9 +37,12 @@ namespace mufflon { namespace scene {
 template < Device dev >
 struct PolygonsDescriptor;
 
+class Scenario;
+
 namespace tessellation {
 
 class Tessellater;
+class TessLevelOracle;
 
 } // namespace tessellation
 
@@ -275,6 +278,9 @@ public:
 
 	// Implements tessellation for the mesh
 	void tessellate(tessellation::Tessellater& tessellater);
+	// Implements displacement mapping for the mesh
+	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
+
 	// Creates a decimater 
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
 	// Implements decimation.
@@ -313,27 +319,27 @@ public:
 	}
 
 	template < Device dev, class T >
-	T* acquire(VertexAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(VertexAttributeHandle hdl) {
 		return m_vertexAttributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	T* acquire(FaceAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(FaceAttributeHandle hdl) {
 		return m_faceAttributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(VertexAttributeHandle hdl) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(VertexAttributeHandle hdl) {
 		return m_vertexAttributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	const T* acquire_const(FaceAttributeHandle hdl) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(FaceAttributeHandle hdl) {
 		return m_faceAttributes.acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T, bool face >
-	T* acquire(StringView name) {
+	ArrayDevHandle_t<dev, T> acquire(StringView name) {
 		return get_attributes<face>().acquire<dev, T>(name);
 	}
 	template < Device dev, class T, bool face >
-	const T* acquire_const(StringView name) {
+	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
 		return get_attributes<face>().acquire_const<dev, T>(name);
 	}
 
@@ -395,6 +401,13 @@ public:
 		return *m_meshData;
 	}
 
+	// Returns whether any polygon has a displacement map associated with the given material assignment
+	bool has_displacement_mapping(const Scenario& scenario) const noexcept;
+
+	bool was_displacement_mapping_applied() const noexcept {
+		return m_wasDisplaced;
+	}
+
 private:
 	static constexpr const char MAT_INDICES_NAME[] = "material-indices";
 
@@ -419,10 +432,16 @@ private:
 		std::size_t faceSize = 0u;
 	};
 
-	using IndexBuffers = util::TaggedTuple<IndexBuffer<Device::CPU>,
-		IndexBuffer<Device::CUDA>>;
-	using AttribBuffers = util::TaggedTuple<AttribBuffer<Device::CPU>,
-		AttribBuffer<Device::CUDA>>;
+	using IndexBuffers = util::TaggedTuple<
+		IndexBuffer<Device::CPU>,
+		IndexBuffer<Device::CUDA>,
+		IndexBuffer<Device::OPENGL>
+	>;
+	using AttribBuffers = util::TaggedTuple<
+		AttribBuffer<Device::CPU>,
+		AttribBuffer<Device::CUDA>,
+		AttribBuffer<Device::OPENGL>
+	>;
 
 	// Helper for deciding between vertex and face attributes
 	template < bool face >
@@ -471,6 +490,9 @@ private:
 	// materials will be updated. Assumption: a material reference
 	// will not change afterwards.
 	std::unordered_set<MaterialIndex> m_uniqueMaterials;
+
+	// Keeps track of whether displacement mapping was already applied or not
+	bool m_wasDisplaced = false;
 };
 
 }}} // namespace mufflon::scene::geometry

@@ -87,12 +87,28 @@ public:
 	TextureHandle get_alpha_texture() const noexcept {
 		return m_alpha;
 	}
-	void set_alpha_texture(TextureHandle alpha) {
+	void set_alpha_texture(TextureHandle alpha) noexcept {
 		m_alpha = alpha;
 		//m_dirty = true;
 	}
 
-	virtual Medium compute_medium() const = 0;
+	// Get the displacement mat (a height map for now)
+	TextureHandle get_displacement_map() const noexcept {
+		return m_displacement;
+	}
+	float get_displacement_bias() const noexcept {
+		return m_displacementBias;
+	}
+	float get_displacement_scale() const noexcept {
+		return m_displacementScale;
+	}
+	void set_displacement(TextureHandle map, const float scale = 1.f, const float bias = 0.f) noexcept {
+		m_displacement = map;
+		m_displacementBias = bias;
+		m_displacementScale = scale;
+	}
+
+	virtual Medium compute_medium(const Medium& outerMedium) const = 0;
 
 	Materials get_type() const { return m_type; }
 
@@ -108,6 +124,10 @@ protected:
 	MediumHandle m_outerMedium;
 	TextureHandle m_alpha = nullptr;		// This is not part of the material descriptor, but rather
 											// separately stored in the scene descriptor
+
+	float m_displacementBias = 0.f;
+	float m_displacementScale = 1.f;
+	TextureHandle m_displacement = nullptr;	// TODO: no idea yet
 	//mutable bool m_dirty = true;			// Any property of the material changed
 
 private:
@@ -136,7 +156,7 @@ public:
 	}
 	std::size_t get_parameter_pack_size() const final;
 	char* get_descriptor(Device device, char* outBuffer) const final;
-	Medium compute_medium() const final;
+	Medium compute_medium(const Medium& outerMedium) const final;
 
 private:
 	TextureHandle m_textures[int(SubMaterial::Textures::TEX_COUNT)];

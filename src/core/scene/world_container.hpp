@@ -201,8 +201,19 @@ public:
 		m_load_lod = func;
 	}
 
+	// Loads a specific LoD from file, if not already present
+	bool load_lod(Object& obj, const u32 lodIndex);
+
 	// Clears the world object from all resources
 	static void clear_instance();
+
+	// Desired tessellation level per pixel
+	float get_tessellation_level() const noexcept { return m_tessLevel; }
+	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
+
+	// Discards any already applied tessellation/displacement for the current scene
+	// and re-tessellates/-displaces with the current max. tessellation level
+	void retessellate();
 
 private:
 	WorldContainer();
@@ -255,6 +266,8 @@ private:
 	u32 m_frameEnd = 0u;
 	u32 m_frameCurrent = 0u;
 
+	// Current tessellation level (levels per pixel)
+	float m_tessLevel = 0u;
 };
 
 } // namespace mufflon::scene

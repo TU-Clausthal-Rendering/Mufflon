@@ -126,7 +126,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	BpmPathVertex vertex[2];
-	BpmPathVertex::create_light(&vertex[0], nullptr, p, m_rngs[idx]);	// TODO: check why there is an (unused) Rng reference
+	BpmPathVertex::create_light(&vertex[0], nullptr, p);
 	math::Throughput throughput;
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 

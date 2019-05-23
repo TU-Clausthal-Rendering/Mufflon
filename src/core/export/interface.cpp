@@ -28,6 +28,7 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
+#include "glad/glad.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -94,7 +95,8 @@ renderer::IRenderer* s_currentRenderer;
 // Current iteration counter
 std::unique_ptr<renderer::OutputHandler> s_imageOutput;
 renderer::OutputValue s_outputTargets{ 0 };
-std::unique_ptr<textures::CpuTexture> s_screenTexture;
+std::unique_ptr<float[]> s_screenTexture;
+int s_screenTextureNumChannels;
 WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
 // Holds the CUDA device index
@@ -233,16 +235,21 @@ inline std::size_t get_attr_size(const AttribDesc& desc) {
 }
 
 // Initializes all renderers
-template < std::size_t I = 0u >
+template < bool initOpenGL, std::size_t I = 0u >
 inline void init_renderers() {
-	if constexpr(I == 0u)
+	if constexpr(I == 0u && !initOpenGL)
 		s_renderers.clear();
 	using RendererType = typename renderer::Renderers::Type<I>;
+	// Only initialize opengl renderers if requested (because of deferred context init)
+	if constexpr(RendererType::may_use_device(Device::OPENGL)) {
+		if(initOpenGL) // deferred init
+			s_renderers.push_back(std::make_unique<RendererType>());
+	}
 	// Only initialize CUDA renderers if CUDA is enabled
-	if(s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))
+	else if(s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))
 		s_renderers.push_back(std::make_unique<RendererType>());
 	if constexpr(I + 1u < renderer::Renderers::size)
-		init_renderers<I + 1u>();
+		init_renderers<initOpenGL, I + 1u>();
 }
 
 // Function delegating the logger output to the applications handle, if applicable
@@ -296,25 +303,11 @@ Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
 	CATCH_ALL(false)
 }
 
-Boolean core_get_target_format(uint32_t index, TextureFormat* format) {
-	TRY
-	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
-	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
-	if(format != nullptr) {
-		const renderer::OutputValue targetFlags{ 1u << index };
-		*format = static_cast<TextureFormat>(s_imageOutput->get_target_format(targetFlags));
-	}
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean core_get_target_image(uint32_t index, Boolean variance,
-							  TextureFormat format, bool sRgb, const char** ptr) {
+Boolean core_get_target_image(uint32_t index, Boolean variance, const float** ptr) {
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	std::scoped_lock iterLock{ s_iterationMutex };
-	std::scoped_lock screenLock{ s_screenTextureMutex };
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
 	const renderer::OutputValue targetFlags{ flags };
 	if(!s_outputTargets.is_set(targetFlags)) {
@@ -324,11 +317,12 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 		
 	// If there's no output yet, we "return" a nullptr
 	if(s_imageOutput != nullptr) {
-		if(format >= TextureFormat::FORMAT_NUM)
-			(void)core_get_target_format(index, &format);
-		s_screenTexture = std::make_unique<textures::CpuTexture>(s_imageOutput->get_data(targetFlags, static_cast<textures::Format>(format), sRgb));
+		auto data = s_imageOutput->get_data(targetFlags);
+		std::scoped_lock screenLock{ s_screenTextureMutex };
+		s_screenTexture = std::move(data);
+		s_screenTextureNumChannels = renderer::RenderTargets::NUM_CHANNELS[index];
 		if(ptr != nullptr)
-			*ptr = reinterpret_cast<const char*>(s_screenTexture->data());
+			*ptr = reinterpret_cast<const float*>(s_screenTexture.get());
 	} else if(ptr != nullptr) {
 		*ptr = nullptr;
 	}
@@ -336,17 +330,28 @@ Boolean core_get_target_image(uint32_t index, Boolean variance,
 	CATCH_ALL(false)
 }
 
+CORE_API Boolean CDECL core_get_target_image_num_channels(int* numChannels) {
+	CHECK_NULLPTR(s_screenTexture, "screen texture", false);
+	*numChannels = s_screenTextureNumChannels;
+	return true;
+}
+
 Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
 	std::scoped_lock lock{ s_screenTextureMutex };
 	if(ptr != nullptr && s_screenTexture != nullptr) {
-		const int PIXELS = s_screenTexture->get_width() * s_screenTexture->get_height();
-
-		const Vec4* texData = reinterpret_cast<const Vec4*>(s_screenTexture->data());
+		const int numPixels = s_imageOutput->get_width() * s_imageOutput->get_height();
+		const float* texData = s_screenTexture.get();
 #pragma PARALLEL_FOR
-		for(int i = 0; i < PIXELS; ++i)
-			ptr[i] = util::pun<Vec4>(factor * util::pun<ei::Vec4>(texData[i]));
+		for(int i = 0; i < numPixels; ++i) {
+			Vec4 pixel { 0.0f };
+			float* dst = reinterpret_cast<float*>(&pixel);
+			int idx = i * s_screenTextureNumChannels;
+			for(int c = 0; c < s_screenTextureNumChannels; ++c)
+				dst[c] = factor * texData[idx+c];
+			ptr[i] = pixel;
+		}
 	}
 	return true;
 	CATCH_ALL(false)
@@ -356,14 +361,15 @@ Boolean core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* 
 	TRY
 	CHECK(borderClamp || ((int)x < s_imageOutput->get_width() && (int)y >= s_imageOutput->get_height()),
 		  "Pixel coordinates are out of bounds", false);
+	*r = *g = *b = *a = 0.0f;
 	if(s_screenTexture) {
-		const ei::Vec4 val = s_screenTexture->read(Pixel{ x, y });
-		*r = val.r;
-		*g = val.g;
-		*b = val.b;
-		*a = val.a;
-	} else {
-		*r = *g = *b = *a = 0.f;
+		int idx = (x + y * s_imageOutput->get_width()) * s_screenTextureNumChannels;
+		switch(s_screenTextureNumChannels) {
+			case 4: *a = s_screenTexture[idx+3]; // FALLTHROUGH
+			case 3: *b = s_screenTexture[idx+2]; // FALLTHROUGH
+			case 2: *g = s_screenTexture[idx+1]; // FALLTHROUGH
+			case 1: *r = s_screenTexture[idx];
+		}
 	}
 	return true;
 	CATCH_ALL(false)
@@ -1404,12 +1410,17 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 
 	// Set common properties and add to scene
 	newMaterial->set_name(name);
-	newMaterial->set_outer_medium( s_world.add_medium(
-		{util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
-			util::pun<Spectrum>(mat->outerMedium.absorption)}) );
-	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium()) );
+	materials::Medium outerMedium {
+		util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
+		util::pun<Spectrum>(mat->outerMedium.absorption)
+	};
+	newMaterial->set_outer_medium( s_world.add_medium(outerMedium) );
+	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium(outerMedium)) );
 	if(mat->alpha != nullptr)
 		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
+	if(mat->displacement.map != nullptr)
+		newMaterial->set_displacement(static_cast<TextureHandle>(mat->displacement.map), mat->displacement.scale,
+									  mat->displacement.bias);
 
 	return newMaterial;
 }
@@ -1711,6 +1722,7 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->load_scene(hdl, res);
 	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
+	s_screenTexture = nullptr;
 	return static_cast<SceneHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
@@ -2270,6 +2282,14 @@ Boolean world_get_frame_end(uint32_t* frameEnd) {
 	CATCH_ALL(false)
 }
 
+void world_set_tessellation_level(const float maxTessLevel) {
+	s_world.set_tessellation_level(maxTessLevel);
+}
+
+float world_get_tessellation_level() {
+	return s_world.get_tessellation_level();
+}
+
 Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
@@ -2612,6 +2632,16 @@ Boolean scene_is_sane() {
 	if(sceneHdl != nullptr)
 		return sceneHdl->is_sane();
 	return false;
+	CATCH_ALL(false)
+}
+
+Boolean scene_request_retessellation() {
+	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
+	s_world.retessellate();
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->reset();
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -2983,6 +3013,7 @@ Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTi
 		if(s_currentRenderer != nullptr)
 			s_currentRenderer->load_scene(hdl, res);
 		s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
+		s_screenTexture = nullptr;
 	} else if(s_world.reload_scene()) {
 		s_currentRenderer->reset();
 	}
@@ -3065,20 +3096,18 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 					   "; the screenshot possibly may not be created");
 
 	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
-	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags },
-										renderer::OutputHandler::get_target_format(renderer::OutputValue{ flags }),
-										false);
-	const int numChannels = textures::NUM_CHANNELS(data.get_format());
+	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags });
+	const int numChannels = renderer::RenderTargets::NUM_CHANNELS[targetIndex];
 	ei::IVec2 res = s_imageOutput->get_resolution();
 
 	TextureData texData;
-	texData.data = data.data();
+	texData.data = reinterpret_cast<uint8_t*>(data.get());
 	texData.components = numChannels;
-	texData.format = TextureFormat(data.get_format());
+	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
 	texData.width = res.x;
 	texData.height = res.y;
 	texData.sRgb = false;
-	texData.layers = data.get_num_layers();
+	texData.layers = 1;
 
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
@@ -3536,7 +3565,7 @@ Boolean mufflon_initialize() {
 		}
 
 		// Initialize renderers
-		init_renderers<>();
+		init_renderers<false>();
 
 		initialized = true;
 	}
@@ -3567,6 +3596,9 @@ Boolean mufflon_initialize_opengl() {
 
 		logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
 
+        // initialize remaining opengl renderer
+		init_renderers<true>();
+
 		initialized = true;
 	}
 	return true;
@@ -3596,7 +3628,12 @@ Boolean mufflon_is_cuda_available() {
 }
 
 void mufflon_destroy_opengl() {
-	// TODO
+    // destroy opengl renderers
+    TRY
+	for (auto& r : s_renderers)
+		if (r->uses_device(Device::OPENGL))
+			r.reset();
+	CATCH_ALL(;)
 }
 
 

@@ -4,7 +4,7 @@
 #include "core/scene/lod.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"
-#include "core/scene/tessellation/uniform.hpp"
+#include "core/scene/tessellation/cam_dist.hpp"
 #include <iostream>
 #include <ei/conversions.hpp>
 #include <windows.h>
@@ -600,6 +600,14 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 	}
 }
 
+bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
+	if(!obj.has_lod_available(lodIndex)) {
+		if(!m_load_lod(&obj, lodIndex))
+			return false;
+	}
+	return true;
+}
+
 SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
 	m_scenario = &scenario;
@@ -617,10 +625,8 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 			tess.set_phong_tessellation(true);
 			obj.get_lod(lod).template get_geometry<geometry::Polygons>().tessellate(tess);
 			*/
-			if(!obj.has_lod_available(lod)) {
-				if(!m_load_lod(&obj, lod))
-					throw std::runtime_error("Failed to after-load LoD");
-			}
+			if(!load_lod(obj, lod))
+				throw std::runtime_error("Failed to after-load LoD");
 
 			// Check if the instance scaling is uniform in case of spheres
 			if(obj.get_lod(lod).get_geometry<geometry::Spheres>().get_sphere_count() > 0u) {
@@ -832,6 +838,20 @@ bool WorldContainer::load_scene_lights() {
 	m_scenario->lights_dirty_reset();
 	m_scenario->envmap_lights_dirty_reset();
 	return reloaded;
+}
+
+
+void WorldContainer::retessellate() {
+	// Basically we need to find out which LoDs are part of the scene, re-tessellate them, and then
+	// rebuild the light tree
+	if(m_scene == nullptr || m_scenario == nullptr)
+		return;
+
+	if(m_scene->retessellate(m_tessLevel)) {
+		// Gotta rebuild the light tree
+		m_lightsDirty = true;
+		(void)this->load_scene_lights();
+	}
 }
 
 } // namespace mufflon::scene

@@ -7,28 +7,30 @@ using namespace mufflon::scene::textures;
 
 namespace mufflon::renderer {
 
+constexpr size_t ATOMIC_F32_SIZE = ei::max(sizeof(cuda::Atomic<Device::CPU, float>), sizeof(cuda::Atomic<Device::CUDA, float>));
+
 OutputHandler::OutputHandler(u16 width, u16 height, OutputValue targets) :
 	// If a texture is created without data, it does not allocate data yet.
-	m_cumulativeTex{
-		Texture{"Output###Cum_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Cum_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Cum_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Cum_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Cum_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+	m_cumulativeTarget{
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Radiance
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Position
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Albedo
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Normal
+		GenericResource{width * height * 1 * ATOMIC_F32_SIZE}	// Lightness
 	},
-	m_iterationTex{
-		Texture{"Output###Iter_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Iter_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Iter_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Iter_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###Iter_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+	m_iterationTarget{
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Radiance
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Position
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Albedo
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Normal
+		GenericResource{width * height * 1 * ATOMIC_F32_SIZE}	// Lightness
 	},
-	m_cumulativeVarTex{
-		Texture{"Output###CumVar_Radiance", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###CumVar_Position", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###CumVar_Albedo", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###CumVar_Normal", width, height, 1, Format::RGBA32F, SamplingMode::NEAREST, false},
-		Texture{"Output###CumVar_Lightness", width, height, 1, Format::R32F, SamplingMode::NEAREST, false}
+	m_cumulativeVarTarget{
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Radiance
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Position
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Albedo
+		GenericResource{width * height * 3 * ATOMIC_F32_SIZE},	// Normal
+		GenericResource{width * height * 1 * ATOMIC_F32_SIZE}	// Lightness
 	},
 	m_targets(targets),
 	m_iteration(-1), // if begin_iteration is called without reset=true, this will still work
@@ -54,19 +56,19 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 		if(m_targets.is_set(flag)) {
 			if(m_targets.is_set(flag << 8)) { // Variance flag set?
 				// Variance case: needs to cumulate samples per iteration
-				rb.m_targets[i] = m_iterationTex[i].acquire<dev>();	// Allocates if necessary
-				m_iterationTex[i].mark_changed(dev);
-				m_iterationTex[i].clear<dev>();
+				rb.m_targets[i] = (RenderTarget<dev>)m_iterationTarget[i].acquire<dev>();	// Allocates if necessary
+				m_iterationTarget[i].mark_changed(dev);
+				mem_set<dev>(rb.m_targets[i], 0, m_iterationTarget[i].size());
 				if(reset) {
-					m_cumulativeTex[i].acquire<dev>();		// Allocates if necessary
-					m_cumulativeVarTex[i].acquire<dev>();	// Allocates if necessary
-					m_cumulativeTex[i].clear<dev>();
-					m_cumulativeVarTex[i].clear<dev>(); // TODO: async
+					auto cumT = (RenderTarget<dev>)m_cumulativeTarget[i].acquire<dev>();		// Allocates if necessary
+					mem_set<dev>(cumT, 0, m_cumulativeTarget[i].size());
+					auto cumVarT = (RenderTarget<dev>)m_cumulativeVarTarget[i].acquire<dev>();		// Allocates if necessary
+					mem_set<dev>(cumVarT, 0, m_cumulativeVarTarget[i].size());
 				}
 			} else {
-				rb.m_targets[i] = m_cumulativeTex[i].acquire<dev>();	// Allocates if necessary
-				m_cumulativeTex[i].mark_changed(dev);
-				if(reset) m_cumulativeTex[i].clear<dev>();
+				rb.m_targets[i] = (RenderTarget<dev>)m_cumulativeTarget[i].acquire<dev>();	// Allocates if necessary
+				m_cumulativeTarget[i].mark_changed(dev);
+				if(reset) mem_set<dev>(rb.m_targets[i], 0, m_cumulativeTarget[i].size());
 			}
 		}
 		++i;
@@ -78,8 +80,7 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 
 template RenderBuffer<Device::CPU> OutputHandler::begin_iteration<Device::CPU>(bool reset);
 template RenderBuffer<Device::CUDA> OutputHandler::begin_iteration<Device::CUDA>(bool reset);
-
-
+template RenderBuffer<Device::OPENGL> OutputHandler::begin_iteration<Device::OPENGL>(bool reset);
 
 template < Device dev >
 void OutputHandler::end_iteration() {
@@ -92,17 +93,18 @@ void OutputHandler::end_iteration() {
 				// Looks like inavitable redundancy. update_variance<<<>>> call is only valid
 				// for one type. Without 'if constexpr' this branch would not compile. if 
 				// handles are initialized TextureDevHandle_t<dev> iterTex...
-				TextureDevHandle_t<Device::CUDA> iterTex = m_iterationTex[i].acquire<Device::CUDA>(); // TODO: aquire const
-				TextureDevHandle_t<Device::CUDA> cumTex = m_cumulativeTex[i].acquire<Device::CUDA>(); m_cumulativeTex[i].mark_changed(Device::CUDA);
-				TextureDevHandle_t<Device::CUDA> varTex = m_cumulativeVarTex[i].acquire<Device::CUDA>(); m_cumulativeVarTex[i].mark_changed(Device::CUDA);
-				update_variance_cuda(iterTex, cumTex, varTex);
+				ConstRenderTarget<Device::CUDA> iterTarget = (ConstRenderTarget<Device::CUDA>)m_iterationTarget[i].acquire_const<Device::CUDA>();
+				RenderTarget<Device::CUDA> cumTarget = (RenderTarget<Device::CUDA>)m_cumulativeTarget[i].acquire<Device::CUDA>(); m_cumulativeTarget[i].mark_changed(Device::CUDA);
+				RenderTarget<Device::CUDA> varTarget = (RenderTarget<Device::CUDA>)m_cumulativeVarTarget[i].acquire<Device::CUDA>(); m_cumulativeVarTarget[i].mark_changed(Device::CUDA);
+				update_variance_cuda(iterTarget, cumTarget, varTarget, RenderTargets::NUM_CHANNELS[i]);
 			} else {
-				TextureDevHandle_t<Device::CPU> iterTex = m_iterationTex[i].acquire<Device::CPU>(); // TODO: aquire const
-				TextureDevHandle_t<Device::CPU> cumTex = m_cumulativeTex[i].acquire<Device::CPU>(); m_cumulativeTex[i].mark_changed(Device::CPU);
-				TextureDevHandle_t<Device::CPU> varTex = m_cumulativeVarTex[i].acquire<Device::CPU>(); m_cumulativeVarTex[i].mark_changed(Device::CPU);
+				ConstRenderTarget<Device::CPU> iterTarget = (ConstRenderTarget<Device::CPU>)m_iterationTarget[i].acquire_const<Device::CPU>();
+				RenderTarget<Device::CPU> cumTarget = (RenderTarget<Device::CPU>)m_cumulativeTarget[i].acquire<Device::CPU>(); m_cumulativeTarget[i].mark_changed(Device::CPU);
+				RenderTarget<Device::CPU> varTarget = (RenderTarget<Device::CPU>)m_cumulativeVarTarget[i].acquire<Device::CPU>(); m_cumulativeVarTarget[i].mark_changed(Device::CPU);
 				// TODO: openmp
 				for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x)
-					update_variance(iterTex, cumTex, varTex, x, y, float(m_iteration));
+					update_variance(iterTarget, cumTarget, varTarget, x, y,
+						RenderTargets::NUM_CHANNELS[i], m_width, float(m_iteration));
 			}
 			// TODO: opengl
 		}
@@ -112,6 +114,7 @@ void OutputHandler::end_iteration() {
 
 template void OutputHandler::end_iteration<Device::CPU>();
 template void OutputHandler::end_iteration<Device::CUDA>();
+template void OutputHandler::end_iteration<Device::OPENGL>();
 
 
 void OutputHandler::set_targets(OutputValue targets) {
@@ -120,14 +123,14 @@ void OutputHandler::set_targets(OutputValue targets) {
 		for (u32 flag : OutputValue::iterator) {
 			// Is this atttribute recorded at all?
 			if(!targets.is_set(flag) && m_targets.is_set(flag)) {
-				m_cumulativeTex[i].unload<Device::CPU>();
-				m_cumulativeTex[i].unload<Device::CUDA>();
+				m_cumulativeTarget[i].unload<Device::CPU>();
+				m_cumulativeTarget[i].unload<Device::CUDA>();
 			}
 			if(!targets.is_set(flag << 8) && m_targets.is_set(flag << 8)) {
-				m_cumulativeVarTex[i].unload<Device::CPU>();
-				m_cumulativeVarTex[i].unload<Device::CUDA>();
-				m_iterationTex[i].unload<Device::CPU>();
-				m_iterationTex[i].unload<Device::CUDA>();
+				m_cumulativeVarTarget[i].unload<Device::CPU>();
+				m_cumulativeVarTarget[i].unload<Device::CUDA>();
+				m_iterationTarget[i].unload<Device::CPU>();
+				m_iterationTarget[i].unload<Device::CUDA>();
 			}
 			++i;
 		}
@@ -135,46 +138,39 @@ void OutputHandler::set_targets(OutputValue targets) {
 	}
 }
 
-scene::textures::Format OutputHandler::get_target_format(OutputValue which) {
-	switch(which) {
-		case OutputValue::LIGHTNESS:
-		case OutputValue::LIGHTNESS_VAR:
-			return Format::R32F;
-		default:
-			return Format::RGBA32F;
-	}
-}
 
-CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool exportSRgb) {
+std::unique_ptr<float[]> OutputHandler::get_data(OutputValue which) {
 	// Is the current flag, and in case of variance its basic value, set?
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
 		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return CpuTexture{1,1,1,exportFormat,SamplingMode::NEAREST,exportSRgb};
+		return nullptr;
 	}
+
+	int quantity = which.get_quantity();
 
 	// Allocate the memory for the output and get basic properties of the quantity to export.
 	// TODO: if format has the same pixel size it is possible to avoid one memcopy by directly
 	// syncing into the new texture (and then convert if necessary).
+	auto data = std::make_unique<float[]>(m_width * m_height * RenderTargets::NUM_CHANNELS[quantity]);
 	//Texture data(m_width, m_height, 1, exportFormat, SamplingMode::NEAREST, exportSRgb);
-	CpuTexture data(m_width, m_height, 1, exportFormat, SamplingMode::NEAREST, exportSRgb);
-	int quantity = which.is_variance() ? ei::ilog2(which >> 8) : ei::ilog2(int(which));
+	//CpuTexture data(m_width, m_height, 1, exportFormat, SamplingMode::NEAREST, exportSRgb);
 	bool isNormalized = !which.is_variance() && m_targets.is_set(which << 8);
 	float normalizer = isNormalized ? 1.0f : ((which & 0xff) ?
 								1.0f / ei::max(1, m_iteration+1) :
 								1.0f / ei::max(1, m_iteration));
 
 	// Upload to CPU / synchronize if necessary
-	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
-		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
-		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
+	ConstRenderTarget<Device::CPU> src
+		= which.is_variance() ?
+			(ConstRenderTarget<Device::CPU>)m_cumulativeVarTarget[quantity].acquire_const<Device::CPU>() :
+			(ConstRenderTarget<Device::CPU>)m_cumulativeTarget[quantity].acquire_const<Device::CPU>();
 
-	const int PIXELS = m_width * m_height;
+	float* dst = data.get();
+	int numValues = m_width * m_height * RenderTargets::NUM_CHANNELS[quantity];
 #pragma PARALLEL_FOR
-	for(int i = 0; i < PIXELS; ++i) {
-		const Pixel pixel{ i % m_width, i / m_width };
-		ei::Vec4 value = read(tex, pixel);
-		value *= normalizer;
-		data.write(value, pixel);
+	for(int i = 0; i < numValues; ++i) {
+		float value = cuda::atomic_load<Device::CPU, float>(src[i]);
+		dst[i] = value * normalizer;
 	}
 
 	return data;
@@ -183,21 +179,36 @@ CpuTexture OutputHandler::get_data(OutputValue which, Format exportFormat, bool 
 ei::Vec4 OutputHandler::get_pixel_value(OutputValue which, Pixel pixel) {
 	// Is the current flag, and in case of variance its basic value, set?
 	if(!m_targets.is_set(which) || (which.is_variance() && !m_targets.is_set(which >> 8))) {
-		logError("[OutputHandler::get_data] The desired quantity cannot be exported, because it is not recorded!");
-		return ei::Vec4{};
+		logError("[OutputHandler::get_pixel_value] The desired quantity cannot be exported, because it is not recorded!");
+		return ei::Vec4{0.0f};
+	}
+	if(pixel.x < 0 || pixel.x >= m_width || pixel.y < 0 || pixel.y >= m_height) {
+		logError("[OutputHandler::get_pixel_value] The query pixel is out of range.");
+		return ei::Vec4{0.0f};
 	}
 
-	int quantity = which.is_variance() ? ei::ilog2(which >> 8) : ei::ilog2(int(which));
+	int quantity = which.get_quantity();
 	bool isNormalized = !which.is_variance() && m_targets.is_set(which << 8);
 	float normalizer = isNormalized ? 1.0f : ((which & 0xff) ?
 											  1.0f / ei::max(1, m_iteration + 1) :
 											  1.0f / ei::max(1, m_iteration));
 	// Upload to CPU / synchronize if necessary
-	ConstTextureDevHandle_t<Device::CPU> tex = which.is_variance() ?
-		m_cumulativeVarTex[quantity].acquire_const<Device::CPU>() :
-		m_cumulativeTex[quantity].acquire_const<Device::CPU>();
+	ConstArrayDevHandle_t<Device::CPU, cuda::Atomic<Device::CPU, float>> src
+		= which.is_variance() ?
+			(ConstArrayDevHandle_t<Device::CPU, cuda::Atomic<Device::CPU, float>>)m_cumulativeVarTarget[quantity].acquire_const<Device::CPU>() :
+			(ConstArrayDevHandle_t<Device::CPU, cuda::Atomic<Device::CPU, float>>)m_cumulativeTarget[quantity].acquire_const<Device::CPU>();
 
-	return read(tex, pixel) * normalizer;
+	int idx = pixel.x + pixel.y * m_width;
+	if(RenderTargets::NUM_CHANNELS[quantity] == 3) {
+		idx *= 3;
+		float r = cuda::atomic_load<Device::CPU, float>(src[idx]);
+		float g = cuda::atomic_load<Device::CPU, float>(src[idx+1]);
+		float b = cuda::atomic_load<Device::CPU, float>(src[idx+2]);
+		return {r * normalizer, g * normalizer, b * normalizer, 0.0f};
+	} else {
+		float l = cuda::atomic_load<Device::CPU, float>(src[idx]);
+		return {l * normalizer, 0.0f, 0.0f, 0.0f};
+	}
 }
 
 } // namespace mufflon::renderer

@@ -3,6 +3,7 @@
 #include "scenario.hpp"
 #include "materials/material.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
 
 namespace mufflon::scene {
 
@@ -42,6 +43,12 @@ LodDescriptor<dev> Lod::get_descriptor() {
 	return desc;
 }
 
+void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario) {
+	m_geometry.for_each([&tessellater, &scenario](auto& elem) {
+		elem.displace(tessellater, scenario);
+	});
+}
+
 template < Device dev >
 void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
 										 const std::vector<const char*>& vertexAttribs,
@@ -53,7 +60,7 @@ void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
 
 template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>();
 template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>();
-//template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
+template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
 template void Lod::update_attribute_descriptor<Device::CPU>(LodDescriptor<Device::CPU>&,
 															   const std::vector<const char*>&,
 															   const std::vector<const char*>&,
@@ -62,8 +69,8 @@ template void Lod::update_attribute_descriptor<Device::CUDA>(LodDescriptor<Devic
 																const std::vector<const char*>&,
 																const std::vector<const char*>&,
 																const std::vector<const char*>&);
-/*template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
-																				 const std::vector<const char*>&,
-																				 const std::vector<const char*>&);*/
-
+template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Device::OPENGL>&,
+																const std::vector<const char*>&,
+																const std::vector<const char*>&,
+																const std::vector<const char*>&);
 } // namespace mufflon::scene

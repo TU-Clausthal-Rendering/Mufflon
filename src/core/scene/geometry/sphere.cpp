@@ -1,5 +1,7 @@
 #include "sphere.hpp"
 #include "core/scene/descriptors.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
+#include "core/scene/scenario.hpp"
 #include <cuda_runtime.h>
 #include "util/punning.hpp"
 
@@ -61,7 +63,7 @@ Spheres::~Spheres() {
 	m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
 		if(buffer.size != 0)
-			Allocator<ChangedBuffer::DEVICE>::free(buffer.buffer, buffer.size);
+			Allocator<ChangedBuffer::DEVICE>::template free<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.buffer, buffer.size);
 	});
 }
 
@@ -187,28 +189,36 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 			if(attribBuffer.size == 0)
 				attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
 			else
-				attribBuffer.buffer = Allocator<dev>::template realloc(attribBuffer.buffer, attribBuffer.size,
+				attribBuffer.buffer = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size,
 																	   attribs.size());
 			attribBuffer.size = attribs.size();
 		}
 
-		std::vector<void*> cpuAttribs(attribs.size());
+		std::vector<ArrayDevHandle_t<dev, void>> cpuAttribs(attribs.size());
 		for(const char* name : attribs)
-			cpuAttribs.push_back(m_attributes.acquire<dev, char>(name));
-		copy(attribBuffer.buffer, cpuAttribs.data(), sizeof(const char*) * attribs.size());
+			cpuAttribs.push_back(m_attributes.acquire<dev, void>(name));
+		copy<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, cpuAttribs.data(), sizeof(const char*) * attribs.size());
 	} else if(attribBuffer.size != 0) {
-		attribBuffer.buffer = Allocator<dev>::free(attribBuffer.buffer, attribBuffer.size);
+		attribBuffer.buffer = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size);
 	}
 	descriptor.numAttributes = static_cast<u32>(attribs.size());
 	descriptor.attributes = attribBuffer.buffer;
 }
 
+
+void Spheres::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
+	(void)oracle;
+	(void)scenario;
+	// There is no displacement we can perform for a perfect sphere (yet)
+}
+
 template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
 template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
+template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>();
 template void Spheres::update_attribute_descriptor<Device::CPU>(SpheresDescriptor<Device::CPU>& descriptor,
 																 const std::vector<const char*>&);
 template void Spheres::update_attribute_descriptor<Device::CUDA>(SpheresDescriptor<Device::CUDA>& descriptor,
 																 const std::vector<const char*>&);
-//template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>(const std::vector<const char*>&);
-
+template void Spheres::update_attribute_descriptor<Device::OPENGL>(SpheresDescriptor<Device::OPENGL>& descriptor,
+																 const std::vector<const char*>&);
 } // namespace mufflon::scene::geometry

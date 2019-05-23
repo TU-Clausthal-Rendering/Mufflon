@@ -17,11 +17,12 @@ Curly brackets are used to declare a choice of different possible strings (e.g. 
 In the case of multiple type choices, details on further mandatory properties will be given below.
 
     {
-        "version": "1.2",
+        "version": "1.3",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
         "deinstance": bool                         // OPTIONAL deinstance the instances
+		"initTessellationLevel": float,            // OPTIONAL specifies the initial tessellation level in levels per pixel
         "cameras": {
             "<name1>": {
                 "type": "{pinhole, focus, ortho}",
@@ -51,8 +52,13 @@ In the case of multiple type choices, details on further mandatory properties wi
                                                 // OR complex number (vec2, for conductor)
                     "absorption": [r,g,b]       // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
                 },
-				"alpha" : <texture>   // OPTIONAL: if red channel is < 0.5, the ray will continue as if unperturbed
-				                      // IMPORTANT: not valid for emissive materials!
+				"alpha" : <texture>     // OPTIONAL: if red channel is < 0.5, the ray will continue as if unperturbed
+				                        // IMPORTANT: not valid for emissive materials!
+                "displacement" : {      // OPTIONAL: specifies displacement mapping applied to every vertex
+				    "map":  <texture>,  // height map
+                    "bias": float,      // OPTIONAL: offset added to the height map, defaults to 0,
+                     "scale": float     // OPTIONAL: specifies the the scale the height map is multiplied with, defaults to 1
+                }
                 ...
             } ...
         },

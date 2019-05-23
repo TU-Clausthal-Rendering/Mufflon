@@ -2,6 +2,8 @@
 
 #include "residency.hpp"
 #include "core/cuda/error.hpp"
+#include "core/opengl/gl_texture.hpp"
+#include "core/opengl/gl_buffer.hpp"
 #include "util/flag.hpp"
 
 namespace mufflon { // There is no memory namespace on purpose
@@ -60,6 +62,25 @@ void synchronize(ConstArrayDevHandle_t<Device::CUDA, T> changed,
 	}
 	cuda::check_error(cudaMemcpy(sync.handle, changed.handle, cudaMemcpyDefault));
 }
+template < class T >
+void synchronize(ConstArrayDevHandle_t<Device::OPENGL, T> changed,
+				 ArrayDevHandle_t<Device::CPU, T>& sync, std::size_t length) {
+	if(sync == nullptr) {
+		sync = new T[length];
+	}
+	gl::getBufferSubData(changed.id, changed.offset, length * sizeof(T), sync);
+}
+template < class T >
+void synchronize(ConstArrayDevHandle_t<Device::CPU, T> changed,
+	ArrayDevHandle_t<Device::OPENGL, T>& sync, std::size_t length) {
+	if (sync.id == 0) {
+		sync.id = gl::genBuffer();
+		sync.offset = 0;
+		gl::bindBuffer(gl::BufferType::ShaderStorage, sync);
+		gl::bufferStorage(sync.id, length * sizeof(T), nullptr, gl::StorageFlags::DynamicStorage);
+	}
+	gl::bufferSubData(sync.id, sync.offset, length * sizeof(T), changed);
+}
 
 // Functions for unloading a handle from the device
 template < class T >
@@ -74,7 +95,10 @@ void unload(ArrayDevHandle_t<Device::CUDA, T>& hdl) {
 		hdl.handle = nullptr;
 	}
 }
-
+template < class T >
+void unload(ArrayDevHandle_t<Device::OPENGL, T>& hdl) {
+	gl::deleteBuffer(hdl.id);
+}
 
 // A number of copy primitives which call the internal required methods.
 // This relies on CUDA UVA
@@ -84,16 +108,45 @@ inline void copy(T* dst, const T* src, std::size_t size ) {
 					  "Must be trivially copyable");
 	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
 }
-// mAssertMsg(dstDev != Device::OPENGL && srcDev != Device::OPENGL, "Unimplemented copy specialization.");
-// TODO: OpenGL (glBufferSubData with offset and object handle as target/src types
+
+template < typename T >
+inline void copy(gl::BufferHandle<T> dst, const T* src, std::size_t size) {
+	static_assert(std::is_trivially_copyable<T>::value,
+		"Must be trivially copyable");
+	gl::bufferSubData(dst.id, dst.get_byte_offset(), size, src);
+}
+
+template < typename T >
+inline void copy(T* dst, gl::BufferHandle<T> src, std::size_t size) {
+	gl::getBufferSubData(src.id, src.get_byte_offset(), size, dst);
+}
+
+template < typename T >
+inline void copy(gl::BufferHandle<T> dst, gl::BufferHandle<T> src, std::size_t size) {
+	gl::copyBufferSubData(src.id, dst.id, src.get_byte_offset(), dst.get_byte_offset(), size);
+}
+
+template < typename T >
+inline void copy(gl::TextureHandle dst, gl::BufferHandle<T> src, std::size_t size) {
+	// TODO gl
+}
 
 template < Device dev >
-inline void mem_set(void* mem, int value, std::size_t size) {
-	memset(mem, value, size);
+inline std::enable_if_t<dev != Device::OPENGL, void> mem_set(void* mem, int value, std::size_t size) {
+	std::memset(mem, value, size);
 }
+
 template <>
 inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
-	cudaMemset(mem, value, size);
+	cuda::check_error(::cudaMemset(mem, value, size));
 }
+
+template < Device dev, class T >
+inline std::enable_if_t<dev == Device::OPENGL, void> mem_set(gl::BufferHandle<T> mem, int value, std::size_t size) {
+	// TODO: proper type and format
+	gl::clearBufferSubData(mem.id, gl::BufferFormat::R32F, mem.get_byte_offset(),
+						   size, gl::BufferFormat::R32F, gl::Type::FLOAT, &value);
+}
+
 
 } // namespace mufflon

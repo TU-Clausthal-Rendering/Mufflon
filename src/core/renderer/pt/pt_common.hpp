@@ -47,7 +47,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
 
-//	if(coord == Pixel{575, 210}) __debugbreak();
+	//if(coord == Pixel{131, 540}) __debugbreak();
 
 	int pathLen = 0;
 	do {

@@ -95,8 +95,9 @@ CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, cons
 // Quad intersection test
 // Implementation from http://www.sci.utah.edu/~kpotter/publications/ramsey-2004-RBPI.pdf
 //CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay& ray, ei::Vec2& uv) {
-CUDA_FUNCTION float intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, const ei::Vec3& p11, const ei::Vec3& p01,
-								  const ei::FastRay& ray, ei::Vec2& uv) {
+CUDA_FUNCTION bool intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, const ei::Vec3& p11, const ei::Vec3& p01,
+								 const ei::FastRay& ray, float& resT1, float& resT2,
+								 ei::Vec2& uv1, ei::Vec2& uv2) {
 	// The following equations may degenare if one or two components of the ray.direction
 	// are 0. To prevent this we choose the largest component and one other to setup the system.
 	// At least one is always greater 0.
@@ -125,7 +126,6 @@ CUDA_FUNCTION float intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, cons
 	const float D2 = d[d2] * ray.direction[d0] - d[d0] * ray.direction[d2];
 
 	// Solve quadratic equ. for number of hitpoints
-	float t = -1.f;
 	float v0 = 0.0f, v1 = 0.0f;
 	if(ei::solveSquarePoly(A2*C1 - A1*C2, A2*D1 - A1*D2 + B2*C1 - B1*C2, B2*D1 - B1*D2, v0, v1)) {
 		// For the sake of divergence ignore the fact we might only have a single solution
@@ -142,8 +142,9 @@ CUDA_FUNCTION float intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, cons
 		}
 		if(v1 == v0) {
 			// There is only one/no hit point (planar quad)!
-			uv = ei::Vec2(u0, v0);
-			t = t0;
+			uv1 = ei::Vec2(u0, v0);
+			resT1 = t0;
+			resT2 = -1.f;
 		} else {
 			if(v1 >= 0.f && v1 <= 1.f) {
 				u1 = computeU(v1, A1, A2, B1, B2, C1, C2, D1, D2);
@@ -154,20 +155,26 @@ CUDA_FUNCTION float intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, cons
 			}
 			if(t0 > 0.f) {
 				if(t1 > 0.f && t1 < t0) {
-					uv = ei::Vec2(u1, v1);
-					t = t1;
+					uv1 = ei::Vec2(u1, v1);
+					uv2 = ei::Vec2(u0, v0);
+					resT1 = t1;
+					resT2 = t0;
 				} else {
-					uv = ei::Vec2(u0, v0);
-					t = t0;
+					uv2 = ei::Vec2(u1, v1);
+					uv1 = ei::Vec2(u0, v0);
+					resT2 = t1;
+					resT1 = t0;
 				}
-			} else if(t1 > 0.f) {
-				uv = ei::Vec2(u1, v1);
-				t = t1;
+			} else {
+				uv1 = ei::Vec2(u1, v1);
+				uv2 = ei::Vec2(u0, v0);
+				resT1 = t1;
+				resT2 = t0;
 			}
 		}
+		return resT1 > 0.f;
 	}
-
-	return t;
+	return false;
 }
 
 template < Device dev, bool alphatesting >
@@ -219,29 +226,41 @@ CUDA_FUNCTION bool intersects_primitve(
 		const i32 indexOffset = (primId - obj.polygon.numTriangles) * 4 + obj.polygon.numTriangles * 3;
 		const ei::Vec3* meshVertices = obj.polygon.vertices;
 		const u32* ids = obj.polygon.vertexIndices + indexOffset;
-		ei::Vec2 bilinear;
 		// There are up to two intersections with a quad. Since the closer one
 		// could be the self intersection move forward on the ray before testing.
-		const float t = intersectQuad(meshVertices[ids[0]], meshVertices[ids[1]],
-									  meshVertices[ids[2]], meshVertices[ids[3]], ray, bilinear);
+		float t1, t2;
+		ei::Vec2 bilin1, bilin2;
 
-		if(t > 0.0f && t < hitT) {
+		if(intersectQuad(meshVertices[ids[0]], meshVertices[ids[1]], meshVertices[ids[2]], meshVertices[ids[3]], ray,
+						 t1, t2, bilin1, bilin2) && t1 < hitT) {
 			// Perform alpha test
 			if(alphatesting) {
 				MaterialIndex matIdx = obj.polygon.matIndices[primId];
 				if(scene.has_alpha(matIdx)) {
 					// Compute UV coordinates
 					const ei::Vec2 uvV[4] = { obj.polygon.uvs[ids[0]], obj.polygon.uvs[ids[1]], obj.polygon.uvs[ids[2]], obj.polygon.uvs[ids[3]] };
-					const ei::Vec2 uv = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], bilinear.x, bilinear.y);
+					const ei::Vec2 uv1 = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], bilin1.x, bilin1.y);
 
 					// < 0.5 is the threshold for transparency (binary decision)
-					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f)
-						return false;
+					if(textures::sample(scene.get_alpha_texture(matIdx), uv1).x < 0.5f) {
+						// Gotta check if we intersect another part of the quad (because it may not be planar)
+						if(t2 > 0.f && t2 < hitT) {
+							const ei::Vec2 uv2 = ei::bilerp(uvV[0u], uvV[1u], uvV[3u], uvV[2u], bilin2.x, bilin2.y);
+							if(textures::sample(scene.get_alpha_texture(matIdx), uv2).x < 0.5f) {
+								return false;
+							} else {
+								t1 = t2;
+								bilin1 = bilin2;
+							}
+						} else {
+							return false;
+						}
+					}
 				}
 			}
 
-			hitT = t;
-			surfParams.bilinear = bilinear;
+			hitT = t1;
+			surfParams.bilinear = bilin1;
 			return true;
 		}
 	} else {
@@ -252,16 +271,16 @@ CUDA_FUNCTION bool intersects_primitve(
 		const ei::Sphere& sph = obj.spheres.spheres[primId];
 		// Because it is important if we start incide or outside it is better
 		// to modify the ray beforehand. Testing for tmin afterwards is buggy.
-		float t;
-		if(ei::intersects(ray, sph, t) && t < hitT) {
+		float t1, t2;
+		if(ei::intersects(ray, sph, t1, t2) && t1 < hitT) {
 			// Perform alpha test
 			if(alphatesting) {
 				MaterialIndex matIdx = obj.spheres.matIndices[primId];
 				if(scene.has_alpha(matIdx)) {
 					// Compute UV coordinates
 					const i32 sphId = primId - (obj.polygon.numTriangles + obj.polygon.numQuads);
-					const ei::Vec3 hitPoint = transform(ray.origin + t * ray.direction, scene.instanceToWorld[instanceId]);
 					const Point center = transform(obj.spheres.spheres[sphId].center, scene.instanceToWorld[instanceId]);
+					const ei::Vec3 hitPoint = transform(ray.origin + t1 * ray.direction, scene.instanceToWorld[instanceId]);
 					const ei::Vec3 geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
 					const ei::Vec3 localN = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[instanceId] }) * geoNormal);
 					const ei::Vec2 uv{
@@ -270,12 +289,28 @@ CUDA_FUNCTION bool intersects_primitve(
 					};
 
 					// < 0.5 is the threshold for transparency (binary decision)
-					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f)
-						return false;
+					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f) {
+						// Check if we can see the back side
+						if(t2 < hitT && t2 > 0.f) {
+							const ei::Vec3 hitPoint2 = transform(ray.origin + t2 * ray.direction, scene.instanceToWorld[instanceId]);
+							const ei::Vec3 geoNormal2 = normalize(hitPoint2 - center); // Normalization required for acos() below
+							const ei::Vec3 localN2 = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[instanceId] }) * geoNormal2);
+							const ei::Vec2 uv2{
+								atan2f(localN2.y, localN2.x) / (2.0f * ei::PI) + 0.5f,
+								acosf(-localN2.z) / ei::PI
+							};
+
+							if(textures::sample(scene.get_alpha_texture(matIdx), uv2).x < 0.5f)
+								return false;
+							t1 = t2;
+						} else {
+							return false;
+						}
+					}
 				}
 			}
 
-			hitT = t;
+			hitT = t1;
 			// Barycentrics unused; TODO: get coordinates anyway?
 			return true;
 		}
@@ -289,7 +324,7 @@ CUDA_FUNCTION bool intersects_primitve(
 template < Device dev > CUDA_FUNCTION
 bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instanceId,
 						   const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
-						   float& tmax, const LodDescriptor<dev>*& obj, const LBVH*& currentBvh) {
+						   float& tmax, const LodDescriptor<dev>*& obj, const LBVH<dev>*& currentBvh) {
 	// Transform the ray into instance-local coordinates
 	const ei::Vec3 rayDir = transformDir(ray.direction, scene.worldToInstance[instanceId]);
 	float scale = len(rayDir);
@@ -309,7 +344,7 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 		rayScale = scale;
 		tmax = objSpaceTMax;
 		obj = &scene.lods[objId];
-		currentBvh = (const LBVH*)obj->accelStruct.accelParameters;
+		currentBvh = (const LBVH<dev>*)obj->accelStruct.accelParameters;
 		return true;
 	}
 	return false;
@@ -319,7 +354,7 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 // state is already in scene space.
 template < Device dev > CUDA_FUNCTION
 void object_to_world_space(const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
-						   const LBVH& sceneBvh, const LBVH*& currentBvh, float& tmax,
+						   const LBVH<dev>& sceneBvh, const LBVH<dev>*& currentBvh, float& tmax,
 						   const LodDescriptor<dev>*& obj) {
 	currentRay = ray;
 	currentBvh = &sceneBvh;
@@ -340,7 +375,7 @@ RayIntersectionResult first_intersection(
 ) {
 	add_epsilon(ray.origin, ray.direction, geoNormal);
 	// Init scene wide properties
-	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
+	const LBVH<dev>& bvh = *(const LBVH<dev>*)scene.accelStruct.accelParameters;
 	i32 hitPrimId = IGNORE_ID;						// No primitive intersected so far.
 	i32 hitInstanceId = IGNORE_ID;
 	SurfaceParametrization surfParams;
@@ -351,7 +386,7 @@ RayIntersectionResult first_intersection(
 	ei::FastRay currentRay = fray;
 	float currentTScale = 1.0f;
 	const LodDescriptor<dev>* obj = nullptr;
-	const LBVH* currentBvh = &bvh;
+	const LBVH<dev>* currentBvh = &bvh;
 	i32 currentInstanceId = IGNORE_ID;
 
 	// Setup traversal.
@@ -604,14 +639,14 @@ bool any_intersection(
 	float tmax = len(correctedDir);
 	const ei::Ray ray { a, correctedDir / tmax };
 	// Init scene wide properties
-	const LBVH& bvh = *(const LBVH*)scene.accelStruct.accelParameters;
+	const LBVH<dev>& bvh = *(const LBVH<dev>*)scene.accelStruct.accelParameters;
 	const ei::FastRay fray { ray };
 
 	// Set the current traversal state
 	ei::FastRay currentRay = fray;
 	float currentTScale = 1.0f;
 	const LodDescriptor<dev>* obj = nullptr;
-	const LBVH* currentBvh = &bvh;
+	const LBVH<dev>* currentBvh = &bvh;
 	i32 currentInstanceId = IGNORE_ID;
 
 	// Setup traversal.

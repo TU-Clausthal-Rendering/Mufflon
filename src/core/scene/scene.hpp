@@ -88,6 +88,9 @@ public:
 	void set_lights(std::vector<lights::PositionalLights>&& posLights,
 					std::vector<lights::DirectionalLight>&& dirLights);
 	void set_background(lights::Background& envLightTexture);
+	// Discards any already applied tessellation/displacement and re-tessellates/-displaces
+	// with the current tessellation level
+	bool retessellate(const float tessLevel);
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
@@ -112,6 +115,8 @@ public:
 	 * It needs to be passed up to three tuples, each coupling names and types for
 	 * vertex, face, and sphere attributes which the renderer wants to have
 	 * access to.
+	 * The max. tessellation level determines the max. inner and outer tessellation
+	 * level of any face. It may be 0 if no (re-)tessellation is desired.
 	 *
 	 * Usage example:
 	 * scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(
@@ -124,13 +129,13 @@ public:
 	template < Device dev >
 	const SceneDescriptor<dev>& get_descriptor(const std::vector<const char*>& vertexAttribs,
 											   const std::vector<const char*>& faceAttribs,
-											   const std::vector<const char*>& sphereAttribs,
-											   const ei::IVec2& resolution);
+											   const std::vector<const char*>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
 	const std::map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
 		return m_objects;
 	}
+
 private:
 	template < Device dev >
 	struct ChangedFlag {
@@ -165,29 +170,54 @@ private:
 	accel_struct::LBVHBuilder m_accelStruct;
 
 	// Resources for descriptors
-	util::TaggedTuple<unique_device_ptr<Device::CPU, LodDescriptor<Device::CPU>[]>,
-		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>> m_lodDevDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
-		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_instTransformsDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
-		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_invInstTransformsDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, u32[]>,
-		unique_device_ptr<Device::CUDA, u32[]>> m_instLodIndicesDesc;
-	util::TaggedTuple<unique_device_ptr<Device::CPU, ei::Box[]>,
-		unique_device_ptr<Device::CUDA, ei::Box[]>> m_lodAabbsDesc;
+	util::TaggedTuple<
+		unique_device_ptr<Device::CPU, LodDescriptor<Device::CPU>[]>,
+		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>,
+		unique_device_ptr<Device::OPENGL, LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
+	util::TaggedTuple<
+		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
+		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
+		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_instTransformsDesc;
+	util::TaggedTuple<
+		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
+		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
+		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_invInstTransformsDesc;
+	util::TaggedTuple<
+		unique_device_ptr<Device::CPU, u32[]>,
+		unique_device_ptr<Device::CUDA, u32[]>,
+		unique_device_ptr<Device::OPENGL, u32[]>> m_instLodIndicesDesc;
+	util::TaggedTuple<
+		unique_device_ptr<Device::CPU, ei::Box[]>,
+		unique_device_ptr<Device::CUDA, ei::Box[]>,
+		unique_device_ptr<Device::OPENGL, ei::Box[]>> m_lodAabbsDesc;
 
 	// Descriptor storage
-	util::TaggedTuple<SceneDescriptor<Device::CPU>, SceneDescriptor<Device::CUDA>> m_descStore;
+	util::TaggedTuple<
+		SceneDescriptor<Device::CPU>, 
+		SceneDescriptor<Device::CUDA>,
+		SceneDescriptor<Device::OPENGL>> m_descStore;
 	// Remember what attributes are part of the descriptor
-	util::TaggedTuple<AttributeNames<Device::CPU>, AttributeNames<Device::CUDA>> m_lastAttributeNames;
+	util::TaggedTuple<
+		AttributeNames<Device::CPU>, 
+		AttributeNames<Device::CUDA>,
+		AttributeNames<Device::OPENGL>> m_lastAttributeNames;
 
 	// Whether the light tree has changed and needs to fetch its descriptor
-	util::TaggedTuple<ChangedFlag<Device::CPU>, ChangedFlag<Device::CUDA>> m_lightTreeDescChanged;
+	util::TaggedTuple<
+		ChangedFlag<Device::CPU>, 
+		ChangedFlag<Device::CUDA>,
+		ChangedFlag<Device::OPENGL>> m_lightTreeDescChanged;
 	// Whether the camera has changed and needs to fetch its descriptor
-	util::TaggedTuple<ChangedFlag<Device::CPU>, ChangedFlag<Device::CUDA>> m_cameraDescChanged;
+	util::TaggedTuple<
+		ChangedFlag<Device::CPU>, 
+		ChangedFlag<Device::CUDA>,
+		ChangedFlag<Device::OPENGL>> m_cameraDescChanged;
 	// Whether the light tree needs to reevaluate its media; doesn't get set if only
 	// the envmap changes
-	util::TaggedTuple<ChangedFlag<Device::CPU>, ChangedFlag<Device::CUDA>> m_lightTreeNeedsMediaUpdate;
+	util::TaggedTuple<
+		ChangedFlag<Device::CPU>, 
+		ChangedFlag<Device::CUDA>,
+		ChangedFlag<Device::OPENGL>> m_lightTreeNeedsMediaUpdate;
 
 	ei::Box m_boundingBox;
 

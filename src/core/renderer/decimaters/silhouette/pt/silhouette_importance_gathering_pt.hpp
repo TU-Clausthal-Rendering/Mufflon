@@ -364,7 +364,7 @@ CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& ou
 			importance += importances[lodIdx][vertexIndex].viewImportance;
 		}
 
-		outputBuffer.contribute(coord, RenderTargets::RADIANCE, ei::Vec4{ importance / maxImportance });
+		outputBuffer.contribute(coord, RenderTargets::RADIANCE, ei::Vec3{ importance / maxImportance });
 	}
 }
 

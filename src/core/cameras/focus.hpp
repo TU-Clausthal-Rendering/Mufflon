@@ -30,10 +30,11 @@ public:
 		m_sensorHeight(sensorHeight)
 	{}
 
-	constexpr float get_focus_distance() const noexcept { return m_focusDistance; }
-	constexpr float get_focal_length() const noexcept { return m_focalLength; }
-	constexpr float get_lens_radius() const noexcept { return m_lensRadius; }
-	constexpr float get_sensor_height() const noexcept { return m_sensorHeight; }
+	float get_focus_distance() const noexcept { return m_focusDistance; }
+	float get_focal_length() const noexcept { return m_focalLength; }
+	float get_lens_radius() const noexcept { return m_lensRadius; }
+	float get_sensor_height() const noexcept { return m_sensorHeight; }
+	float get_vertical_fov() const noexcept { return m_vFov; }
 	void set_focus_distance(float distance) noexcept { m_focusDistance = distance; }
 	void set_focal_length(float length) noexcept { m_focalLength = length; }
 	void set_lens_radius(float radius) noexcept { m_lensRadius = radius; }

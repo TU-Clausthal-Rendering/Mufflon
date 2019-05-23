@@ -18,6 +18,9 @@ template < Device dev, class T >
 struct AtomicValue { using Type = T; };
 template < class T >
 struct AtomicValue<Device::CPU, T> { using Type = std::atomic<T>; };
+// TODO GL
+template < class T > 
+struct AtomicValue<Device::OPENGL, T> { using Type = std::atomic<T>; };
 
 // Implementations of atomic-exchange
 template < Device dev, class T >
@@ -47,6 +50,16 @@ struct AtomicOps<Device::CPU, T> {
 			desired = expected + value;
 		} while(!atom.compare_exchange_weak(expected, desired));
 	}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static T load(const typename AtomicValue<Device::CPU, T>::Type& atom) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		return atom.load();
+	}
 };
 
 template <>
@@ -70,6 +83,16 @@ struct AtomicOps<Device::CPU, i32> {
 #endif // __CUDA_ARCH__
 		atom += value;
 	}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static i32 load(const typename AtomicValue<Device::CPU, i32>::Type& atom) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		return atom.load();
+	}
 };
 
 template <  class T >
@@ -86,6 +109,40 @@ struct AtomicOps<Device::CUDA, T> {
 #ifdef __CUDA_ARCH__
 		(void)atomicAdd(&atom, value);
 #endif // __CUDA_ARCH__
+	}
+
+	__host__ __device__ static T load(const typename AtomicValue<Device::CUDA, T>::Type& atom) {
+#ifdef __CUDA_ARCH__
+		return atom;
+#endif // __CUDA_ARCH__
+	}
+};
+
+// TODO GL
+template <  class T >
+struct AtomicOps<Device::OPENGL, T> {
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static T exchange(typename AtomicValue<Device::OPENGL, T>::Type& atom, const T value) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		return std::atomic_exchange_explicit(&atom, value, std::memory_order::memory_order_relaxed);
+	}
+
+#ifdef __CUDACC__
+#pragma nv_exec_check_disable
+#endif // __CUDACC__
+	__host__ __device__ static void add(typename AtomicValue<Device::OPENGL, T>::Type& atom, const T value) {
+#ifdef __CUDA_ARCH__
+		mAssertMsg(false, "This function must not be called on the GPU!");
+#endif // __CUDA_ARCH__
+		T expected = atom.load();
+		T desired;
+		do {
+			desired = expected + value;
+		} while (!atom.compare_exchange_weak(expected, desired));
 	}
 };
 
@@ -155,6 +212,12 @@ CUDA_FUNCTION T atomic_exchange(Atomic<dev, T>& atom, const T value) {
 template < Device dev, class T >
 CUDA_FUNCTION void atomic_add(Atomic<dev, T>& atom, const T value) {
 	atomic_details::AtomicOps<dev, T>::add(atom, value);
+}
+
+// Note: this function must not be called on the GPU for CPU atomics!
+template < Device dev, class T >
+CUDA_FUNCTION T atomic_load(const Atomic<dev, T>& atom) {
+	return atomic_details::AtomicOps<dev, T>::load(atom);
 }
 
 }} // namespace mufflon::cuda
