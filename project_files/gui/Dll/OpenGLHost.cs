@@ -39,6 +39,9 @@ namespace gui.Dll
         private Thread m_renderThread;
         private bool m_isRunning;
 
+        // Tracks when we're done initializing
+        private bool m_renderThreadInitialized = false;
+
         // Indicates whether an OpenGL context has been created
         public bool OpenGlContextCreated { get; private set; } = false;
 
@@ -68,7 +71,7 @@ namespace gui.Dll
             m_renderThread = new Thread(new ThreadStart(InitializeOpenGl)) { Name = "RenderThread" };
             m_renderThread.Start();
             // wait until opengl was initialized on the render loop and mufflon renderers were loaded
-            SpinWait.SpinUntil(() => OpenGlContextCreated);
+            SpinWait.SpinUntil(() => m_renderThreadInitialized);
         }
 
         private void InitializeOpenGl() {
@@ -113,6 +116,7 @@ namespace gui.Dll
 
             // Initialize the OpenGL display DLL
             OpenGlContextCreated = Core.mufflon_initialize_opengl();
+            m_renderThreadInitialized = true;
 
             // Start the render loop
             Render();
