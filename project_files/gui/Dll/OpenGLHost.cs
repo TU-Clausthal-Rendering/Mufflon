@@ -41,6 +41,8 @@ namespace gui.Dll
 
         // Tracks when we're done initializing
         private bool m_renderThreadInitialized = false;
+        // Wakes up a render thread that went to sleep after an error to perform cleanup
+        private ManualResetEvent m_cleanup = new ManualResetEvent(true);
 
         // Indicates whether an OpenGL context has been created
         public bool OpenGlContextCreated { get; private set; } = false;
@@ -59,6 +61,7 @@ namespace gui.Dll
                 while (m_isRunning)
                     Loop(this, null);
             } catch (Exception e) {
+                m_cleanup.Reset();
                 Dispatcher.BeginInvoke(Error, e.Message);
             }
         }
@@ -121,11 +124,16 @@ namespace gui.Dll
             // Start the render loop
             Render();
 
+            // Hold up with the cleanup until we destroy the window
+            m_cleanup.WaitOne();
             if (OpenGlContextCreated)
                 Core.mufflon_destroy_opengl();
 
+            // Unload the core DLL
+            Core.mufflon_destroy();
+            
             // Release the contexts
-            if(m_renderContext != IntPtr.Zero)
+            if (m_renderContext != IntPtr.Zero)
                 User32.ReleaseDC(m_hWnd, m_renderContext);
             User32.ReleaseDC(m_hWnd, m_deviceContext);
         }
@@ -159,6 +167,7 @@ namespace gui.Dll
             if(m_hWnd == IntPtr.Zero)
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
+
             return new HandleRef(this, m_hWnd);
         }
 
@@ -169,9 +178,8 @@ namespace gui.Dll
         protected override void DestroyWindowCore(HandleRef hwnd) {
             m_isRunning = false;
             Destroy(this, null);
+            m_cleanup.Set();
             m_renderThread.Join();
-            // Unload the core DLL
-            Core.mufflon_destroy();
 
             // destroy resources
             User32.DestroyWindow(hwnd.Handle);

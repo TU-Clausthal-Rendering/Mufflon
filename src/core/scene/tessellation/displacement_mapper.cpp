@@ -12,7 +12,7 @@ namespace mufflon::scene::tessellation {
 namespace {
 
 ei::Vec3 get_displaced_position() {
-
+	return {};
 }
 
 } // namespace

@@ -1007,7 +1007,7 @@ bool JsonLoader::load_file() {
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level
-		if(initTessLevel > 0u) {
+		if(initTessLevel > 0.f) {
 			world_set_tessellation_level(initTessLevel);
 			scene_request_retessellation();
 		}
