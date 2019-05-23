@@ -13,7 +13,7 @@ cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const LtParameters& params);
 
-void init_rngs(u32 num, math::Rng* rngs);
+void init_rngs(u32 num, int seed, math::Rng* rngs);
 
 } // namespace gpupt_detail
 
@@ -30,7 +30,8 @@ void GpuLightTracer::iterate() {
 }
 
 void GpuLightTracer::on_reset() {
-	gpult_detail::init_rngs(m_outputBuffer.get_num_pixels(), m_rngs.get());
+	int seed = m_params.seed * (m_outputBuffer.get_num_pixels() + 1);
+	gpult_detail::init_rngs(m_outputBuffer.get_num_pixels(), seed, m_rngs.get());
 }
 
 void GpuLightTracer::on_descriptor_requery() {

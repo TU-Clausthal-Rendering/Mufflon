@@ -26,6 +26,7 @@ struct PStdPhotons {
 };
 
 using NebParameters = ParameterHandler<
+	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 //	PNeeCount,
