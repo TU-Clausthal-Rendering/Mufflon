@@ -246,7 +246,7 @@ inline void init_renderers() {
 			s_renderers.push_back(std::make_unique<RendererType>());
 	}
 	// Only initialize CUDA renderers if CUDA is enabled
-	else if(s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))
+	else if(!initOpenGL && (s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA)))
 		s_renderers.push_back(std::make_unique<RendererType>());
 	if constexpr(I + 1u < renderer::Renderers::size)
 		init_renderers<initOpenGL, I + 1u>();
