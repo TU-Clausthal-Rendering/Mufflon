@@ -165,7 +165,7 @@ private:
 						const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
 	void deinstance();
 	void read_object();
-	void read_lod(const ObjectState& object, mufflon::u32 lod);
+	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
 
 	fs::path m_filePath;
 	// Parser state

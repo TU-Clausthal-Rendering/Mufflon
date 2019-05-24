@@ -99,19 +99,22 @@ u32 Scenario::get_effective_lod(ConstInstanceHandle hdl) const noexcept {
 			if(auto objIter = m_perObjectCustomization.find(&hdl->get_object()); objIter != m_perObjectCustomization.end()) {
 				return (objIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : objIter->second.lod;
 			} else {
-				return m_globalLodLevel;
+				return std::min(m_globalLodLevel, static_cast<u32>(hdl->get_object().get_lod_slot_count() - 1u));
 			}
 		} else {
-			return (instIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : instIter->second.lod;
+			return std::min((instIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : instIter->second.lod,
+							static_cast<u32>(hdl->get_object().get_lod_slot_count() - 1u));
 		}
 	} else {
 		if(auto objIter = m_perObjectCustomization.find(&hdl->get_object()); objIter != m_perObjectCustomization.end()) {
-			return (objIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : objIter->second.lod;
+			return std::min((objIter->second.lod == NO_CUSTOM_LOD) ? m_globalLodLevel : objIter->second.lod,
+							static_cast<u32>(hdl->get_object().get_lod_slot_count() - 1u));
 		} else {
-			return m_globalLodLevel;
+			return std::min(m_globalLodLevel,
+							static_cast<u32>(hdl->get_object().get_lod_slot_count() - 1u));
 		}
 	}
-	return m_globalLodLevel;
+	return std::min(m_globalLodLevel, static_cast<u32>(hdl->get_object().get_lod_slot_count() - 1u));
 }
 
 void Scenario::mask_object(ConstObjectHandle hdl) {
