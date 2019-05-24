@@ -226,6 +226,13 @@ public:
 		m_memory.unload<dev>();
 	}
 
+	void clear() {
+		unload<Device::CPU>();
+		unload<Device::CUDA>();
+		unload<Device::OPENGL>();
+		m_cpuHMCounter.store(0u);
+	}
+
 	// Get the functional HashMap
 	template< Device dev >
 	HashMap<dev,K,V> acquire() {

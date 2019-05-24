@@ -253,7 +253,6 @@ void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, 
 }
 
 
-
 } // namespace
 
 namespace lighttree_detail {
@@ -304,6 +303,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	unload<Device::CPU>();
 	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
+	m_primToNodePath.clear();
 	m_treeCpu->primToNodePath = m_primToNodePath.acquire<Device::CPU>();
 	//m_treeCpu->guide = &guide_flux;
 	m_treeCpu->posGuide = false;
