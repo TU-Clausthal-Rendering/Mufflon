@@ -228,7 +228,6 @@ private:
 	std::unique_ptr<CpuTexture> m_cpuTexture;
 	cudaArray_t m_cudaTexture;
 	gl::Handle m_glHandle = 0;
-	gl::TextureHandle m_glTexture = 0;
 	gl::TextureFormat m_glFormat = {};
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;

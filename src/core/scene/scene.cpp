@@ -297,32 +297,36 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
 	}
 
-	// Light tree
-	// TODO: rebuild light tree if area light got tessellated
-	if(m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
-		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
-		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
-	}
+    if(dev != Device::OPENGL) {
+		// Light tree
+	    // TODO: rebuild light tree if area light got tessellated
+		if (m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
+			sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
+			m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
+		}
 
-	// Rebuild Instance BVH?
-	if(m_accelStruct.needs_rebuild()) {
-		auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
-		m_accelStruct.build(sceneDescriptor);
-		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
-		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
-	}
-	sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
-
+		// Rebuild Instance BVH?
+		if (m_accelStruct.needs_rebuild()) {
+			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
+			m_accelStruct.build(sceneDescriptor);
+			m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
+			m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
+		}
+		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
+    }
+	
 	// Camera doesn't get a media-changed flag because it's relatively cheap to determine?
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
 		this->update_camera_medium(sceneDescriptor);
 		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
-	
-	if(m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
-		m_lightTree.update_media(sceneDescriptor);
-		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
-	}
+
+    if(dev != Device::OPENGL) {
+        if (m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
+	        m_lightTree.update_media(sceneDescriptor);
+		    m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
+	    }
+    }
 	
 	return sceneDescriptor;
 }
@@ -353,10 +357,12 @@ ConstCameraHandle Scene::get_camera() const noexcept {
 
 template < Device dev >
 void Scene::update_camera_medium(SceneDescriptor<dev>& descriptor) {
-	if constexpr(dev == Device::CPU)
+	if constexpr (dev == Device::CPU)
 		update_camera_medium_cpu(descriptor);
-	else if constexpr(dev == Device::CUDA)
+	else if constexpr (dev == Device::CUDA)
 		scene_detail::update_camera_medium_cuda(descriptor);
+	else if constexpr (dev == Device::OPENGL); // TODO gl?
+		//update_camera_medium_cpu(descriptor);
 	else
 		mAssert(false);
 }

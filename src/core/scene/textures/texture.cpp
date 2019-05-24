@@ -38,7 +38,6 @@ Texture::Texture(Texture&& tex) noexcept :
 	m_cpuTexture(std::move(tex.m_cpuTexture)),
 	m_cudaTexture(tex.m_cudaTexture),
 	m_glHandle(tex.m_glHandle),
-	m_glTexture(tex.m_glTexture),
     m_glFormat(tex.m_glFormat),
 	m_handles(tex.m_handles),
     m_constHandles(tex.m_constHandles),
@@ -46,7 +45,7 @@ Texture::Texture(Texture&& tex) noexcept :
 {
 	tex.m_cudaTexture = nullptr;
 	tex.m_glHandle = 0;
-	tex.m_glTexture = 0;
+	tex.m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = 0;
 }
 
 Texture::~Texture() {
@@ -166,7 +165,7 @@ void Texture::unload() {
 			if(m_glHandle) {
 				gl::deleteTexture(m_glHandle);
 				m_glHandle = 0;
-				m_glTexture = 0;
+				m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = 0;
 			}
 		} break;
 	}
@@ -312,13 +311,14 @@ void Texture::create_texture_cuda() {
 
 void Texture::create_texture_opengl() {
 	mAssert(m_glHandle == 0);
-	m_glHandle = gl::genTexture();
+	if (m_glHandle) return;
+    m_glHandle = gl::genTexture();
 	gl::bindTexture(gl::TextureType::Texture2DArray, m_glHandle);
 	m_glFormat = gl::convertFormat(m_format, m_sRgb);
     // TODO mipmaps?
 	gl::texStorage3D(m_glHandle, 1, m_glFormat.internal, m_width, m_height, m_numLayers);
     // create bindless texture
-	m_glTexture = gl::getTextureSamplerHandle(m_glHandle, get_gl_sampler(m_mode));
+    m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = gl::getTextureSamplerHandle(m_glHandle, get_gl_sampler(m_mode));
 }
 
 } // namespace mufflon::scene::textures

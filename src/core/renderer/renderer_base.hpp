@@ -24,7 +24,7 @@ public:
 protected:
 	RenderBuffer<DEVICE> m_outputBuffer;
 	// CPU gets the descriptor directly, everyone else gets a unique_ptr
-	std::conditional_t<DEVICE == Device::CPU, scene::SceneDescriptor<DEVICE>,
+	std::conditional_t<DEVICE == Device::CPU || DEVICE == Device::OPENGL, scene::SceneDescriptor<DEVICE>,
 		unique_device_ptr<DEVICE, scene::SceneDescriptor<DEVICE>>> m_sceneDesc;
 };
 

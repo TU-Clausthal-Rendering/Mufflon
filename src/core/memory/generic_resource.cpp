@@ -18,13 +18,19 @@ void GenericResource::synchronize() {
 	if(m_mem.template get<unique_device_ptr<dstDev, char[]>>() == nullptr)
 		m_mem.template get<unique_device_ptr<dstDev, char[]>>() = make_udevptr_array<dstDev, char>(m_size);
 	if(m_dirty.needs_sync(dstDev) && m_size != 0u) {	// Otherwise we would do a useless copy inside the same memory
-		const char* srcDev = nullptr;
-		if(m_dirty.has_changes(Device::CPU))
-			srcDev = m_mem.template get<unique_device_ptr<Device::CPU, char[]>>().get();
-		if(m_dirty.has_changes(Device::CUDA))
-			srcDev = m_mem.template get<unique_device_ptr<Device::CUDA, char[]>>().get();
-		mAssertMsg(srcDev != nullptr, "Device not supported or DirtyFlags inconsistent.");
-		copy<char>(m_mem.template get<unique_device_ptr<dstDev, char[]>>().get(), srcDev, m_size);
+		auto dstDevPtr = m_mem.template get<unique_device_ptr<dstDev, char[]>>().get();
+	    if(m_dirty.has_changes(Device::OPENGL)) {
+			gl::BufferHandle<char> srcDev = m_mem.template get<unique_device_ptr<Device::OPENGL, char[]>>().get();
+			copy(dstDevPtr, srcDev, m_size);
+		} else {
+			const char* srcDev = nullptr;
+			if (m_dirty.has_changes(Device::CPU))
+				srcDev = m_mem.template get<unique_device_ptr<Device::CPU, char[]>>().get();
+			if (m_dirty.has_changes(Device::CUDA))
+				srcDev = m_mem.template get<unique_device_ptr<Device::CUDA, char[]>>().get();
+			mAssertMsg(srcDev != nullptr, "Device not supported or DirtyFlags inconsistent.");
+			copy<char>(dstDevPtr, srcDev, m_size);
+		}
 		m_dirty.mark_synced(dstDev);
 	}
 }
