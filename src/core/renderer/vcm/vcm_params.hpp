@@ -5,6 +5,7 @@
 namespace mufflon { namespace renderer {
 
 using VcmParameters = ParameterHandler<
+	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PMergeRadius,

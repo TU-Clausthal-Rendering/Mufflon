@@ -132,17 +132,19 @@ inline void copy(gl::TextureHandle dst, gl::BufferHandle<T> src, std::size_t siz
 }
 
 template < Device dev >
-inline void mem_set(void* mem, int value, std::size_t size) {
-	memset(mem, value, size);
-}
-template <>
-inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
-	cudaMemset(mem, value, size);
+inline std::enable_if_t<dev != Device::OPENGL, void> mem_set(void* mem, int value, std::size_t size) {
+	std::memset(mem, value, size);
 }
 
-//template <>
-//inline void mem_set<Device::OPENGL>(gl::Handle handle, int value, std::size_t size) {
-//	
-//}
+template <>
+inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
+	cuda::check_error(::cudaMemset(mem, value, size));
+}
+
+template < Device dev, class T >
+inline std::enable_if_t<dev == Device::OPENGL, void> mem_set(gl::BufferHandle<T> mem, int value, std::size_t size) {
+	gl::clearBufferSubData(mem.id, mem.get_byte_offset(), size, value);
+}
+
 
 } // namespace mufflon

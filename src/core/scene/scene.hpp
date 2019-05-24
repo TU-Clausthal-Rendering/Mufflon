@@ -89,8 +89,8 @@ public:
 					std::vector<lights::DirectionalLight>&& dirLights);
 	void set_background(lights::Background& envLightTexture);
 	// Discards any already applied tessellation/displacement and re-tessellates/-displaces
-	// with the current max. tessellation level
-	bool retessellate(const u32 maxTessLevel);
+	// with the current tessellation level
+	bool retessellate(const float tessLevel);
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
@@ -129,8 +129,7 @@ public:
 	template < Device dev >
 	const SceneDescriptor<dev>& get_descriptor(const std::vector<const char*>& vertexAttribs,
 											   const std::vector<const char*>& faceAttribs,
-											   const std::vector<const char*>& sphereAttribs,
-											   const ei::IVec2& resolution);
+											   const std::vector<const char*>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
 	const std::map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {

@@ -22,7 +22,7 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPathTracer,
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
-	CpuVcm, 
+	CpuVcm,
 	GlForward
 >;
 

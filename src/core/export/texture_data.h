@@ -17,10 +17,18 @@ typedef enum {
 	FORMAT_R32F,
 	FORMAT_RG32F,
 	FORMAT_RGBA32F,
+	// RGB formats are not supported by the Texture class.
+	// Since TextureFormat(textures::Format) should be a valid cast,
+	// special in/output formats must be added at the end of this enum.
+	FORMAT_RGB8U,
+	FORMAT_RGB16U,
+	FORMAT_RGB16F,
+	FORMAT_RGB32F,
 	FORMAT_NUM
 } TextureFormat;
 
 typedef struct {
+	// A block of data which is formated with .format (on padding or similar).
 	uint8_t* data = nullptr;
 	uint32_t width = 0u;
 	uint32_t height = 0u;

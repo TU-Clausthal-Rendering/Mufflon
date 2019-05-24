@@ -23,7 +23,11 @@ namespace mufflon::gl {
 		glCopyNamedBufferSubData(src, dst, srcOffset, dstOffset, size);
 	}
 
-	void deleteBuffer(Handle h) {
+    void clearBufferSubData(Handle dst, size_t offset, size_t size, int value) {
+		glClearNamedBufferSubData(dst, GL_R32I, offset, size, GL_RED, GL_INT, &value);
+	}
+
+    void deleteBuffer(Handle h) {
 		glDeleteBuffers(1, &h); 
 	}
 
@@ -133,6 +137,10 @@ namespace mufflon::gl {
     TextureHandle getTextureHandle(Handle h) {
 		mAssert(h);
 		return glGetTextureHandleARB(h);
+	}
+
+    TextureHandle getTextureSamplerHandle(Handle tex, Handle sampler) {
+		return glGetTextureSamplerHandleARB(tex, sampler);
 	}
 
     void makeTextureHandleResident(TextureHandle h) {

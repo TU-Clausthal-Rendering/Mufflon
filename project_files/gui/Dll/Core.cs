@@ -146,10 +146,9 @@ namespace gui.Dll
         public delegate void LogCallback(string message, Severity severity);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_format(UInt32 index, out TextureFormat format);
+        internal static extern bool core_get_target_image(UInt32 index, Boolean variance, out IntPtr ptr);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_image(UInt32 index, Boolean variance,
-            TextureFormat format, bool sRgb, out IntPtr ptr);
+        internal static extern bool core_get_target_image_num_channels(IntPtr numChannels);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_copy_screen_texture_rgba32(IntPtr ptr, float factor);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -346,9 +345,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_env_light_map(IntPtr hdl, IntPtr tex);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void world_set_max_tessellation_level(uint level);
+        internal static extern void world_set_tessellation_level(float level);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern uint world_get_max_tessellation_level();
+        internal static extern float world_get_tessellation_level();
 
         // Camera API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

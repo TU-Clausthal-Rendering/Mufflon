@@ -42,7 +42,7 @@ LodDescriptor<dev> Lod::get_descriptor() {
 	return desc;
 }
 
-void Lod::displace(tessellation::Tessellater& tessellater, const Scenario& scenario) {
+void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario) {
 	m_geometry.for_each([&tessellater, &scenario](auto& elem) {
 		elem.displace(tessellater, scenario);
 	});

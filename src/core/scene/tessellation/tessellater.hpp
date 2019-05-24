@@ -8,9 +8,29 @@
 
 namespace mufflon::scene::tessellation {
 
+// Serves as an oracle for the tessellation level
+class TessLevelOracle {
+public:
+	TessLevelOracle() = default;
+
+	// Get the outer tessellation level (ie. the number of new vertices) for the given edge of the given face
+	virtual u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const = 0;
+
+	// Get the inner tessellation level (ie. the number of new vertices) for the given face
+	virtual u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0;
+
+	void set_mesh(geometry::PolygonMeshType* mesh) {
+		m_mesh = mesh;
+	}
+
+protected:
+	geometry::PolygonMeshType* m_mesh = nullptr;
+};
+
 class Tessellater {
 public:
-	Tessellater() = default;
+	Tessellater(TessLevelOracle& oracle) :
+		m_tessLevelOracle(oracle) {}
 	Tessellater(const Tessellater&) = delete;
 	Tessellater(Tessellater&&) = delete;
 	Tessellater& operator=(const Tessellater&) = delete;
@@ -32,12 +52,6 @@ protected:
 		u32 offset;
 		u32 count;
 	};
-
-	// Get the outer tessellation level (ie. the number of new vertices) for the given edge of the given face
-	virtual u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const = 0;
-
-	// Get the inner tessellation level (ie. the number of new vertices) for the given face
-	virtual u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0;
 
 	// Set the vertex properties (position, normals etc.) for the newly created outer vertex.
 	// The coordinate x is the linear coordinate between the two edge vertices
@@ -87,6 +101,9 @@ protected:
 	virtual void triangulate_strip(const u32 lengthOuter, const u32 lengthInner,
 								   const OpenMesh::FaceHandle original);
 
+	virtual void pre_tessellate() { (void)0; }
+	virtual void post_tessellate() { (void)0; }
+
 	// Mesh to be tessellated
 	geometry::PolygonMeshType* m_mesh = nullptr;
 	// Handle or mesh property storing the offset and count of edge vertices
@@ -121,6 +138,8 @@ private:
 	std::vector<OpenMesh::VertexHandle> m_innerVertices;
 	// Holds the vertices of a face between outer and inner tessellation vertices
 	std::vector<OpenMesh::VertexHandle> m_stripVertices;
+
+	TessLevelOracle& m_tessLevelOracle;
 };
 
 } // mufflon::scene::tessellation

@@ -104,8 +104,10 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 	PtPathVertex::create_camera(&vertex, &vertex, scene.camera.get(), coord, rng.next());
 	VertexSample sample = vertex.sample(scene.media, math::RndSet2_1{ rng.next(), rng.next() }, false);
 	ei::Ray ray{ sample.origin, sample.excident };
+	float totalDistance = 0.f;
 
-	while(true) {
+	// Arbitrary upper limit to avoid complete hangings
+	for(int i = 0; i < params.maxTraceDepth; ++i) {
 		scene::accel_struct::RayIntersectionResult nextHit =
 			scene::accel_struct::first_intersection<CURRENT_DEV, false>(scene, ray, vertex.get_geometric_normal(), scene::MAX_SCENE_SIZE);
 		if(nextHit.hitId.instanceId < 0) {
@@ -120,7 +122,9 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 			const auto& hitId = nextHit.hitId;
 			const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
 			const auto& poly = lod.polygon;
-			const auto& hit = ray.origin + ray.direction * nextHit.distance;
+			const float hitDist = nextHit.distance < 0.001f ? 0.001f : nextHit.distance;
+			const auto& hit = ray.origin + ray.direction * hitDist;
+			totalDistance += hitDist;
 
 			ei::Vec3 closestLinePoint;
 			if(static_cast<u32>(nextHit.hitId.primId) < poly.numTriangles) {
@@ -150,7 +154,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 				case cameras::CameraModel::PINHOLE:
 				{
 					const auto& pinholeParams = static_cast<const cameras::PinholeParams&>(camParams);
-					pixelSize = nextHit.distance * pinholeParams.tanVFov / static_cast<float>(pinholeParams.resolution.y);
+					pixelSize = totalDistance * pinholeParams.tanVFov / static_cast<float>(pinholeParams.resolution.y);
 				}	break;
 				case cameras::CameraModel::FOCUS:	// TODO: does this make sense?
 				case cameras::CameraModel::ORTHOGRAPHIC:
@@ -163,7 +167,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 			const float sqDistThreshold = ei::sq(params.lineWidth * pixelSize);
 			// Only draw it if it's below the threshold (expressed in pixels)
 			if(ei::lensq(projectedLineSegment) > sqDistThreshold) {
-				ray.origin = ray.origin + ray.direction * (nextHit.distance + 0.0001f);
+				ray.origin = ray.origin + ray.direction * hitDist;
 			} else {
 				outputBuffer.contribute(coord, throughput, borderColor,
 										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },

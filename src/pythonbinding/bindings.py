@@ -142,6 +142,15 @@ class DllInterface:
 
     def world_get_current_scenario(self):
         return self.dllHolder.core.world_get_current_scenario()
+    
+    def world_set_tessellation_level(self, level):
+        self.dllHolder.core.world_set_tessellation_level(level)
+
+    def world_get_tessellation_level(self):
+        return self.dllHolder.core.world_get_tessellation_level()
+
+    def scene_request_retessellation(self):
+        return self.dllHolder.scene_request_retessellation()
 
 
 def path_leaf(path):

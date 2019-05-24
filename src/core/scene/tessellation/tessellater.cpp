@@ -24,6 +24,9 @@ constexpr inline u32 get_inner_vertex_index(const u32 edgeIndex, const u32 index
 void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	auto profilerTimer = Profiler::instance().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
 	m_mesh = &mesh;
+	m_tessLevelOracle.set_mesh(&mesh);
+
+	this->pre_tessellate();
 
 	// Store the vertex handles of the newly created vertices per edge
 	m_edgeVertexHandles.clear();
@@ -39,7 +42,6 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	if (!m_addedVertexProp.is_valid())
 		throw std::runtime_error("Failed to add edge vertex property to mesh");
 
-
 	for(auto edge : m_mesh->edges()) {
 		mAssert(edge.is_valid());
 
@@ -47,7 +49,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0));
 
 		// Ask how many new vertices this edge should get
-		u32 newVertices = this->get_edge_tessellation_level(edge);
+		u32 newVertices = m_tessLevelOracle.get_edge_tessellation_level(edge);
 		m_mesh->property(m_addedVertexProp, edge) = AddedVertices{
 			from, to,
 			static_cast<u32>(m_edgeVertexHandles.size()),
@@ -90,7 +92,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		// Check if we're in a triangle or quad
 		const std::size_t vertexCount = std::distance(m_mesh->cfv_ccwbegin(face), m_mesh->cfv_ccwend(face));
 		// Find out the inner tessellation level
-		u32 innerLevel = this->get_inner_tessellation_level(face);
+		u32 innerLevel = m_tessLevelOracle.get_inner_tessellation_level(face);
 		// TODO: remove this, for now it ensures that we always have inner tessellation if we have outer
 		if(innerLevel == 0u && m_edgeVertexHandles.size() > 0u)
 			innerLevel = 1u;
@@ -282,18 +284,19 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		}
 
 	}
-
+	
 	// Clean up
 	m_mesh->remove_property(m_addedVertexProp);
 	m_mesh->delete_face(tempFace, true);
 	m_mesh->garbage_collection();
 	m_mesh->release_face_status();
 	m_mesh->release_vertex_status();
+
+	this->post_tessellate();
 }
 
-void Tessellater::set_edge_vertex(const float x,
-										  const OpenMesh::EdgeHandle edge,
-										  const OpenMesh::VertexHandle vertex) {
+void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge,
+								  const OpenMesh::VertexHandle vertex) {
 	mAssert(x >= 0.f && x <= 1.f);
 	const OpenMesh::VertexHandle from = m_mesh->from_vertex_handle(m_mesh->halfedge_handle(edge, 0u));
 	const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0u));

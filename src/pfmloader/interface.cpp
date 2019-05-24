@@ -211,17 +211,18 @@ Boolean store_texture(const char* path, const TextureData* texData) {
 
 		const auto pixels = reinterpret_cast<const char *>(texData->data);
 		if(texData->format == TextureFormat::FORMAT_R32F || texData->format == TextureFormat::FORMAT_RG32F
-			|| texData->format == TextureFormat::FORMAT_RGBA32F) {
+			|| texData->format == TextureFormat::FORMAT_RGB32F || texData->format == TextureFormat::FORMAT_RGBA32F) {
 			for(uint32_t y = 0; y < texData->height; ++y) {
 				for(uint32_t x = 0; x < texData->width; ++x) {
+					// PFM can only store one or three channel textures.
+					// Write RG, RGB and RGBA as RGB and R as R.
 					switch(numChannels) {
-					case 1: file.write(&pixels[(y * texData->width + x) * sizeof(float)], sizeof(float)); break;
-					case 2: {
-						const ei::Vec2& pixel = *reinterpret_cast<ei::Vec2*>(pixels[(y * texData->width + x) * 2u * sizeof(float)]);
-						file.write(reinterpret_cast<const char*>(&pixel), 3u * sizeof(float));
-					}	break;
-					default:
-						file.write(&pixels[(y * texData->width + x) * numChannels * sizeof(float)], 3u * sizeof(float));
+						case 1: file.write(&pixels[(y * texData->width + x) * sizeof(float)], sizeof(float)); break;
+						default: {
+							ei::Vec4 pixel { 0.0f };
+							memcpy(&pixel, &pixels[(y * texData->width + x) * numChannels * sizeof(float)], numChannels * sizeof(float));
+							file.write(reinterpret_cast<const char*>(&pixel), 3u * sizeof(float));
+						}
 					}
 				}
 			}

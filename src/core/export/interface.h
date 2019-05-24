@@ -423,8 +423,8 @@ CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
 CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_end(uint32_t* animationFrame);
-CORE_API void CDECL world_set_max_tessellation_level(const uint32_t maxTessLevel);
-CORE_API uint32_t CDECL world_get_max_tessellation_level();
+CORE_API void CDECL world_set_tessellation_level(const float maxTessLevel);
+CORE_API float CDECL world_get_tessellation_level();
 
 // Scenario interface
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
@@ -589,9 +589,8 @@ CORE_API void CDECL mufflon_destroy();
 CORE_API void CDECL mufflon_destroy_opengl();
 
 
-CORE_API Boolean CDECL core_get_target_format(uint32_t index, TextureFormat* format);
-CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, TextureFormat format,
-											 bool sRgb,const char** ptr);
+CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, const float** ptr);
+CORE_API Boolean CDECL core_get_target_image_num_channels(int* numChannels);
 CORE_API Boolean CDECL core_get_target_image_rgba32(uint32_t index, Boolean variance, float* ptr);
 CORE_API Boolean CDECL core_copy_screen_texture_rgba32(Vec4* ptr, const float factor);
 CORE_API Boolean CDECL core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r,

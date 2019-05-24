@@ -55,6 +55,7 @@ namespace gl {
 	void bindBuffer(BufferType target, Handle id);
 	void bufferStorage(Handle id, size_t size, const void* data, StorageFlags flags);
 	void copyBufferSubData(Handle src, Handle dst, size_t srcOffset, size_t dstOffset, size_t size);
+	void clearBufferSubData(Handle dst, size_t offset, size_t size, int value);
 	void deleteBuffer(Handle h);
 	void bufferSubData(Handle h, size_t offset, size_t size, const void* data);
 	void clearBufferData(Handle h, size_t clearValueSize, size_t numValues, const void* clearValue);
@@ -77,6 +78,7 @@ namespace gl {
 	void texStorage3D(Handle h, int levels, TextureInternal format, size_t width, size_t height, size_t depth);
 	void texSubImage3D(Handle h, int level, size_t offsetX, size_t offsetY, size_t offsetZ, size_t width, size_t height, size_t depth, TextureSetFormat setFormat, TextureSetType setType, const void* data);
 	TextureHandle getTextureHandle(Handle h);
+	TextureHandle getTextureSamplerHandle(Handle tex, Handle sampler);
 	void makeTextureHandleResident(TextureHandle h);
 	void makeTextureHandleNonResident(TextureHandle h);
 }}

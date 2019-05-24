@@ -4,7 +4,7 @@
 
 namespace mufflon::scene::tessellation {
 
-class Uniform : public Tessellater {
+class Uniform : public TessLevelOracle {
 public:
 	Uniform() = default;
 	Uniform(const u32 level) :
@@ -27,11 +27,11 @@ public:
 	}
 
 protected:
-	virtual u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const override {
+	u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const override {
 		return m_outerLevel;
 	}
 
-	virtual u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const override {
+	u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const override {
 		return m_innerLevel;
 	}
 
