@@ -5,6 +5,8 @@
 #include "core/scene/types.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <ei/vector.hpp>
+#include <tuple>
+#include <vector>
 
 namespace mufflon::scene::tessellation {
 
@@ -65,7 +67,7 @@ protected:
 	virtual void set_quad_inner_vertex(const float x, const float y,
 									   const OpenMesh::VertexHandle vertex,
 									   const OpenMesh::FaceHandle face,
-									   const OpenMesh::VertexHandle(&vertices)[4u]);
+									   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 
 	// Set the vertex properties (position, normals etc.) for the newly created inner vertex.
 	// The coordinates x and y are the barycentric coordinates of the vertex with respect to the
@@ -73,7 +75,7 @@ protected:
 	virtual void set_triangle_inner_vertex(const float x, const float y,
 										   const OpenMesh::VertexHandle vertex,
 										   const OpenMesh::FaceHandle face,
-										   const OpenMesh::VertexHandle(&vertices)[4u]);
+										   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 
 	// Set the face properties (material index etc.) for the newly created inner face
 	virtual void set_quad_face_inner(const OpenMesh::FaceHandle original,
@@ -115,10 +117,10 @@ protected:
 private:
 	void spawn_inner_quad_vertices(const u32 innerLevel,
 								   const OpenMesh::FaceHandle face,
-								   const OpenMesh::VertexHandle(&vertices)[4u]);
+								   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 	void spawn_inner_triangle_vertices(const u32 innerLevel,
 									   const OpenMesh::FaceHandle face,
-									   const OpenMesh::VertexHandle(&vertices)[4u]);
+									   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 	// Spawns the quads between inner and outer vertices
 	u32 spawn_outer_quads(const u32 innerLevel, const u32 outerLevel,
 						  const u32 startInner, const u32 startOuter,
@@ -130,7 +132,8 @@ private:
 									  const u32 edgeIndex, const AddedVertices& outerVertices,
 									  const OpenMesh::VertexHandle from,
 									  const OpenMesh::VertexHandle to,
-									  const OpenMesh::FaceHandle face);
+									  const OpenMesh::FaceHandle face,
+									  bool doLeft, bool doRight);
 
 	// Holds all vertices spawned for edges of the mesh
 	std::vector<OpenMesh::VertexHandle> m_edgeVertexHandles;
