@@ -15,12 +15,12 @@ ei::Vec3 get_displaced_position() {
 	return {};
 }
 
+// Returns the 
+
 } // namespace
 
 void DisplacementMapper::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge,
 										 const OpenMesh::VertexHandle vertex) {
-	Tessellater::set_edge_vertex(x, edge, vertex);
-#if 0
 	using namespace materials;
 
 	mAssert(x >= 0.f && x <= 1.f);
@@ -90,7 +90,6 @@ void DisplacementMapper::set_edge_vertex(const float x, const OpenMesh::EdgeHand
 			Tessellater::set_edge_vertex(x, edge, vertex);
 		}
 	}
-#endif // 0
 }
 
 void DisplacementMapper::set_quad_inner_vertex(const float x, const float y,

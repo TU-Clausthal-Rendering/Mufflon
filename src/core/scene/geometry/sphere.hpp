@@ -111,12 +111,6 @@ public:
 	void mark_changed(Device dev) {
 		m_attributes.mark_changed(dev);
 	}
-	void mark_changed(Device dev, SphereAttributeHandle hdl) {
-		m_attributes.mark_changed(dev, hdl);
-	}
-	void mark_changed(Device dev, StringView name) {
-		m_attributes.mark_changed(dev, name);
-	}
 
 	// Adds a sphere.
 	SphereHandle add(const Point& point, float radius);

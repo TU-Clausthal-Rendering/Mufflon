@@ -596,7 +596,7 @@ Boolean polygon_set_vertex_attribute(LodHdl lvlDtl, const PolygonAttributeHdl* a
 		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		lod.template get_geometry<Polygons>().acquire<Device::CPU, Type>(hdl)[vertex]
 			= *static_cast<const Type*>(value);
-		lod.template get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
+		lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -620,7 +620,7 @@ Boolean polygon_set_vertex_normal(LodHdl lvlDtl, VertexHdl vertex, Vec3 normal) 
 
 	auto hdl = lod.get_geometry<Polygons>().get_normals_hdl();
 	lod.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec3f>(hdl)[vertex] = util::pun<OpenMesh::Vec3f>(normal);
-	lod.get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
+	lod.get_geometry<Polygons>().mark_changed(Device::CPU);
 	return true;
 	CATCH_ALL(false)
 }
@@ -639,7 +639,7 @@ Boolean polygon_set_vertex_uv(LodHdl lvlDtl, VertexHdl vertex, Vec2 uv) {
 
 	auto hdl = lod.get_geometry<Polygons>().get_uvs_hdl();
 	lod.get_geometry<Polygons>().acquire<Device::CPU, OpenMesh::Vec2f>(hdl)[vertex] = util::pun<OpenMesh::Vec2f>(uv);
-	lod.get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
+	lod.get_geometry<Polygons>().mark_changed(Device::CPU);
 	return true;
 	CATCH_ALL(false)
 }
@@ -666,7 +666,7 @@ Boolean polygon_set_face_attribute(LodHdl lvlDtl, const PolygonAttributeHdl* att
 		FaceAttributeHandle hdl{ static_cast<size_t>(attr->index) };
 		lod.template get_geometry<Polygons>().acquire<Device::CPU, Type>(hdl)[face]
 			= *static_cast<const Type*>(value);
-		lod.template get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
+		lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -692,7 +692,7 @@ Boolean polygon_set_material_idx(LodHdl lvlDtl, FaceHdl face, MatIdx idx) {
 
 	auto hdl = lod.get_geometry<Polygons>().get_material_indices_hdl();
 	lod.get_geometry<Polygons>().acquire<Device::CPU, MaterialIndex>(hdl)[face] = idx;
-	lod.get_geometry<Polygons>().mark_changed(Device::CPU, hdl);
+	lod.get_geometry<Polygons>().mark_changed(Device::CPU);
 	return true;
 	CATCH_ALL(false)
 }
@@ -960,7 +960,7 @@ Boolean spheres_set_attribute(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 		using Type = typename std::decay_t<decltype(val)>::Type;
 		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		lod.template get_geometry<Spheres>().acquire<Device::CPU, Type>(hdl)[sphere] = *static_cast<const Type*>(value);
-		lod.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
+		lod.template get_geometry<Spheres>().mark_changed(Device::CPU);
 		return true;
 	}, [attr, name = FUNCTION_NAME]() {
 		logError("[", name, "] Unknown/Unsupported attribute type",
@@ -986,7 +986,7 @@ Boolean spheres_set_material_idx(LodHdl lvlDtl, SphereHdl sphere, MatIdx idx) {
 
 	SphereAttributeHandle hdl = lod.template get_geometry<Spheres>().get_material_indices_hdl();
 	lod.template get_geometry<Spheres>().acquire<Device::CPU, MaterialIndex>(hdl)[sphere] = idx;
-	lod.template get_geometry<Spheres>().mark_changed(Device::CPU, hdl);
+	lod.template get_geometry<Spheres>().mark_changed(Device::CPU);
 	return true;
 	CATCH_ALL(false)
 }

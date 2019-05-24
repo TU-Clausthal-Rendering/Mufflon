@@ -6,8 +6,9 @@ namespace mufflon {
 void GenericResource::resize(std::size_t size) {
 	// Release all resources if they have the wrong size.
 	if(m_size != size) {
-		m_mem.template get<unique_device_ptr<Device::CPU, char[]>>() = nullptr;
-		m_mem.template get<unique_device_ptr<Device::CUDA, char[]>>() = nullptr;
+		unload<Device::CPU>();
+		unload<Device::CUDA>();
+		unload<Device::OPENGL>();
 	}
 	// Set the size for future allocations
 	m_size = size;
@@ -15,18 +16,29 @@ void GenericResource::resize(std::size_t size) {
 
 template < Device dstDev >
 void GenericResource::synchronize() {
-	if(m_mem.template get<unique_device_ptr<dstDev, char[]>>() == nullptr)
-		m_mem.template get<unique_device_ptr<dstDev, char[]>>() = make_udevptr_array<dstDev, char>(m_size);
-	if(m_dirty.needs_sync(dstDev) && m_size != 0u) {	// Otherwise we would do a useless copy inside the same memory
-		const char* srcDev = nullptr;
-		if(m_dirty.has_changes(Device::CPU))
-			srcDev = m_mem.template get<unique_device_ptr<Device::CPU, char[]>>().get();
-		if(m_dirty.has_changes(Device::CUDA))
-			srcDev = m_mem.template get<unique_device_ptr<Device::CUDA, char[]>>().get();
-		mAssertMsg(srcDev != nullptr, "Device not supported or DirtyFlags inconsistent.");
-		copy<char>(m_mem.template get<unique_device_ptr<dstDev, char[]>>().get(), srcDev, m_size);
-		m_dirty.mark_synced(dstDev);
+	auto& dstMem = m_mem.template get<SyncedDevPtr<dstDev>>();
+	if(dstMem.ptr == nullptr && m_size != 0u) {
+		dstMem.ptr = make_udevptr_array<dstDev, char>(m_size);
+		dstMem.synced = false;
 	}
+
+	if(!dstMem.synced) {
+		bool synced = false;
+		m_mem.for_each([&](auto& data) {
+			using ChangedBuffer = std::decay_t<decltype(data)>;
+			if(!synced && ChangedBuffer::DEVICE != dstDev && data.synced && data.ptr != nullptr) {
+				copy<char>(dstMem.ptr.get(), data.ptr.get(), m_size);
+				synced = true;
+			}
+		});
+		dstMem.synced = true;
+	}
+}
+
+void GenericResource::mark_changed(Device dev) noexcept {
+	if(dev != Device::CPU) unload<Device::CPU>();
+	if(dev != Device::CUDA) unload<Device::CUDA>();
+	if(dev != Device::OPENGL) unload<Device::OPENGL>();
 }
 
 // Explicit instanciations

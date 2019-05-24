@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/memory/residency.hpp"
+#include "format.hpp"
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
-#include "util/flag.hpp"
 #include "util/string_view.hpp"
-#include "format.hpp"
+#include "core/export/api.h"
+#include "core/memory/residency.hpp"
 #include "core/opengl/gl_texture.hpp"
 #include <array>
 #include <cuda_runtime.h>
@@ -189,7 +189,12 @@ public:
 	}
 
 	void mark_changed(Device changed) noexcept {
-		m_dirty.mark_changed(changed);
+		if(changed != Device::CPU)
+			this->unload<Device::CPU>();
+		if(changed != Device::CUDA)
+			this->unload<Device::CUDA>();
+		if(changed != Device::OPENGL)
+			this->unload<Device::OPENGL>();
 	}
 
 	// Explicitly synchronize the given device
@@ -223,7 +228,6 @@ private:
 	SamplingMode m_mode;
 	bool m_sRgb;
 	// Handles and resources
-	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<CpuTexture> m_cpuTexture;
 	cudaArray_t m_cudaTexture;
 	HandleTypes m_handles;

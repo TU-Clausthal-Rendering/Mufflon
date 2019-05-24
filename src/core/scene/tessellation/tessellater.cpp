@@ -64,6 +64,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 			this->set_edge_vertex(static_cast<float>(i + 1u) / static_cast<float>(newVertices + 1u),
 								  edge, m_edgeVertexHandles.back());
 		}
+		this->set_edge_vertex(0, edge, from);
 	}
 
 	// We need a temporary face to copy over properties in case we have a tessellation level of zero
@@ -297,6 +298,8 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 
 void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge,
 								  const OpenMesh::VertexHandle vertex) {
+	if(x == 0)
+		return;
 	mAssert(x >= 0.f && x <= 1.f);
 	const OpenMesh::VertexHandle from = m_mesh->from_vertex_handle(m_mesh->halfedge_handle(edge, 0u));
 	const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0u));

@@ -47,7 +47,6 @@ Polygons::Polygons(const Polygons& poly) :
 	m_normalsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec3f>(m_meshData->vertex_normals_pph())),
 	m_uvsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec2f>(m_meshData->vertex_texcoords2D_pph())),
 	m_matIndicesHdl(m_faceAttributes.add_attribute<u16>(MAT_INDICES_NAME)),
-	m_indexFlags(poly.m_indexFlags),
 	m_boundingBox(poly.m_boundingBox),
 	m_triangles(poly.m_triangles),
 	m_quads(poly.m_quads),
@@ -94,7 +93,6 @@ Polygons::Polygons(Polygons&& poly) :
 	m_normalsHdl(std::move(poly.m_normalsHdl)),
 	m_uvsHdl(std::move(poly.m_uvsHdl)),
 	m_matIndicesHdl(std::move(poly.m_matIndicesHdl)),
-	m_indexFlags(std::move(poly.m_indexFlags)),
 	m_boundingBox(std::move(poly.m_boundingBox)),
 	m_triangles(poly.m_triangles),
 	m_quads(poly.m_quads),
@@ -182,9 +180,7 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
 	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec3f>(m_normalsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
 	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec2f>(m_uvsHdl)[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
-	m_vertexAttributes.mark_changed(Device::CPU, m_pointsHdl);
-	m_vertexAttributes.mark_changed(Device::CPU, m_normalsHdl);
-	m_vertexAttributes.mark_changed(Device::CPU, m_uvsHdl);
+	m_vertexAttributes.mark_changed(Device::CPU);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
 
@@ -206,7 +202,6 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
 	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
 	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
-	m_indexFlags.mark_changed(Device::CPU);
 
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_attribute_elem_count() + 1u);
@@ -218,7 +213,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
 	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
-	m_faceAttributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_faceAttributes.mark_changed(Device::CPU);
 	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
@@ -257,7 +252,6 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
 	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
 	indexBuffer[currIndexCount + 3u] = static_cast<u32>(v3.idx());
-	m_indexFlags.mark_changed(Device::CPU);
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_attribute_elem_count() + 1u);
 	++m_quads;
@@ -269,7 +263,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
 	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
-	m_faceAttributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_faceAttributes.mark_changed(Device::CPU);
 	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
@@ -403,8 +397,7 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 	tessellater.set_phong_tessellation(false);
 	tessellater.tessellate(*m_meshData);
 
-	this->mark_changed(Device::CPU, get_points_hdl());
-	this->mark_changed(Device::CPU, get_normals_hdl());
+	this->mark_changed(Device::CPU);
 	this->rebuild_index_buffer();
 	m_wasDisplaced = true;
 	logInfo("Displacement mapped polygon mesh (", prevTri, "/", prevQuad,
@@ -474,14 +467,13 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 		m_boundingBox.max = ei::max(vertices[i], m_boundingBox.max);
 		m_boundingBox.min = ei::min(vertices[i], m_boundingBox.min);
 	}
-	m_vertexAttributes.mark_changed(Device::CPU, m_pointsHdl);
 	// Transform normals
 	ei::Vec3* normals = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_normalsHdl);
 	for(size_t i = 0; i < this->get_vertex_count(); i++) { // one normal per vertex
 		normals[i] /= scale;
 		normals[i] = rotation * normals[i];
 	}
-	m_vertexAttributes.mark_changed(Device::CPU, m_normalsHdl);
+	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
 template < Device dev >
@@ -489,15 +481,17 @@ void Polygons::synchronize() {
 	m_vertexAttributes.synchronize<dev>();
 	m_faceAttributes.synchronize<dev>();
 	// Synchronize the index buffer
-	if(m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
-		if(m_indexFlags.has_competing_changes()) {
-			logError("[Polygons::synchronize] Competing device changes; ignoring one");
-		}
+
+	if(m_indexBuffer.template get<IndexBuffer<dev>>().indices == nullptr) {
+		// Try to find a valid device
+		bool synced = false;
 		m_indexBuffer.for_each([&](auto& buffer) {
 			using ChangedBuffer = std::decay_t<decltype(buffer)>;
-			this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
+			if(!synced && buffer.indices != nullptr) {
+				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
+				synced = true;
+			}
 		});
-		m_indexFlags.mark_synced(dev);
 	}
 }
 
@@ -579,8 +573,15 @@ void Polygons::reserve_index_buffer(std::size_t capacity) {
 			buffer.indices = Allocator<dev>::template realloc<u32>(buffer.indices, buffer.reserved,
 																   capacity);
 		buffer.reserved = capacity;
-		if constexpr(markChanged)
-			m_indexFlags.mark_changed(dev);
+		if constexpr(markChanged) {
+			m_indexBuffer.for_each([](auto& data) {
+				using ChangedBuffer = std::decay_t<decltype(data)>;
+				if(ChangedBuffer::DEVICE != dev && data.indices != nullptr) {
+					Allocator<ChangedBuffer::DEVICE>::template free<u32>(data.indices, data.reserved);
+					data.reserved = 0u;
+				}
+			});
+		}
 	}
 }
 
@@ -649,18 +650,15 @@ void Polygons::rebuild_index_buffer() {
 template < Device changed, Device sync >
 void Polygons::synchronize_index_buffer() {
 	if constexpr(changed != sync) {
-		if(m_indexFlags.has_changes(changed)) {
-			auto& changedBuffer = m_indexBuffer.get<IndexBuffer<changed>>();
-			auto& syncBuffer = m_indexBuffer.get<IndexBuffer<sync>>();
+		auto& changedBuffer = m_indexBuffer.get<IndexBuffer<changed>>();
+		auto& syncBuffer = m_indexBuffer.get<IndexBuffer<sync>>();
 
-			// Check if we need to realloc
-			if(syncBuffer.reserved < m_triangles + m_quads)
-				this->reserve_index_buffer<sync, false>(3u * m_triangles + 4u * m_quads);
+		// Check if we need to realloc
+		if(syncBuffer.reserved < m_triangles + m_quads)
+			this->reserve_index_buffer<sync, false>(3u * m_triangles + 4u * m_quads);
 
-			if(changedBuffer.reserved != 0u)
-				copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
-			m_indexFlags.mark_synced(sync);
-		}
+		if(changedBuffer.reserved != 0u)
+			copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
 	}
 }
 

@@ -241,12 +241,6 @@
     <ClCompile Include="..\..\src\core\scene\tessellation\tessellater.cpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
-    <ClInclude Include="..\..\src\core\scene\tessellation\cam_dist.cpp">
-      <Filter>Source Files\core\scene\tessellation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\tessellation\displacement_mapper.cpp">
-      <Filter>Source Files\core\scene\tessellation</Filter>
-    </ClInclude>
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClCompile>
@@ -288,6 +282,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp">
       <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\tessellation\cam_dist.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\tessellation\displacement_mapper.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -362,9 +362,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\scene.hpp">
       <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\util\flag.hpp">
-      <Filter>Source Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\material.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
@@ -986,6 +983,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp">
       <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\flag.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

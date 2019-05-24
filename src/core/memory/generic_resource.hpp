@@ -4,7 +4,6 @@
 #include "dyntype_memory.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/assert.hpp"
-#include "util/flag.hpp"
 #include "core/memory/residency.hpp"
 #include "core/concepts.hpp"
 
@@ -38,38 +37,38 @@ public:
 	//char* acquire(bool sync = true) {
 	//	if(sync)
 	//		synchronize<dev>();
-	//	else if(m_mem.template get<unique_device_ptr<dev, char[]>>() == nullptr && m_size != 0u)
-	//		m_mem.template get<unique_device_ptr<dev, char[]>>() = make_udevptr_array<dev, char>(m_size);
+	//	else if(m_mem.template get<SyncedDevPtr<dev>>() == nullptr && m_size != 0u)
+	//		m_mem.template get<SyncedDevPtr<dev>>() = make_udevptr_array<dev, char>(m_size);
 	//	// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
-	//	auto* pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
+	//	auto* pMem = m_mem.template get<SyncedDevPtr<dev>>().get();
 	//	return pMem;
 	//}
 	//template < Device dev >
 	//const char* acquire_const(bool sync = true) {
 	//	if(sync)
 	//		synchronize<dev>();
-	//	else if(m_mem.template get<unique_device_ptr<dev, char[]>>() == nullptr && m_size != 0u)
-	//		m_mem.template get<unique_device_ptr<dev, char[]>>() = make_udevptr_array<dev, char>(m_size);
-	//	auto* pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
+	//	else if(m_mem.template get<SyncedDevPtr<dev>>() == nullptr && m_size != 0u)
+	//		m_mem.template get<SyncedDevPtr<dev>>() = make_udevptr_array<dev, char>(m_size);
+	//	auto* pMem = m_mem.template get<SyncedDevPtr<dev>>().get();
 	//	return pMem;
 	//}
 	template < Device dev >
 	ArrayDevHandle_t<dev, char> acquire(bool sync = true) {
 		if(sync)
 			synchronize<dev>();
-		else if(m_mem.template get<unique_device_ptr<dev, char[]>>() == nullptr && m_size != 0u)
-			m_mem.template get<unique_device_ptr<dev, char[]>>() = make_udevptr_array<dev, char>(m_size);
+		else if(m_mem.template get<SyncedDevPtr<dev>>().ptr == nullptr && m_size != 0u)
+			m_mem.template get<SyncedDevPtr<dev>>().ptr = make_udevptr_array<dev, char>(m_size);
 		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
-		auto pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
+		auto pMem = m_mem.template get<SyncedDevPtr<dev>>().ptr.get();
 		return pMem;
 	}
 	template < Device dev >
 	ConstArrayDevHandle_t<dev, char> acquire_const(bool sync = true) {
 		if(sync)
 			synchronize<dev>();
-		else if(m_mem.template get<unique_device_ptr<dev, char[]>>() == nullptr && m_size != 0u)
-			m_mem.template get<unique_device_ptr<dev, char[]>>() = make_udevptr_array<dev, char>(m_size);
-		auto pMem = m_mem.template get<unique_device_ptr<dev, char[]>>().get();
+		else if(m_mem.template get<SyncedDevPtr<dev>>().ptr == nullptr && m_size != 0u)
+			m_mem.template get<SyncedDevPtr<dev>>().ptr = make_udevptr_array<dev, char>(m_size);
+		auto pMem = m_mem.template get<SyncedDevPtr<dev>>().ptr.get();
 		return pMem;
 	}
 
@@ -79,28 +78,30 @@ public:
 
 	template < Device dev >
 	void unload() {
-		m_mem.template get<unique_device_ptr<dev, char[]>>() = nullptr;
+		m_mem.template get<SyncedDevPtr<dev>>().ptr = nullptr;
+		m_mem.template get<SyncedDevPtr<dev>>().synced = false;
 	}
 
-	void mark_changed(Device changed) noexcept {
-		m_dirty.mark_changed(changed);
-	}
-
-	void mark_synced(Device synced) noexcept {
-		m_dirty.mark_synced(synced);
-	}
+	void mark_changed(Device changed) noexcept;
 
 	template < Device dev >
 	bool is_resident() const noexcept {
-		return m_mem.template get<unique_device_ptr<dev, char[]>>() != nullptr;
+		return m_mem.template get<SyncedDevPtr<dev>>().ptr != nullptr;
 	}
 private:
+	template < Device dev >
+	struct SyncedDevPtr {
+		static constexpr Device DEVICE = dev;
+		
+		unique_device_ptr<dev, char[]> ptr;
+		bool synced = false;
+	};
+
 	std::size_t m_size;
-	util::DirtyFlags<Device> m_dirty;
 	util::TaggedTuple<
-		unique_device_ptr<Device::CPU, char[]>,
-		unique_device_ptr<Device::CUDA, char[]>,
-		unique_device_ptr<Device::OPENGL, char[]>> m_mem;
+		SyncedDevPtr<Device::CPU>,
+		SyncedDevPtr<Device::CUDA>,
+		SyncedDevPtr<Device::OPENGL>> m_mem;
 };
 template struct DeviceManagerConcept<GenericResource>;
 

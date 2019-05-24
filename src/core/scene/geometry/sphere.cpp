@@ -74,7 +74,7 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
 	spheres[newIndex].center = point;
 	spheres[newIndex].radius = radius;
-	m_attributes.mark_changed(Device::CPU, m_spheresHdl);
+	m_attributes.mark_changed(Device::CPU);
 	// Expand bounding box
 	m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ei::Sphere{ point, radius }} };
 	return hdl;
@@ -83,7 +83,7 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
 	SphereHandle hdl = this->add(point, radius);
 	m_attributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
-	m_attributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_attributes.mark_changed(Device::CPU);
 	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
@@ -158,7 +158,7 @@ void Spheres::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(spheres[i].center + ei::Vec3(spheres[i].radius)), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(spheres[i].center - ei::Vec3(spheres[i].radius)), m_boundingBox.min);
 	}
-	m_attributes.mark_changed(Device::CPU, m_spheresHdl);
+	m_attributes.mark_changed(Device::CPU);
 	// TODO: Apply transformation to UV Coordinates
 }
 

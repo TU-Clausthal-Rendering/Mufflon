@@ -2,6 +2,7 @@
 
 #include "lod.hpp"
 #include <memory>
+#include "util/flag.hpp"
 #include "util/string_view.hpp"
 #include <vector>
 
