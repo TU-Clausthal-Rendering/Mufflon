@@ -19,6 +19,8 @@ constexpr inline u32 get_inner_vertex_index(const u32 edgeIndex, const u32 index
 	return 0u;
 }
 
+constexpr float PHONGTESS_ALPHA = 0.5f;
+
 } // namespace
 
 void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
@@ -310,7 +312,7 @@ void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge
 	// Use phong tessellation to have the tessellation do something useful in absence
 	// of displacement mapping
 	const ei::Vec3 pos = ei::lerp(p0, p1, x);
-	const ei::Vec3 normal = ei::lerp(n0, n1, x);
+	const ei::Vec3 normal = normalize(ei::lerp(n0, n1, x));
 	const ei::Vec2 uv = ei::lerp(util::pun<ei::Vec2>(m_mesh->texcoord2D(from)),
 								 util::pun<ei::Vec2>(m_mesh->texcoord2D(to)), x);
 
@@ -318,7 +320,8 @@ void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge
 		const ei::Vec3 plane0 = pos - ei::dot(pos - p0, n0) * n0;
 		const ei::Vec3 plane1 = pos - ei::dot(pos - p1, n1) * n1;
 		const ei::Vec3 phongPos = ei::lerp(plane0, plane1, x);
-		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(phongPos));
+		const ei::Vec3 outPos = lerp(pos, phongPos, PHONGTESS_ALPHA);
+		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(outPos));
 	} else {
 		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(pos));
 	}
@@ -341,7 +344,7 @@ void Tessellater::set_quad_inner_vertex(const float x, const float y,
 	const ei::Vec3 n3 = util::pun<ei::Vec3>(m_mesh->normal(vertices[3u]));
 
 	// TODO: use shading normals to adjust point
-	const ei::Vec3 normal = ei::bilerp(n0, n1, n3, n2, x, y);
+	const ei::Vec3 normal = normalize(ei::bilerp(n0, n1, n3, n2, x, y));
 	const ei::Vec3 pos = ei::bilerp(p0, p1, p3, p2, x, y);
 	const ei::Vec2 uv = ei::bilerp(util::pun<ei::Vec2>(m_mesh->texcoord2D(vertices[0u])),
 								   util::pun<ei::Vec2>(m_mesh->texcoord2D(vertices[1u])),
@@ -358,7 +361,8 @@ void Tessellater::set_quad_inner_vertex(const float x, const float y,
 		const ei::Vec3 plane2 = pos - ei::dot(pos - p2, n2) * n2;
 		const ei::Vec3 plane3 = pos - ei::dot(pos - p3, n3) * n3;
 		const ei::Vec3 phongPos = ei::bilerp(plane0, plane1, plane3, plane2, x, y);
-		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(phongPos));
+		const ei::Vec3 outPos = lerp(pos, phongPos, PHONGTESS_ALPHA);
+		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(outPos));
 	} else {
 		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(pos));
 	}
@@ -380,7 +384,7 @@ void Tessellater::set_triangle_inner_vertex(const float x, const float y,
 	const ei::Vec3 n2 = util::pun<ei::Vec3>(m_mesh->normal(vertices[2u]));
 
 	const ei::Vec3 pos = x * p0 + y * p1 + (1.f - x - y) * p2;
-	const ei::Vec3 normal = x * n0 + y * n1 + (1.f - x - y) * n2;
+	const ei::Vec3 normal = normalize(x * n0 + y * n1 + (1.f - x - y) * n2);
 	const ei::Vec2 uv = x * util::pun<ei::Vec2>(m_mesh->texcoord2D(vertices[0u]))
 		+ y * util::pun<ei::Vec2>(m_mesh->texcoord2D(vertices[1u]))
 		+ (1.f - x - y) * util::pun<ei::Vec2>(m_mesh->texcoord2D(vertices[2u]));
@@ -392,7 +396,8 @@ void Tessellater::set_triangle_inner_vertex(const float x, const float y,
 		const ei::Vec3 plane1 = pos - ei::dot(pos - p1, n1) * n1;
 		const ei::Vec3 plane2 = pos - ei::dot(pos - p2, n2) * n2;
 		const ei::Vec3 phongPos = x * plane0 + y * plane1 + (1.f - x - y) * plane2;
-		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(phongPos));
+		const ei::Vec3 outPos = lerp(pos, phongPos, PHONGTESS_ALPHA);
+		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(outPos));
 	} else {
 		m_mesh->set_point(vertex, util::pun<OpenMesh::Vec3f>(pos));
 	}

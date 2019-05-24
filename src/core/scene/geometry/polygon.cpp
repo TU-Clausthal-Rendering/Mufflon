@@ -394,7 +394,7 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 	m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
 	tessellater.set_material_idx_hdl(matIdxProp);
 
-	tessellater.set_phong_tessellation(false);
+	tessellater.set_phong_tessellation(true);
 	tessellater.tessellate(*m_meshData);
 
 	this->mark_changed(Device::CPU);
