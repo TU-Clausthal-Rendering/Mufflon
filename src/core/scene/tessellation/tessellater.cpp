@@ -266,11 +266,11 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 																   edgeIndex, outerVertices, from, to, tempFace,
 																   false, true);
 						} else {
-							// We can't put a quad with our previous edge, but maybe with the next one?
-							// So don't spawn a triangle strip if we don't need to
+							// We can't put a quad with our previous edge
 							this->spawn_outer_corner_triangles(innerLevel, startInner, startOuter, outerQuadCount,
 																edgeIndex, outerVertices, from, to, tempFace,
-																true, nextOuterVertices.count != innerLevel);
+																true, innerLevel != outerVertices.count);
+
 						}
 					} else {
 						// Triangle strip only
