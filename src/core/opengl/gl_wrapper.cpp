@@ -152,4 +152,14 @@ namespace mufflon::gl {
 		mAssert(h);
 		glMakeTextureHandleNonResidentARB(h);
 	}
+
+    Handle genSampler() {
+		Handle res;
+		glGenSamplers(1, &res);
+		return res;
+	}
+
+    void samplerParameter(Handle h, SamplerParameterI param, int value) {
+		glSamplerParameteri(h, GLenum(param), value);
+	}
 }

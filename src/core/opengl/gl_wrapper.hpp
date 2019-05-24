@@ -81,4 +81,23 @@ namespace gl {
 	TextureHandle getTextureSamplerHandle(Handle tex, Handle sampler);
 	void makeTextureHandleResident(TextureHandle h);
 	void makeTextureHandleNonResident(TextureHandle h);
+
+    enum class SamplerParameterI {
+        WrapR = 0x8072,
+        WrapS = 0x2802,
+        WrapT = 0x2803,
+        MinFilter = 0x2801,
+        MagFilter = 0x2800,
+    };
+
+	constexpr int WRAP_REPEAT = 0x2901;
+	constexpr int FILTER_NEAREST = 0x2600;
+	constexpr int FILTER_LINEAR = 0x2601;
+	constexpr int FILTER_NEAREST_MIPMAP_NEAREST = 0x2700;
+	constexpr int FILTER_NEAREST_MIPMAP_LINEAR = 0x2702;
+	constexpr int FILTER_LINEAR_MIPMAP_NEAREST = 0x2701;
+	constexpr int FILTER_LINEAR_MIPMAP_LINEAR = 0x2703;
+
+	Handle genSampler();
+	void samplerParameter(Handle h, SamplerParameterI param, int value);
 }}

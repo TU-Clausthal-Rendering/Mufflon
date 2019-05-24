@@ -214,6 +214,7 @@ public:
 		return static_cast<std::size_t>(m_width * m_height * m_numLayers * PIXEL_SIZE(m_format));
 	}
 
+	static gl::Handle get_gl_sampler(SamplingMode mode);
 private:
 	// Information
 	u16 m_width;

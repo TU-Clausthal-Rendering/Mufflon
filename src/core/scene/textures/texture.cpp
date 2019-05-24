@@ -63,6 +63,28 @@ Texture::~Texture() {
     }
 }
 
+gl::Handle Texture::get_gl_sampler(SamplingMode mode) {
+	static gl::Handle linSampler = 0;
+	static gl::Handle nearSampler = 0;
+	gl::Handle& id = mode == SamplingMode::LINEAR ? linSampler : nearSampler;
+	// sampler already generated?
+    if (id) return id;
+
+    // generate sampler
+	id = gl::genSampler();
+	gl::samplerParameter(id, gl::SamplerParameterI::WrapS, gl::WRAP_REPEAT);
+	gl::samplerParameter(id, gl::SamplerParameterI::WrapT, gl::WRAP_REPEAT);
+	gl::samplerParameter(id, gl::SamplerParameterI::WrapR, gl::WRAP_REPEAT);
+
+    // TODO set mipmaps
+	gl::samplerParameter(id, gl::SamplerParameterI::MinFilter,
+		mode == SamplingMode::LINEAR ? gl::FILTER_LINEAR : gl::FILTER_NEAREST);
+	gl::samplerParameter(id, gl::SamplerParameterI::MagFilter,
+		mode == SamplingMode::LINEAR ? gl::FILTER_LINEAR : gl::FILTER_NEAREST);
+    // TODO set anisotrophy
+	return id;
+}
+
 template < Device dev >
 void Texture::synchronize() {
 	if(m_dirty.has_competing_changes())
@@ -296,8 +318,7 @@ void Texture::create_texture_opengl() {
     // TODO mipmaps?
 	gl::texStorage3D(m_glHandle, 1, m_glFormat.internal, m_width, m_height, m_numLayers);
     // create bindless texture
-	m_glTexture = gl::getTextureHandle(m_glHandle);
-    // TODO create sampler?
+	m_glTexture = gl::getTextureSamplerHandle(m_glHandle, get_gl_sampler(m_mode));
 }
 
 } // namespace mufflon::scene::textures
