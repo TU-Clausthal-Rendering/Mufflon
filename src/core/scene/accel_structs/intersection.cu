@@ -265,8 +265,6 @@ CUDA_FUNCTION bool intersects_primitve(
 	} else {
 		mAssert(primId < obj.numPrimitives);
 		// Sphere.
-		// Masking not possible for spheres: in case of transparent objects we need
-		// self intersections inside.
 		const ei::Sphere& sph = obj.spheres.spheres[primId];
 		// Because it is important if we start incide or outside it is better
 		// to modify the ray beforehand. Testing for tmin afterwards is buggy.
