@@ -147,19 +147,15 @@ void Spheres::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 		-std::numeric_limits<float>::max()
 	};
 	// Transform mesh
-	ei::Mat3x3 rotation(transMat);
-	ei::Vec3 translation(transMat[3], transMat[7], transMat[11]);
 	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
 	for (size_t i = 0; i < this->get_sphere_count(); i++) {
 		mAssert(scale.x == scale.y && scale.y == scale.z);
 		spheres[i].radius *= scale.x;
-		spheres[i].center = rotation * spheres[i].center;
-		spheres[i].center += translation;
+		spheres[i].center = ei::transform(spheres[i].center, transMat);
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(spheres[i].center + ei::Vec3(spheres[i].radius)), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(spheres[i].center - ei::Vec3(spheres[i].radius)), m_boundingBox.min);
 	}
 	m_attributes.mark_changed(Device::CPU);
-	// TODO: Apply transformation to UV Coordinates
 }
 
 // Gets the descriptor with only default attributes (position etc)
