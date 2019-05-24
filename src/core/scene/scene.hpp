@@ -173,7 +173,7 @@ private:
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, LodDescriptor<Device::CPU>[]>,
 		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>,
-		unique_device_ptr<Device::OPENGL, LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
+		unique_device_ptr<NotGl<Device::OPENGL>, LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
@@ -184,8 +184,7 @@ private:
 		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_invInstTransformsDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, u32[]>,
-		unique_device_ptr<Device::CUDA, u32[]>,
-		unique_device_ptr<Device::OPENGL, u32[]>> m_instLodIndicesDesc;
+		unique_device_ptr<Device::CUDA, u32[]>> m_instLodIndicesDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Box[]>,
 		unique_device_ptr<Device::CUDA, ei::Box[]>,

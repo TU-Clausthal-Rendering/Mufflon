@@ -215,8 +215,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		}
 
 		// Allocate the device memory and copy over the descriptors
-		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
-		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
+		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
+		lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodDescs.size());
 		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
 		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
@@ -227,8 +227,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(invInstanceTransformations.size());
 		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), sizeof(ei::Mat3x4) * invInstanceTransformations.size());
 
-		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
-		instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
+		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<NotGl<dev>, u32[]>>();
+		instLodIndicesDesc = make_udevptr_array<NotGl<dev>, u32>(lodIndices.size());
 		copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
@@ -277,8 +277,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 			lodDescs.back().previous = prevLevel;
 		}
 		// Allocate the device memory and copy over the descriptors
-		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<dev, LodDescriptor<dev>[]>>();
-		lodDevDesc = make_udevptr_array<dev, LodDescriptor<dev>>(lodDescs.size());
+		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
+		lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodDescs.size());
 		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 		sceneDescriptor.lods = lodDevDesc.get();
 	}

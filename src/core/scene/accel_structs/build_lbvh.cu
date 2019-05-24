@@ -759,6 +759,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 
 template < Device dev >
 void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB) {
+	if(dev == Device::OPENGL) return;
 	build_lbvh<LodDescriptor<dev>>(obj, currentBB, obj.numPrimitives);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
