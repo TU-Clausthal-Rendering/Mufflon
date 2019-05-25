@@ -39,6 +39,8 @@ namespace gui.Controller.Renderer
             m_models.Statusbar.UpdateMemory();
 
             // Try to acquire the lock - if we're waiting, we're not rendering
+            if(m_shouldExit)
+                return;
             m_models.Renderer.RenderLock.WaitOne();
             // Check if we've been shut down
             if(m_shouldExit)
