@@ -258,7 +258,6 @@ void DisplacementMapper::post_tessellate() {
 			for(i64 i = 0; i < static_cast<i64>(m_mesh->n_vertices()); ++i) {
 				const auto vertex = m_mesh->vertex_handle(static_cast<u32>(i));
 				
-				float angleSum = 0.f;
 				ei::Vec3 normal{ 0.f };
 
 				typename geometry::PolygonMeshType::Normal inHeVec;
@@ -266,17 +265,18 @@ void DisplacementMapper::post_tessellate() {
 				if(!heIter.is_valid())
 					continue;
 				m_mesh->calc_edge_vector(*heIter, inHeVec);
+				ei::Vec3 normInHeVec = ei::normalize(util::pun<ei::Vec3>(inHeVec));
 				for(; heIter.is_valid(); ++heIter) {
 					if(m_mesh->is_boundary(*heIter))
 						continue;
 					OpenMesh::HalfedgeHandle outHeh(m_mesh->next_halfedge_handle(*heIter));
 					typename geometry::PolygonMeshType::Normal outHeVec;
 					m_mesh->calc_edge_vector(outHeh, outHeVec);
-					const float angle = std::acos(-OpenMesh::dot(inHeVec, outHeVec));
-					normal += ei::normalize(util::pun<ei::Vec3>(OpenMesh::cross(inHeVec, outHeVec))) * angle;
-					angleSum += angle;
-					inHeVec = outHeVec;
-					inHeVec *= -1;//change the orientation
+					const auto normOutHeVec = ei::normalize(util::pun<ei::Vec3>(outHeVec));
+					const float angle = std::acos(-ei::dot(normOutHeVec, normInHeVec));
+					normal += ei::cross(normInHeVec, normOutHeVec) * angle;
+					normInHeVec = normOutHeVec;
+					normInHeVec *= -1;//change the orientation
 				}
 
 	/*#pragma warning(push)

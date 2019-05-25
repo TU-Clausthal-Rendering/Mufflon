@@ -218,7 +218,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 					const u32 nextEdgeIndex = edgeIndex + 1u < vertexCount ? (edgeIndex + 1u) : 0u;
 					const AddedVertices& nextOuterVertices = vertices[nextEdgeIndex].second;
 
-					if(outerVertices.count > 1 && innerLevel > 1 && outerVertices.count % 2 == innerLevel % 2) {
+					if(outerVertices.count % 2 == innerLevel % 2) {
 						// Determine what vertex the quads start at
 						u32 startInner, startOuter;
 						if(innerLevel <= outerVertices.count) {
@@ -269,7 +269,8 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 							// We can't put a quad with our previous edge
 							this->spawn_outer_corner_triangles(innerLevel, startInner, startOuter, outerQuadCount,
 																edgeIndex, outerVertices, from, to, tempFace,
-																true, innerLevel != outerVertices.count);
+																true, innerLevel != outerVertices.count
+																	|| innerLevel != nextOuterVertices.count);
 
 						}
 					} else {
