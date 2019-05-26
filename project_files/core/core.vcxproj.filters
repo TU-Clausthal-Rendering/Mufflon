@@ -298,6 +298,9 @@
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1004,6 +1007,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h">
       <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

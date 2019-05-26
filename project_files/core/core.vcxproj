@@ -35,6 +35,7 @@
     <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp" />
     <ClCompile Include="..\..\src\core\renderer\vcm\cpu_vcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
@@ -224,6 +225,7 @@
     <ClInclude Include="..\..\src\core\renderer\vcm\cpu_vcm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\vcm\vcm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\cpu_wireframe.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\gpu_wireframe.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_params.hpp" />
