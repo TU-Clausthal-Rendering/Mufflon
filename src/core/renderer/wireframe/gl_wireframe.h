@@ -2,6 +2,7 @@
 
 #include "wireframe_params.hpp"
 #include "core/renderer/gl_renderer_base.h"
+#include "core/opengl/gl_pipeline.h"
 
 namespace mufflon::renderer {
     
@@ -21,5 +22,8 @@ private:
 	WireframeParameters m_params = {};
 	ei::Mat4x4 m_viewProjMatrix;
 	gl::Program m_program;
+
+	gl::Pipeline m_pipe;
+	gl::VertexArray m_vao;
 };
 }

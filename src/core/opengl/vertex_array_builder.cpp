@@ -6,6 +6,7 @@ namespace mufflon::gl {
 
     VertexArrayBuilder::VertexArrayBuilder() {
 		glGenVertexArrays(1, &m_id);
+		glBindVertexArray(m_id);
     }
 
 	static GLenum get_float_type(uint32_t byteSize) {

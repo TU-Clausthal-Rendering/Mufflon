@@ -84,11 +84,11 @@ struct DepthStencilState
 };
 
 enum class BlendOp {
-	ADD = 0x8006,
-	SUBTRACT = 0x800A,
-	REVERSE_SUBTRACT = 0x800B,
-	MIN = 0x8007,
-	MAX = 0x8008
+	Add = 0x8006,
+	Subtract = 0x800A,
+	ReverseSubtract = 0x800B,
+	Min = 0x8007,
+	Max = 0x8008
 };
 
 enum class LogicOp {
@@ -125,20 +125,20 @@ enum class BlendFactor {
 
 // Logic and alphablending exclude each other globally for all buffers.
 enum class BlendMode {
-	DISABLE,
-	BLEND,
-	LOGIC
+	Disable,
+	Blend,
+	Logic
 };
 
 struct BlendState {
     struct RenderTarget {
 		BlendFactor srcColorFactor = BlendFactor::One, srcAlphaFactor = BlendFactor::One;
 		BlendFactor dstColorFactor = BlendFactor::Zero, dstAlphaFactor = BlendFactor::Zero;
-		BlendOp colorBlendOp = BlendOp::ADD;
-		BlendOp alphaBlendOp = BlendOp::ADD;
+		BlendOp colorBlendOp = BlendOp::Add;
+		BlendOp alphaBlendOp = BlendOp::Add;
     } renderTarget[8];
 
-	BlendMode enableBlending = BlendMode::DISABLE;
+	BlendMode enableBlending = BlendMode::Disable;
 	LogicOp logicOp = LogicOp::Copy;
 	bool alphaToCoverage = false;
 };
@@ -149,5 +149,7 @@ struct Pipeline {
 	BlendState blend;
 
 	gl::Handle program = 0;
+	gl::Handle vertexArray = 0;
+	gl::Handle framebuffer = 0;
 };
 }

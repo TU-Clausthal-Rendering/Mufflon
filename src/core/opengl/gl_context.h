@@ -6,7 +6,7 @@ class Context {
 public:
 	static void set(const Pipeline& pipeline);
 private:
-	Context() = default;
+	Context();
 	static Context& get();
 
 	struct State {
@@ -15,5 +15,6 @@ private:
 		BlendState blend;
         // sampler might get added later
 	} m_state;
+	VertexArray m_emptyVao;
 };
 }

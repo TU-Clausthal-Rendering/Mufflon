@@ -7,6 +7,9 @@ namespace mufflon::gl {
 void Context::set(const Pipeline& pipeline) {
 	auto& state = get().m_state;
 
+	mAssert(pipeline.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, pipeline.framebuffer);
+
 	if(state.rasterizer.cullMode != pipeline.rasterizer.cullMode)
 	{
 		if(pipeline.rasterizer.cullMode == CullMode::None)
@@ -125,11 +128,11 @@ void Context::set(const Pipeline& pipeline) {
 	// ***** Blend state ******************************************************
 	if(state.blend.enableBlending != pipeline.blend.enableBlending)
 	{
-		if(pipeline.blend.enableBlending == BlendMode::BLEND) {
+		if(pipeline.blend.enableBlending == BlendMode::Blend) {
 			glEnable(GL_BLEND);
 			glDisable(GL_COLOR_LOGIC_OP);
 		}
-		else if(pipeline.blend.enableBlending == BlendMode::LOGIC)
+		else if(pipeline.blend.enableBlending == BlendMode::Logic)
 			glEnable(GL_COLOR_LOGIC_OP);
 		else {
 			glDisable(GL_BLEND);
@@ -137,7 +140,7 @@ void Context::set(const Pipeline& pipeline) {
 		}
 		state.blend.enableBlending = pipeline.blend.enableBlending;
 	}
-	if(state.blend.enableBlending == BlendMode::BLEND)
+	if(state.blend.enableBlending == BlendMode::Blend)
 	{
 		for(int i = 0; i < 8; ++i)
 		{
@@ -181,7 +184,14 @@ void Context::set(const Pipeline& pipeline) {
 	mAssert(pipeline.program);
     glUseProgram(pipeline.program);
 
-	// TODO vertex format
+	if(pipeline.vertexArray)
+		glBindVertexArray(pipeline.vertexArray);
+	else // bind empty vertex format
+		glBindVertexArray(get().m_emptyVao);
+}
+
+Context::Context() {
+	glGenVertexArrays(1, &m_emptyVao);
 }
 
 Context& Context::get() {
