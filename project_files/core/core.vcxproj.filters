@@ -301,6 +301,12 @@
     <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_context.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\vertex_array_builder.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1010,6 +1016,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_context.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h">
+      <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

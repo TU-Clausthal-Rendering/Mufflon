@@ -7,7 +7,7 @@ namespace mufflon::renderer {
     
 class GlWireframe final : public GlRendererBase {
 public:
-	GlWireframe() = default;
+	GlWireframe();
 	~GlWireframe() = default;
 
 	void iterate() final;
@@ -19,5 +19,7 @@ public:
 
 private:
 	WireframeParameters m_params = {};
+	ei::Mat4x4 m_viewProjMatrix;
+	gl::Program m_program;
 };
 }
