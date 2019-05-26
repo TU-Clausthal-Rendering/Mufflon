@@ -21,6 +21,7 @@
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp" />
+    <ClCompile Include="..\..\src\core\opengl\program_builder.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
@@ -190,6 +191,7 @@
     <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp" />
     <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp" />
     <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\program_builder.h" />
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />

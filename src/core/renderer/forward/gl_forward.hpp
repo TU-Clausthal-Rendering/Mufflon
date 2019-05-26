@@ -9,7 +9,7 @@ class GlForward final : public RendererBase<Device::OPENGL> {
 public:
 	// Initialize all resources required by this renderer
 	GlForward() = default;
-	~GlForward() = default;
+	~GlForward() { unload(); }
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
@@ -17,9 +17,19 @@ public:
 	StringView get_short_name() const noexcept final { return "FW"; }
 
 	void on_descriptor_requery() final;
+    void on_reset() override;
 
 private:
+	void unload();
+
 	ForwardParameters m_params = {};
+	// render targets
+    gl::Handle m_depthTarget;
+	gl::Handle m_colorTarget;
+
+	gl::Handle m_framebuffer;
+
+	gl::Handle m_copyShader;
 };
 
 
