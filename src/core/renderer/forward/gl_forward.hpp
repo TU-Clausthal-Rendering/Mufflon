@@ -1,12 +1,12 @@
 #pragma once
 
 #include "forward_params.hpp"
-#include "core/renderer/renderer_base.hpp"
 #include "core/opengl/gl_object.h"
+#include "core/renderer/gl_renderer_base.h"
 
 namespace mufflon::renderer {
 	
-class GlForward final : public RendererBase<Device::OPENGL> {
+class GlForward final : public GlRendererBase {
 public:
 	// Initialize all resources required by this renderer
 	GlForward();
@@ -22,13 +22,6 @@ public:
 
 private:
 	ForwardParameters m_params = {};
-	// render targets
-    gl::Texture m_depthTarget;
-	gl::Texture m_colorTarget;
-
-	gl::Framebuffer m_framebuffer;
-
-	gl::Program m_copyShader;
 };
 
 

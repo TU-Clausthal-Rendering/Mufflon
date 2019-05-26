@@ -4,25 +4,16 @@
 
 namespace mufflon::renderer {
 
+GlForward::GlForward() {
+
+}
+
 void GlForward::on_descriptor_requery() {
 
 }
 
 void GlForward::on_reset() {
-    // create textures
-	glGenTextures(1, &m_colorTarget);
-	glBindTexture(GL_TEXTURE_2D, m_colorTarget);
-	glTextureStorage2D(m_colorTarget, 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-
-    // create framebuffer
-	glGenFramebuffers(1, &m_framebuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
-	glNamedFramebufferTexture(m_framebuffer, GL_COLOR_ATTACHMENT0, m_colorTarget, 0);
-	const auto fbStatus = glCheckNamedFramebufferStatus(m_framebuffer, GL_DRAW_FRAMEBUFFER);
-	mAssert(fbStatus == GL_FRAMEBUFFER_COMPLETE);
-	const GLenum attachments[] = { GL_COLOR_ATTACHMENT0 };
-	glNamedFramebufferDrawBuffers(m_framebuffer, 1, attachments);
-
+	GlRendererBase::on_reset();
 	/*m_copyShader = gl::ProgramBuilder().add_source(gl::ShaderType::Vertex, R"(
     #version 460
 	void main() {
@@ -43,46 +34,10 @@ void GlForward::on_reset() {
 	
 }
 
-GlForward::GlForward() {
-	m_copyShader = gl::ProgramBuilder().add_source(gl::ShaderType::Compute, R"(   
-    #version 460
-    layout(local_size_x = 16, local_size_y  = 16) in;
-    layout(binding = 0) uniform sampler2D src_image;
-    layout(binding = 0) writeonly restrict buffer dst_buffer {
-        float data[];
-    };
-    layout(location = 0) uniform uvec2 size;
-
-    void main(){
-        vec3 color = texelFetch(src_image, ivec2(gl_GlobalInvocationID), 0).rgb;
-        if(gl_GlobalInvocationID.x >= size.x) return;
-        if(gl_GlobalInvocationID.y >= size.y) return;
-
-        uint index = gl_GlobalInvocationID.y * size.x + gl_GlobalInvocationID.x;
-        data[3 * index] = color.r;
-        data[3 * index + 1] = color.g;
-        data[3 * index + 2] = color.b;
-    }
-    )").build();
-}
-
 void GlForward::iterate() {
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
-	glViewport(0, 0, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-	glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	begin_frame({ 0.0f, 0.0f, 1.0f, 1.0f });
 
-    // copy image from texture to buffer
-	glUseProgram(m_copyShader);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_colorTarget);
-	auto dstBuf = m_outputBuffer.m_targets[RenderTargets::RADIANCE];
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, dstBuf.id);
-	glProgramUniform2ui(m_copyShader, 0, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-
-	glDispatchCompute(m_outputBuffer.get_width() / 16 + 1, m_outputBuffer.get_height() / 16 + 1, 1);
-
-	glFlush();
+	end_frame();
 }
 
 } // namespace mufflon::renderer

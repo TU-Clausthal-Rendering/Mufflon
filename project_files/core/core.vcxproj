@@ -25,6 +25,7 @@
     <ClCompile Include="..\..\src\core\opengl\program_builder.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\gpu_lt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\gl_forward.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h" />
     <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\gpu_lt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\lt_common.hpp" />
