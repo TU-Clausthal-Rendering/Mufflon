@@ -407,7 +407,6 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescr
 	const float cDist = sqrtf(cDistSq);
 	connectionDir /= cDist;
 	// Compute the contribution (diffIrradiance)
-	// TODO: instance rotation on globalDir?
 	auto& mat = scene.get_material(light.material);
 	materials::ParameterPack matParams;
 	materials::fetch(mat, textures::direction_to_uv(globalDir), &matParams);

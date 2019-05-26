@@ -23,7 +23,6 @@ Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, Format 
 		// A file loader provides an array with pixel data. This is loaded into
 		// a CPUTexture per default.
 		create_texture_cpu(move(data));
-		m_dirty.mark_changed(Device::CPU);
 	}
 }
 
@@ -34,7 +33,6 @@ Texture::Texture(Texture&& tex) noexcept :
 	m_format(tex.m_format),
 	m_mode(tex.m_mode),
 	m_sRgb(tex.m_sRgb),
-	m_dirty(tex.m_dirty),
 	m_cpuTexture(std::move(tex.m_cpuTexture)),
 	m_cudaTexture(tex.m_cudaTexture),
 	m_glHandle(tex.m_glHandle),
@@ -54,6 +52,7 @@ Texture::~Texture() {
 		cuda::check_error(cudaDestroyTextureObject(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>().handle));
 		cuda::check_error(cudaDestroySurfaceObject(m_handles.get<TextureDevHandle_t<Device::CUDA>>().handle));
 		cuda::check_error(cudaFreeArray(m_cudaTexture));
+		m_cudaTexture = nullptr;
 		m_cudaTexture = nullptr;
 	}
     if(m_glHandle) {
@@ -86,59 +85,54 @@ gl::Handle Texture::get_gl_sampler(SamplingMode mode) {
 
 template < Device dev >
 void Texture::synchronize() {
-	if(m_dirty.has_competing_changes())
-		logError("[Texture::synchronize] Competing changes for this texture. Some changes will be lost.");
-	if(m_dirty.needs_sync(dev)) {
-		// Create texture resources if necessary
-		if(!is_valid(m_constHandles.get<ConstTextureDevHandle_t<dev>>())) {
-			switch(dev) {
-				case Device::CPU: create_texture_cpu(); break;
-				case Device::CUDA: create_texture_cuda(); break;
-				case Device::OPENGL: create_texture_opengl(); break;
-				default: mAssert(false);
-			}
+	// Create texture resources if necessary
+	if(!is_valid(m_constHandles.get<ConstTextureDevHandle_t<dev>>())) {
+		switch(dev) {
+			case Device::CPU: create_texture_cpu(); break;
+			case Device::CUDA: create_texture_cuda(); break;
+			case Device::OPENGL: create_texture_opengl(); break;
+			default: mAssert(false);
 		}
-		// Copy the memory (wherever it changed)
-		if((dev == Device::CUDA) && m_dirty.has_changes(Device::CPU)) {
+	}
+
+	// Check from which device to copy
+	if(dev != Device::CPU && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>())) {
+		if(dev == Device::CUDA) {
 			cudaMemcpy3DParms copyParams{ 0u };
 			copyParams.srcPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
 			copyParams.dstArray = m_cudaTexture;
 			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
 			copyParams.kind = cudaMemcpyDefault;
 			cuda::check_error(cudaMemcpy3D(&copyParams));
+		} else {
+			// TODO: OpenGL
 		}
-		if((dev == Device::CPU) && m_dirty.has_changes(Device::CUDA)) {
+	} else if(dev != Device::CUDA && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>())) {
+		if(dev == Device::CPU) {
 			cudaMemcpy3DParms copyParams{ 0u };
 			copyParams.dstPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
 			copyParams.srcArray = m_cudaTexture;
 			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
 			copyParams.kind = cudaMemcpyDefault;
 			cuda::check_error(cudaMemcpy3D(&copyParams));
+		} else {
+			// TODO: OpenGL
 		}
-        if((dev == Device::OPENGL) && m_dirty.has_changes(Device::CPU)) {
-			gl::texSubImage3D(m_glHandle, 0, 0, 0, 0, m_width, m_height, m_numLayers, m_glFormat.setFormat, m_glFormat.setType, m_cpuTexture->data());
-        }
-	} else {
-		// Alternative: might be that we weren't allocated yet
-		// Create texture resources if necessary
-		if(!is_valid(m_constHandles.get<ConstTextureDevHandle_t<dev>>())) {
-			switch(dev) {
-				case Device::CPU: create_texture_cpu(); break;
-				case Device::CUDA: create_texture_cuda(); break;
-				case Device::OPENGL: create_texture_opengl(); break;
-				default: mAssert(false);
-			}
+	} else if(dev != Device::OPENGL && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>())) {
+		if(dev == Device::CPU) {
+			// TODO
+		} else {
+			// TODO
 		}
 	}
-	m_dirty.mark_synced(dev);
 }
+
 template void Texture::synchronize<Device::CPU>();
 template void Texture::synchronize<Device::CUDA>();
 template void Texture::synchronize<Device::OPENGL>();
 
 template < Device dev >
 void Texture::unload() {
-	m_dirty.redact_change(dev);
 	switch(dev) {
 		case Device::CPU: {
 			if(m_cpuTexture) {

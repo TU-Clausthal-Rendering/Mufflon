@@ -4,7 +4,6 @@
 #include "core/scene/descriptors.hpp"
 #include "core/memory/generic_resource.hpp"
 #include "core/memory/residency.hpp"
-#include "util/flag.hpp"
 #include "accel_struct_info.hpp"
 
 namespace mufflon { namespace scene { namespace accel_struct {

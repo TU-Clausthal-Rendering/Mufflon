@@ -14,7 +14,7 @@ Also, it is unclear for the linked object how it knows to be part of a LOD of so
 
 To solve this problems we define:
 
-1. LODs are linked in a **ring buffer**
+1. LODs are linked in a **ring buffer** linking from higher to lower detailed ones
 2. The **least** detailed LOD must have the **highest "Distance"** in the LOD property
 3. There is a proxy **without geometry** linking one or multiple LODs.\
   The proxy is the object which gets instanced
@@ -27,7 +27,7 @@ Consequence for an exporter: all LODs of one object can be found by following th
 
 * Set renderer to "Blender Game"
 * Create LODs on a separate layer. The objects do not need to have the same translation matrix... (Object space is used from Blender and Exporter).
-* Link all LODs in a big cycle.
+* Link all LODs in a big cycle: higher detailed LODs refer to the next lower detailed one.
 * Adding or removing new LODs is simple by adding/removing an element in the ring.
 * Make sure the least detailed LOD has the highest "Distance" in the LOD property.
 * Create a proxy: e.g. a box, delete its geometry in edit mode, link one or multiple LODs for the blender scene rendering

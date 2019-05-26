@@ -10,7 +10,6 @@
 #include "core/scene/handles.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/textures/texture.hpp"
-#include "util/flag.hpp"
 #include <vector>
 #include <unordered_map>
 
@@ -185,7 +184,6 @@ private:
 	// Keep track of the light count (positional and directional combined)
 	u32 m_lightCount = 0u;
 
-	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<LightTree<Device::CPU>> m_treeCpu;
 	std::unique_ptr<LightTree<Device::CUDA>> m_treeCuda;
 	std::unique_ptr<LightTree<Device::OPENGL>> m_treeOpengl;

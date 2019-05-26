@@ -200,15 +200,9 @@ public:
 	void mark_changed(Device dev) {
 		get_attributes<face>().mark_changed(dev);
 	}
-	void mark_changed(Device dev, VertexAttributeHandle hdl) {
-		m_vertexAttributes.mark_changed(dev, hdl);
-	}
-	void mark_changed(Device dev, FaceAttributeHandle hdl) {
-		m_faceAttributes.mark_changed(dev, hdl);
-	}
-	template < bool face >
-	void mark_changed(Device dev, StringView name) {
-		get_attributes<face>().mark_changed(dev, name);
+	void mark_changed(Device dev) {
+		get_attributes<true>().mark_changed(dev);
+		get_attributes<false>().mark_changed(dev);
 	}
 
 	// Gets the descriptor with only default attributes (position etc)
@@ -467,7 +461,6 @@ private:
 	FaceAttributeHandle m_matIndicesHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
 	IndexBuffers m_indexBuffer;
-	util::DirtyFlags<Device> m_indexFlags;
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
 

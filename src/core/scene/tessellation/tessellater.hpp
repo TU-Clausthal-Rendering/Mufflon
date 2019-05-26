@@ -5,19 +5,22 @@
 #include "core/scene/types.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <ei/vector.hpp>
+#include <tuple>
+#include <vector>
 
 namespace mufflon::scene::tessellation {
 
 // Serves as an oracle for the tessellation level
 class TessLevelOracle {
 public:
+
 	TessLevelOracle() = default;
 
 	// Get the outer tessellation level (ie. the number of new vertices) for the given edge of the given face
 	virtual u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const = 0;
 
-	// Get the inner tessellation level (ie. the number of new vertices) for the given face
-	virtual u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0;
+	virtual u32 get_triangle_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0;
+	virtual std::pair<u32, u32> get_quad_inner_tessellation_level(const OpenMesh::FaceHandle face) const = 0;
 
 	void set_mesh(geometry::PolygonMeshType* mesh) {
 		m_mesh = mesh;
@@ -48,7 +51,6 @@ protected:
 	// the vertices were added
 	struct AddedVertices {
 		OpenMesh::VertexHandle from;
-		OpenMesh::VertexHandle to;
 		u32 offset;
 		u32 count;
 	};
@@ -65,7 +67,7 @@ protected:
 	virtual void set_quad_inner_vertex(const float x, const float y,
 									   const OpenMesh::VertexHandle vertex,
 									   const OpenMesh::FaceHandle face,
-									   const OpenMesh::VertexHandle(&vertices)[4u]);
+									   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 
 	// Set the vertex properties (position, normals etc.) for the newly created inner vertex.
 	// The coordinates x and y are the barycentric coordinates of the vertex with respect to the
@@ -73,7 +75,7 @@ protected:
 	virtual void set_triangle_inner_vertex(const float x, const float y,
 										   const OpenMesh::VertexHandle vertex,
 										   const OpenMesh::FaceHandle face,
-										   const OpenMesh::VertexHandle(&vertices)[4u]);
+										   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 
 	// Set the face properties (material index etc.) for the newly created inner face
 	virtual void set_quad_face_inner(const OpenMesh::FaceHandle original,
@@ -92,7 +94,8 @@ protected:
 										 const OpenMesh::FaceHandle newOuter);
 
 	// Perfoms tessellation for the inner face (quad)
-	virtual void tessellate_inner_quads(const u32 innerLevel, const OpenMesh::FaceHandle original);
+	virtual void tessellate_inner_quads(const u32 innerLevelX, const u32 innerLevelY,
+										const OpenMesh::FaceHandle original);
 	
 	// Performs tessellation for the inner face (triangle)
 	virtual void tessellate_inner_triangles(const u32 innerLevel, const OpenMesh::FaceHandle original);
@@ -113,24 +116,27 @@ protected:
 	bool m_usePhongTessellation = false;
 
 private:
-	void spawn_inner_quad_vertices(const u32 innerLevel,
+	void spawn_inner_quad_vertices(const u32 innerLevelX, const u32 innerLevelY,
 								   const OpenMesh::FaceHandle face,
-								   const OpenMesh::VertexHandle(&vertices)[4u]);
+								   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 	void spawn_inner_triangle_vertices(const u32 innerLevel,
 									   const OpenMesh::FaceHandle face,
-									   const OpenMesh::VertexHandle(&vertices)[4u]);
+									   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
 	// Spawns the quads between inner and outer vertices
-	u32 spawn_outer_quads(const u32 innerLevel, const u32 outerLevel,
+	u32 spawn_outer_quads(const u32 innerLevelX, const u32 innerLevelY,
+						  const u32 currInnerLevel, const u32 outerLevel,
 						  const u32 startInner, const u32 startOuter,
 						  const u32 edgeVertexOffset, const u32 edgeIndex,
 						  const bool swapEdgeVertices, const OpenMesh::FaceHandle face);
 	// Spawns the triangles needed in the corners after quads have been added
-	void spawn_outer_corner_triangles(const u32 innerLevel, const u32 startInner,
+	void spawn_outer_corner_triangles(const u32 currInnerLevel, const u32 innerLevelX,
+									  const u32 innerLevelY, const u32 startInner,
 									  const u32 startOuter, const u32 outerQuadCount,
 									  const u32 edgeIndex, const AddedVertices& outerVertices,
 									  const OpenMesh::VertexHandle from,
 									  const OpenMesh::VertexHandle to,
-									  const OpenMesh::FaceHandle face);
+									  const OpenMesh::FaceHandle face,
+									  bool doLeft, bool doRight);
 
 	// Holds all vertices spawned for edges of the mesh
 	std::vector<OpenMesh::VertexHandle> m_edgeVertexHandles;

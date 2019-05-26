@@ -7,6 +7,7 @@
 namespace mufflon {
 template < Device dev, typename T >
 class unique_device_ptr : public std::unique_ptr<T, Deleter<dev>> {
+	static constexpr Device DEVICE = dev;
 	// inherit constructors
 	using std::unique_ptr<T, Deleter<dev>>::unique_ptr;
 };
@@ -14,6 +15,7 @@ class unique_device_ptr : public std::unique_ptr<T, Deleter<dev>> {
 template <typename T>
 class unique_device_ptr<Device::OPENGL, T> {
 public:
+	static constexpr Device DEVICE = Device::OPENGL;
 	using TType = std::remove_pointer_t<std::decay_t<T>>;
 
 	unique_device_ptr() = default;
@@ -45,6 +47,9 @@ public:
 	}
 	gl::BufferHandle<TType> get() {
 		return m_handle;
+	}
+	void reset() {
+		(*this) = unique_device_ptr<Device::OPENGL, T>();
 	}
 	bool empty() const noexcept {
 		return m_handle == 0;
