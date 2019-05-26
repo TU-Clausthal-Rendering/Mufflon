@@ -1,5 +1,5 @@
 #pragma once
-#include "gl_wrapper.hpp"
+#include "gl_object.h"
 #include <string>
 #include <vector>
 
@@ -16,16 +16,13 @@ enum class ShaderType {
 
 class ProgramBuilder {
 public:
-	~ProgramBuilder();
     // creates program from file
 	ProgramBuilder& add_file(ShaderType type, const std::string& filename);
     // creates program from string source
 	ProgramBuilder& add_source(ShaderType type, const std::string& source, const std::string& debugName = "");
 	// returns the program handle
-    gl::Handle build();
+    gl::Program build();
 private:
-	void unload(gl::Handle program);
-private:
-	std::vector<gl::Handle> m_attachments;
+	std::vector<gl::Shader> m_attachments;
 };
 }

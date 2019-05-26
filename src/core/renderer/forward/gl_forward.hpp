@@ -2,6 +2,7 @@
 
 #include "forward_params.hpp"
 #include "core/renderer/renderer_base.hpp"
+#include "core/opengl/gl_object.h"
 
 namespace mufflon::renderer {
 	
@@ -9,7 +10,7 @@ class GlForward final : public RendererBase<Device::OPENGL> {
 public:
 	// Initialize all resources required by this renderer
 	GlForward();
-	~GlForward() { unload(); }
+	~GlForward() = default;
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
@@ -20,16 +21,14 @@ public:
     void on_reset() override;
 
 private:
-	void unload();
-
 	ForwardParameters m_params = {};
 	// render targets
-    gl::Handle m_depthTarget;
-	gl::Handle m_colorTarget;
+    gl::Texture m_depthTarget;
+	gl::Texture m_colorTarget;
 
-	gl::Handle m_framebuffer;
+	gl::Framebuffer m_framebuffer;
 
-	gl::Handle m_copyShader;
+	gl::Program m_copyShader;
 };
 
 

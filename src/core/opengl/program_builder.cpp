@@ -6,10 +6,6 @@
 
 namespace mufflon::gl {
 
-    ProgramBuilder::~ProgramBuilder() {
-		unload(0);
-    }
-
     ProgramBuilder& ProgramBuilder::add_file(ShaderType type, const std::string& filename) {
 		std::ifstream file;
 		file.open(filename.c_str());
@@ -29,7 +25,7 @@ namespace mufflon::gl {
 
     ProgramBuilder& ProgramBuilder::add_source(ShaderType type, const std::string& source, const std::string& debugName) {
 		const gl::Handle shader = glCreateShader(GLenum(type));
-		m_attachments.push_back(shader);
+		m_attachments.emplace_back(gl::Shader(shader));
 
         auto src = source.c_str();
 		glShaderSource(shader, 1, &src, nullptr);
@@ -52,17 +48,23 @@ namespace mufflon::gl {
 		return *this;
     }
 
-    gl::Handle ProgramBuilder::build() {
-		const gl::Handle id = glCreateProgram();
-		
-        for(auto a : m_attachments)
+	gl::Program ProgramBuilder::build() {
+		gl::Program id(glCreateProgram());
+
+        // attach shader
+        for(auto& a : m_attachments)
 			glAttachShader(id, a);
 
+        // link shader
 		glLinkProgram(id);
 
         // free shader attachments
-		unload(id);
+		for(auto& a : m_attachments) {
+			glDetachShader(id, a);
+		}
+		m_attachments.clear();
 
+        // verify linking
 		GLint isLinked = GL_FALSE;
 		glGetProgramiv(id, GL_LINK_STATUS, &isLinked);
 
@@ -77,14 +79,5 @@ namespace mufflon::gl {
         }
 
 		return id;
-    }
-
-    void ProgramBuilder::unload(gl::Handle program) {
-		for(auto a : m_attachments) {
-            if(program)
-			    glDetachShader(program, a);
-			glDeleteShader(a);
-		}
-		m_attachments.clear();
     }
 }

@@ -292,6 +292,9 @@
     <ClCompile Include="..\..\src\core\opengl\program_builder.cpp">
       <Filter>Source Files\core\opengl</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_object.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -991,6 +994,9 @@
       <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\opengl\program_builder.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_object.h">
       <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
   </ItemGroup>

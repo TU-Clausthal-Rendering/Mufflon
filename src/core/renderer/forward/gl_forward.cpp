@@ -9,9 +9,8 @@ void GlForward::on_descriptor_requery() {
 }
 
 void GlForward::on_reset() {
-	unload();
     // create textures
-	m_colorTarget = gl::genTexture();
+	glGenTextures(1, &m_colorTarget);
 	glBindTexture(GL_TEXTURE_2D, m_colorTarget);
 	glTextureStorage2D(m_colorTarget, 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 
@@ -42,15 +41,6 @@ void GlForward::on_reset() {
     }
     )").build();*/
 	
-}
-
-void GlForward::unload() {
-	gl::deleteTexture(m_colorTarget);
-	m_colorTarget = 0;
-	gl::deleteTexture(m_depthTarget);
-	m_depthTarget = 0;
-	glDeleteFramebuffers(1, &m_framebuffer);
-	m_framebuffer = 0;
 }
 
 GlForward::GlForward() {

@@ -20,6 +20,7 @@
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
+    <ClCompile Include="..\..\src\core\opengl\gl_object.cpp" />
     <ClCompile Include="..\..\src\core\opengl\gl_wrapper.cpp" />
     <ClCompile Include="..\..\src\core\opengl\program_builder.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
@@ -189,6 +190,7 @@
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h" />
     <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_object.h" />
     <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp" />
     <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp" />
     <ClInclude Include="..\..\src\core\opengl\program_builder.h" />
