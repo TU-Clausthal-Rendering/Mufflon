@@ -48,12 +48,11 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 		mAssert(edge.is_valid());
 
 		const OpenMesh::VertexHandle from = m_mesh->from_vertex_handle(m_mesh->halfedge_handle(edge, 0));
-		const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0));
 
 		// Ask how many new vertices this edge should get
 		u32 newVertices = m_tessLevelOracle.get_edge_tessellation_level(edge);
 		m_mesh->property(m_addedVertexProp, edge) = AddedVertices{
-			from, to,
+			from,
 			static_cast<u32>(m_edgeVertexHandles.size()),
 			newVertices
 		};
@@ -106,25 +105,26 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 
 		// Check if we're in a triangle or quad
 		const std::size_t vertexCount = vertices.size();
-		// Find out the inner tessellation level
-		u32 innerLevel = m_tessLevelOracle.get_inner_tessellation_level(face);
-		// Check if we have outer tessellation level (and bump it if necessary)
-		if(innerLevel == 0u) {
-			if(maxOuterLevel == 0u)
-				continue;
-			else
-				innerLevel = 1u;
-		}
-
 		mAssert(vertexCount <= 4u);
-		// We gotta remove the face here already since non-tessellated edges make problems otherwise
-		// Copy over the properties and remove the face
-		m_mesh->copy_all_properties(face, tempFace, false);
-		m_mesh->delete_face(face, false);
 
 		// Create the faces for the inner vertices
 		if(vertexCount == 3u) {
 			// Triangles
+
+			// Find out the inner tessellation level
+			u32 innerLevel = m_tessLevelOracle.get_triangle_inner_tessellation_level(face);
+			// Check if we have outer tessellation level (and bump it if necessary)
+			if(innerLevel == 0u) {
+				if(maxOuterLevel == 0u)
+					continue;
+				else
+					innerLevel = 1u;
+			}
+
+			// We gotta remove the face here already since non-tessellated edges make problems otherwise
+			// Copy over the properties and remove the face
+			m_mesh->copy_all_properties(face, tempFace, false);
+			m_mesh->delete_face(face, false);
 
 			// Spawn the inner vertices
 			m_innerVertices.clear();
@@ -183,11 +183,26 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 			}
 		} else {
 			// Quads
+			// Find out the inner tessellation level
+			auto[innerLevelX, innerLevelY] = m_tessLevelOracle.get_quad_inner_tessellation_level(face);
+			u32 innerLevel = std::max(innerLevelX, innerLevelY);
+			// Check if we have outer tessellation level (and bump it if necessary)
+			if(innerLevel == 0u) {
+				if(maxOuterLevel == 0u)
+					continue;
+				else
+					innerLevel = 1u;
+			}
+
+			// We gotta remove the face here already since non-tessellated edges make problems otherwise
+			// Copy over the properties and remove the face
+			m_mesh->copy_all_properties(face, tempFace, false);
+			m_mesh->delete_face(face, false);
 
 			// Spawn the inner vertices and create the quads
 			m_innerVertices.clear();
-			this->spawn_inner_quad_vertices(innerLevel, tempFace, vertices);
-			this->tessellate_inner_quads(innerLevel, tempFace);
+			this->spawn_inner_quad_vertices(innerLevel, innerLevel, tempFace, vertices);
+			this->tessellate_inner_quads(innerLevel, innerLevel, tempFace);
 
 			// Create the faces between outer and inner tessellation
 			for(u32 edgeIndex = 0u; edgeIndex < vertexCount; ++edgeIndex) {
@@ -195,6 +210,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 				const OpenMesh::VertexHandle to = vertices[(edgeIndex + 1u < vertexCount) ? edgeIndex + 1u : 0u].first;
 
 				const AddedVertices& outerVertices = vertices[edgeIndex].second;
+				//const u32 currInnerLevel = edgeIndex % 2 == 0 ? innerLevelX : innerLevelY;
 
 				// Catch edge cases
 				if(outerVertices.count == 0u) {
@@ -217,6 +233,8 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 				} else {
 					const u32 nextEdgeIndex = edgeIndex + 1u < vertexCount ? (edgeIndex + 1u) : 0u;
 					const AddedVertices& nextOuterVertices = vertices[nextEdgeIndex].second;
+					// Swap the inner level to other edge type
+					//const u32 otherInnerLevel = edgeIndex % 2 == 0 ? innerLevelY : innerLevelX;
 
 					if(outerVertices.count % 2 == innerLevel % 2) {
 						// Determine what vertex the quads start at
@@ -230,9 +248,10 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 						}
 
 						// Create as many good-looking quads as possible
-						const u32 outerQuadCount = this->spawn_outer_quads(innerLevel, outerVertices.count, startInner,
-																			startOuter, outerVertices.offset, edgeIndex,
-																			from != outerVertices.from, tempFace);
+						const u32 outerQuadCount = this->spawn_outer_quads(innerLevel, innerLevel, innerLevel,
+																		   outerVertices.count, startInner,
+																		   startOuter, outerVertices.offset, edgeIndex,
+																		   from != outerVertices.from, tempFace);
 
 						// The corner needs to be either triangulated or filled with a quad
 						const u32 prevEdgeIndex = edgeIndex > 0u ? (edgeIndex - 1u) : (static_cast<u32>(vertexCount - 1u));
@@ -262,14 +281,14 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 							// Since we're responsible for the right corner too we need to check if the next edge
 							// may place a quad
 							if(innerLevel != nextOuterVertices.count)
-								this->spawn_outer_corner_triangles(innerLevel, startInner, startOuter, outerQuadCount,
-																   edgeIndex, outerVertices, from, to, tempFace,
-																   false, true);
+								this->spawn_outer_corner_triangles(innerLevel, innerLevel, innerLevel, startInner,
+																   startOuter, outerQuadCount, edgeIndex, outerVertices,
+																   from, to, tempFace, false, true);
 						} else {
 							// We can't put a quad with our previous edge
-							this->spawn_outer_corner_triangles(innerLevel, startInner, startOuter, outerQuadCount,
-																edgeIndex, outerVertices, from, to, tempFace,
-																true, innerLevel != outerVertices.count
+							this->spawn_outer_corner_triangles(innerLevel, innerLevel, innerLevel, startInner,
+															   startOuter, outerQuadCount, edgeIndex, outerVertices,
+															   from, to, tempFace, true, innerLevel != outerVertices.count
 																	|| innerLevel != nextOuterVertices.count);
 
 						}
@@ -437,13 +456,14 @@ void Tessellater::set_triangle_face_outer(const OpenMesh::FaceHandle original,
 }
 
 // Perfoms tessellation for quad inner level
-void Tessellater::tessellate_inner_quads(const u32 innerLevel, const OpenMesh::FaceHandle original) {
-	for(u32 y = 0u; y < innerLevel - 1u; ++y) {
-		for(u32 x = 0u; x < innerLevel - 1u; ++x) {
-			const OpenMesh::VertexHandle& v0 = m_innerVertices[y * innerLevel + x];
-			const OpenMesh::VertexHandle& v1 = m_innerVertices[y * innerLevel + x + 1u];
-			const OpenMesh::VertexHandle& v2 = m_innerVertices[(y + 1u) * innerLevel + x + 1u];
-			const OpenMesh::VertexHandle& v3 = m_innerVertices[(y + 1u) * innerLevel + x];
+void Tessellater::tessellate_inner_quads(const u32 innerLevelX, const u32 innerLevelY,
+										 const OpenMesh::FaceHandle original) {
+	for(u32 y = 0u; y < innerLevelY - 1u; ++y) {
+		for(u32 x = 0u; x < innerLevelX - 1u; ++x) {
+			const OpenMesh::VertexHandle& v0 = m_innerVertices[y * innerLevelX + x];
+			const OpenMesh::VertexHandle& v1 = m_innerVertices[y * innerLevelX + x + 1u];
+			const OpenMesh::VertexHandle& v2 = m_innerVertices[(y + 1u) * innerLevelX + x + 1u];
+			const OpenMesh::VertexHandle& v3 = m_innerVertices[(y + 1u) * innerLevelX + x];
 
 			const OpenMesh::FaceHandle newFace = m_mesh->add_face(v0, v1, v2, v3);
 			this->set_quad_face_inner(original, newFace);
@@ -479,18 +499,18 @@ void Tessellater::tessellate_inner_triangles(const u32 innerLevel, const OpenMes
 	}
 }
 
-void Tessellater::spawn_inner_quad_vertices(const u32 innerLevel,
+void Tessellater::spawn_inner_quad_vertices(const u32 innerLevelX, const u32 innerLevelY,
 											const OpenMesh::FaceHandle face,
 											const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices) {
 	// Spawn the inner vertices
-	for(u32 y = 0u; y < innerLevel; ++y) {
-		for(u32 x = 0u; x < innerLevel; ++x) {
+	for(u32 y = 0u; y < innerLevelY; ++y) {
+		for(u32 x = 0u; x < innerLevelX; ++x) {
 			const OpenMesh::VertexHandle newVertex = m_mesh->add_vertex(OpenMesh::Vec3f{});
 			if(!newVertex.is_valid())
 				throw std::runtime_error("Quad: failed to add inner vertex");
 			m_innerVertices.push_back(newVertex);
-			this->set_quad_inner_vertex(static_cast<float>(x + 1u) / static_cast<float>(innerLevel + 1u),
-										static_cast<float>(y + 1u) / static_cast<float>(innerLevel + 1u),
+			this->set_quad_inner_vertex(static_cast<float>(x + 1u) / static_cast<float>(innerLevelX + 1u),
+										static_cast<float>(y + 1u) / static_cast<float>(innerLevelY + 1u),
 										m_innerVertices.back(), face, vertices);
 		}
 	}
@@ -500,8 +520,8 @@ void Tessellater::spawn_inner_triangle_vertices(const u32 innerLevel,
 												const OpenMesh::FaceHandle face,
 												const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices) {
 	for(u32 y = 0u; y < innerLevel; ++y) {
-		//const float edgeBaryZ = (y + 1u) / static_cast<float>(innerLevel + 1u);
-		//const float edgeBaryX = 1.f - edgeBaryZ;
+		const float edgeBaryZ = (y + 1u) / static_cast<float>(innerLevel + 1u);
+		const float edgeBaryX = 1.f - edgeBaryZ;
 		const float bZ = (y + 1u) / static_cast<float>(innerLevel + 2u);
 		for(u32 x = 0u; x < innerLevel - y; ++x) {
 			const OpenMesh::VertexHandle newVertex = m_mesh->add_vertex(OpenMesh::Vec3f{});
@@ -510,18 +530,19 @@ void Tessellater::spawn_inner_triangle_vertices(const u32 innerLevel,
 			m_innerVertices.push_back(newVertex);
 			const float bX = ((innerLevel - y) - x) / static_cast<float>(innerLevel + 2u);
 
-			//const float baryX = edgeBaryX - edgeBaryX * (x + 1u) / static_cast<float>(innerLevel - y + 1u);
-			//const float baryY = 1.f - edgeBaryZ - baryX;
-			this->set_triangle_inner_vertex(bX, 1.f - bZ - bX, newVertex, face, vertices);
+			const float baryX = edgeBaryX - edgeBaryX * (x + 1u) / static_cast<float>(innerLevel - y + 1u);
+			const float baryY = 1.f - edgeBaryZ - baryX;
+			this->set_triangle_inner_vertex(baryX, baryY, newVertex, face, vertices);
 		}
 	}
 }
 
-u32 Tessellater::spawn_outer_quads(const u32 innerLevel, const u32 outerLevel,
-										   const u32 startInner, const u32 startOuter,
-										   const u32 edgeVertexOffset, const u32 edgeIndex,
-										   const bool swapEdgeVertices, const OpenMesh::FaceHandle face) {
-	const u32 stripeQuadCount = std::min(innerLevel, outerLevel) - 1u;
+u32 Tessellater::spawn_outer_quads(const u32 innerLevelX, const u32 innerLevelY,
+								   const u32 currInnerLevel, const u32 outerLevel,
+								   const u32 startInner, const u32 startOuter,
+								   const u32 edgeVertexOffset, const u32 edgeIndex,
+								   const bool swapEdgeVertices, const OpenMesh::FaceHandle face) {
+	const u32 stripeQuadCount = std::min(currInnerLevel, outerLevel) - 1u;
 	for(u32 i = 0u; i < stripeQuadCount; ++i) {
 		// Compute what edge of the inner quad the vertices are on
 		// Make sure that the vertices are counter-clockwise
@@ -533,8 +554,8 @@ u32 Tessellater::spawn_outer_quads(const u32 innerLevel, const u32 outerLevel,
 			i0 = edgeVertexOffset + startOuter + i;
 			i1 = edgeVertexOffset + startOuter + i + 1u;
 		}
-		const u32 i2 = get_inner_vertex_index(edgeIndex, startInner + i + 1u, innerLevel);
-		const u32 i3 = get_inner_vertex_index(edgeIndex, startInner + i, innerLevel);
+		const u32 i2 = get_inner_vertex_index(edgeIndex, startInner + i + 1u, currInnerLevel);
+		const u32 i3 = get_inner_vertex_index(edgeIndex, startInner + i, currInnerLevel);
 
 		const OpenMesh::VertexHandle& v0 = m_edgeVertexHandles[i0];
 		const OpenMesh::VertexHandle& v1 = m_edgeVertexHandles[i1];
@@ -550,7 +571,8 @@ u32 Tessellater::spawn_outer_quads(const u32 innerLevel, const u32 outerLevel,
 	return stripeQuadCount;
 }
 
-void Tessellater::spawn_outer_corner_triangles(const u32 innerLevel, const u32 startInner,
+void Tessellater::spawn_outer_corner_triangles(const u32 currInnerLevel, const u32 innerLevelX,
+											   const u32 innerLevelY, const u32 startInner,
 											   const u32 startOuter, const u32 outerQuadCount,
 											   const u32 edgeIndex, const AddedVertices& outerVertices,
 											   const OpenMesh::VertexHandle from,
@@ -570,7 +592,7 @@ void Tessellater::spawn_outer_corner_triangles(const u32 innerLevel, const u32 s
 				m_stripVertices.push_back(m_edgeVertexHandles[outerVertices.offset + i]);
 		}
 		for(u32 i = 0u; i < startInner + 1u; ++i)
-			m_stripVertices.push_back(m_innerVertices[get_inner_vertex_index(edgeIndex, startInner - i, innerLevel)]);
+			m_stripVertices.push_back(m_innerVertices[get_inner_vertex_index(edgeIndex, startInner - i, currInnerLevel)]);
 		this->triangulate_strip(startOuter, startInner + 1u, face);
 	}
 	if(doRight) {
@@ -586,10 +608,10 @@ void Tessellater::spawn_outer_corner_triangles(const u32 innerLevel, const u32 s
 		}
 		m_stripVertices.push_back(to);
 		const u32 startIndexInner = startInner + outerQuadCount;
-		for(u32 i = startIndexInner; i < innerLevel; ++i)
-			m_stripVertices.push_back(m_innerVertices[get_inner_vertex_index(edgeIndex, innerLevel - i - 1u + startIndexInner, innerLevel)]);
+		for(u32 i = startIndexInner; i < currInnerLevel; ++i)
+			m_stripVertices.push_back(m_innerVertices[get_inner_vertex_index(edgeIndex, currInnerLevel - i - 1u + startIndexInner, currInnerLevel)]);
 		if(m_stripVertices.size() >= 3u)
-			this->triangulate_strip(outerVertices.count - startOuter - outerQuadCount - 1u, innerLevel - startIndexInner, face);
+			this->triangulate_strip(outerVertices.count - startOuter - outerQuadCount - 1u, currInnerLevel - startIndexInner, face);
 	}
 }
 

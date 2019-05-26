@@ -5,6 +5,8 @@
 
 namespace mufflon::scene::tessellation {
 
+
+
 CameraDistanceOracle::CameraDistanceOracle(const float perPixelTessLevel, ConstCameraHandle cam,
 										   const u32 animationPathIndex, const ei::IVec2& resolution,
 										   const std::vector<ei::Mat3x4>& instTrans) :
@@ -49,43 +51,46 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 	return static_cast<u32>(m_perPixelTessLevel * std::max(1.f, maxFactor / m_projPixelHeight));
 }
 
-u32 CameraDistanceOracle::get_inner_tessellation_level(const OpenMesh::FaceHandle face) const {
-	static thread_local std::vector<ei::Vec3> transformedPoints;
-
+u32 CameraDistanceOracle::get_triangle_inner_tessellation_level(const OpenMesh::FaceHandle face) const {
 	float maxFactor = 0.f;
 	for(const auto& instTrans : m_instanceTransformations) {
-		ei::Vec3 centre{ 0.f };
-		transformedPoints.clear();
-		for(auto iter = m_mesh->cfv_ccwbegin(face); iter.is_valid(); ++iter) {
-			transformedPoints.push_back(ei::transform(util::pun<ei::Vec3>(m_mesh->point(*iter)), instTrans));
-			centre += transformedPoints.back();
-		}
-		const float distSq = ei::lensq((centre / static_cast<float>(transformedPoints.size())) - m_camPos);
+		auto iter = m_mesh->cfv_ccwbegin(face);
 
+		const ei::Vec3 p0 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*iter)), instTrans);
+		const ei::Vec3 p1 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*(++iter))), instTrans);
+		const ei::Vec3 p2 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*(++iter))), instTrans);
+
+		const ei::Vec3 centre = (p0 + p1 + p2) / 3.f;
+		const float distSq = ei::lensq(centre - m_camPos);
 		// Compute area as another factor
-		float area;
-		if(transformedPoints.size() == 3u) {
-			const auto& p0 = transformedPoints[0u];
-			const auto& p1 = transformedPoints[1u];
-			const auto& p2 = transformedPoints[2u];
-			// Triangle
-			area = 0.5f * ei::len(ei::cross(p1 - p0, p2 - p0));
-		} else {
-			// Quad; we assume that the quad is planar, if not we overestimate the area
-			const auto& p0 = transformedPoints[0u];
-			const auto& p1 = transformedPoints[1u];
-			const auto& p2 = transformedPoints[2u];
-			const auto& p3 = transformedPoints[3u];
-			area = 0.5f * (ei::len(ei::cross(p1 - p0, p2 - p0)) + ei::len(ei::cross(p2 - p0, p3 - p0)));
-		}
-
-		// TODO
+		const float area = 0.5f * ei::len(ei::cross(p1 - p0, p2 - p0));
 		const float factor = area / distSq;
 
 		maxFactor = std::max(maxFactor, factor);
 	}
 
 	return static_cast<u32>(m_perPixelTessLevel * std::max(1.f, std::sqrt(maxFactor / (m_projPixelHeight * m_projPixelHeight))));
+}
+
+std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(const OpenMesh::FaceHandle face) const {
+	float maxFactorX = 0.f;
+	float maxFactorY = 0.f;
+	for(const auto& instTrans : m_instanceTransformations) {
+		auto iter = m_mesh->cfv_ccwbegin(face);
+
+		const ei::Vec3 p0 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*iter)), instTrans);
+		const ei::Vec3 p1 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*(++iter))), instTrans);
+		const ei::Vec3 p2 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*(++iter))), instTrans);
+		const ei::Vec3 p3 = ei::transform(util::pun<ei::Vec3>(m_mesh->point(*(++iter))), instTrans);
+
+		const ei::Vec3 centre = (p0 + p1 + p2 + p3) / 4.f;
+		const float dist = ei::len(centre - m_camPos);
+		maxFactorX = std::max(maxFactorX, ei::len(p2 - p0) / dist);
+		maxFactorY = std::max(maxFactorY, ei::len(p1 - p0) / dist);
+	}
+
+	return { static_cast<u32>(m_perPixelTessLevel * std::max(1.f, maxFactorX / m_projPixelHeight)),
+		static_cast<u32>(m_perPixelTessLevel * std::max(1.f, maxFactorY / m_projPixelHeight)) };
 }
 
 } // namespace mufflon::scene::tessellation

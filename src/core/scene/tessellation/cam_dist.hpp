@@ -21,7 +21,8 @@ public:
 
 protected:
 	u32 get_edge_tessellation_level(const OpenMesh::EdgeHandle edge) const override;
-	u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const override;
+	u32 get_triangle_inner_tessellation_level(const OpenMesh::FaceHandle face) const override;
+	std::pair<u32, u32> get_quad_inner_tessellation_level(const OpenMesh::FaceHandle face) const override;
 
 private:
 	float m_perPixelTessLevel;

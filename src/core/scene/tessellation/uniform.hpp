@@ -31,8 +31,12 @@ protected:
 		return m_outerLevel;
 	}
 
-	u32 get_inner_tessellation_level(const OpenMesh::FaceHandle face) const override {
+	u32 get_triangle_inner_tessellation_level(const OpenMesh::FaceHandle face) const override {
 		return m_innerLevel;
+	}
+
+	std::pair<u32, u32> get_quad_inner_tessellation_level(const OpenMesh::FaceHandle face) const override {
+		return { m_innerLevel, m_innerLevel };
 	}
 
 private:
