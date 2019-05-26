@@ -8,7 +8,7 @@ namespace mufflon::renderer {
 class GlForward final : public RendererBase<Device::OPENGL> {
 public:
 	// Initialize all resources required by this renderer
-	GlForward() = default;
+	GlForward();
 	~GlForward() { unload(); }
 
 	void iterate() final;
