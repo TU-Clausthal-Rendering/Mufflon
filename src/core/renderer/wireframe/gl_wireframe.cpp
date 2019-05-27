@@ -62,8 +62,8 @@ void GlWireframe::iterate() {
 
 	gl::Context::set(m_pipe);
 	// camera matrix
-	glProgramUniformMatrix4fv(m_program, 0, 1, GL_FALSE, reinterpret_cast<const float*>(&m_viewProjMatrix));
-    for(size_t i = 0; i < m_sceneDesc.numLods; ++i) {
+	glProgramUniformMatrix4fv(m_program, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
+    for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
 		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
         
