@@ -284,10 +284,10 @@
       <Filter>Source Files\core\opengl</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\tessellation\cam_dist.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\tessellation\displacement_mapper.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
