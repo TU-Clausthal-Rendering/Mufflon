@@ -62,6 +62,8 @@ namespace gui.Dll
                     Loop(this, null);
             } catch (Exception e) {
                 m_cleanup.Reset();
+                if (!m_isRunning)
+                    m_cleanup.Set();
                 Dispatcher.BeginInvoke(Error, e.Message);
             }
         }
