@@ -72,7 +72,8 @@ class OpenMeshAttributePool {
 
 		template <class T>
 		ArrayDevHandle_t<Device::CUDA, T> acquire(size_t index) {
-			return as<T*, char*>(&parent.m_cudaPool[parent.m_attributes[index].poolOffset]);
+			return as<ArrayDevHandle_t<Device::CUDA, T>, ArrayDevHandle_t<Device::CUDA, char>>(
+				parent.m_cudaPool + parent.m_attributes[index].poolOffset);
 		}
 
 		OpenMeshAttributePool<IsFace>& parent;
@@ -84,7 +85,8 @@ class OpenMeshAttributePool {
 
 		template <class T>
 		ArrayDevHandle_t<Device::OPENGL, T> acquire(size_t index) {
-			return ArrayDevHandle_t<Device::OPENGL, T>(0);
+			return as<ArrayDevHandle_t<Device::OPENGL, T>, ArrayDevHandle_t<Device::OPENGL, char>>(
+				parent.m_openglPool + parent.m_attributes[index].poolOffset);
 		}
 
 		OpenMeshAttributePool<IsFace>& parent;
@@ -261,6 +263,7 @@ private:
 	std::size_t m_attribElemCapacity = 0u;
 	std::size_t m_poolSize = 0u;
 	ArrayDevHandle_t<Device::CUDA, char> m_cudaPool = nullptr;
+	ArrayDevHandle_t<Device::OPENGL, char> m_openglPool;
 	// TODO: OpenGL pool?
 
 	std::vector<AttribInfo> m_attributes;
