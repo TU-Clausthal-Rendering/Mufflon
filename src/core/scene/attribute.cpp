@@ -205,6 +205,8 @@ template < bool face >
 void OpenMeshAttributePool<face>::mark_changed(Device dev) {
 	if(dev != Device::CPU)
 		unload<Device::CPU>();
+	else
+		m_openMeshSynced = true;
 	if(dev != Device::CUDA)
 		unload<Device::CUDA>();
 	if(dev != Device::OPENGL)
@@ -423,7 +425,7 @@ std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrS
 }
 
 std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStream,
-				  std::size_t start, std::size_t count) {
+								 std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
 	this->synchronize<Device::CPU>();
 	std::size_t actualCount = count;
@@ -435,7 +437,7 @@ std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStr
 	const char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + attribute.poolOffset + elemSize * start;
 	return attrStream.write(mem, elemSize * count) / attribute.elemSize;
 }
-	// Resolves a name to an attribute
+// Resolves a name to an attribute
 AttributeHandle AttributePool::get_attribute_handle(StringView name) {
 	auto mapIter = m_nameMap.find(name);
 	if(mapIter == m_nameMap.end())

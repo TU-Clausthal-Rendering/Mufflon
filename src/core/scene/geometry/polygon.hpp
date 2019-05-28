@@ -194,16 +194,14 @@ public:
 	void unload() {
 		m_vertexAttributes.unload<dev>();
 		m_faceAttributes.unload<dev>();
+		unload_index_buffer<dev>();
 	}
 
 	template < bool face >
 	void mark_changed(Device dev) {
 		get_attributes<face>().mark_changed(dev);
 	}
-	void mark_changed(Device dev) {
-		get_attributes<true>().mark_changed(dev);
-		get_attributes<false>().mark_changed(dev);
-	}
+	void mark_changed(Device dev);
 
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
@@ -446,6 +444,8 @@ private:
 	// Synchronizes two device index buffers
 	template < Device changed, Device sync >
 	void synchronize_index_buffer();
+	template < Device dev >
+	void unload_index_buffer();
 	// Resizes the attribute buffer to hold v vertex and f face attribute pointers
 	template < Device dev >
 	void resizeAttribBuffer(std::size_t v, std::size_t f);
