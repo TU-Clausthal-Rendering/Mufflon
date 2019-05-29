@@ -9,24 +9,10 @@ namespace mufflon::renderer {
 
 GlWireframe::GlWireframe() {
     // shader
-	m_program = gl::ProgramBuilder().add_source(gl::ShaderType::Vertex, R"(
-#version 460
-layout(location = 0) in vec3 in_position;        
-
-layout(location = 0) uniform mat4 u_viewProj;
-
-void main(){
-    gl_Position = u_viewProj * vec4(in_position, 1.0);
-}
-
-    )").add_source(gl::ShaderType::Fragment, R"(
-#version 460
-layout(location = 0) out vec4 out_fragColor;   
-void main(){
-    out_fragColor = vec4(1.0);
-}
-
-    )").build();
+	m_program = gl::ProgramBuilder()
+        .add_file(gl::ShaderType::Vertex, "shader/wireframe_vertex.glsl")
+        .add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
+        .build();
 
     // vertex layout
 	m_vao = gl::VertexArrayBuilder().add(
