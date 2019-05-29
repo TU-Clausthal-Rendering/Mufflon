@@ -1173,7 +1173,11 @@ Boolean instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame)
 
 void world_clear_all() {
 	TRY
+	auto iterLock = std::scoped_lock(s_iterationMutex);
+	auto screenLock = std::scoped_lock(s_screenTextureMutex);
 	WorldContainer::clear_instance();
+	s_imageOutput.reset();
+	s_screenTexture.reset();
 	CATCH_ALL(;)
 }
 

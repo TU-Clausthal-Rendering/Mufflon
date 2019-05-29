@@ -90,6 +90,9 @@ namespace gui.Model
                 if (!File.Exists(path))
                     throw new Exception("File not found");
 
+                // It is important that we clear the world from the renderer thread due to OpenGL allocations
+                // We may assume that we're not rendering, so we can perform one iteration
+                Renderer.ClearWorld();
                 var status = await Task.Run(() =>
                 {
                     var res = Loader.loader_load_json(path);

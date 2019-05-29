@@ -109,6 +109,9 @@ namespace gui.Model
     /// </summary>
     public class RendererModel : INotifyPropertyChanged
     {
+        public event EventHandler RequestWorldClear;
+        public event EventHandler RequestRedraw;
+
         private volatile bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
 
@@ -166,7 +169,13 @@ namespace gui.Model
         // e.g. when selecting a different render target to display
         public void UpdateRenderBitmap()
         {
-            RenderLock.Set();
+            RequestRedraw(this, null);
+        }
+
+        // Clears the world from the render thread
+        public void ClearWorld()
+        {
+            RequestWorldClear(this, null);
         }
 
         // This iterates by leveraging the GUI and includes texture updates etc
