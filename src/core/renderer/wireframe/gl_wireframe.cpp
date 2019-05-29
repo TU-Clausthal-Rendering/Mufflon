@@ -43,8 +43,12 @@ void GlWireframe::on_reset() {
 	m_quadPipe.framebuffer = m_framebuffer;
 
 	auto* cam = m_currentScene->get_camera();
-	m_viewProjMatrix = 
-		ei::perspectiveGL(1.5f, 
+	float fov = 1.5f;
+    if(auto pcam = dynamic_cast<const cameras::Pinhole*>(cam)) {
+		fov = pcam->get_vertical_fov();
+	}
+    m_viewProjMatrix = 
+		ei::perspectiveGL(fov, 
 		    float(m_outputBuffer.get_width()) / m_outputBuffer.get_height(), 
 		    cam->get_near(), cam->get_far()) * 
 		ei::camera(
@@ -59,6 +63,7 @@ void GlWireframe::iterate() {
 	
     // camera matrix
 	glProgramUniformMatrix4fv(m_triangleProgram, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
+	glProgramUniformMatrix4fv(m_quadProgram, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
 
 	draw_triangles(m_trianglePipe, Attribute::Position);
 	draw_quads(m_quadPipe, Attribute::Position);
