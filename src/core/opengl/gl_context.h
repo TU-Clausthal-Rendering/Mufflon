@@ -15,6 +15,6 @@ private:
 		BlendState blend;
         // sampler might get added later
 	} m_state;
-	VertexArray m_emptyVao;
+	gl::Handle m_emptyVao;
 };
 }

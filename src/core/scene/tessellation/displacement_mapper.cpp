@@ -226,7 +226,7 @@ void DisplacementMapper::post_tessellate() {
 		// along the normal (TODO: geometric or shading); if multiple adjacent faces disagree
 		// about the displacement (e.g. two different displacement maps), then the average
 		// is taken
-	#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR
 		for(i64 i = 0; i < static_cast<i64>(m_mesh->n_vertices()); ++i) {
 			const auto vertex = m_mesh->vertex_handle(static_cast<u32>(i));
 			ei::Vec3 normal{ 0.f };
@@ -254,10 +254,9 @@ void DisplacementMapper::post_tessellate() {
 		{
 			auto normalProfileTimer = Profiler::instance().start<CpuProfileState>("DisplacementMapper::post_tessellate normals");
 			// TODO: we recompute the geometric normals here, but we could probably compute them directly...
-	//#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR
 			for(i64 i = 0; i < static_cast<i64>(m_mesh->n_vertices()); ++i) {
 				const auto vertex = m_mesh->vertex_handle(static_cast<u32>(i));
-				
 				ei::Vec3 normal{ 0.f };
 
 				typename geometry::PolygonMeshType::Normal inHeVec;
@@ -273,21 +272,17 @@ void DisplacementMapper::post_tessellate() {
 					typename geometry::PolygonMeshType::Normal outHeVec;
 					m_mesh->calc_edge_vector(outHeh, outHeVec);
 					const auto normOutHeVec = ei::normalize(util::pun<ei::Vec3>(outHeVec));
+					const ei::Vec3 currNormal = ei::cross(util::pun<ei::Vec3>(inHeVec),
+														  util::pun<ei::Vec3>(outHeVec));
 					const float angle = std::acos(-ei::dot(normOutHeVec, normInHeVec));
-					normal += ei::cross(normInHeVec, normOutHeVec) * angle;
-					normInHeVec = normOutHeVec;
-					normInHeVec *= -1;//change the orientation
+					normal += currNormal * angle; // Contains sector area already
+					inHeVec = -outHeVec;
+					normInHeVec = -normOutHeVec;
 				}
-
-	/*#pragma warning(push)
-	#pragma warning(disable : 4244)
-				m_mesh->calc_vertex_normal_correct(vertex, normal);
-	#pragma warning(pop)
-				m_mesh->set_normal(vertex, util::pun<typename geometry::PolygonMeshType::Normal>(ei::normalize(util::pun<ei::Vec3>(normal))));*/
 				m_mesh->set_normal(vertex, util::pun<typename geometry::PolygonMeshType::Normal>(ei::normalize(normal)));
 			}
 		}
-}
+	}
 }
 
 std::pair<ei::Vec3, ei::Vec3> DisplacementMapper::get_edge_vertex_tangents(const OpenMesh::EdgeHandle edge,

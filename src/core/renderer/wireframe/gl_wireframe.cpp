@@ -58,30 +58,13 @@ void GlWireframe::on_reset() {
 }
 
 void GlWireframe::iterate() {
-	begin_frame({ 1.0f, 0.0f, 0.0f, 1.0f });
-
-	gl::Context::set(m_pipe);
-	// camera matrix
+	begin_frame({ 0.0f, 0.0f, 0.0f, 1.0f });
+	
+    // camera matrix
 	glProgramUniformMatrix4fv(m_program, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
-    for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
-		const auto idx = m_sceneDesc.lodIndices[i];
-		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
-        
-        if(!lod.polygon.numTriangles) continue; // TODO draw spheres
 
-		mAssert(lod.polygon.vertices.id);
-		mAssert(lod.polygon.vertexIndices.id);
-		mAssert(!lod.polygon.vertices.offset);
-		mAssert(!lod.polygon.vertexIndices.offset);
+	draw_triangles(m_pipe, Attribute::Position);
 
-        // bind vertex and index buffer
-		glBindVertexBuffer(0, lod.polygon.vertices.id, 0, sizeof(ei::Vec3));
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
-
-		glDrawElements(GL_TRIANGLES, lod.polygon.numTriangles * 3, GL_UNSIGNED_INT, nullptr);
-
-        // TODO quad patches
-    }
 
 	end_frame();
 }

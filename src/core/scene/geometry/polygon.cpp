@@ -374,6 +374,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 }
 
 void Polygons::tessellate(tessellation::Tessellater& tessellater) {
+	this->synchronize<Device::CPU>();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 	tessellater.tessellate(*m_meshData);
@@ -384,6 +385,7 @@ void Polygons::tessellate(tessellation::Tessellater& tessellater) {
 
 void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
 	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::displace");
+	this->synchronize<Device::CPU>();
 	// Then perform tessellation
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
@@ -411,6 +413,7 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 
 std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 							   std::size_t targetVertices, bool garbageCollect) {
+	this->synchronize<Device::CPU>();
 	decimater.initialize();
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
@@ -444,6 +447,7 @@ void Polygons::garbage_collect() {
 }
 
 void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
+	this->synchronize<Device::CPU>();
 	if(this->get_vertex_count() == 0) return;
 	// Invalidate bounding box
 	m_boundingBox.min = {
@@ -493,6 +497,17 @@ void Polygons::synchronize() {
 			}
 		});
 	}
+}
+
+void Polygons::mark_changed(Device dev) {
+	get_attributes<true>().mark_changed(dev);
+	get_attributes<false>().mark_changed(dev);
+	if(dev != Device::CPU)
+		unload_index_buffer<Device::CPU>();
+	if(dev != Device::CUDA)
+		unload_index_buffer<Device::CUDA>();
+	if(dev != Device::OPENGL)
+		unload_index_buffer<Device::OPENGL>();
 }
 
 bool Polygons::has_displacement_mapping(const Scenario& scenario) const noexcept {
@@ -660,6 +675,14 @@ void Polygons::synchronize_index_buffer() {
 		if(changedBuffer.reserved != 0u)
 			copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
 	}
+}
+
+template < Device dev >
+void Polygons::unload_index_buffer() {
+	auto& idxBuffer = m_indexBuffer.template get<IndexBuffer<dev>>();
+	if(idxBuffer.indices != nullptr)
+		idxBuffer.indices = Allocator<dev>::free(idxBuffer.indices, idxBuffer.reserved);
+	idxBuffer.reserved = 0u;
 }
 
 template < Device dev >

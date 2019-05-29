@@ -116,6 +116,12 @@ protected:
 	bool m_usePhongTessellation = false;
 
 private:
+	void tessellate_edges();
+	void tessellate_triangle(const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices,
+							 const OpenMesh::FaceHandle face, const u32 innerLevel);
+	void tessellate_quad(const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices,
+						 const OpenMesh::FaceHandle face, const u32 innerLevelX, const u32 innerLevelY);
+
 	void spawn_inner_quad_vertices(const u32 innerLevelX, const u32 innerLevelY,
 								   const OpenMesh::FaceHandle face,
 								   const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices);
@@ -129,14 +135,25 @@ private:
 						  const u32 edgeVertexOffset, const u32 edgeIndex,
 						  const bool swapEdgeVertices, const OpenMesh::FaceHandle face);
 	// Spawns the triangles needed in the corners after quads have been added
-	void spawn_outer_corner_triangles(const u32 currInnerLevel, const u32 innerLevelX,
-									  const u32 innerLevelY, const u32 startInner,
-									  const u32 startOuter, const u32 outerQuadCount,
+	void spawn_outer_corner_triangles(const u32 innerLevelX, const u32 innerLevelY, const u32 currInnerLevel,
+									  const u32 startInner, const u32 startOuter, const u32 outerQuadCount,
 									  const u32 edgeIndex, const AddedVertices& outerVertices,
 									  const OpenMesh::VertexHandle from,
 									  const OpenMesh::VertexHandle to,
 									  const OpenMesh::FaceHandle face,
 									  bool doLeft, bool doRight);
+	// Tesssellates the border region between inner quads and edge if good-looking quads might be possible
+	void spawn_outer_quad_corner_region(const u32 innerLevelX, const u32 innerLevelY, const u32 currInnerLevel,
+										const u32 otherInnerLevel, const u32 startInner, const u32 startOuter,
+										const bool edgeNeedsFlip, const u32 edgeIndex, const u32 outerQuadCount,
+										const OpenMesh::VertexHandle from, const OpenMesh::VertexHandle to,
+										const OpenMesh::VertexHandle prevFrom,
+										const OpenMesh::FaceHandle face, const AddedVertices& outerVertices,
+										const AddedVertices& prevOuterVertices, const AddedVertices& nextOuterVertices);
+
+	OpenMesh::VertexHandle get_inner_vertex_triangle(const u32 edgeIndex, const u32 index, const u32 innerLevelX) const;
+	OpenMesh::VertexHandle get_inner_vertex_quad(const u32 edgeIndex, const u32 index,
+													 const u32 innerLevelX, const u32 innerLevelY) const;
 
 	// Holds all vertices spawned for edges of the mesh
 	std::vector<OpenMesh::VertexHandle> m_edgeVertexHandles;

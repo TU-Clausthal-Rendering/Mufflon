@@ -18,14 +18,18 @@ OpenMeshAttributePool<face>::OpenMeshAttributePool(OpenMeshAttributePool&& pool)
 	m_attribElemCapacity(pool.m_attribElemCapacity),
 	m_poolSize(pool.m_poolSize),
 	m_cudaPool(pool.m_cudaPool),
+	m_openglPool(pool.m_openglPool),
 	m_attributes(std::move(pool.m_attributes)) {
-	m_cudaPool = ArrayDevHandle_t<Device::CUDA, char>{};
+	pool.m_cudaPool = ArrayDevHandle_t<Device::CUDA, char>{};
+	pool.m_openglPool = ArrayDevHandle_t<Device::OPENGL, char>{};
 }
 
 template < bool face >
 OpenMeshAttributePool<face>::~OpenMeshAttributePool() {
-	if(m_cudaPool)
+	if(m_cudaPool != nullptr)
 		m_cudaPool = Allocator<Device::CUDA>::free(m_cudaPool, m_poolSize);
+	if(m_openglPool != nullptr)
+		m_openglPool = Allocator<Device::OPENGL>::free(m_openglPool, m_poolSize);
 }
 
 template < bool face >
@@ -39,8 +43,15 @@ void OpenMeshAttributePool<face>::copy(const OpenMeshAttributePool<face>& pool) 
 	if(m_poolSize == 0 || pool.m_cudaPool == ArrayDevHandle_t<Device::CUDA, char>{}) {
 		m_cudaPool = ArrayDevHandle_t<Device::CUDA, char>{};
 	} else {
-		m_cudaPool = Allocator<Device::CUDA>::template alloc_array<char>(m_poolSize);
+		m_cudaPool = Allocator<Device::CUDA>::template alloc_array<char, false>(m_poolSize);
 		::mufflon::copy(m_cudaPool, pool.m_cudaPool, m_poolSize);
+	}
+
+	if(m_poolSize == 0 || pool.m_openglPool == ArrayDevHandle_t<Device::OPENGL, char>{}) {
+		m_openglPool = ArrayDevHandle_t<Device::OPENGL, char>{};
+	} else {
+		m_openglPool = Allocator<Device::OPENGL>::template alloc_array<char, false>(m_poolSize);
+		::mufflon::copy(m_openglPool, pool.m_openglPool, m_poolSize);
 	}
 }
 
@@ -50,8 +61,8 @@ template < bool face >
 void OpenMeshAttributePool<face>::reserve(std::size_t capacity) {
 	if(capacity <= m_attribElemCapacity)
 		return;
-
 	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
 	if constexpr(IS_FACE)
 		m_mesh.reserve(m_mesh.n_vertices(), m_mesh.n_edges(), capacity);
 	else
@@ -95,12 +106,16 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 
 	if(m_attribElemCount != 0) {
 		std::size_t bytes = m_attribElemCount * m_poolSize / m_attribElemCapacity;
-		if(m_cudaPool)
+		if(m_cudaPool != nullptr)
 			m_cudaPool = Allocator<Device::CUDA>::realloc(m_cudaPool, m_poolSize, bytes);
+		if(m_openglPool != nullptr)
+			m_openglPool = Allocator<Device::OPENGL>::realloc(m_openglPool, m_poolSize, bytes);
 		m_poolSize = bytes;
 	} else {
-		if(m_cudaPool)
+		if(m_cudaPool != nullptr)
 			m_cudaPool = Allocator<Device::CUDA>::free(m_cudaPool, m_poolSize);
+		if(m_openglPool != nullptr)
+			m_openglPool = Allocator<Device::OPENGL>::free(m_openglPool, m_poolSize);
 		m_poolSize = 0u;
 	}
 }
@@ -114,31 +129,59 @@ void OpenMeshAttributePool<face>::synchronize() {
 		case Device::CPU: {
 			if(m_openMeshSynced)
 				return;
-			if(m_cudaPool == nullptr)
-				return;
-			// Copy over dirty attributes
-			std::size_t currOffset = 0u;
-			for(auto& attrib : m_attributes) {
-				char* cpuData = attrib.accessor(m_mesh);
-				::mufflon::copy(cpuData, &m_cudaPool[currOffset], attrib.elemSize * m_attribElemCount);
-				currOffset += attrib.elemSize * m_attribElemCount;
+			if(m_cudaPool != nullptr) {
+				// Copy over dirty attributes
+				std::size_t currOffset = 0u;
+				for(auto& attrib : m_attributes) {
+					char* cpuData = attrib.accessor(m_mesh);
+					::mufflon::copy(cpuData, m_cudaPool + currOffset, attrib.elemSize * m_attribElemCount);
+					currOffset += attrib.elemSize * m_attribElemCount;
+				}
+				m_openMeshSynced = true;
+			} else if(m_openglPool != nullptr) {
+				// Copy over dirty attributes
+				std::size_t currOffset = 0u;
+				for(auto& attrib : m_attributes) {
+					char* cpuData = attrib.accessor(m_mesh);
+					::mufflon::copy(cpuData, m_openglPool + currOffset, attrib.elemSize * m_attribElemCount);
+					currOffset += attrib.elemSize * m_attribElemCount;
+				}
+				m_openMeshSynced = true;
 			}
-			m_openMeshSynced = true;
 		}	break;
 		case Device::CUDA: {
-			if(m_cudaPool)
+			if(m_cudaPool != nullptr)
 				return;
-			m_cudaPool = Allocator<Device::CUDA>::alloc_array<char>(m_poolSize);
-			// Copy over all attributes
-			std::size_t currOffset = 0u;
-			for(auto& attrib : m_attributes) {
-				const char* cpuData = attrib.accessor(m_mesh);
-				::mufflon::copy(m_cudaPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
-				currOffset += attrib.elemSize * m_attribElemCount;
+			if(m_openMeshSynced) {
+				m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
+				// Copy over all attributes
+				std::size_t currOffset = 0u;
+				for(auto& attrib : m_attributes) {
+					const char* cpuData = attrib.accessor(m_mesh);
+					::mufflon::copy(m_cudaPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
+					currOffset += attrib.elemSize * m_attribElemCount;
+				}
+			} else if(m_openglPool != nullptr) {
+				//m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
+				logError("Cannot synchronize from OpenGL to CUDA yet!");
 			}
 		}	break;
 		case Device::OPENGL:
-			// TODO
+			if(m_openglPool != nullptr)
+				return;
+			if(m_openMeshSynced) {
+				m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
+				// Copy over all attributes
+				std::size_t currOffset = 0u;
+				for(auto& attrib : m_attributes) {
+					const char* cpuData = attrib.accessor(m_mesh);
+					::mufflon::copy(m_openglPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
+					currOffset += attrib.elemSize * m_attribElemCount;
+				}
+			} else if(m_cudaPool != nullptr) {
+				//m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
+				logError("Cannot synchronize from CUDA to OpenGL yet!");
+			}
 			break;
 	}
 }
@@ -150,10 +193,11 @@ void OpenMeshAttributePool<face>::unload() {
 	if constexpr(dev == Device::CPU) {
 		m_openMeshSynced = false;
 	} else if constexpr(dev == Device::CUDA) {
-		if(m_cudaPool)
+		if(m_cudaPool != nullptr)
 			m_cudaPool = Allocator<Device::CUDA>::free(m_cudaPool, m_poolSize);
 	} else if constexpr(dev == Device::OPENGL) {
-		// TODO
+		if(m_openglPool != nullptr)
+			m_openglPool = Allocator<Device::OPENGL>::free(m_openglPool, m_poolSize);
 	}
 }
 
@@ -161,6 +205,8 @@ template < bool face >
 void OpenMeshAttributePool<face>::mark_changed(Device dev) {
 	if(dev != Device::CPU)
 		unload<Device::CPU>();
+	else
+		m_openMeshSynced = true;
 	if(dev != Device::CUDA)
 		unload<Device::CUDA>();
 	if(dev != Device::OPENGL)
@@ -220,7 +266,7 @@ AttributePool::AttributePool(const AttributePool& pool) :
 		if(m_poolSize == 0 || elem.handle == ArrayDevHandle_t<ChangedBuffer::DEVICE, char>{}) {
 			pool.handle = ArrayDevHandle_t<ChangedBuffer::DEVICE, char>{};
 		} else {
-			pool.handle = Allocator<ChangedBuffer::DEVICE>::template alloc_array<char>(m_poolSize);
+			pool.handle = Allocator<ChangedBuffer::DEVICE>::template alloc_array<char, false>(m_poolSize);
 			copy(pool.handle, elem.handle, m_poolSize);
 		}
 	});
@@ -254,6 +300,7 @@ void AttributePool::reserve(std::size_t capacity) {
 	if(capacity <= m_attribElemCapacity)
 		return;
 	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
 
 	std::size_t currOffset = 0u;
 	// Adjust pool offsets for the attributes
@@ -323,9 +370,33 @@ void AttributePool::synchronize() {
 	if(syncPool != nullptr) return;
 
 	// Always allocate memory (copies can and will only be done if there is a dirty memory)
-	syncPool = Allocator<dev>::template alloc_array<char>(m_poolSize);
+	syncPool = Allocator<dev>::template alloc_array<char, false>(m_poolSize);
 
-	copy(syncPool, m_pools.template get<PoolHandle<dev>>().handle, m_poolSize);
+	// TODO: OpenGL
+	switch(dev) {
+		case Device::CPU:
+			if(m_pools.template get<PoolHandle<Device::CUDA>>().handle != nullptr)
+				copy(syncPool, m_pools.template get<PoolHandle<Device::CUDA>>().handle, m_poolSize);
+			else if(m_pools.template get<PoolHandle<Device::OPENGL>>().handle != nullptr)
+				copy(syncPool, m_pools.template get<PoolHandle<Device::OPENGL>>().handle, m_poolSize);
+			break;
+		case Device::CUDA:
+			if(m_pools.template get<PoolHandle<Device::CPU>>().handle != nullptr) {
+				copy(syncPool, m_pools.template get<PoolHandle<Device::CPU>>().handle, m_poolSize);
+			} else if(m_pools.template get<PoolHandle<Device::OPENGL>>().handle != nullptr) {
+				logError("Cannot synchronize from OpenGL to CUDA yet!");
+				syncPool = Allocator<dev>::free(syncPool, m_poolSize);
+			}
+			break;
+		case Device::OPENGL:
+			if(m_pools.template get<PoolHandle<Device::CPU>>().handle != nullptr) {
+				copy(syncPool, m_pools.template get<PoolHandle<Device::CPU>>().handle, m_poolSize);
+			} else if(m_pools.template get<PoolHandle<Device::CUDA>>().handle != nullptr) {
+				logError("Cannot synchronize from CUDA to OpenGL yet!");
+				syncPool = Allocator<dev>::free(syncPool, m_poolSize);
+			}
+			break;
+	}
 }
 
 template < Device dev >
@@ -354,7 +425,7 @@ std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrS
 }
 
 std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStream,
-				  std::size_t start, std::size_t count) {
+								 std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
 	this->synchronize<Device::CPU>();
 	std::size_t actualCount = count;
@@ -366,7 +437,7 @@ std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStr
 	const char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + attribute.poolOffset + elemSize * start;
 	return attrStream.write(mem, elemSize * count) / attribute.elemSize;
 }
-	// Resolves a name to an attribute
+// Resolves a name to an attribute
 AttributeHandle AttributePool::get_attribute_handle(StringView name) {
 	auto mapIter = m_nameMap.find(name);
 	if(mapIter == m_nameMap.end())

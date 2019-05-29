@@ -1,6 +1,7 @@
 #include "gl_renderer_base.h"
 #include "core/opengl/program_builder.h"
 #include <glad/glad.h>
+#include "core/opengl/gl_context.h"
 
 namespace mufflon::renderer {
 
@@ -10,7 +11,7 @@ GlRendererBase::GlRendererBase() {
     #version 460
     layout(local_size_x = 16, local_size_y  = 16) in;
     layout(binding = 0) uniform sampler2D src_image;
-    layout(binding = 0) writeonly restrict buffer dst_buffer {
+    layout(binding = 0) restrict buffer dst_buffer {
         float data[];
     };
     layout(location = 0) uniform uvec2 size;
@@ -21,9 +22,9 @@ GlRendererBase::GlRendererBase() {
         if(gl_GlobalInvocationID.y >= size.y) return;
 
         uint index = gl_GlobalInvocationID.y * size.x + gl_GlobalInvocationID.x;
-        data[3 * index] = color.r;
-        data[3 * index + 1] = color.g;
-        data[3 * index + 2] = color.b;
+        data[3 * index] += color.r;
+        data[3 * index + 1] += color.g;
+        data[3 * index + 2] += color.b;
     }
     )").build();
 }
@@ -63,12 +64,73 @@ void GlRendererBase::end_frame() {
 	glProgramUniform2ui(m_copyShader, 0, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 
 	glDispatchCompute(
-        get_aligned(m_outputBuffer.get_width(), WORK_GROUP_SIZE),
-        get_aligned(m_outputBuffer.get_height(), WORK_GROUP_SIZE),
+        int(get_aligned(m_outputBuffer.get_width(), WORK_GROUP_SIZE)),
+        int(get_aligned(m_outputBuffer.get_height(), WORK_GROUP_SIZE)),
 		1
 	);
 
 	glFlush();
+}
+
+void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
+	gl::Context::set(pipe);
+
+	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
+		const auto idx = m_sceneDesc.lodIndices[i];
+		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
+
+		if(!lod.polygon.numTriangles) continue;
+
+		// bind vertex and index buffer
+        if(attribs & Attribute::Position) {
+			mAssert(lod.polygon.vertices.id);
+			glBindVertexBuffer(0, lod.polygon.vertices.id, 0, sizeof(ei::Vec3));
+        }
+		if(attribs & Attribute::Normal) {
+			mAssert(lod.polygon.normals.id);
+			glBindVertexBuffer(1, lod.polygon.normals.id, 0, sizeof(ei::Vec3));
+		}
+		if(attribs & Attribute::Texcoord) {
+			mAssert(lod.polygon.uvs.id);
+			glBindVertexBuffer(2, lod.polygon.uvs.id, 0, sizeof(ei::Vec2));
+		}
+
+	    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
+        
+	    // draw
+		glDrawElements(GL_TRIANGLES, lod.polygon.numTriangles * 3, GL_UNSIGNED_INT, nullptr);
+	}
+}
+
+void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
+	gl::Context::set(pipe);
+
+	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
+		const auto idx = m_sceneDesc.lodIndices[i];
+		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
+
+		if(!lod.polygon.numTriangles) continue;
+
+		// bind vertex and index buffer
+		if(attribs & Attribute::Position) {
+			mAssert(lod.polygon.vertices.id);
+			glBindVertexBuffer(0, lod.polygon.vertices.id, 0, sizeof(ei::Vec3));
+		}
+		if(attribs & Attribute::Normal) {
+			mAssert(lod.polygon.normals.id);
+			glBindVertexBuffer(1, lod.polygon.normals.id, 0, sizeof(ei::Vec3));
+		}
+		if(attribs & Attribute::Texcoord) {
+			mAssert(lod.polygon.uvs.id);
+			glBindVertexBuffer(2, lod.polygon.uvs.id, 0, sizeof(ei::Vec2));
+		}
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
+        
+		// draw TODO
+        
+		//glDrawElements(GL_PATCHES, lod.polygon.numTriangles * 3, GL_UNSIGNED_INT, nullptr);
+	}
 }
 
 size_t GlRendererBase::get_aligned(size_t size, size_t alignment) {

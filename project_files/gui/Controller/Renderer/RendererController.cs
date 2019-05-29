@@ -68,6 +68,8 @@ namespace gui.Controller.Renderer
             }
 
             // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
+            if(m_shouldExit)
+                return;
             m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
         }
 
