@@ -9,10 +9,16 @@ namespace mufflon::renderer {
 
 GlWireframe::GlWireframe() {
     // shader
-	m_program = gl::ProgramBuilder()
+	m_triangleProgram = gl::ProgramBuilder()
         .add_file(gl::ShaderType::Vertex, "shader/wireframe_vertex.glsl")
         .add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
         .build();
+
+	m_quadProgram = gl::ProgramBuilder()
+		.add_file(gl::ShaderType::Vertex, "shader/wireframe_vertex.glsl")
+		.add_file(gl::ShaderType::TessEval, "shader/wireframe_tese.glsl")
+		.add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
+		.build();
 
     // vertex layout
 	m_vao = gl::VertexArrayBuilder().add(
@@ -20,17 +26,22 @@ GlWireframe::GlWireframe() {
 	).build();
 
     // wireframe pipeline
-	m_pipe.program = m_program;
-	m_pipe.vertexArray = m_vao;
-	m_pipe.rasterizer.cullMode = gl::CullMode::None;
-	m_pipe.rasterizer.fillMode = gl::FillMode::Wireframe;
+	m_trianglePipe.program = m_triangleProgram;
+	m_trianglePipe.vertexArray = m_vao;
+	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
+	m_trianglePipe.rasterizer.fillMode = gl::FillMode::Wireframe;
+
+	m_quadPipe = m_trianglePipe;
+	m_quadPipe.patch.vertices = 4;
+	m_quadPipe.program = m_quadProgram;
 }
 
 void GlWireframe::on_reset() {
 	GlRendererBase::on_reset();
 
-	m_pipe.framebuffer = m_framebuffer;
-    
+	m_trianglePipe.framebuffer = m_framebuffer;
+	m_quadPipe.framebuffer = m_framebuffer;
+
 	auto* cam = m_currentScene->get_camera();
 	m_viewProjMatrix = 
 		ei::perspectiveGL(1.5f, 
@@ -47,10 +58,10 @@ void GlWireframe::iterate() {
 	begin_frame({ 0.0f, 0.0f, 0.0f, 1.0f });
 	
     // camera matrix
-	glProgramUniformMatrix4fv(m_program, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
+	glProgramUniformMatrix4fv(m_triangleProgram, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
 
-	draw_triangles(m_pipe, Attribute::Position);
-
+	draw_triangles(m_trianglePipe, Attribute::Position);
+	draw_quads(m_quadPipe, Attribute::Position);
 
 	end_frame();
 }

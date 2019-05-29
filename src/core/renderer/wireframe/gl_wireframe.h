@@ -21,9 +21,11 @@ public:
 private:
 	WireframeParameters m_params = {};
 	ei::Mat4x4 m_viewProjMatrix;
-	gl::Program m_program;
+	gl::Program m_triangleProgram;
+	gl::Program m_quadProgram;
 
-	gl::Pipeline m_pipe;
+	gl::Pipeline m_trianglePipe;
+	gl::Pipeline m_quadPipe;
 	gl::VertexArray m_vao;
 };
 }

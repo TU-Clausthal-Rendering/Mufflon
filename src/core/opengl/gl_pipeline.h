@@ -1,5 +1,6 @@
 #pragma once
 #include "gl_object.h"
+#include <array>
 
 namespace mufflon::gl {
 
@@ -143,10 +144,18 @@ struct BlendState {
 	bool alphaToCoverage = false;
 };
 
+struct PatchState {
+	int vertices = 3;
+    // default tesselation level if no control shader is supplied
+	std::array<float, 4> outer = { 1.0f, 1.0f, 1.0f, 1.0f };
+	std::array<float, 2> inner = { 1.0f, 1.0f };
+};
+
 struct Pipeline {
 	RasterizerState rasterizer;
 	DepthStencilState depthStencil;
 	BlendState blend;
+	PatchState patch;
 
 	gl::Handle program = 0;
 	gl::Handle vertexArray = 0;

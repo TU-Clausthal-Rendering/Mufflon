@@ -85,12 +85,13 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 
 void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
+	mAssert(pipe.patch.vertices == 4);
 
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
 		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
 
-		if(!lod.polygon.numTriangles) continue;
+		if(!lod.polygon.numQuads) continue;
 
 		// bind vertex and index buffer
 		if(attribs & Attribute::Position) {
@@ -108,9 +109,9 @@ void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
         
-		// draw TODO
-        
-		//glDrawElements(GL_PATCHES, lod.polygon.numTriangles * 3, GL_UNSIGNED_INT, nullptr);
+		// draw
+		size_t offset = lod.polygon.numTriangles * 3 * sizeof(GLuint);
+		glDrawElements(GL_PATCHES, lod.polygon.numQuads * 4, GL_UNSIGNED_INT, reinterpret_cast<void*>(offset));
 	}
 }
 

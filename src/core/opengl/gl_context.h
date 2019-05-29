@@ -13,6 +13,7 @@ private:
 		RasterizerState rasterizer;
 		DepthStencilState depthStencil;
 		BlendState blend;
+		PatchState patch;
         // sampler might get added later
 	} m_state;
 	gl::Handle m_emptyVao;

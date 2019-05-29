@@ -1075,5 +1075,8 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

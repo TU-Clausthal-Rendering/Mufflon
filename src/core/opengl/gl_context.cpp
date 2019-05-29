@@ -10,6 +10,17 @@ void Context::set(const Pipeline& pipeline) {
 	mAssert(pipeline.framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, pipeline.framebuffer);
 
+    if(state.patch.vertices != pipeline.patch.vertices) {
+		glPatchParameteri(GL_PATCH_VERTICES, pipeline.patch.vertices);
+    }
+    if(state.patch.inner != pipeline.patch.inner) {
+		glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, state.patch.inner.data());
+    }
+	if(state.patch.outer != pipeline.patch.outer) {
+		glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, state.patch.outer.data());
+	}
+	state.patch = pipeline.patch;
+
 	if(state.rasterizer.cullMode != pipeline.rasterizer.cullMode)
 	{
 		if(pipeline.rasterizer.cullMode == CullMode::None)
@@ -192,6 +203,8 @@ void Context::set(const Pipeline& pipeline) {
 
 Context::Context() {
 	glGenVertexArrays(1, &m_emptyVao);
+	glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, m_state.patch.outer.data());
+	glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, m_state.patch.inner.data());
 }
 
 Context& Context::get() {
