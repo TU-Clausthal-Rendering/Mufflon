@@ -176,8 +176,7 @@ private:
 		unique_device_ptr<NotGl<Device::OPENGL>, LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
-		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
-		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_instTransformsDesc;
+		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>> m_instTransformsDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,

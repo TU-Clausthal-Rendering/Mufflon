@@ -62,6 +62,9 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 
 		if(!lod.polygon.numTriangles) continue;
 
+		// Set the instance transformation matrix
+		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&m_sceneDesc.instanceToWorld[i]));
+
 		// bind vertex and index buffer
         if(attribs & Attribute::Position) {
 			mAssert(lod.polygon.vertices.id);
@@ -92,6 +95,9 @@ void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
 
 		if(!lod.polygon.numQuads) continue;
+
+		// Set the instance transformation matrix
+		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&m_sceneDesc.instanceToWorld[i]));
 
 		// bind vertex and index buffer
 		if(attribs & Attribute::Position) {

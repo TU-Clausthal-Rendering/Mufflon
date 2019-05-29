@@ -97,7 +97,7 @@ struct SceneDescriptor {
 	AccelDescriptor accelStruct;
 	// Per instance: transformation + pre-computed scale
 	// TODO: put some of these into one array instead of separate ones
-	ArrayDevHandle_t<dev, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
+	ArrayDevHandle_t<NotGl<dev>, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
 	ArrayDevHandle_t<dev, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
 	ArrayDevHandle_t<NotGl<dev>, u32> lodIndices;
 	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
