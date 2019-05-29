@@ -56,7 +56,7 @@ inline std::unique_ptr<textures::Texture> create_summed_area_table(TextureHandle
 		texture->get_name() + "###SAT",
 		texture->get_width() * texture->get_num_layers(), // Place all cubemap faces side by side
 		texture->get_height(),
-		1u,
+		1u, textures::MipmapType::NONE,
 		textures::Format::R32F,
 		textures::SamplingMode::NEAREST,
 		false

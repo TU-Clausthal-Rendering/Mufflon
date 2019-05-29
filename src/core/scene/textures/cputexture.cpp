@@ -1,4 +1,5 @@
 #include "cputexture.hpp"
+#include "util/parallel.hpp"
 #include "core/memory/dyntype_memory.hpp"
 #include <ei/conversions.hpp>
 #include <cuda_fp16.h>
@@ -8,13 +9,33 @@ using namespace ei;
 namespace mufflon::scene::textures {
 
 CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, SamplingMode mode,
-					   bool sRgb, std::unique_ptr<u8[]> data) :
-	m_imageData((data == nullptr)
-				? std::make_unique<u8[]>(width * height * numLayers * PIXEL_SIZE(format))
-				: move(data)),
+					   MipmapType type, bool sRgb, bool dataHasMipmaps, std::unique_ptr<u8[]> data) :
+	m_imageData((data == nullptr) ? nullptr : move(data)),
 	m_format(format),
-	m_size(width, height, numLayers)
+	m_size(width, height, numLayers, type == MipmapType::NONE ? 1u : (1 + ei::ilog2(std::max(width, height))))
 {
+	// Compute the mipmap offsets
+	m_mipmapOffsets = std::make_unique<ei::UVec3[]>(m_size.w);
+	u32 currOffset = 0u;
+	u32 currWidth = width;
+	u32 currHeight = height;
+	for(i16 level = 0; level < m_size.w; ++level) {
+		m_mipmapOffsets[level] = ei::UVec3{ currWidth, currHeight, currOffset };
+		currOffset += static_cast<u32>(currWidth * currHeight * m_size.z);
+		currWidth = std::max(1u, currWidth / 2u);
+		currHeight = std::max(1u, currHeight / 2u);
+	}
+	const bool computeMipmaps = (m_imageData == nullptr) || (m_size.w > 1 && !dataHasMipmaps);
+	if(m_imageData == nullptr) {
+		m_imageData = std::make_unique<u8[]>(currOffset * PIXEL_SIZE(format));
+	} else if(m_size.w > 1u && !dataHasMipmaps) {
+		// If the old array only had space for the highest mipmap we gotta realloc
+		u8* ptr = static_cast<u8*>(std::realloc(m_imageData.release(), currOffset * PIXEL_SIZE(format)));
+		if(ptr == nullptr)
+			throw std::bad_alloc();
+		m_imageData.reset(ptr);
+	}
+
 	// Choose an optimized sampling routine
 	if(width * height * numLayers == 1)
 		m_sample = mode == SamplingMode::NEAREST ? &CpuTexture::sample111_nearest : &CpuTexture::sample111_linear;
@@ -49,17 +70,67 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 			m_write = &CpuTexture::write_RGBA32F; break;
 		default: mAssert(false);
 	};
+
+	// Compute the actual mipmap
+	if(computeMipmaps)
+		recompute_mipmaps(type);
 }
 
-Vec4 CpuTexture::read(const Pixel& texel, int layer) const {
-	IVec3 wrappedPixel = mod(IVec3{texel, layer}, m_size);
-	int idx = get_index(wrappedPixel);
+void CpuTexture::recompute_mipmaps(MipmapType type) {
+	if(type == MipmapType::NONE)
+		return;
+
+	for(i32 level = 1; level < m_size.w; ++level) {
+		for(i32 layer = 0; layer < m_size.z; ++layer) {
+			// Take four texels to form the mipmap texel
+			const i32 mipWidth = m_size.x >> level;
+			const i32 mipHeight = m_size.y >> level;
+			const float stepX = m_size.x / static_cast<float>(mipWidth);
+			const float stepY = m_size.y / static_cast<float>(mipHeight);
+
+#pragma PARALLEL_FOR
+			for(i32 y = 0u; y < mipHeight; ++y) {
+				for(i32 x = 0u; x < mipWidth; ++x) {
+					const i32 lowerX = ei::floor(x * stepX);
+					const i32 upperX = ei::ceil((x + 1) * stepX);
+					const i32 lowerY = ei::floor(y * stepY);
+					const i32 upperY = ei::ceil((y + 1) * stepY);
+					ei::Vec4 val;
+					switch(type) {
+						case MipmapType::AVG: {
+							val = ei::Vec4{ 0.f };
+							for(i32 cy = lowerY; cy <= upperY; ++cy)
+								for(i32 cx = lowerX; cx <= upperX; ++cx)
+									val += read(Pixel{ cx, cy }, layer, level - 1);
+							val /= static_cast<float>((upperX - lowerX + 1) * (upperY - lowerY + 1));
+						}	break;
+						case MipmapType::MIN: {
+							val = ei::Vec4{ std::numeric_limits<float>::max() };
+							for(i32 cy = lowerY; cy <= upperY; ++cy)
+								for(i32 cx = lowerX; cx <= upperX; ++cx)
+									val = std::min(val, read(Pixel{ cx, cy }, layer, level - 1));
+						}	break;
+						case MipmapType::MAX: {
+							val = ei::Vec4{ -std::numeric_limits<float>::max() };
+							for(i32 cy = lowerY; cy <= upperY; ++cy)
+								for(i32 cx = lowerX; cx <= upperX; ++cx)
+									val = std::max(val, read(Pixel{ cx, cy }, layer, level - 1));
+						}	break;
+					}
+					write(val, Pixel{ x << level, y << level }, layer, level);
+				}
+			}
+		}
+	}
+}
+
+Vec4 CpuTexture::read(const Pixel& texel, int layer, int level) const {
+	int idx = get_index(ei::IVec4{ texel, layer, level });
 	return (this->*m_fetch)(idx);
 }
 
-void CpuTexture::write(const Vec4& value, const Pixel& texel, int layer) {
-	IVec3 wrappedPixel = mod(IVec3{texel, layer}, m_size);
-	int idx = get_index(wrappedPixel);
+void CpuTexture::write(const Vec4& value, const Pixel& texel, int layer, int level) {
+	int idx = get_index(ei::IVec4{ texel, layer, level });
 	(this->*m_write)(idx, value);
 }
 
@@ -297,30 +368,42 @@ void CpuTexture::write_RGB9E5(int texelIdx, const Vec4& value) {
 }
 
 
-Vec4 CpuTexture::sample_nearest(const UvCoordinate& uv, int layer) const {
-	IVec3 baseCoord {ei::floor(uv.x * m_size.x), ei::floor(uv.y * m_size.y), layer};
-	return (this->*m_fetch)(get_index(mod(baseCoord, m_size)));
+Vec4 CpuTexture::sample_nearest(const UvCoordinate& uv, int layer, float level) const {
+	IVec4 baseCoord {ei::floor(uv.x * m_size.x), ei::floor(uv.y * m_size.y), layer,
+					 static_cast<u16>(ei::round(level))};
+	return (this->*m_fetch)(get_index(baseCoord));
 }
 
-Vec4 CpuTexture::sample_linear(const UvCoordinate& uv, int layer) const {
+Vec4 CpuTexture::sample_linear(const UvCoordinate& uv, int layer, float level) const {
 	Vec2 frac {uv.x * m_size.x, uv.y * m_size.y};
-	IVec3 baseCoord {floor(frac), layer};
-	frac.x -= baseCoord.x; frac.y -= baseCoord.y;
+	// Higher mipmap
+	const float upperMipmapLevel = std::floor(level);
+	IVec4 upperCoord {floor(frac), layer, static_cast<u16>(upperMipmapLevel)};
+	frac.x -= upperCoord.x; frac.y -= upperCoord.y;
 	// Get all 4 texel in the layer and sum them with the interpolation weights (frac)
-	Vec4 sample = (this->*m_fetch)(get_index(mod(baseCoord, m_size))) * (1.0f - frac.x) * (1.0f - frac.y);
-	sample += (this->*m_fetch)(get_index(mod(baseCoord + IVec3(1,0,0), m_size))) * (frac.x) * (1.0f - frac.y);
-	sample += (this->*m_fetch)(get_index(mod(baseCoord + IVec3(0,1,0), m_size))) * (1.0f - frac.x) * (frac.y);
-	sample += (this->*m_fetch)(get_index(mod(baseCoord + IVec3(1,1,0), m_size))) * (frac.x) * (frac.y);
+	Vec4 sample = (this->*m_fetch)(get_index(upperCoord)) * (1.0f - frac.x) * (1.0f - frac.y);
+	sample += (this->*m_fetch)(get_index(upperCoord + IVec4(1,0,0,0))) * (frac.x) * (1.0f - frac.y);
+	sample += (this->*m_fetch)(get_index(upperCoord + IVec4(0,1,0,0))) * (1.0f - frac.x) * (frac.y);
+	sample += (this->*m_fetch)(get_index(upperCoord + IVec4(1,1,0,0))) * (frac.x) * (frac.y);
+	// Check if we need to compute another sample
+	if(ei::ceil(level) != upperMipmapLevel) {
+		upperCoord.w += 1u;
+		Vec4 lowerSample = (this->*m_fetch)(get_index(mod(upperCoord, m_size))) * (1.0f - frac.x) * (1.0f - frac.y);
+		lowerSample += (this->*m_fetch)(get_index(mod(upperCoord + IVec4(1, 0, 0, 0), m_size))) * (frac.x) * (1.0f - frac.y);
+		lowerSample += (this->*m_fetch)(get_index(mod(upperCoord + IVec4(0, 1, 0, 0), m_size))) * (1.0f - frac.x) * (frac.y);
+		lowerSample += (this->*m_fetch)(get_index(mod(upperCoord + IVec4(1, 1, 0, 0), m_size))) * (frac.x) * (frac.y);
+		sample = ei::lerp(sample, lowerSample, level - upperMipmapLevel);
+	}
 	// TODO: benchmark if replacing all the mod() calls with a single one and conditional
 	// additions for the three new vectors gives some advantage.
 	return sample;
 }
 
-Vec4 CpuTexture::sample111_nearest(const UvCoordinate& uv, int layer) const {
+Vec4 CpuTexture::sample111_nearest(const UvCoordinate& uv, int layer, float level) const {
 	return (this->*m_fetch)(0);
 }
 
-Vec4 CpuTexture::sample111_linear(const UvCoordinate& uv, int layer) const {
+Vec4 CpuTexture::sample111_linear(const UvCoordinate& uv, int layer, float level) const {
 	return (this->*m_fetch)(0);
 }
 

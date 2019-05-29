@@ -96,13 +96,16 @@ public:
 	TextureHandle get_displacement_map() const noexcept {
 		return m_displacement;
 	}
+	TextureHandle get_displacement_max_mips() const noexcept {
+		return m_displacementMaxMips;
+	}
 	float get_displacement_bias() const noexcept {
 		return m_displacementBias;
 	}
 	float get_displacement_scale() const noexcept {
 		return m_displacementScale;
 	}
-	void set_displacement(TextureHandle map, const float scale = 1.f, const float bias = 0.f) noexcept {
+	void set_displacement(TextureHandle map, TextureHandle maxMips, const float scale = 1.f, const float bias = 0.f) noexcept {
 		m_displacement = map;
 		m_displacementBias = bias;
 		m_displacementScale = scale;
@@ -127,7 +130,8 @@ protected:
 
 	float m_displacementBias = 0.f;
 	float m_displacementScale = 1.f;
-	TextureHandle m_displacement = nullptr;	// TODO: no idea yet
+	TextureHandle m_displacement = nullptr;
+	TextureHandle m_displacementMaxMips = nullptr;
 	//mutable bool m_dirty = true;			// Any property of the material changed
 
 private:

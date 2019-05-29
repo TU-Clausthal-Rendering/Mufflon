@@ -11,16 +11,16 @@ namespace mufflon { namespace scene { namespace textures {
 #ifdef __CUDACC__
 #pragma nv_exec_check_disable
 #endif // _CUDACC__
-CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer = 0) {
-	return texture->read(texel, layer);
+CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer = 0, int level = 0) {
+	return texture->read(texel, layer, level);
 }
-CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer = 0) {
+CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer = 0, int level = 0) {
 #ifdef __CUDA_ARCH__
 	// CUDA textures cannot switch linear filtering on/off, so we assume always-on and normalized coordinates.
 	// This means that 1. we need to add 0.5 to the coordinate to get to the center of the texel
 	// and 2. we need to normalize the coordinates into range [0, 1]
-	return ei::details::hard_cast<ei::Vec4>(tex2DLayered<float4>(texture.handle, (texel.x + 0.5f) / static_cast<float>(texture.width),
-		(texel.y + 0.5f) / static_cast<float>(texture.height), layer));
+	return ei::details::hard_cast<ei::Vec4>(tex2DLayeredLod<float4>(texture.handle, (texel.x + 0.5f) / static_cast<float>(texture.width),
+		(texel.y + 0.5f) / static_cast<float>(texture.height), layer, level));
 #else // __CUDA_ARCH__
 	return {};
 #endif // __CUDA_ARCH__
@@ -30,6 +30,7 @@ CUDA_FUNCTION ei::Vec4 read(ConstTextureDevHandle_t<Device::CUDA> texture, const
 #pragma nv_exec_check_disable
 #endif // _CUDACC__
 CUDA_FUNCTION ei::Vec4 read(TextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer = 0) {
+	// We only support reading from the top-level mipmap for read/write textures since CUDA surfaces can only bind to a single mipmap
 	return texture->read(texel, layer);
 }
 CUDA_FUNCTION ei::Vec4 read(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer = 0) {
@@ -64,6 +65,7 @@ CUDA_FUNCTION void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& 
 #pragma nv_exec_check_disable
 #endif // _CUDACC__
 CUDA_FUNCTION void write(TextureDevHandle_t<Device::CPU> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
+	// We only support writing to the top-level mipmap since CUDA surfaces can only bind to a single mipmap
 	texture->write(value, texel, layer);
 }
 CUDA_FUNCTION void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& texel, int layer, const ei::Vec4& value) {
@@ -78,16 +80,16 @@ CUDA_FUNCTION void write(TextureDevHandle_t<Device::CUDA> texture, const Pixel& 
 #ifdef __CUDACC__
 #pragma nv_exec_check_disable
 #endif // _CUDACC__
-CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CPU> texture, const UvCoordinate& uv, int layer = 0u) {
-	return texture->sample(uv, layer);
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CPU> texture, const UvCoordinate& uv, int layer = 0u, float level = 0.f) {
+	return texture->sample(uv, layer, level);
 }
 
 // Sample a CPU or CUDA texture
-CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CUDA> texture, const UvCoordinate& uv, int layer = 0u) {
+CUDA_FUNCTION ei::Vec4 sample(ConstTextureDevHandle_t<Device::CUDA> texture, const UvCoordinate& uv, int layer = 0u, float level = 0.f) {
 	// TODO: layer
 	// UV coordinates need to be scaled, so that we 
 #ifdef __CUDA_ARCH__
-	auto texel = tex2DLayered<float4>(texture.handle, uv.x, uv.y, layer);
+	auto texel = tex2DLayeredLod<float4>(texture.handle, uv.x, uv.y, layer, level);
 	return ei::details::hard_cast<ei::Vec4>(texel);
 #else // __CUDA_ARCH__
 	return {};
