@@ -163,6 +163,8 @@ namespace gui.Dll
 
         // World API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void world_clear_all();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_create_object();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_object_name")]
         private static extern IntPtr world_get_object_name_(IntPtr obj);

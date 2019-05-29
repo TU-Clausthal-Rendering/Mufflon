@@ -8,11 +8,13 @@
 
 namespace mufflon::scene::textures {
 
-Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, Format format,
-				 SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data) :
+Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, MipmapType mipmapType, Format format,
+				 SamplingMode mode, bool sRgb, bool dataHasMipmaps, std::unique_ptr<u8[]> data) :
 	m_width(width),
 	m_height(height),
 	m_numLayers(std::max<u16>(1u, numLayers)),
+	m_mipmapType(mipmapType),
+	m_mipmapLevels(mipmapType == MipmapType::NONE ? 1u : (1 + ei::ilog2(std::max(width, height)))),
 	m_format(format),
 	m_mode(mode),
 	m_sRgb(sRgb),
@@ -22,7 +24,7 @@ Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, Format 
 	if(data) {
 		// A file loader provides an array with pixel data. This is loaded into
 		// a CPUTexture per default.
-		create_texture_cpu(move(data));
+		create_texture_cpu(dataHasMipmaps, move(data));
 	}
 }
 
@@ -38,8 +40,9 @@ Texture::Texture(Texture&& tex) noexcept :
 	m_glHandle(tex.m_glHandle),
     m_glFormat(tex.m_glFormat),
 	m_handles(tex.m_handles),
-    m_constHandles(tex.m_constHandles),
-    m_name(std::move(tex.m_name))
+	m_constHandles(tex.m_constHandles),
+	m_mipmapLevels(tex.m_mipmapLevels),
+	m_name(std::move(tex.m_name))
 {
 	tex.m_cudaTexture = nullptr;
 	tex.m_glHandle = 0;
@@ -51,7 +54,7 @@ Texture::~Texture() {
 	if(m_cudaTexture) {
 		cuda::check_error(cudaDestroyTextureObject(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>().handle));
 		cuda::check_error(cudaDestroySurfaceObject(m_handles.get<TextureDevHandle_t<Device::CUDA>>().handle));
-		cuda::check_error(cudaFreeArray(m_cudaTexture));
+		cuda::check_error(cudaFreeMipmappedArray(m_cudaTexture));
 		m_cudaTexture = nullptr;
 		m_cudaTexture = nullptr;
 	}
@@ -93,36 +96,50 @@ void Texture::synchronize() {
 			case Device::OPENGL: create_texture_opengl(); break;
 			default: mAssert(false);
 		}
-	}
 
-	// Check from which device to copy
-	if(dev != Device::CPU && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>())) {
-		if(dev == Device::CUDA) {
-			cudaMemcpy3DParms copyParams{ 0u };
-			copyParams.srcPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
-			copyParams.dstArray = m_cudaTexture;
-			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
-			copyParams.kind = cudaMemcpyDefault;
-			cuda::check_error(cudaMemcpy3D(&copyParams));
-		} else {
-			// TODO: OpenGL
-		}
-	} else if(dev != Device::CUDA && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>())) {
-		if(dev == Device::CPU) {
-			cudaMemcpy3DParms copyParams{ 0u };
-			copyParams.dstPtr = make_cudaPitchedPtr(m_cpuTexture->data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
-			copyParams.srcArray = m_cudaTexture;
-			copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
-			copyParams.kind = cudaMemcpyDefault;
-			cuda::check_error(cudaMemcpy3D(&copyParams));
-		} else {
-			// TODO: OpenGL
-		}
-	} else if(dev != Device::OPENGL && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>())) {
-		if(dev == Device::CPU) {
-			// TODO
-		} else {
-			// TODO
+		// Check from which device to copy
+		if(dev != Device::CPU && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>())) {
+			if(dev == Device::CUDA) {
+				u32 width = m_width;
+				u32 height = m_height;
+				// Copy over all mipmap levels!
+				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
+					cudaMemcpy3DParms copyParams{ 0u };
+					copyParams.srcPtr = make_cudaPitchedPtr(m_cpuTexture->data(level), width * PIXEL_SIZE(m_format), width, height);
+					cuda::check_error(cudaGetMipmappedArrayLevel(&copyParams.dstArray, m_cudaTexture, level));
+					copyParams.extent = make_cudaExtent(width, height, m_numLayers);
+					copyParams.kind = cudaMemcpyDefault;
+					cuda::check_error(cudaMemcpy3D(&copyParams));
+					width = std::max(1u, width / 2u);
+					height = std::max(1u, height / 2u);
+				}
+			} else {
+				// TODO: OpenGL
+			}
+		} else if(dev != Device::CUDA && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>())) {
+			if(dev == Device::CPU) {
+				u32 width = m_width;
+				u32 height = m_height;
+				// Copy over all mipmap levels!
+				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
+					cudaMemcpy3DParms copyParams{ 0u };
+					copyParams.dstPtr = make_cudaPitchedPtr(m_cpuTexture->data(level), width * PIXEL_SIZE(m_format), width, height);
+					cuda::check_error(cudaGetMipmappedArrayLevel(&copyParams.srcArray, m_cudaTexture, level));
+					copyParams.extent = make_cudaExtent(width, height, m_numLayers);
+					copyParams.kind = cudaMemcpyDefault;
+					cuda::check_error(cudaMemcpy3D(&copyParams));
+					width = std::max(1u, width / 2u);
+					height = std::max(1u, height / 2u);
+				}
+			} else {
+				// TODO: OpenGL
+			}
+		} else if(dev != Device::OPENGL && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>())) {
+			if(dev == Device::CPU) {
+				// TODO
+			} else {
+				// TODO
+			}
 		}
 	}
 }
@@ -148,7 +165,7 @@ void Texture::unload() {
 				auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
 				cuda::check_error(cudaDestroyTextureObject(texHdl.handle));
 				cuda::check_error(cudaDestroySurfaceObject(surfHdl.handle));
-				cuda::check_error(cudaFreeArray(m_cudaTexture));
+				cuda::check_error(cudaFreeMipmappedArray(m_cudaTexture));
 				// Reset handles
 				texHdl.handle = 0;
 				surfHdl.handle = 0;
@@ -178,9 +195,17 @@ void Texture::clear() {
 	size_t texMemSize = size_t(m_width) * size_t(m_height) * size_t(m_numLayers) * PIXEL_SIZE(m_format);
 	switch(dev) {
 		case Device::CPU: {
-			if(!m_cpuTexture)
+			if(!m_cpuTexture) {
 				logError("[Texture::zero] Trying to clear a CPU texture without memory.");
-			else memset(m_cpuTexture->data(), 0, texMemSize);
+			} else {
+				u32 width = m_width;
+				u32 height = m_height;
+				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
+					memset(m_cpuTexture->data(level), 0, size_t(width) * size_t(height) * size_t(m_numLayers) * PIXEL_SIZE(m_format));
+					width = std::max(1u, width / 2u);
+					height = std::max(1u, height / 2u);
+				}
+			}
 		} break;
 		case Device::CUDA: {
 			if(!m_cudaTexture)
@@ -192,12 +217,18 @@ void Texture::clear() {
 					memset(s_zeroMem.data(), 0, texMemSize);
 				}
 
-				cudaMemcpy3DParms copyParams{ 0u };
-				copyParams.srcPtr = make_cudaPitchedPtr(s_zeroMem.data(), m_width * PIXEL_SIZE(m_format), m_width, m_height);
-				copyParams.dstArray = m_cudaTexture;
-				copyParams.extent = make_cudaExtent(m_width, m_height, m_numLayers);
-				copyParams.kind = cudaMemcpyDefault;
-				cuda::check_error(cudaMemcpy3D(&copyParams));
+				u32 width = m_width;
+				u32 height = m_height;
+				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
+					cudaMemcpy3DParms copyParams{ 0u };
+					copyParams.srcPtr = make_cudaPitchedPtr(s_zeroMem.data(), width * PIXEL_SIZE(m_format), width, height);
+					cuda::check_error(cudaGetMipmappedArrayLevel(&copyParams.dstArray, m_cudaTexture, level));
+					copyParams.extent = make_cudaExtent(width, height, m_numLayers);
+					copyParams.kind = cudaMemcpyDefault;
+					cuda::check_error(cudaMemcpy3D(&copyParams));
+					width = std::max(1u, width / 2u);
+					height = std::max(1u, height / 2u);
+				}
 			}
 		} break;
 		case Device::OPENGL: {
@@ -216,10 +247,10 @@ template void Texture::clear<Device::OPENGL>();
 
 
 
-void Texture::create_texture_cpu(std::unique_ptr<u8[]> data) {
+void Texture::create_texture_cpu(bool dataHasMipmaps, std::unique_ptr<u8[]> data) {
 	mAssert(m_cpuTexture == nullptr);
-	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format,
-												m_mode, m_sRgb, move(data));
+	m_cpuTexture = std::make_unique<CpuTexture>(m_width, m_height, m_numLayers, m_format, m_mode,
+												m_mipmapType, m_sRgb, data != nullptr ? dataHasMipmaps : false, move(data));
 	m_handles.get<TextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
 	m_constHandles.get<ConstTextureDevHandle_t<Device::CPU>>() = m_cpuTexture.get();
 }
@@ -247,25 +278,19 @@ void Texture::create_texture_cuda() {
 	cuda::check_error(cudaGetLastError());
 
 	// Allocate the CUDA texture array
-	cuda::check_error(cudaMalloc3DArray(&m_cudaTexture, &channelDesc,
-										make_cudaExtent(m_width, m_height, m_numLayers),
-										cudaArrayLayered | (m_format == Format::RGBA32F ?
-														cudaArraySurfaceLoadStore : 0)));
+	cuda::check_error(cudaMallocMipmappedArray(&m_cudaTexture, &channelDesc, make_cudaExtent(m_width, m_height, m_numLayers),
+											   m_mipmapLevels, cudaArrayLayered));
 
 	// Specify the texture view on the memory
 	cudaResourceDesc resDesc{};
-	resDesc.resType = cudaResourceTypeArray;
-	resDesc.res.array.array = m_cudaTexture;
+	resDesc.resType = cudaResourceTypeMipmappedArray;
+	resDesc.res.mipmap.mipmap = m_cudaTexture;
 	cudaTextureDesc texDesc{};
 	texDesc.addressMode[0] = texDesc.addressMode[1] = texDesc.addressMode[2] = cudaAddressModeWrap;
 	texDesc.sRGB = m_sRgb;
 	texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] = texDesc.borderColor[3] = 0.0f;
 	texDesc.normalizedCoords = true;
 	texDesc.maxAnisotropy = 0;
-	texDesc.mipmapFilterMode = cudaFilterModePoint;
-	texDesc.mipmapLevelBias = 0.0f;
-	texDesc.minMipmapLevelClamp = 0;
-	texDesc.maxMipmapLevelClamp = 0;
 	// The texture read mode depends on the type and size of texels
 	// Normalization is only possible for 8- and 16-bit non-floats
 	if(channelDesc.f == cudaChannelFormatKindFloat) {
@@ -282,6 +307,10 @@ void Texture::create_texture_cuda() {
 			texDesc.readMode = cudaReadModeElementType;
 		}
 	}
+	texDesc.mipmapFilterMode = texDesc.filterMode;
+	texDesc.mipmapLevelBias = 0.0f;
+	texDesc.minMipmapLevelClamp = 0;
+	texDesc.maxMipmapLevelClamp = static_cast<float>(m_mipmapLevels);
 
 	// Fill the handle (texture)
 	auto& texHdl = m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>();
@@ -291,16 +320,11 @@ void Texture::create_texture_cuda() {
 	texHdl.depth = m_numLayers;
 	texHdl.format = m_format;
 
-	// Fill the handle (surface)
-	if(m_format == Format::RGBA32F) // Allow read-only RGB formats without causing errors here
-	{
-		auto& surfHdl = m_handles.get<TextureDevHandle_t<Device::CUDA>>();
-		cuda::check_error(cudaCreateSurfaceObject(&surfHdl.handle, &resDesc));
-		surfHdl.width = m_width;
-		surfHdl.height = m_height;
-		surfHdl.depth = m_numLayers;
-		surfHdl.format = m_format;
-	}
+	/* Problem: CUDA surfaces bind to exactly one cudaArray, ie. one needs to select the mipmap level prior to binding.
+	 * Since surfaces have their own set of issues (e.g. no atomic access) we chose to NOT support CUDA surface creation.
+	 * For the sake of a consistent interface one may still call acquire<Device::CUDA>(), but will only ever get a null
+	 * handle back.
+	 */
 }
 
 void Texture::create_texture_opengl() {

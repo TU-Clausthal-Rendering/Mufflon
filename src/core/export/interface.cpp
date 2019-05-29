@@ -1173,7 +1173,11 @@ Boolean instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame)
 
 void world_clear_all() {
 	TRY
+	auto iterLock = std::scoped_lock(s_iterationMutex);
+	auto screenLock = std::scoped_lock(s_screenTextureMutex);
 	WorldContainer::clear_instance();
+	s_imageOutput.reset();
+	s_screenTexture.reset();
 	CATCH_ALL(;)
 }
 
@@ -1415,9 +1419,11 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium(outerMedium)) );
 	if(mat->alpha != nullptr)
 		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
-	if(mat->displacement.map != nullptr)
-		newMaterial->set_displacement(static_cast<TextureHandle>(mat->displacement.map), mat->displacement.scale,
-									  mat->displacement.bias);
+	if(mat->displacement.map != nullptr) {
+		newMaterial->set_displacement(static_cast<TextureHandle>(mat->displacement.map),
+									  static_cast<TextureHandle>(mat->displacement.maxMips),
+									  mat->displacement.scale, mat->displacement.bias);
+	}
 
 	return newMaterial;
 }
@@ -1756,7 +1762,7 @@ TextureHdl world_get_texture(const char* path) {
 	CATCH_ALL(nullptr)
 }
 
-TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
+TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapType type) {
 	TRY
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
@@ -1785,15 +1791,17 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling) {
 	}
 	// The texture will take ownership of the pointer
 	auto texture = std::make_unique<textures::Texture>(path, texData.width, texData.height,
-													   texData.layers, static_cast<textures::Format>(texData.format),
+													   texData.layers, static_cast<textures::MipmapType>(type),
+													   static_cast<textures::Format>(texData.format),
 													   static_cast<textures::SamplingMode>(sampling),
-													   texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+													   texData.sRgb, false, std::unique_ptr<u8[]>(texData.data));
 	hdl = s_world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
-TextureHdl world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat) {
+TextureHdl world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat,
+									   MipmapType type) {
 	TRY
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
@@ -1830,22 +1838,27 @@ TextureHdl world_add_texture_converted(const char* path, TextureSampling samplin
 	textures::CpuTexture tempTex(texData.width, texData.height, texData.layers,
 								 static_cast<textures::Format>(texData.format),
 								 static_cast<textures::SamplingMode>(sampling),
-								 texData.sRgb, std::unique_ptr<u8[]>(texData.data));
+								 textures::MipmapType::NONE, texData.sRgb, false,
+								 std::unique_ptr<u8[]>(texData.data));
 	// Create an empty texture that we'll fill with the desired format
+	std::unique_ptr<u8[]> texBuffer = nullptr;
+	if(type != MipmapType::MIPMAP_NONE)
+		texBuffer = std::make_unique<u8[]>(texData.width * texData.height * texData.layers * textures::PIXEL_SIZE(tempTex.get_format())
+										   * (1 + ei::ilog2(std::max(texData.width, texData.height))));
 	auto finalTex = std::make_unique<textures::Texture>(std::move(textureName), texData.width, texData.height, texData.layers,
-														static_cast<textures::Format>(targetFormat),
+														static_cast<textures::MipmapType>(type), static_cast<textures::Format>(targetFormat),
 														static_cast<textures::SamplingMode>(sampling),
-														texData.sRgb);
+														texData.sRgb, true, std::move(texBuffer));
 	auto cpuFinalTex = finalTex->template acquire<Device::CPU>();
-
 	for(u32 layer = 0u; layer < texData.layers; ++layer) {
 		for(u32 y = 0u; y < texData.height; ++y) {
 			for(u32 x = 0u; x < texData.width; ++x) {
 				const Pixel texel{ x, y };
-				textures::write(cpuFinalTex, texel, layer, tempTex.read(texel, layer));
+				cpuFinalTex->write(tempTex.read(texel, layer), texel, layer);
 			}
 		}
 	}
+	cpuFinalTex->recompute_mipmaps(static_cast<textures::MipmapType>(type));
 	finalTex->mark_changed(Device::CPU);
 
 	// The texture will take ownership of the pointer
@@ -1885,12 +1898,124 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	memcpy(&paddedVal, value, num * sizeof(float));
 	std::unique_ptr<u8[]> data = std::make_unique<u8[]>(textures::PIXEL_SIZE(format));
 	memcpy(data.get(), &paddedVal, textures::PIXEL_SIZE(format));
-	auto texture = std::make_unique<textures::Texture>(name, 1, 1, 1, format,
+	auto texture = std::make_unique<textures::Texture>(name, 1, 1, 1, textures::MipmapType::NONE, format,
 													   static_cast<textures::SamplingMode>(sampling),
-													   false, move(data));
+													   false, true, move(data));
 	hdl = s_world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
+}
+
+
+CORE_API Boolean CDECL world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips) {
+	TRY
+	CHECK_NULLPTR(path, "texture path", false);
+	CHECK_NULLPTR(hdlTex, "texture handle", false);
+	CHECK_NULLPTR(hdlMips, "texture max MIPMaps handle", false);
+
+	// Give the texture a special name to avoid conflicts with regularly loaded textures
+	std::string textureName = std::string(path) + std::string("##DISPLACEMENT_MAP##");
+	std::string textureMipsName = std::string(path) + std::string("##DISPLACEMENT_MAP_MIPS##");
+
+	// Check if the texture is already loaded
+	auto hdl = s_world.find_texture(textureName);
+	if(hdl != nullptr) {
+		// Also find the max mipmaps
+		auto hdlMaxMips = s_world.find_texture(textureMipsName);
+		if(hdlMaxMips == nullptr) {
+			logError("[", FUNCTION_NAME, "] Failed to find max MIPMaps for existing displacement map");
+			return false;
+		}
+		s_world.ref_texture(hdl);
+		s_world.ref_texture(hdlMaxMips);
+		*hdlTex = hdl;
+		*hdlMips = hdlMaxMips;
+		return true;
+	}
+
+	// Use the plugins to load the texture
+	fs::path filePath(path);
+	TextureData texData{};
+	for(auto& plugin : s_plugins) {
+		if(plugin.is_loaded()) {
+			if(plugin.can_load_format(filePath.extension().string())) {
+				if(plugin.load(filePath.string(), &texData))
+					break;
+			}
+		}
+	}
+	if(texData.data == nullptr) {
+		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
+				 filePath.string(), "'");
+		return false;
+	}
+
+	TextureHandle dispMap;
+	if(texData.format != TextureFormat::FORMAT_R32F) {
+		// Create a texture which will serve as a copy mechanism
+		textures::CpuTexture tempTex(texData.width, texData.height, texData.layers,
+									 static_cast<textures::Format>(texData.format),
+									 textures::SamplingMode::NEAREST,
+									 textures::MipmapType::NONE, texData.sRgb, false,
+									 std::unique_ptr<u8[]>(texData.data));
+		// Create an empty texture that we'll fill with the desired format
+		std::unique_ptr<u8[]> texBuffer = std::make_unique<u8[]>(texData.width * texData.height * texData.layers * textures::PIXEL_SIZE(tempTex.get_format())
+																 * (1 + ei::ilog2(std::max(texData.width, texData.height))));
+		auto finalTex = std::make_unique<textures::Texture>(std::move(textureName), texData.width, texData.height, texData.layers,
+															textures::MipmapType::MIN, textures::Format::R32F,
+															textures::SamplingMode::NEAREST,
+															texData.sRgb, true, std::move(texBuffer));
+		auto cpuFinalTex = finalTex->template acquire<Device::CPU>();
+		for(u32 layer = 0u; layer < texData.layers; ++layer) {
+			for(u32 y = 0u; y < texData.height; ++y) {
+				for(u32 x = 0u; x < texData.width; ++x) {
+					const Pixel texel{ x, y };
+					cpuFinalTex->write(tempTex.read(texel, layer), texel, layer);
+				}
+			}
+		}
+		cpuFinalTex->recompute_mipmaps(textures::MipmapType::MIN);
+		finalTex->mark_changed(Device::CPU);
+		dispMap = s_world.add_texture(std::move(finalTex));
+	} else {
+		auto finalTex = std::make_unique<textures::Texture>(std::move(textureName), texData.width, texData.height, texData.layers,
+															textures::MipmapType::MIN, textures::Format::R32F,
+															textures::SamplingMode::NEAREST,
+															texData.sRgb, false, std::unique_ptr<u8[]>(texData.data));
+		dispMap = s_world.add_texture(std::move(finalTex));
+	}
+	*hdlTex = dispMap;
+
+	// Create the second texture holding only mipmaps (max. ones this time)
+	// For that we need to compute one mipmap level ourselves
+	if(texData.width > 1 || texData.height > 1) {
+		std::unique_ptr<u8[]> texBuffer = std::make_unique<u8[]>(texData.width / 2 * texData.height / 2 * texData.layers
+																 * textures::PIXEL_SIZE(textures::Format::R32F)
+																 * ei::ilog2(std::max(texData.width, texData.height)));
+		auto mipTex = std::make_unique<textures::Texture>(std::move(textureMipsName), texData.width / 2, texData.height / 2, texData.layers,
+														  textures::MipmapType::MAX, textures::Format::R32F,
+														  textures::SamplingMode::NEAREST,
+														  texData.sRgb, true, std::move(texBuffer));
+		auto cpuDispTech = dispMap->template acquire<Device::CPU>();
+		auto cpuMipTech = mipTex->template acquire<Device::CPU>();
+		for(u32 layer = 0u; layer < texData.layers; ++layer) {
+			for(u32 y = 0u; y < texData.height; y += 2) {
+				for(u32 x = 0u; x < texData.width; x += 2) {
+					const Pixel texel{ x, y };
+					ei::Vec4 val = cpuDispTech->read(Pixel{ x, y }, layer);
+					val = std::max(val, cpuDispTech->read(Pixel{ x + 1, y }, layer));
+					val = std::max(val, cpuDispTech->read(Pixel{ x , y + 1 }, layer));
+					val = std::max(val, cpuDispTech->read(Pixel{ x + 1, y + 1 }, layer));
+					cpuMipTech->write(val, Pixel{ x / 2, y / 2 }, layer);
+				}
+			}
+		}
+		cpuMipTech->recompute_mipmaps(textures::MipmapType::MAX);
+		*hdlMips = s_world.add_texture(std::move(mipTex));
+	}
+
+	return true;
+	CATCH_ALL(false)
 }
 
 const char* world_get_texture_name(TextureHdl hdl) {
