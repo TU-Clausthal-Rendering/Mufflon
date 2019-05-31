@@ -11,7 +11,9 @@ void main(){
     if(gl_GlobalInvocationID.x >= size.x) return;
     if(gl_GlobalInvocationID.y >= size.y) return;
 
-    uint index = gl_GlobalInvocationID.y * size.x + gl_GlobalInvocationID.x;
+	// TODO why has x to be flipped?
+    uint index = (gl_GlobalInvocationID.y + 1) * size.x - gl_GlobalInvocationID.x - 1;
+    //uint index = gl_GlobalInvocationID.y * size.x + gl_GlobalInvocationID.x;
     data[3 * index] += color.r;
     data[3 * index + 1] += color.g;
     data[3 * index + 2] += color.b;

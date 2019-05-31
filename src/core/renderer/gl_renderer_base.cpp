@@ -2,6 +2,7 @@
 #include "core/opengl/program_builder.h"
 #include <glad/glad.h>
 #include "core/opengl/gl_context.h"
+#include "core/scene/scene.hpp"
 
 namespace mufflon::renderer {
 
@@ -86,6 +87,27 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 	}
 }
 
+void GlRendererBase::draw_spheres(const gl::Pipeline& pipe) {
+	gl::Context::set(pipe);
+
+	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
+		const auto idx = m_sceneDesc.lodIndices[i];
+		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
+
+		if(!lod.spheres.numSpheres) continue;
+
+		// Set the instance transformation matrix
+		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&m_sceneDesc.instanceToWorld[i]));
+
+		// bind vertex and index buffer
+		mAssert(lod.spheres.spheres.id);
+		glBindVertexBuffer(0, lod.spheres.spheres.id, 0, sizeof(ei::Sphere));
+
+		// draw
+		glDrawArrays(GL_POINTS, 0, lod.spheres.numSpheres);
+	}
+}
+
 void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 	mAssert(pipe.patch.vertices == 4);
@@ -119,6 +141,31 @@ void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 		size_t offset = lod.polygon.numTriangles * 3 * sizeof(GLuint);
 		glDrawElements(GL_PATCHES, lod.polygon.numQuads * 4, GL_UNSIGNED_INT, reinterpret_cast<void*>(offset));
 	}
+}
+
+GlRendererBase::CameraTransforms GlRendererBase::get_camera_transforms() const {
+	CameraTransforms t;
+
+	auto* cam = m_currentScene->get_camera();
+	float fov = 1.5f;
+	if(auto pcam = dynamic_cast<const cameras::Pinhole*>(cam)) {
+		fov = pcam->get_vertical_fov();
+	}
+	t.projection = ei::perspectiveGL(fov,
+		float(m_outputBuffer.get_width()) / m_outputBuffer.get_height(),
+		cam->get_near(), cam->get_far());
+	t.view = ei::camera(
+		cam->get_position(0),
+		cam->get_position(0) + cam->get_view_dir(0),
+		cam->get_up_dir(0)
+	);
+	t.viewProj = t.projection * t.view;
+	// transpose since opengl expects column major
+	t.projection = ei::transpose(t.projection);
+	t.view = ei::transpose(t.view);
+	t.viewProj = ei::transpose(t.viewProj);
+
+	return t;
 }
 
 size_t GlRendererBase::get_aligned(size_t size, size_t alignment) {

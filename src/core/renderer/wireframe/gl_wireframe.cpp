@@ -20,20 +20,35 @@ GlWireframe::GlWireframe() {
 		.add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
 		.build();
 
+	m_sphereProgram = gl::ProgramBuilder()
+		.add_file(gl::ShaderType::Vertex, "shader/wireframe_svertex.glsl")
+		.add_file(gl::ShaderType::Geometry, "shader/wireframe_sgeom.glsl")
+		.add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
+		.build();
+
     // vertex layout
-	m_vao = gl::VertexArrayBuilder().add(
-		0, 0, 3 // Positions
-	).build();
+	m_triangleVao = gl::VertexArrayBuilder()
+        .add(0, 0, 3) // position
+        .build();
+
+	m_spheresVao = gl::VertexArrayBuilder()
+        .add(0, 0, 3, true, 4, 0) // position
+        .add(0, 1, 1, true, 4, 3 * sizeof(float)) // radius
+        .build();
 
     // wireframe pipeline
 	m_trianglePipe.program = m_triangleProgram;
-	m_trianglePipe.vertexArray = m_vao;
+	m_trianglePipe.vertexArray = m_triangleVao;
 	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
 	m_trianglePipe.rasterizer.fillMode = gl::FillMode::Wireframe;
 
 	m_quadPipe = m_trianglePipe;
 	m_quadPipe.patch.vertices = 4;
 	m_quadPipe.program = m_quadProgram;
+
+	m_spherePipe = m_trianglePipe;
+	m_spherePipe.program = m_sphereProgram;
+	m_spherePipe.vertexArray = m_spheresVao;
 }
 
 void GlWireframe::on_reset() {
@@ -41,32 +56,23 @@ void GlWireframe::on_reset() {
 
 	m_trianglePipe.framebuffer = m_framebuffer;
 	m_quadPipe.framebuffer = m_framebuffer;
+	m_spherePipe.framebuffer = m_framebuffer;
 
-	auto* cam = m_currentScene->get_camera();
-	float fov = 1.5f;
-    if(auto pcam = dynamic_cast<const cameras::Pinhole*>(cam)) {
-		fov = pcam->get_vertical_fov();
-	}
-    m_viewProjMatrix = 
-		ei::perspectiveGL(fov, 
-		    float(m_outputBuffer.get_width()) / m_outputBuffer.get_height(), 
-		    cam->get_near(), cam->get_far()) * 
-		ei::camera(
-			cam->get_position(0),
-            cam->get_position(0) + cam->get_view_dir(0),
-            cam->get_up_dir(0)
-		);
+	glGenBuffers(1, &m_transformBuffer);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
+	auto curTransforms = get_camera_transforms();
+	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
 }
 
 void GlWireframe::iterate() {
 	begin_frame({ 0.0f, 0.0f, 0.0f, 1.0f });
 	
-    // camera matrix
-	glProgramUniformMatrix4fv(m_triangleProgram, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
-	glProgramUniformMatrix4fv(m_quadProgram, 0, 1, GL_TRUE, reinterpret_cast<const float*>(&m_viewProjMatrix));
+    // camera matrices
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_transformBuffer);
 
 	draw_triangles(m_trianglePipe, Attribute::Position);
 	draw_quads(m_quadPipe, Attribute::Position);
+	draw_spheres(m_spherePipe);
 
 	end_frame();
 }

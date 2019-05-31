@@ -24,14 +24,22 @@ public:
     // reload textures with appropriate size
     void on_reset() override;
 protected:
+	struct CameraTransforms {
+		ei::Mat4x4 viewProj;
+		ei::Mat4x4 view;
+		ei::Mat4x4 projection;
+	};
+
     // enable framebuffer and clear textures
 	void begin_frame(ei::Vec4 clearColor);
     // copy framebuffer to rendertarget buffer
 	void end_frame();
 
 	void draw_triangles(const gl::Pipeline& pipe, Attribute attribs);
-	void draw_spheres(const gl::Pipeline& pipe, Attribute attribs);
+	void draw_spheres(const gl::Pipeline& pipe);
 	void draw_quads(const gl::Pipeline& pipe, Attribute attribs);
+
+	CameraTransforms get_camera_transforms() const;
 
     // returns aligned division: size / alignment + !!(size % alignment)
 	static size_t get_aligned(size_t size, size_t alignment);

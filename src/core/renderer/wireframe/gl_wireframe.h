@@ -20,12 +20,18 @@ public:
 
 private:
 	WireframeParameters m_params = {};
-	ei::Mat4x4 m_viewProjMatrix;
+	
 	gl::Program m_triangleProgram;
 	gl::Program m_quadProgram;
+	gl::Program m_sphereProgram;
 
 	gl::Pipeline m_trianglePipe;
 	gl::Pipeline m_quadPipe;
-	gl::VertexArray m_vao;
+	gl::Pipeline m_spherePipe;
+	
+    gl::VertexArray m_triangleVao;
+	gl::VertexArray m_spheresVao;
+
+	gl::Buffer m_transformBuffer;
 };
 }
