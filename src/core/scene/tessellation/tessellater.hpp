@@ -8,12 +8,17 @@
 #include <tuple>
 #include <vector>
 
-namespace mufflon::scene::tessellation {
+namespace mufflon::scene {
+
+class Scenario;
+
+namespace tessellation {
+
+constexpr float PHONGTESS_ALPHA = 0.5f;
 
 // Serves as an oracle for the tessellation level
 class TessLevelOracle {
 public:
-
 	TessLevelOracle() = default;
 
 	// Get the outer tessellation level (ie. the number of new vertices) for the given edge of the given face
@@ -26,8 +31,20 @@ public:
 		m_mesh = mesh;
 	}
 
+	void set_phong_tessellation(bool enabled) {
+		m_usePhongTessellation = enabled;
+	}
+
+	void set_mat_properties(const Scenario& scenario, OpenMesh::FPropHandleT<MaterialIndex> matHdl) noexcept {
+		m_scenario = &scenario;
+		m_matHdl = matHdl;
+	}
+
 protected:
 	geometry::PolygonMeshType* m_mesh = nullptr;
+	bool m_usePhongTessellation = false;
+	OpenMesh::FPropHandleT<MaterialIndex> m_matHdl;
+	const Scenario* m_scenario = nullptr;
 };
 
 class Tessellater {
@@ -96,7 +113,7 @@ protected:
 	// Perfoms tessellation for the inner face (quad)
 	virtual void tessellate_inner_quads(const u32 innerLevelX, const u32 innerLevelY,
 										const OpenMesh::FaceHandle original);
-	
+
 	// Performs tessellation for the inner face (triangle)
 	virtual void tessellate_inner_triangles(const u32 innerLevel, const OpenMesh::FaceHandle original);
 
@@ -153,7 +170,7 @@ private:
 
 	OpenMesh::VertexHandle get_inner_vertex_triangle(const u32 edgeIndex, const u32 index, const u32 innerLevelX) const;
 	OpenMesh::VertexHandle get_inner_vertex_quad(const u32 edgeIndex, const u32 index,
-													 const u32 innerLevelX, const u32 innerLevelY) const;
+												 const u32 innerLevelX, const u32 innerLevelY) const;
 
 	// Holds all vertices spawned for edges of the mesh
 	std::vector<OpenMesh::VertexHandle> m_edgeVertexHandles;
@@ -165,4 +182,5 @@ private:
 	TessLevelOracle& m_tessLevelOracle;
 };
 
-} // mufflon::scene::tessellation
+} // namespace tessellation
+} // namespace mufflon::scene

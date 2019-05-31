@@ -19,8 +19,6 @@ OpenMesh::FaceHandle create_dummy_face(geometry::PolygonMeshType& mesh) {
 	return tempFace;
 }
 
-constexpr float PHONGTESS_ALPHA = 0.5f;
-
 } // namespace
 
 void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
@@ -29,6 +27,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	// Setup
 	m_mesh = &mesh;
 	m_tessLevelOracle.set_mesh(&mesh);
+	m_tessLevelOracle.set_phong_tessellation(m_usePhongTessellation);
 	m_edgeVertexHandles.clear();
 	m_innerVertices.clear();
 	this->pre_tessellate();
@@ -350,10 +349,10 @@ void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge
 	mAssert(x >= 0.f && x <= 1.f);
 	const OpenMesh::VertexHandle from = m_mesh->from_vertex_handle(m_mesh->halfedge_handle(edge, 0u));
 	const OpenMesh::VertexHandle to = m_mesh->to_vertex_handle(m_mesh->halfedge_handle(edge, 0u));
-	const ei::Vec3& p0 = util::pun<ei::Vec3>(m_mesh->point(from));
-	const ei::Vec3& p1 = util::pun<ei::Vec3>(m_mesh->point(to));
-	const ei::Vec3& n0 = util::pun<ei::Vec3>(m_mesh->normal(from));
-	const ei::Vec3& n1 = util::pun<ei::Vec3>(m_mesh->normal(to));
+	const ei::Vec3 p0 = util::pun<ei::Vec3>(m_mesh->point(from));
+	const ei::Vec3 p1 = util::pun<ei::Vec3>(m_mesh->point(to));
+	const ei::Vec3 n0 = util::pun<ei::Vec3>(m_mesh->normal(from));
+	const ei::Vec3 n1 = util::pun<ei::Vec3>(m_mesh->normal(to));
 	// Use phong tessellation to have the tessellation do something useful in absence
 	// of displacement mapping
 	const ei::Vec3 pos = ei::lerp(p0, p1, x);

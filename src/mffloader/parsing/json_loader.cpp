@@ -174,7 +174,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
 				mat->inner.lambert.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
 			} else if(albedoIter->value.IsString()) {
-				mat->inner.lambert.albedo = load_texture(read<const char*>(m_state, albedoIter), TextureSampling::SAMPLING_LINEAR, MipmapType::MIPMAP_AVG);
+				mat->inner.lambert.albedo = load_texture(read<const char*>(m_state, albedoIter), TextureSampling::SAMPLING_LINEAR);
 			} else
 				throw std::runtime_error("Invalid type for albedo.");
 
