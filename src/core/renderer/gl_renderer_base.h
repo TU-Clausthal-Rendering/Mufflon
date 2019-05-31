@@ -11,11 +11,12 @@ namespace mufflon::renderer {
     
 class GlRendererBase : public RendererBase<Device::OPENGL> {
 public:
-	enum class Attribute {
+	enum class Attribute : uint32_t {
         None = 0,
 		Position = 1,
 		Normal = 1 << 1,
-		Texcoord = 1 << 2
+		Texcoord = 1 << 2,
+        All = 0xFFFFFFFF
 	};
 
 	GlRendererBase();

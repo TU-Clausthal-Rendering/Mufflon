@@ -1,11 +1,44 @@
 #include "gl_forward.hpp"
 #include <glad/glad.h>
 #include "core/opengl/program_builder.h"
+#include "core/opengl/vertex_array_builder.h"
 
 namespace mufflon::renderer {
 
 GlForward::GlForward() {
+    // programs
+	gl::ProgramBuilder triangleProgramBuilder;
 
+	m_triangleProgram = triangleProgramBuilder
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/forward_vertex.glsl", false)
+		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/forward_fragment.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
+		.build_program();
+
+    // add intermediate tesselation
+	m_quadProgram = triangleProgramBuilder
+        .add_file("shader/forward_tese.glsl", false)
+        .build_shader(gl::ShaderType::TessEval)
+		.build_program();
+
+	// vertex layout
+	m_triangleVao = gl::VertexArrayBuilder()
+		.add(0, 0, 3) // position
+	    .add(1, 1, 3) // normals
+        .add(2, 2, 2) // texcoords
+        .build();
+
+    // pipelines
+	m_trianglePipe.program = m_triangleProgram;
+	m_trianglePipe.vertexArray = m_triangleVao;
+    // TODO remove this
+	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
+
+	m_quadPipe = m_trianglePipe;
+	m_quadPipe.patch.vertices = 4;
+	m_quadPipe.program = m_quadProgram;
 }
 
 void GlForward::on_descriptor_requery() {
@@ -14,28 +47,25 @@ void GlForward::on_descriptor_requery() {
 
 void GlForward::on_reset() {
 	GlRendererBase::on_reset();
-	/*m_copyShader = gl::ProgramBuilder().add_source(gl::ShaderType::Vertex, R"(
-    #version 460
-	void main() {
-	    vec4 vertex = vec4(0.0, 0.0, 0.0, 1.0);
-	    if(gl_VertexID == 0u) vertex = vec4(1.0, -1.0, 0.0, 1.0);
-	    if(gl_VertexID == 1u) vertex = vec4(-1.0, -1.0, 0.0, 1.0);
-	    if(gl_VertexID == 2u) vertex = vec4(1.0, 1.0, 0.0, 1.0);
-	    if(gl_VertexID == 3u) vertex = vec4(-1.0, 1.0, 0.0, 1.0);
-	    gl_Position = vertex;
-    })").add_source(gl::ShaderType::Fragment, R"(
-    #version 460    
-    layout(location = 0) out vec4 out_fragColor;    
 
-    void main() {
-        out_fragColor = vec4(1.0f);
-    }
-    )").build();*/
-	
+	m_trianglePipe.framebuffer = m_framebuffer;
+	m_quadPipe.framebuffer = m_framebuffer;
+	m_spherePipe.framebuffer = m_framebuffer;
+
+	glGenBuffers(1, &m_transformBuffer);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
+	auto curTransforms = get_camera_transforms();
+	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
 }
 
 void GlForward::iterate() {
-	begin_frame({ 0.0f, 0.0f, 1.0f, 1.0f });
+	begin_frame({ 0.0f, 0.0f, 0.0f, 1.0f });
+
+	// camera matrices
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_transformBuffer);
+
+	draw_triangles(m_trianglePipe, Attribute::All);
+	draw_quads(m_quadPipe, Attribute::All);
 
 	end_frame();
 }

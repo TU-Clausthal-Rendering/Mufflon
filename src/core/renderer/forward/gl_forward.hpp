@@ -3,6 +3,7 @@
 #include "forward_params.hpp"
 #include "core/opengl/gl_object.h"
 #include "core/renderer/gl_renderer_base.h"
+#include "core/opengl/gl_pipeline.h"
 
 namespace mufflon::renderer {
 	
@@ -22,6 +23,19 @@ public:
 
 private:
 	ForwardParameters m_params = {};
+
+	gl::Program m_triangleProgram;
+	gl::Program m_quadProgram;
+	gl::Program m_sphereProgram;
+
+	gl::Pipeline m_trianglePipe;
+	gl::Pipeline m_quadPipe;
+	gl::Pipeline m_spherePipe;
+
+	gl::VertexArray m_triangleVao;
+	gl::VertexArray m_spheresVao;
+
+	gl::Buffer m_transformBuffer;
 };
 
 

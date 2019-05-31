@@ -14,5 +14,4 @@ layout(location = 1) out float out_radius;
 void main() {
 	out_position = (u_cam.view * vec4(u_instanceTrans * vec4(in_position, 1.0), 1.0)).xyz;
 	out_radius = in_radius;
-	gl_Position = vec4(0.0f);
 }

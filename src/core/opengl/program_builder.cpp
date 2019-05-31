@@ -144,7 +144,6 @@ namespace mufflon::gl {
 		for(auto& a : m_attachments) {
 			glDetachShader(id, a);
 		}
-		m_attachments.clear();
 
         // verify linking
 		GLint isLinked = GL_FALSE;
@@ -157,7 +156,7 @@ namespace mufflon::gl {
 			errorLog.resize(length);
 			glGetProgramInfoLog(id, length, &length, &errorLog[0]);
 
-			logError("failed to link program ", errorLog);
+			throw std::runtime_error("failed to link program " + errorLog);
         }
 
 		return id;
