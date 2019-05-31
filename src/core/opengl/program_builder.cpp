@@ -48,9 +48,17 @@ namespace mufflon::gl {
     }
 
     ProgramBuilder& ProgramBuilder::add_file(const std::string& filename, bool isCommon) {
+		static std::unordered_map<std::string, std::string> s_cachedFiles;
+
+        // was the file already loaded?
+		const auto it = s_cachedFiles.find(filename);
+        if(it != s_cachedFiles.end()) {
+			return add_source(it->second, "file: "+ filename, isCommon);
+        }
+
+        // load file
 		std::ifstream file;
 		file.open(filename.c_str());
-
         
 		if(!file.is_open()) {
 			logError("could not open shader file: ", filename);
@@ -60,6 +68,9 @@ namespace mufflon::gl {
 		std::stringstream sstream;
 		sstream << file.rdbuf();
 		file.close();
+
+        // add to cache
+		s_cachedFiles[filename] = sstream.str();
 
 		return add_source(sstream.str(), "file: " + filename, isCommon);
     }
