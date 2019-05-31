@@ -1084,5 +1084,8 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_svertex.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\camera_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

@@ -1,12 +1,4 @@
-#version 460
 layout(location = 0) in vec3 in_position;
-
-struct CameraTransforms
-{
-	mat4 viewProj;
-	mat4 view;
-	mat4 projection;
-};
 
 layout(binding = 0) uniform u_camTrans
 {

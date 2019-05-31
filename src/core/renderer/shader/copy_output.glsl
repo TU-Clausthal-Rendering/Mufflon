@@ -1,4 +1,3 @@
-#version 460
 layout(local_size_x = 16, local_size_y  = 16) in;
 layout(binding = 0) uniform sampler2D src_image;
 layout(binding = 0) restrict buffer dst_buffer {

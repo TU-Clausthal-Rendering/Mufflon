@@ -1,5 +1,3 @@
-#version 460 core
-
 #define RESOLUTION 64
 
 layout(points) in;
@@ -8,13 +6,6 @@ layout(line_strip, max_vertices = RESOLUTION) out;
 // in camera space
 layout(location = 0) in vec3 in_position[1];
 layout(location = 1) in float in_radius[1];
-
-struct CameraTransforms
-{
-	mat4 viewProj;
-	mat4 view;
-	mat4 projection;
-};
 
 layout(binding = 0) uniform u_camTrans
 {

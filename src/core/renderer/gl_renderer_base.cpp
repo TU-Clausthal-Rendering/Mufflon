@@ -8,7 +8,10 @@ namespace mufflon::renderer {
 
 GlRendererBase::GlRendererBase() {
     // compute shader that copies a texture into a buffer
-	m_copyShader = gl::ProgramBuilder().add_file(gl::ShaderType::Compute, "shader/copy_output.glsl").build();
+	m_copyShader = gl::ProgramBuilder()
+        .add_file("shader/copy_output.glsl")
+        .build_shader(gl::ShaderType::Compute)
+        .build_program();
 }
 
 void GlRendererBase::on_reset() {

@@ -1,4 +1,3 @@
-#version 460
 layout(quads, equal_spacing) in;
 
 void main()

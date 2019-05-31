@@ -10,21 +10,32 @@ namespace mufflon::renderer {
 GlWireframe::GlWireframe() {
     // shader
 	m_triangleProgram = gl::ProgramBuilder()
-        .add_file(gl::ShaderType::Vertex, "shader/wireframe_vertex.glsl")
-        .add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
-        .build();
+        .add_file("shader/camera_transforms.glsl")
+        .add_file("shader/wireframe_vertex.glsl", false)
+        .build_shader(gl::ShaderType::Vertex)
+        .add_file("shader/wireframe_fragment.glsl", false)
+        .build_shader(gl::ShaderType::Fragment)
+        .build_program();
 
 	m_quadProgram = gl::ProgramBuilder()
-		.add_file(gl::ShaderType::Vertex, "shader/wireframe_vertex.glsl")
-		.add_file(gl::ShaderType::TessEval, "shader/wireframe_tese.glsl")
-		.add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
-		.build();
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/wireframe_vertex.glsl", false)
+        .build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/wireframe_tese.glsl", false)
+        .build_shader(gl::ShaderType::TessEval)
+		.add_file("shader/wireframe_fragment.glsl", false)
+        .build_shader(gl::ShaderType::Fragment)
+		.build_program();
 
 	m_sphereProgram = gl::ProgramBuilder()
-		.add_file(gl::ShaderType::Vertex, "shader/wireframe_svertex.glsl")
-		.add_file(gl::ShaderType::Geometry, "shader/wireframe_sgeom.glsl")
-		.add_file(gl::ShaderType::Fragment, "shader/wireframe_fragment.glsl")
-		.build();
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/wireframe_svertex.glsl", false)
+        .build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/wireframe_sgeom.glsl", false)
+        .build_shader(gl::ShaderType::Geometry)
+		.add_file("shader/wireframe_fragment.glsl", false)
+        .build_shader(gl::ShaderType::Fragment)
+		.build_program();
 
     // vertex layout
 	m_triangleVao = gl::VertexArrayBuilder()
