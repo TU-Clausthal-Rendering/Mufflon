@@ -7,7 +7,9 @@
 
 namespace mufflon::renderer {
 
-GlWireframe::GlWireframe() {
+GlWireframe::GlWireframe() :
+    GlRendererBase(false, false)
+{
     // shader
 	m_triangleProgram = gl::ProgramBuilder()
         .add_file("shader/camera_transforms.glsl")

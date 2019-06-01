@@ -5,7 +5,9 @@
 
 namespace mufflon::renderer {
 
-GlForward::GlForward() {
+GlForward::GlForward() :
+    GlRendererBase(true, false) 
+{
     // programs
 	gl::ProgramBuilder triangleProgramBuilder;
 
@@ -33,6 +35,7 @@ GlForward::GlForward() {
     // pipelines
 	m_trianglePipe.program = m_triangleProgram;
 	m_trianglePipe.vertexArray = m_triangleVao;
+	m_trianglePipe.depthStencil.depthTest = true;
     // TODO remove this
 	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
 

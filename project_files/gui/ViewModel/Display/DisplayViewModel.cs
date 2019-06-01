@@ -110,7 +110,7 @@ namespace gui.ViewModel.Display
         }
 
         private void OnRepainted(object sender) {
-            m_referenceElement.Dispatcher.Invoke(new Action(() => {
+            m_referenceElement.Dispatcher.BeginInvoke(new Action(() => {
                 RenderImageSource = m_models.Display.RenderBitmap;
                 OnPropertyChanged(nameof(RenderImageSource));
             }));

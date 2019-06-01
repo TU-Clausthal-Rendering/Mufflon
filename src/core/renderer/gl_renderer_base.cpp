@@ -6,12 +6,33 @@
 
 namespace mufflon::renderer {
 
-GlRendererBase::GlRendererBase() {
+GlRendererBase::GlRendererBase(bool useDepth, bool useStencil) {
     // compute shader that copies a texture into a buffer
 	m_copyShader = gl::ProgramBuilder()
         .add_file("shader/copy_output.glsl")
         .build_shader(gl::ShaderType::Compute)
         .build_program();
+
+    // appropriate depth stencil format
+    if(useDepth) {
+		if(useStencil) {
+			m_depthStencilFormat = GL_DEPTH24_STENCIL8;
+			m_depthAttachmentType = GL_DEPTH_STENCIL_ATTACHMENT;
+		}
+		else {
+			m_depthStencilFormat = GL_DEPTH_COMPONENT32F;
+			m_depthAttachmentType = GL_DEPTH_ATTACHMENT;
+		}
+    } else {
+		if(useStencil) {
+			m_depthStencilFormat = GL_STENCIL_INDEX8;
+			m_depthAttachmentType = GL_STENCIL_ATTACHMENT;
+		}
+		else {
+			m_depthStencilFormat = 0;
+			m_depthAttachmentType = 0;
+		}
+	}
 }
 
 void GlRendererBase::on_reset() {
@@ -20,12 +41,19 @@ void GlRendererBase::on_reset() {
 	glBindTexture(GL_TEXTURE_2D, m_colorTarget);
 	glTextureStorage2D(m_colorTarget, 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 
-    // TODO depth target
+    if(m_depthStencilFormat) {
+		glGenTextures(1, &m_depthTarget);
+		glBindTexture(GL_TEXTURE_2D, m_depthTarget);
+		glTextureStorage2D(m_depthTarget, 1, m_depthStencilFormat, m_outputBuffer.get_width(), m_outputBuffer.get_height());
+    }
 
     // framebuffer
 	glGenFramebuffers(1, &m_framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
 	glNamedFramebufferTexture(m_framebuffer, GL_COLOR_ATTACHMENT0, m_colorTarget, 0);
+	if(m_depthStencilFormat)
+		glNamedFramebufferTexture(m_framebuffer, m_depthAttachmentType, m_depthTarget, 0);
+
 	const auto fbStatus = glCheckNamedFramebufferStatus(m_framebuffer, GL_DRAW_FRAMEBUFFER);
 	mAssert(fbStatus == GL_FRAMEBUFFER_COMPLETE);
 	const GLenum attachments[] = { GL_COLOR_ATTACHMENT0 };
@@ -36,7 +64,7 @@ void GlRendererBase::begin_frame(ei::Vec4 clearColor) {
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
 	glViewport(0, 0, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 	glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
 void GlRendererBase::end_frame() {

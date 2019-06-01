@@ -19,7 +19,7 @@ public:
         All = 0xFFFFFFFF
 	};
 
-	GlRendererBase();
+	GlRendererBase(bool useDepth, bool useStencil);
 	virtual ~GlRendererBase() = default;
 
     // reload textures with appropriate size
@@ -45,10 +45,12 @@ protected:
     // returns aligned division: size / alignment + !!(size % alignment)
 	static size_t get_aligned(size_t size, size_t alignment);
 
+	uint32_t m_depthStencilFormat;
 	gl::Texture m_depthTarget;
 	gl::Texture m_colorTarget;
 	gl::Framebuffer m_framebuffer;
 private:
+	uint32_t m_depthAttachmentType;
 	gl::Program m_copyShader;
 	static const size_t WORK_GROUP_SIZE = 16;
 };
