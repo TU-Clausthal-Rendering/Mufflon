@@ -47,7 +47,7 @@ protected:
 
 	uint32_t m_depthStencilFormat;
 	gl::Texture m_depthTarget;
-	gl::Texture m_colorTarget;
+	gl::Texture m_colorTargets[OutputValue::TARGET_COUNT];
 	gl::Framebuffer m_framebuffer;
 private:
 	uint32_t m_depthAttachmentType;

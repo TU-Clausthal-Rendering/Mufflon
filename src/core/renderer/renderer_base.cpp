@@ -56,7 +56,8 @@ bool RendererBase<Device::OPENGL>::pre_iteration(OutputHandler& outputBuffer) {
 		if (m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
 		m_sceneDesc = m_currentScene->get_descriptor<Device::OPENGL>({}, {}, {});
-		this->on_descriptor_requery();
+		m_outputTargets = outputBuffer.get_target();
+	    this->on_descriptor_requery();
 		this->on_reset();
 		m_reset = false;
 		return true;

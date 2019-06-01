@@ -36,11 +36,18 @@ GlRendererBase::GlRendererBase(bool useDepth, bool useStencil) {
 }
 
 void GlRendererBase::on_reset() {
-	// color target
-    glGenTextures(1, &m_colorTarget);
-	glBindTexture(GL_TEXTURE_2D, m_colorTarget);
-	glTextureStorage2D(m_colorTarget, 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
+	// create requested color targets
+	uint32_t curTarget = 0;
+    for(auto t : OutputValue::iterator) {
+        if(t & m_outputTargets) {
+			glGenTextures(1, &m_colorTargets[curTarget]);
+			glBindTexture(GL_TEXTURE_2D, m_colorTargets[curTarget]);
+			glTextureStorage2D(m_colorTargets[curTarget], 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
+        }
+		curTarget++;
+    }
 
+    // additional depth/stencil attachment
     if(m_depthStencilFormat) {
 		glGenTextures(1, &m_depthTarget);
 		glBindTexture(GL_TEXTURE_2D, m_depthTarget);
@@ -50,14 +57,21 @@ void GlRendererBase::on_reset() {
     // framebuffer
 	glGenFramebuffers(1, &m_framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
-	glNamedFramebufferTexture(m_framebuffer, GL_COLOR_ATTACHMENT0, m_colorTarget, 0);
+	curTarget = 0;
+	std::vector<GLenum> attachments;
+    for(auto t : OutputValue::iterator) {
+		if(t & m_outputTargets) {
+			glNamedFramebufferTexture(m_framebuffer, GL_COLOR_ATTACHMENT0 + curTarget, m_colorTargets[curTarget], 0);
+			attachments.push_back(GL_COLOR_ATTACHMENT0 + curTarget);
+		}
+		curTarget++;
+	}
 	if(m_depthStencilFormat)
 		glNamedFramebufferTexture(m_framebuffer, m_depthAttachmentType, m_depthTarget, 0);
 
 	const auto fbStatus = glCheckNamedFramebufferStatus(m_framebuffer, GL_DRAW_FRAMEBUFFER);
 	mAssert(fbStatus == GL_FRAMEBUFFER_COMPLETE);
-	const GLenum attachments[] = { GL_COLOR_ATTACHMENT0 };
-	glNamedFramebufferDrawBuffers(m_framebuffer, 1, attachments);
+	glNamedFramebufferDrawBuffers(m_framebuffer, GLsizei(attachments.size()), attachments.data());
 }
 
 void GlRendererBase::begin_frame(ei::Vec4 clearColor) {
@@ -68,19 +82,25 @@ void GlRendererBase::begin_frame(ei::Vec4 clearColor) {
 }
 
 void GlRendererBase::end_frame() {
-    // copy colorTarget to render target ssbo
-	glUseProgram(m_copyShader);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_colorTarget);
-	const auto dstBuf = m_outputBuffer.m_targets[RenderTargets::RADIANCE];
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, dstBuf.id);
+	// copy render targets to buffers
+    glUseProgram(m_copyShader);
 	glProgramUniform2ui(m_copyShader, 0, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 
-	glDispatchCompute(
-        int(get_aligned(m_outputBuffer.get_width(), WORK_GROUP_SIZE)),
-        int(get_aligned(m_outputBuffer.get_height(), WORK_GROUP_SIZE)),
-		1
-	);
+	size_t curTarget = 0;
+	for(auto t : OutputValue::iterator) {
+		if(t & m_outputTargets) {
+			glBindTextureUnit(0, m_colorTargets[curTarget]);
+			const auto dstBuf = m_outputBuffer.m_targets[curTarget];
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, dstBuf.id);
+
+			glDispatchCompute(
+				int(get_aligned(m_outputBuffer.get_width(), WORK_GROUP_SIZE)),
+				int(get_aligned(m_outputBuffer.get_height(), WORK_GROUP_SIZE)),
+				1
+			);
+		}
+		curTarget++;
+	}
 
 	glFlush();
 }
