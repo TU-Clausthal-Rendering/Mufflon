@@ -11,6 +11,7 @@
 #include <string>
 #include <map>
 #include <optional>
+#include <tuple>
 
 namespace mff_loader::json {
 
@@ -52,7 +53,8 @@ public:
 
 private:
 	TextureHdl load_texture(const char* name, TextureSampling sampling = TextureSampling::SAMPLING_LINEAR,
-							std::optional<TextureFormat> targetFormat = std::nullopt);
+							MipmapType mipmapType = MipmapType::MIPMAP_NONE, std::optional<TextureFormat> targetFormat = std::nullopt);
+	std::pair<TextureHdl, TextureHdl> load_displacement_map(const char* name);
 	MaterialParams* load_material(rapidjson::Value::ConstMemberIterator matIter);
 	void free_material(MaterialParams* mat);
 	bool load_cameras(const ei::Box& aabb);

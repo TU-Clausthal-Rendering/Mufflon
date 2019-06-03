@@ -37,9 +37,9 @@ void CpuPathTracer::on_reset() {
 
 void CpuPathTracer::init_rngs(int num) {
 	m_rngs.resize(num);
-	// TODO: incude some global seed into the initialization
+	int seed = m_params.seed * (num + 1);
 	for(int i = 0; i < num; ++i)
-		m_rngs[i] = math::Rng(i);
+		m_rngs[i] = math::Rng(i + seed);
 }
 
 } // namespace mufflon::renderer

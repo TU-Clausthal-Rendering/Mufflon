@@ -266,8 +266,6 @@ CUDA_FUNCTION bool intersects_primitve(
 	} else {
 		mAssert(primId < obj.numPrimitives);
 		// Sphere.
-		// Masking not possible for spheres: in case of transparent objects we need
-		// self intersections inside.
 		const ei::Sphere& sph = obj.spheres.spheres[primId];
 		// Because it is important if we start incide or outside it is better
 		// to modify the ray beforehand. Testing for tmin afterwards is buggy.
@@ -279,25 +277,23 @@ CUDA_FUNCTION bool intersects_primitve(
 				if(scene.has_alpha(matIdx)) {
 					// Compute UV coordinates
 					const i32 sphId = primId - (obj.polygon.numTriangles + obj.polygon.numQuads);
-					const Point center = transform(obj.spheres.spheres[sphId].center, scene.instanceToWorld[instanceId]);
-					const ei::Vec3 hitPoint = transform(ray.origin + t1 * ray.direction, scene.instanceToWorld[instanceId]);
+					const Point center = obj.spheres.spheres[sphId].center;
+					const ei::Vec3 hitPoint = ray.origin + t1 * ray.direction;
 					const ei::Vec3 geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
-					const ei::Vec3 localN = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[instanceId] }) * geoNormal);
-					const ei::Vec2 uv{
-						atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f,
-						acosf(-localN.z) / ei::PI
+					const ei::Vec2 uv {
+						atan2f(geoNormal.z, geoNormal.x) / (2.0f * ei::PI) + 0.5f,
+						acosf(-geoNormal.y) / ei::PI
 					};
 
 					// < 0.5 is the threshold for transparency (binary decision)
 					if(textures::sample(scene.get_alpha_texture(matIdx), uv).x < 0.5f) {
 						// Check if we can see the back side
 						if(t2 < hitT && t2 > 0.f) {
-							const ei::Vec3 hitPoint2 = transform(ray.origin + t2 * ray.direction, scene.instanceToWorld[instanceId]);
+							const ei::Vec3 hitPoint2 = ray.origin + t2 * ray.direction;
 							const ei::Vec3 geoNormal2 = normalize(hitPoint2 - center); // Normalization required for acos() below
-							const ei::Vec3 localN2 = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[instanceId] }) * geoNormal2);
-							const ei::Vec2 uv2{
-								atan2f(localN2.y, localN2.x) / (2.0f * ei::PI) + 0.5f,
-								acosf(-localN2.z) / ei::PI
+							const ei::Vec2 uv2 {
+								atan2f(geoNormal2.z, geoNormal2.x) / (2.0f * ei::PI) + 0.5f,
+								acosf(-geoNormal2.y) / ei::PI
 							};
 
 							if(textures::sample(scene.get_alpha_texture(matIdx), uv2).x < 0.5f)
@@ -535,9 +531,8 @@ RayIntersectionResult first_intersection(
 			else
 				tangentX = ei::Vec3(normalize(ei::Vec2(geoNormal.y, -geoNormal.x)), 0.0f);
 
-			const ei::Vec3 localN = normalize(transpose(ei::Mat3x3{ scene.instanceToWorld[hitInstanceId] }) * geoNormal);
-			uv.x = atan2f(localN.y, localN.x) / (2.0f * ei::PI) + 0.5f;
-			uv.y = acosf(-localN.z) / ei::PI;
+			uv.x = atan2f(geoNormal.z, geoNormal.x) / (2.0f * ei::PI) + 0.5f;
+			uv.y = acosf(-geoNormal.y) / ei::PI;
 			surfParams.st = uv;
 			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, uv, surfParams };
 		} else {

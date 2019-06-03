@@ -253,7 +253,6 @@ void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, 
 }
 
 
-
 } // namespace
 
 namespace lighttree_detail {
@@ -286,13 +285,12 @@ LightSubTree::Node::Node(const char* base,
 {}
 
 
-LightTreeBuilder::LightTreeBuilder() :
-	m_dirty()
-{}
+LightTreeBuilder::LightTreeBuilder() {}
 
 LightTreeBuilder::~LightTreeBuilder() {
 	unload<Device::CPU>();
 	unload<Device::CUDA>();
+	unload<Device::OPENGL>();
 }
 
 void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
@@ -305,6 +303,7 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	unload<Device::CPU>();
 	m_treeCpu = std::make_unique<LightTree<Device::CPU>>();
+	m_primToNodePath.clear();
 	m_treeCpu->primToNodePath = m_primToNodePath.acquire<Device::CPU>();
 	//m_treeCpu->guide = &guide_flux;
 	m_treeCpu->posGuide = false;
@@ -396,7 +395,8 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	create_light_tree(posLightOffsets, m_treeCpu->posLights, scale, materials);
 	fill_map(posLights, m_treeCpu->primToNodePath);
 	m_primToNodePath.mark_changed(Device::CPU);
-	m_dirty.mark_changed(Device::CPU);
+	m_treeCuda.reset();
+	m_treeOpengl.reset();
 
 	m_lightCount = static_cast<u32>(posLights.size() + dirLights.size());
 }
@@ -407,7 +407,8 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 template < Device dev >
 void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
-	if(dev == Device::CUDA && (m_dirty.needs_sync(dev) || !m_treeCuda)) {
+	// We never change the light tree on another device aside from the CPU
+	if(dev == Device::CUDA && !m_treeCuda) {
 		if(!m_treeCpu)
 			throw std::runtime_error("[LightTreeBuilder::synchronize] There is no source for light-tree synchronization!");
 		// Easiest way to synchronize this complicated type (espacially, if the size changed)
@@ -427,8 +428,6 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		m_treeCuda->dirLights.memory = lightMem;
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = lightMem + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
-
-		m_dirty.mark_synced(dev);
 	} 
 
 	// The background can always be outdated

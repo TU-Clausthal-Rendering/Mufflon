@@ -202,22 +202,14 @@ public:
 	void unload() {
 		m_vertexAttributes.unload<dev>();
 		m_faceAttributes.unload<dev>();
+		unload_index_buffer<dev>();
 	}
 
 	template < bool face >
 	void mark_changed(Device dev) {
 		get_attributes<face>().mark_changed(dev);
 	}
-	void mark_changed(Device dev, VertexAttributeHandle hdl) {
-		m_vertexAttributes.mark_changed(dev, hdl);
-	}
-	void mark_changed(Device dev, FaceAttributeHandle hdl) {
-		m_faceAttributes.mark_changed(dev, hdl);
-	}
-	template < bool face >
-	void mark_changed(Device dev, StringView name) {
-		get_attributes<face>().mark_changed(dev, name);
-	}
+	void mark_changed(Device dev);
 
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
@@ -453,13 +445,15 @@ private:
 	}
 
 	// Reserves more space for the index buffer
-	template < Device dev >
+	template < Device dev, bool markChanged = true >
 	void reserve_index_buffer(std::size_t capacity);
 	// Rebuilds the index buffer from scratch
 	void rebuild_index_buffer();
 	// Synchronizes two device index buffers
 	template < Device changed, Device sync >
 	void synchronize_index_buffer();
+	template < Device dev >
+	void unload_index_buffer();
 	// Resizes the attribute buffer to hold v vertex and f face attribute pointers
 	template < Device dev >
 	void resizeAttribBuffer(std::size_t v, std::size_t f);
@@ -475,7 +469,6 @@ private:
 	FaceAttributeHandle m_matIndicesHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
 	IndexBuffers m_indexBuffer;
-	util::DirtyFlags<Device> m_indexFlags;
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
 

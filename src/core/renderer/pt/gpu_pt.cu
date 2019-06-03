@@ -53,16 +53,16 @@ cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
 	return cudaGetLastError();
 }
 
-__global__ static void init_rng(u32 num, math::Rng* rngs) {
+__global__ static void init_rng(u32 num, int seed, math::Rng* rngs) {
 	u32 idx = threadIdx.x + blockDim.x * blockIdx.x;
 	if(idx < num) {
-		rngs[idx] = math::Rng{ idx };
+		rngs[idx] = math::Rng{ idx + seed };
 	}
 }
-void init_rngs(u32 num, math::Rng* rngs) {
+void init_rngs(u32 num, int seed, math::Rng* rngs) {
 	dim3 blockDims { 256u, 1u, 1u };
 	dim3 gridDims { (num + 255u) / 256u, 1u, 1u };
-	init_rng<<<gridDims, blockDims>>>(num, rngs);
+	init_rng<<<gridDims, blockDims>>>(num, seed, rngs);
 	//cudaDeviceSynchronize();
 	cuda::check_error(cudaGetLastError());
 }

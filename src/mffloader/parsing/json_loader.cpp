@@ -95,7 +95,7 @@ void JsonLoader::clear_state() {
 	m_materialMap.clear();
 }
 
-TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling,
+TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, MipmapType mipmapType,
 									std::optional<TextureFormat> targetFormat) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
@@ -108,12 +108,28 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling,
 	path = fs::canonical(path);
 	TextureHdl tex;
 	if(targetFormat.has_value())
-		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value());
+		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value(), mipmapType);
 	else
-		tex = world_add_texture(path.string().c_str(), sampling);
+		tex = world_add_texture(path.string().c_str(), sampling, mipmapType);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
+}
+
+std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* name) {
+	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
+	// Make the path relative to the file
+	fs::path path(name);
+	if(!path.is_absolute())
+		path = m_filePath.parent_path() / name;
+	if(!fs::exists(path))
+		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
+	path = fs::canonical(path);
+	TextureHdl tex = nullptr;
+	TextureHdl texMips = nullptr;
+	if(!world_add_displacement_map(path.string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
+		throw std::runtime_error("Failed to add displacement map '" + std::string(name) + "'");
+	return { tex, texMips };
 }
 
 MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator matIter) {
@@ -158,7 +174,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
 				mat->inner.lambert.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
 			} else if(albedoIter->value.IsString()) {
-				mat->inner.lambert.albedo = load_texture(read<const char*>(m_state, albedoIter));
+				mat->inner.lambert.albedo = load_texture(read<const char*>(m_state, albedoIter), TextureSampling::SAMPLING_LINEAR);
 			} else
 				throw std::runtime_error("Invalid type for albedo.");
 
@@ -284,7 +300,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 
 		// We load the alpha texture last to give emissive materials to deny it, if present
 		if(alphaPath != nullptr) {
-			mat->alpha = load_texture(alphaPath, TextureSampling::SAMPLING_LINEAR, TextureFormat::FORMAT_R8U);
+			mat->alpha = load_texture(alphaPath, TextureSampling::SAMPLING_LINEAR, MipmapType::MIPMAP_NONE,
+									  TextureFormat::FORMAT_R8U);
 		} else {
 			mat->alpha = nullptr;
 		}
@@ -295,8 +312,9 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			m_state.objectNames.push_back(dispIter->name.GetString());
 			mat->displacement.bias = read_opt<float>(m_state, dispIter->value, "bias", 0.f);
 			mat->displacement.scale = read_opt<float>(m_state, dispIter->value, "scale", 1.f);
-			mat->displacement.map = load_texture(read<const char*>(m_state, get(m_state, dispIter->value, "map")),
-												 TextureSampling::SAMPLING_LINEAR, TextureFormat::FORMAT_R32F);
+			auto[tex, mipsTex] = load_displacement_map(read<const char*>(m_state, get(m_state, dispIter->value, "map")));
+			mat->displacement.map = tex;
+			mat->displacement.maxMips = mipsTex;
 			m_state.objectNames.pop_back();
 		} else {
 			mat->displacement.map = nullptr;
@@ -1007,7 +1025,7 @@ bool JsonLoader::load_file() {
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level
-		if(initTessLevel > 0u) {
+		if(initTessLevel > 0.f) {
 			world_set_tessellation_level(initTessLevel);
 			scene_request_retessellation();
 		}

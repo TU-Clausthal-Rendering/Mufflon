@@ -4,6 +4,10 @@
 
 namespace mufflon { namespace renderer {
 
-using BptParameters = ParameterHandler<PMinPathLength, PMaxPathLength>;
+using BptParameters = ParameterHandler<
+	PSeed,
+	PMinPathLength,
+	PMaxPathLength
+>;
 
 }} // namespace mufflon::renderer

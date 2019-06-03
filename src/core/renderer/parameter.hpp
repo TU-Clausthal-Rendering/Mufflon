@@ -115,6 +115,13 @@ private:
 
 // *** Specific Parameter Implementations ***
 
+struct PSeed {
+	int seed { 0 };
+	static ParamDesc get_desc() noexcept {
+		return {"Seed", ParameterTypes::INT};
+	}
+};
+
 // Only show paths with at least minPathLength segments
 struct PMinPathLength {
 	int minPathLength { 0 };

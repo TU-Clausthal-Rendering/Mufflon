@@ -5,6 +5,7 @@
 namespace mufflon { namespace renderer {
 
 using PtParameters = ParameterHandler<
+	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PNeeCount,

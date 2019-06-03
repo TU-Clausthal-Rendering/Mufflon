@@ -601,7 +601,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// Allocate memory for a part of the BVH.We do not know the final size yet and
 	// cannot allocate the other parts in bvh.
 	m_primIds.resize(numPrimitives * sizeof(i32));
-	auto primIds = as<ArrayDevHandle_t<DescType::DEVICE, i32>, ArrayDevHandle_t<DescType::DEVICE, char>>(m_primIds.acquire<DescType::DEVICE>());
+	auto primIds = as<ArrayDevHandle_t<DescType::DEVICE, i32>, ArrayDevHandle_t<DescType::DEVICE, char>>(m_primIds.acquire<DescType::DEVICE>(false));
 	auto parents = make_udevptr_array<DescType::DEVICE, i32, false>(numNodes);
 
 	// To avoid unnecessary allocations we allocate the device counter array here already (usage in calculate_bounding_boxes)

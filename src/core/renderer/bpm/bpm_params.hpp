@@ -5,6 +5,7 @@
 namespace mufflon { namespace renderer {
 
 using BpmParameters = ParameterHandler<
+	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PMergeRadius,

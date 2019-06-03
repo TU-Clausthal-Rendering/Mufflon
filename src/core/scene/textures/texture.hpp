@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/memory/residency.hpp"
+#include "format.hpp"
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
-#include "util/flag.hpp"
 #include "util/string_view.hpp"
-#include "format.hpp"
+#include "core/export/api.h"
+#include "core/memory/residency.hpp"
 #include "core/opengl/gl_texture.hpp"
 #include <array>
 #include <cuda_runtime.h>
@@ -149,6 +149,13 @@ enum class SamplingMode {
 	LINEAR
 };
 
+enum class MipmapType {
+	NONE,
+	AVG,
+	MIN,
+	MAX
+};
+
 /*
  * The texture class handles the resource. Sampling and accessing the data
  * is up to device specific needs and is implemented in textures/interface.hpp.
@@ -163,8 +170,8 @@ public:
 											   ConstTextureDevHandle_t<Device::OPENGL>>;
 
 	// Loads a texture into the CPU-RAM
-	Texture(std::string name, u16 width, u16 height, u16 numLayers, Format format,
-			SamplingMode mode, bool sRgb, std::unique_ptr<u8[]> data = nullptr);
+	Texture(std::string name, u16 width, u16 height, u16 numLayers, MipmapType mipmapType, Format format,
+			SamplingMode mode, bool sRgb, bool dataHasMipmaps = false, std::unique_ptr<u8[]> data = nullptr);
 	Texture(const Texture&) = delete;
 	Texture(Texture&&);
 	Texture& operator=(const Texture&) = delete;
@@ -189,7 +196,12 @@ public:
 	}
 
 	void mark_changed(Device changed) noexcept {
-		m_dirty.mark_changed(changed);
+		if(changed != Device::CPU)
+			this->unload<Device::CPU>();
+		if(changed != Device::CUDA)
+			this->unload<Device::CUDA>();
+		if(changed != Device::OPENGL)
+			this->unload<Device::OPENGL>();
 	}
 
 	// Explicitly synchronize the given device
@@ -219,18 +231,19 @@ private:
 	u16 m_width;
 	u16 m_height;
 	u16 m_numLayers;
+	MipmapType m_mipmapType;
+	u32 m_mipmapLevels;
 	Format m_format;
 	SamplingMode m_mode;
 	bool m_sRgb;
 	// Handles and resources
-	util::DirtyFlags<Device> m_dirty;
 	std::unique_ptr<CpuTexture> m_cpuTexture;
-	cudaArray_t m_cudaTexture;
+	cudaMipmappedArray_t m_cudaTexture;
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
 	std::string m_name;
 
-	void create_texture_cpu(std::unique_ptr<u8[]> data = nullptr);
+	void create_texture_cpu(bool dataHasMipmaps = false, std::unique_ptr<u8[]> data = nullptr);
 	void create_texture_cuda();
 };
 

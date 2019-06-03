@@ -23,12 +23,17 @@ namespace gui.Controller.Renderer
 
         // Keep track of the number of consecutive iterations performed
         private int m_iterationsPerformed = 0;
+        // Check if we got called to clear the world
+        private bool m_clearWorld = false;
+        private ManualResetEvent m_clearedWorld = new ManualResetEvent(true);
 
         public RendererController(Models models)
         {
             m_models = models;
             m_models.App.GlHost.Loop += RenderLoop;
             m_models.App.GlHost.Destroy += OnDestroy;
+            m_models.Renderer.RequestRedraw += OnRequestRedraw;
+            m_models.Renderer.RequestWorldClear += OnRequestWorldClear;
         }
         
         /* Performs one render loop iteration
@@ -39,34 +44,48 @@ namespace gui.Controller.Renderer
             m_models.Statusbar.UpdateMemory();
 
             // Try to acquire the lock - if we're waiting, we're not rendering
+            if(m_shouldExit)
+                return;
             m_models.Renderer.RenderLock.WaitOne();
             // Check if we've been shut down
             if(m_shouldExit)
                 return;
 
-            UpdateRenderTargets();
+            if(m_clearWorld)
+            {
+                // Only clear the world, do nothing else
+                Core.world_clear_all();
+                m_clearWorld = false;
+                m_models.Renderer.RenderLock.Reset();
+                m_clearedWorld.Set();
+            } else
+            {
+                UpdateRenderTargets();
 
-            if(m_models.Renderer.IsRendering) {
-                if(m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
-                {
-                    // Update camera movements and enter the render DLL
-                    if (m_models.Settings.AllowCameraMovement)
-                        m_models.RendererCamera.MoveCamera();
-                    m_models.Renderer.Iterate();
-                    ++m_iterationsPerformed;
-                } else
-                {
-                    // No more iterations left -> we're done
-                    m_iterationsPerformed = 0;
-                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                if(m_models.Renderer.IsRendering) {
+                    if(m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
+                    {
+                        // Update camera movements and enter the render DLL
+                        if (m_models.Settings.AllowCameraMovement)
+                            m_models.RendererCamera.MoveCamera();
+                        m_models.Renderer.Iterate();
+                        ++m_iterationsPerformed;
+                    } else
+                    {
+                        // No more iterations left -> we're done
+                        m_iterationsPerformed = 0;
+                        System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                        m_models.Renderer.RenderLock.Reset();
+                    }
+                } else {
                     m_models.Renderer.RenderLock.Reset();
                 }
-            } else {
-                m_models.Renderer.RenderLock.Reset();
-            }
 
-            // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
-            m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
+                // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
+                if(m_shouldExit)
+                    return;
+                m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
+            }
         }
 
         // Handles changes in viewport size and render targets
@@ -112,6 +131,19 @@ namespace gui.Controller.Renderer
             // This needs to happen in the main UI thread
             //if(!m_models.Renderer.IsRendering)
             m_models.Renderer.RenderLock.Set();
+        }
+
+        private void OnRequestRedraw(object sender, EventArgs args)
+        {
+            m_models.Renderer.RenderLock.Set();
+        }
+
+        private void OnRequestWorldClear(object sender, EventArgs args)
+        {
+            m_clearedWorld.Reset();
+            m_clearWorld = true;
+            m_models.Renderer.RenderLock.Set();
+            m_clearedWorld.WaitOne();
         }
     }
 }

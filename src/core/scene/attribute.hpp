@@ -4,7 +4,6 @@
 #include "core/memory/residency.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include "util/byte_io.hpp"
-#include "util/flag.hpp"
 #include "util/tagged_tuple.hpp"
 #include <cstddef>
 #include <functional>
@@ -73,7 +72,8 @@ class OpenMeshAttributePool {
 
 		template <class T>
 		ArrayDevHandle_t<Device::CUDA, T> acquire(size_t index) {
-			return as<T*, char*>(&parent.m_cudaPool[parent.m_attributes[index].poolOffset]);
+			return as<ArrayDevHandle_t<Device::CUDA, T>, ArrayDevHandle_t<Device::CUDA, char>>(
+				parent.m_cudaPool + parent.m_attributes[index].poolOffset);
 		}
 
 		OpenMeshAttributePool<IsFace>& parent;
@@ -85,7 +85,8 @@ class OpenMeshAttributePool {
 
 		template <class T>
 		ArrayDevHandle_t<Device::OPENGL, T> acquire(size_t index) {
-			return ArrayDevHandle_t<Device::OPENGL, T>(0);
+			return as<ArrayDevHandle_t<Device::OPENGL, T>, ArrayDevHandle_t<Device::OPENGL, char>>(
+				parent.m_openglPool + parent.m_attributes[index].poolOffset);
 		}
 
 		OpenMeshAttributePool<IsFace>& parent;
@@ -128,8 +129,7 @@ public:
 			[propHandle](geometry::PolygonMeshType& mesh) {
 				auto& prop = mesh.property(propHandle);
 				return reinterpret_cast<char*>(prop.data_vector().data());
-			},
-			util::DirtyFlags<Device>{}
+			}
 		};
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
@@ -156,8 +156,7 @@ public:
 			[propHdl](geometry::PolygonMeshType& mesh) {
 				auto& prop = mesh.property(propHdl);
 				return reinterpret_cast<char*>(prop.data_vector().data());
-			},
-			util::DirtyFlags<Device>{}
+			}
 		};
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
@@ -183,8 +182,6 @@ public:
 	ArrayDevHandle_t<dev, T> acquire(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
 		// Mark both the specific attribute flags and the flags that indicate a change is present
-		m_attributes[hdl.index].dirty.mark_changed(dev);
-		m_dirty.mark_changed(dev);
 		AcquireHelper<dev> helper(*this);
 		return helper.template acquire<T>(hdl.index);
 		/*switch (dev) {
@@ -197,7 +194,7 @@ public:
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
-		this->synchronize<dev>(hdl);
+		this->synchronize<dev>();
 		AcquireHelper<dev> helper(*const_cast<OpenMeshAttributePool<IsFace>*>(this));
 		return helper.template acquire<T>(hdl.index);
 		/*switch (dev) {
@@ -219,21 +216,11 @@ public:
 
 	template < Device dev >
 	void synchronize();
-	template < Device dev >
-	void synchronize(AttributeHandle hdl);
-	template < Device dev >
-	void synchronize(StringView name) {
-		return synchronize(get_attribute_handle(name));
-	}
 
 	template < Device dev >
 	void unload();
 
-	void mark_changed(Device dev, AttributeHandle hdl);
 	void mark_changed(Device dev);
-	void mark_changed(Device dev, StringView name) {
-		mark_changed(dev, get_attribute_handle(name));
-	}
 
 	// Loads the attribute from a byte stream, starting at elem start
 	// Resizes the attributes if necessary
@@ -272,7 +259,6 @@ private:
 		std::size_t elemSize = 0u;
 		std::size_t poolOffset = 0u;
 		std::function<char*(geometry::PolygonMeshType&)> accessor;
-		util::DirtyFlags<Device> dirty{};
 	};
 
 	geometry::PolygonMeshType &m_mesh;	// References the OpenMesh mesh
@@ -281,10 +267,11 @@ private:
 	std::size_t m_attribElemCapacity = 0u;
 	std::size_t m_poolSize = 0u;
 	ArrayDevHandle_t<Device::CUDA, char> m_cudaPool = nullptr;
+	ArrayDevHandle_t<Device::OPENGL, char> m_openglPool;
 	// TODO: OpenGL pool?
 
-	util::DirtyFlags<Device> m_dirty;
 	std::vector<AttribInfo> m_attributes;
+	bool m_openMeshSynced = false;
 };
 
 
@@ -312,8 +299,7 @@ public:
 		// Create the accessor...
 		AttribInfo info{
 			sizeof(T),
-			m_poolSize,
-			util::DirtyFlags<Device>{}
+			m_poolSize
 		};
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
@@ -341,10 +327,7 @@ public:
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
-		this->synchronize<dev>(hdl);
-		// Mark both the specific attribute flags and the flags that indicate a change is present
-		m_attributes[hdl.index].dirty.mark_changed(dev);
-		m_dirty.mark_changed(dev);
+		this->synchronize<dev>();
 		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
 			m_pools.template get<PoolHandle<dev>>().handle + m_attributes[hdl.index].poolOffset);
 	}
@@ -352,7 +335,7 @@ public:
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
-		this->synchronize<dev>(hdl);
+		this->synchronize<dev>();
 		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
 			m_pools.template get<PoolHandle<dev>>().handle + m_attributes[hdl.index].poolOffset);
 	}
@@ -369,21 +352,11 @@ public:
 
 	template < Device dev >
 	void synchronize();
-	template < Device dev >
-	void synchronize(AttributeHandle hdl);
-	template < Device dev >
-	void synchronize(StringView name) {
-		return synchronize(get_attribute_handle(name));
-	}
 
 	template < Device dev >
 	void unload();
 
-	void mark_changed(Device dev, AttributeHandle hdl);
 	void mark_changed(Device dev);
-	void mark_changed(Device dev, StringView name) {
-		mark_changed(dev, get_attribute_handle(name));
-	}
 
 	// Loads the attribute from a byte stream, starting at elem start
 	// Resizes the attributes if necessary
@@ -422,7 +395,6 @@ private:
 	struct AttribInfo {
 		std::size_t elemSize = 0u;
 		std::size_t poolOffset = 0u;
-		util::DirtyFlags<Device> dirty;
 	};
 
 	template < Device dev >
@@ -440,7 +412,6 @@ private:
 		PoolHandle<Device::CUDA>,
 		PoolHandle<Device::OPENGL>> m_pools = {};
 
-	util::DirtyFlags<Device> m_dirty;
 	std::vector<AttribInfo> m_attributes;
 };
 

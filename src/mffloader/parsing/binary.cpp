@@ -660,7 +660,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 				lod.numSpheres, " deflated sphere material indices");
 }
 
-void BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
+u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_lod");
 
 	// Remember where we were in the file
@@ -673,14 +673,13 @@ void BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
 	// Jump to the LoD
 	const u32 lods = read<u32>();
-	if(lod >= lods)
-		throw std::runtime_error("LoD out of range (" + std::to_string(lod) + " >= " + std::to_string(lods));
-	m_fileStream.seekg(sizeof(u64) * lod, std::ifstream::cur);
+	const u32 actualLod = std::min(lod, lods - 1u);
+	m_fileStream.seekg(sizeof(u64) * actualLod, std::ifstream::cur);
 	m_fileStream.seekg(read<u64>(), std::ifstream::beg);
 
 	if(read<u32>() != LOD_MAGIC)
 		throw std::runtime_error("Invalid LoD magic constant (object '" + object.name + "', LoD "
-								 + std::to_string(lod) + ")");
+								 + std::to_string(actualLod) + ")");
 
 	// Read the LoD information
 	LodState lodState;
@@ -692,9 +691,9 @@ void BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	lodState.numVertAttribs = read<u32>();
 	lodState.numFaceAttribs = read<u32>();
 	lodState.numSphereAttribs = read<u32>();
-	lodState.lodHdl = object_add_lod(object.objHdl, lod);
+	lodState.lodHdl = object_add_lod(object.objHdl, actualLod);
 
-	logPedantic("[BinaryLoader::read_lod] Loading LoD ", lod, " for object '", object.name, "'...");
+	logPedantic("[BinaryLoader::read_lod] Loading LoD ", actualLod, " for object '", object.name, "'...");
 
 	// Reserve memory for the current LOD
 	if(!polygon_reserve(lodState.lodHdl, lodState.numVertices,
@@ -727,7 +726,7 @@ void BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 		read_uncompressed_face_attributes(object, lodState);
 		read_uncompressed_spheres(object, lodState);
 
-		logInfo("[BinaryLoader::read_lod] Loaded LoD ", lod, " of object object '",
+		logInfo("[BinaryLoader::read_lod] Loaded LoD ", actualLod, " of object object '",
 				object.name, "' with ", lodState.numVertices, " vertices, ",
 				lodState.numTriangles, " triangles, ", lodState.numQuads, " quads, ",
 				lodState.numSpheres, " spheres");
@@ -735,6 +734,7 @@ void BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 
 	// Restore the file state
 	m_fileStream.seekg(currOffset, std::ifstream::beg);
+	return actualLod;
 }
 
 void BinaryLoader::read_object() {
@@ -786,7 +786,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		// We now have a valid instance: time to check if we have the required LoD
 		if(!object_has_lod(m_objects[objId].objHdl, lod)) {
 			// We don't -> gotta load it
-			read_lod(m_objects[objId], lod);
+			lod = read_lod(m_objects[objId], lod);
 		}
 
 		if(!instance_set_transformation_matrix(instHdl, &transMat))

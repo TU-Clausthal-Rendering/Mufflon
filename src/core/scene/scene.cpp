@@ -76,7 +76,7 @@ void Scene::load_materials() {
 	// Temporary storage to only copy once
 	auto cpuTexHdlBuffer = std::make_unique<textures::ConstTextureDevHandle_t<dev>[]>(MAT_SLOTS);
 
-	auto mem = m_materials.acquire<dev>();
+	auto mem = m_materials.acquire<dev>(false);
 	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
@@ -94,9 +94,6 @@ void Scene::load_materials() {
 	// Coyp the alpha texture handles
 	copy((ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.acquire<dev>()),
 		 cpuTexHdlBuffer.get(), sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
-
-	m_alphaTextures.mark_synced(dev);
-	m_materials.mark_synced(dev); // Avoid overwrites with data from different devices.
 }
 
 template < Device dev >
@@ -151,7 +148,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged || sceneDescriptor.lodIndices != nullptr) {
+	if(geometryChanged || sceneDescriptor.lodIndices == nullptr) {
 		// Invalidate other descriptors
 		if(geometryChanged)
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });

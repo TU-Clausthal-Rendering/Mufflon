@@ -47,7 +47,6 @@ Polygons::Polygons(const Polygons& poly) :
 	m_normalsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec3f>(m_meshData->vertex_normals_pph())),
 	m_uvsHdl(m_vertexAttributes.register_attribute<OpenMesh::Vec2f>(m_meshData->vertex_texcoords2D_pph())),
 	m_matIndicesHdl(m_faceAttributes.add_attribute<u16>(MAT_INDICES_NAME)),
-	m_indexFlags(poly.m_indexFlags),
 	m_boundingBox(poly.m_boundingBox),
 	m_triangles(poly.m_triangles),
 	m_quads(poly.m_quads),
@@ -94,7 +93,6 @@ Polygons::Polygons(Polygons&& poly) :
 	m_normalsHdl(std::move(poly.m_normalsHdl)),
 	m_uvsHdl(std::move(poly.m_uvsHdl)),
 	m_matIndicesHdl(std::move(poly.m_matIndicesHdl)),
-	m_indexFlags(std::move(poly.m_indexFlags)),
 	m_boundingBox(std::move(poly.m_boundingBox)),
 	m_triangles(poly.m_triangles),
 	m_quads(poly.m_quads),
@@ -182,9 +180,7 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
 	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec3f>(m_normalsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
 	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec2f>(m_uvsHdl)[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
-	m_vertexAttributes.mark_changed(Device::CPU, m_pointsHdl);
-	m_vertexAttributes.mark_changed(Device::CPU, m_normalsHdl);
-	m_vertexAttributes.mark_changed(Device::CPU, m_uvsHdl);
+	m_vertexAttributes.mark_changed(Device::CPU);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
 
@@ -206,7 +202,6 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
 	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
 	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
-	m_indexFlags.mark_changed(Device::CPU);
 
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_attribute_elem_count() + 1u);
@@ -218,7 +213,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
 	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
-	m_faceAttributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_faceAttributes.mark_changed(Device::CPU);
 	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
@@ -257,7 +252,6 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
 	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
 	indexBuffer[currIndexCount + 3u] = static_cast<u32>(v3.idx());
-	m_indexFlags.mark_changed(Device::CPU);
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_attribute_elem_count() + 1u);
 	++m_quads;
@@ -269,7 +263,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
 	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
-	m_faceAttributes.mark_changed(Device::CPU, m_matIndicesHdl);
+	m_faceAttributes.mark_changed(Device::CPU);
 	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
@@ -380,6 +374,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 }
 
 void Polygons::tessellate(tessellation::Tessellater& tessellater) {
+	this->synchronize<Device::CPU>();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 	tessellater.tessellate(*m_meshData);
@@ -390,20 +385,24 @@ void Polygons::tessellate(tessellation::Tessellater& tessellater) {
 
 void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
 	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::displace");
+	this->synchronize<Device::CPU>();
 	// Then perform tessellation
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
-	tessellation::DisplacementMapper tessellater(oracle);
-	tessellater.set_scenario(scenario);
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
 	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
 	m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
+	oracle.set_mat_properties(scenario, matIdxProp);
+	tessellation::DisplacementMapper tessellater(oracle);
+	tessellater.set_scenario(scenario);
 	tessellater.set_material_idx_hdl(matIdxProp);
 
-	tessellater.set_phong_tessellation(false);
+	tessellater.set_phong_tessellation(true);
 	tessellater.tessellate(*m_meshData);
-	m_meshData->garbage_collection();
+
+	this->mark_changed(Device::CPU);
 	this->rebuild_index_buffer();
+	m_wasDisplaced = true;
 	logInfo("Uniformly tessellated polygon mesh (", prevTri, "/", prevQuad,
 			" -> ", m_triangles, "/", m_quads, ")");
 }
@@ -415,6 +414,7 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 
 std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 							   std::size_t targetVertices, bool garbageCollect) {
+	this->synchronize<Device::CPU>();
 	decimater.initialize();
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
@@ -456,6 +456,7 @@ void Polygons::garbage_collect(std::function<void(VertexHandle, VertexHandle)> v
 }
 
 void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
+	this->synchronize<Device::CPU>();
 	if(this->get_vertex_count() == 0) return;
 	// Invalidate bounding box
 	m_boundingBox.min = {
@@ -479,14 +480,13 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 		m_boundingBox.max = ei::max(vertices[i], m_boundingBox.max);
 		m_boundingBox.min = ei::min(vertices[i], m_boundingBox.min);
 	}
-	m_vertexAttributes.mark_changed(Device::CPU, m_pointsHdl);
 	// Transform normals
 	ei::Vec3* normals = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_normalsHdl);
 	for(size_t i = 0; i < this->get_vertex_count(); i++) { // one normal per vertex
 		normals[i] /= scale;
 		normals[i] = rotation * normals[i];
 	}
-	m_vertexAttributes.mark_changed(Device::CPU, m_normalsHdl);
+	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
 template < Device dev >
@@ -494,15 +494,29 @@ void Polygons::synchronize() {
 	m_vertexAttributes.synchronize<dev>();
 	m_faceAttributes.synchronize<dev>();
 	// Synchronize the index buffer
-	if(m_indexFlags.needs_sync(dev) && m_indexFlags.has_changes()) {
-		if(m_indexFlags.has_competing_changes()) {
-			logError("[Polygons::synchronize] Competing device changes; ignoring one");
-		}
+
+	if(m_indexBuffer.template get<IndexBuffer<dev>>().indices == nullptr) {
+		// Try to find a valid device
+		bool synced = false;
 		m_indexBuffer.for_each([&](auto& buffer) {
 			using ChangedBuffer = std::decay_t<decltype(buffer)>;
-			this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
+			if(!synced && buffer.indices != nullptr) {
+				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
+				synced = true;
+			}
 		});
 	}
+}
+
+void Polygons::mark_changed(Device dev) {
+	get_attributes<true>().mark_changed(dev);
+	get_attributes<false>().mark_changed(dev);
+	if(dev != Device::CPU)
+		unload_index_buffer<Device::CPU>();
+	if(dev != Device::CUDA)
+		unload_index_buffer<Device::CUDA>();
+	if(dev != Device::OPENGL)
+		unload_index_buffer<Device::OPENGL>();
 }
 
 bool Polygons::has_displacement_mapping(const Scenario& scenario) const noexcept {
@@ -573,7 +587,7 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 }
 
 // Reserves more space for the index buffer
-template < Device dev >
+template < Device dev, bool markChanged >
 void Polygons::reserve_index_buffer(std::size_t capacity) {
 	auto& buffer = m_indexBuffer.get<IndexBuffer<dev>>();
 	if(capacity > buffer.reserved) {
@@ -581,9 +595,17 @@ void Polygons::reserve_index_buffer(std::size_t capacity) {
 			buffer.indices = Allocator<dev>::template alloc_array<u32>(capacity);
 		else
 			buffer.indices = Allocator<dev>::template realloc<u32>(buffer.indices, buffer.reserved,
-															 capacity);
+																   capacity);
 		buffer.reserved = capacity;
-		m_indexFlags.mark_changed(dev);
+		if constexpr(markChanged) {
+			m_indexBuffer.for_each([](auto& data) {
+				using ChangedBuffer = std::decay_t<decltype(data)>;
+				if(ChangedBuffer::DEVICE != dev && data.indices != nullptr) {
+					Allocator<ChangedBuffer::DEVICE>::template free<u32>(data.indices, data.reserved);
+					data.reserved = 0u;
+				}
+			});
+		}
 	}
 }
 
@@ -652,19 +674,24 @@ void Polygons::rebuild_index_buffer() {
 template < Device changed, Device sync >
 void Polygons::synchronize_index_buffer() {
 	if constexpr(changed != sync) {
-		if(m_indexFlags.has_changes(changed)) {
-			auto& changedBuffer = m_indexBuffer.get<IndexBuffer<changed>>();
-			auto& syncBuffer = m_indexBuffer.get<IndexBuffer<sync>>();
+		auto& changedBuffer = m_indexBuffer.get<IndexBuffer<changed>>();
+		auto& syncBuffer = m_indexBuffer.get<IndexBuffer<sync>>();
 
-			// Check if we need to realloc
-			if(syncBuffer.reserved < m_triangles + m_quads)
-				this->reserve_index_buffer<sync>(3u * m_triangles + 4u * m_quads);
+		// Check if we need to realloc
+		if(syncBuffer.reserved < m_triangles + m_quads)
+			this->reserve_index_buffer<sync, false>(3u * m_triangles + 4u * m_quads);
 
-			if(changedBuffer.reserved != 0u)
-				copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
-			m_indexFlags.mark_synced(sync);
-		}
+		if(changedBuffer.reserved != 0u)
+			copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
 	}
+}
+
+template < Device dev >
+void Polygons::unload_index_buffer() {
+	auto& idxBuffer = m_indexBuffer.template get<IndexBuffer<dev>>();
+	if(idxBuffer.indices != nullptr)
+		idxBuffer.indices = Allocator<dev>::free(idxBuffer.indices, idxBuffer.reserved);
+	idxBuffer.reserved = 0u;
 }
 
 template < Device dev >
@@ -688,9 +715,12 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 }
 
 // Explicit instantiations
-template void Polygons::reserve_index_buffer<Device::CPU>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::CUDA>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::OPENGL>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CUDA, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CUDA, false>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::CUDA>();
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::OPENGL>();
 template void Polygons::synchronize_index_buffer<Device::CUDA, Device::CPU>();
