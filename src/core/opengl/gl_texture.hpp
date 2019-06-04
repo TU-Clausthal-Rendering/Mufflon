@@ -6,10 +6,10 @@ namespace mufflon {
 namespace gl {
 	struct TextureHandle
 	{
-		Handle id;
-		u16 width;
-		u16 height;
-		u16 depth;
+		Handle id = 0;
+		u16 width = 0;
+		u16 height = 0;
+		u16 depth = 0;
 		scene::textures::Format format;
 	};
 
