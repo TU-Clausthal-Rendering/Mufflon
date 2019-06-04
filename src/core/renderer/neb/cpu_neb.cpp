@@ -556,6 +556,8 @@ void CpuNextEventBacktracking::iterate() {
 	m_selfEmissionCount.store(0);
 #ifndef NEB_KDTREE
 	m_density.set_iteration(m_currentIteration + 1);
+#else
+	m_density.clear();
 #endif
 
 	u64 photonSeed = m_rngs[0].next();
@@ -572,7 +574,7 @@ void CpuNextEventBacktracking::iterate() {
 	i32 numViewVertices = m_viewVertexMap.size();
 
 #ifdef NEB_KDTREE
-	m_density.build();
+	m_density.build2();
 #else
 	// In the first iteration, the octree has a bad quality, because on each split
 	// the distribution information is lost.
@@ -654,9 +656,12 @@ void CpuNextEventBacktracking::iterate() {
 								  1.0f, emission);
 	}//*/
 
-	logPedantic("[NEB] Memory occupation | View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),
+	logPedantic("[NEB] Memory occupation    View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),
 				"% | Photons: ", m_photonMap.size() * 100.0f / float(m_photonMap.capacity()),
 				"% | Octree: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
+#ifdef NEB_KDTREE
+	logPedantic("[NEB] KD-Tree depth: ", m_density.compute_depth(), " optimal: ", ei::ilog2(m_density.size())+1);
+#endif
 }
 
 void CpuNextEventBacktracking::on_reset() {

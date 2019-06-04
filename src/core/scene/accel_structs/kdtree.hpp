@@ -53,6 +53,9 @@ public:
 	Data& get_data_by_index(int index) { return m_data[index]; }
 	const Data& get_data_by_index(int index) const { return m_data[index]; }
 
+	// This build method is based on an inverted merge sort.
+	// It starts with a sorted array in each dimension and then recursively
+	// splits the tree at the median element of the largest dimension.
 	void build() {
 		int n = m_dataCount.load();
 		// Create a sorted array along each data axis
@@ -73,6 +76,31 @@ public:
 		info.sorted = sorted;
 		info.tmp.resize(n / 2 + 1);
 		build(info, 0, n);
+
+		resort_positions();
+	}
+
+	// This build method uses a kind of quicksort with median of N elements.
+	// Instead of sorting the elements in each subtree, it only moves them on the
+	// left/right side.
+	void build2() {
+		// Create two working index buffers (ping pong) and get the bounding box.
+		Vec bbMin{ m_positions[0] };
+		Vec bbMax{ m_positions[0] };
+		int n = m_dataCount.load();
+		std::unique_ptr<int[]> tmp[2];
+		tmp[0] = std::make_unique<int[]>(n);
+		for(int i = 0; i < n; ++i) {
+			tmp[0][i] = i;
+			bbMin = min(bbMin, m_positions[i]);
+			bbMax = max(bbMax, m_positions[i]);
+		}
+		tmp[1] = std::make_unique<int[]>(n); // No need for initilization
+
+		int allocCounter = 0;
+		build_qs(tmp[0].get(), tmp[1].get(), bbMin, bbMax, n, allocCounter);
+
+		resort_positions();
 	}
 
 	// Find the nearest k points within a hypersphere around refPosition.
@@ -93,6 +121,11 @@ public:
 			m_tree[m_tree[i].right].data *= -1;
 		}
 	}*/
+
+	int compute_depth(int node = 0) const {
+		if(node == -1) return 0;
+		return 1 + ei::max(compute_depth(m_tree[node].left), compute_depth(m_tree[node].right));
+	}
 
 private:
 	struct Node {
@@ -170,7 +203,7 @@ private:
 		} else m_tree[c].right = -1;
 	}
 
-	void split(int* splitDim, int* refDim, int num, int center, int dimToSplit, std::vector<int>& tmp) {
+	void split(int* __restrict splitDim, int* __restrict refDim, int num, int center, int dimToSplit, std::vector<int>& tmp) {
 		Vec refPos = m_positions[refDim[center]];
 		// Setup two pointers to the two new range begins
 		int l = 0;
@@ -208,9 +241,112 @@ private:
 		memcpy( splitDim + center, &tmp[0], r * sizeof(int) );
 	}
 
+
+	// Improve cache performance for queries by resorting the position array
+	void resort_positions() {
+		auto newPositions = std::make_unique<Vec[]>(m_dataCapacity);
+		int n = m_dataCount.load();
+		for(int i = 0; i < n; ++i) {
+			newPositions[i] = m_positions[m_tree[i].data];
+		}
+		std::swap(m_positions, newPositions);
+	}
+
+
+	// Find the median via selection sort.
+	int median(int* candidates, int count, int splitDim) {
+		if(count <= 2) return candidates[0];
+		int m = count / 2;
+/*		for(int i = 0; i <= m; ++i) for(int j = i+1; j < count; ++j)
+			if(m_positions[canditates[j]][splitDim] < m_positions[canditates[i]][splitDim])
+				std::swap(canditates[i], canditates[j]);*/
+		std::nth_element(candidates, candidates + m, candidates + count,
+			[this,splitDim](const int a, const int b){ return m_positions[a][splitDim] < m_positions[b][splitDim]; } );
+		return candidates[m];
+	}
+
+	int closest_to(const int* candidates, int count, int splitDim, float wantedPos) {
+		float minD = ei::abs(m_positions[candidates[0]][splitDim] - wantedPos);
+		int minC = 0;
+		for(int i = 1; i < count; ++i) {
+			float d = ei::abs(m_positions[candidates[i]][splitDim] - wantedPos);
+			if(d < minD) {
+				minD = d;
+				minC = i;
+			}
+		}
+		return candidates[minC];
+	}
+
+	int build_qs(int* __restrict indices, int* __restrict tmp, const Vec& bbMin, const Vec& bbMax, int count, int& allocCounter) {
+		// "allocate" a new node
+		int node = allocCounter++;
+
+		// No need for splitting
+		if(count == 1) {
+			m_tree[node].data = indices[0];
+			m_tree[node].splitDim = 0;
+			m_tree[node].left = -1;
+			m_tree[node].right = -1;
+			return node;
+		}
+
+		// Determine the largest dimension for splitting
+		Vec bbTmp = bbMax - bbMin;
+		int splitDim = 0;
+		for(int dim = 1; dim < N; ++dim)
+			if(bbTmp[dim] > bbTmp[splitDim]) splitDim = dim;
+
+		// Get median of some random elements
+		constexpr int MEDIAN_C = 9;
+		int candidates[MEDIAN_C];
+		int step = ei::max(1, count / MEDIAN_C);
+		int medianCount = ei::min(count, MEDIAN_C);
+		int off = (count - (medianCount - 1) * step) / 2;
+		for(int i = 0; i < medianCount; ++i)
+			candidates[i] = indices[off + i * step];
+		// Find the median via selection sort up to the element M.
+		//int refIdx = median(candidates, medianCount, splitDim);
+		int refIdx = closest_to(candidates, medianCount, splitDim, bbMin[splitDim] + bbTmp[splitDim] * 0.5f);
+		float refPos = m_positions[refIdx][splitDim];
+
+		// Split the data into the two sets
+		int pl = 0;
+		int pr = count-1;
+		bool putEqualLeft = true;
+		for(int i = 0; i < count; ++i) {
+			if(indices[i] != refIdx) { // The reference element must not be in any of the two sets
+				float curPos = m_positions[indices[i]][splitDim];
+				if(curPos < refPos || (putEqualLeft && curPos == refPos))
+					tmp[pl++] = indices[i];
+				else
+					tmp[pr--] = indices[i];
+				if(curPos == refPos) putEqualLeft = !putEqualLeft;
+			}
+		}
+		++pr; // Let cr point to the first element on the right side
+
+		m_tree[node].data = refIdx;
+		m_tree[node].splitDim = splitDim;
+		// Recursive build. Note that tmp and indices are swapped, because tmp now contains
+		// our valid node sets and the previous indices can be used as temporary memory.
+		if(pl > 0) {
+			bbTmp = bbMax; bbTmp[splitDim] = refPos;
+			m_tree[node].left = build_qs(tmp, indices, bbMin, bbTmp, pl, allocCounter);
+		} else m_tree[node].left = -1;
+		if(count-pr > 0) {
+			bbTmp = bbMin; bbTmp[splitDim] = refPos;
+			m_tree[node].right = build_qs(tmp+pr, indices+pr, bbTmp, bbMax, count-pr, allocCounter);
+		} else m_tree[node].right = -1;
+
+		return node;
+	}
+
 	void query_euclidean_rec(const Vec& refPosition, int k, int* idx, float* distSq, int c) const {
 		if(c == -1) return;
-		const Vec pos = m_positions[m_tree[c].data];
+		//const Vec& pos = m_positions[m_tree[c].data];
+		const Vec& pos = m_positions[c];
+		float hyperPlaneDist = refPosition[m_tree[c].splitDim] - pos[m_tree[c].splitDim];
 		float cDistSq = lensq(refPosition - pos);
 		// Insertion sort in the canditate array.
 		if(cDistSq < distSq[k-1]) {
@@ -225,7 +361,6 @@ private:
 		}
 
 		// Search candidates in the subtrees.
-		float hyperPlaneDist = refPosition[m_tree[c].splitDim] - pos[m_tree[c].splitDim];
 		if(hyperPlaneDist <= 0.0f) {
 			// Search first on the left side
 			query_euclidean_rec(refPosition, k, idx, distSq, m_tree[c].left);
