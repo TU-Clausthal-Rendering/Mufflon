@@ -78,6 +78,7 @@ namespace gui.Controller.Renderer
                         m_models.Renderer.RenderLock.Reset();
                     }
                 } else {
+                    m_iterationsPerformed = 0;
                     m_models.Renderer.RenderLock.Reset();
                 }
 
