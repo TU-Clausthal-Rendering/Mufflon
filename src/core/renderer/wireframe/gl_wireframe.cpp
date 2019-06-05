@@ -43,7 +43,7 @@ GlWireframe::GlWireframe() :
 
 	m_sphereProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
-		.add_file("shader/wireframe_svertex.glsl", false)
+		.add_file("shader/sphere_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/wireframe_sgeom.glsl", false)
         .build_shader(gl::ShaderType::Geometry)

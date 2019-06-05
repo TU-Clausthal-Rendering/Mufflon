@@ -1081,9 +1081,6 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_svertex.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\camera_transforms.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
@@ -1097,6 +1094,18 @@
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_sgeom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_sfragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

@@ -29,6 +29,7 @@ protected:
 		ei::Mat4x4 viewProj;
 		ei::Mat4x4 view;
 		ei::Mat4x4 projection;
+		ei::Mat4x4 invView;
 	};
 
     // enable framebuffer and clear textures

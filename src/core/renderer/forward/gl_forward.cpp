@@ -15,6 +15,7 @@ GlForward::GlForward() :
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/forward_shade.glsl", false)
 		.add_file("shader/forward_fragment.glsl", false)
 		.build_shader(gl::ShaderType::Fragment)
 		.build_program();
@@ -25,12 +26,28 @@ GlForward::GlForward() :
         .build_shader(gl::ShaderType::TessEval)
 		.build_program();
 
+	m_sphereProgram = gl::ProgramBuilder()
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/sphere_vertex.glsl", false)
+        .build_shader(gl::ShaderType::Vertex)
+        .add_file("shader/forward_sgeom.glsl", false)
+        .build_shader(gl::ShaderType::Geometry)
+		.add_file("shader/forward_shade.glsl", false)
+		.add_file("shader/forward_sfragment.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
+		.build_program();
+
 	// vertex layout
 	m_triangleVao = gl::VertexArrayBuilder()
 		.add(0, 0, 3) // position
 	    .add(1, 1, 3) // normals
         .add(2, 2, 2) // texcoords
         .build();
+
+    m_spheresVao = gl::VertexArrayBuilder()
+		.add(0, 0, 3, true, 4, 0) // position
+		.add(0, 1, 1, true, 4, 3 * sizeof(float)) // radius
+		.build();
 
     // pipelines
 	m_trianglePipe.program = m_triangleProgram;
@@ -42,6 +59,10 @@ GlForward::GlForward() :
 	m_quadPipe = m_trianglePipe;
 	m_quadPipe.patch.vertices = 4;
 	m_quadPipe.program = m_quadProgram;
+
+	m_spherePipe = m_trianglePipe;
+	m_spherePipe.program = m_sphereProgram;
+	m_spherePipe.vertexArray = m_spheresVao;
 }
 
 void GlForward::on_descriptor_requery() {
@@ -69,6 +90,7 @@ void GlForward::iterate() {
 
 	draw_triangles(m_trianglePipe, Attribute::All);
 	draw_quads(m_quadPipe, Attribute::All);
+	draw_spheres(m_spherePipe);
 
 	end_frame();
 }

@@ -210,11 +210,13 @@ GlRendererBase::CameraTransforms GlRendererBase::get_camera_transforms() const {
 		cam->get_position(0) + cam->get_view_dir(0),
 		cam->get_up_dir(0)
 	);
+	t.invView = ei::invert(t.view);
 	t.viewProj = t.projection * t.view;
 	// transpose since opengl expects column major
 	t.projection = ei::transpose(t.projection);
 	t.view = ei::transpose(t.view);
 	t.viewProj = ei::transpose(t.viewProj);
+	t.invView = ei::transpose(t.invView);
 
 	return t;
 }
