@@ -1096,5 +1096,8 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_tese.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

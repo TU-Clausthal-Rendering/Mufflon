@@ -10,6 +10,8 @@ void Context::set(const Pipeline& pipeline) {
 	mAssert(pipeline.framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, pipeline.framebuffer);
 
+    // Patches
+
     if(state.patch.vertices != pipeline.patch.vertices) {
 		glPatchParameteri(GL_PATCH_VERTICES, pipeline.patch.vertices);
     }
@@ -20,6 +22,8 @@ void Context::set(const Pipeline& pipeline) {
 		glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, state.patch.outer.data());
 	}
 	state.patch = pipeline.patch;
+
+    // rasterizer
 
 	if(state.rasterizer.cullMode != pipeline.rasterizer.cullMode)
 	{
@@ -135,6 +139,25 @@ void Context::set(const Pipeline& pipeline) {
 			state.depthStencil.passOpBack = pipeline.depthStencil.passOpBack;
 		}
 	}
+    if(state.depthStencil.polygonOffsetFactor != pipeline.depthStencil.polygonOffsetFactor ||
+		state.depthStencil.polygonOffsetUnits != pipeline.depthStencil.polygonOffsetUnits || 
+		state.depthStencil.polygonOffsetClamp != pipeline.depthStencil.polygonOffsetClamp) {
+       if(pipeline.depthStencil.polygonOffsetFactor != 0.0f ||
+		   pipeline.depthStencil.polygonOffsetUnits != 0.0f ||
+		   pipeline.depthStencil.polygonOffsetClamp != 0.0f) {
+		   glEnable(GL_POLYGON_OFFSET_FILL);
+		   glEnable(GL_POLYGON_OFFSET_POINT);
+		   glEnable(GL_POLYGON_OFFSET_LINE);
+		   glPolygonOffsetClamp(pipeline.depthStencil.polygonOffsetFactor, pipeline.depthStencil.polygonOffsetUnits, pipeline.depthStencil.polygonOffsetClamp);
+       } else {
+		   glDisable(GL_POLYGON_OFFSET_FILL);
+		   glDisable(GL_POLYGON_OFFSET_POINT);
+		   glDisable(GL_POLYGON_OFFSET_LINE);
+	   }
+		state.depthStencil.polygonOffsetFactor = pipeline.depthStencil.polygonOffsetFactor;
+		state.depthStencil.polygonOffsetUnits = pipeline.depthStencil.polygonOffsetUnits;
+    }
+    
 
 	// ***** Blend state ******************************************************
 	if(state.blend.enableBlending != pipeline.blend.enableBlending)

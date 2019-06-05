@@ -82,6 +82,22 @@ struct DepthStencilState
 	// passOpFront: Passed both tests.
 	StencilOp stencilFailOpFront = StencilOp::Keep, zfailOpFront = StencilOp::Keep, passOpFront = StencilOp::Keep;
 	StencilOp stencilFailOpBack = StencilOp::Keep, zfailOpBack = StencilOp::Keep, passOpBack = StencilOp::Keep;
+
+    // Each fragment's depth value will be offset after it 
+    // is interpolated from the depth values of the appropriate vertices.
+	// The value of the offset is factor×DZ+r×units, where DZ is 
+    // a measurement of the change in depth relative to the screen 
+    // area of the polygon, and r is the smallest value that is guaranteed 
+    // to produce a resolvable offset for a given implementation. 
+    // The offset is added before the depth test is performed and before the value is written into the depth buffer. 
+    float polygonOffsetFactor = 0.0f;
+	float polygonOffsetUnits = 0.0f;
+    // clamps the calculated offset to a minimum or maximum value
+    // "The offset value o for a polygon is
+    // m x <factor> + r x <units>,                 if <clamp> = 0 or NaN;
+    // min(m x <factor> + r x <units>, <clamp>),   if <clamp> > 0;
+    // max(m x <factor> + r x <units>, <clamp>),   if <clamp> < 0.
+	float polygonOffsetClamp = 0.0f;
 };
 
 enum class BlendOp {

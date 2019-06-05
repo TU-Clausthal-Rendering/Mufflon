@@ -8,7 +8,7 @@
 namespace mufflon::renderer {
 
 GlWireframe::GlWireframe() :
-    GlRendererBase(false, false)
+    GlRendererBase(true, false)
 {
     // shader
 	m_triangleProgram = gl::ProgramBuilder()
@@ -25,8 +25,20 @@ GlWireframe::GlWireframe() :
         .build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/wireframe_tese.glsl", false)
         .build_shader(gl::ShaderType::TessEval)
+        .add_file("shader/wireframe_quad_geom.glsl", false)
+        .build_shader(gl::ShaderType::Geometry)
 		.add_file("shader/wireframe_fragment.glsl", false)
         .build_shader(gl::ShaderType::Fragment)
+		.build_program();
+
+    m_quadDepthProgram = gl::ProgramBuilder()
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/wireframe_vertex.glsl", false)
+		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/wireframe_tese.glsl", false)
+		.build_shader(gl::ShaderType::TessEval)
+		.add_file("shader/wireframe_fragment.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
 		.build_program();
 
 	m_sphereProgram = gl::ProgramBuilder()
@@ -54,6 +66,7 @@ GlWireframe::GlWireframe() :
 	m_trianglePipe.vertexArray = m_triangleVao;
 	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
 	m_trianglePipe.rasterizer.fillMode = gl::FillMode::Wireframe;
+	m_trianglePipe.depthStencil.depthCmpFunc = gl::CmpFunc::LessEqual;
 
 	m_quadPipe = m_trianglePipe;
 	m_quadPipe.patch.vertices = 4;
@@ -62,14 +75,39 @@ GlWireframe::GlWireframe() :
 	m_spherePipe = m_trianglePipe;
 	m_spherePipe.program = m_sphereProgram;
 	m_spherePipe.vertexArray = m_spheresVao;
+
+    // depth pre pass pipeline
+	m_triangleDepthPipe.program = m_triangleProgram;
+	m_triangleDepthPipe.vertexArray = m_triangleVao;
+	m_triangleDepthPipe.rasterizer.cullMode = gl::CullMode::None;
+	m_triangleDepthPipe.depthStencil.depthTest = true;
+	m_triangleDepthPipe.rasterizer.colorWrite = false;
+    // add offset to prevent z fighting that occurs because primitive types (lines and triangles) are mixed
+	m_triangleDepthPipe.depthStencil.polygonOffsetFactor = 1.0f;
+	m_triangleDepthPipe.depthStencil.polygonOffsetUnits = 1.0f;
+
+	m_quadDepthPipe = m_triangleDepthPipe;
+	m_quadDepthPipe.patch.vertices = 4;
+	m_quadDepthPipe.program = m_quadDepthProgram;
 }
 
 void GlWireframe::on_reset() {
 	GlRendererBase::on_reset();
-
+    // set framebuffer
 	m_trianglePipe.framebuffer = m_framebuffer;
 	m_quadPipe.framebuffer = m_framebuffer;
 	m_spherePipe.framebuffer = m_framebuffer;
+	m_triangleDepthPipe.framebuffer = m_framebuffer;
+	m_quadDepthPipe.framebuffer = m_framebuffer;
+	m_spherePipe.framebuffer = m_framebuffer;
+
+    // apply parameters
+	m_trianglePipe.rasterizer.lineWidth = m_params.lineWidth;
+	m_trianglePipe.depthStencil.depthTest = m_params.enableDepth;
+	m_quadPipe.rasterizer.lineWidth = m_params.lineWidth;
+	m_quadPipe.depthStencil.depthTest = m_params.enableDepth;
+	m_spherePipe.rasterizer.lineWidth = m_params.lineWidth;
+	m_spherePipe.depthStencil.depthTest = m_params.enableDepth;
 
 	glGenBuffers(1, &m_transformBuffer);
 	glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
@@ -82,6 +120,11 @@ void GlWireframe::iterate() {
 	
     // camera matrices
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_transformBuffer);
+
+    if(m_params.enableDepth) {
+		draw_triangles(m_triangleDepthPipe, Attribute::Position);
+		draw_quads(m_quadDepthPipe, Attribute::Position);
+    }
 
 	draw_triangles(m_trianglePipe, Attribute::Position);
 	draw_quads(m_quadPipe, Attribute::Position);
