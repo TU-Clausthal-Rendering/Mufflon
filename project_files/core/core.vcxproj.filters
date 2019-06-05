@@ -1096,16 +1096,16 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_sgeom.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_vertex.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_sfragment.glsl">
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl">
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_fragment.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

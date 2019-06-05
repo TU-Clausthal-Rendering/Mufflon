@@ -156,6 +156,7 @@ void Context::set(const Pipeline& pipeline) {
 	   }
 		state.depthStencil.polygonOffsetFactor = pipeline.depthStencil.polygonOffsetFactor;
 		state.depthStencil.polygonOffsetUnits = pipeline.depthStencil.polygonOffsetUnits;
+		state.depthStencil.polygonOffsetClamp = pipeline.depthStencil.polygonOffsetClamp;
     }
     
 

@@ -25,6 +25,7 @@ private:
 	gl::Program m_quadProgram;
 	gl::Program m_quadDepthProgram;
 	gl::Program m_sphereProgram;
+	gl::Program m_sphereDepthProgram;
 
 	gl::Pipeline m_trianglePipe;
 	gl::Pipeline m_triangleDepthPipe;

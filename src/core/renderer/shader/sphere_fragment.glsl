@@ -33,5 +33,7 @@ void main() {
 	// map clipPos from [-1, 1] to (probably) [0, 1]. With default values: clip.z/clip.w * 0.5 + 0.5
 	gl_FragDepth = (clipPos.z / clipPos.w * gl_DepthRange.diff + (gl_DepthRange.near + gl_DepthRange.far)) * 0.5;
 
+#ifdef FORWARD_SHADE
 	shade(toWorld(vec4(position, 1.0)), toWorld(vec4(normal, 0.0)), in_location);
+#endif
 }

@@ -1,3 +1,4 @@
+#define FORWARD_SHADE
 layout(location = 0) out vec4 out_fragColor;
 layout(location = 1) out vec3 out_position;
 layout(location = 2) out vec3 out_albedo;

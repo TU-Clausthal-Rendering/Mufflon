@@ -19,9 +19,10 @@ void main() {
 	// draw circle in view space
 	for(int i = 0; i <= RESOLUTION; ++i) {
 		float t = i * factor;
-		vec3 p = vec3(cos(t), sin(t), 0.0);
 
-		gl_Position = u_cam.projection * vec4(in_position[0] + p * in_radius[0], 1.0);
+		// increase the radius and position a little bit because drawing exactly on the radius will probably be hidden by the depth test
+		vec3 p = vec3(cos(t), sin(t), -0.01);
+		gl_Position = u_cam.projection * vec4(in_position[0] + p * in_radius[0] * 1.01, 1.0);
 		EmitVertex();
 	}
 

@@ -51,6 +51,16 @@ GlWireframe::GlWireframe() :
         .build_shader(gl::ShaderType::Fragment)
 		.build_program();
 
+    m_sphereDepthProgram = gl::ProgramBuilder()
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/sphere_vertex.glsl", false)
+		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/sphere_geom.glsl", false)
+		.build_shader(gl::ShaderType::Geometry)
+		.add_file("shader/sphere_fragment.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
+		.build_program();
+
     // vertex layout
 	m_triangleVao = gl::VertexArrayBuilder()
         .add(0, 0, 3) // position
@@ -89,6 +99,10 @@ GlWireframe::GlWireframe() :
 	m_quadDepthPipe = m_triangleDepthPipe;
 	m_quadDepthPipe.patch.vertices = 4;
 	m_quadDepthPipe.program = m_quadDepthProgram;
+
+	m_sphereDepthPipe = m_triangleDepthPipe;
+	m_sphereDepthPipe.program = m_sphereDepthProgram;
+	m_sphereDepthPipe.vertexArray = m_spheresVao;
 }
 
 void GlWireframe::on_reset() {
@@ -99,7 +113,7 @@ void GlWireframe::on_reset() {
 	m_spherePipe.framebuffer = m_framebuffer;
 	m_triangleDepthPipe.framebuffer = m_framebuffer;
 	m_quadDepthPipe.framebuffer = m_framebuffer;
-	m_spherePipe.framebuffer = m_framebuffer;
+	m_sphereDepthPipe.framebuffer = m_framebuffer;
 
     // apply parameters
 	m_trianglePipe.rasterizer.lineWidth = m_params.lineWidth;
@@ -124,6 +138,7 @@ void GlWireframe::iterate() {
     if(m_params.enableDepth) {
 		draw_triangles(m_triangleDepthPipe, Attribute::Position);
 		draw_quads(m_quadDepthPipe, Attribute::Position);
+		draw_spheres(m_sphereDepthPipe);
     }
 
 	draw_triangles(m_trianglePipe, Attribute::Position);

@@ -30,10 +30,10 @@ GlForward::GlForward() :
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)
-        .add_file("shader/forward_sgeom.glsl", false)
+        .add_file("shader/sphere_geom.glsl", false)
         .build_shader(gl::ShaderType::Geometry)
 		.add_file("shader/forward_shade.glsl", false)
-		.add_file("shader/forward_sfragment.glsl", false)
+		.add_file("shader/sphere_fragment.glsl", false)
 		.build_shader(gl::ShaderType::Fragment)
 		.build_program();
 
