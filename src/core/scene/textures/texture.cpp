@@ -114,7 +114,17 @@ void Texture::synchronize() {
 					height = std::max(1u, height / 2u);
 				}
 			} else {
-				// TODO: OpenGL
+				u32 width = m_width;
+				u32 height = m_height;
+                // copy all mipmaps levels
+                for(u32 level = 0u; level < m_mipmapLevels; ++level) {
+					gl::texSubImage3D(m_glHandle, level, 0, 0, 0, width, height, m_numLayers,
+						m_glFormat.setFormat, m_glFormat.setType, m_cpuTexture->data(0));
+					width = std::max(1u, width / 2u);
+					height = std::max(1u, height / 2u);
+                }
+
+				    
 			}
 		} else if(dev != Device::CUDA && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>())) {
 			if(dev == Device::CPU) {
@@ -329,14 +339,16 @@ void Texture::create_texture_cuda() {
 
 void Texture::create_texture_opengl() {
 	mAssert(m_glHandle == 0);
-	if (m_glHandle) return;
     m_glHandle = gl::genTexture();
 	gl::bindTexture(gl::TextureType::Texture2DArray, m_glHandle);
+
 	m_glFormat = gl::convertFormat(m_format, m_sRgb);
-    // TODO mipmaps?
-	gl::texStorage3D(m_glHandle, 1, m_glFormat.internal, m_width, m_height, m_numLayers);
+	gl::texStorage3D(m_glHandle, m_mipmapLevels, m_glFormat.internal, m_width, m_height, m_numLayers);
+    
     // create bindless texture
-    m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = gl::getTextureSamplerHandle(m_glHandle, get_gl_sampler(m_mode));
+    auto texHandle = gl::getTextureSamplerHandle(m_glHandle, get_gl_sampler(m_mode));
+	gl::makeTextureHandleResident(texHandle);
+	m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = texHandle;
 }
 
 } // namespace mufflon::scene::textures
