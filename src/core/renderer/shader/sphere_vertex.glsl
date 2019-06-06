@@ -15,6 +15,6 @@ layout(location = 2) flat out int out_materialIndex;
 
 void main() {
 	out_position = (u_cam.view * vec4(u_instanceTrans * vec4(in_position, 1.0), 1.0)).xyz;
-	out_radius = in_radius;
+	out_radius = in_radius * u_instanceTrans[0][0];
 	out_materialIndex = in_materialIndex;
 }
