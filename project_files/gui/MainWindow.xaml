@@ -119,6 +119,16 @@
                               SelectedValuePath="Index"
                               IsEnabled="{Binding IsRendering, Converter={StaticResource inverter}}"/>
                 </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Left">
+                    <ComboBox Grid.Column="0"
+                              x:Name="RendererDeviceSelection"
+                              DataContext="{Binding Renderer}"
+                              ItemsSource="{Binding SupportedRenderVariations}"
+                              SelectedItem="{Binding SelectedRendererVariation}"
+                              DisplayMemberPath="Name"
+                              SelectedValuePath="Variation"
+                              IsEnabled="{Binding IsRendering, Converter={StaticResource inverter}}"/>
+                </StatusBarItem>
 
                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 

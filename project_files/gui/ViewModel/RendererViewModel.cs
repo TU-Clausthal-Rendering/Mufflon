@@ -135,23 +135,47 @@ namespace gui.ViewModel
                     if (m_index == value) return;
                     m_index = value;
                     m_name = Core.render_get_renderer_name(m_index);
-                    var devices = Enum.GetValues(typeof(Core.RenderDevice));
-                    int count = 0;
-                    foreach(Core.RenderDevice device in devices)
-                    {
-                        if(Core.render_renderer_uses_device(m_index, device))
-                        {
-                            if (count++ == 0)
-                                m_name += " (";
-                            else
-                                m_name += ", ";
-                            m_name += Enum.GetName(typeof(Core.RenderDevice), device);
-                        }
-                    }
-                    if (count > 0)
-                        m_name += ")";
                 }
             }
+            public string Name { get => m_name; }
+        }
+
+        public class RendererVariation
+        {
+            private uint m_index = 0;
+            private uint m_variation = uint.MaxValue;
+            private string m_name;
+
+            public RendererVariation(uint index)
+            {
+                m_index = index;
+            }
+
+            public UInt32 Variation
+            {
+                get => m_variation;
+                set
+                {
+                    if (m_variation == value) return;
+                    m_variation = value;
+                    m_name = "";
+                    Core.RenderDevice devices = Core.render_get_renderer_devices(m_index, m_variation);
+                    if (devices == Core.RenderDevice.None)
+                    {
+                        m_name = "None";
+                    } else
+                    {
+                        if ((devices & Core.RenderDevice.Cpu) != 0)
+                            m_name += "CPU, ";
+                        if ((devices & Core.RenderDevice.Cuda) != 0)
+                            m_name += "CUDA, ";
+                        if ((devices & Core.RenderDevice.OpenGL) != 0)
+                            m_name += "OPENGL, ";
+                        m_name = m_name.Substring(0, m_name.Length - 2);
+                    }
+                }
+            }
+
             public string Name { get => m_name; }
         }
 
@@ -160,6 +184,7 @@ namespace gui.ViewModel
         private ICommand m_playPause;
         private ICommand m_reset;
         private RendererItem m_selectedRenderer;
+        private RendererVariation m_selectedRendererVariation;
         private DataGrid m_propertiesGrid;
         
 
@@ -171,8 +196,23 @@ namespace gui.ViewModel
                 if (m_selectedRenderer == value) return;
                 m_selectedRenderer = value;
                 m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Index;
+                // Reset the variation to first
+                m_models.Renderer.RendererVariation = 0;
                 m_models.Renderer.RendererIndex = m_selectedRenderer.Index;
+                // The variants get updated in rendererChanged
                 OnPropertyChanged(nameof(SelectedRenderer));
+            }
+        }
+        public RendererVariation SelectedRendererVariation
+        {
+            get => m_selectedRendererVariation;
+            set
+            {
+                if (m_selectedRendererVariation == value) return;
+                m_selectedRendererVariation = value;
+                m_models.Settings.LastSelectedRendererVariation = m_selectedRendererVariation.Variation;
+                m_models.Renderer.RendererVariation = m_selectedRendererVariation.Variation;
+                OnPropertyChanged(nameof(SelectedRendererVariation));
             }
         }
 
@@ -191,6 +231,7 @@ namespace gui.ViewModel
         }
 
         public ObservableCollection<RendererItem> Renderers { get; } = new ObservableCollection<RendererItem>();
+        public ObservableCollection<RendererVariation> SupportedRenderVariations{ get; } = new ObservableCollection<RendererVariation>();
         public ObservableCollection<INotifyPropertyChanged> RendererProperties { get; } = new ObservableCollection<INotifyPropertyChanged>();
 
         public RendererViewModel(Models models, ICommand playPause, ICommand reset)
@@ -240,6 +281,15 @@ namespace gui.ViewModel
             switch (args.PropertyName)
             {
                 case nameof(Models.Renderer.RendererIndex):
+                    SupportedRenderVariations.Clear();
+                    var variationCount = m_models.Renderer.RendererVariationsCount;
+                    for (uint v = 0u; v < variationCount; ++v)
+                        SupportedRenderVariations.Add(new RendererVariation(m_models.Renderer.RendererIndex) { Variation = v });
+                    SelectedRendererVariation = SupportedRenderVariations[0];
+                    OnPropertyChanged(nameof(SupportedRenderVariations));
+                    rendererTypeChanged();
+                    break;
+                case nameof(Models.Renderer.RendererVariation):
                     rendererTypeChanged();
                     break;
                 case nameof(Models.Renderer.IsRendering):
@@ -318,21 +368,33 @@ namespace gui.ViewModel
         {
             // Enable the renderers
             Renderers.Clear();
+            SupportedRenderVariations.Clear();
             var rendererCount = m_models.Renderer.RendererCount;
             for (UInt32 i = 0u; i < rendererCount; ++i)
                 Renderers.Add(new RendererItem() { Index = i });
             // Enable the last selected renderer
             uint lastSelected = m_models.Settings.LastSelectedRenderer;
+            uint lastSelectedVariation = m_models.Settings.LastSelectedRendererVariation;
             if (lastSelected >= Renderers.Count)
             {
                 lastSelected = 0;
                 m_models.Settings.LastSelectedRenderer = 0;
             }
-            SelectedRenderer = Renderers[(int)m_models.Settings.LastSelectedRenderer];
+            SelectedRenderer = Renderers[(int)lastSelected];
+
             if (m_models.Renderer.RendererIndex == SelectedRenderer.Index)
                 rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.RendererIndex)));
             else
                 m_models.Renderer.RendererIndex = SelectedRenderer.Index;
+
+            // Set the active variant (the list has been build already)
+            if (lastSelectedVariation >= SupportedRenderVariations.Count)
+            {
+                lastSelectedVariation = 0;
+                m_models.Settings.LastSelectedRendererVariation = 0;
+            }
+            SelectedRendererVariation = SupportedRenderVariations[(int)lastSelectedVariation];
+
 
             // Load the parameter values from settings
             OnPropertyChanged(nameof(Renderers));

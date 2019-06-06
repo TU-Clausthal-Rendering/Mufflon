@@ -104,11 +104,14 @@ class DllInterface:
     def render_disable_render_target(self, targetIndex, variance):
         return self.dllHolder.core.render_disable_render_target(c_uint32(targetIndex), c_bool(variance))
 
-    def render_enable_renderer(self, rendererIndex):
-        return self.dllHolder.core.render_enable_renderer(c_uint32(rendererIndex))
+    def render_enable_renderer(self, rendererIndex, variation):
+        return self.dllHolder.core.render_enable_renderer(c_uint32(rendererIndex), c_uint32(variation))
 
     def render_get_renderer_count(self):
         return self.dllHolder.core.render_get_renderer_count()
+
+    def render_get_renderer_variations(self, index):
+        return self.dllHolder.core.render_get_renderer_variations(c_uint32(index))
 
     def render_get_renderer_name(self, rendererIndex):
         return self.dllHolder.core.render_get_renderer_name(c_uint32(rendererIndex)).decode()
@@ -116,8 +119,8 @@ class DllInterface:
     def render_get_renderer_short_name(self, rendererIndex):
         return self.dllHolder.core.render_get_renderer_short_name(c_uint32(rendererIndex)).decode()
 
-    def render_renderer_uses_device(self, rendererIndex, device):
-        return self.dllHolder.core.render_renderer_uses_device(c_uint32(rendererIndex), c_int32(device)) != 0
+    def render_get_renderer_devices(self, rendererIndex, variation):
+        return self.dllHolder.core.render_get_renderer_devices(c_uint32(rendererIndex), c_uint32(variation))
 
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name( self.dllHolder.core.world_get_current_scenario()).decode()
@@ -179,18 +182,15 @@ class RenderActions:
             name = self.dllInterface.render_get_renderer_name(i)
             shortName = self.dllInterface.render_get_renderer_short_name(i)
             if (name.lower() == rendererName.lower() or shortName.lower() == rendererName.lower()):
-                matchesDevices = True
-                for dev in Device:
-                    if (dev in devices) != self.dllInterface.render_renderer_uses_device(i, dev):
-                        matchesDevices = False
-                        break
-                if matchesDevices:
-                    self.activeRendererName = rendererName
-                    self.dllInterface.render_enable_renderer(i)
-                    return
+                for v in range(self.dllInterface.render_get_renderer_variations(i)):
+                    if devices == self.dllInterface.render_get_renderer_devices(i, v):
+                        self.activeRendererName = rendererName
+                        self.dllInterface.render_enable_renderer(i, v)
+                        return
         deviceStr = "[ "
-        for dev in devices:
-            deviceStr += dev.name + " "
+        for dev in Device:
+            if (devices & dev) != 0:
+                deviceStr += dev.name + " "
         deviceStr += "]"
         raise Exception("Could not find renderer '" + rendererName + "' for the devices " + deviceStr)
         

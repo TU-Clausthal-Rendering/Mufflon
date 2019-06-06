@@ -235,5 +235,17 @@ namespace gui.Properties {
                 this["MaxConsoleMessages"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public uint LastSelectedRendererVariation {
+            get {
+                return ((uint)(this["LastSelectedRendererVariation"]));
+            }
+            set {
+                this["LastSelectedRendererVariation"] = value;
+            }
+        }
     }
 }

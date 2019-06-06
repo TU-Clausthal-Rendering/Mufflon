@@ -29,8 +29,10 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Vertex Connection and Merging"; }
-	StringView get_short_name() const noexcept final { return "VCM"; }
+	static constexpr StringView get_name_static() noexcept { return "Vertex Connection and Merging"; }
+	static constexpr StringView get_short_name_static() noexcept { return "VCM"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void on_reset() final;
 

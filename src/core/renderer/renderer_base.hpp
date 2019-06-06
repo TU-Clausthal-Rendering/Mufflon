@@ -15,7 +15,7 @@ public:
 
 	RendererBase();
 
-	bool constexpr uses_device(Device device) noexcept override { return may_use_device(device); }
+	bool uses_device(Device device) const noexcept override { return may_use_device(device); }
 	static constexpr bool may_use_device(Device device) noexcept { return DEVICE == device; }
 
 	bool pre_iteration(OutputHandler& outputBuffer) override;

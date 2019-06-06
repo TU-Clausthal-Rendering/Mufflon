@@ -542,10 +542,11 @@ CORE_API Boolean CDECL world_set_focus_camera_aperture(CameraHdl cam, float aper
 
 // Interface for rendering
 CORE_API uint32_t CDECL render_get_renderer_count();
+CORE_API uint32_t CDECL render_get_renderer_variations(uint32_t index);
 CORE_API const char* CDECL render_get_renderer_name(uint32_t index);
 CORE_API const char* CDECL render_get_renderer_short_name(uint32_t index);
-CORE_API Boolean CDECL render_renderer_uses_device(uint32_t index, RenderDevice dev);
-CORE_API Boolean CDECL render_enable_renderer(uint32_t index);
+CORE_API RenderDevice CDECL render_get_renderer_devices(uint32_t index, uint32_t variations);
+CORE_API Boolean CDECL render_enable_renderer(uint32_t index, uint32_t variation);
 CORE_API Boolean CDECL render_iterate(ProcessTime* time);
 CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();
