@@ -96,6 +96,8 @@ namespace mufflon::gl {
 		std::stringstream source;
 		int curFile = 0;
 		source << "#version " << m_version << '\n';
+        // use bindless extension
+		source << "#extension GL_ARB_bindless_texture : require\n";
 		for(auto& i : m_commonIncludes)
 			source << "#line 1 " << curFile++ << '\n' << i.content << '\n';
 		for(auto& i : m_localIncludes)
