@@ -574,7 +574,7 @@ void CpuNextEventBacktracking::iterate() {
 	i32 numViewVertices = m_viewVertexMap.size();
 
 #ifdef NEB_KDTREE
-	m_density.build2();
+	m_density.build();
 #else
 	// In the first iteration, the octree has a bad quality, because on each split
 	// the distribution information is lost.
