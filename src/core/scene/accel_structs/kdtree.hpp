@@ -63,19 +63,13 @@ public:
 		Vec bbMin{ m_positions[0] };
 		Vec bbMax{ m_positions[0] };
 		int n = m_dataCount.load();
-		std::unique_ptr<int[]> tmp[3];
-		tmp[0] = std::make_unique<int[]>(n);
-		tmp[1] = std::make_unique<int[]>(n);
 		for(int i = 0; i < n; ++i) {
-			tmp[0][i] = i;
-			tmp[1][i] = i;
 			bbMin = min(bbMin, m_positions[i]);
 			bbMax = max(bbMax, m_positions[i]);
 		}
-		tmp[2] = std::make_unique<int[]>(n); // No need for initilization
 
 		int allocCounter = 0;
-		build_qs(tmp[0].get(), tmp[1].get(), tmp[2].get(), bbMin, bbMax, n, allocCounter);
+		build_qs(bbMin, bbMax, 0, n, allocCounter);
 	}
 
 	// Find the nearest k points within a hypersphere around refPosition.
@@ -123,22 +117,11 @@ private:
 		return candidates[m];
 	}
 
-	// The idxIndices get constantly reordered in the build process.
-	// Additionally, the data is also reordered one element at a time.
-	// Therefore, datIndices contains the true data location, while idxIndices
-	// points to a datIndices entry.
-	int resolve_idx(const int* __restrict idxIndices, const int* __restrict datIndices, int iiIdx) {
-		int iIdx = idxIndices[iiIdx];
-		while(datIndices[iIdx] != iIdx)
-			iIdx = datIndices[iIdx];
-		return iIdx;
-	}
-
-	ei::IVec2 closest_to(const ei::IVec2* candidates, int count, int splitDim, float wantedPos) {
-		float minD = ei::abs(m_positions[candidates[0].x][splitDim] - wantedPos);
+	std::pair<float,int> closest_to(const std::pair<float,int>* candidates, int count, int splitDim, float wantedPos) {
+		float minD = ei::abs(candidates[0].first - wantedPos);
 		int minC = 0;
 		for(int i = 1; i < count; ++i) {
-			float d = ei::abs(m_positions[candidates[i].x][splitDim] - wantedPos);
+			float d = ei::abs(candidates[i].first - wantedPos);
 			if(d < minD) {
 				minD = d;
 				minC = i;
@@ -147,13 +130,12 @@ private:
 		return candidates[minC];
 	}
 
-	int build_qs(int* __restrict idxIndices, int* __restrict datIndices, int* __restrict tmp, const Vec& bbMin, const Vec& bbMax, int count, int& allocCounter) {
+	int build_qs(const Vec& bbMin, const Vec& bbMax, int left, int count, int& allocCounter) {
 		// "allocate" a new node
 		int node = allocCounter++;
 
 		// No need for splitting
 		if(count == 1) {
-			mAssert(node == resolve_idx(idxIndices, datIndices, 0));
 			m_tree[node].splitDim = 0;
 			m_tree[node].left = -1;
 			m_tree[node].right = -1;
@@ -168,53 +150,67 @@ private:
 
 		// Get median of some random elements
 		constexpr int MEDIAN_C = 9;
-		ei::IVec2 candidates[MEDIAN_C];	// TODO: stack saving optimization possible
+		std::pair<float,int> candidates[MEDIAN_C];	// TODO: stack saving optimization possible
 		int step = ei::max(1, count / MEDIAN_C);
 		int medianCount = ei::min(count, MEDIAN_C);
-		int off = (count - (medianCount - 1) * step) / 2;
+		int off = left + (count - (medianCount - 1) * step) / 2;
 		for(int i = 0; i < medianCount; ++i) {
 			int iiIdx = off + i * step;
-			candidates[i] = {resolve_idx(idxIndices, datIndices, off + i * step), iiIdx};
+			candidates[i] = {m_positions[iiIdx][splitDim], iiIdx};
 		}
 		// Find the median via selection sort up to the element M.
 		//int refIdx = median(candidates, medianCount, splitDim);
-		ei::IVec2 refIdx = closest_to(candidates, medianCount, splitDim, bbMin[splitDim] + bbTmp[splitDim] * 0.5f);
-		float refPos = m_positions[refIdx.x][splitDim];
+		auto ref = closest_to(candidates, medianCount, splitDim, bbMin[splitDim] + bbTmp[splitDim] * 0.5f);
 
 		// Swap the refIdx element to the tree-node index (improves caching which is
 		// important for the position array.
 		// Further, it is not necessary to store a data index in the tree nodes, improving
 		// the cache performance further and reducing memory consumption.
-		std::swap(m_positions[refIdx.x], m_positions[node]);
-		std::swap(m_data[refIdx.x], m_data[node]);
-		// The data at node was moved to the previous position of refIdx.
-		datIndices[node] = refIdx.x;
+		std::swap(m_positions[ref.second], m_positions[node]);
+		std::swap(m_data[ref.second], m_data[node]);
+		mAssert(node == left);
 
-		// Split the data into the two sets
-		int pl = 0;
-		int pr = count-1;
+		// Split the data into the two sets (quicksort partitioning)
+		int pl = left + 1; // The reference element must not be in any of the two sets. Above swap + i=1 skip the reference element.
+		int pr = left + count-1;
 		bool putEqualLeft = true;
-		std::swap(idxIndices[refIdx.y], idxIndices[0]);	// The reference element must not be in any of the two sets
-		for(int i = 1; i < count; ++i) {				// Swap + i=1 skip the reference element
-			float curPos = m_positions[resolve_idx(idxIndices, datIndices, i)][splitDim];
-			if(curPos < refPos || (putEqualLeft && curPos == refPos))
-				tmp[pl++] = idxIndices[i];
-			else
-				tmp[pr--] = idxIndices[i];
-			if(curPos == refPos) putEqualLeft = !putEqualLeft;
+		while(pl < pr) {
+			while(pl < pr && (m_positions[pl][splitDim] <= ref.first)) {
+				if(m_positions[pl][splitDim] == ref.first) {
+					if(putEqualLeft)
+						putEqualLeft = !putEqualLeft;
+					else break;
+				}
+				++pl;
+			}
+			while(pl < pr && (m_positions[pr][splitDim] >= ref.first)) {
+				if(m_positions[pr][splitDim] == ref.first) {
+					if(!putEqualLeft)
+						putEqualLeft = !putEqualLeft;
+					else break;
+				}
+				--pr;
+			}
+			if(pl < pr) {
+				std::swap(m_positions[pl], m_positions[pr]);
+				std::swap(m_data[pl], m_data[pr]);
+				++pl;
+				--pr;
+			}
 		}
-		++pr; // Let cr point to the first element on the right side
 
 		m_tree[node].splitDim = splitDim;
 		// Recursive build. Note that tmp and indices are swapped, because tmp now contains
 		// our valid node sets and the previous indices can be used as temporary memory.
-		if(pl > 0) {
-			bbTmp = bbMax; bbTmp[splitDim] = refPos;
-			m_tree[node].left = build_qs(tmp, datIndices, idxIndices, bbMin, bbTmp, pl, allocCounter);
+		int cl = pl-left-1;
+		int cr = count - cl - 1;
+		if(cl > 0) {
+			bbTmp = bbMax; bbTmp[splitDim] = ref.first;
+			m_tree[node].left = build_qs(bbMin, bbTmp, left+1, cl, allocCounter);
 		} else m_tree[node].left = -1;
-		if(count-pr > 0) {
-			bbTmp = bbMin; bbTmp[splitDim] = refPos;
-			m_tree[node].right = build_qs(tmp+pr, datIndices, idxIndices+pr, bbTmp, bbMax, count-pr, allocCounter);
+		if(cr > 0) {
+			bbTmp = bbMin; bbTmp[splitDim] = ref.first;
+			m_tree[node].right = build_qs(bbTmp, bbMax, pl, cr, allocCounter);
 		} else m_tree[node].right = -1;
 
 		return node;
