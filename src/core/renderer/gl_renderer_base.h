@@ -16,6 +16,7 @@ public:
 		Position = 1,
 		Normal = 1 << 1,
 		Texcoord = 1 << 2,
+        Material = 1 << 3,
         All = 0xFFFFFFFF
 	};
 
@@ -38,7 +39,7 @@ protected:
 	void end_frame();
 
 	void draw_triangles(const gl::Pipeline& pipe, Attribute attribs);
-	void draw_spheres(const gl::Pipeline& pipe);
+	void draw_spheres(const gl::Pipeline& pipe, Attribute attribs);
 	void draw_quads(const gl::Pipeline& pipe, Attribute attribs);
 
 	CameraTransforms get_camera_transforms() const;

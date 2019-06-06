@@ -45,8 +45,9 @@ GlForward::GlForward() :
         .build();
 
     m_spheresVao = gl::VertexArrayBuilder()
-		.add(0, 0, 3, true, 4, 0) // position
-		.add(0, 1, 1, true, 4, 3 * sizeof(float)) // radius
+		.add(0, 0, 3, true, sizeof(float), 0) // position
+		.add(0, 1, 1, true, sizeof(float), 3 * sizeof(float)) // radius
+        .add(1, 2, 1, false, sizeof(u16)) // material indices
 		.build();
 
     // pipelines
@@ -90,7 +91,7 @@ void GlForward::iterate() {
 
 	draw_triangles(m_trianglePipe, Attribute::All);
 	draw_quads(m_quadPipe, Attribute::All);
-	draw_spheres(m_spherePipe);
+	draw_spheres(m_spherePipe, Attribute::All);
 
 	end_frame();
 }

@@ -1,6 +1,7 @@
 layout(location = 0) in vec2 in_location;
 layout(location = 1) flat in float in_radius;
 layout(location = 2) in vec3 in_position;
+layout(location = 3) flat in int in_materialIndex;
 
 layout(binding = 0) uniform u_camTrans
 {
@@ -34,6 +35,17 @@ void main() {
 	gl_FragDepth = (clipPos.z / clipPos.w * gl_DepthRange.diff + (gl_DepthRange.near + gl_DepthRange.far)) * 0.5;
 
 #ifdef FORWARD_SHADE
-	shade(toWorld(vec4(position, 1.0)), toWorld(vec4(normal, 0.0)), in_location);
+	// reconstruct polar coordinates from normal (radius is one)
+	const vec3 worldNormal = toWorld(vec4(normal, 0.0));
+	float theta = acos(worldNormal.y);
+	float phi = atan(worldNormal.z, worldNormal.x);
+	
+	const float invPi = 1.0 / 3.14159265359;
+	shade(
+		toWorld(vec4(position, 1.0)), 
+		worldNormal, 
+		vec2(phi * invPi * 0.5 + 0.5, theta * invPi), 
+		in_materialIndex
+	);
 #endif
 }

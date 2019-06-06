@@ -39,11 +39,11 @@ void GlRendererBase::on_reset() {
 	// create requested color targets
 	uint32_t curTarget = 0;
     for(auto t : OutputValue::iterator) {
-        if(t & m_outputTargets) {
+        //if(t & m_outputTargets) {
 			glGenTextures(1, &m_colorTargets[curTarget]);
 			glBindTexture(GL_TEXTURE_2D, m_colorTargets[curTarget]);
 			glTextureStorage2D(m_colorTargets[curTarget], 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-        }
+        //}
 		curTarget++;
     }
 
@@ -60,10 +60,10 @@ void GlRendererBase::on_reset() {
 	curTarget = 0;
 	std::vector<GLenum> attachments;
     for(auto t : OutputValue::iterator) {
-		if(t & m_outputTargets) {
+		//if(t & m_outputTargets) {
 			glNamedFramebufferTexture(m_framebuffer, GL_COLOR_ATTACHMENT0 + curTarget, m_colorTargets[curTarget], 0);
 			attachments.push_back(GL_COLOR_ATTACHMENT0 + curTarget);
-		}
+		//}
 		curTarget++;
 	}
 	if(m_depthStencilFormat)
@@ -120,15 +120,15 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 		// bind vertex and index buffer
         if(attribs & Attribute::Position) {
 			mAssert(lod.polygon.vertices.id);
-			glBindVertexBuffer(0, lod.polygon.vertices.id, 0, sizeof(ei::Vec3));
+			glBindVertexBuffer(0, lod.polygon.vertices.id, lod.polygon.vertices.offset, sizeof(ei::Vec3));
         }
 		if(attribs & Attribute::Normal) {
 			mAssert(lod.polygon.normals.id);
-			glBindVertexBuffer(1, lod.polygon.normals.id, 0, sizeof(ei::Vec3));
+			glBindVertexBuffer(1, lod.polygon.normals.id, lod.polygon.normals.offset, sizeof(ei::Vec3));
 		}
 		if(attribs & Attribute::Texcoord) {
 			mAssert(lod.polygon.uvs.id);
-			glBindVertexBuffer(2, lod.polygon.uvs.id, 0, sizeof(ei::Vec2));
+			glBindVertexBuffer(2, lod.polygon.uvs.id, lod.polygon.uvs.offset, sizeof(ei::Vec2));
 		}
 
 	    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
@@ -138,7 +138,7 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 	}
 }
 
-void GlRendererBase::draw_spheres(const gl::Pipeline& pipe) {
+void GlRendererBase::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
@@ -150,9 +150,15 @@ void GlRendererBase::draw_spheres(const gl::Pipeline& pipe) {
 		// Set the instance transformation matrix
 		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&m_sceneDesc.instanceToWorld[i]));
 
-		// bind vertex and index buffer
-		mAssert(lod.spheres.spheres.id);
-		glBindVertexBuffer(0, lod.spheres.spheres.id, 0, sizeof(ei::Sphere));
+		// bind vertex buffer
+        if(attribs & Attribute::Position) {
+			mAssert(lod.spheres.spheres.id);
+			glBindVertexBuffer(0, lod.spheres.spheres.id, lod.spheres.spheres.offset, sizeof(ei::Sphere));
+        }
+        if(attribs & Attribute::Material) {
+			mAssert(lod.spheres.matIndices.id);
+			glBindVertexBuffer(1, lod.spheres.matIndices.id, lod.spheres.matIndices.offset, sizeof(u16));
+        }
 
 		// draw
 		glDrawArrays(GL_POINTS, 0, lod.spheres.numSpheres);
@@ -175,15 +181,15 @@ void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 		// bind vertex and index buffer
 		if(attribs & Attribute::Position) {
 			mAssert(lod.polygon.vertices.id);
-			glBindVertexBuffer(0, lod.polygon.vertices.id, 0, sizeof(ei::Vec3));
+			glBindVertexBuffer(0, lod.polygon.vertices.id, lod.polygon.vertices.offset, sizeof(ei::Vec3));
 		}
 		if(attribs & Attribute::Normal) {
 			mAssert(lod.polygon.normals.id);
-			glBindVertexBuffer(1, lod.polygon.normals.id, 0, sizeof(ei::Vec3));
+			glBindVertexBuffer(1, lod.polygon.normals.id, lod.polygon.normals.offset, sizeof(ei::Vec3));
 		}
 		if(attribs & Attribute::Texcoord) {
 			mAssert(lod.polygon.uvs.id);
-			glBindVertexBuffer(2, lod.polygon.uvs.id, 0, sizeof(ei::Vec2));
+			glBindVertexBuffer(2, lod.polygon.uvs.id, lod.polygon.uvs.offset, sizeof(ei::Vec2));
 		}
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);

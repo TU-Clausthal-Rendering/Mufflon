@@ -138,12 +138,12 @@ void GlWireframe::iterate() {
     if(m_params.enableDepth) {
 		draw_triangles(m_triangleDepthPipe, Attribute::Position);
 		draw_quads(m_quadDepthPipe, Attribute::Position);
-		draw_spheres(m_sphereDepthPipe);
+		draw_spheres(m_sphereDepthPipe, Attribute::Position);
     }
 
 	draw_triangles(m_trianglePipe, Attribute::Position);
 	draw_quads(m_quadPipe, Attribute::Position);
-	draw_spheres(m_spherePipe);
+	draw_spheres(m_spherePipe, Attribute::Position);
 
 	end_frame();
 }
