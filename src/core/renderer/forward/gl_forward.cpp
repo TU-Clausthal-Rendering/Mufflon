@@ -12,6 +12,7 @@ GlForward::GlForward() :
 	gl::ProgramBuilder triangleProgramBuilder;
 
 	m_triangleProgram = triangleProgramBuilder
+        .add_define("MAX_MATERIAL_DESCRIPTOR_SIZE", scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE())
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
@@ -27,6 +28,7 @@ GlForward::GlForward() :
 		.build_program();
 
 	m_sphereProgram = gl::ProgramBuilder()
+		.add_define("MAX_MATERIAL_DESCRIPTOR_SIZE", scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE())
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)

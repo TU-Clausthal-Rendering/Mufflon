@@ -108,6 +108,12 @@ void GlRendererBase::end_frame() {
 void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 
+	if(attribs & Attribute::Material) {
+		mAssert(m_sceneDesc.materials.id);
+		mAssert(!m_sceneDesc.materials.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
+	}
+
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
 		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
@@ -141,6 +147,12 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 void GlRendererBase::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 
+    if(attribs & Attribute::Material) {
+		mAssert(m_sceneDesc.materials.id);
+		mAssert(!m_sceneDesc.materials.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
+    }
+
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
 		const scene::LodDescriptor<Device::OPENGL>& lod = m_sceneDesc.lods[idx];
@@ -168,6 +180,12 @@ void GlRendererBase::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 	mAssert(pipe.patch.vertices == 4);
+
+	if(attribs & Attribute::Material) {
+		mAssert(m_sceneDesc.materials.id);
+		mAssert(!m_sceneDesc.materials.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
+	}
 
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
