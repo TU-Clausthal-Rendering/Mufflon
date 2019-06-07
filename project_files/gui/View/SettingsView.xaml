@@ -9,7 +9,7 @@
         Title="Settings" 
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
-        MinHeight="200" 
+        MinHeight="250" 
         MinWidth="400">
     <Window.Resources>
         <s:Double x:Key="StackPanelWidth">300</s:Double>
@@ -35,6 +35,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
@@ -109,6 +110,16 @@
                                     Command="{Binding General.SelectScreenshotFolderCommand}"
                                     HorizontalAlignment="Right">...</Button>
                         </Grid>
+                        
+                        <TextBlock Grid.Row="5" Grid.Column="0"
+                                   Text="Invert camera controls:"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"
+                                   ToolTip="Inverted = swipe, normal = real-time flight"
+                                   Margin="{StaticResource LeftPropertyMargin}"/>
+                        <CheckBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2"
+                                  HorizontalAlignment="Center"
+                                  IsChecked="{Binding General.InvertCameraControls}"/>
                     </Grid>
                 </StackPanel>
             </TabItem>

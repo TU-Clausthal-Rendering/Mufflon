@@ -247,5 +247,17 @@ namespace gui.Properties {
                 this["LastSelectedRendererVariation"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool InvertCameraControls {
+            get {
+                return ((bool)(this["InvertCameraControls"]));
+            }
+            set {
+                this["InvertCameraControls"] = value;
+            }
+        }
     }
 }
