@@ -23,8 +23,10 @@ public:
 	// This is just a test method, don't use this as an actual interface
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Wireframe"; }
-	StringView get_short_name() const noexcept final { return "WF"; }
+	static constexpr StringView get_name_static() noexcept { return "Wireframe"; }
+	static constexpr StringView get_short_name_static() noexcept { return "WF"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void on_descriptor_requery() final;
 

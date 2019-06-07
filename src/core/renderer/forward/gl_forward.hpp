@@ -15,8 +15,10 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Forward"; }
-	StringView get_short_name() const noexcept final { return "FW"; }
+	static constexpr StringView get_name_static() noexcept { return "Forward"; }
+	static constexpr StringView get_short_name_static() noexcept { return "FW"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void on_descriptor_requery() final;
     void on_reset() override;

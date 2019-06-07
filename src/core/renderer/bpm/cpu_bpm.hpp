@@ -29,8 +29,10 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Bidirectional Photon Mapper"; }
-	StringView get_short_name() const noexcept final { return "BPM"; }
+	static constexpr StringView get_name_static() noexcept { return "Bidirectional Photon Mapper"; }
+	static constexpr StringView get_short_name_static() noexcept { return "BPM"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void on_reset() final;
 

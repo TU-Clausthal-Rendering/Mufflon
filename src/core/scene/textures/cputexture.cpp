@@ -108,13 +108,13 @@ void CpuTexture::recompute_mipmaps(MipmapType type) {
 							val = ei::Vec4{ std::numeric_limits<float>::max() };
 							for(i32 cy = lowerY; cy <= upperY; ++cy)
 								for(i32 cx = lowerX; cx <= upperX; ++cx)
-									val = std::min(val, read(Pixel{ cx, cy }, layer, level - 1));
+									val = ei::min(val, read(Pixel{ cx, cy }, layer, level - 1));
 						}	break;
 						case MipmapType::MAX: {
 							val = ei::Vec4{ -std::numeric_limits<float>::max() };
 							for(i32 cy = lowerY; cy <= upperY; ++cy)
 								for(i32 cx = lowerX; cx <= upperX; ++cx)
-									val = std::max(val, read(Pixel{ cx, cy }, layer, level - 1));
+									val = ei::max(val, read(Pixel{ cx, cy }, layer, level - 1));
 						}	break;
 					}
 					write(val, Pixel{ x << level, y << level }, layer, level);

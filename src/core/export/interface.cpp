@@ -5,6 +5,7 @@
 #include "util/parallel.hpp"
 #include "util/punning.hpp"
 #include "util/degrad.hpp"
+#include "util/indexed_string_map.hpp"
 #include "ei/vector.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "profiler/gpu_profiler.hpp"
@@ -113,7 +114,7 @@ std::ofstream s_logFile;
 std::vector<TextureLoaderPlugin> s_plugins;
 
 // List of renderers
-std::vector<std::unique_ptr<renderer::IRenderer>> s_renderers;
+util::IndexedStringMap<std::vector<std::unique_ptr<renderer::IRenderer>>> s_renderers;
 
 constexpr PolygonAttributeHdl INVALID_POLY_VATTR_HANDLE{
 	INVALID_INDEX,
@@ -239,15 +240,24 @@ template < bool initOpenGL, std::size_t I = 0u >
 inline void init_renderers() {
 	if constexpr(I == 0u && !initOpenGL)
 		s_renderers.clear();
+
 	using RendererType = typename renderer::Renderers::Type<I>;
+	std::vector<std::unique_ptr<renderer::IRenderer>>* renderers = s_renderers.find(RendererType::get_name_static());
+
 	// Only initialize opengl renderers if requested (because of deferred context init)
 	if constexpr(RendererType::may_use_device(Device::OPENGL)) {
-		if(initOpenGL) // deferred init
-			s_renderers.push_back(std::make_unique<RendererType>());
+		if(initOpenGL) {// deferred init
+			if(renderers == nullptr)
+				renderers = &s_renderers.get(s_renderers.insert(std::string(RendererType::get_name_static()), {}));
+			renderers->push_back(std::make_unique<RendererType>());
+		}
 	}
 	// Only initialize CUDA renderers if CUDA is enabled
-	else if(!initOpenGL && (s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA)))
-		s_renderers.push_back(std::make_unique<RendererType>());
+	else if(!initOpenGL && (s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))) {
+		if(renderers == nullptr)
+			renderers = &s_renderers.get(s_renderers.insert(std::string(RendererType::get_name_static()), {}));
+		renderers->push_back(std::make_unique<RendererType>());
+	}
 	if constexpr(I + 1u < renderer::Renderers::size)
 		init_renderers<initOpenGL, I + 1u>();
 }
@@ -3077,32 +3087,44 @@ uint32_t render_get_renderer_count() {
 	return static_cast<uint32_t>(s_renderers.size());
 }
 
+uint32_t render_get_renderer_variations(uint32_t index) {
+	TRY
+	CHECK(index < s_renderers.size(), "renderer index out of bounds", 0);
+	return static_cast<uint32_t>(s_renderers.get(index).size());
+	CATCH_ALL(0)
+}
+
 const char* render_get_renderer_name(uint32_t index) {
 	TRY
 	CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
-	return &s_renderers[index]->get_name()[0u];
+	return &s_renderers.get_key(index)[0u];
 	CATCH_ALL(nullptr)
 }
 
 const char* render_get_renderer_short_name(uint32_t index) {
 	TRY
-		CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
-	return &s_renderers[index]->get_short_name()[0u];
+	CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
+	return &s_renderers.get(index).front()->get_short_name()[0u];
 	CATCH_ALL(nullptr)
 }
 
-Boolean render_renderer_uses_device(uint32_t index, RenderDevice dev) {
+RenderDevice render_get_renderer_devices(uint32_t index, uint32_t variation) {
 	TRY
-	CHECK(index < s_renderers.size(), "renderer index out of bounds", false);
-	return s_renderers[index]->uses_device(static_cast<Device>(dev));
-	CATCH_ALL(false)
+	CHECK(index < s_renderers.size(), "renderer index out of bounds", RenderDevice::DEVICE_NONE);
+	CHECK(variation < s_renderers.get(index).size(), "renderer index out of bounds", RenderDevice::DEVICE_NONE);
+	const renderer::IRenderer& renderer = *s_renderers.get(index)[variation];
+	return static_cast<RenderDevice>((renderer.uses_device(Device::CPU) ? RenderDevice::DEVICE_CPU : 0)
+									 | (renderer.uses_device(Device::CUDA) ? RenderDevice::DEVICE_CUDA : 0)
+									 | (renderer.uses_device(Device::OPENGL) ? RenderDevice::DEVICE_OPENGL : 0));
+	CATCH_ALL(RenderDevice::DEVICE_NONE)
 }
 
-Boolean render_enable_renderer(uint32_t index) {
+Boolean render_enable_renderer(uint32_t index, uint32_t variation) {
 	TRY
 	CHECK(index < s_renderers.size(), "renderer index out of bounds", false);
+	CHECK(variation < s_renderers.get(index).size(), "renderer index out of bounds", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
-	s_currentRenderer = s_renderers[index].get();
+	s_currentRenderer = s_renderers.get(index)[variation].get();
 	if(s_world.get_current_scenario() != nullptr)
 		s_currentRenderer->load_scene(s_world.get_current_scene(),
 									  s_world.get_current_scenario()->get_resolution());
@@ -3737,9 +3759,10 @@ Boolean mufflon_is_cuda_available() {
 void mufflon_destroy_opengl() {
     // destroy opengl renderers
     TRY
-	for (auto& r : s_renderers)
-		if (r->uses_device(Device::OPENGL))
-			r.reset();
+	for(std::size_t i = 0u; i < s_renderers.size(); ++i)
+		for(auto& renderer : s_renderers.get(i))
+			if (renderer->uses_device(Device::OPENGL))
+				renderer.reset();
 	CATCH_ALL(;)
 }
 

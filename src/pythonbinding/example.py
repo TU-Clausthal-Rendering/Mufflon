@@ -9,9 +9,9 @@ def render():
     renderer.set_loader_log_level(LogLevel.WARNING)
     
     # Name is case insensitive
-    renderer.enable_renderer("PT", [ Device.CUDA ])
-    #renderer.enable_renderer("pt", [ Device.CUDA ])
-    #renderer.enable_renderer("patHtraCer", [ Device.CPU ])
+    renderer.enable_renderer("PT", Device.CPU | Device.CUDA)
+    #renderer.enable_renderer("pt", Device.CUDA)
+    #renderer.enable_renderer("patHtraCer", Device.CPU)
     
     
     renderer.load_json(sceneJson="pathToScene.json")

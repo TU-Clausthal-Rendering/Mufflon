@@ -114,6 +114,7 @@ namespace gui.Model
 
         private volatile bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
+        private UInt32 m_rendererVariation = 0;
 
         public RendererModel()
         {
@@ -211,6 +212,7 @@ namespace gui.Model
         }
 
         public UInt32 RendererCount { get => Core.render_get_renderer_count(); }
+        public UInt32 RendererVariationsCount { get => Core.render_get_renderer_variations(RendererIndex); }
 
         public UInt32 RendererIndex
         {
@@ -220,16 +222,31 @@ namespace gui.Model
                 if (m_rendererIndex == value) return;
                 // Quickly save the parameters before changing the renderer
                 m_rendererIndex = value;
-                if (!Core.render_enable_renderer(RendererIndex))
+                if (!Core.render_enable_renderer(RendererIndex, RendererVariation))
                     throw new Exception(Core.core_get_dll_error());
                 Reset();
                 OnPropertyChanged(nameof(RendererIndex));
             }
         }
 
+        public uint RendererVariation
+        {
+            get => m_rendererVariation;
+            set
+            {
+                if (m_rendererVariation == value) return;
+                // Quickly save the parameters before changing the renderer
+                m_rendererVariation = value;
+                if (!Core.render_enable_renderer(RendererIndex, RendererVariation))
+                    throw new Exception(Core.core_get_dll_error());
+                Reset();
+                OnPropertyChanged(nameof(RendererVariation));
+            }
+        }
+
         public bool UsesDevice(Core.RenderDevice dev)
         {
-            return Core.render_renderer_uses_device(RendererIndex, dev);
+            return (Core.render_get_renderer_devices(RendererIndex, RendererVariation) & dev) != 0;
         }
 
         private string m_name;

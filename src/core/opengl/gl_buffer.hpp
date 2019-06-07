@@ -8,9 +8,9 @@ namespace gl {
 	template<class T>
 	struct BufferHandle
 	{
-		Handle id;
+		Handle id = 0;
 		// element offset
-		size_t offset;
+		size_t offset = 0;
 
 		BufferHandle() = default;
 		BufferHandle(Handle id, size_t offset = 0) :

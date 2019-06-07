@@ -54,7 +54,7 @@
                           DataType="{x:Type viewmodel:RendererPropertyBool}">
                 <CheckBox HorizontalAlignment="Center"
                           VerticalAlignment="Center"
-                          IsChecked="{Binding Value, UpdateSourceTrigger=LostFocus}"/>
+                          IsChecked="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
             </DataTemplate>
             <DataTemplate x:Key="IntTemplate"
                           DataType="{x:Type viewmodel:RendererPropertyInt}">

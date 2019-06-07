@@ -107,6 +107,7 @@ public:
 	}
 	void set_displacement(TextureHandle map, TextureHandle maxMips, const float scale = 1.f, const float bias = 0.f) noexcept {
 		m_displacement = map;
+		m_displacementMaxMips = maxMips;
 		m_displacementBias = bias;
 		m_displacementScale = scale;
 	}

@@ -292,6 +292,9 @@
     <ClCompile Include="..\..\src\core\scene\tessellation\displacement_mapper.cpp">
       <Filter>Source Files\core\scene\tessellation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\memory\synchronize.cpp">
+      <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\opengl\program_builder.cpp">
       <Filter>Source Files\core\opengl</Filter>
     </ClCompile>

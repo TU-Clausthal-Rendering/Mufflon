@@ -389,11 +389,12 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 	// Then perform tessellation
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
-	tessellation::DisplacementMapper tessellater(oracle);
-	tessellater.set_scenario(scenario);
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
 	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
 	m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
+	oracle.set_mat_properties(scenario, matIdxProp);
+	tessellation::DisplacementMapper tessellater(oracle);
+	tessellater.set_scenario(scenario);
 	tessellater.set_material_idx_hdl(matIdxProp);
 
 	tessellater.set_phong_tessellation(true);
