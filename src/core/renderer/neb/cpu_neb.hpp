@@ -109,6 +109,7 @@ private:
 	scene::accel_struct::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
 #else
 	DensityOctree m_density;
+	//SplitDensityOctree m_density;
 #endif
 };
 
