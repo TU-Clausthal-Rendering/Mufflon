@@ -132,9 +132,6 @@ void GlWireframe::on_reset() {
 	glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
 	auto curTransforms = get_camera_transforms();
 	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
-
-    // set uniform parameters
-	glProgramUniform2f(m_sphereProgram, 2, float(m_outputBuffer.get_width()), float(m_outputBuffer.get_height()));
 }
 
 void GlWireframe::iterate() {

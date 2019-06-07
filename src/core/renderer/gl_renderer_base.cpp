@@ -235,16 +235,28 @@ GlRendererBase::CameraTransforms GlRendererBase::get_camera_transforms() const {
 	CameraTransforms t;
 
 	auto* cam = m_currentScene->get_camera();
-	float fov = 1.5f;
+
+	t.position = cam->get_position(0);
+	t.direction = cam->get_view_dir(0);
+
+    // windows stuff...
+#undef near
+#undef far
+	t.near = cam->get_near();
+	t.far = cam->get_far();
+	t.screen.x = m_outputBuffer.get_width();
+	t.screen.y = m_outputBuffer.get_height();
+    
+    float fov = 1.5f;
 	if(auto pcam = dynamic_cast<const cameras::Pinhole*>(cam)) {
 		fov = pcam->get_vertical_fov();
 	}
 	t.projection = ei::perspectiveGL(fov,
-		float(m_outputBuffer.get_width()) / m_outputBuffer.get_height(),
-		cam->get_near(), cam->get_far());
+		float(t.screen.x) / t.screen.y,
+		t.near, t.far);
 	t.view = ei::camera(
-		cam->get_position(0),
-		cam->get_position(0) + cam->get_view_dir(0),
+		t.position,
+		t.position + t.direction,
 		cam->get_up_dir(0)
 	);
 	t.invView = ei::invert(t.view);

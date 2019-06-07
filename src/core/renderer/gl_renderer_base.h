@@ -31,6 +31,12 @@ protected:
 		ei::Mat4x4 view;
 		ei::Mat4x4 projection;
 		ei::Mat4x4 invView;
+
+		ei::Vec3 position;
+		float near;
+		ei::Vec3 direction;
+		float far;
+		ei::UVec2 screen;
 	};
 
     // enable framebuffer and clear textures
