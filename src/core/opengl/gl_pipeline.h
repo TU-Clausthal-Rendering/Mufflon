@@ -167,6 +167,21 @@ struct PatchState {
 	std::array<float, 2> inner = { 1.0f, 1.0f };
 };
 
+enum class PrimitiveTopology {
+	Points = 0x0000,
+	LineStrip = 0x0003,
+	LineLoop = 0x0002,
+	Lines = 0x0001,
+	LineStripAdjacency = 0x000B,
+	LinesAdjacency = 0x000A,
+	TriangleStrip = 0x0005,
+	TriangleFan = 0x0006,
+	Triangles = 0x0004,
+	TriangleStripAdjacency = 0x000D,
+	TrianglesAdjacency = 0x000C,
+	Patches = 0x000E
+};
+
 struct Pipeline {
 	RasterizerState rasterizer;
 	DepthStencilState depthStencil;
@@ -176,5 +191,7 @@ struct Pipeline {
 	gl::Handle program = 0;
 	gl::Handle vertexArray = 0;
 	gl::Handle framebuffer = 0;
+    // this will not directly be set in the context but this should be used for draw commands
+	PrimitiveTopology topology = PrimitiveTopology::Triangles;
 };
 }

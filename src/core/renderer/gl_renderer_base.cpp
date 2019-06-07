@@ -136,11 +136,17 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 			mAssert(lod.polygon.uvs.id);
 			glBindVertexBuffer(2, lod.polygon.uvs.id, lod.polygon.uvs.offset, sizeof(ei::Vec2));
 		}
+		if(attribs & Attribute::Material) {
+			mAssert(lod.polygon.matIndices.id);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, lod.polygon.matIndices.id,
+				lod.polygon.matIndices.offset,
+				lod.polygon.numTriangles * sizeof(u16));
+		}
 
 	    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
         
 	    // draw
-		glDrawElements(GL_TRIANGLES, lod.polygon.numTriangles * 3, GL_UNSIGNED_INT, nullptr);
+		glDrawElements(GLenum(pipe.topology), lod.polygon.numTriangles * 3, GL_UNSIGNED_INT, nullptr);
 	}
 }
 
@@ -173,7 +179,7 @@ void GlRendererBase::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
         }
 
 		// draw
-		glDrawArrays(GL_POINTS, 0, lod.spheres.numSpheres);
+		glDrawArrays(GLenum(pipe.topology), 0, lod.spheres.numSpheres);
 	}
 }
 
@@ -209,12 +215,19 @@ void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 			mAssert(lod.polygon.uvs.id);
 			glBindVertexBuffer(2, lod.polygon.uvs.id, lod.polygon.uvs.offset, sizeof(ei::Vec2));
 		}
+        if(attribs & Attribute::Material) {
+			mAssert(lod.polygon.matIndices.id);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, lod.polygon.matIndices.id,
+				lod.polygon.matIndices.offset,
+				(lod.polygon.numTriangles + lod.polygon.numQuads) * sizeof(u16));
+			glProgramUniform1ui(pipe.program, 2, lod.polygon.numTriangles);
+        }
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lod.polygon.vertexIndices.id);
         
 		// draw
 		size_t offset = lod.polygon.numTriangles * 3 * sizeof(GLuint);
-		glDrawElements(GL_PATCHES, lod.polygon.numQuads * 4, GL_UNSIGNED_INT, reinterpret_cast<void*>(offset));
+		glDrawElements(GLenum(pipe.topology), lod.polygon.numQuads * 4, GL_UNSIGNED_INT, reinterpret_cast<void*>(offset));
 	}
 }
 

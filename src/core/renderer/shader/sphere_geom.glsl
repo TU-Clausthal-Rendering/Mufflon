@@ -4,7 +4,7 @@ layout(triangle_strip, max_vertices = 4) out;
 // in camera space
 layout(location = 0) in vec3 in_position[1];
 layout(location = 1) in float in_radius[1];
-layout(location = 2) flat in int in_materialIndex[1];
+layout(location = 2) flat in uint in_materialIndex[1];
 
 // location in [-1, 1]² range
 layout(location = 0) out vec2 out_location;
@@ -12,7 +12,7 @@ layout(location = 0) out vec2 out_location;
 layout(location = 1) flat out float out_radius;
 // view space position
 layout(location = 2) out vec3 out_position;
-layout(location = 3) flat out int out_materialIndex;
+layout(location = 3) flat out uint out_materialIndex;
 
 layout(binding = 0) uniform u_camTrans
 {

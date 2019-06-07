@@ -9,26 +9,33 @@ GlForward::GlForward() :
     GlRendererBase(true, false) 
 {
     // programs
-	gl::ProgramBuilder triangleProgramBuilder;
-
-	m_triangleProgram = triangleProgramBuilder
-        .add_define("MAX_MATERIAL_DESCRIPTOR_SIZE", scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE())
+	m_triangleProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/material_id_binding.glsl", false)
+		.add_file("shader/forward_tese.glsl", false)
+		.build_shader(gl::ShaderType::TessEval)
 		.add_file("shader/forward_shade.glsl", false)
 		.add_file("shader/forward_fragment.glsl", false)
 		.build_shader(gl::ShaderType::Fragment)
 		.build_program();
 
     // add intermediate tesselation
-	m_quadProgram = triangleProgramBuilder
-        .add_file("shader/forward_tese.glsl", false)
-        .build_shader(gl::ShaderType::TessEval)
+	m_quadProgram = gl::ProgramBuilder()
+		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/forward_vertex.glsl", false)
+		.build_shader(gl::ShaderType::Vertex)
+        .add_file("shader/material_id_binding.glsl", false)
+		.add_file("shader/forward_quad_tese.glsl", false)
+		.build_shader(gl::ShaderType::TessEval)
+		.add_file("shader/forward_shade.glsl", false)
+		.add_file("shader/forward_fragment.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
 		.build_program();
 
 	m_sphereProgram = gl::ProgramBuilder()
-		.add_define("MAX_MATERIAL_DESCRIPTOR_SIZE", scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE())
+		//.add_define("MAX_MATERIAL_DESCRIPTOR_SIZE", scene::materials::MAX_MATERIAL_DESCRIPTOR_SIZE())
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)
@@ -56,6 +63,7 @@ GlForward::GlForward() :
 	m_trianglePipe.program = m_triangleProgram;
 	m_trianglePipe.vertexArray = m_triangleVao;
 	m_trianglePipe.depthStencil.depthTest = true;
+	m_trianglePipe.topology = gl::PrimitiveTopology::Patches;
     // TODO remove this
 	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
 
@@ -66,6 +74,7 @@ GlForward::GlForward() :
 	m_spherePipe = m_trianglePipe;
 	m_spherePipe.program = m_sphereProgram;
 	m_spherePipe.vertexArray = m_spheresVao;
+	m_spherePipe.topology = gl::PrimitiveTopology::Points;
 }
 
 void GlForward::on_descriptor_requery() {

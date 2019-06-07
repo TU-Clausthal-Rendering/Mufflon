@@ -1,7 +1,7 @@
 layout(location = 0) in vec2 in_location;
 layout(location = 1) flat in float in_radius;
 layout(location = 2) in vec3 in_position;
-layout(location = 3) flat in int in_materialIndex;
+layout(location = 3) flat in uint in_materialIndex;
 
 layout(binding = 0) uniform u_camTrans
 {

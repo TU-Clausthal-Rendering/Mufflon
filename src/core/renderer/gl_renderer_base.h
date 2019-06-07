@@ -38,8 +38,25 @@ protected:
     // copy framebuffer to rendertarget buffer
 	void end_frame();
 
+	// used uniform locations:
+    // 1: instance transform
+    // used shader storage bindings:
+    // 0: material data
+    // 1: material per primitive ids
 	void draw_triangles(const gl::Pipeline& pipe, Attribute attribs);
+
+	// used uniform locations:
+    // 1: instance transform
+    // used shader storage bindings:
+    // 0: material data (material ids are passed as vertex attribute)
 	void draw_spheres(const gl::Pipeline& pipe, Attribute attribs);
+
+    // used uniform locations:
+    // 1: instance transform
+    // 2: num triangles (for material offset)
+    // used shader storage bindings:
+    // 0: material data
+    // 1: material per primitive ids
 	void draw_quads(const gl::Pipeline& pipe, Attribute attribs);
 
 	CameraTransforms get_camera_transforms() const;

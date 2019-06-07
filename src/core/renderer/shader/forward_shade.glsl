@@ -6,19 +6,19 @@ layout(location = 2) out vec3 out_albedo;
 layout(location = 3) out vec3 out_normal;
 layout(location = 4) out vec3 out_lightness;
 
-#define EMISSIVE 0
-#define LAMBERT 1
-#define ORENNAYAR 2				
-#define TORRANCE 3				
-#define WALTER 4				
-#define LAMBERT_EMISSIVE 5
-#define TORRANCE_LAMBERT 6			
-#define FRESNEL_TORRANCE_LAMBERT 7
-#define WALTER_TORRANCE 8
-#define FRESNEL_TORRANCE_WALTER 9
-#define MICROFACET 10	
+#define EMISSIVE 0u
+#define LAMBERT 1u
+#define ORENNAYAR 2u				
+#define TORRANCE 3u				
+#define WALTER 4u			
+#define LAMBERT_EMISSIVE 5u
+#define TORRANCE_LAMBERT 6u			
+#define FRESNEL_TORRANCE_LAMBERT 7u
+#define WALTER_TORRANCE 8u
+#define FRESNEL_TORRANCE_WALTER 9u
+#define MICROFACET 10u	
 
-layout(binding = 0) buffer materialsBuffer {
+layout(binding = 0) readonly buffer materialsBuffer {
 	uint u_materialData[];
 };
 
@@ -35,7 +35,7 @@ uvec2 readTexHdl(uint byteOffset) {
 	return uvec2(u_materialData[index], u_materialData[index + 1]);
 }
 
-void shade(vec3 pos, vec3 normal, vec2 texcoord, int materialIndex) {
+void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	out_normal = normal;
 	out_position = pos;
 	const vec3 uv = vec3(texcoord, 0.0); // all textures are sampler2DArrays with layer 0

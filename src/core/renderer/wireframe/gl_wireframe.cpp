@@ -74,6 +74,7 @@ GlWireframe::GlWireframe() :
     // wireframe pipeline
 	m_trianglePipe.program = m_triangleProgram;
 	m_trianglePipe.vertexArray = m_triangleVao;
+	m_trianglePipe.topology = gl::PrimitiveTopology::Triangles;
 	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
 	m_trianglePipe.rasterizer.fillMode = gl::FillMode::Wireframe;
 	m_trianglePipe.depthStencil.depthCmpFunc = gl::CmpFunc::LessEqual;
@@ -81,10 +82,12 @@ GlWireframe::GlWireframe() :
 	m_quadPipe = m_trianglePipe;
 	m_quadPipe.patch.vertices = 4;
 	m_quadPipe.program = m_quadProgram;
+	m_quadPipe.topology = gl::PrimitiveTopology::Patches;
 
 	m_spherePipe = m_trianglePipe;
 	m_spherePipe.program = m_sphereProgram;
 	m_spherePipe.vertexArray = m_spheresVao;
+	m_spherePipe.topology = gl::PrimitiveTopology::Points;
 
     // depth pre pass pipeline
 	m_triangleDepthPipe.program = m_triangleProgram;
@@ -99,10 +102,12 @@ GlWireframe::GlWireframe() :
 	m_quadDepthPipe = m_triangleDepthPipe;
 	m_quadDepthPipe.patch.vertices = 4;
 	m_quadDepthPipe.program = m_quadDepthProgram;
+	m_quadDepthPipe.topology = gl::PrimitiveTopology::Patches;
 
 	m_sphereDepthPipe = m_triangleDepthPipe;
 	m_sphereDepthPipe.program = m_sphereDepthProgram;
 	m_sphereDepthPipe.vertexArray = m_spheresVao;
+	m_sphereDepthPipe.topology = gl::PrimitiveTopology::Points;
 }
 
 void GlWireframe::on_reset() {
