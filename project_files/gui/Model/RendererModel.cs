@@ -268,6 +268,7 @@ namespace gui.Model
             switch(args.PropertyName)
             {
                 case nameof(RendererIndex):
+                case nameof(RendererVariation):
                 {
                     // Query renderer parameters for new renderer
                     List<RendererParameter> paramList = new List<RendererParameter>();
