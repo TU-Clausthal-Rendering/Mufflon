@@ -80,7 +80,7 @@ struct TextureDevHandle<Device::OPENGL> : public DeviceHandle<Device::OPENGL> {
 	using ConstHandleType = gl::TextureHandle;
 };
 __host__ constexpr bool is_valid(typename TextureDevHandle<Device::OPENGL>::HandleType handle) noexcept {
-	return handle.id != 0u;
+	return handle != 0u;
 }
 
 
@@ -173,7 +173,7 @@ public:
 	Texture(std::string name, u16 width, u16 height, u16 numLayers, MipmapType mipmapType, Format format,
 			SamplingMode mode, bool sRgb, bool dataHasMipmaps = false, std::unique_ptr<u8[]> data = nullptr);
 	Texture(const Texture&) = delete;
-	Texture(Texture&&);
+	Texture(Texture&&) noexcept;
 	Texture& operator=(const Texture&) = delete;
 	Texture& operator=(Texture&&) = delete;
 	~Texture();
@@ -226,6 +226,7 @@ public:
 		return static_cast<std::size_t>(m_width * m_height * m_numLayers * PIXEL_SIZE(m_format));
 	}
 
+	static gl::Handle get_gl_sampler(SamplingMode mode);
 private:
 	// Information
 	u16 m_width;
@@ -239,12 +240,15 @@ private:
 	// Handles and resources
 	std::unique_ptr<CpuTexture> m_cpuTexture;
 	cudaMipmappedArray_t m_cudaTexture;
+	gl::Handle m_glHandle = 0;
+	gl::TextureFormat m_glFormat = {};
 	HandleTypes m_handles;
 	ConstHandleTypes m_constHandles;
 	std::string m_name;
 
 	void create_texture_cpu(bool dataHasMipmaps = false, std::unique_ptr<u8[]> data = nullptr);
 	void create_texture_cuda();
+	void create_texture_opengl();
 };
 
 }}} // namespace mufflon::scene::textures

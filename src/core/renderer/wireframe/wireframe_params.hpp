@@ -18,6 +18,14 @@ struct PWireframeMaxTraceDepth {
 	}
 };
 
+struct PWireframeEnableDepthTest {
+	bool enableDepth = false;
+    static ParamDesc get_desc() noexcept {
+		return { "Depth Test", ParameterTypes::BOOL };
+    }
+};
+
 using WireframeParameters = ParameterHandler<PWireframeLinewidth, PWireframeMaxTraceDepth>;
+using GlWireframeParameters = ParameterHandler<PWireframeLinewidth, PWireframeEnableDepthTest>;
 
 }} // namespace mufflon::renderer

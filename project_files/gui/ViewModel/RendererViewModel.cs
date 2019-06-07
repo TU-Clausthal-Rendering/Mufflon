@@ -208,7 +208,7 @@ namespace gui.ViewModel
             get => m_selectedRendererVariation;
             set
             {
-                if (m_selectedRendererVariation == value) return;
+                if (m_selectedRendererVariation == value || value == null) return;
                 m_selectedRendererVariation = value;
                 m_models.Settings.LastSelectedRendererVariation = m_selectedRendererVariation.Variation;
                 m_models.Renderer.RendererVariation = m_selectedRendererVariation.Variation;

@@ -137,6 +137,9 @@
     <Filter Include="Source Files\core\opengl">
       <UniqueIdentifier>{c4dc2b5b-e976-40a8-a5be-54ca66b6ac3c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\shader">
+      <UniqueIdentifier>{567932eb-30db-4597-8d6b-b7890a02dd7f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -291,6 +294,24 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\memory\synchronize.cpp">
       <Filter>Source Files\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\program_builder.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_object.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_context.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\vertex_array_builder.cpp">
+      <Filter>Source Files\core\opengl</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -990,6 +1011,27 @@
     <ClInclude Include="..\..\src\util\flag.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\program_builder.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_object.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_context.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1025,5 +1067,55 @@
     <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu">
       <Filter>Source Files\core\renderer\lt</Filter>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\copy_output.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\camera_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_quad_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\material_id_binding.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

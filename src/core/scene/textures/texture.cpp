@@ -28,7 +28,7 @@ Texture::Texture(std::string name, u16 width, u16 height, u16 numLayers, MipmapT
 	}
 }
 
-Texture::Texture(Texture&& tex) :
+Texture::Texture(Texture&& tex) noexcept :
 	m_width(tex.m_width),
 	m_height(tex.m_height),
 	m_numLayers(tex.m_numLayers),
@@ -37,12 +37,16 @@ Texture::Texture(Texture&& tex) :
 	m_sRgb(tex.m_sRgb),
 	m_cpuTexture(std::move(tex.m_cpuTexture)),
 	m_cudaTexture(tex.m_cudaTexture),
+	m_glHandle(tex.m_glHandle),
+    m_glFormat(tex.m_glFormat),
 	m_handles(tex.m_handles),
 	m_constHandles(tex.m_constHandles),
 	m_mipmapLevels(tex.m_mipmapLevels),
 	m_name(std::move(tex.m_name))
 {
-	m_cudaTexture = nullptr;
+	tex.m_cudaTexture = nullptr;
+	tex.m_glHandle = 0;
+	tex.m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = 0;
 }
 
 Texture::~Texture() {
@@ -54,16 +58,42 @@ Texture::~Texture() {
 		m_cudaTexture = nullptr;
 		m_cudaTexture = nullptr;
 	}
+    if(m_glHandle) {
+		gl::deleteTexture(m_glHandle);
+		m_glHandle = 0;
+    }
+}
+
+gl::Handle Texture::get_gl_sampler(SamplingMode mode) {
+	static gl::Handle linSampler = 0;
+	static gl::Handle nearSampler = 0;
+	gl::Handle& id = mode == SamplingMode::LINEAR ? linSampler : nearSampler;
+	// sampler already generated?
+    if (id) return id;
+
+    // generate sampler
+	id = gl::genSampler();
+	gl::samplerParameter(id, gl::SamplerParameterI::WrapS, gl::WRAP_REPEAT);
+	gl::samplerParameter(id, gl::SamplerParameterI::WrapT, gl::WRAP_REPEAT);
+	gl::samplerParameter(id, gl::SamplerParameterI::WrapR, gl::WRAP_REPEAT);
+
+    // TODO set mipmaps
+	gl::samplerParameter(id, gl::SamplerParameterI::MinFilter,
+		mode == SamplingMode::LINEAR ? gl::FILTER_LINEAR : gl::FILTER_NEAREST);
+	gl::samplerParameter(id, gl::SamplerParameterI::MagFilter,
+		mode == SamplingMode::LINEAR ? gl::FILTER_LINEAR : gl::FILTER_NEAREST);
+    // TODO set anisotrophy
+	return id;
 }
 
 template < Device dev >
 void Texture::synchronize() {
-		// Create texture resources if necessary
+	// Create texture resources if necessary
 	if(!is_valid(m_constHandles.get<ConstTextureDevHandle_t<dev>>())) {
 		switch(dev) {
 			case Device::CPU: create_texture_cpu(); break;
 			case Device::CUDA: create_texture_cuda(); break;
-			//case Device::OPENGL: create_texture_opengl(); break;
+			case Device::OPENGL: create_texture_opengl(); break;
 			default: mAssert(false);
 		}
 
@@ -84,7 +114,17 @@ void Texture::synchronize() {
 					height = std::max(1u, height / 2u);
 				}
 			} else {
-				// TODO: OpenGL
+				u32 width = m_width;
+				u32 height = m_height;
+                // copy all mipmaps levels
+                for(u32 level = 0u; level < m_mipmapLevels; ++level) {
+					gl::texSubImage3D(m_glHandle, level, 0, 0, 0, width, height, m_numLayers,
+						m_glFormat.setFormat, m_glFormat.setType, m_cpuTexture->data(0));
+					width = std::max(1u, width / 2u);
+					height = std::max(1u, height / 2u);
+                }
+
+				    
 			}
 		} else if(dev != Device::CUDA && is_valid(m_constHandles.get<ConstTextureDevHandle_t<Device::CUDA>>())) {
 			if(dev == Device::CPU) {
@@ -113,11 +153,10 @@ void Texture::synchronize() {
 		}
 	}
 }
+
 template void Texture::synchronize<Device::CPU>();
 template void Texture::synchronize<Device::CUDA>();
 template void Texture::synchronize<Device::OPENGL>();
-
-
 
 template < Device dev >
 void Texture::unload() {
@@ -144,7 +183,11 @@ void Texture::unload() {
 			}
 		} break;
 		case Device::OPENGL: {
-			// TODO
+			if(m_glHandle) {
+				gl::deleteTexture(m_glHandle);
+				m_glHandle = 0;
+				m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = 0;
+			}
 		} break;
 	}
 }
@@ -152,8 +195,6 @@ void Texture::unload() {
 template void Texture::unload<Device::CPU>();
 template void Texture::unload<Device::CUDA>();
 template void Texture::unload<Device::OPENGL>();
-
-
 
 template < Device dev >
 void Texture::clear() {
@@ -201,7 +242,11 @@ void Texture::clear() {
 			}
 		} break;
 		case Device::OPENGL: {
-			// TODO
+			if(!m_glHandle)
+				logError("[Texture::zero] Trying to clear a OPENGL texture without memory.");
+			else {
+				gl::clearTexImage(m_glHandle, 0);
+			}
 		} break;
 	}
 }
@@ -209,7 +254,6 @@ void Texture::clear() {
 template void Texture::clear<Device::CPU>();
 template void Texture::clear<Device::CUDA>();
 template void Texture::clear<Device::OPENGL>();
-
 
 
 
@@ -291,6 +335,20 @@ void Texture::create_texture_cuda() {
 	 * For the sake of a consistent interface one may still call acquire<Device::CUDA>(), but will only ever get a null
 	 * handle back.
 	 */
+}
+
+void Texture::create_texture_opengl() {
+	mAssert(m_glHandle == 0);
+    m_glHandle = gl::genTexture();
+	gl::bindTexture(gl::TextureType::Texture2DArray, m_glHandle);
+
+	m_glFormat = gl::convertFormat(m_format, m_sRgb);
+	gl::texStorage3D(m_glHandle, m_mipmapLevels, m_glFormat.internal, m_width, m_height, m_numLayers);
+    
+    // create bindless texture
+    auto texHandle = gl::getTextureSamplerHandle(m_glHandle, get_gl_sampler(m_mode));
+	gl::makeTextureHandleResident(texHandle);
+	m_constHandles.get<ConstTextureDevHandle_t<Device::OPENGL>>() = texHandle;
 }
 
 } // namespace mufflon::scene::textures
