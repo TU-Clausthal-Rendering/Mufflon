@@ -41,13 +41,13 @@ public:
 	int capacity() const { return m_dataCapacity; }
 	int mem_size() const { return m_dataCapacity * (sizeof(Data) + sizeof(Vec) + sizeof(Node)); }
 
-	Data* insert(const Vec& position, const Data& data) { return insert(position, Data{data}); }
-	Data* insert(const Vec& position, Data&& data) {
+	int insert(const Vec& position, const Data& data) { return insert(position, Data{data}); }
+	int insert(const Vec& position, Data&& data) {
 		int dataIdx = m_dataCount.fetch_add(1);
 		// TODO: more robust overflow behavior?
 		m_data[dataIdx] = std::move(data);
 		m_positions[dataIdx] = position;
-		return &m_data[dataIdx];
+		return dataIdx;
 	}
 
 	Data& get_data_by_index(int index) { return m_data[index]; }
