@@ -177,6 +177,7 @@ Materials
                 | <texture>,            // OR anisotropic roughness [0,1]^2
                                         // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
+    "shadowingModel": "{VCAVITY,SMITH}",// Name of the shadowing model (default VCAVITY)
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
                                         // DEFAULT: [0.5, 0.5, 0.5]
@@ -187,6 +188,7 @@ Materials
                  | <texture>,           // OR anisotropic roughness [0,1]^2
                                         // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
+    "shadowingModel": "{VCAVITY,SMITH}",// Name of the shadowing model (default VCAVITY)
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "absorption": [r,g,b],              // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
     "ior": float                        // Dielectric index of refraction
