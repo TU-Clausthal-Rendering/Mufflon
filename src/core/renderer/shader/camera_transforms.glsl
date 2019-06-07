@@ -11,3 +11,8 @@ struct CameraTransforms
 	float far;
 	uvec2 screen;
 };
+
+layout(binding = 0) uniform u_camTrans
+{
+	CameraTransforms u_cam;
+};

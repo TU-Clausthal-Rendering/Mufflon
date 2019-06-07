@@ -3,11 +3,6 @@ layout(location = 1) flat in float in_radius;
 layout(location = 2) in vec3 in_position;
 layout(location = 3) flat in uint in_materialIndex;
 
-layout(binding = 0) uniform u_camTrans
-{
-	CameraTransforms u_cam;
-};
-
 // convert view space to world space
 vec3 toWorld(vec4 viewVec) {
 	vec4 res = u_cam.invView * viewVec;

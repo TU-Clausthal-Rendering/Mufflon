@@ -7,11 +7,6 @@ layout(line_strip, max_vertices = RESOLUTION) out;
 layout(location = 0) in vec3 in_position[1];
 layout(location = 1) in float in_radius[1];
 
-layout(binding = 0) uniform u_camTrans
-{
-	CameraTransforms u_cam;
-};
-
 void main() {
 	// 2 pi / RESOLUTION
 	const float factor = 6.28318530718 / float(RESOLUTION - 1);

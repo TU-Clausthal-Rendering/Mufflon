@@ -6,12 +6,7 @@ layout(location = 0) out vec3 out_position;
 layout(location = 1) out vec3 out_normal;
 layout(location = 2) out vec2 out_texcoord;
 
-layout(binding = 0) uniform u_camTrans
-{
-	CameraTransforms u_cam;
-};
 layout(location = 1) uniform mat4x3 u_instanceTrans;
-
 
 void main() {
 	out_position = u_instanceTrans * vec4(in_position, 1.0);

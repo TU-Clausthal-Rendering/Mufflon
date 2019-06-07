@@ -14,11 +14,6 @@ layout(location = 1) flat out float out_radius;
 layout(location = 2) out vec3 out_position;
 layout(location = 3) flat out uint out_materialIndex;
 
-layout(binding = 0) uniform u_camTrans
-{
-	CameraTransforms u_cam;
-};
-
 const vec2 offsets[] = { vec2(-1.0, 1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, -1.0) };
 
 // span a quad in view space that contains the entire sphere

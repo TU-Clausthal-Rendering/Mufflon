@@ -1,9 +1,5 @@
 layout(location = 0) in vec3 in_position;
 
-layout(binding = 0) uniform u_camTrans
-{
-	CameraTransforms u_cam;
-};
 layout(location = 1) uniform mat4x3 u_instanceTrans;
 
 void main() {
