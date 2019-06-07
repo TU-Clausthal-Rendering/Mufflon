@@ -181,6 +181,16 @@ namespace gui.Model
             }
         }
 
+        public uint LastSelectedRendererVariation
+        {
+            get => Settings.Default.LastSelectedRendererVariation;
+            set
+            {
+                Debug.Assert(value >= 0);
+                Settings.Default.LastSelectedRendererVariation = value;
+            }
+        }
+
         public int LastSelectedRenderTarget
         {
             get => Settings.Default.LastSelectedRenderTarget;
@@ -327,6 +337,12 @@ namespace gui.Model
         {
             get => Settings.Default.AllowCameraMovement;
             set => Settings.Default.AllowCameraMovement = value;
+        }
+
+        public bool InvertCameraControls
+        {
+            get => Settings.Default.InvertCameraControls;
+            set => Settings.Default.InvertCameraControls = value;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -556,6 +556,8 @@ void CpuNextEventBacktracking::iterate() {
 	m_selfEmissionCount.store(0);
 #ifndef NEB_KDTREE
 	m_density.set_iteration(m_currentIteration + 1);
+#else
+	m_density.clear();
 #endif
 
 	u64 photonSeed = m_rngs[0].next();
@@ -606,6 +608,8 @@ void CpuNextEventBacktracking::iterate() {
 #else
 		//vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
 		vertex.ext().density = m_density.get_density_robust(vertex.get_position(), *vertex.get_tangent_space());
+		//vertex.ext().density = m_density.get_density_interpolated(vertex.get_position(), vertex.get_geometric_normal());
+		//vertex.ext().density = m_density.get_density_interpolated_robust(vertex.get_position(), *vertex.get_tangent_space());
 #endif
 		mAssert(vertex.ext().density < 1e38f);
 
@@ -627,7 +631,7 @@ void CpuNextEventBacktracking::iterate() {
 
 		if(photonMergeArea > 0.0f)
 			radiance += merge_photons(photonMergeRadiusSq, vertex, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);
-		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);
+		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);//*/
 		//scene::Point lastPos = vertex.previous() ? vertex.previous()->get_position() : {0.0f};
 		//auto emission = vertex.get_emission(m_sceneDesc, lastPos);
 		//radiance += finalize_emission(neeMergeArea, photonMergeArea, emission, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);//*/
@@ -637,7 +641,7 @@ void CpuNextEventBacktracking::iterate() {
 		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
 								  1.0f, radiance);
 		/*if(vertex.get_path_len() == 1)
-			m_outputBuffer.set(coord, 0, ei::Vec4{vertex.ext().density * (m_currentIteration+1)});//*/
+			m_outputBuffer.set(coord, 0, ei::Vec3{vertex.ext().density * (m_currentIteration+1)});//*/
 	}
 
 	// Finialize the evaluation of emissive end vertices.
@@ -654,9 +658,12 @@ void CpuNextEventBacktracking::iterate() {
 								  1.0f, emission);
 	}//*/
 
-	logPedantic("[NEB] Memory occupation | View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),
+	logPedantic("[NEB] Memory occupation    View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),
 				"% | Photons: ", m_photonMap.size() * 100.0f / float(m_photonMap.capacity()),
 				"% | Octree: ", m_density.size() * 100.0f / float(m_density.capacity()), "%.");
+#ifdef NEB_KDTREE
+	logPedantic("[NEB] KD-Tree depth: ", m_density.compute_depth(), " optimal: ", ei::ilog2(m_density.size())+1);
+#endif
 }
 
 void CpuNextEventBacktracking::on_reset() {

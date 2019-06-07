@@ -92,9 +92,7 @@ inline void mem_set<Device::CUDA>(void* mem, int value, std::size_t size) {
 
 template < Device dev, class T >
 inline std::enable_if_t<dev == Device::OPENGL, void> mem_set(gl::BufferHandle<T> mem, int value, std::size_t size) {
-	// TODO: proper type and format
-	gl::clearBufferSubData(mem.id, gl::BufferFormat::R32F, mem.get_byte_offset(),
-						   size, gl::BufferFormat::R32F, gl::Type::FLOAT, &value);
+	gl::clearBufferSubData(mem.id, mem.get_byte_offset(), size, value);
 }
 
 

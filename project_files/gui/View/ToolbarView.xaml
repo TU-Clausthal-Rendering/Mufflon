@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:gui.View"
              mc:Ignorable="d"
              d:DesignStyle="{StaticResource DesignerStyle}"
-             d:DesignHeight="30" d:DesignWidth="270">
+             d:DesignHeight="30" d:DesignWidth="295">
     <UserControl.Resources>
         <Style TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -56,6 +56,10 @@
                 <Image Source="../Icons/camera_nomove.png"
                         Visibility="{Binding CameraMoveIconVisibility, Converter={StaticResource visinverter}, FallbackValue=Collapsed, UpdateSourceTrigger=PropertyChanged}"/>
             </StackPanel>
+        </Button>
+        <Button Command="{Binding EnterFreeFlightMode}"
+                ToolTip="Enables realtime-like free flight camera; to exit click anywhere">
+            <Image Source="../Icons/flight.png"/>
         </Button>
     <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" HorizontalAlignment="Center"/>
         <Button Command="{Binding OneIterationCommand}"

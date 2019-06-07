@@ -22,8 +22,10 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Importance decimater"; }
-	StringView get_short_name() const noexcept final { return "ImpD"; }
+	static constexpr StringView get_name_static() noexcept { return "Importance decimater"; }
+	static constexpr StringView get_short_name_static() noexcept { return "ImpD"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void pre_descriptor_requery() final;
 	void post_iteration(OutputHandler& outputBuffer) final;

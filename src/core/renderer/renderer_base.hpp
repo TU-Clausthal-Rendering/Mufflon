@@ -15,7 +15,7 @@ public:
 
 	RendererBase();
 
-	bool constexpr uses_device(Device device) noexcept override { return may_use_device(device); }
+	bool uses_device(Device device) const noexcept override { return may_use_device(device); }
 	static constexpr bool may_use_device(Device device) noexcept { return DEVICE == device; }
 
 	bool pre_iteration(OutputHandler& outputBuffer) override;
@@ -23,8 +23,10 @@ public:
 
 protected:
 	RenderBuffer<DEVICE> m_outputBuffer;
+	OutputValue m_outputTargets;
+
 	// CPU gets the descriptor directly, everyone else gets a unique_ptr
-	std::conditional_t<DEVICE == Device::CPU, scene::SceneDescriptor<DEVICE>,
+	std::conditional_t<DEVICE == Device::CPU || DEVICE == Device::OPENGL, scene::SceneDescriptor<DEVICE>,
 		unique_device_ptr<DEVICE, scene::SceneDescriptor<DEVICE>>> m_sceneDesc;
 };
 

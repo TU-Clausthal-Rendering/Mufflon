@@ -17,7 +17,7 @@ Curly brackets are used to declare a choice of different possible strings (e.g. 
 In the case of multiple type choices, details on further mandatory properties will be given below.
 
     {
-        "version": "1.3",
+        "version": "1.4",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
@@ -177,6 +177,7 @@ Materials
                 | <texture>,            // OR anisotropic roughness [0,1]^2
                                         // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
+    "shadowingModel": "{vcavity,smith}",// Name of the shadowing model (default vcavity)
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "albedo": [r,g,b] | <texture>       // vec3 [0,1]^3 for the color OR an RGB texture (relative path)
                                         // DEFAULT: [0.5, 0.5, 0.5]
@@ -187,6 +188,7 @@ Materials
                  | <texture>,           // OR anisotropic roughness [0,1]^2
                                         // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
+    "shadowingModel": "{vcavity,smith}",// Name of the shadowing model (default vcavity)
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "absorption": [r,g,b],              // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
     "ior": float                        // Dielectric index of refraction
@@ -236,6 +238,7 @@ Prefer for optimal sampling. Assumes dielectric surfaces only.
                  | <texture>,           // OR anisotropic roughness [0,1]^2
                                         // OR a texture with one or two channels (relative path)
                                         // DEFAULT: 0.5
+    "shadowingModel": "{vcavity,smith}",// Name of the shadowing model (default vcavity)
     "ndf": "{BS,GGX,Cos}",              // Name of the normal distribution function (default GGX)
     "absorption": [r,g,b],              // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
     "ior": float                        // Dielectric index of refraction

@@ -22,8 +22,10 @@ public:
 	// This is just a test method, don't use this as an actual interface
 	void iterate() override;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Lighttracer"; }
-	StringView get_short_name() const noexcept final { return "LT"; }
+	static constexpr StringView get_name_static() noexcept { return "Lighttracer"; }
+	static constexpr StringView get_short_name_static() noexcept { return "LT"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 	void on_reset() final;
 	void post_descriptor_requery() final;
 

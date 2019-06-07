@@ -32,8 +32,10 @@ public:
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
-	StringView get_name() const noexcept final { return "Next Event Backtracking"; }
-	StringView get_short_name() const noexcept final { return "NEB"; }
+	static constexpr StringView get_name_static() noexcept { return "Next Event Backtracking"; }
+	static constexpr StringView get_short_name_static() noexcept { return "NEB"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void on_reset() final;
 
@@ -107,6 +109,7 @@ private:
 	scene::accel_struct::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
 #else
 	DensityOctree m_density;
+	//SplitDensityOctree m_density;
 #endif
 };
 

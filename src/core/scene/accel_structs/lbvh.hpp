@@ -69,6 +69,9 @@ public:
 
 	template < Device dev >
 	AccelDescriptor acquire_const() {
+		if (dev == Device::OPENGL)
+			return AccelDescriptor{}; // no valid descriptor for opengl yet
+
 		if(needs_rebuild())
 			throw std::runtime_error("[LBVHBuilder::acquire_const] the BVH must be created with build() before a descriptor can be returned.");
 		synchronize<dev>();

@@ -1,6 +1,7 @@
 #include "gl_wrapper.hpp"
 #include "glad/glad.h"
 #include <memory>
+#include "util/assert.hpp"
 
 namespace mufflon::gl {
 
@@ -22,12 +23,11 @@ namespace mufflon::gl {
 		glCopyNamedBufferSubData(src, dst, srcOffset, dstOffset, size);
 	}
 
-	void clearBufferSubData(Handle dst, BufferFormat bufferFormat, size_t dstOffset, size_t size, BufferFormat dataFormat,
-							Type dataType, const void* data) {
-		glClearNamedBufferSubData(dst, GLenum(bufferFormat), dstOffset, size, GLenum(dataFormat), GLenum(dataType), data);
+    void clearBufferSubData(Handle dst, size_t offset, size_t size, int value) {
+		glClearNamedBufferSubData(dst, GL_R32I, offset, size, GL_RED, GL_INT, &value);
 	}
 
-	void deleteBuffer(Handle h) {
+    void deleteBuffer(Handle h) {
 		glDeleteBuffers(1, &h); 
 	}
 
@@ -101,5 +101,65 @@ namespace mufflon::gl {
 
 	void getBufferSubData(Handle h, size_t offset, size_t size, void* dstData){
 		glGetNamedBufferSubData(h, offset, size, dstData);
+	}
+
+    Handle genTexture() {
+		Handle id;
+		glGenTextures(1, &id);
+		return id;
+	}
+
+    void bindTexture(TextureType type, Handle id) {
+		glBindTexture(GLenum(type), id);
+	}
+
+    void deleteTexture(Handle h) {
+		glDeleteTextures(1, &h);
+	}
+
+    void clearTexImage(Handle h, int level) {
+        // clear with zeros
+		mAssert(h);
+		glClearTexImage(h, level, GL_RGBA, GL_FLOAT, nullptr);
+	}
+
+    void texStorage3D(Handle h, int levels, TextureInternal format, size_t width, size_t height, size_t depth) {
+		mAssert(h);
+		glTextureStorage3D(h, levels, GLenum(format), GLsizei(width), GLsizei(height), GLsizei(depth));
+	}
+
+    void texSubImage3D(Handle h, int level, size_t offsetX, size_t offsetY, size_t offsetZ, size_t width, size_t height,
+        size_t depth, TextureSetFormat setFormat, TextureSetType setType, const void* data) {
+		mAssert(h);
+		glTextureSubImage3D(h, level, GLint(offsetX), GLint(offsetY), GLint(offsetZ), GLsizei(width), GLsizei(height), GLsizei(depth), GLenum(setFormat), GLenum(setType), data);
+	}
+
+    TextureHandle getTextureHandle(Handle h) {
+		mAssert(h);
+		return glGetTextureHandleARB(h);
+	}
+
+    TextureHandle getTextureSamplerHandle(Handle tex, Handle sampler) {
+		return glGetTextureSamplerHandleARB(tex, sampler);
+	}
+
+    void makeTextureHandleResident(TextureHandle h) {
+		mAssert(h);
+		glMakeTextureHandleResidentARB(h);
+	}
+
+    void makeTextureHandleNonResident(TextureHandle h) {
+		mAssert(h);
+		glMakeTextureHandleNonResidentARB(h);
+	}
+
+    Handle genSampler() {
+		Handle res;
+		glGenSamplers(1, &res);
+		return res;
+	}
+
+    void samplerParameter(Handle h, SamplerParameterI param, int value) {
+		glSamplerParameteri(h, GLenum(param), value);
 	}
 }

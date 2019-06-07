@@ -102,6 +102,7 @@
     <Compile Include="Command\ActionCommand.cs" />
     <Compile Include="Command\AddLightCommand.cs" />
     <Compile Include="Command\AdjustGammaCommand.cs" />
+    <Compile Include="Command\EnterFreeFlightMode.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\PerformIterationsCommand.cs" />
     <Compile Include="Command\ResetCameraCommand.cs" />
@@ -544,6 +545,9 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\tessellate.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\flight.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

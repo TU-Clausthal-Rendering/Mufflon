@@ -17,13 +17,14 @@
 #include "core/renderer/neb/cpu_neb.hpp"
 #include "core/renderer/vcm/cpu_vcm.hpp"
 #include "core/renderer/forward/gl_forward.hpp"
+#include "core/renderer/wireframe/gl_wireframe.h"
 
 namespace mufflon::renderer {
 
 using Renderers = util::TaggedTuple<
 	CpuPathTracer, GpuPathTracer,
 	CpuLightTracer, GpuLightTracer,
-	CpuWireframe, GpuWireframe,
+	CpuWireframe, GpuWireframe, GlWireframe,
 	CpuBidirPathTracer,
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,

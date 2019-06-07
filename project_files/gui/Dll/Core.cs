@@ -118,6 +118,7 @@ namespace gui.Dll
             Linear
         };
 
+        [Flags]
         public enum RenderDevice
         {
             None = 0,
@@ -421,6 +422,8 @@ namespace gui.Dll
         // Renderer API
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt32 render_get_renderer_count();
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern UInt32 render_get_renderer_variations(uint index);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_renderer_name")]
         private static extern IntPtr render_get_renderer_name_(UInt32 index);
         internal static string render_get_renderer_name(UInt32 index) { return StringUtil.FromNativeUTF8(render_get_renderer_name_(index)); }
@@ -428,9 +431,9 @@ namespace gui.Dll
         private static extern IntPtr render_get_renderer_short_name_(UInt32 index);
         internal static string render_get_renderer_short_name(UInt32 index) { return StringUtil.FromNativeUTF8(render_get_renderer_short_name_(index)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_renderer_uses_device(UInt32 index, RenderDevice dev);
+        internal static extern RenderDevice render_get_renderer_devices(UInt32 index, uint variations);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_renderer(UInt32 index);
+        internal static extern bool render_enable_renderer(UInt32 index, uint variation);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_iterate(out ProcessTime iterateTime, out ProcessTime preTime, out ProcessTime postTime);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

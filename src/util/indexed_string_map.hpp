@@ -71,6 +71,12 @@ public:
 		m_map.emplace(*m_mapKeyStore[index], index);
 	}
 
+	void clear() {
+		m_map.clear();
+		m_mapKeyStore.clear();
+		m_data.clear();
+	}
+
 private:
 	std::unordered_map<StringView, std::size_t> m_map;
 	std::vector<std::unique_ptr<std::string>> m_mapKeyStore;

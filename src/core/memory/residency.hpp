@@ -128,4 +128,10 @@ using ArrayDevHandle_t = typename ArrayDevHandle<dev, T>::HandleType;
 template < Device dev, class T >
 using ConstArrayDevHandle_t = typename ArrayDevHandle<dev, T>::ConstHandleType;
 
+// returns the device for CPU and CUDA but returns CPU for OPENGL
+template < Device dev >
+constexpr Device NotGl = dev;
+template <>
+constexpr Device NotGl<Device::OPENGL> = Device::CPU;
+
 } // namespace mufflon

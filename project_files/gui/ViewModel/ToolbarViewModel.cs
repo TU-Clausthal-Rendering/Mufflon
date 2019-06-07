@@ -23,6 +23,7 @@ namespace gui.ViewModel
             SaveScreenShotCommand = new ScreenShotCommand(models);
             ToggleCameraMovementCommand = new ActionCommand(() =>
                 models.Settings.AllowCameraMovement = !models.Settings.AllowCameraMovement);
+            EnterFreeFlightMode = new EnterFreeFlightMode(models);
             OneIterationCommand = new PerformIterationsCommand(m_models, 1u);
             TenIterationsCommand = new PerformIterationsCommand(m_models, 10u);
             HundredIterationsCommand = new PerformIterationsCommand(m_models, 100u);
@@ -65,6 +66,7 @@ namespace gui.ViewModel
         public ICommand ResetCommand { get; }
         public ICommand SaveScreenShotCommand { get; }
         public ICommand ToggleCameraMovementCommand { get; }
+        public ICommand EnterFreeFlightMode { get; }
         public ICommand OneIterationCommand { get; }
         public ICommand TenIterationsCommand { get; }
         public ICommand HundredIterationsCommand { get; }
