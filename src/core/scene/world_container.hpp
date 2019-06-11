@@ -146,7 +146,6 @@ public:
 	StringView get_light_name(u32 index, lights::LightType type) const;
 	void set_light_name(u32 index, lights::LightType type, StringView name);
 	// Functions for dirtying cameras and lights
-	void mark_camera_dirty(ConstCameraHandle cam);
 	void mark_light_dirty(u32 index, lights::LightType type);
 
 	// Add new textures to the scene
@@ -244,15 +243,11 @@ private:
 	// All available cameras mapped to their name.
 	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
 	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
-	std::unordered_map<ConstCameraHandle, u8> m_camerasDirty;
 	// All light sources of the scene
 	util::IndexedStringMap<std::vector<lights::PointLight>> m_pointLights;
 	util::IndexedStringMap<std::vector<lights::SpotLight>> m_spotLights;
 	util::IndexedStringMap<std::vector<lights::DirectionalLight>> m_dirLights;
 	util::IndexedStringMap<lights::Background> m_envLights;
-	// Dirty flags to keep track of changed values
-	bool m_lightsDirty = true;
-	bool m_envLightDirty = true;
 	// Texture cache
 	std::unordered_map<StringView, std::unique_ptr<textures::Texture>> m_textures;
 	std::map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has
