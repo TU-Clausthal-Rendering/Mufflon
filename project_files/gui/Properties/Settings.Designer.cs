@@ -259,5 +259,17 @@ namespace gui.Properties {
                 this["InvertCameraControls"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1000")]
+        public uint LastNIterationCommand {
+            get {
+                return ((uint)(this["LastNIterationCommand"]));
+            }
+            set {
+                this["LastNIterationCommand"] = value;
+            }
+        }
     }
 }

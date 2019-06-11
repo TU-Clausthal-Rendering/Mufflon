@@ -105,6 +105,7 @@
     <Compile Include="Command\EnterFreeFlightMode.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\PerformIterationsCommand.cs" />
+    <Compile Include="Command\PerformIterationsDialogCommand.cs" />
     <Compile Include="Command\ResetCameraCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
     <Compile Include="Command\ScreenShotCommand.cs" />
@@ -210,6 +211,9 @@
     </Compile>
     <Compile Include="View\Display\DisplayView.xaml.cs">
       <DependentUpon>DisplayView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\IterateNDialog.xaml.cs">
+      <DependentUpon>IterateNDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="View\TessellationView.xaml.cs">
       <DependentUpon>TessellationView.xaml</DependentUpon>
@@ -334,6 +338,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\Display\DisplayView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\IterateNDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -548,6 +556,9 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\flight.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\iterate_n.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

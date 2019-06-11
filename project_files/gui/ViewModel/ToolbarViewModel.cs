@@ -27,6 +27,7 @@ namespace gui.ViewModel
             OneIterationCommand = new PerformIterationsCommand(m_models, 1u);
             TenIterationsCommand = new PerformIterationsCommand(m_models, 10u);
             HundredIterationsCommand = new PerformIterationsCommand(m_models, 100u);
+            NIterationsCommand = new PerformIterationsDialogCommand(m_models);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
@@ -70,6 +71,7 @@ namespace gui.ViewModel
         public ICommand OneIterationCommand { get; }
         public ICommand TenIterationsCommand { get; }
         public ICommand HundredIterationsCommand { get; }
+        public ICommand NIterationsCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
