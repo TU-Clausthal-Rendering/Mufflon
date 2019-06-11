@@ -87,7 +87,9 @@ float get_mis_weight(const BpmPathVertex& thisVertex, const AngularPdf pdfBack,
 }
 
 CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
+	// Take element k+1 for the independent area estimate (using the radius of the k-th element is biased).
 	return distSq[n];	// Unbiased according to Garcia 2012, but biased in my experiments
+
 	//return (distSq[n] + distSq[n-1]) / 2.0f;	// Good results in experiments for uniform
 	//return distSq[n-1];
 }
@@ -95,6 +97,7 @@ CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
 // A photon mapping kernel with dSq = current sample distance and rSq = bandwidth.
 CUDA_FUNCTION float kernel(float dSq, float rSq) {
 	//return 1.0f;	// Uniform
+	//return 2.0f * (1.0f - dSq / rSq);		// Epanechnikov
 	return 3.0f * ei::sq(1.0f - dSq / rSq);	// Silverman
 }
 
@@ -136,10 +139,11 @@ void CpuBidirPhotonMapper::iterate() {
 		for(int i = 0; i < m_photonMapKd.size(); ++i) {
 			PhotonDescKNN& photon = m_photonMapKd.get_data_by_index(i);
 			const ei::Vec3& currentPos = m_photonMapKd.get_position_by_index(i);
-			int* indices = m_knnQueryMem.data() + get_current_thread_idx() * (m_params.knn+1) * 2;
-			float* distSq = as<float>(indices + m_params.knn+1);
-			m_photonMapKd.query_euclidean(currentPos, m_params.knn + 1, indices, distSq, ei::sq(currentMergeRadius));
-			photon.mergeArea = select_bandwidth(distSq, m_params.knn) * ei::PI;
+			int* indices = m_knnQueryMem.data() + get_current_thread_idx() * (m_params.knn+2) * 2;
+			float* distSq = as<float>(indices + m_params.knn+2);
+			m_photonMapKd.query_euclidean(currentPos, m_params.knn + 2, indices, distSq, ei::sq(currentMergeRadius));
+			photon.mergeArea = select_bandwidth(distSq, m_params.knn+1) * ei::PI;
+			mAssert(photon.mergeArea > 0.0f);
 		}
 		// 2. sequential update of perv... members
 		for(int i = 0; i < m_photonMapKd.size(); ++i) {
@@ -168,7 +172,7 @@ void CpuBidirPhotonMapper::on_reset() {
 	} else {
 		m_photonMapManager.resize(0);
 		m_photonMapKd.reserve(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1));
-		m_knnQueryMem.resize((m_params.knn + 1) * 2 * get_thread_num());
+		m_knnQueryMem.resize((m_params.knn + 2) * 2 * get_thread_num());
 	}
 }
 
@@ -271,10 +275,9 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 			radiance *= mergeAreaInv;
 			prevMergeArea = ei::PI * mergeRadiusSq;
 		} else {
-			int* indices = m_knnQueryMem.data() + get_current_thread_idx() * (m_params.knn+1) * 2;
+			int* indices = m_knnQueryMem.data() + get_current_thread_idx() * (m_params.knn + 1) * 2;
 			float* distSq = as<float>(indices + m_params.knn+1);
 			m_photonMapKd.query_euclidean(currentPos, m_params.knn + 1, indices, distSq, ei::sq(currentMergeRadius));
-			// Take element k+1 for the independent area estimate (using the radius of the k-th element is biased).
 			float bandwidth = select_bandwidth(distSq, m_params.knn);
 			float currentMergeArea = ei::PI * bandwidth;
 			// Prepare view-path MIS differences due to area
@@ -287,6 +290,8 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 					radiance += merge(vertex[currentV], photon) * kernel(distSq[i], bandwidth);
 			}
 			radiance /= currentMergeArea;
+			if(isnan(radiance.x))
+				__debugbreak();
 		}
 		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
 			scene::Direction{0.0f}, Spectrum{0.0f});

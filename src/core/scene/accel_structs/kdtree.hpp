@@ -106,14 +106,14 @@ private:
 
 
 	// Find the median via selection sort.
-	int median(int* candidates, int count, int splitDim) {
+	std::pair<float,int> median(std::pair<float,int>* candidates, int count, int splitDim) {
 		if(count <= 2) return candidates[0];
 		int m = count / 2;
 /*		for(int i = 0; i <= m; ++i) for(int j = i+1; j < count; ++j)
 			if(m_positions[canditates[j]][splitDim] < m_positions[canditates[i]][splitDim])
 				std::swap(canditates[i], canditates[j]);*/
 		std::nth_element(candidates, candidates + m, candidates + count,
-			[this,splitDim](const int a, const int b){ return m_positions[a][splitDim] < m_positions[b][splitDim]; } );
+			[this,splitDim](const std::pair<float,int> a, const std::pair<float,int> b){ return m_positions[a.second][splitDim] < m_positions[b.second][splitDim]; } );
 		return candidates[m];
 	}
 
@@ -141,6 +141,20 @@ private:
 			m_tree[node].right = -1;
 			return node;
 		}
+		if(count == 2) {
+			m_tree[node].splitDim = 0;
+			m_tree[node].left = -1;
+			m_tree[node].right = -1;
+			int otherNode = allocCounter++;
+			m_tree[otherNode].splitDim = 0;
+			m_tree[otherNode].left = -1;
+			m_tree[otherNode].right = -1;
+			if(m_positions[left][0] <= m_positions[left+1][0])
+				m_tree[node].right = otherNode;
+			else
+				m_tree[node].left = otherNode;
+			return node;
+		}
 
 		// Determine the largest dimension for splitting
 		Vec bbTmp = bbMax - bbMin;
@@ -156,11 +170,12 @@ private:
 		int off = left + (count - (medianCount - 1) * step) / 2;
 		for(int i = 0; i < medianCount; ++i) {
 			int iiIdx = off + i * step;
+			mAssert(iiIdx < left + count);
 			candidates[i] = {m_positions[iiIdx][splitDim], iiIdx};
 		}
 		// Find the median via selection sort up to the element M.
-		//int refIdx = median(candidates, medianCount, splitDim);
-		auto ref = closest_to(candidates, medianCount, splitDim, bbMin[splitDim] + bbTmp[splitDim] * 0.5f);
+		auto ref = median(candidates, medianCount, splitDim);
+		//auto ref = closest_to(candidates, medianCount, splitDim, bbMin[splitDim] + bbTmp[splitDim] * 0.5f);
 
 		// Swap the refIdx element to the tree-node index (improves caching which is
 		// important for the position array.
@@ -198,11 +213,16 @@ private:
 				--pr;
 			}
 		}
+		// Either pl or pl+1 is the split position.
+		if(m_positions[pl][splitDim] < ref.first)
+			++pl;
+		mAssert(((pl == left + count) || m_positions[pl][splitDim] >= ref.first) && m_positions[pl-1][splitDim] <= ref.first);
+		mAssert(pl <= left + count);
 
 		m_tree[node].splitDim = splitDim;
 		// Recursive build. Note that tmp and indices are swapped, because tmp now contains
 		// our valid node sets and the previous indices can be used as temporary memory.
-		int cl = pl-left-1;
+		int cl = pl - left - 1;
 		int cr = count - cl - 1;
 		if(cl > 0) {
 			bbTmp = bbMax; bbTmp[splitDim] = ref.first;
@@ -218,7 +238,6 @@ private:
 
 	void query_euclidean_rec(const Vec& refPosition, int k, int* idx, float* distSq, int c) const {
 		if(c == -1) return;
-		//const Vec& pos = m_positions[m_tree[c].data];
 		const Vec& pos = m_positions[c];
 		float hyperPlaneDist = refPosition[m_tree[c].splitDim] - pos[m_tree[c].splitDim];
 		float cDistSq = lensq(refPosition - pos);
