@@ -5,20 +5,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using gui.Dll;
 using gui.Model;
 using gui.View;
 
 namespace gui.Command
 {
-    class PerformIterationsDialogCommand : ICommand
+    class PerformNIterationsCommand : ICommand
     {
         private readonly Models m_models;
 
-        public PerformIterationsDialogCommand(Models models)
+        public PerformNIterationsCommand(Models models)
         {
             m_models = models;
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
+            m_models.Toolbar.PropertyChanged += IterationsOnPropertyChanged;
         }
 
         private void ModelsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
@@ -33,20 +35,21 @@ namespace gui.Command
                 OnCanExecuteChanged();
         }
 
+        private void IterationsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        {
+            if (sender == m_models.Toolbar && args.PropertyName == nameof(Models.Toolbar.Iterations))
+                OnCanExecuteChanged();
+        }
+
         public bool CanExecute(object parameter)
         {
-            return m_models.World != null && !m_models.Renderer.IsRendering;
+            return m_models.World != null && !m_models.Renderer.IsRendering
+                && m_models.Toolbar.Iterations.HasValue;
         }
 
         public void Execute(object parameter)
         {
-            IterateNDialog dialog = new IterateNDialog(m_models.Settings.LastNIterationCommand);
-            if(dialog.ShowDialog() == true)
-            {
-                uint newIterCount = dialog.Iterations;
-                m_models.Settings.LastNIterationCommand = newIterCount;
-                m_models.Renderer.Iterate(newIterCount);
-            }
+            m_models.Renderer.Iterate(m_models.Toolbar.Iterations.Value);
         }
 
         public event EventHandler CanExecuteChanged;

@@ -32,6 +32,18 @@ namespace gui.Model
             }
         }
 
+        private uint? m_iterations = null;
+        public uint? Iterations
+        {
+            get => m_iterations;
+            set
+            {
+                if (m_iterations == value) return;
+                m_iterations = value;
+                OnPropertyChanged(nameof(Iterations));
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
