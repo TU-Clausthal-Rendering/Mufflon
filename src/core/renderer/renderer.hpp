@@ -121,7 +121,6 @@ public:
 	// Gets called after the renderer reset is executed, ie. after
 	// the new descriptor has been fetched
 	void clear_reset() {
-		logWarning("Reset events: ", to_string(m_lastReset));
 		this->post_reset();
 		m_lastReset = {};
 	}
