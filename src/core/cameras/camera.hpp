@@ -93,15 +93,25 @@ public:
 			up.x, up.y, up.z,
 			direction.x, direction.y, direction.z
 		};
+		m_isDirty = true;
 	}
 	const scene::Point& get_position(const u32 pathIndex) const noexcept { return m_position[pathIndex]; }
-	void set_position(const scene::Point position, const u32 pathIndex) noexcept { m_position[pathIndex] = position; }
+	void set_position(const scene::Point position, const u32 pathIndex) noexcept {
+		m_position[pathIndex] = position;
+		m_isDirty = true;
+	}
 	// The near clipping distance (plane)
 	float get_near() const noexcept { return m_near; }
-	void set_near(float n) noexcept { m_near = n; }
+	void set_near(float n) noexcept {
+		m_near = n;
+		m_isDirty = true;
+	}
 	// The far clipping distance (plane)
 	float get_far() const noexcept { return m_far; }
-	void set_far(float n) noexcept { m_far = n; }
+	void set_far(float n) noexcept {
+		m_far = n;
+		m_isDirty = true;
+	}
 
 	/*
 	 * Translate the camera along its axis. To be used for interactive cameras
@@ -113,22 +123,29 @@ public:
 		m_position[pathIndex] += leftRight * get_x_dir(pathIndex)
 					+ upDown * get_up_dir(pathIndex)
 					+ forBack * get_view_dir(pathIndex);
+		m_isDirty = true;
 	}
 
 	// Rotate around the x-axis.
 	void rotate_up_down(Radians a, const u32 pathIndex) noexcept {
 		m_viewSpace[pathIndex] = ei::rotationX(a) * m_viewSpace[pathIndex];
+		m_isDirty = true;
 	}
 	// Rotate around the up direction (y-axis).
 	void rotate_left_right(Radians a, const u32 pathIndex) noexcept {
 		m_viewSpace[pathIndex] = m_viewSpace[pathIndex] * ei::rotationY(a);
+		m_isDirty = true;
 	}
 	// Rotate around the view direction (z-axis).
 	void roll(Radians a, const u32 pathIndex) noexcept {
 		m_viewSpace[pathIndex] = ei::rotationZ(a) * m_viewSpace[pathIndex];
+		m_isDirty = true;
 	}
 
 	CameraModel get_model() const noexcept { return m_model; }
+
+	bool is_dirty() const noexcept { return m_isDirty; }
+	void mark_clean() noexcept { m_isDirty = false; }
 
 	/*
 	 * Interface to obtain the architecture independent parameters required for sampling
@@ -146,6 +163,7 @@ protected:
 	std::vector<scene::Point> m_position;	// The central position for any projection
 	float m_near {1e-10f};					// Optional near clipping distance
 	float m_far {1e10f};					// Optional far clipping distance
+	bool m_isDirty = true;
 private:
 	std::string m_name;
 	CameraModel m_model;

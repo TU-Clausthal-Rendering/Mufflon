@@ -345,6 +345,12 @@ namespace gui.Model
             set => Settings.Default.InvertCameraControls = value;
         }
 
+        public uint LastNIterationCommand
+        {
+            get => Settings.Default.LastNIterationCommand;
+            set => Settings.Default.LastNIterationCommand = value;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

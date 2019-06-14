@@ -23,7 +23,10 @@ public:
 	{}
 
 	Radians get_vertical_fov() const noexcept { return m_vFov; }
-	void set_vertical_fov(Radians fov) noexcept { m_vFov = fov; m_tanVFov = std::tan(fov / 2); }
+	void set_vertical_fov(Radians fov) noexcept {
+		m_vFov = fov; m_tanVFov = std::tan(fov / 2);
+		m_isDirty = true;
+	}
 
 	// Get the parameter bundle
 	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution, const u32 pathIndex) const final;

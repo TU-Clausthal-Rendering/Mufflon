@@ -139,10 +139,18 @@ public:
 	// Updates (read replaces) the envmap light only
 	void set_envLight(Background& envLight) {
 		m_envLight = &envLight;
+		m_backgroundDirty = true;
 	}
 
 	const Background* get_envLight() const noexcept {
 		return m_envLight;
+	}
+
+	// Marks the background as "dirty" (which will determine whether it needs to be replaced by
+	// the world container, not whether e.g. the texture needs to be synchronized); this gets
+	// reset upon synchronize
+	bool is_background_dirty() const noexcept {
+		return m_backgroundDirty;
 	}
 
 	// Determines for each point- and spotlight in what medium it is
@@ -191,6 +199,8 @@ private:
 	GenericResource m_treeMemory;
 	// Environment light model, may be black, a texture or an analytic model
 	lights::Background* m_envLight{ nullptr };
+
+	bool m_backgroundDirty = true;
 };
 
 }} // namespace scene::lights

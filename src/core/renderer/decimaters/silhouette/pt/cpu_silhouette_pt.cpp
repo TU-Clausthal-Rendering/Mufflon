@@ -38,8 +38,11 @@ CpuShadowSilhouettesPT::CpuShadowSilhouettesPT()
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
-void CpuShadowSilhouettesPT::on_scene_load() {
-	if(m_currentDecimationIteration != 0u) {
+void CpuShadowSilhouettesPT::pre_reset() {
+	if((get_reset_event() & ResetEvent::CAMERA) != ResetEvent::NONE || this->resolution_changed())
+		init_rngs(m_outputBuffer.get_num_pixels());
+
+	if((get_reset_event() & ResetEvent::SCENARIO) != ResetEvent::NONE && m_currentDecimationIteration != 0u) {
 		// At least activate the created LoDs
 		for(auto& obj : m_currentScene->get_objects()) {
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
@@ -47,9 +50,16 @@ void CpuShadowSilhouettesPT::on_scene_load() {
 			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 		}
 	}
+
+	// Initialize the decimaters
+	// TODO: how to deal with instancing
+	if(m_currentDecimationIteration == 0u)
+		this->initialize_decimaters();
+	
+	RendererBase<Device::CPU>::pre_reset();
 }
 
-void CpuShadowSilhouettesPT::on_scene_unload() {
+void CpuShadowSilhouettesPT::on_world_clearing() {
 	m_decimaters.clear();
 	m_currentDecimationIteration = 0u;
 }
@@ -59,7 +69,7 @@ void CpuShadowSilhouettesPT::post_iteration(OutputHandler& outputBuffer) {
 		// Finalize the decimation process
 		logInfo("Finished decimation process");
 		++m_currentDecimationIteration;
-		m_reset = true;
+		this->on_manual_reset();
 
 		// Fix up all other scenarios too (TODO: not a wise choice to do so indiscriminately...)
 		for(std::size_t i = 0u; i < scene::WorldContainer::instance().get_scenario_count(); ++i) {
@@ -82,19 +92,10 @@ void CpuShadowSilhouettesPT::post_iteration(OutputHandler& outputBuffer) {
 				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
 
 		m_currentScene->clear_accel_structure();
-		m_reset = true;
+		this->on_manual_reset();
 		++m_currentDecimationIteration;
 	}
 	RendererBase<Device::CPU>::post_iteration(outputBuffer);
-}
-
-void CpuShadowSilhouettesPT::pre_descriptor_requery() {
-	init_rngs(m_outputBuffer.get_num_pixels());
-
-	// Initialize the decimaters
-	// TODO: how to deal with instancing
-	if(m_currentDecimationIteration == 0u)
-		this->initialize_decimaters();
 }
 
 void CpuShadowSilhouettesPT::iterate() {

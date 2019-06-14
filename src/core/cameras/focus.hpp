@@ -35,10 +35,22 @@ public:
 	float get_lens_radius() const noexcept { return m_lensRadius; }
 	float get_sensor_height() const noexcept { return m_sensorHeight; }
 	float get_vertical_fov() const noexcept { return m_vFov; }
-	void set_focus_distance(float distance) noexcept { m_focusDistance = distance; }
-	void set_focal_length(float length) noexcept { m_focalLength = length; }
-	void set_lens_radius(float radius) noexcept { m_lensRadius = radius; }
-	void set_sensor_height(float height) noexcept { m_sensorHeight = height; }
+	void set_focus_distance(float distance) noexcept {
+		m_focusDistance = distance;
+		m_isDirty = true;
+	}
+	void set_focal_length(float length) noexcept {
+		m_focalLength = length;
+		m_isDirty = true;
+	}
+	void set_lens_radius(float radius) noexcept {
+		m_lensRadius = radius;
+		m_isDirty = true;
+	}
+	void set_sensor_height(float height) noexcept {
+		m_sensorHeight = height;
+		m_isDirty = true;
+	}
 
 	// Get the parameter bundle
 	void get_parameter_pack(CameraParams* outBuffer, const Pixel& resolution, const u32 pathIndex) const final;

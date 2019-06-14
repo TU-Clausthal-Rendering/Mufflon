@@ -28,7 +28,7 @@ public:
 	StringView get_name() const noexcept final { return get_name_static(); }
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
-	void post_descriptor_requery() final;
+	void post_reset() final;
 
 private:
 	WireframeParameters m_params = {};

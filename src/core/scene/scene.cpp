@@ -342,10 +342,8 @@ void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 }
 
 void Scene::set_background(lights::Background& envLight) {
-	if(&envLight != m_lightTree.get_envLight()) {
-		m_lightTree.set_envLight(envLight);
-		m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });
-	}
+	m_lightTree.set_envLight(envLight);
+	m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });
 }
 
 ConstCameraHandle Scene::get_camera() const noexcept {

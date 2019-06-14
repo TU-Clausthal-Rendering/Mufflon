@@ -17,17 +17,16 @@ RendererBase<Device::OPENGL>::RendererBase() {}
 
 template < Device dev >
 bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
-	m_outputBuffer = outputBuffer.begin_iteration<dev>(m_reset);
+	const bool needsReset = get_reset_event() != ResetEvent::NONE;
+	m_outputBuffer = outputBuffer.begin_iteration<dev>(needsReset);
 	m_currentIteration = outputBuffer.get_current_iteration();
-	if(m_reset) {
+	if(needsReset) {
+		this->pre_reset();
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
-		this->pre_descriptor_requery();
 		auto desc = m_currentScene->get_descriptor<dev>({}, {}, {});
 		copy(m_sceneDesc.get(), &desc, sizeof(desc));
-		this->post_descriptor_requery();
-		this->on_reset();
-		m_reset = false;
+		this->clear_reset();
 		return true;
 	}
 	return false;
@@ -35,16 +34,15 @@ bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 
 template <>
 bool RendererBase<Device::CPU>::pre_iteration(OutputHandler& outputBuffer) {
-	m_outputBuffer = outputBuffer.begin_iteration<Device::CPU>(m_reset);
+	const bool needsReset = get_reset_event() != ResetEvent::NONE;
+	m_outputBuffer = outputBuffer.begin_iteration<Device::CPU>(needsReset);
 	m_currentIteration = outputBuffer.get_current_iteration();
-	if(m_reset) {
+	if(needsReset) {
+		this->pre_reset();
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
-		this->pre_descriptor_requery();
 		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {});
-		this->post_descriptor_requery();
-		this->on_reset();
-		m_reset = false;
+		this->clear_reset();
 		return true;
 	}
 	return false;
@@ -52,16 +50,16 @@ bool RendererBase<Device::CPU>::pre_iteration(OutputHandler& outputBuffer) {
 
 template <>
 bool RendererBase<Device::OPENGL>::pre_iteration(OutputHandler& outputBuffer) {
-	m_outputBuffer = outputBuffer.begin_iteration<Device::OPENGL>(m_reset);
+	const bool needsReset = get_reset_event() != ResetEvent::NONE;
+	m_outputBuffer = outputBuffer.begin_iteration<Device::OPENGL>(needsReset);
 	m_currentIteration = outputBuffer.get_current_iteration();
-	if (m_reset) {
+	if (needsReset) {
+		this->pre_reset();
 		if (m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
 		m_sceneDesc = m_currentScene->get_descriptor<Device::OPENGL>({}, {}, {});
 		m_outputTargets = outputBuffer.get_target();
-	    this->post_descriptor_requery();
-		this->on_reset();
-		m_reset = false;
+		this->clear_reset();
 		return true;
 	}
 	return false;

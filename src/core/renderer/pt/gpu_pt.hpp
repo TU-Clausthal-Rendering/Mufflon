@@ -27,8 +27,7 @@ public:
 	static constexpr StringView get_short_name_static() noexcept { return "PT"; }
 	StringView get_name() const noexcept final { return get_name_static(); }
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
-	void on_reset() final;
-	void post_descriptor_requery() final;
+	void post_reset() final;
 
 private:
 	PtParameters m_params;

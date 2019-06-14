@@ -178,11 +178,13 @@ void CpuVcm::iterate() {
 	}
 }
 
-void CpuVcm::on_reset() {
+void CpuVcm::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
-	m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
-	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
-	m_pathEndPoints.resize(m_outputBuffer.get_num_pixels());
+	if(resolution_changed()) {
+		m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
+		m_photonMap = m_photonMapManager.acquire<Device::CPU>();
+		m_pathEndPoints.resize(m_outputBuffer.get_num_pixels());
+	}
 }
 
 void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {

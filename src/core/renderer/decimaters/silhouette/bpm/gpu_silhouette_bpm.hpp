@@ -29,10 +29,9 @@ public:
 	StringView get_name() const noexcept final { return get_name_static(); }
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
-	void pre_descriptor_requery() final;
+	void pre_reset() final;
+	void on_world_clearing() final;
 	void post_iteration(OutputHandler& outputBuffer) final;
-	void on_scene_load() final;
-	void on_scene_unload() final;
 
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.

@@ -10,7 +10,7 @@ namespace mufflon::renderer {
 
 using PtPathVertex = PathVertex<VertexExtension>;
 
-void CpuWireframe::post_descriptor_requery() {
+void CpuWireframe::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 }
 

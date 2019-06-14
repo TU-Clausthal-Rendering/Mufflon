@@ -105,6 +105,7 @@
     <Compile Include="Command\EnterFreeFlightMode.cs" />
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\PerformIterationsCommand.cs" />
+    <Compile Include="Command\PerformNIterationsCommand.cs" />
     <Compile Include="Command\ResetCameraCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
     <Compile Include="Command\ScreenShotCommand.cs" />
@@ -525,10 +526,6 @@
     <Resource Include="Icons\logo1.ico" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Icons\iterate_ten.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Icons\iterate_hundred.png" />
     <Resource Include="Icons\iterate_one.png" />
   </ItemGroup>
   <ItemGroup>
@@ -548,6 +545,9 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\flight.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\iterate_n.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

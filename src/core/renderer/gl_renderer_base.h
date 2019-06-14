@@ -24,7 +24,7 @@ public:
 	virtual ~GlRendererBase() = default;
 
     // reload textures with appropriate size
-    void on_reset() override;
+    void post_reset() override;
 protected:
 	struct CameraTransforms {
 		ei::Mat4x4 viewProj;

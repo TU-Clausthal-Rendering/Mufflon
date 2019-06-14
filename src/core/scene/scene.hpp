@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "instance.hpp"
 #include "handles.hpp"
@@ -74,6 +74,10 @@ public:
 	template < Device dev >
 	bool is_accel_dirty() const noexcept {
 		return m_accelStruct[get_device_index<dev>()].type == accel_struct::AccelType::NONE;
+	}
+
+	void mark_lights_dirty() {
+		m_lightTree.unload<Device::CPU>();
 	}
 
 	// Checks whether the scene currently has a BVH.

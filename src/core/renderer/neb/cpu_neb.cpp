@@ -666,7 +666,7 @@ void CpuNextEventBacktracking::iterate() {
 #endif
 }
 
-void CpuNextEventBacktracking::on_reset() {
+void CpuNextEventBacktracking::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 	//int countHeuristic = m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * 2; // Save count
 	int countHeuristic = m_outputBuffer.get_num_pixels() * ei::ceil(logf(float(m_params.maxPathLength)) * 4.0f);

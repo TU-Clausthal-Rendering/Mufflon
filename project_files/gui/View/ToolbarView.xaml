@@ -4,9 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:gui.View"
+             xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d"
              d:DesignStyle="{StaticResource DesignerStyle}"
-             d:DesignHeight="30" d:DesignWidth="295">
+             d:DesignHeight="30" d:DesignWidth="320">
     <UserControl.Resources>
         <Style TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -66,13 +67,13 @@
                 ToolTip="Advance rendering by one iteration">
             <Image Source="../Icons/iterate_one.png"/>
         </Button>
-        <Button Command="{Binding TenIterationsCommand}"
-                ToolTip="Advance rendering by ten iterations">
-            <Image Source="../Icons/iterate_ten.png"/>
-        </Button>
-        <Button Command="{Binding HundredIterationsCommand}"
-                ToolTip="Advance rendering by one hundred iterations">
-            <Image Source="../Icons/iterate_hundred.png"/>
+        <helper:EnterTextBox Text="{Binding Iterations, NotifyOnValidationError=True}"
+                             Width="35"
+                             Validation.Error="OnValidationError"
+                             VerticalAlignment="Center"/>
+        <Button Command="{Binding NIterationsCommand}"
+                ToolTip="Advance rendering by n iterations">
+            <Image Source="../Icons/iterate_n.png"/>
         </Button>
     </StackPanel>
 </UserControl>

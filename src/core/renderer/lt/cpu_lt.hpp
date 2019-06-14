@@ -26,7 +26,7 @@ public:
 	StringView get_name() const noexcept final { return get_name_static(); }
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
-	void on_reset() final;
+	void post_reset() final;
 
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
