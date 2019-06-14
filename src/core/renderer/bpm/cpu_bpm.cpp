@@ -162,7 +162,7 @@ void CpuBidirPhotonMapper::iterate() {
 	}
 }
 
-void CpuBidirPhotonMapper::on_reset() {
+void CpuBidirPhotonMapper::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 	// Initilize one of two data structures and remove the other one
 	if(m_params.knn == 0) {

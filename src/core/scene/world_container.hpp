@@ -8,6 +8,7 @@
 #include "lights/background.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
+#include "core/renderer/renderer.hpp"
 #include "util/indexed_string_map.hpp"
 #include "core/scene/materials/medium.hpp"
 #include <map>
@@ -146,7 +147,7 @@ public:
 	StringView get_light_name(u32 index, lights::LightType type) const;
 	void set_light_name(u32 index, lights::LightType type, StringView name);
 	// Functions for dirtying cameras and lights
-	void mark_light_dirty(u32 index, lights::LightType type);
+	bool mark_light_dirty(u32 index, lights::LightType type);
 
 	// Add new textures to the scene
 	bool has_texture(StringView name) const;
@@ -166,9 +167,9 @@ public:
 	 * This destroys the currently loaded scene and overwrites it with a new one.
 	 * Returns nullptr if something goes wrong.
 	 */
-	SceneHandle load_scene(ScenarioHandle hdl);
+	SceneHandle load_scene(ScenarioHandle hdl, renderer::IRenderer* renderer);
 	// Reloads the scene from the current scenario if necessary
-	bool reload_scene();
+	void reload_scene(renderer::IRenderer* renderer);
 
 	// Returns the currently loaded scene, if present
 	SceneHandle get_current_scene() {
@@ -182,7 +183,7 @@ public:
 
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
-	void set_frame_current(const u32 frameCurrent);
+	bool set_frame_current(const u32 frameCurrent);
 
 	// Performs a sanity check on the current world - has lights, cameras etc.
 	Sanity is_sane_world() const;
@@ -220,7 +221,7 @@ private:
 	WorldContainer& operator=(WorldContainer&&) = default;
 	~WorldContainer() = default;
 
-	SceneHandle load_scene(Scenario& scenario);
+	SceneHandle load_scene(Scenario& scenario, renderer::IRenderer* renderer);
 	bool load_scene_lights();
 
 	// Global container object for everything

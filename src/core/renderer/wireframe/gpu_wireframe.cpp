@@ -21,9 +21,11 @@ GpuWireframe::GpuWireframe () :
 	//m_rng{ static_cast<u32>(std::random_device{}()) }
 {}
 
-void GpuWireframe::on_descriptor_requery() {
-	m_seeds = std::make_unique<u32[]>(m_outputBuffer.get_num_pixels());
-	m_seedsPtr = make_udevptr_array<Device::CUDA, u32>(m_outputBuffer.get_num_pixels());
+void GpuWireframe::post_reset() {
+	if(resolution_changed()) {
+		m_seeds = std::make_unique<u32[]>(m_outputBuffer.get_num_pixels());
+		m_seedsPtr = make_udevptr_array<Device::CUDA, u32>(m_outputBuffer.get_num_pixels());
+	}
 }
 
 void GpuWireframe::iterate() {

@@ -77,12 +77,8 @@ GlForward::GlForward() :
 	m_spherePipe.topology = gl::PrimitiveTopology::Points;
 }
 
-void GlForward::on_descriptor_requery() {
-
-}
-
-void GlForward::on_reset() {
-	GlRendererBase::on_reset();
+void GlForward::post_reset() {
+	GlRendererBase::post_reset();
 
 	m_trianglePipe.framebuffer = m_framebuffer;
 	m_quadPipe.framebuffer = m_framebuffer;

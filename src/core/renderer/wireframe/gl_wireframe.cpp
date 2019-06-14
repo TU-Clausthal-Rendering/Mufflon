@@ -110,8 +110,8 @@ GlWireframe::GlWireframe() :
 	m_sphereDepthPipe.topology = gl::PrimitiveTopology::Points;
 }
 
-void GlWireframe::on_reset() {
-	GlRendererBase::on_reset();
+void GlWireframe::post_reset() {
+	GlRendererBase::post_reset();
     // set framebuffer
 	m_trianglePipe.framebuffer = m_framebuffer;
 	m_quadPipe.framebuffer = m_framebuffer;

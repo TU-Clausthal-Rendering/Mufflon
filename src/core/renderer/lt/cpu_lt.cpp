@@ -23,7 +23,7 @@ void CpuLightTracer::iterate() {
 	}
 }
 
-void CpuLightTracer::on_reset() {
+void CpuLightTracer::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 	logInfo("[CpuLightTracer] Params: path length in [", m_params.minPathLength, ", ",
 		m_params.maxPathLength, "]");
