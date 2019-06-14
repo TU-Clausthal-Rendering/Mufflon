@@ -1185,8 +1185,9 @@ void world_clear_all() {
 	TRY
 	auto iterLock = std::scoped_lock(s_iterationMutex);
 	auto screenLock = std::scoped_lock(s_screenTextureMutex);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_world_clearing();
+	for(std::size_t i = 0u; i < s_renderers.size(); ++i)
+		for(auto& renderer : s_renderers.get(i))
+			renderer->on_world_clearing();
 	WorldContainer::clear_instance();
 	s_imageOutput.reset();
 	s_screenTexture.reset();
@@ -2377,8 +2378,10 @@ Boolean world_set_frame_current(const uint32_t animationFrame) {
 	const u32 oldFrame = s_world.get_frame_current();
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->on_animation_frame_changing(oldFrame, animationFrame);
-	if(s_world.set_frame_current(animationFrame) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_animation_frame_changed(oldFrame, animationFrame);
+	if(s_world.set_frame_current(animationFrame))
+		for(std::size_t i = 0u; i < s_renderers.size(); ++i)
+			for(auto& renderer : s_renderers.get(i))
+				renderer->on_animation_frame_changed(oldFrame, animationFrame);
 	return true;
 	CATCH_ALL(false)
 }
