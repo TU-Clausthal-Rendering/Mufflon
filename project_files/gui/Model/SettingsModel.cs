@@ -339,6 +339,18 @@ namespace gui.Model
             set => Settings.Default.AllowCameraMovement = value;
         }
 
+        public bool InvertCameraControls
+        {
+            get => Settings.Default.InvertCameraControls;
+            set => Settings.Default.InvertCameraControls = value;
+        }
+
+        public uint LastNIterationCommand
+        {
+            get => Settings.Default.LastNIterationCommand;
+            set => Settings.Default.LastNIterationCommand = value;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

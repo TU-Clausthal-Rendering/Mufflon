@@ -23,9 +23,9 @@ namespace gui.ViewModel
             SaveScreenShotCommand = new ScreenShotCommand(models);
             ToggleCameraMovementCommand = new ActionCommand(() =>
                 models.Settings.AllowCameraMovement = !models.Settings.AllowCameraMovement);
+            EnterFreeFlightMode = new EnterFreeFlightMode(models);
             OneIterationCommand = new PerformIterationsCommand(m_models, 1u);
-            TenIterationsCommand = new PerformIterationsCommand(m_models, 10u);
-            HundredIterationsCommand = new PerformIterationsCommand(m_models, 100u);
+            NIterationsCommand = new PerformNIterationsCommand(m_models);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
@@ -52,6 +52,17 @@ namespace gui.ViewModel
             }
         }
 
+        public uint? Iterations
+        {
+            get => m_models.Toolbar.Iterations;
+            set
+            {
+                m_models.Toolbar.Iterations = value;
+                if (m_models.Toolbar.Iterations.HasValue)
+                    m_models.Settings.LastNIterationCommand = m_models.Toolbar.Iterations.Value;
+            }
+        }
+
         public Visibility PlayIconVisibility =>
             m_models.Renderer.IsRendering ? Visibility.Collapsed : Visibility.Visible;
 
@@ -65,9 +76,9 @@ namespace gui.ViewModel
         public ICommand ResetCommand { get; }
         public ICommand SaveScreenShotCommand { get; }
         public ICommand ToggleCameraMovementCommand { get; }
+        public ICommand EnterFreeFlightMode { get; }
         public ICommand OneIterationCommand { get; }
-        public ICommand TenIterationsCommand { get; }
-        public ICommand HundredIterationsCommand { get; }
+        public ICommand NIterationsCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

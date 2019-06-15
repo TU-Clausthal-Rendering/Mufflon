@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <climits>
+#include <ostream>
 #include <string>
+#include <stdexcept>
 
 namespace mufflon {
 

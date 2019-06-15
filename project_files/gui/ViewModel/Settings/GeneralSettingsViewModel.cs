@@ -48,6 +48,7 @@ namespace gui.ViewModel.Settings
             SelectedLoaderProfilerLevel = LoaderProfilerLevels.First(level => level.Cargo == s.LoaderProfileLevel);
 
             ScreenshotFolder = s.ScreenshotFolder;
+            InvertCameraControls = s.InvertCameraControls;
             SelectedScreenshotNamePattern = s.ScreenshotNamePattern;
             MaxConsoleMessages = s.MaxConsoleMessages;
         }
@@ -60,6 +61,7 @@ namespace gui.ViewModel.Settings
             s.LoaderProfileLevel = SelectedLoaderProfilerLevel.Cargo;
             s.ScreenshotNamePattern = SelectedScreenshotNamePattern;
             s.ScreenshotFolder = ScreenshotFolder;
+            s.InvertCameraControls = InvertCameraControls;
             s.MaxConsoleMessages = MaxConsoleMessages;
             // TODO history?
         }
@@ -95,6 +97,8 @@ namespace gui.ViewModel.Settings
         public string SelectedScreenshotNamePattern { get; set; }
 
         public int MaxConsoleMessages { get; set; }
+
+        public bool InvertCameraControls { get; set; }
 
         // the history should always be saved
         // TODO update this after selection change

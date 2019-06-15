@@ -24,5 +24,10 @@ namespace gui.View
         {
             InitializeComponent();
         }
+
+        private void OnValidationError(object sender, ValidationErrorEventArgs e)
+        {
+            (DataContext as ViewModel.ToolbarViewModel).Iterations = null;
+        }
     }
 }

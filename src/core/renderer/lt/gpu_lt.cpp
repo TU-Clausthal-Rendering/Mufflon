@@ -29,14 +29,11 @@ void GpuLightTracer::iterate() {
 												m_sceneDesc.get(), m_rngs.get(), m_params));
 }
 
-void GpuLightTracer::on_reset() {
+void GpuLightTracer::post_reset() {
+	if(!m_rngs || m_rngs.get_deleter().get_size() != static_cast<std::size_t>(m_outputBuffer.get_num_pixels()))
+		m_rngs = make_udevptr_array<Device::CUDA, math::Rng, false>(m_outputBuffer.get_num_pixels());
 	int seed = m_params.seed * (m_outputBuffer.get_num_pixels() + 1);
 	gpult_detail::init_rngs(m_outputBuffer.get_num_pixels(), seed, m_rngs.get());
-}
-
-void GpuLightTracer::on_descriptor_requery() {
-	if(!m_rngs || (m_rngs.get_deleter().get_size() != static_cast<std::size_t>(m_outputBuffer.get_num_pixels())))
-		m_rngs = make_udevptr_array<Device::CUDA, math::Rng, false>(m_outputBuffer.get_num_pixels());
 }
 
 } // namespace mufflon::renderer

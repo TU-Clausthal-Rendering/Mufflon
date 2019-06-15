@@ -160,7 +160,7 @@ void CpuBidirPathTracer::iterate() {
 	}
 }
 
-void CpuBidirPathTracer::on_reset() {
+void CpuBidirPathTracer::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
 }
 

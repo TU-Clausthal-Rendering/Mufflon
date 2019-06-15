@@ -4,6 +4,7 @@ using gui.Utility;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -29,6 +30,7 @@ namespace gui.Controller.Renderer
         private UIElement m_referenceElement;
         private BitArray m_keyWasPressed = new BitArray(Enum.GetNames(typeof(ScanCodes)).Length);
         private Point m_lastMousePosition;
+        private bool m_repositioningCursor = false;
 
         public RendererCameraController(Models models, UIElement referenceElement) {
             m_models = models;
@@ -39,6 +41,7 @@ namespace gui.Controller.Renderer
             referenceElement.MouseMove += OnMouseMoveHandler;
             referenceElement.MouseWheel += OnMouseWheel;
             m_models.RendererCamera.OnMove += OnCameraMove;
+            m_models.RendererCamera.PropertyChanged += OnFlightModeChanged;
         }
 
         public Vec2<float> MouseDrag { get; private set; }
@@ -76,16 +79,31 @@ namespace gui.Controller.Renderer
         {
             if (e.LeftButton == MouseButtonState.Pressed) {
                 m_referenceElement.Focus();
-                m_lastMousePosition = e.MouseDevice.GetPosition(m_referenceElement);
+                if(m_models.RendererCamera.FreeFlightEnabled)
+                    m_models.RendererCamera.FreeFlightEnabled = false;
+                else
+                    m_lastMousePosition = e.MouseDevice.GetPosition(m_referenceElement);
             }
         }
 
         private void OnMouseMoveHandler(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed) {
+            if (m_repositioningCursor)
+            {
+                // Since we set the mouse cursor manually to the center the event gets fired (delayed)
+                // even though we don't want to move, but this gives us the perfect oportunity to update
+                // the last position without whacky hacks
+                m_repositioningCursor = false;
+                m_lastMousePosition = e.MouseDevice.GetPosition(m_referenceElement);
+                return;
+            }
+
+            if (e.LeftButton == MouseButtonState.Pressed || m_models.RendererCamera.FreeFlightEnabled) {
                 Point currPos = e.MouseDevice.GetPosition(m_referenceElement);
                 m_models.RendererCamera.MouseOffset += currPos - m_lastMousePosition;
                 m_lastMousePosition = currPos;
+                if (m_models.RendererCamera.FreeFlightEnabled)
+                    SetCursorToRenderCanvasCenter();
             }
         }
 
@@ -112,10 +130,41 @@ namespace gui.Controller.Renderer
 
             // Check if the camera turned
             if (m_models.RendererCamera.MouseOffset.X != 0f || m_models.RendererCamera.MouseOffset.Y != 0f) {
-                Vec2<float> mouseOffset = new Vec2<float>((float)m_models.RendererCamera.MouseOffset.Y * m_models.RendererCamera.MouseSpeed,
-                                                          -(float)m_models.RendererCamera.MouseOffset.X * m_models.RendererCamera.MouseSpeed);
+                float factor = 1f;
+                if (m_models.Settings.InvertCameraControls && !m_models.RendererCamera.FreeFlightEnabled)
+                    factor = -1f;
+                Vec2<float> mouseOffset = new Vec2<float>(factor * -(float)m_models.RendererCamera.MouseOffset.Y * m_models.RendererCamera.MouseSpeed,
+                                                          factor * (float)m_models.RendererCamera.MouseOffset.X * m_models.RendererCamera.MouseSpeed);
                 m_models.World.CurrentScenario.Camera.Rotate(mouseOffset);
             }
+        }
+
+        private void OnFlightModeChanged(object sender, PropertyChangedEventArgs args)
+        {
+            if(args.PropertyName == nameof(Model.Display.RenderCameraModel.FreeFlightEnabled))
+            {
+                if (m_models.RendererCamera.FreeFlightEnabled)
+                {
+                    Mouse.OverrideCursor = Cursors.None;
+                    SetCursorToRenderCanvasCenter();
+                    // If we don't manually focus the canvas we won't be able to use the keyboard to move
+                    m_referenceElement.Focus();
+                }
+                else
+                {
+                    Mouse.OverrideCursor = null;
+                }
+            }
+        }
+
+        private void SetCursorToRenderCanvasCenter()
+        {
+            // Tell our handler that we should ignore this event
+            m_repositioningCursor = true;
+            var localCenter = new Point(m_models.App.Window.RenderDisplay.RenderCanvas.ActualWidth / 2.0,
+                m_models.App.Window.RenderDisplay.RenderCanvas.ActualHeight / 2.0);
+            var screenCenter = m_models.App.Window.RenderDisplay.RenderCanvas.PointToScreen(localCenter);
+            System.Windows.Forms.Cursor.Position = new System.Drawing.Point((int)screenCenter.X, (int)screenCenter.Y);
         }
     }
 }

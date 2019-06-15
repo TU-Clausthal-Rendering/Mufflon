@@ -407,6 +407,9 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 template < Device dev >
 void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
+	// Background is no longer outdated
+	m_backgroundDirty = false;
+
 	// We never change the light tree on another device aside from the CPU
 	if(dev == Device::CUDA && !m_treeCuda) {
 		if(!m_treeCpu)

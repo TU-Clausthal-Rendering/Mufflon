@@ -35,43 +35,46 @@ GlRendererBase::GlRendererBase(bool useDepth, bool useStencil) {
 	}
 }
 
-void GlRendererBase::on_reset() {
-	// create requested color targets
-	uint32_t curTarget = 0;
-    for(auto t : OutputValue::iterator) {
-        //if(t & m_outputTargets) {
+void GlRendererBase::post_reset() {
+	// Check if the resolution might have changed
+	if(this->resolution_changed() || !m_framebuffer) {
+		// create requested color targets
+		uint32_t curTarget = 0;
+		for(auto t : OutputValue::iterator) {
+			//if(t & m_outputTargets) {
 			glGenTextures(1, &m_colorTargets[curTarget]);
 			glBindTexture(GL_TEXTURE_2D, m_colorTargets[curTarget]);
 			glTextureStorage2D(m_colorTargets[curTarget], 1, GL_RGBA32F, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-        //}
-		curTarget++;
-    }
+			//}
+			curTarget++;
+		}
 
-    // additional depth/stencil attachment
-    if(m_depthStencilFormat) {
-		glGenTextures(1, &m_depthTarget);
-		glBindTexture(GL_TEXTURE_2D, m_depthTarget);
-		glTextureStorage2D(m_depthTarget, 1, m_depthStencilFormat, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-    }
+		// additional depth/stencil attachment
+		if(m_depthStencilFormat) {
+			glGenTextures(1, &m_depthTarget);
+			glBindTexture(GL_TEXTURE_2D, m_depthTarget);
+			glTextureStorage2D(m_depthTarget, 1, m_depthStencilFormat, m_outputBuffer.get_width(), m_outputBuffer.get_height());
+		}
 
-    // framebuffer
-	glGenFramebuffers(1, &m_framebuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
-	curTarget = 0;
-	std::vector<GLenum> attachments;
-    for(auto t : OutputValue::iterator) {
-		//if(t & m_outputTargets) {
+		// framebuffer
+		glGenFramebuffers(1, &m_framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
+		curTarget = 0;
+		std::vector<GLenum> attachments;
+		for(auto t : OutputValue::iterator) {
+			//if(t & m_outputTargets) {
 			glNamedFramebufferTexture(m_framebuffer, GL_COLOR_ATTACHMENT0 + curTarget, m_colorTargets[curTarget], 0);
 			attachments.push_back(GL_COLOR_ATTACHMENT0 + curTarget);
-		//}
-		curTarget++;
-	}
-	if(m_depthStencilFormat)
-		glNamedFramebufferTexture(m_framebuffer, m_depthAttachmentType, m_depthTarget, 0);
+			//}
+			curTarget++;
+		}
+		if(m_depthStencilFormat)
+			glNamedFramebufferTexture(m_framebuffer, m_depthAttachmentType, m_depthTarget, 0);
 
-	const auto fbStatus = glCheckNamedFramebufferStatus(m_framebuffer, GL_DRAW_FRAMEBUFFER);
-	mAssert(fbStatus == GL_FRAMEBUFFER_COMPLETE);
-	glNamedFramebufferDrawBuffers(m_framebuffer, GLsizei(attachments.size()), attachments.data());
+		const auto fbStatus = glCheckNamedFramebufferStatus(m_framebuffer, GL_DRAW_FRAMEBUFFER);
+		mAssert(fbStatus == GL_FRAMEBUFFER_COMPLETE);
+		glNamedFramebufferDrawBuffers(m_framebuffer, GLsizei(attachments.size()), attachments.data());
+	}
 }
 
 void GlRendererBase::begin_frame(ei::Vec4 clearColor) {

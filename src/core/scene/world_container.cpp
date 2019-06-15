@@ -22,13 +22,15 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
-void WorldContainer::set_frame_current(const u32 frameCurrent) {
+bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	const u32 newFrame = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent));
 	if(newFrame != m_frameCurrent) {
 		m_frameCurrent = newFrame;
 		// Delete the current scene to make it clear to everyone that it needs to be refetched
 		m_scene.reset();
+		return true;
 	}
+	return false;
 }
 
 WorldContainer::Sanity WorldContainer::is_sane_world() const {
@@ -271,7 +273,6 @@ CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<camera
 		return nullptr;
 	iter.first->second->set_name(iter.first->first);
 	m_cameraHandles.push_back(iter.first);
-	m_camerasDirty.emplace(iter.first->second.get(), true);
 	m_frameEnd = std::max(m_frameEnd, m_frameStart + iter.first->second->get_path_segment_count() - 1u);
 	return iter.first->second.get();
 }
@@ -511,45 +512,46 @@ void WorldContainer::set_light_name(u32 index, lights::LightType type, StringVie
 	}
 }
 
-void WorldContainer::mark_camera_dirty(ConstCameraHandle hdl) {
-	// TODO: put the mark-dirty on scenario/scene level (one for add/remove, one for touched)?
-	// We need one for the env-map for sure, because that operation takes long
-	if(hdl == nullptr)
-		return;
-	m_camerasDirty[hdl] = true;
-}
-
-void WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
+bool WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 	if(m_scenario != nullptr) {
 		switch(type) {
 			case lights::LightType::POINT_LIGHT:
 				// Check if the light is part of the active scenario/scene
-				if(std::find(m_scenario->get_point_lights().cbegin(), m_scenario->get_point_lights().cend(), index)
-				   != m_scenario->get_point_lights().cend())
-					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
+				if(m_scene != nullptr && std::find(m_scenario->get_point_lights().cbegin(), m_scenario->get_point_lights().cend(), index)
+				   != m_scenario->get_point_lights().cend()) {
+					m_scene->mark_lights_dirty(); // Doesn't matter what light, we need to rebuild the light tree
+					return true;
+				}
 				break;
 			case lights::LightType::SPOT_LIGHT:
 				// Check if the light is part of the active scenario/scene
 				if(std::find(m_scenario->get_spot_lights().cbegin(), m_scenario->get_spot_lights().cend(), index)
-				   != m_scenario->get_spot_lights().cend())
-					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
+				   != m_scenario->get_spot_lights().cend()) {
+					m_scene->mark_lights_dirty(); // Doesn't matter what light, we need to rebuild the light tree
+					return true;
+				}
 				break;
 			case lights::LightType::DIRECTIONAL_LIGHT:
 				// Check if the light is part of the active scenario/scene
 				if(std::find(m_scenario->get_dir_lights().cbegin(), m_scenario->get_dir_lights().cend(), index)
-				   != m_scenario->get_dir_lights().cend())
-					m_lightsDirty = true; // Doesn't matter what light, we need to rebuild the light tree
+				   != m_scenario->get_dir_lights().cend()) {
+					m_scene->mark_lights_dirty(); // Doesn't matter what light, we need to rebuild the light tree
+					return true;
+				}
 				break;
 			case lights::LightType::ENVMAP_LIGHT: {
 				// Check if the envmap is the current one
-				const lights::Background& background = m_envLights.get(m_scenario->get_background());
-				if(&background == &m_envLights.get(index))
-					m_envLightDirty = true;
+				lights::Background& background = m_envLights.get(m_scenario->get_background());
+				if(&background == &m_envLights.get(index)) {
+					m_scene->set_background(background);
+					return true;
+				}
 			}	break;
 			default:
 				logWarning("[WorldContainer::mark_light_dirty]: Ignoring unknown light type");
 		}
 	}
+	return false;
 }
 
 bool WorldContainer::has_texture(StringView name) const {
@@ -606,8 +608,10 @@ bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 	return true;
 }
 
-SceneHandle WorldContainer::load_scene(Scenario& scenario) {
+SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* renderer) {
 	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
+	if(renderer != nullptr)
+		renderer->on_scenario_changing();
 	m_scenario = &scenario;
 	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart);
 	// TODO: unload LoDs that are not needed anymore?
@@ -658,10 +662,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 				   "(Furthest point of the bounding box should not be further than "
 				   "2^20m away)");
 
-	// Everything is dirty if we load a new scene
-	m_lightsDirty = true;
-	m_envLightDirty = true;
-
 	// Load the lights
 	this->load_scene_lights();
 	// Make media available / resident
@@ -670,36 +670,38 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario) {
 
 	m_scenario->camera_dirty_reset();
 
+	if(renderer != nullptr)
+		renderer->on_scenario_changed(&scenario);
+
 	// Assign the newly created scene and destroy the old one?
 	return m_scene.get();
 }
 
-SceneHandle WorldContainer::load_scene(ScenarioHandle hdl) {
+SceneHandle WorldContainer::load_scene(ScenarioHandle hdl, renderer::IRenderer* renderer) {
 	mAssert(hdl != nullptr);
-	return load_scene(*hdl);
+	return load_scene(*hdl, renderer);
 }
 
-bool WorldContainer::reload_scene() {
+void WorldContainer::reload_scene(renderer::IRenderer* renderer) {
 	// There is always a scenario set
 	mAssert(m_scenario != nullptr);
 
 	// TODO: better differentiate what needs to be reloaded on animation change
 	if(m_scene == nullptr) {
-		(void) load_scene(*m_scenario);
-		return true;
+		(void) load_scene(*m_scenario, renderer);
+		return;
 	}
-	bool reloaded = this->load_scene_lights();
 
 	// TODO: dirty flag for media?
 	// TODO: dirty flag for materials?
 
 	// TODO: re-enable dirty flag for camera, but also pay attention to modifications
-	if(m_scenario->camera_dirty_reset() || m_camerasDirty[m_scenario->get_camera()]) {
+	if(m_scenario->camera_dirty_reset() || m_scenario->get_camera()->is_dirty()) {
+		renderer->on_camera_changing();
 		m_scene->set_camera(m_scenario->get_camera());
-		m_camerasDirty[m_scenario->get_camera()] = false;
-		reloaded = true;
+		m_scenario->get_camera()->mark_clean();
+		renderer->on_camera_changed();
 	}
-	return reloaded;
 }
 
 bool WorldContainer::load_scene_lights() {
@@ -710,7 +712,19 @@ bool WorldContainer::load_scene_lights() {
 	 */
 
 	bool reloaded = false;
-	if(m_lightsDirty || m_scenario->lights_dirty_reset() || !m_scene->get_light_tree_builder().is_resident<Device::CPU>()) {
+
+	// This needs to come first since setting the lights rebuilds the tree and marks the envmap as non-dirty
+	if(m_scene->get_light_tree_builder().is_background_dirty()
+	   || m_scenario->envmap_lights_dirty_reset()) {
+		reloaded = true;
+
+		// Find out what the active envmap light is
+		lights::Background& background = m_envLights.get(m_scenario->get_background());
+		m_scene->set_background(background);
+	}
+
+	if(!m_scene->get_light_tree_builder().is_resident<Device::CPU>() || m_scenario->lights_dirty_reset()
+	   || !m_scene->get_light_tree_builder().is_resident<Device::CPU>()) {
 		reloaded = true;
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
@@ -818,19 +832,7 @@ bool WorldContainer::load_scene_lights() {
 		}
 
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));
-		m_lightsDirty = false;
-
 		// Detect whether an (or THE envmap has been added/removed)
-	}
-
-	if(m_envLightDirty || m_scenario->envmap_lights_dirty_reset()) {
-		reloaded = true;
-
-		// Find out what the active envmap light is
-		lights::Background& background = m_envLights.get(m_scenario->get_background());
-		m_scene->set_background(background);
-
-		m_envLightDirty = false;
 	}
 
 	m_scenario->lights_dirty_reset();
@@ -847,7 +849,7 @@ void WorldContainer::retessellate() {
 
 	if(m_scene->retessellate(m_tessLevel)) {
 		// Gotta rebuild the light tree
-		m_lightsDirty = true;
+		m_scene->mark_lights_dirty();
 		(void)this->load_scene_lights();
 	}
 }

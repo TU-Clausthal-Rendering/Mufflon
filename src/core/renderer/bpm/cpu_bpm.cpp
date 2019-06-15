@@ -59,7 +59,7 @@ struct BpmVertexExt {
 
 // MIS weight for merges
 float get_mis_weight(const BpmPathVertex& viewVertex, const math::PdfPair pdf,
-					 const CpuBidirPhotonMapper::PhotonDesc& photon) {
+					 const CpuBidirPhotonMapper::PhotonDescCommon& photon) {
 	// Add the merge at the previous view path vertex
 	mAssert(viewVertex.previous() != nullptr);
 	float relPdf = viewVertex.ext().prevConversionFactor * float(pdf.back)
@@ -86,6 +86,21 @@ float get_mis_weight(const BpmPathVertex& thisVertex, const AngularPdf pdfBack,
 	return 1.0f / (1.0f + mergeProbSum);
 }
 
+CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
+	// Take element k+1 for the independent area estimate (using the radius of the k-th element is biased).
+	return distSq[n];	// Unbiased according to Garcia 2012, but biased in my experiments
+
+	//return (distSq[n] + distSq[n-1]) / 2.0f;	// Good results in experiments for uniform
+	//return distSq[n-1];
+}
+
+// A photon mapping kernel with dSq = current sample distance and rSq = bandwidth.
+CUDA_FUNCTION float kernel(float dSq, float rSq) {
+	//return 1.0f;	// Uniform
+	//return 2.0f * (1.0f - dSq / rSq);		// Epanechnikov
+	return 3.0f * ei::sq(1.0f - dSq / rSq);	// Silverman
+}
+
 } // namespace ::
 
 
@@ -98,7 +113,12 @@ void CpuBidirPhotonMapper::iterate() {
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)
 		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
-	m_photonMap.clear(currentMergeRadius * 2.0001f);
+
+	// Clear photons from previous iteration
+	if(m_params.knn == 0)
+		m_photonMap.clear(currentMergeRadius * 2.0001f);
+	else
+		m_photonMapKd.clear();
 
 	// First pass: Create one photon path per view path
 	u64 photonSeed = m_rngs[0].next();
@@ -106,6 +126,32 @@ void CpuBidirPhotonMapper::iterate() {
 #pragma PARALLEL_FOR
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
+	}
+
+	if(m_params.knn > 0) {
+		m_photonMapKd.build();
+		// For the MIS it is necessary to query the density at each photon.
+		// Fortunatelly, the photons where added to the tree in forward order.
+		// I.e. if we iterate NON-PARALLEL each previous photon is completed when the
+		// next one is arrived.
+		// 1. prallel query
+#pragma PARALLEL_FOR
+		for(int i = 0; i < m_photonMapKd.size(); ++i) {
+			PhotonDescKNN& photon = m_photonMapKd.get_data_by_index(i);
+			const ei::Vec3& currentPos = m_photonMapKd.get_position_by_index(i);
+			int* indices = m_knnQueryMem.data() + get_current_thread_idx() * (m_params.knn+2) * 2;
+			float* distSq = as<float>(indices + m_params.knn+2);
+			m_photonMapKd.query_euclidean(currentPos, m_params.knn + 2, indices, distSq, ei::sq(currentMergeRadius));
+			photon.mergeArea = select_bandwidth(distSq, m_params.knn+1) * ei::PI;
+			mAssert(photon.mergeArea > 0.0f);
+		}
+		// 2. sequential update of perv... members
+		for(int i = 0; i < m_photonMapKd.size(); ++i) {
+			PhotonDescKNN& photon = m_photonMapKd.get_data_by_index(i);
+			float prevArea = photon.previousIdx == -1 ? 1.0f
+				: m_photonMapKd.get_data_by_index(photon.previousIdx).mergeArea;
+			photon.prevConversionFactor *= prevArea / photon.mergeArea;
+		}
 	}
 
 	// Second pass: trace view paths and merge
@@ -116,10 +162,18 @@ void CpuBidirPhotonMapper::iterate() {
 	}
 }
 
-void CpuBidirPhotonMapper::on_reset() {
+void CpuBidirPhotonMapper::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
-	m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1));
-	m_photonMap = m_photonMapManager.acquire<Device::CPU>();
+	// Initilize one of two data structures and remove the other one
+	if(m_params.knn == 0) {
+		m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1));
+		m_photonMap = m_photonMapManager.acquire<Device::CPU>();
+		m_photonMapKd.reserve(0);
+	} else {
+		m_photonMapManager.resize(0);
+		m_photonMapKd.reserve(m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1));
+		m_knnQueryMem.resize((m_params.knn + 2) * 2 * get_thread_num());
+	}
 }
 
 void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
@@ -128,7 +182,9 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 	BpmPathVertex vertex[2];
 	BpmPathVertex::create_light(&vertex[0], nullptr, p);
 	math::Throughput throughput;
-	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
+	float mergeArea = m_params.knn > 0 ? 1.0f :	// The merge area is dynamic in KNN searches
+		ei::PI * currentMergeRadius * currentMergeRadius;
+	int prevKdTreeIdx = -1;
 
 	int pathLen = 0;
 	int currentV = 0;
@@ -149,17 +205,27 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 			vertex[currentV].ext().prevConversionFactor /= numPhotons * mergeArea;
 
 		// Store a photon to the photon map
-		m_photonMap.insert(vertex[currentV].get_position(),
-			{ vertex[currentV].get_position(), vertex[currentV].ext().incidentPdf,
-			  vertex[currentV].get_incident_direction(), pathLen,
-			  throughput.weight / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
-			  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor });
+		if(m_params.knn == 0)
+			m_photonMap.insert(vertex[currentV].get_position(), {
+				vertex[currentV].ext().incidentPdf,
+				vertex[currentV].get_incident_direction(), pathLen,
+				throughput.weight / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+				vertex[currentV].get_position() });
+		else
+			prevKdTreeIdx = m_photonMapKd.insert(vertex[currentV].get_position(), {
+				vertex[currentV].ext().incidentPdf,
+				vertex[currentV].get_incident_direction(), pathLen,
+				throughput.weight / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+				1.0f, prevKdTreeIdx });
 	} while(pathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
 }
 
 void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius) {
 	float mergeRadiusSq = currentMergeRadius * currentMergeRadius;
 	float mergeAreaInv = 1.0f / (ei::PI * mergeRadiusSq);
+	float prevMergeArea = 1.0f;
 	// Trace view path
 	BpmPathVertex vertex[2];
 	// Create a start for the path
@@ -182,7 +248,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		if(viewPathLen >= m_params.minPathLength) {
 			EmissionValue emission = vertex[currentV].get_emission(m_sceneDesc, vertex[1-currentV].get_position());
 			if(emission.value != 0.0f && viewPathLen > 1) {
-				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, ei::PI * mergeRadiusSq);
+				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, prevMergeArea);
 				emission.value *= misWeight;
 			}
 			mAssert(!isnan(emission.value.x));
@@ -194,22 +260,38 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		// Merges
 		Spectrum radiance { 0.0f };
 		scene::Point currentPos = vertex[currentV].get_position();
-		auto photonIt = m_photonMap.find_first(currentPos);
-		while(photonIt) {
-			// Only merge photons which are within the sphere around our position.
-			// and which have the correct full path length.
-			int pathLen = viewPathLen + photonIt->pathLen;
-			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
-				&& lensq(photonIt->position - currentPos) < mergeRadiusSq) {
-				// Radiance estimate
-				Pixel tmpCoord;
-				auto bsdf = vertex[currentV].evaluate(-photonIt->incident,
-													  m_sceneDesc.media, tmpCoord, false,
-													  &photonIt->geoNormal);
-				float misWeight = get_mis_weight(vertex[currentV], bsdf.pdf, *photonIt);
-				radiance += bsdf.value * photonIt->flux * (mergeAreaInv * misWeight);
+		if(m_params.knn == 0) {
+			auto photonIt = m_photonMap.find_first(currentPos);
+			while(photonIt) {
+				// Only merge photons which are within the sphere around our position.
+				// and which have the correct full path length.
+				int pathLen = viewPathLen + photonIt->pathLen;
+				if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
+					&& lensq(photonIt->position - currentPos) < mergeRadiusSq) {
+					radiance += merge(vertex[currentV], *photonIt);
+				}
+				++photonIt;
 			}
-			++photonIt;
+			radiance *= mergeAreaInv;
+			prevMergeArea = ei::PI * mergeRadiusSq;
+		} else {
+			int* indices = m_knnQueryMem.data() + get_current_thread_idx() * (m_params.knn + 1) * 2;
+			float* distSq = as<float>(indices + m_params.knn+1);
+			m_photonMapKd.query_euclidean(currentPos, m_params.knn + 1, indices, distSq, ei::sq(currentMergeRadius));
+			float bandwidth = select_bandwidth(distSq, m_params.knn);
+			float currentMergeArea = ei::PI * bandwidth;
+			// Prepare view-path MIS differences due to area
+			vertex[currentV].ext().prevConversionFactor *= prevMergeArea / currentMergeArea;
+			prevMergeArea = currentMergeArea;
+			for(int i = 0; i < m_params.knn && indices[i] >= 0; ++i) {
+				const PhotonDescKNN& photon = m_photonMapKd.get_data_by_index(indices[i]);
+				int pathLen = viewPathLen + photon.pathLen;
+				if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength)
+					radiance += merge(vertex[currentV], photon) * kernel(distSq[i], bandwidth);
+			}
+			radiance /= currentMergeArea;
+			if(isnan(radiance.x))
+				__debugbreak();
 		}
 		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
 			scene::Direction{0.0f}, Spectrum{0.0f});
@@ -221,6 +303,16 @@ void CpuBidirPhotonMapper::init_rngs(int num) {
 	int seed = m_params.seed * (num + 1);
 	for(int i = 0; i < num; ++i)
 		m_rngs[i] = math::Rng(i + seed);
+}
+
+Spectrum CpuBidirPhotonMapper::merge(const BpmPathVertex& vertex, const PhotonDescCommon& photon) {
+	// Radiance estimate
+	Pixel tmpCoord;
+	auto bsdf = vertex.evaluate(-photon.incident,
+								 m_sceneDesc.media, tmpCoord, false,
+								 &photon.geoNormal);
+	float misWeight = get_mis_weight(vertex, bsdf.pdf, photon);
+	return bsdf.value * photon.flux * misWeight;
 }
 
 } // namespace mufflon::renderer
