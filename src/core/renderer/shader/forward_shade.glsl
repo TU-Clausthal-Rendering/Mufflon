@@ -6,6 +6,17 @@ layout(location = 2) out vec3 out_albedo;
 layout(location = 3) out vec3 out_normal;
 layout(location = 4) out vec3 out_lightness;
 
+struct ColorInfo
+{
+	vec3 color;
+	vec3 albedo;
+};
+
+void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 emission) {
+	c.color += emission;
+	c.albedo += albedo;
+}
+
 #define EMISSIVE 0u
 #define LAMBERT 1u
 #define ORENNAYAR 2u				
@@ -35,6 +46,43 @@ uvec2 readTexHdl(uint byteOffset) {
 	return uvec2(u_materialData[index], u_materialData[index + 1]);
 }
 
+void shadeEmissive(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray emissionTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	calcRadiance(c, pos, normal, vec3(0.0), texture(emissionTex, uv).rgb);
+}
+
+void shadeLambert(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0));
+}
+
+void shadeOrennayar(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0));
+}
+
+void shadeTorrance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
+	//sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset + 8));
+	offset += 16;
+	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0));
+}
+
+void shadeWalter(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	//sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0));
+}
+
+void shadeMicrofacet(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	//sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0));
+}
+
 void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	out_normal = normal;
 	out_position = pos;
@@ -45,38 +93,54 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	uint matType = readShort(matOffset);
 	uint matFlags = readShort(matOffset + 2);
 
-	vec3 color = vec3(0.0);
+	ColorInfo c;
+	c.color = vec3(0.0);
+	c.albedo = vec3(0.0);
 	// next is medium handle => until (matOffset + 8)
+	matOffset += 8;
+
 	switch(matType) {
-	case EMISSIVE: {
-		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset + 8));
-		color = texture(emissionTex, uv).rgb;
-	} break;
+	case EMISSIVE:
+		shadeEmissive(c, pos, normal, uv, matOffset);
+		break;
 	case ORENNAYAR:
-	case LAMBERT: {
-		sampler2DArray albedoTex = sampler2DArray(readTexHdl(matOffset + 8));
-		color = texture(albedoTex, uv).rgb;
-		out_albedo = color;
-	} break;
-	case TORRANCE: {
-		sampler2DArray albedoTex = sampler2DArray(readTexHdl(matOffset + 8));
-		sampler2DArray roughnessTex = sampler2DArray(readTexHdl(matOffset + 16));
-		out_albedo = texture(albedoTex, uv).rgb;
-		color = texture(roughnessTex, uv).rgb;
-	} break;
-	case WALTER: {
-		sampler2DArray roughnessTex = sampler2DArray(readTexHdl(matOffset + 8));
-		color = texture(roughnessTex, uv).rgb;
-	} break;
+		shadeOrennayar(c, pos, normal, uv, matOffset);
+		break;
+	case LAMBERT:
+		shadeLambert(c, pos, normal, uv, matOffset);
+		break;
+	case TORRANCE:
+		shadeTorrance(c, pos, normal, uv, matOffset);
+		break;
+	case WALTER: 
+		shadeWalter(c, pos, normal, uv, matOffset);
+		break;
+	case MICROFACET:
+		shadeMicrofacet(c, pos, normal, uv, matOffset);
+		break;
+	case LAMBERT_EMISSIVE: // TODO blend correctly
+		shadeLambert(c, pos, normal, uv, matOffset);
+		shadeEmissive(c, pos, normal, uv, matOffset);
+		break;
+	case TORRANCE_LAMBERT:
+		shadeTorrance(c, pos, normal, uv, matOffset);
+		shadeLambert(c, pos, normal, uv, matOffset);
+		break;
+	case FRESNEL_TORRANCE_LAMBERT:
+		shadeTorrance(c, pos, normal, uv, matOffset);
+		shadeLambert(c, pos, normal, uv, matOffset);
+		break;
+	case WALTER_TORRANCE:
+		shadeWalter(c, pos, normal, uv, matOffset);
+		shadeTorrance(c, pos, normal, uv, matOffset);
+		break;
+	case FRESNEL_TORRANCE_WALTER:
+		shadeTorrance(c, pos, normal, uv, matOffset);
+		shadeWalter(c, pos, normal, uv, matOffset);
+		break;
 	}
 
-
-
-	//out_fragColor = vec4(normal * 0.5 + vec3(0.5), 1.0);
-	//out_fragColor = vec4(fract(texcoord), 1.0, 1.0);
-
-	out_fragColor = vec4(color, 1.0);
-
-	// TODO
-	out_lightness = vec3(0.0f);
+	out_fragColor = vec4(c.color, 1.0);
+	out_albedo = c.albedo;
+	out_lightness = vec3(0.0);
 }

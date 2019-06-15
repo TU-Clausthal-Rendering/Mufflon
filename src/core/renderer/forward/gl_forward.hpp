@@ -23,6 +23,8 @@ public:
     void post_reset() override;
 
 private:
+	void init();
+
 	ForwardParameters m_params = {};
 
 	gl::Program m_triangleProgram;
