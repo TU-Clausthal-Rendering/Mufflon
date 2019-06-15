@@ -83,8 +83,8 @@ void GlForward::init() {
 	m_trianglePipe.vertexArray = m_triangleVao;
 	m_trianglePipe.depthStencil.depthTest = true;
 	m_trianglePipe.topology = gl::PrimitiveTopology::Patches;
-	// TODO remove this
-	m_trianglePipe.rasterizer.cullMode = gl::CullMode::None;
+	m_trianglePipe.rasterizer.cullMode = gl::CullMode::Back;
+	m_trianglePipe.rasterizer.frontFaceWinding = gl::Winding::CW;
 
 	m_quadPipe = m_trianglePipe;
 	m_quadPipe.patch.vertices = 4;

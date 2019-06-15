@@ -12,9 +12,29 @@ struct ColorInfo
 	vec3 albedo;
 };
 
+struct LightInfo
+{
+	vec3 color; // color multiplied with attenuation
+	vec3 direction; // outgoing from material, normalized
+};
+
+// light travel direction
+LightInfo calcDirLight(vec3 direction, vec3 radiance) {
+	LightInfo i;
+	i.color = radiance;
+	i.direction = normalize(-direction);
+	return i;
+}
+
 void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 emission) {
 	c.color += emission;
 	c.albedo += albedo;
+
+	LightInfo light;
+	light = calcDirLight(vec3(-0.2, -1, 0.3), vec3(0.9));
+
+	float cosTheta = max(dot(light.direction, normal), 0.0);
+	c.color += albedo * light.color * cosTheta;
 }
 
 #define EMISSIVE 0u
