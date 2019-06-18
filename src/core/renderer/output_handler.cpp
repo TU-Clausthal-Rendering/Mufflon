@@ -82,6 +82,81 @@ template RenderBuffer<Device::CPU> OutputHandler::begin_iteration<Device::CPU>(b
 template RenderBuffer<Device::CUDA> OutputHandler::begin_iteration<Device::CUDA>(bool reset);
 template RenderBuffer<Device::OPENGL> OutputHandler::begin_iteration<Device::OPENGL>(bool reset);
 
+template < Device dev1, Device dev2 >
+std::tuple<RenderBuffer<dev1>, RenderBuffer<dev2>> OutputHandler::begin_iteration_hybrid(bool reset) {
+	// Count the iteration
+	if(reset)
+		m_iteration = 0;
+	else ++m_iteration;
+
+	RenderBuffer<dev1> rb1;
+	RenderBuffer<dev2> rb2;
+	int i = 0;
+	for(u32 flag : OutputValue::iterator) {
+		// Is this atttribute recorded at all?
+		if(m_targets.is_set(flag)) {
+			if(m_targets.is_set(flag << 8)) { // Variance flag set?
+				// Variance case: needs to cumulate samples per iteration
+				rb1.m_targets[i] = (RenderTarget<dev1>)m_iterationTarget[i].acquire<dev1>();	// Allocates if necessary
+				rb2.m_targets[i] = (RenderTarget<dev2>)m_iterationTarget[i].acquire<dev2>();	// Allocates if necessary
+				m_iterationTarget[i].mark_changed(dev1);
+				mem_set<dev1>(rb1.m_targets[i], 0, m_iterationTarget[i].size());
+				mem_set<dev2>(rb2.m_targets[i], 0, m_iterationTarget[i].size());
+				if(reset) {
+					auto cumT = (RenderTarget<dev1>)m_cumulativeTarget[i].acquire<dev1>();		// Allocates if necessary
+					mem_set<dev1>(cumT, 0, m_cumulativeTarget[i].size());
+					auto cumVarT = (RenderTarget<dev1>)m_cumulativeVarTarget[i].acquire<dev1>();		// Allocates if necessary
+					mem_set<dev1>(cumVarT, 0, m_cumulativeVarTarget[i].size());
+				}
+			} else {
+				rb1.m_targets[i] = (RenderTarget<dev1>)m_cumulativeTarget[i].acquire<dev1>(false);	// Allocates if necessary
+				rb2.m_targets[i] = (RenderTarget<dev2>)m_cumulativeTarget[i].acquire<dev2>(false);	// Allocates if necessary
+				if(reset) {
+					mem_set<dev1>(rb1.m_targets[i], 0, m_cumulativeTarget[i].size());
+					mem_set<dev2>(rb2.m_targets[i], 0, m_cumulativeTarget[i].size());
+				}
+			}
+		}
+		++i;
+	}
+	rb1.m_resolution = ei::IVec2{ m_width, m_height };
+	rb2.m_resolution = ei::IVec2{ m_width, m_height };
+
+	return { std::move(rb1), std::move(rb2) };
+}
+template std::tuple<RenderBuffer<Device::CPU>, RenderBuffer<Device::CUDA>> OutputHandler::begin_iteration_hybrid<Device::CPU, Device::CUDA>(bool reset);
+
+template < Device from, Device to >
+void OutputHandler::sync_back(const int ySplit) {
+	const std::size_t actualSplit = std::min<std::size_t>(ySplit, get_height());
+	const std::size_t offset = get_width() * 3 * ATOMIC_F32_SIZE * actualSplit;
+	const std::size_t size = get_width() * 3 * ATOMIC_F32_SIZE * (get_height() - actualSplit);
+	for(u32 flag : OutputValue::iterator) {
+		int i = 0;
+		// Is this atttribute recorded at all?
+		if(m_targets.is_set(flag)) {
+			if(m_targets.is_set(flag << 8)) { // Variance flag set?
+				ArrayDevHandle_t<to, char> dst = m_iterationTarget[i].acquire<to>(false);
+				ConstArrayDevHandle_t<from, char> src = m_iterationTarget[i].acquire<from>(false);
+				copy(dst + offset, src + offset, size);
+			} else {
+				ArrayDevHandle_t<to, char> dst = m_cumulativeTarget[i].acquire<to>(false);
+				ConstArrayDevHandle_t<from, char> src = m_cumulativeTarget[i].acquire<from>(false);
+				// TODO: mark changed?
+				copy(dst + offset, src + offset, size);
+			}
+		}
+		++i;
+	}
+}
+
+template void OutputHandler::sync_back<Device::CPU, Device::CUDA>(const int ySplit);
+template void OutputHandler::sync_back<Device::CPU, Device::OPENGL>(const int ySplit);
+template void OutputHandler::sync_back<Device::CUDA, Device::CPU>(const int ySplit);
+template void OutputHandler::sync_back<Device::CUDA, Device::OPENGL>(const int ySplit);
+template void OutputHandler::sync_back<Device::OPENGL, Device::CPU>(const int ySplit);
+template void OutputHandler::sync_back<Device::OPENGL, Device::CUDA>(const int ySplit);
+
 template < Device dev >
 void OutputHandler::end_iteration() {
 	int i = 0;
@@ -115,7 +190,6 @@ void OutputHandler::end_iteration() {
 template void OutputHandler::end_iteration<Device::CPU>();
 template void OutputHandler::end_iteration<Device::CUDA>();
 template void OutputHandler::end_iteration<Device::OPENGL>();
-
 
 void OutputHandler::set_targets(OutputValue targets) {
 	if(targets != m_targets) {

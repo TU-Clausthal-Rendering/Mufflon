@@ -3,6 +3,7 @@
 #include "util/tagged_tuple.hpp"
 #include "core/renderer/pt/cpu_pt.hpp"
 #include "core/renderer/pt/gpu_pt.hpp"
+#include "core/renderer/pt/hybrid_pt.hpp"
 #include "core/renderer/lt/cpu_lt.hpp"
 #include "core/renderer/lt/gpu_lt.hpp"
 #include "core/renderer/wireframe/cpu_wireframe.hpp"
@@ -18,7 +19,7 @@
 namespace mufflon::renderer {
 
 using Renderers = util::TaggedTuple<
-	CpuPathTracer, GpuPathTracer,
+	CpuPathTracer, GpuPathTracer, HybridPathTracer,
 	CpuLightTracer, GpuLightTracer,
 	CpuWireframe, GpuWireframe, GlWireframe,
 	CpuBidirPathTracer,

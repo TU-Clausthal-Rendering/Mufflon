@@ -319,6 +319,9 @@
     <ClCompile Include="..\..\src\core\renderer\ivcm\cpu_ivcm.cpp">
       <Filter>Source Files\core\renderer\ivcm</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1047,6 +1050,9 @@
     <ClInclude Include="..\..\src\core\math\intersection_areas.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1081,6 +1087,9 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu">
       <Filter>Source Files\core\renderer\lt</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cu">
+      <Filter>Source Files\core\renderer\pt</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>

@@ -4,12 +4,28 @@
 
 namespace mufflon { namespace renderer {
 
+struct PSplitFactor {
+	float split = 0.5f;
+	static ParamDesc get_desc() noexcept {
+		return { "Vertical CPU/CUDA split", ParameterTypes::FLOAT };
+	}
+};
+
 using PtParameters = ParameterHandler<
 	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PNeeCount,
 	PNeePositionGuide
+>;
+
+using HybridPtParams = ParameterHandler<
+	PSeed,
+	PMinPathLength,
+	PMaxPathLength,
+	PNeeCount,
+	PNeePositionGuide,
+	PSplitFactor
 >;
 
 }} // namespace mufflon::renderer

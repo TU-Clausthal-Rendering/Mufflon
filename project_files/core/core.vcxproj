@@ -36,6 +36,7 @@
     <ClCompile Include="..\..\src\core\renderer\neb\cpu_neb.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp" />
     <ClCompile Include="..\..\src\core\renderer\vcm\cpu_vcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
@@ -226,6 +227,7 @@
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
@@ -316,6 +318,7 @@
     <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />
