@@ -3163,6 +3163,7 @@ Boolean render_enable_renderer(uint32_t index, uint32_t variation) {
 	s_currentRenderer = s_renderers.get(index)[variation].get();
 	if(s_world.get_current_scenario() != nullptr)
 		s_currentRenderer->load_scene(s_world.get_current_scene());
+	s_currentRenderer->on_renderer_enable();
 	return true;
 	CATCH_ALL(false)
 }

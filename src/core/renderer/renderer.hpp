@@ -14,16 +14,36 @@ namespace renderer {
 
 // Specifies what kind of reset happened
 struct ResetEvent : public util::Flags<u16> {
-	static constexpr u16 NONE			= 0b000000000;
-	static constexpr u16 ANIMATION		= 0b000000001;
-	static constexpr u16 CAMERA			= 0b000000010;
-	static constexpr u16 LIGHT			= 0b000000100;
-	static constexpr u16 TESSELLATION	= 0b000001000;
-	static constexpr u16 SCENARIO		= 0b000010000;
-	static constexpr u16 WORLD			= 0b000100000;
-	static constexpr u16 PARAMETER		= 0b001000000;
-	static constexpr u16 MANUAL			= 0b010000000;
-	static constexpr u16 RENDERTARGET	= 0b100000000;
+	static constexpr u16 NONE				= 0b00'0000'0000;
+	static constexpr u16 ANIMATION			= 0b00'0000'0001;
+	static constexpr u16 CAMERA				= 0b00'0000'0010;
+	static constexpr u16 LIGHT				= 0b00'0000'0100;
+	static constexpr u16 TESSELLATION		= 0b00'0000'1000;
+	static constexpr u16 SCENARIO			= 0b00'0001'0000;
+	static constexpr u16 WORLD				= 0b00'0010'0000;
+	static constexpr u16 PARAMETER			= 0b00'0100'0000;
+	static constexpr u16 MANUAL				= 0b00'1000'0000;
+	static constexpr u16 RENDERTARGET		= 0b01'0000'0000;
+	static constexpr u16 RENDERER_ENABLE	= 0b10'0000'0000;
+
+	static constexpr u16 ALL				= 0b11'1111'1111;
+
+	// Maps certain possible state changes to reset events (excluding parameter changes)
+	bool resolution_changed() const noexcept {
+		return is_any_set( ResetEvent::SCENARIO
+						 | ResetEvent::WORLD );
+	}
+
+	bool geometry_changed() const noexcept {
+		return is_any_set( ResetEvent::SCENARIO
+						 | ResetEvent::WORLD
+						 | ResetEvent::ANIMATION
+						 | ResetEvent::TESSELLATION );
+	}
+
+	bool lighttree_changed() const noexcept {
+		return geometry_changed() || is_set(ResetEvent::LIGHT);
+	}
 };
 
 inline std::string to_string(const ResetEvent evt) {
@@ -109,6 +129,11 @@ public:
 		m_lastReset.set(ResetEvent::PARAMETER);
 	}
 
+	// Triggered if this renderer is switched to from another renderer
+	virtual void on_renderer_enable() {
+		m_lastReset.set(ResetEvent::RENDERER_ENABLE);
+	}
+
 	// Gets called after the renderer reset is executed, ie. after
 	// the new descriptor has been fetched
 	void clear_reset() {
@@ -125,23 +150,6 @@ public:
 	}
 
 	ResetEvent get_reset_event() const noexcept { return m_lastReset; }
-
-	// Maps certain possible state changes to reset events (excluding parameter changes)
-	bool resolution_changed() const noexcept {
-		return get_reset_event().is_any_set( ResetEvent::SCENARIO
-										   | ResetEvent::WORLD );
-	}
-
-	bool geometry_changed() const noexcept {
-		return get_reset_event().is_any_set( ResetEvent::SCENARIO
-										   | ResetEvent::WORLD
-										   | ResetEvent::ANIMATION
-										   | ResetEvent::TESSELLATION );
-	}
-
-	bool lighttree_changed() const noexcept {
-		return geometry_changed() || get_reset_event().is_set(ResetEvent::LIGHT);
-	}
 
 	// Returns whether the scene was reset
 	virtual bool pre_iteration(OutputHandler& outputBuffer) = 0;

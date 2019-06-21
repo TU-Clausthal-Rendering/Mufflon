@@ -179,8 +179,10 @@ void CpuVcm::iterate() {
 }
 
 void CpuVcm::post_reset() {
+	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
+								ResetEvent::ALL : get_reset_event() };
 	init_rngs(m_outputBuffer.get_num_pixels());
-	if(resolution_changed()) {
+	if(resetFlags.resolution_changed()) {
 		m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
 		m_photonMap = m_photonMapManager.acquire<Device::CPU>();
 		m_pathEndPoints.resize(m_outputBuffer.get_num_pixels());
