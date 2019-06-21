@@ -11,6 +11,7 @@
 #include "core/renderer/bpm/cpu_bpm.hpp"
 #include "core/renderer/neb/cpu_neb.hpp"
 #include "core/renderer/vcm/cpu_vcm.hpp"
+#include "core/renderer/ivcm/cpu_ivcm.hpp"
 #include "core/renderer/forward/gl_forward.hpp"
 #include "core/renderer/wireframe/gl_wireframe.h"
 
@@ -23,7 +24,7 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPathTracer,
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
-	CpuVcm,
+	CpuVcm, CpuIvcm,
 	GlForward
 >;
 

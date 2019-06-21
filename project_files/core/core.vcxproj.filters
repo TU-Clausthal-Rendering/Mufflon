@@ -140,6 +140,9 @@
     <Filter Include="Source Files\core\renderer\shader">
       <UniqueIdentifier>{567932eb-30db-4597-8d6b-b7890a02dd7f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\ivcm">
+      <UniqueIdentifier>{9c7b84e1-22f4-4bb8-bc42-5381abca4f1b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -312,6 +315,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\opengl\vertex_array_builder.cpp">
       <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\ivcm\cpu_ivcm.cpp">
+      <Filter>Source Files\core\renderer\ivcm</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1031,6 +1037,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h">
       <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp">
+      <Filter>Source Files\core\renderer\ivcm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp">
+      <Filter>Source Files\core\renderer\ivcm</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
