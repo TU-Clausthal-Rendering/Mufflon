@@ -5,7 +5,8 @@
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/photon_map.hpp"
+#include "core/data_structs/photon_map.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -57,11 +58,12 @@ private:
 
 	IvcmParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
-	HashGridManager<IvcmPathVertex> m_photonMapManager;
-	HashGrid<Device::CPU, IvcmPathVertex> m_photonMap;
+	data_structs::HashGridManager<IvcmPathVertex> m_photonMapManager;
+	data_structs::HashGrid<Device::CPU, IvcmPathVertex> m_photonMap;
 	std::vector<const IvcmPathVertex*> m_pathEndPoints;
 	std::vector<AreaPdf> m_tmpPathProbabilities;
 	std::vector<IvcmPathVertex> m_tmpViewPathVertices;
+	std::unique_ptr<data_structs::DmHashGrid> m_densityHM;
 };
 
 } // namespace mufflon::renderer

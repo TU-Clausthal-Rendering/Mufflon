@@ -5,8 +5,8 @@
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/photon_map.hpp"
-#include "core/scene/accel_structs/kdtree.hpp"
+#include "core/data_structs/photon_map.hpp"
+#include "core/data_structs/kdtree.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -66,9 +66,9 @@ private:
 
 	BpmParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
-	HashGridManager<PhotonDesc> m_photonMapManager;
-	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
-	scene::accel_struct::KdTree<PhotonDescKNN, 3> m_photonMapKd;
+	data_structs::HashGridManager<PhotonDesc> m_photonMapManager;
+	data_structs::HashGrid<Device::CPU, PhotonDesc> m_photonMap;
+	data_structs::KdTree<PhotonDescKNN, 3> m_photonMapKd;
 	std::vector<int> m_knnQueryMem;
 };
 

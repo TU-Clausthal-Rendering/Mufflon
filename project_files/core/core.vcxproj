@@ -181,6 +181,9 @@
     <ClInclude Include="..\..\src\core\cuda\cuda_utils.hpp" />
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\export\api.h" />
     <ClInclude Include="..\..\src\core\export\interface.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
@@ -224,7 +227,6 @@
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp" />

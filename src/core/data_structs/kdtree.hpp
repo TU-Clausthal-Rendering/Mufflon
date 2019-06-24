@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace mufflon::scene::accel_struct {
+namespace mufflon::data_structs {
 
 /* General kd-tree container on CPU Device (TODO: GPU version? acquire()?).
  * Uses median splits to partitionate a set of points which was added iteratively before.

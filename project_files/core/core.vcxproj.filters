@@ -143,6 +143,9 @@
     <Filter Include="Source Files\core\renderer\ivcm">
       <UniqueIdentifier>{9c7b84e1-22f4-4bb8-bc42-5381abca4f1b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\data_structs">
+      <UniqueIdentifier>{4ea1c992-03c5-4ac9-a3f1-951c1a12f616}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -930,9 +933,6 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
     </ClInclude>
@@ -1052,6 +1052,17 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp">
       <Filter>Source Files\core\renderer\pt</Filter>
+    </ClInclude>    <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
