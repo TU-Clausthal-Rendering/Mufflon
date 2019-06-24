@@ -1,50 +1,11 @@
 ﻿#pragma once
 
+#include "core/math/intersection_areas.hpp"
 #include <ei/3dtypes.hpp>
 #include <memory>
 #include <atomic>
 
 namespace mufflon::renderer {
-
-	// TODO: move codesnipped somewhere else (epsilon?)
-	// Compute the area of the plane-box intersection
-	// https://math.stackexchange.com/questions/885546/area-of-the-polygon-formed-by-cutting-a-cube-with-a-plane
-	// https://math.stackexchange.com/a/885662
-	inline float intersection_area(const ei::Vec3& bmin, const ei::Vec3& bmax, const ei::Vec3& pos, const ei::Vec3& normal) {
-		ei::Vec3 cellSize = bmax - bmin;
-		ei::Vec3 absN = abs(normal);
-		// 1D cases
-		if(ei::abs(absN.x - 1.0f) < 1e-3f) return cellSize.y * cellSize.z;
-		if(ei::abs(absN.y - 1.0f) < 1e-3f) return cellSize.x * cellSize.z;
-		if(ei::abs(absN.z - 1.0f) < 1e-3f) return cellSize.x * cellSize.y;
-		// 2D cases
-		for(int d = 0; d < 3; ++d) if(absN[d] < 1e-4f) {
-			int x = (d + 1) % 3;
-			int y = (d + 2) % 3;
-			// Use the formula from stackexchange: phi(t) = max(0,t)^2 / 2 m_1 m_2
-			// -> l(t) = sum^4 s max(0,t-dot(m,v)) / m_1 m_2
-			// -> A(t) = l(t) * h_3
-			float t = normal[x] * pos[x] + normal[y] * pos[y];
-			float sum = 0.0f;
-			sum += ei::max(0.0f, t - (normal[x] * bmin[x] + normal[y] * bmin[y]));
-			sum -= ei::max(0.0f, t - (normal[x] * bmin[x] + normal[y] * bmax[y]));
-			sum -= ei::max(0.0f, t - (normal[x] * bmax[x] + normal[y] * bmin[y]));
-			sum += ei::max(0.0f, t - (normal[x] * bmax[x] + normal[y] * bmax[y]));
-			return cellSize[d] * ei::abs(sum / (normal[x] * normal[y]));
-		}
-		// 3D cases
-		float t = dot(normal, pos);
-		float sum = 0.0f;
-		sum += ei::sq(ei::max(0.0f, t - dot(normal, bmin)));
-		sum -= ei::sq(ei::max(0.0f, t - dot(normal, ei::Vec3{bmin.x, bmin.y, bmax.z})));
-		sum += ei::sq(ei::max(0.0f, t - dot(normal, ei::Vec3{bmin.x, bmax.y, bmax.z})));
-		sum -= ei::sq(ei::max(0.0f, t - dot(normal, ei::Vec3{bmin.x, bmax.y, bmin.z})));
-		sum += ei::sq(ei::max(0.0f, t - dot(normal, ei::Vec3{bmax.x, bmax.y, bmin.z})));
-		sum -= ei::sq(ei::max(0.0f, t - dot(normal, ei::Vec3{bmax.x, bmin.y, bmin.z})));
-		sum += ei::sq(ei::max(0.0f, t - dot(normal, ei::Vec3{bmax.x, bmin.y, bmax.z})));
-		sum -= ei::sq(ei::max(0.0f, t - dot(normal, bmax)));
-		return ei::abs(sum / (2.0f * normal.x * normal.y * normal.z));
-	}
 
 	template<typename T>
 	inline void atomic_max(std::atomic<T>& a, T b) {
@@ -145,8 +106,7 @@ namespace mufflon::renderer {
 				ei::IVec3 cellPos = iPos / currentLvlMask;
 				ei::Vec3 cellSize = 1.0f / (currentGridRes * m_sceneSizeInv);
 				ei::Vec3 cellMin = cellPos * cellSize;
-				ei::Vec3 cellMax = cellMin + cellSize;
-				float area = intersection_area(cellMin, cellMax, offPos, normal);
+				float area = math::intersection_area_nrm(cellSize, offPos - cellMin, normal);
 				// Sometimes the above method returns zero. Therefore we restrict the
 				// area to something larger then a hunderds part of an approximate cell area.
 				float cellDiag = m_sceneScale / currentGridRes;
@@ -462,7 +422,7 @@ namespace mufflon::renderer {
 				const ei::Vec3 cellSize = 1.0f / (cellsPerDim * m_sceneSizeInv);
 				const ei::Vec3 cellMin = offPos - cellSize / 2.f;
 				const ei::Vec3 cellMax = cellMin + cellSize;
-				float area = intersection_area(cellMin, cellMax, offPos, normal);
+				float area = math::intersection_area(cellMin, cellMax, offPos, normal);
 				if(size)
 					*size = area;
 				// We do not have the problem with too small an area that the uninterpolated
@@ -503,7 +463,7 @@ namespace mufflon::renderer {
 				ei::Vec3 cellSize = 1.0f / (currentGridRes * m_sceneSizeInv);
 				ei::Vec3 cellMin = cellPos * cellSize;
 				ei::Vec3 cellMax = cellMin + cellSize;
-				float area = intersection_area(cellMin, cellMax, offPos, normal);
+				float area = math::intersection_area(cellMin, cellMax, offPos, normal);
 				// Sometimes the above method returns zero. Therefore we restrict the
 				// area to something larger then a hunderds part of an approximate cell area.
 				float cellDiag = m_sceneScale / currentGridRes;

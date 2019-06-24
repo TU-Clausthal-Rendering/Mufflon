@@ -1044,6 +1044,9 @@
     <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp">
       <Filter>Source Files\core\renderer\ivcm</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\math\intersection_areas.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
