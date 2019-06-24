@@ -14,11 +14,10 @@ public:
 	// Create a hash grid with a fixed memory footprint. This hash grid does not
 	// implement a resizing mechanism, so if you try to add more elements than
 	// the expected number data is lost.
-	DmHashGrid(uint numExpectedEntries, float cellSize)
-	{
+	DmHashGrid(uint numExpectedEntries, float cellSize) {
 		m_cellSize = ei::Vec3 { cellSize };
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_count.reset(new std::atomic_uint32_t[m_mapSize]);
+		m_data.reset(new Entry[m_mapSize]);
 		m_densityScale = 1.0f;
 	}
 
@@ -34,7 +33,7 @@ public:
 
 	void clear() {
 		for(u32 i = 0; i < m_mapSize; ++i)
-			m_count[i].store(0u, std::memory_order_relaxed);
+			m_data[i].count.store(0u, std::memory_order_relaxed);
 	}
 
 	// Cell size is the major influence parameter for the performance.
@@ -49,29 +48,61 @@ public:
 	float get_density_scale() const { return m_densityScale; }
 
 	// Increase the counter for a cell using a world position.
-	u32 increase_count(const ei::Vec3& position) {
-		u32 h = get_cell_hash(get_grid_cell(position));
+	void increase_count(const ei::Vec3& position) {
+		ei::UVec3 gridPos = get_grid_cell(position);
+		u32 h = get_cell_hash(gridPos);
 		u32 i = h % m_mapSize;
-		return m_count[i].fetch_add(1);
+		int s = 1;
+		// Quadratic probing until we find the correct or the empty cell
+		while(true) {
+			u32 expected = 0u;
+			// Check on empty and set a marker to allocate if empty
+			if(m_data[i].count.compare_exchange_strong(expected, ~0u)) {
+				// The cell was empty before -> initialize
+				m_data[i].cell = gridPos;
+				m_data[i].count.store(1u);	// Releases the lock at the same time as setting the correct count
+				return;
+			} else if(expected != ~0u) { // Not a cell marked as 'in allocation'
+				if(m_data[i].cell == gridPos) {
+					m_data[i].count.fetch_add(1);
+					return;
+				}
+				// Next probe: non-empty cell with different coordinate found
+				i = (h + (s&1 ? s*s : -s*s) + m_mapSize) % m_mapSize;
+				++s;
+			} // else spin-lock (achieved by not changing i)
+		}
 	}
 
 	float get_density(const ei::Vec3& position, const ei::Vec3& normal) const {
-		ei::IVec3 gridPos = ei::floor(position / m_cellSize);
+		ei::IVec3 gridPosI = ei::floor(position / m_cellSize);
+		ei::UVec3 gridPos { gridPosI };
 		// Get count
-		u32 h = get_cell_hash(ei::UVec3{gridPos});
+		u32 h = get_cell_hash(gridPos);
 		u32 i = h % m_mapSize;
-		u32 c = m_count[i].load();
+		int s = 1;
+		u32 c = m_data[i].count.load();
+		while(c > 0 && m_data[i].cell != gridPos) {
+			i = (h + (s&1 ? s*s : -s*s) + m_mapSize) % m_mapSize;
+			++s;
+			c = m_data[i].count.load();
+		}
 		// Determine intersection area between cell and query plane
-		ei::Vec3 localPos = position - gridPos * m_cellSize;
+		ei::Vec3 localPos = position - gridPosI * m_cellSize;
 		float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
 		return c * m_densityScale / area;
 	}
 
 private:
+	struct Entry {
+		ei::UVec3 cell;
+		std::atomic_uint32_t count = 0;
+	};
+
 	ei::Vec3 m_cellSize;
 	float m_densityScale;
 	u32 m_mapSize;
-	std::unique_ptr<std::atomic_uint32_t[]> m_count;
+	std::unique_ptr<Entry[]> m_data;
 };
 
 }} // namespace mufflon::util::density
