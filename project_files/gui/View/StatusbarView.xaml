@@ -21,6 +21,16 @@
                        Content="{Binding Statusbar.CudaMemory, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
         <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
         <StatusBarItem HorizontalAlignment="Left"
+                       HorizontalContentAlignment="Stretch"
+                       VerticalContentAlignment="Stretch"
+                       ToolTip="Factor used in gamma correction">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Gamma factor: "/>
+                <TextBlock Text="{Binding Display.GammaFactor, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+        </StatusBarItem>
+        <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+        <StatusBarItem HorizontalAlignment="Left"
                        Width="85">
             <StackPanel Orientation="Horizontal">
                 <Image Source="../Icons/cross_arrow.png"
