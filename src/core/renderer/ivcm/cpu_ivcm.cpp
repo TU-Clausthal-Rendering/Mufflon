@@ -109,6 +109,21 @@ float get_mis_weight_rhit(const AreaPdf* incidentF, const AreaPdf* incidentB, in
 	return 1.0f / (1.0f + relPdfSumV);
 }
 
+// Fill a range in the incidentF/B arrays
+void copy_path_values(AreaPdf* incidentF, AreaPdf* incidentB,
+	const IvcmPathVertex* vert, Interaction prevType,
+	AngularPdf pdfBack, ConnectionDir connectionDir,
+	int begin, int end) {
+	int step = begin < end ? 1 : -1;
+	for(int i = begin; i != end; i += step) {
+		incidentF[i] = vert->ext().incidentPdf;
+		incidentB[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
+		pdfBack = vert->ext().pdfBack;
+		connectionDir = vert->get_incident_connection();
+		vert = vert->previous();
+	}
+}
+
 
 struct ConnectionValue { Spectrum bxdfs; float cosines; };
 ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
@@ -139,31 +154,13 @@ ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1
 			int pl0 = path0.get_path_len();
 			incidentB[pl0] = path0.convert_pdf(path1.get_type(), val1.pdf.forw, connection).pdf;
 			incidentF[pl0] = path0.ext().incidentPdf;
-			const IvcmPathVertex* vert = path0.previous();
-			Interaction prevType = path0.get_type();
-			AngularPdf pdfBack = val0.pdf.back;
-			ConnectionDir connectionDir { path0.get_incident_direction(), path0.get_incident_dist_sq() };
-			for(int i = pl0-1; i >= 0; --i) {
-				incidentF[i] = vert->ext().incidentPdf;
-				incidentB[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
-				pdfBack = vert->ext().pdfBack;
-				connectionDir = ConnectionDir{ vert->get_incident_direction(), vert->get_incident_dist_sq() };
-				vert = vert->previous();
-			}
+			copy_path_values(incidentF, incidentB, path0.previous(), path0.get_type(),
+				val0.pdf.back, path0.get_incident_connection(), pl0-1, -1);
 			int pathLen = pl0 + path1.get_path_len() + 1;
 			incidentF[pl0+1] = path1.convert_pdf(path0.get_type(), val0.pdf.forw, connection).pdf;
 			incidentB[pl0+1] = path1.ext().incidentPdf;
-			vert = path1.previous();
-			prevType = path1.get_type();
-			pdfBack = val1.pdf.back;
-			connectionDir = ConnectionDir{ path1.get_incident_direction(), path1.get_incident_dist_sq() };
-			for(int i = pl0+2; i <= pathLen; ++i) {
-				incidentF[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
-				incidentB[i] = vert->ext().incidentPdf;
-				pdfBack = vert->ext().pdfBack;
-				connectionDir = ConnectionDir{ vert->get_incident_direction(), vert->get_incident_dist_sq() };
-				vert = vert->previous();
-			}
+			copy_path_values(incidentB, incidentF, path1.previous(), path1.get_type(),
+				val1.pdf.back, path1.get_incident_connection(), pl0 + 2, pathLen + 1);
 			float misWeight = get_mis_weight_connect(incidentF, incidentB, pathLen, pl0, mergeArea, numPhotons);
 			return {bxdfProd * (misWeight / connection.distanceSq), cosProd};
 		}
@@ -186,28 +183,10 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 	int pathLen = pl0 + photon.get_path_len();
 	incidentF[pl0] = viewPath.ext().incidentPdf;
 	incidentB[pl0] = photon.ext().incidentPdf;
-	const IvcmPathVertex* vert = viewPath.previous();
-	Interaction prevType = viewPath.get_type();
-	AngularPdf pdfBack = bsdf.pdf.back;
-	ConnectionDir connectionDir { viewPath.get_incident_direction(), viewPath.get_incident_dist_sq() };
-	for(int i = pl0-1; i >= 0; --i) {
-		incidentF[i] = vert->ext().incidentPdf;
-		incidentB[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
-		pdfBack = vert->ext().pdfBack;
-		connectionDir = ConnectionDir{ vert->get_incident_direction(), vert->get_incident_dist_sq() };
-		vert = vert->previous();
-	}
-	vert = photon.previous();
-	prevType = photon.get_type();
-	pdfBack = bsdf.pdf.forw;
-	connectionDir = ConnectionDir{ photon.get_incident_direction(), photon.get_incident_dist_sq() };
-	for(int i = pl0+1; i <= pathLen; ++i) {
-		incidentF[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
-		incidentB[i] = vert->ext().incidentPdf;
-		pdfBack = vert->ext().pdfBack;
-		connectionDir = ConnectionDir{ vert->get_incident_direction(), vert->get_incident_dist_sq() };
-		vert = vert->previous();
-	}
+	copy_path_values(incidentF, incidentB, viewPath.previous(), viewPath.get_type(),
+		bsdf.pdf.back, viewPath.get_incident_connection(), pl0 - 1, -1);
+	copy_path_values(incidentB, incidentF, photon.previous(), photon.get_type(),
+		bsdf.pdf.forw, photon.get_incident_connection(), pl0 + 1, pathLen + 1);
 	float misWeight = get_mis_weight_photon(incidentF, incidentB, pathLen, pl0, mergeArea, numPhotons);
 	return bsdf.value * photon.ext().throughput * misWeight;
 }
@@ -328,17 +307,8 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			if(emission.value != 0.0f) {
 				incidentF[viewPathLen] = currentVertex->ext().incidentPdf;
 				incidentB[viewPathLen] = emission.emitPdf;
-				const IvcmPathVertex* vert = currentVertex->previous();
-				Interaction prevType = currentVertex->get_type();
-				AngularPdf pdfBack = emission.pdf;
-				ConnectionDir connectionDir { currentVertex->get_incident_direction(), currentVertex->get_incident_dist_sq() };
-				for(int i = viewPathLen-1; i >= 0; --i) {
-					incidentF[i] = vert->ext().incidentPdf;
-					incidentB[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
-					pdfBack = vert->ext().pdfBack;
-					connectionDir = ConnectionDir{ vert->get_incident_direction(), vert->get_incident_dist_sq() };
-					vert = vert->previous();
-				}
+				copy_path_values(incidentF, incidentB, currentVertex->previous(), currentVertex->get_type(),
+					emission.pdf, currentVertex->get_incident_connection(), viewPathLen - 1, -1);
 				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, numPhotons);
 				emission.value *= misWeight;
 			}

@@ -352,6 +352,10 @@ public:
 		return lensq(m_previous->get_position(m_position) - m_position);
 	}
 
+	CUDA_FUNCTION ConnectionDir get_incident_connection() const {
+		return { get_incident_direction(), get_incident_dist_sq() };
+	}
+
 	// Get the previous path vertex or nullptr if this is a start vertex.
 	CUDA_FUNCTION const PathVertex* previous() const {
 		return m_previous;
