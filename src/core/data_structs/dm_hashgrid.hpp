@@ -77,20 +77,36 @@ public:
 	float get_density(const ei::Vec3& position, const ei::Vec3& normal) const {
 		ei::IVec3 gridPosI = ei::floor(position / m_cellSize);
 		ei::UVec3 gridPos { gridPosI };
-		// Get count
-		u32 h = get_cell_hash(gridPos);
-		u32 i = h % m_mapSize;
-		int s = 1;
-		u32 c = m_data[i].count.load();
-		while(c > 0 && m_data[i].cell != gridPos) {
-			i = (h + (s&1 ? s*s : -s*s) + m_mapSize) % m_mapSize;
-			++s;
-			c = m_data[i].count.load();
-		}
+		u32 c = get_count(gridPos);
 		// Determine intersection area between cell and query plane
 		ei::Vec3 localPos = position - gridPosI * m_cellSize;
 		float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
 		return c * m_densityScale / area;
+	}
+
+	float get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal) const {
+		// Get integer and interpolation coordinates
+		ei::Vec3 nrmPos = position / m_cellSize - 0.5f;
+		ei::IVec3 gridPosI = ei::floor(nrmPos);
+		ei::Vec3 ws[2];
+		ws[0] = nrmPos - gridPosI;
+		ws[1] = 1.0f - ws[0];
+		float countSum = 0.0f, areaSum = 0.0f;
+		// Iterate over all eight cells
+		for(int i = 0u; i < 8u; ++i) {
+			int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
+			ei::IVec3 cellPos { gridPosI.x + ix,
+								gridPosI.y + iy,
+								gridPosI.z + iz };
+			ei::Vec3 localPos = position - cellPos * m_cellSize;
+			float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
+			float count = static_cast<float>(get_count(ei::UVec3{cellPos}));
+			// Compute trilinear interpolated result of count and area (running sum)
+			float w = ws[ix].x * ws[iy].y * ws[iz].z;
+			areaSum += area * w;
+			countSum += count * w;
+		}
+		return sdiv(countSum, areaSum) * m_densityScale;
 	}
 
 private:
@@ -103,6 +119,19 @@ private:
 	float m_densityScale;
 	u32 m_mapSize;
 	std::unique_ptr<Entry[]> m_data;
+
+	u32 get_count(const ei::UVec3& gridPos) const {
+		u32 h = get_cell_hash(gridPos);
+		u32 i = h % m_mapSize;
+		int s = 1;
+		u32 c = m_data[i].count.load();
+		while(c > 0 && m_data[i].cell != gridPos) {
+			i = (h + (s&1 ? s*s : -s*s) + m_mapSize) % m_mapSize;
+			++s;
+			c = m_data[i].count.load();
+		}
+		return c;
+	}
 };
 
 }} // namespace mufflon::util::density

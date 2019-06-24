@@ -11,9 +11,9 @@ inline float intersection_area(const ei::Vec3& bmin, const ei::Vec3& bmax, const
 	ei::Vec3 cellSize = bmax - bmin;
 	ei::Vec3 absN = abs(normal);
 	// 1D cases
-	if(ei::abs(absN.x - 1.0f) < 1e-3f) return cellSize.y * cellSize.z;
-	if(ei::abs(absN.y - 1.0f) < 1e-3f) return cellSize.x * cellSize.z;
-	if(ei::abs(absN.z - 1.0f) < 1e-3f) return cellSize.x * cellSize.y;
+	if(ei::abs(absN.x - 1.0f) < 1e-3f) return (pos.x >= 0.0f && pos.x <= cellSize.x) ? cellSize.y * cellSize.z : 0.0f;
+	if(ei::abs(absN.y - 1.0f) < 1e-3f) return (pos.y >= 0.0f && pos.y <= cellSize.y) ? cellSize.x * cellSize.z : 0.0f;
+	if(ei::abs(absN.z - 1.0f) < 1e-3f) return (pos.z >= 0.0f && pos.z <= cellSize.z) ? cellSize.x * cellSize.y : 0.0f;
 	// 2D cases
 	for(int d = 0; d < 3; ++d) if(absN[d] < 1e-4f) {
 		int x = (d + 1) % 3;
@@ -49,9 +49,9 @@ inline float intersection_area(const ei::Vec3& bmin, const ei::Vec3& bmax, const
 inline float intersection_area_nrm(const ei::Vec3& cellSize, const ei::Vec3& pos, const ei::Vec3& normal) {
 	ei::Vec3 absN = abs(normal);
 	// 1D cases
-	if(ei::abs(absN.x - 1.0f) < 1e-3f) return cellSize.y * cellSize.z;
-	if(ei::abs(absN.y - 1.0f) < 1e-3f) return cellSize.x * cellSize.z;
-	if(ei::abs(absN.z - 1.0f) < 1e-3f) return cellSize.x * cellSize.y;
+	if(ei::abs(absN.x - 1.0f) < 1e-3f) return (pos.x >= 0.0f && pos.x <= cellSize.x) ? cellSize.y * cellSize.z : 0.0f;
+	if(ei::abs(absN.y - 1.0f) < 1e-3f) return (pos.y >= 0.0f && pos.y <= cellSize.y) ? cellSize.x * cellSize.z : 0.0f;
+	if(ei::abs(absN.z - 1.0f) < 1e-3f) return (pos.z >= 0.0f && pos.z <= cellSize.z) ? cellSize.x * cellSize.y : 0.0f;
 	// 2D cases
 	for(int d = 0; d < 3; ++d) if(absN[d] < 1e-4f) {
 		int x = (d + 1) % 3;

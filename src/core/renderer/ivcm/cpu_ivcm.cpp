@@ -239,9 +239,9 @@ void CpuIvcm::post_reset() {
 		m_tmpViewPathVertices.resize(get_thread_num() * (m_params.maxPathLength + 1));
 	}
 	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
-		m_densityHM = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32, m_params.mergeRadius * 2.0001f);
+		m_densityHM = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32, m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
 	else
-		m_densityHM->set_cell_size(m_params.mergeRadius * 2.0001f);
+		m_densityHM->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
 	m_densityHM->clear();
 }
 
@@ -310,7 +310,8 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity) {
-			float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());
+			//float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());
+			float density = m_densityHM->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());
