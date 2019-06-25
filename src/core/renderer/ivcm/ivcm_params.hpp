@@ -6,7 +6,7 @@ namespace mufflon { namespace renderer {
 
 struct PShowDensity {
 	bool showDensity { false };
-	static ParamDesc get_desc() noexcept {
+	static constexpr ParamDesc get_desc() noexcept {
 		return {"Show Density", ParameterTypes::BOOL};
 	}
 };
