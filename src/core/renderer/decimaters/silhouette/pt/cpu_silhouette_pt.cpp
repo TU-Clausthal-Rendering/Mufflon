@@ -39,7 +39,7 @@ CpuShadowSilhouettesPT::CpuShadowSilhouettesPT()
 }
 
 void CpuShadowSilhouettesPT::pre_reset() {
-	if((get_reset_event() & ResetEvent::CAMERA) != ResetEvent::NONE || this->resolution_changed())
+	if((get_reset_event() & ResetEvent::CAMERA) != ResetEvent::NONE || get_reset_event().resolution_changed())
 		init_rngs(m_outputBuffer.get_num_pixels());
 
 	if((get_reset_event() & ResetEvent::SCENARIO) != ResetEvent::NONE && m_currentDecimationIteration != 0u) {

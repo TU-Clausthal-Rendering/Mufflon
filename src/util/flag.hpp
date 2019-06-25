@@ -40,6 +40,10 @@ struct Flags {
 				   "Only a single flag (bit) should be checked.");
 		return (mask & flag) != 0;
 	}
+	// Check if one of a number of flags is set
+	CUDA_FUNCTION bool is_any_set(T mask) const noexcept {
+		return (this->mask & mask) != 0;
+	}
 	// Check if NO flag is set
 	CUDA_FUNCTION bool is_empty() const noexcept { return mask == 0; }
 	// Check if exactly one flag is set

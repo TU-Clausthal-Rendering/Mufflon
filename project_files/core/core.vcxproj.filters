@@ -161,6 +161,15 @@
     <Filter Include="Source Files\core\renderer\decimaters\silhouette\pt">
       <UniqueIdentifier>{7a43bdd3-36aa-4ebe-ac55-6593e9913187}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\data_structs">
+      <UniqueIdentifier>{289186c0-f182-4fc0-b155-152cce2ed846}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\ivcm">
+      <UniqueIdentifier>{14f2cde4-ec86-4b3b-8d19-653f350f63bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\shader">
+      <UniqueIdentifier>{0794bf0f-2b18-4269-a38c-12ddf1099ca1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -342,6 +351,30 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_context.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\gl_object.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\program_builder.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\opengl\vertex_array_builder.cpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\ivcm\cpu_ivcm.cpp">
+      <Filter>Source Files\core\renderer\ivcm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -951,9 +984,6 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
     </ClInclude>
@@ -983,9 +1013,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
@@ -1113,6 +1140,48 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_params.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\math\intersection_areas.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_context.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_object.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\program_builder.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp">
+      <Filter>Source Files\core\renderer\ivcm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp">
+      <Filter>Source Files\core\renderer\ivcm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h">
+      <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1139,6 +1208,9 @@
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu">
       <Filter>Source Files\core\renderer\pt</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cu">
+      <Filter>Source Files\core\renderer\pt</Filter>
+    </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </CudaCompile>
@@ -1154,5 +1226,55 @@
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cu">
       <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\core\renderer\shader\camera_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\copy_output.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\forward_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\forward_quad_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\forward_shade.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\forward_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\forward_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\material_id_binding.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\sphere_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\sphere_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\sphere_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\wireframe_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\shader\wireframe_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </None>
   </ItemGroup>
 </Project>

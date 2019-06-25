@@ -221,7 +221,7 @@ CUDA_FUNCTION float get_mis_weight(const SilPathVertex& thisVertex, const Angula
 } // namespace
 
 CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-										   HashGrid<CURRENT_DEV, PhotonDesc>& photonMap,
+										   data_structs::HashGrid<CURRENT_DEV, PhotonDesc>& photonMap,
 										   const SilhouetteParameters& params,
 										   const int idx, const int photonCount,
 										   const u64 photonSeed, const float mergeRadius,
@@ -266,7 +266,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 
 
 CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-									 const HashGrid<CURRENT_DEV, PhotonDesc>& photonMap,
+									 const data_structs::HashGrid<CURRENT_DEV, PhotonDesc>& photonMap,
 									 const SilhouetteParameters& params,
 									 const Pixel& coord, math::Rng& rng,
 									 const int photonCount, const float mergeRadius,

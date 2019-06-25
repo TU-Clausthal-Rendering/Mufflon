@@ -70,7 +70,9 @@ void Scene::load_materials() {
 		offset += m_scenario.get_assigned_material(i)->get_descriptor_size(dev);
 	}
 	// Allocate the memory
-	m_materials.resize(offset);
+	// TODO: this is a workaround to stop erasing previous material memory when other devices already got some
+	if(m_materials.size() < offset)
+		m_materials.resize(offset);
 	m_alphaTextures.resize(sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
 
 	// Temporary storage to only copy once
@@ -285,8 +287,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		load_materials<dev>();
 	// This query should be cheap. The above if already made the information resident.
 	sceneDescriptor.media = (ArrayDevHandle_t<dev, materials::Medium>)(m_media.template acquire_const<dev>());
-	sceneDescriptor.materials = (ArrayDevHandle_t<dev, int>)(m_materials.template acquire_const<dev>());
-	sceneDescriptor.alphaTextures = (ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.template acquire_const<dev>());
+	sceneDescriptor.materials = (ArrayDevHandle_t<dev, int>)(m_materials.template acquire_const<dev>(false));
+	sceneDescriptor.alphaTextures = (ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.template acquire_const<dev>(false));
 	
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {

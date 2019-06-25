@@ -9,7 +9,7 @@
 #include <ei/prime.hpp>
 #include <atomic>
 
-namespace mufflon { namespace renderer {
+namespace mufflon { namespace data_structs {
 
 /*
  * Hash-grid implementation. A hash grid is extremly fast and well parallelizable
@@ -282,8 +282,8 @@ private:
 	std::atomic_uint32_t m_cpuHMCounter;		// Store the atomic counter here, because the returned HashMap<CPU> is not trivially copyable otherwise
 };
 
-} // namespace renderer
+} // namespace data_structs
 
-template struct DeviceManagerConcept<renderer::HashGridManager<int>>;
+template struct DeviceManagerConcept<data_structs::HashGridManager<int>>;
 
 } // namespace mufflon

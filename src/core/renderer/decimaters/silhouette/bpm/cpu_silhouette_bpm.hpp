@@ -3,9 +3,9 @@
 #include "decimation_common_bpm.hpp"
 #include "silhouette_bpm_common.hpp"
 #include "silhouette_bpm_params.hpp"
+#include "core/data_structs/photon_map.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
-#include "core/renderer/photon_map.hpp"
 #include <atomic>
 #include <vector>
 
@@ -42,8 +42,8 @@ private:
 
 	bpm::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
-	HashGridManager<bpm::PhotonDesc> m_photonMapManager;
-	HashGrid<Device::CPU, bpm::PhotonDesc> m_photonMap;
+	data_structs::HashGridManager<bpm::PhotonDesc> m_photonMapManager;
+	data_structs::HashGrid<Device::CPU, bpm::PhotonDesc> m_photonMap;
 
 	float m_maxImportance = 0.f;
 	std::vector<std::unique_ptr<bpm::ImportanceDecimater<Device::CPU>>> m_decimaters;

@@ -5,7 +5,7 @@
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/photon_map.hpp"
+#include "core/data_structs/photon_map.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -56,8 +56,8 @@ private:
 
 	VcmParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
-	HashGridManager<VcmPathVertex> m_photonMapManager;
-	HashGrid<Device::CPU, VcmPathVertex> m_photonMap;
+	data_structs::HashGridManager<VcmPathVertex> m_photonMapManager;
+	data_structs::HashGrid<Device::CPU, VcmPathVertex> m_photonMap;
 	std::vector<const VcmPathVertex*> m_pathEndPoints;
 };
 

@@ -3163,6 +3163,7 @@ Boolean render_enable_renderer(uint32_t index, uint32_t variation) {
 	s_currentRenderer = s_renderers.get(index)[variation].get();
 	if(s_world.get_current_scenario() != nullptr)
 		s_currentRenderer->load_scene(s_world.get_current_scene());
+	s_currentRenderer->on_renderer_enable();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3483,6 +3484,85 @@ Boolean renderer_get_parameter_bool(const char* name, Boolean* value) {
 		return false;
 	}
 	*value = s_currentRenderer->get_parameters().get_param_bool(name);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_set_parameter_enum(const char* name, int value) {
+	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	s_currentRenderer->get_parameters().set_param_enum(name, int(value));
+	s_currentRenderer->on_renderer_parameter_changed();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_get_parameter_enum(const char* name, int* value) {
+	TRY
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*value = s_currentRenderer->get_parameters().get_param_enum(name);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_get_parameter_enum_count(const char* param, uint32_t* count) {
+	TRY
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*count = s_currentRenderer->get_parameters().get_enum_value_count(param);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_get_parameter_enum_value_from_index(const char* param, uint32_t index, int* value) {
+	TRY
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*value = s_currentRenderer->get_parameters().get_enum_value(param, index);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_get_parameter_enum_value_from_name(const char* param, const char* valueName, int* value) {
+	TRY
+		if(s_currentRenderer == nullptr) {
+			logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+			return false;
+		}
+	*value = s_currentRenderer->get_parameters().get_enum_name_value(param, std::string(valueName));
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_get_parameter_enum_index_from_value(const char* param, int value, uint32_t* index) {
+	TRY
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*index = s_currentRenderer->get_parameters().get_enum_index(param, value);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean renderer_get_parameter_enum_name(const char* param, int value, const char** name) {
+	TRY
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*name = s_currentRenderer->get_parameters().get_enum_value_name(param, value).c_str();
 	return true;
 	CATCH_ALL(false)
 }

@@ -44,7 +44,7 @@ GpuShadowSilhouettesPT::GpuShadowSilhouettesPT() :
 {}
 
 void GpuShadowSilhouettesPT::pre_reset() {
-	if(this->resolution_changed()) {
+	if(get_reset_event().resolution_changed()) {
 		m_seeds = std::make_unique<u32[]>(m_outputBuffer.get_num_pixels());
 		m_seedsPtr = make_udevptr_array<Device::CUDA, u32>(m_outputBuffer.get_num_pixels());
 	}

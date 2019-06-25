@@ -29,7 +29,10 @@ namespace gui.Model
                     "loading and storing of last renderer parameters", Core.Severity.Warning);
             Type = type;
             Index = index;
-            m_value = Value;
+            if (type == Core.ParameterType.Enum)
+                m_value = "";
+            else
+                m_value = 0;
         }
 
         public Core.ParameterType Type { get; private set; }
@@ -64,6 +67,17 @@ namespace gui.Model
                             throw new Exception(Core.core_get_dll_error());
                         m_value = val;
                         return val;
+                        }
+                    case Core.ParameterType.Enum:
+                    {
+                        int val;
+                        if (!Core.renderer_get_parameter_enum(Name, out val))
+                            throw new Exception(Core.core_get_dll_error());
+                        m_value = val;
+                        string name;
+                        if (!Core.renderer_get_parameter_enum_name(Name, (int)m_value, out name))
+                            throw new Exception(Core.core_get_dll_error());
+                        return name;
                     }
                 }
                 return null;
@@ -77,14 +91,25 @@ namespace gui.Model
                     case Core.ParameterType.Bool:
                         if (!Core.renderer_set_parameter_bool(Name, ((bool) value) ? 1u : 0u))
                             throw new Exception(Core.core_get_dll_error());
+                        m_value = value;
                         break;
                     case Core.ParameterType.Int:
                         if (!Core.renderer_set_parameter_int(Name, (int) value))
                             throw new Exception(Core.core_get_dll_error());
+                        m_value = value;
                         break;
                     case Core.ParameterType.Float:
                         if (!Core.renderer_set_parameter_float(Name, (float) value))
                             throw new Exception(Core.core_get_dll_error());
+                        m_value = value;
+                        break;
+                    case Core.ParameterType.Enum:
+                        int val;
+                        if(!Core.renderer_get_parameter_enum_value_from_name(Name, (string)value, out val))
+                            throw new Exception(Core.core_get_dll_error());
+                        if (!Core.renderer_set_parameter_enum(Name, val))
+                            throw new Exception(Core.core_get_dll_error());
+                        m_value = val;
                         break;
                 }
                 OnPropertyChanged(nameof(Value));
@@ -389,6 +414,9 @@ namespace gui.Model
                             double val;
                             if (Double.TryParse(paramVals[2], out val))
                                 Parameters[i].Value = (float)val;
+                        } else if(paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Enum) && Parameters[i].Type == Core.ParameterType.Enum)
+                        {
+                            Parameters[i].Value = paramVals[2];
                         }
                     }
                 }

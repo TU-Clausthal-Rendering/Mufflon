@@ -271,7 +271,8 @@ typedef struct MaterialParamsStruct {
 enum ParameterType {
 	PARAM_INT,
 	PARAM_FLOAT,
-	PARAM_BOOL
+	PARAM_BOOL,
+	PARAM_ENUM
 };
 
 // Abstraction for bulk load
@@ -569,6 +570,13 @@ CORE_API Boolean CDECL renderer_set_parameter_float(const char* name, float valu
 CORE_API Boolean CDECL renderer_get_parameter_float(const char* name, float* value);
 CORE_API Boolean CDECL renderer_set_parameter_bool(const char* name, Boolean value);
 CORE_API Boolean CDECL renderer_get_parameter_bool(const char* name, Boolean* value);
+CORE_API Boolean CDECL renderer_set_parameter_enum(const char* name, int value);
+CORE_API Boolean CDECL renderer_get_parameter_enum(const char* name, int* value);
+CORE_API Boolean CDECL renderer_get_parameter_enum_count(const char* param, uint32_t* count);
+CORE_API Boolean CDECL renderer_get_parameter_enum_value_from_index(const char* param, uint32_t index, int* value);
+CORE_API Boolean CDECL renderer_get_parameter_enum_value_from_name(const char* param, const char* valueName, int* value);
+CORE_API Boolean CDECL renderer_get_parameter_enum_index_from_value(const char* param, int value, uint32_t* index);
+CORE_API Boolean CDECL renderer_get_parameter_enum_name(const char* param, int value, const char** name);
 
 // Interface for profiling
 CORE_API void CDECL profiling_enable();

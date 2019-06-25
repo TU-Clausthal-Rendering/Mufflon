@@ -4,20 +4,20 @@
 
 namespace mufflon { namespace renderer {
 
-struct PkNN {
-	int knn { 0 };
+struct PShowDensity {
+	bool showDensity { false };
 	static constexpr ParamDesc get_desc() noexcept {
-		return {"kNN Merges", ParameterTypes::INT};
+		return {"Show Density", ParameterTypes::BOOL};
 	}
 };
 
-using BpmParameters = ParameterHandler<
+using IvcmParameters = ParameterHandler<
 	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PMergeRadius,
 	PProgressive,
-	PkNN
+	PShowDensity
 >;
 
 }} // namespace mufflon::renderer

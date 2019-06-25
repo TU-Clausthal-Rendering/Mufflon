@@ -220,10 +220,16 @@ public:
 	// 'targets' which where set in the constructor.
 	template < Device dev >
 	RenderBuffer<dev> begin_iteration(bool reset);
+	template < Device dev1, Device dev2 >
+	std::tuple<RenderBuffer<dev1>, RenderBuffer<dev2>> begin_iteration_hybrid(bool reset);
 
 	// Do some finalization, like variance computations
 	template < Device dev >
 	void end_iteration();
+
+	// For multi-device renderers: synchronizes the result split along the x-axis
+	template < Device from, Device to >
+	void sync_back(int ySplit);
 
 	void set_targets(OutputValue targets);
 	OutputValue get_target() const noexcept { return m_targets; }
