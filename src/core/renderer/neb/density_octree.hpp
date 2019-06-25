@@ -358,7 +358,7 @@ namespace mufflon::renderer {
 							//       │         │         │         │         │
 							// 0.25  │    4    │    5    │    6    │    7    │
 							//       │         │         │         │         │
-							const ei::Vec3 interpFactors = gridCoord * 0.5f - 0.25f;
+							const ei::Vec3 interpFactors = ei::clamp(gridCoord * 0.5f - 0.25f, 0.f, 1.f);
 							const float densityZ0 = ei::bilerp(currCellInfo[0].count, currCellInfo[1].count,
 															   currCellInfo[2].count, currCellInfo[3].count,
 															   interpFactors.x, interpFactors.y);
@@ -409,7 +409,7 @@ namespace mufflon::renderer {
 			// center of the interpolation cube and are then guaranteed in range [0.5, -0.5]
 			// (except at the bounding box edges, where we extrapolate
 			const ei::IVec3 finalICoord = ei::clamp(ei::round(finalGridCoord), ei::IVec3{ 1 }, ei::IVec3{cellsPerDim - 1});
-			const ei::Vec3 interpFactors = finalGridCoord - finalICoord + 0.5f;
+			const ei::Vec3 interpFactors = ei::clamp(finalGridCoord - finalICoord + 0.5f, 0.f, 1.f);
 			// Trilinear interpolation in the cube gives us the density estimate
 			const float densityZ0 = ei::bilerp(currCellInfo[0].count, currCellInfo[1].count, currCellInfo[2].count, currCellInfo[3].count,
 											   interpFactors.x, interpFactors.y);

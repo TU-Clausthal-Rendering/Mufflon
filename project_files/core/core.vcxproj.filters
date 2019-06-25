@@ -161,6 +161,9 @@
     <Filter Include="Source Files\core\renderer\decimaters\silhouette\pt">
       <UniqueIdentifier>{7a43bdd3-36aa-4ebe-ac55-6593e9913187}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\shadow_photons">
+      <UniqueIdentifier>{5b06425b-ddaf-41df-93e8-2cbe354c22b6}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\core\data_structs">
       <UniqueIdentifier>{289186c0-f182-4fc0-b155-152cce2ed846}</UniqueIdentifier>
     </Filter>
@@ -375,6 +378,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\shadow_photons\cpu_shadow_photons.cpp">
+      <Filter>Source Files\core\renderer\decimaters\shadow_photons</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1182,6 +1188,12 @@
     <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\shadow_photons\cpu_shadow_photons.hpp">
+      <Filter>Source Files\core\renderer\decimaters\shadow_photons</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\shadow_photons\shadow_photons_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\shadow_photons</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1228,53 +1240,21 @@
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\src\core\renderer\shader\camera_transforms.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\copy_output.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\forward_fragment.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\forward_quad_tese.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\forward_shade.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\forward_tese.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\forward_vertex.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\material_id_binding.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\sphere_fragment.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\sphere_geom.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\sphere_vertex.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\wireframe_tese.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
-    <None Include="..\..\src\core\renderer\shader\wireframe_vertex.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </None>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\copy_output.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_vertex.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_tese.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_vertex.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\camera_transforms.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_fragment.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_vertex.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_tese.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_geom.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_fragment.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_quad_tese.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\material_id_binding.glsl" />
   </ItemGroup>
 </Project>

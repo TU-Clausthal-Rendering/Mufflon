@@ -14,7 +14,7 @@ public:
 	// Create a hash grid with a fixed memory footprint. This hash grid does not
 	// implement a resizing mechanism, so if you try to add more elements than
 	// the expected number data is lost.
-	DmHashGrid(uint numExpectedEntries, float cellSize) {
+	DmHashGrid(u32 numExpectedEntries, float cellSize) {
 		m_cellSize = ei::Vec3 { cellSize };
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
 		m_data.reset(new Entry[m_mapSize]);

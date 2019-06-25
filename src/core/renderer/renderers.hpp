@@ -9,6 +9,7 @@
 #include "core/renderer/decimaters/silhouette/pt/gpu_silhouette_pt.hpp"
 #include "core/renderer/decimaters/silhouette/bpm/cpu_silhouette_bpm.hpp"
 #include "core/renderer/decimaters/silhouette/bpm/gpu_silhouette_bpm.hpp"
+#include "core/renderer/decimaters/shadow_photons/cpu_shadow_photons.hpp"
 #include "core/renderer/lt/cpu_lt.hpp"
 #include "core/renderer/lt/gpu_lt.hpp"
 #include "core/renderer/wireframe/cpu_wireframe.hpp"
@@ -34,7 +35,8 @@ using Renderers = util::TaggedTuple<
 	GlForward,
 	decimaters::silhouette::CpuShadowSilhouettesPT, decimaters::silhouette::GpuShadowSilhouettesPT,
 	decimaters::silhouette::CpuShadowSilhouettesBPM,
-	decimaters::CpuImportanceDecimater
+	decimaters::CpuImportanceDecimater,
+	decimaters::spm::ShadowPhotonVisualizer
 >;
 
 } // namespace mufflon::renderer
