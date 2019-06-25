@@ -15,15 +15,22 @@ ShadowPhotonVisualizer::~ShadowPhotonVisualizer() {
 void ShadowPhotonVisualizer::post_reset() {
 	const auto resetFlags = get_reset_event();
 	init_rngs(m_outputBuffer.get_num_pixels());
-	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
-		m_densityHM = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32, 0.00125f * m_sceneDesc.diagSize * 2.0001f);
-	else
-		m_densityHM->set_cell_size(0.00125f * m_sceneDesc.diagSize * 2.0001f);
-	m_densityHM->clear();
+	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE)) {
+		m_densityShadowPhotons = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32,
+																			m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+		m_densityPhotons = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32,
+																	  m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+	} else {
+		// TODO: proper cell size
+		m_densityShadowPhotons->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+		m_densityPhotons->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+	}
+	m_densityShadowPhotons->clear();
+	m_densityPhotons->clear();
 }
 
 void ShadowPhotonVisualizer::iterate() {
-	m_densityHM->set_density_scale(1.0f / (m_currentIteration + 1));
+	m_densityShadowPhotons->set_density_scale(1.0f / (m_currentIteration + 1));
 
 	const u64 photonSeed = m_rngs[0].next();
 	const int numPhotons = m_outputBuffer.get_num_pixels();
@@ -38,8 +45,17 @@ void ShadowPhotonVisualizer::iterate() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < numPixels; ++pixel) {
 		Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		const float density = query_photon_density(coord, pixel);
-		m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ density });
+		const float photonDensity = query_photon_density(coord, pixel);
+		const float shadowPhotonDensity = query_shadow_photon_density(coord, pixel);
+		m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ photonDensity, 0.f, shadowPhotonDensity });
+		m_outputBuffer.set(coord, RenderTargets::POSITION, ei::Vec3{ photonDensity });
+		m_outputBuffer.set(coord, RenderTargets::ALBEDO, ei::Vec3{ shadowPhotonDensity });
+
+		const float ratio = photonDensity / std::max(1.f, (photonDensity + shadowPhotonDensity));
+		if(ratio < 0.5f)
+			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 2.f * ratio });
+		else
+			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 1.f - 2.f * (ratio - 0.5f) });
 	}
 }
 
@@ -57,7 +73,30 @@ float ShadowPhotonVisualizer::query_photon_density(const Pixel pixel, const int 
 	if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
 		return 0.f;
 
-	return m_densityHM->get_density_interpolated(vertex.get_position(), vertex.get_normal());
+	if(m_params.pointSampling)
+		return m_densityPhotons->get_density(vertex.get_position(), vertex.get_normal());
+	else
+		return m_densityPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal());
+}
+
+float ShadowPhotonVisualizer::query_shadow_photon_density(const Pixel pixel, const int idx) {
+	// Walk only once
+
+	// Dummies, we don't care about that
+	math::Throughput throughput;
+	VertexSample sample;
+	SpvPathVertex vertex;
+	SpvPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), pixel, m_rngs[idx].next());
+
+	math::RndSet2_1 rnd{ m_rngs[idx].next(), m_rngs[idx].next() };
+	float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
+	if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
+		return 0.f;
+
+	if(m_params.pointSampling)
+		return m_densityShadowPhotons->get_density(vertex.get_position(), vertex.get_normal());
+	else
+		return m_densityShadowPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal());
 }
 
 void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, const u64 seed) {
@@ -82,12 +121,13 @@ void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, c
 		currentV = otherV;
 		otherV = 1 - currentV;
 
+		// Deposit regular photon
+		m_densityPhotons->increase_count(vertex[currentV].get_position());
+
 		// Trace shadow photon
 		std::optional<ei::Vec3> shadowPos = trace_shadow_photon(vertex[currentV], idx);
-		if(shadowPos.has_value()) {
-			printf("Increment\n");
-			m_densityHM->increase_count(shadowPos.value());
-		}
+		if(shadowPos.has_value())
+			m_densityShadowPhotons->increase_count(shadowPos.value());
 	} while(pathLen < m_params.maxPathLength - 1); // -1 because there is at least one segment on the view path
 }
 

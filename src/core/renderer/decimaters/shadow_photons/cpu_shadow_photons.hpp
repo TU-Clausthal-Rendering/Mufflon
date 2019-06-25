@@ -40,13 +40,15 @@ public:
 private:
 	void trace_photon(const int idx, const int numPhotons, const u64 seed);
 	float query_photon_density(const Pixel pixel, const int idx);
+	float query_shadow_photon_density(const Pixel pixel, const int idx);
 	void init_rngs(const int num);
 
 	std::optional<ei::Vec3> trace_shadow_photon(const SpvPathVertex& vertex, const int idx);
 
 	ShadowPhotonParameters m_params;
 	std::vector<math::Rng> m_rngs;
-	std::unique_ptr<data_structs::DmHashGrid> m_densityHM;
+	std::unique_ptr<data_structs::DmHashGrid> m_densityPhotons;
+	std::unique_ptr<data_structs::DmHashGrid> m_densityShadowPhotons;
 };
 
 } // namespace mufflon::renderer::decimaters::spm
