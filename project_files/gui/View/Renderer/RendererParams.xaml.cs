@@ -20,6 +20,7 @@ namespace gui.View.Renderer
     {
         public DataTemplate BoolTemplate { get; set; }
         public DataTemplate IntTemplate { get; set; }
+        public DataTemplate EnumTemplate { get; set; }
         public DataTemplate FloatTemplate { get; set; }
 
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
@@ -28,6 +29,8 @@ namespace gui.View.Renderer
                 return BoolTemplate;
             else if (item is RendererPropertyInt)
                 return IntTemplate;
+            else if (item is RendererPropertyEnum)
+                return EnumTemplate;
             else if (item is RendererPropertyFloat)
                 return FloatTemplate;
             else

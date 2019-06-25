@@ -100,7 +100,8 @@ namespace gui.Dll
         {
             Int,
             Float,
-            Bool
+            Bool,
+            Enum
         };
 
         public enum Severity
@@ -485,6 +486,39 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_bool")]
         private static extern bool renderer_get_parameter_bool_(IntPtr name, out uint value);
         internal static bool renderer_get_parameter_bool(string name, out uint value) { return renderer_get_parameter_bool_(StringUtil.ToNativeUtf8(name), out value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_set_parameter_enum")]
+        private static extern bool renderer_set_parameter_enum_(IntPtr name, int value);
+        internal static bool renderer_set_parameter_enum(string name, int value) { return renderer_set_parameter_enum_(StringUtil.ToNativeUtf8(name), value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_enum")]
+        private static extern bool renderer_get_parameter_enum_(IntPtr name, out int value);
+        internal static bool renderer_get_parameter_enum(string name, out int value) { return renderer_get_parameter_enum_(StringUtil.ToNativeUtf8(name), out value); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool renderer_get_parameter_enum_count(string param, out uint count);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_enum_name")]
+        private static extern bool renderer_get_parameter_enum_name_(IntPtr param, int value, out IntPtr name);
+        internal static bool renderer_get_parameter_enum_name(string name, int value, out string valName) {
+            IntPtr enumName;
+            bool res = renderer_get_parameter_enum_name_(StringUtil.ToNativeUtf8(name), value, out enumName);
+            valName = StringUtil.FromNativeUTF8(enumName);
+            return res;
+        }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_enum_value_from_index")]
+        private static extern bool renderer_get_parameter_enum_value_from_index_(IntPtr param, uint index, out int value);
+        internal static bool renderer_get_parameter_enum_value_from_index(string param, uint index, out int value)
+        {
+            return renderer_get_parameter_enum_value_from_index_(StringUtil.ToNativeUtf8(param), index, out value);
+        }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_enum_value_from_name")]
+        private static extern bool renderer_get_parameter_enum_value_from_name_(IntPtr param, IntPtr valueName, out int value);
+        internal static bool renderer_get_parameter_enum_value_from_name(string param, string valueName, out int value) {
+            return renderer_get_parameter_enum_value_from_name_(StringUtil.ToNativeUtf8(param), StringUtil.ToNativeUtf8(valueName), out value);
+        }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_enum_index_from_value")]
+        private static extern bool renderer_get_parameter_enum_index_from_value_(IntPtr param, int value, out uint index);
+        internal static bool renderer_get_parameter_enum_index_from_value(string param, int value, out uint index)
+        {
+            return renderer_get_parameter_enum_index_from_value_(StringUtil.ToNativeUtf8(param), value, out index);
+        }
 
         // Interface for profiling
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

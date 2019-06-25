@@ -119,6 +119,93 @@ namespace gui.ViewModel
 
         #endregion
     }
+    public class RendererPropertyEnum : INotifyPropertyChanged
+    {
+        private RendererParameter m_param;
+
+        public class Item
+        {
+            private uint m_index = UInt32.MaxValue;
+            private string m_propName;
+            private string m_name;
+            private int m_value;
+
+            public Item(uint index, string propName)
+            {
+                m_propName = propName;
+                Index = index;
+            }
+
+            public uint Index
+            {
+                get => m_index;
+                set
+                {
+                    if (m_index == value) return;
+                    m_index = value;
+                    if(!Core.renderer_get_parameter_enum_value_from_index(m_propName, m_index, out m_value))
+                        throw new Exception(Core.core_get_dll_error());
+                    if (!Core.renderer_get_parameter_enum_name(m_propName, m_value, out m_name))
+                        throw new Exception(Core.core_get_dll_error());
+                }
+            }
+            public string Name { get => m_name; }
+            public int Value { get => m_value; }
+        }
+
+        private Item m_selectedValue;
+
+        public RendererPropertyEnum(RendererParameter param) {
+            m_param = param;
+            uint num;
+            if (!Core.renderer_get_parameter_enum_count(m_param.Name, out num))
+                throw new Exception(Core.core_get_dll_error());
+            for (uint i = 0u; i < num; ++i)
+                Values.Add(new Item(i, m_param.Name));
+            SelectedValue = get_index(param.Value as string);
+        }
+
+        public Item get_index(string name)
+        {
+            // TODO: this is kind of inefficient, but I didn't want to introduce another map to the enum parameter...
+            int value;
+            uint index;
+            if(!Core.renderer_get_parameter_enum_value_from_name(m_param.Name, name, out value))
+                throw new Exception(Core.core_get_dll_error());
+            if (!Core.renderer_get_parameter_enum_index_from_value(m_param.Name, value, out index))
+                throw new Exception(Core.core_get_dll_error());
+            return Values[(int)index];
+        }
+
+        public string Name { get => m_param.Name; }
+
+        public ObservableCollection<Item> Values { get; } = new ObservableCollection<Item>();
+
+        public Item SelectedValue
+        {
+            get => m_selectedValue;
+            set
+            {
+                if (value == m_selectedValue) return;
+                m_selectedValue = value;
+                if(m_selectedValue != null)
+                    m_param.Value = m_selectedValue.Name;
+                OnPropertyChanged(nameof(SelectedValue));
+            }
+        }
+
+        #region PropertyChanged
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        [NotifyPropertyChangedInvocator]
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        #endregion
+    }
 
     public class RendererViewModel : INotifyPropertyChanged
     {
@@ -330,7 +417,8 @@ namespace gui.ViewModel
 
             foreach(RendererParameter param in m_models.Renderer.Parameters)
             {
-                switch(param.Type)
+                param.PropertyChanged -= OnRenderParameterChanged;
+                switch (param.Type)
                 {
                     case Core.ParameterType.Bool:
                         RendererProperties.Add(new RendererPropertyBool(param));
@@ -340,6 +428,9 @@ namespace gui.ViewModel
                         break;
                     case Core.ParameterType.Float:
                         RendererProperties.Add(new RendererPropertyFloat(param));
+                        break;
+                    case Core.ParameterType.Enum:
+                        RendererProperties.Add(new RendererPropertyEnum(param));
                         break;
                     default:
                         throw new Exception("Invalid renderer parameter type!");
@@ -359,6 +450,8 @@ namespace gui.ViewModel
                 (prop as RendererPropertyBool).Value = (bool)param.Value;
             else if (prop is RendererPropertyInt)
                 (prop as RendererPropertyInt).Value = (int)param.Value;
+            else if (prop is RendererPropertyEnum)
+                (prop as RendererPropertyEnum).SelectedValue = (prop as RendererPropertyEnum).get_index(param.Value as string);
             else if (prop is RendererPropertyFloat)
                 (prop as RendererPropertyFloat).Value = (float)param.Value;
         }

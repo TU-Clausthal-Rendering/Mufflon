@@ -6,7 +6,7 @@ namespace mufflon { namespace renderer {
 
 struct PkNN {
 	int knn { 0 };
-	static ParamDesc get_desc() noexcept {
+	static constexpr ParamDesc get_desc() noexcept {
 		return {"kNN Merges", ParameterTypes::INT};
 	}
 };

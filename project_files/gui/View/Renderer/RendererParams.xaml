@@ -62,6 +62,12 @@
                                      HorizontalContentAlignment="Right"
                                      VerticalContentAlignment="Center"/>
             </DataTemplate>
+            <DataTemplate x:Key="EnumTemplate"
+                          DataType="{x:Type viewmodel:RendererPropertyEnum}">
+                <ComboBox SelectedItem="{Binding SelectedValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          ItemsSource="{Binding Values}"
+                          DisplayMemberPath="Name"/>
+            </DataTemplate>
             <!--<viewmodel:FloatConverter x:Key="FloatConverterKey"/>
             Then ', Converter={StaticResource FloatConverterKey}' behind UpdateSourceTrigger
             -->
@@ -74,6 +80,7 @@
             <local:ColumnTemplateSelector x:Key="ColumnTemplateSelector"
                                           BoolTemplate="{StaticResource BoolTemplate}"
                                           IntTemplate="{StaticResource IntTemplate}"
+                                          EnumTemplate="{StaticResource EnumTemplate}"
                                           FloatTemplate="{StaticResource FloatTemplate}"/>
         </DataGrid.Resources>
         <DataGrid.Columns>

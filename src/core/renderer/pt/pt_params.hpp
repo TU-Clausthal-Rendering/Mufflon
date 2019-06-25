@@ -6,7 +6,7 @@ namespace mufflon { namespace renderer {
 
 struct PSplitFactor {
 	float split = 0.5f;
-	static ParamDesc get_desc() noexcept {
+	static constexpr ParamDesc get_desc() noexcept {
 		return { "Vertical CPU/CUDA split", ParameterTypes::FLOAT };
 	}
 };
