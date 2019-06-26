@@ -1240,21 +1240,53 @@
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\copy_output.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_vertex.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_tese.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_vertex.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\camera_transforms.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_fragment.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_vertex.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_tese.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_geom.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_fragment.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_quad_tese.glsl" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\material_id_binding.glsl" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\camera_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\copy_output.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_quad_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_shade.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\forward_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\material_id_binding.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sphere_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_quad_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_sgeom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_tese.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

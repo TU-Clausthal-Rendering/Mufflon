@@ -45,13 +45,25 @@ void ShadowPhotonVisualizer::iterate() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < numPixels; ++pixel) {
 		Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		const float photonDensity = query_photon_density(coord, pixel);
-		const float shadowPhotonDensity = query_shadow_photon_density(coord, pixel);
+
+		// Dummies, we don't care about that
+		math::Throughput throughput;
+		VertexSample sample;
+		SpvPathVertex vertex;
+		SpvPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
+
+		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
+		float rndRoulette = math::sample_uniform(u32(m_rngs[pixel].next()));
+		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
+			continue;
+
+		const float photonDensity = query_photon_density(vertex);
+		const float shadowPhotonDensity = query_shadow_photon_density(vertex);
+		const float ratio = photonDensity / std::max(1.f, (photonDensity + shadowPhotonDensity));
+
 		m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ photonDensity, 0.f, shadowPhotonDensity });
 		m_outputBuffer.set(coord, RenderTargets::POSITION, ei::Vec3{ photonDensity });
 		m_outputBuffer.set(coord, RenderTargets::ALBEDO, ei::Vec3{ shadowPhotonDensity });
-
-		const float ratio = photonDensity / std::max(1.f, (photonDensity + shadowPhotonDensity));
 		if(ratio < 0.5f)
 			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 2.f * ratio });
 		else
@@ -59,40 +71,14 @@ void ShadowPhotonVisualizer::iterate() {
 	}
 }
 
-float ShadowPhotonVisualizer::query_photon_density(const Pixel pixel, const int idx) {
-	// Walk only once
-
-	// Dummies, we don't care about that
-	math::Throughput throughput;
-	VertexSample sample;
-	SpvPathVertex vertex;
-	SpvPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), pixel, m_rngs[idx].next());
-
-	math::RndSet2_1 rnd{ m_rngs[idx].next(), m_rngs[idx].next() };
-	float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
-	if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
-		return 0.f;
-
+float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex) {
 	if(m_params.pointSampling)
 		return m_densityPhotons->get_density(vertex.get_position(), vertex.get_normal());
 	else
 		return m_densityPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal());
 }
 
-float ShadowPhotonVisualizer::query_shadow_photon_density(const Pixel pixel, const int idx) {
-	// Walk only once
-
-	// Dummies, we don't care about that
-	math::Throughput throughput;
-	VertexSample sample;
-	SpvPathVertex vertex;
-	SpvPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), pixel, m_rngs[idx].next());
-
-	math::RndSet2_1 rnd{ m_rngs[idx].next(), m_rngs[idx].next() };
-	float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
-	if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
-		return 0.f;
-
+float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& vertex) {
 	if(m_params.pointSampling)
 		return m_densityShadowPhotons->get_density(vertex.get_position(), vertex.get_normal());
 	else

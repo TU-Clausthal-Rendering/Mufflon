@@ -39,8 +39,8 @@ public:
 
 private:
 	void trace_photon(const int idx, const int numPhotons, const u64 seed);
-	float query_photon_density(const Pixel pixel, const int idx);
-	float query_shadow_photon_density(const Pixel pixel, const int idx);
+	float query_photon_density(const SpvPathVertex& vertex);
+	float query_shadow_photon_density(const SpvPathVertex& vertex);
 	void init_rngs(const int num);
 
 	std::optional<ei::Vec3> trace_shadow_photon(const SpvPathVertex& vertex, const int idx);

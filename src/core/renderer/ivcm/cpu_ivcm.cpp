@@ -302,14 +302,15 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
-				*(currentVertex + 1), sample) == WalkResult::CANCEL)
+		WalkResult walkRes;
+		if((walkRes = walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
+				*(currentVertex + 1), sample)) == WalkResult::CANCEL)
 			break;
 		++viewPathLen;
 		++currentVertex;
 
 		// Visualize density map (disables all other contributions)
-		if(m_params.showDensity) {
+		if(m_params.showDensity && walkRes == WalkResult::HIT) {
 			//float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());
 			float density = m_densityHM->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
