@@ -15,7 +15,7 @@ inline void atomic_max(std::atomic<T>& a, T b) {
 
 // A sparse octree with atomic insertion to measure the density of elements in space.
 class DmOctree {
-	static constexpr float SPLIT_FACTOR = 16.f;
+	static constexpr float SPLIT_FACTOR = 0.5f;
 	// At some time the counting should stop -- otherwise the counter will overflow inevitable.
 	static constexpr int FILL_ITERATIONS = 1000;
 public:
@@ -89,6 +89,14 @@ public:
 		}
 	}
 
+	// Idea for truly smooth interpolation:
+	//	Track the center positions of the cells to interpolate. Those might be
+	//	the same for multiple coordinates. The shape formed by these centers is
+	//	a convex polyhedron. Then one needs a kind of general barycentric coordinates
+	//	to interpolate within this polyhedron:
+	//		* http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.516.1856&rep=rep1&type=pdf (with pseudocode)
+	//		* http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.94.9919&rep=rep1&type=pdf
+	//		* 2D: http://geometry.caltech.edu/pubs/MHBD02.pdf
 	float get_density(const ei::Vec3& pos, const ei::Vec3& normal) {
 		ei::Vec3 offPos = pos - m_minBound;
 		ei::Vec3 normPos = offPos * m_sceneSizeInv;
@@ -134,14 +142,14 @@ public:
 		ei::IVec3 iPos { normPos * gridRes };
 		// Memory to track nodes
 		int buffer[16];
-		i8 lvlBuffer[16];
+		float areaBuffer[16];
 		int* parents = buffer;
 		int* current = buffer + 8;
-		i8* parentLvl = lvlBuffer;
-		i8* currentLvl = lvlBuffer + 8;
+		float* parentArea = areaBuffer;
+		float* currentArea = areaBuffer + 8;
 		for(int i=0; i<8; ++i) {
 			current[i] = 0;	// Initialize to root level
-			currentLvl[i] = 0;
+			currentArea[i] = -1;
 		}
 		int lvl = 0;
 		ei::IVec3 parentMinPos { 0 };
@@ -149,7 +157,7 @@ public:
 		while(anyHadChildren) {
 			++lvl;
 			std::swap(parents, current);
-			std::swap(parentLvl, currentLvl);
+			std::swap(parentArea, currentArea);
 			// Compute the 8 nodes which are required for the bilinear interpolation.
 			// Interpolation jumps at half cells -> need index from next level
 			// and a remapping.
@@ -178,50 +186,57 @@ public:
 					cellPos = clamp(cellPos, 0, lvlRes - 1);
 					int localChildIdx = (cellPos.x & 1) + 2 * (cellPos.y & 1) + 4 * (cellPos.z & 1);
 					current[i] = -c + localChildIdx;
-					currentLvl[i] = lvl;
+					currentArea[i] = -1.0f;
 				} else { // Otherwise copy the parent to the next finer level.
 					current[i] = parentAddress;
-					currentLvl[i] = parentLvl[parentIdx];
+					currentArea[i] = parentArea[parentIdx];
 				}
 			}
 			parentMinPos = lvlPos;
-			// Check if any of the current nodes has children -> must proceed
+			// Check if any of the current nodes has children -> must proceed.
+			// Also, compute the areas of leaf nodes.
 			anyHadChildren = false;
-			for(int i = 0; i < 8; ++i)
-				anyHadChildren |= m_nodes[current[i]].load() < 0;
+			const ei::Vec3 cellSize = m_sceneSize / lvlRes;
+			const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
+			for(int i = 0; i < 8; ++i) {
+				const int c = m_nodes[current[i]].load();
+				anyHadChildren |= c < 0;
+				// Density not yet computed? Density might have been copied
+				// from parent in which case we do not need to compute it anew.
+				if(c >= 0 && currentArea[i] < 0.0f) {
+					const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
+					const ei::Vec3 localPos = normPos * lvlRes - (lvlPos + ei::IVec3{ix, iy, iz});
+					float area = math::intersection_area_nrm(cellSize, localPos * cellSize, normal);
+					currentArea[i] = ei::lerp(avgArea, area, 0.9f);
+				}
+			}
 		}
 		// The loop terminates if all 8 cells in 'current' are leaves.
 		// This means we want to interpolate 'current' on 'lvl'.
-		int lvlRes = 1 << lvl;
+		const int lvlRes = 1 << lvl;
 		ei::Vec3 tPos = normPos * lvlRes - 0.5f;
 		ei::IVec3 gridPos = ei::floor(tPos);
 		//return m_nodes[current[0]].load() * m_densityScale;
 		ei::Vec3 ws[2];
 		ws[1] = tPos - gridPos;
 		ws[0] = 1.0f - ws[1];
-		float countSum = 0.0f, areaSum = 0.0f, wSum = 0.0f;
-		float densitySum = 0.0f;
-		ei::Vec3 cellSize { m_sceneSize / lvlRes };
+		float countSum = 0.0f, areaSum = 0.0f;
+		const ei::Vec3 cellSize { m_sceneSize / lvlRes };
 		for(int i = 0u; i < 8u; ++i) {
-			int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
-			ei::Vec3 localPos = ws[1] + 0.5f - ei::IVec3{ix, iy, iz};
-			localPos *= cellSize;
-			float area = math::intersection_area_nrm(cellSize, localPos, normal);
+			const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
+			const ei::Vec3 localPos = ws[1] + 0.5f - ei::IVec3{ix, iy, iz};
+			float area = math::intersection_area_nrm(cellSize, localPos * cellSize, normal);
 			// Compute trilinear interpolated result of count and area (running sum)
 			float w = ws[ix].x * ws[iy].y * ws[iz].z;
 			mAssert(m_nodes[current[i]].load() >= 0);
 			if(area > 0.0f) {
-				float lvlFactor = float(1 << ((lvl - currentLvl[i]) * 2));
-				float lvlFactorA = 1.0f;//float(1 << ((lvl - currentLvl[i]) * 2));
-				countSum += m_nodes[current[i]].load() * w / lvlFactor;
-				areaSum += area * w / lvlFactorA;
-				densitySum += m_nodes[current[i]].load() * w / (lvlFactor * area);
-				wSum += w;
+				float lvlFactor = area / currentArea[i];
+				countSum += m_nodes[current[i]].load() * w * lvlFactor;
+				areaSum += area * w;
 			}
 		}
 		mAssert(areaSum > 0.0f);
 		return sdiv(countSum, areaSum) * m_densityScale;
-		//return sdiv(densitySum, wSum) * m_densityScale;
 	}
 
 	int capacity() const { return m_capacity; }
