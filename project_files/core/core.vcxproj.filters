@@ -963,9 +963,6 @@
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\wireframe_common.hpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
     </ClInclude>
@@ -1052,7 +1049,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp">
       <Filter>Source Files\core\renderer\pt</Filter>
-    </ClInclude>    <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp">
       <Filter>Source Files\core\data_structs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
@@ -1062,6 +1060,9 @@
       <Filter>Source Files\core\data_structs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\data_structs\dm_octree.hpp">
       <Filter>Source Files\core\data_structs</Filter>
     </ClInclude>
   </ItemGroup>
