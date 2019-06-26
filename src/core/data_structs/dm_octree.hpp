@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "core/math/intersection_areas.hpp"
+#include "util/log.hpp"
 #include <ei/3dtypes.hpp>
 #include <memory>
 #include <atomic>
@@ -20,6 +21,8 @@ class DmOctree {
 public:
 	// splitFactor: Number of photons in one cell (per iteration) before it is splitted.
 	DmOctree(const ei::Box& sceneBounds, int capacity, float splitFactor) {
+		if(splitFactor <= 1.0f)
+			logError("[DmOctree] Split factor must be larger than 1. Otherwise the tree will be split infinitely. Setting to 1.1 instead ", splitFactor);
 		// Slightly enlarge the volume to avoid numerical issues on the boundary
 		ei::Vec3 sceneSize = (sceneBounds.max - sceneBounds.min) * 1.002f;
 		m_sceneSize = sceneSize;
@@ -35,7 +38,7 @@ public:
 		//for(int i = 1; i < m_capacity; ++i)
 		//	m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
 		m_depth.store(0);
-		m_splitFactor = splitFactor;
+		m_splitFactor = ei::max(1.1f, splitFactor);
 	}
 
 	// Initialize iteration count dependent data (1-indexed).
@@ -240,6 +243,47 @@ public:
 		return sdiv(countSum, areaSum) * m_densityScale;
 	}
 
+	void balance(int current = 0, int nx = 0, int ny = 0, int nz = 0, int px = 0, int py = 0, int pz = 0) {
+		// Call balance for each child recursively, if the child has children itself.
+		// Otherwise balance is satisfied.
+		int children = -m_nodes[current].load();
+		if(children <= 0) return;	// No tree here
+		for(int i = 0; i < 8; ++i) {
+			int childC = m_nodes[children + i].load();
+			if(childC < 0) {
+				// To make the recursive call we need all the neighbors on the child-level.
+				// If they do not extist we need to split the respective cell.
+				const ei::IVec3 localPos { i & 1, (i>>1) & 1, i>>2 };
+				int cnx = find_neighbor(localPos, 0, 0, nx, children);
+				int cny = find_neighbor(localPos, 1, 0, ny, children);
+				int cnz = find_neighbor(localPos, 2, 0, nz, children);
+				int cpx = find_neighbor(localPos, 0, 1, px, children);
+				int cpy = find_neighbor(localPos, 1, 1, py, children);
+				int cpz = find_neighbor(localPos, 2, 1, pz, children);
+				balance(children + i, cnx, cny, cnz, cpx, cpy, cpz);
+			}
+		}
+	}
+
+	// dir: 0 search in negative dir, 1 search in positive dir
+	int find_neighbor(const ei::IVec3& localPos, int dim, int dir, int parentNeighbor, int siblings) {
+		int cn = 0;	// Initialize to outer boundary
+		// The adoint position is the child index of the neighbor (indepndent of the parent).
+		// It merely flips the one coordinate of the relevant dimension
+		int adjointIdx = 0;
+		adjointIdx += (dim == 0 ? 1-localPos[0] : localPos[0]);
+		adjointIdx += (dim == 1 ? 1-localPos[1] : localPos[1]) * 2;
+		adjointIdx += (dim == 2 ? 1-localPos[2] : localPos[2]) * 4;
+		if(localPos[dim] == dir && parentNeighbor > 0) { // Not on boundary
+			int nC = m_nodes[parentNeighbor].load();
+			if(nC >= 0) nC = split(parentNeighbor);
+			cn = -nC + adjointIdx;
+		} else if(localPos[dim] == (1-dir)) {
+			cn = siblings + adjointIdx;
+		}
+		return cn;
+	}
+
 	int capacity() const { return m_capacity; }
 	int size() const { return ei::min(m_capacity, m_allocationCounter.load()); }
 	// Get the size of the associated memory excluding this instance.
@@ -301,6 +345,17 @@ private:
 			}
 		}
 		return count;
+	}
+
+	// Non-atomic unconditional split. Returns the new address
+	int split(int idx) {
+		int child = m_allocationCounter.fetch_add(8);
+		if(child >= m_capacity) { // Allocation overflow
+			m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
+			return 0;
+		}
+		m_nodes[idx].store(-child);
+		return -child;
 	}
 };
 

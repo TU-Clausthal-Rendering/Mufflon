@@ -213,6 +213,7 @@ void CpuIvcm::iterate() {
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
 	}
+	m_density->balance();
 
 	// Second pass: trace view paths and merge
 #pragma PARALLEL_FOR
