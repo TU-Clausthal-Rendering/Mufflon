@@ -15,11 +15,11 @@ inline void atomic_max(std::atomic<T>& a, T b) {
 
 // A sparse octree with atomic insertion to measure the density of elements in space.
 class DmOctree {
-	static constexpr float SPLIT_FACTOR = 0.5f;
 	// At some time the counting should stop -- otherwise the counter will overflow inevitable.
 	static constexpr int FILL_ITERATIONS = 1000;
 public:
-	DmOctree(const ei::Box& sceneBounds, int capacity) {
+	// splitFactor: Number of photons in one cell (per iteration) before it is splitted.
+	DmOctree(const ei::Box& sceneBounds, int capacity, float splitFactor) {
 		// Slightly enlarge the volume to avoid numerical issues on the boundary
 		ei::Vec3 sceneSize = (sceneBounds.max - sceneBounds.min) * 1.002f;
 		m_sceneSize = sceneSize;
@@ -35,6 +35,7 @@ public:
 		//for(int i = 1; i < m_capacity; ++i)
 		//	m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
 		m_depth.store(0);
+		m_splitFactor = splitFactor;
 	}
 
 	// Initialize iteration count dependent data (1-indexed).
@@ -43,7 +44,7 @@ public:
 		int iterClamp = ei::min(FILL_ITERATIONS, iter);
 		m_stopFilling = iter > FILL_ITERATIONS;
 		m_densityScale = 1.0f / iterClamp;
-		m_splitCountDensity = ei::ceil(SPLIT_FACTOR * 8) * iterClamp;
+		m_splitCountDensity = ei::ceil(m_splitFactor) * iterClamp;
 		// Set the counter of all unused cells to the number of expected samples
 		// times 2. A planar surface will never extend to all eight cells. It might
 		// intersect 7 of them, but still the distribution is one of a surface.
@@ -51,7 +52,7 @@ public:
 		// value.
 		if(!m_stopFilling)
 			for(int i = m_allocationCounter.load(); i < m_capacity; ++i)
-				m_nodes[i].store(ei::ceil(SPLIT_FACTOR * 2 * iter));
+				m_nodes[i].store(ei::ceil(iter * m_splitFactor / 4));
 	}
 
 	// Overwrite all counters with 0, but keep allocation and child pointers.
@@ -245,7 +246,8 @@ public:
 	std::size_t mem_size() const { return sizeof(std::atomic_int32_t) * m_capacity; }
 private:
 	float m_densityScale;		// 1/#iterations to normalize the counters into a density
-	int m_splitCountDensity;	// The number when a node is split must be a multiple of 8 and must grow proportional to #iterations
+	float m_splitFactor;		// Number of photons per iteration before a cell is split
+	int m_splitCountDensity;	// Total number of photons before split
 	ei::Vec3 m_minBound;
 	ei::Vec3 m_sceneSizeInv;
 	ei::Vec3 m_sceneSize;
