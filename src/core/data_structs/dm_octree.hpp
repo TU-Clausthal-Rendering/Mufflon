@@ -24,10 +24,10 @@ public:
 		if(splitFactor <= 1.0f)
 			logError("[DmOctree] Split factor must be larger than 1. Otherwise the tree will be split infinitely. Setting to 1.1 instead ", splitFactor);
 		// Slightly enlarge the volume to avoid numerical issues on the boundary
-		ei::Vec3 sceneSize = (sceneBounds.max - sceneBounds.min) * 1.002f;
+		ei::Vec3 sceneSize = (sceneBounds.max - sceneBounds.min) * 2.002f;
 		m_sceneSize = sceneSize;
 		m_sceneSizeInv = 1.0f / sceneSize;
-		m_minBound = sceneBounds.min - sceneSize * (0.001f / 1.002f);
+		m_minBound = sceneBounds.min - sceneSize * (2.002f - 1.0f) / 2.0f;
 		m_capacity = 1 + ((capacity + 7) & (~7));
 		m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
 		// Root nodes have a count of 0
@@ -187,7 +187,6 @@ public:
 				int c = m_nodes[parentAddress].load();
 				if(c < 0) {
 					// Insert the child node's address
-					cellPos = clamp(cellPos, 0, lvlRes - 1);
 					int localChildIdx = (cellPos.x & 1) + 2 * (cellPos.y & 1) + 4 * (cellPos.z & 1);
 					current[i] = -c + localChildIdx;
 					currentArea[i] = -1.0f;
@@ -209,9 +208,16 @@ public:
 				// from parent in which case we do not need to compute it anew.
 				if(c >= 0 && currentArea[i] < 0.0f) {
 					const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
-					const ei::Vec3 localPos = normPos * lvlRes - (lvlPos + ei::IVec3{ix, iy, iz});
-					float area = math::intersection_area_nrm(cellSize, localPos * cellSize, normal);
-					currentArea[i] = ei::lerp(avgArea, area, 0.9f);
+					const ei::Vec3 localPos = offPos - (lvlPos + ei::IVec3{ix, iy, iz}) * cellSize;
+					float area = math::intersection_area_nrm(cellSize, localPos, normal);
+/*					float area2 = math::intersection_area_nrm(cellSize * 1.02f, localPos + cellOffset, normal);
+					ei::Vec3 cellMin = (lvlPos + ei::IVec3{ix, iy, iz}) * m_sceneSize / lvlRes;
+					ei::Vec3 cellMax = cellMin + m_sceneSize / lvlRes;
+					float area3 = math::intersection_area(cellMin, cellMax, offPos, normal);
+					float area4 = math::intersection_area(cellMin - cellOffset, cellMax + cellOffset, offPos, normal);*/
+					currentArea[i] = area;//ei::lerp(avgArea, area, 0.9f);
+					//currentArea[i] = math::intersection_area_nrm(cellSize, offPos - (lvlPos + 0.5f) * cellSize, normal);
+					//currentArea[i] = math::intersection_area_nrm(cellSize * 2, offPos - lvlPos * cellSize, normal) / 4.0f;
 				}
 			}
 		}
@@ -226,19 +232,36 @@ public:
 		ws[0] = 1.0f - ws[1];
 		float countSum = 0.0f, areaSum = 0.0f;
 		const ei::Vec3 cellSize { m_sceneSize / lvlRes };
-		for(int i = 0u; i < 8u; ++i) {
+		const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
+		for(int i = 0; i < 8; ++i)
+		{
 			const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
-			const ei::Vec3 localPos = ws[1] + 0.5f - ei::IVec3{ix, iy, iz};
-			float area = math::intersection_area_nrm(cellSize, localPos * cellSize, normal);
+			const ei::Vec3 localPos = offPos - (gridPos + ei::IVec3{ix, iy, iz}) * cellSize;
+			float area = math::intersection_area_nrm(cellSize, localPos, normal);
+			float areaReg = ei::lerp(avgArea, area, 0.9f);
 			// Compute trilinear interpolated result of count and area (running sum)
 			float w = ws[ix].x * ws[iy].y * ws[iz].z;
 			mAssert(m_nodes[current[i]].load() >= 0);
-			if(area > 0.0f) {
-				float lvlFactor = area / currentArea[i];
+			//if(area > 0.0f)
+			if(area > 0.0f && currentArea[i] > 0.0f)
+			{
+				//ei::Vec3 cellMin = (gridPos + ei::IVec3{ix, iy, iz}) * m_sceneSize / lvlRes;
+				//ei::Vec3 cellMax = cellMin + m_sceneSize / lvlRes;
+				//if(currentArea[i] == 0.0f) __debugbreak();
+				//float lvlFactor = area / currentArea[i];
+				//float lvlFactor = ei::max(area, avgArea * 0.1f) / ei::max(currentArea[i], avgArea * 0.1f);
+				float lvlFactor = (area + avgArea * 0.01f) / (currentArea[i] + avgArea * 0.01f);
+				//float lvlFactor = avgArea / currentArea[i];
+				//float lvlFactor = 1.0f / currentArea[i];
 				countSum += m_nodes[current[i]].load() * w * lvlFactor;
+				//areaSum += area / 4.0f;
+				//areaSum += area * w;
 				areaSum += area * w;
+				//areaSum += w;
 			}
 		}
+		//areaSum = math::intersection_area_nrm(cellSize, offPos - (gridPos + 0.5f) * cellSize, normal);
+		//areaSum = math::intersection_area_nrm(cellSize * 2, offPos - gridPos * cellSize, normal) / 4.0f;
 		mAssert(areaSum > 0.0f);
 		return sdiv(countSum, areaSum) * m_densityScale;
 	}
