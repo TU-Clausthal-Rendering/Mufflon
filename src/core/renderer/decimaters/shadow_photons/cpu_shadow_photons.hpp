@@ -2,8 +2,7 @@
 
 #include "shadow_photons_params.hpp"
 #include "core/renderer/renderer_base.hpp"
-#include "core/renderer/neb/density_octree.hpp"
-#include "core/data_structs/dm_hashgrid.hpp"
+#include "core/data_structs/dm_octree.hpp"
 #include <ei/vector.hpp>
 #include <optional>
 
@@ -47,8 +46,8 @@ private:
 
 	ShadowPhotonParameters m_params;
 	std::vector<math::Rng> m_rngs;
-	std::unique_ptr<data_structs::DmHashGrid> m_densityPhotons;
-	std::unique_ptr<data_structs::DmHashGrid> m_densityShadowPhotons;
+	std::unique_ptr<data_structs::DmOctree> m_densityPhotons;
+	std::unique_ptr<data_structs::DmOctree> m_densityShadowPhotons;
 };
 
 } // namespace mufflon::renderer::decimaters::spm

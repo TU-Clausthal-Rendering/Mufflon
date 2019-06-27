@@ -137,7 +137,7 @@ public:
 		return 0.0f;
 	}
 
-	float get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& normal) {
+	float get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient = nullptr) {
 		ei::Vec3 offPos = pos - m_minBound;
 		ei::Vec3 normPos = offPos * m_sceneSizeInv;
 		// Get the integer position on the finest level.
@@ -236,6 +236,10 @@ public:
 				countSum += m_nodes[current[i]].load() * w * lvlFactor;
 				areaSum += area * w;
 			}
+		}
+
+		if(gradient != nullptr) {
+			// TODO: incorporate area
 		}
 		mAssert(areaSum > 0.0f);
 		return sdiv(countSum, areaSum) * m_densityScale;

@@ -15,21 +15,19 @@ ShadowPhotonVisualizer::~ShadowPhotonVisualizer() {
 void ShadowPhotonVisualizer::post_reset() {
 	const auto resetFlags = get_reset_event();
 	init_rngs(m_outputBuffer.get_num_pixels());
-	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE)) {
-		m_densityShadowPhotons = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
-		m_densityPhotons = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
-	} else {
-		// TODO: proper cell size
-		m_densityShadowPhotons->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
-		m_densityPhotons->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE)) {// || resetFlags.is_set(ResetEvent::PARAMETER)) {
+		// TODO: proper capacity
+		m_densityShadowPhotons = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
+		m_densityPhotons = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
 	}
 	m_densityShadowPhotons->clear();
 	m_densityPhotons->clear();
-	m_densityShadowPhotons->set_cell_size(m_params.cellSize);
-	m_densityPhotons->set_cell_size(m_params.cellSize);
 }
 
 void ShadowPhotonVisualizer::iterate() {
+	m_densityPhotons->set_iteration(1 + m_currentIteration);
+	m_densityShadowPhotons->set_iteration(1 + m_currentIteration);
+
 	const u64 photonSeed = m_rngs[0].next();
 	const int numPhotons = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
