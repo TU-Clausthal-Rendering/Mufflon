@@ -204,7 +204,7 @@ void CpuIvcm::iterate() {
 	if(m_params.progressive)
 		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
 	m_photonMap.clear(currentMergeRadius * 2.0001f);
-	m_densityHM->set_density_scale(1.0f / (m_currentIteration + 1));
+	m_density->set_iteration(m_currentIteration + 1);
 
 	// First pass: Create one photon path per view path
 	u64 photonSeed = m_rngs[0].next();
@@ -213,6 +213,7 @@ void CpuIvcm::iterate() {
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
 	}
+	//m_density->balance();
 
 	// Second pass: trace view paths and merge
 #pragma PARALLEL_FOR
@@ -238,11 +239,13 @@ void CpuIvcm::post_reset() {
 		m_tmpPathProbabilities.resize(get_thread_num() * 2 * (m_params.maxPathLength + 1));
 		m_tmpViewPathVertices.resize(get_thread_num() * (m_params.maxPathLength + 1));
 	}
+	// TODO: reasonable density structure capacities
+//	if(resetFlags.geometry_changed())
+//		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
 	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
-		m_densityHM = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32, m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
-	else
-		m_densityHM->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
-	m_densityHM->clear();
+		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
+	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+	m_density->clear();
 }
 
 void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
@@ -267,7 +270,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 
 		// Store a photon to the photon map
 		previous = m_photonMap.insert(vertex.get_position(), vertex);
-		m_densityHM->increase_count(vertex.get_position());
+		m_density->increase_count(vertex.get_position());
 	}
 
 	m_pathEndPoints[idx] = previous;
@@ -302,17 +305,17 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		WalkResult walkRes;
-		if((walkRes = walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
-				*(currentVertex + 1), sample)) == WalkResult::CANCEL)
+		const WalkResult walkRes = walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
+										*(currentVertex + 1), sample);
+		if(walkRes == WalkResult::CANCEL)
 			break;
 		++viewPathLen;
 		++currentVertex;
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			//float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());
-			float density = m_densityHM->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
+			//float density = m_density->get_density(currentVertex->get_position(), currentVertex->get_normal());
+			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());

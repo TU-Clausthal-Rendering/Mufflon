@@ -192,6 +192,7 @@
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\dm_octree.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\export\api.h" />

@@ -14,8 +14,8 @@ public:
 	// Create a hash grid with a fixed memory footprint. This hash grid does not
 	// implement a resizing mechanism, so if you try to add more elements than
 	// the expected number data is lost.
-	DmHashGrid(u32 numExpectedEntries, float cellSize) {
-		m_cellSize = ei::Vec3 { cellSize };
+	DmHashGrid(u32 numExpectedEntries) {
+		m_cellSize = ei::Vec3 { 1.0f };
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
 		m_data.reset(new Entry[m_mapSize]);
 		m_densityScale = 1.0f;
@@ -42,10 +42,8 @@ public:
 	void set_cell_size(float cellSize) { m_cellSize = ei::Vec3{ cellSize }; }
 	float get_cell_size() const { return m_cellSize.x; }
 
-	// The density scale can be used to if multiple iterations are accumulated
-	// in the map. Set to 1/iterationCount to get correct densities.
-	void set_density_scale(float scale) { m_densityScale = scale; }
-	float get_density_scale() const { return m_densityScale; }
+	// Call in each iteration to make sure the density is scaled properly
+	void set_iteration(int iter) { m_densityScale = 1.0f / iter; }
 
 	// Increase the counter for a cell using a world position.
 	void increase_count(const ei::Vec3& position) {
@@ -116,6 +114,8 @@ private:
 	};
 
 	ei::Vec3 m_cellSize;
+	// The density scale can be used to if multiple iterations are accumulated
+	// in the map. Set to 1/iterationCount to get correct densities.
 	float m_densityScale;
 	u32 m_mapSize;
 	std::unique_ptr<Entry[]> m_data;
@@ -134,4 +134,4 @@ private:
 	}
 };
 
-}} // namespace mufflon::util::density
+}} // namespace mufflon::data_structs

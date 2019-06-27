@@ -11,12 +11,20 @@ struct PInterpolate {
 	}
 };
 
+struct PCellSize {
+	float cellSize = 1.f;
+	static constexpr ParamDesc get_desc() {
+		return ParamDesc{ "Hashgrid cell size", ParameterTypes::FLOAT };
+	}
+};
+
 using ShadowPhotonParameters = ParameterHandler<
 	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PMergeRadius,
-	PInterpolate
+	PInterpolate,
+	PCellSize
 >;
 
 }}}} // namespace mufflon::renderer::decimaters::spm

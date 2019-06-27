@@ -7,6 +7,7 @@
 #include "core/math/rng.hpp"
 #include "core/data_structs/photon_map.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
+#include "core/data_structs/dm_octree.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -63,7 +64,8 @@ private:
 	std::vector<const IvcmPathVertex*> m_pathEndPoints;
 	std::vector<AreaPdf> m_tmpPathProbabilities;
 	std::vector<IvcmPathVertex> m_tmpViewPathVertices;
-	std::unique_ptr<data_structs::DmHashGrid> m_densityHM;
+	//std::unique_ptr<data_structs::DmOctree> m_density;
+	std::unique_ptr<data_structs::DmHashGrid> m_density;
 };
 
 } // namespace mufflon::renderer
