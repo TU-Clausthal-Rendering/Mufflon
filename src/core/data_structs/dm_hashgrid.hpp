@@ -87,8 +87,8 @@ public:
 		ei::Vec3 nrmPos = position / m_cellSize - 0.5f;
 		ei::IVec3 gridPosI = ei::floor(nrmPos);
 		ei::Vec3 ws[2];
-		ws[0] = nrmPos - gridPosI;
-		ws[1] = 1.0f - ws[0];
+		ws[1] = nrmPos - gridPosI;
+		ws[0] = 1.0f - ws[1];
 		float countSum = 0.0f, areaSum = 0.0f;
 		// Iterate over all eight cells
 		for(int i = 0u; i < 8u; ++i) {
