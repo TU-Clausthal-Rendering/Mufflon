@@ -76,8 +76,8 @@ namespace gui.Model.Display
             set
             {
                 if(m_cursorPos == value) return;
-                m_cursorPos.X = Math.Min((int)((ScrollOffset.X + Math.Max(0, value.X)) / Zoom), RenderSize.X - 1);
-                m_cursorPos.Y = Math.Min((int)((ScrollOffset.Y + Math.Max(0, value.Y)) / Zoom), RenderSize.Y - 1);
+                m_cursorPos.X = Math.Min(RenderSize.X, Math.Max(0, value.X));
+                m_cursorPos.Y = Math.Min(RenderSize.Y, Math.Max(0, value.Y));
 
                 float r, g, b, a;
                 if (!Core.core_get_pixel_info((uint)m_cursorPos.X,
