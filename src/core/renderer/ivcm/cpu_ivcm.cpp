@@ -315,7 +315,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
 			//float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());
-			float density = m_densityHM->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
+			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());
