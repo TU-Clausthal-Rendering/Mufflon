@@ -200,7 +200,6 @@ public:
 			// Also, compute the areas of leaf nodes.
 			anyHadChildren = false;
 			const ei::Vec3 cellSize = m_sceneSize / lvlRes;
-			const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
 			for(int i = 0; i < 8; ++i) {
 				const int c = m_nodes[current[i]].load();
 				anyHadChildren |= c < 0;
@@ -209,15 +208,8 @@ public:
 				if(c >= 0 && currentArea[i] < 0.0f) {
 					const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
 					const ei::Vec3 localPos = offPos - (lvlPos + ei::IVec3{ix, iy, iz}) * cellSize;
-					float area = math::intersection_area_nrm(cellSize, localPos, normal);
-/*					float area2 = math::intersection_area_nrm(cellSize * 1.02f, localPos + cellOffset, normal);
-					ei::Vec3 cellMin = (lvlPos + ei::IVec3{ix, iy, iz}) * m_sceneSize / lvlRes;
-					ei::Vec3 cellMax = cellMin + m_sceneSize / lvlRes;
-					float area3 = math::intersection_area(cellMin, cellMax, offPos, normal);
-					float area4 = math::intersection_area(cellMin - cellOffset, cellMax + cellOffset, offPos, normal);*/
-					currentArea[i] = area;//ei::lerp(avgArea, area, 0.9f);
-					//currentArea[i] = math::intersection_area_nrm(cellSize, offPos - (lvlPos + 0.5f) * cellSize, normal);
-					//currentArea[i] = math::intersection_area_nrm(cellSize * 2, offPos - lvlPos * cellSize, normal) / 4.0f;
+					const float area = math::intersection_area_nrm(cellSize, localPos, normal);
+					currentArea[i] = area;
 				}
 			}
 		}
@@ -226,42 +218,25 @@ public:
 		const int lvlRes = 1 << lvl;
 		ei::Vec3 tPos = normPos * lvlRes - 0.5f;
 		ei::IVec3 gridPos = ei::floor(tPos);
-		//return m_nodes[current[0]].load() * m_densityScale;
 		ei::Vec3 ws[2];
 		ws[1] = tPos - gridPos;
 		ws[0] = 1.0f - ws[1];
 		float countSum = 0.0f, areaSum = 0.0f;
 		const ei::Vec3 cellSize { m_sceneSize / lvlRes };
 		const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
-		for(int i = 0; i < 8; ++i)
-		{
+		for(int i = 0; i < 8; ++i) {
 			const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
 			const ei::Vec3 localPos = offPos - (gridPos + ei::IVec3{ix, iy, iz}) * cellSize;
-			float area = math::intersection_area_nrm(cellSize, localPos, normal);
-			float areaReg = ei::lerp(avgArea, area, 0.9f);
+			const float area = math::intersection_area_nrm(cellSize, localPos, normal);
 			// Compute trilinear interpolated result of count and area (running sum)
-			float w = ws[ix].x * ws[iy].y * ws[iz].z;
+			const float w = ws[ix].x * ws[iy].y * ws[iz].z;
 			mAssert(m_nodes[current[i]].load() >= 0);
-			//if(area > 0.0f)
-			if(area > 0.0f && currentArea[i] > 0.0f)
-			{
-				//ei::Vec3 cellMin = (gridPos + ei::IVec3{ix, iy, iz}) * m_sceneSize / lvlRes;
-				//ei::Vec3 cellMax = cellMin + m_sceneSize / lvlRes;
-				//if(currentArea[i] == 0.0f) __debugbreak();
-				//float lvlFactor = area / currentArea[i];
-				//float lvlFactor = ei::max(area, avgArea * 0.1f) / ei::max(currentArea[i], avgArea * 0.1f);
+			if(area > 0.0f && currentArea[i] > 0.0f) {
 				float lvlFactor = (area + avgArea * 0.01f) / (currentArea[i] + avgArea * 0.01f);
-				//float lvlFactor = avgArea / currentArea[i];
-				//float lvlFactor = 1.0f / currentArea[i];
 				countSum += m_nodes[current[i]].load() * w * lvlFactor;
-				//areaSum += area / 4.0f;
-				//areaSum += area * w;
 				areaSum += area * w;
-				//areaSum += w;
 			}
 		}
-		//areaSum = math::intersection_area_nrm(cellSize, offPos - (gridPos + 0.5f) * cellSize, normal);
-		//areaSum = math::intersection_area_nrm(cellSize * 2, offPos - gridPos * cellSize, normal) / 4.0f;
 		mAssert(areaSum > 0.0f);
 		return sdiv(countSum, areaSum) * m_densityScale;
 	}

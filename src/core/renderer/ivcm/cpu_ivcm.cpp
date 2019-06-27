@@ -213,7 +213,7 @@ void CpuIvcm::iterate() {
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
 	}
-	m_density->balance();
+	//m_density->balance();
 
 	// Second pass: trace view paths and merge
 #pragma PARALLEL_FOR
@@ -241,7 +241,7 @@ void CpuIvcm::post_reset() {
 	}
 	// TODO: reasonable density structure capacities
 	if(resetFlags.geometry_changed())
-		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 3.0f);
+		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
 //	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
 //		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
 //	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
@@ -314,8 +314,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			//float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());
-			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
+			//float density = m_densityHM->get_density(currentVertex->get_position(), currentVertex->get_normal());			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());
