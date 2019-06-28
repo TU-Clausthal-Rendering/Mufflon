@@ -221,6 +221,9 @@ public:
 		ei::Vec3 ws[2];
 		ws[1] = tPos - gridPos;
 		ws[0] = 1.0f - ws[1];
+		// Compute the gradients for both Z blocks by interpolating
+		float densities[8];
+
 		float countSum = 0.0f, areaSum = 0.0f;
 		const ei::Vec3 cellSize { m_sceneSize / lvlRes };
 		const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
@@ -233,13 +236,40 @@ public:
 			mAssert(m_nodes[current[i]].load() >= 0);
 			if(area > 0.0f && currentArea[i] > 0.0f) {
 				float lvlFactor = (area + avgArea * 0.01f) / (currentArea[i] + avgArea * 0.01f);
-				countSum += m_nodes[current[i]].load() * w * lvlFactor;
-				areaSum += area * w;
+				const float weightedCount = m_nodes[current[i]].load() * w * lvlFactor;
+				const float weightedArea = area * w;
+				// TODO: can this become unstable?
+				densities[i] = sdiv(weightedCount, weightedArea);
+				countSum += weightedCount;
+				areaSum += weightedArea;
 			}
 		}
 
 		if(gradient != nullptr) {
-			// TODO: incorporate area
+			// Compute the gradients between the cells
+			const float gradients[12] = {
+				densities[1] - densities[0],	// X0Y0Z0 -> X1Y0Z0
+				densities[3] - densities[2],	// X0Y1Z0 -> X1Y1Z0
+				densities[2] - densities[0],	// X0Y0Z0 -> X0Y1Z0
+				densities[3] - densities[1],	// X1Y0Z0 -> X1Y1Z0
+				densities[5] - densities[4],	// X0Y0Z1 -> X1Y0Z1
+				densities[7] - densities[6],	// X0Y1Z1 -> X1Y1Z1
+				densities[6] - densities[4],	// X0Y0Z1 -> X0Y1Z1
+				densities[7] - densities[5],	// X1Y0Z1 -> X1Y1Z1
+				densities[4] - densities[0],	// X0Y0Z0 -> X0Y0Z1
+				densities[5] - densities[1],	// X1Y0Z0 -> X1Y0Z1
+				densities[6] - densities[2],	// X0Y1Z0 -> X0Y1Z1
+				densities[7] - densities[3]		// X1Y1Z0 -> X1Y1Z1
+			};
+			// Now interpolate them
+			*gradient = ei::Vec3{
+				ei::lerp(ei::lerp(gradients[0], gradients[1], ws[0].y),
+						 ei::lerp(gradients[4], gradients[5], ws[0].y), ws[0].z),
+				ei::lerp(ei::lerp(gradients[2], gradients[3], ws[0].x),
+						 ei::lerp(gradients[6], gradients[7], ws[0].x), ws[0].z),
+				ei::lerp(ei::lerp(gradients[8], gradients[9], ws[0].x),
+						 ei::lerp(gradients[10], gradients[11], ws[0].x), ws[0].y),
+			};
 		}
 		mAssert(areaSum > 0.0f);
 		return sdiv(countSum, areaSum) * m_densityScale;

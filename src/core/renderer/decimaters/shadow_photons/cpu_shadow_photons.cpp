@@ -53,8 +53,9 @@ void ShadowPhotonVisualizer::iterate() {
 		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
 			continue;
 
+		ei::Vec3 shadowGradient{0.f};
 		const float photonDensity = query_photon_density(vertex);
-		const float shadowPhotonDensity = query_shadow_photon_density(vertex);
+		const float shadowPhotonDensity = query_shadow_photon_density(vertex, &shadowGradient);
 		const float ratio = photonDensity / std::max(1.f, (photonDensity + shadowPhotonDensity));
 
 		m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ photonDensity, 0.f, shadowPhotonDensity });
@@ -64,21 +65,28 @@ void ShadowPhotonVisualizer::iterate() {
 			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 2.f * ratio });
 		else
 			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 1.f - 2.f * (ratio - 0.5f) });
+		// We project the gradient onto the surface
+		if(std::abs(ratio - 0.5f) < 0.25f) {
+			const float projShadowGradient = ei::len(shadowGradient - ei::dot(shadowGradient, vertex.get_normal()) * vertex.get_normal());
+			m_outputBuffer.set(coord, RenderTargets::LIGHTNESS, ei::Vec3{ projShadowGradient });
+		} else {
+			m_outputBuffer.set(coord, RenderTargets::LIGHTNESS, ei::Vec3{ 0.f });
+		}
 	}
 }
 
-float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex) {
+float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex, ei::Vec3* gradient) {
 	if(m_params.pointSampling)
 		return m_densityPhotons->get_density(vertex.get_position(), vertex.get_normal());
 	else
-		return m_densityPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal());
+		return m_densityPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal(), gradient);
 }
 
-float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& vertex) {
+float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& vertex, ei::Vec3* gradient) {
 	if(m_params.pointSampling)
 		return m_densityShadowPhotons->get_density(vertex.get_position(), vertex.get_normal());
 	else
-		return m_densityShadowPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal());
+		return m_densityShadowPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal(), gradient);
 }
 
 void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, const u64 seed) {
