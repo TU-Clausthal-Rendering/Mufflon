@@ -3,6 +3,7 @@
 #include "core/export/api.h"
 #include "util/types.hpp"
 #include "core/math/sampling.hpp"
+#include "core/math/functions.hpp"
 #include "medium.hpp"
 #include <cuda_runtime.h>
 #include <ei/vector.hpp>
@@ -16,8 +17,8 @@ CUDA_FUNCTION Direction compute_half_vector(const Medium& inMedium, const Medium
 	// For refraction we need normalize(in * n_i + out * n_e) with the
 	// refraction indices n. Luckily n_i=n_e for reflection, so we need
 	// no case distinction.
-	// Also, an additional invariant to rander two-sided materials is
-	// that the halfTS has a positiv z axis (aligned with normal).
+	// Also, an additional invariant to render two-sided materials is
+	// that the halfTS has a positive z axis (aligned with normal).
 	Direction halfTS = inMedium.get_refraction_index().x * incidentTS
 		             + exMedium.get_refraction_index().x * excidentTS;
 	float l = len(halfTS) * ei::sgn(halfTS.z); // Half vector always on side of the normal
@@ -27,7 +28,7 @@ CUDA_FUNCTION Direction compute_half_vector(const Medium& inMedium, const Medium
 /*
  * Cached half vector. Not every model needs to compute a half vector,
  * but it is possible that blend/fresnel models require it multiple times.
- * The same models require access to the refraction indices -> usefull to
+ * The same models require access to the refraction indices -> useful to
  * have both at hand
  */
 struct Boundary { // Interface would be a good name too, but 'interface' as variable would clash with a keyword
@@ -57,14 +58,19 @@ private:
 
 
 
-enum class NDF {
+enum class NDF : i16 {
 	GGX,		// Anisotropic GGX
 	BECKMANN,	// Anisotropic Beckmann-Spizzichino
 	//COSINE
 };
 
+enum class ShadowingModel : i16 {
+	VCAVITY,
+	SMITH
+};
+
 // Geometry term (Selfshadow) for V-cavity model.
-CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDotN, float hDotN, const ei::Vec2 & _roughness)
+CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDotN, float hDotN, const ei::Vec2 & roughness)
 {
 	// For refraction the half vector can be the other way around than the surface. I.e. the
 	// microfacet would be seen from back-side, which is impossible.
@@ -75,13 +81,40 @@ CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDot
 	//return sdiv(2.0f, 1.0f + sqrt(1.0f + _roughness.x*_roughness.y * (sdiv(1.0f, wDotN*wDotN) - 1.0f)));
 }
 
+// Geometry term (Selfshadow) for Smith model.
+CUDA_FUNCTION __forceinline__ float geoshadowing_smith(const ei::Vec3& w, const ei::Vec2& roughness, NDF ndf) {
+	switch (ndf) {
+		case NDF::GGX: {
+			// H14Understanding P.86
+			// alpha0 = sqrt(x²alphax²/sqrt(1-z²)²+y²alphay²/sqrt(1-z²)²)
+			// = 1/sqrt(1-z²)*sqrt(x²alphax²+y²alphay²)
+			// tan(theta) = sin(theta)/cos(theta) = sqrt(1-z²)/z
+			// a = 1/(alpha0*tan(theta))
+			// = sqrt(x²alphax²+y²alphay²)/z
+			// 1/a² = sqrt(x²alphax²+y²alphay²)/z²
+			float oneOverASquared = sdiv(ei::sq(w.x * roughness.x) + ei::sq(w.y * roughness.y), w.z * w.z);
+			// G = 1/(1+(-1+sqrt(1+1/a²))/2)
+			// = 2/(1+sqrt(1+1/a²))
+			return 2.0f / (1.0f + sqrt(1.f + oneOverASquared));
+		}
+		case NDF::BECKMANN: {
+			// http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
+			float c = sdiv(w.z, sqrt(w.x*w.x*roughness.x*roughness.x + w.y*w.y*roughness.y*roughness.y));
+			c = ei::clamp(c,-1e18f, 1e18f);
+			return c >= 1.6f ? 1.f : sdiv(3.535f*c + 2.181f*c*c, 1 + 2.276f*c + 2.577f*c*c);
+		}
+	}
+	mAssert(false);
+	return 1.f;
+}
+
 namespace detail {
 	// Johannes' personal hack for appearance of multibounce model (compensates energy loss)
-	CUDA_FUNCTION __forceinline__ float modify_G_multi_bounce(float _g)
+	CUDA_FUNCTION __forceinline__ float modify_G_multi_bounce(float g)
 	{
-		return _g < 0.11f ? powf(_g+0.74299714456847f, 8.0f) - 0.092874643071059f
-								: ((1.139400367544197f * _g - 3.317658394008854f) * _g + 3.317115685385115f) * _g - 0.13885765892046f;//*/
-		//return _g;
+		/*return g < 0.11f ? powf(g+0.74299714456847f, 8.0f) - 0.092874643071059f
+								: ((1.139400367544197f * g - 3.317658394008854f) * g + 3.317115685385115f) * g - 0.13885765892046f;//*/
+		return g;
 	}
 }
 
@@ -92,11 +125,21 @@ CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity_transmission(float Gi, 
 	return ei::max(0.0f, detail::modify_G_multi_bounce(Gi) + detail::modify_G_multi_bounce(Ge) - 1.0f);
 }
 
+// Smith geometry term for refraction (transmitted)
+CUDA_FUNCTION __forceinline__ float geoshadowing_smith_transmission(float Gi, float Ge) {
+	return Gi * Ge; // Smith
+}
+
 // V-cavity geometry term for reflection
 CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity_reflection(float Gi, float Ge)
 {
 	//return Gi * Ge; // Smith
 	return detail::modify_G_multi_bounce( ei::min(Gi, Ge) );
+}
+
+// Smith geometry term for reflection
+CUDA_FUNCTION __forceinline__ float geoshadowing_smith_reflection(float Gi, float Ge) {
+	return Gi * Ge; // Smith
 }
 
 // Get a normal of the cavity proportional to their visibility.
@@ -125,7 +168,142 @@ sample_visible_normal_vcavity(const Direction& incidentTS, const Direction& cavi
 	}
 }
 
+// Get the sampled slopes for the smith model with beckmann distribution
+CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
+	float slopeX, slopeY;
+	// special case (normal incidence)
+	if(theta < 0.0001) {
+		const float r = sqrt(-log(rnd.u0));
+		const float phi = 6.28318530718f * rnd.u1;
+		slopeX = r * cos(phi);
+		slopeY = r * sin(phi);
+		return {slopeX, slopeY};
+	}
+	// precomputations
+	const float sinTheta = sinf(theta);
+	const float cosTheta = cosf(theta);
+	const float tanTheta = sinTheta / cosTheta;
+	const float a = 1.0f / tanTheta;
+	const float erfA = erf(a);
+	const float expA2 = exp(-a * a);
+	const float SQRT_PI_INV = 0.56418958354f;
+	const float lambda = 0.5f*(erfA - 1.f) + 0.5f*SQRT_PI_INV*expA2 / a;
+	const float g1 = sdiv(1.0f , 1.0f + lambda); // masking
+	const float c = 1.0f - g1 * erfA;
 
+	// sample slope X
+
+	u64 ci = math::percentage_of(std::numeric_limits<u64>::max(), c);
+	if(rnd2 < ci) {
+		const float w1 = 0.5f * SQRT_PI_INV * sinTheta * expA2;
+		const float w2 = cosTheta * (0.5f - 0.5f*erfA);
+		const float p = w1 / (w1 + w2);
+
+		u64 pi = math::percentage_of(ci, p);
+		if(rnd2 < pi) {
+			rnd2 = math::rescale_sample(rnd2, 0, pi - 1);
+			slopeX = -sqrt(-log(rnd.u0*expA2));
+		} else {
+			rnd2 = math::rescale_sample(rnd2, pi, std::numeric_limits<u64>::max());
+			slopeX = math::erfInv(rnd.u0 - 1.0f - rnd.u0 * erfA);
+		}
+	} else {
+		slopeX = math::erfInv((-1.0f + 2.0f*rnd.u0)*erfA);
+		const float p = (-slopeX * sinTheta + cosTheta) / (2.0f*cosTheta);
+		u64 pi = ci + math::percentage_of(std::numeric_limits<u64>::max() - ci, p);
+		if(rnd2 > pi) {
+			rnd2 = math::rescale_sample(rnd2, pi, std::numeric_limits<u64>::max());
+			slopeX = -slopeX;
+		}
+		else
+			rnd2 = math::rescale_sample(rnd2, 0, pi - 1);
+	}
+	// sample slope Y
+	slopeY = math::erfInv(2.0f*rnd.u1 - 1.0f);
+	mAssert(!isnan(slopeX) && !isnan(slopeY));
+	return { slopeX, slopeY };
+}
+
+// Get the sampled slopes for the smith model with ggx distribution
+CUDA_FUNCTION ei::Vec2 sample_slopes_ggx(float theta, const math::RndSet2& rnd, u64& rnd2) {
+	float slopeX, slopeY;
+	mAssert(theta >= 0.0f);
+	// special case (normal incidence)
+	if(theta < 0.0001) {
+		const float r = sqrtf(sdiv(rnd.u0, (1.f-rnd.u0)));
+		const float phi = 6.28318530718f * rnd.u1;
+		slopeX = r * cosf(phi);
+		slopeY = r * sinf(phi);
+		return { slopeX, slopeY };
+	}
+	const float tanTheta = tanf(theta);
+	mAssert(tanTheta >= 0.0f);
+	const float a1 = 1.0f / tanTheta;
+	const float g1 = 2.f / (1.f + sqrtf(1.0f + 1.0f / (a1 * a1)));
+	// sample slope_x
+	const float a = 2.0f*rnd.u0 / g1 - 1.0f;
+	const float tmp = sdiv(1.0f , a * a - 1.0f);
+	const float d = sqrtf(ei::sq(tanTheta * tmp) - (a * a - tanTheta * tanTheta) * tmp);
+	const float slopeX1 = tanTheta * tmp - d;
+	const float slopeX2 = tanTheta * tmp + d;
+	slopeX = (a < 0.f || slopeX2 > 1.0f / tanTheta) ? slopeX1 : slopeX2;
+	// sample slope_y
+	float s;
+	if(rnd2 & (1ull << 63)) {
+		rnd2 *= 2; 
+		s = 1.0f;
+	} else {
+		rnd2 *= 2;
+		s = -1.0f;
+	}
+	const float z = sdiv((rnd.u1 * (rnd.u1 * (rnd.u1 * 0.27385f - 0.73369f) + 0.46341f)), 
+		(rnd.u1 * (rnd.u1 * (rnd.u1 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f));
+	slopeY = s * z * sqrtf(1.0f + slopeX * slopeX);
+	return { slopeX, slopeY };
+}
+
+// Get a normal of the cavity proportional to their visibility.
+CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Direction& incidentTS, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
+	// stretch incidentTS
+	Direction omegaI = incidentTS * ei::Vec3{ roughness , 1.0f };
+	// normalize
+	omegaI = normalize(omegaI);
+	if(incidentTS.z < 0.0f) omegaI = -omegaI;
+	// get polar coordinates of omegaI
+	float theta = 0.0f;
+	float phi = 0.0f;
+	if(omegaI[2] < 0.99999f) {
+		theta = acos(omegaI[2]);
+		phi = atan2(omegaI[1], omegaI[0]);
+	}
+	// sample
+	ei::Vec2 slopes;
+	switch (ndf) {
+		case NDF::BECKMANN: {
+			slopes = sample_slopes_beckmann(theta, roughness, rnd, rnd2);
+		} break;
+		case NDF::GGX: {
+			slopes = sample_slopes_ggx(theta, rnd, rnd2);
+		}
+	}
+	// rotate
+	float sinPhi = sinf(phi);
+	float cosPhi = cosf(phi);
+	float tmp = cosPhi * slopes.x - sinPhi * slopes.y;
+	slopes.y = sinPhi * slopes.x + cosPhi * slopes.y;
+	slopes.x = tmp;
+	//unstrech
+	slopes.x *= roughness.x;
+	slopes.y *= roughness.y;
+	// compute normal
+	Direction out;
+	float invOut;
+	invOut = sqrtf(slopes.x * slopes.x + slopes.y * slopes.y + 1.f);
+	out[0] = -slopes.x / invOut;
+	out[1] = -slopes.y / invOut;
+	out[2] = 1.f / invOut;
+	return out;
+}
 
 // Evaluate any of the supported ndfs
 CUDA_FUNCTION float eval_ndf(NDF ndf, ei::Vec2 roughness, const Direction& halfTS) {

@@ -900,6 +900,9 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\math\functions.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>

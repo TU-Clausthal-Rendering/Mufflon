@@ -17,8 +17,7 @@ CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CU
 		roughness.y = texValues[MatTorrance::ROUGHNESS+texOffset].y;
 	return MatSampleTorrance{
 		Spectrum{texValues[MatTorrance::ALBEDO+texOffset]},
-		params.ndf,
-		roughness
+		params.shadowing, params.ndf, roughness
 	};
 }
 
@@ -29,32 +28,52 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
 									  bool) {
-	// Importance sampling for the ndf
-	math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
-
-	// Find the visible half vector.
+	float iDotH;
+	Direction halfTS;
+	AngularPdf cavityPdf;
 	u64 rnd = rndSet.i0;
-	auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
+	if(params.shadowing == ShadowingModel::SMITH) {
+		halfTS = sample_visible_normal_smith(params.ndf, incidentTS, params.roughness, rndSet, rnd);
+		cavityPdf = AngularPdf(eval_ndf(params.ndf, params.roughness, halfTS));
+		iDotH = ei::dot(incidentTS, halfTS);
+	} else {
+		// Importance sampling for the ndf
+		math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
 
-	boundary.set_halfTS(h.halfTS);
+		// Find the visible half vector.
+		auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
+		halfTS = h.halfTS;
+		iDotH = h.cosI;
+		cavityPdf = cavityTS.pdf;
+	}
+	boundary.set_halfTS(halfTS);
 
 	// Reflect the vector 
-	Direction excidentTS = (2.0f * h.cosI) * h.halfTS - incidentTS;
+	Direction excidentTS = (2.0f * iDotH) * halfTS - incidentTS;
+	if(incidentTS.z * excidentTS.z < 0.0f)
+		return math::PathSample{};
 
 	// Get geometry factors for PDF and throughput computation
-	float ge = geoshadowing_vcavity(h.cosI, excidentTS.z, h.halfTS.z, params.roughness);
-	float gi = geoshadowing_vcavity(h.cosI, incidentTS.z, h.halfTS.z, params.roughness);
-	if(ge == 0.0f || gi == 0.0f)
+	float ge, gi, g;
+	if(params.shadowing == ShadowingModel::SMITH) {
+		ge = geoshadowing_smith(excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(incidentTS, params.roughness, params.ndf);
+		g = geoshadowing_smith_reflection(gi, ge);
+	} else {
+		ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
+		gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+		g = geoshadowing_vcavity_reflection(gi, ge);
+	}
+	if(ge == 0.0f || gi == 0.0f) // Completely nullify the invalid result
 		return math::PathSample {};
-	float g = geoshadowing_vcavity_reflection(gi, ge);
 
 	// Copy the sign for two sided diffuse
 	return math::PathSample {
 		params.albedo * sdiv(g, gi),
 		math::PathEventType::REFLECTED,
 		excidentTS,
-		cavityTS.pdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * h.halfTS.z)),
-		cavityTS.pdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * h.halfTS.z))
+		cavityPdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),
+		cavityPdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z))
 	};
 }
 
@@ -69,11 +88,19 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 	// Geometry Term
 	Direction halfTS = boundary.get_halfTS(incidentTS, excidentTS);
 	float iDotH = dot(incidentTS, halfTS);
-	float ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
-	float gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+	float ge, gi, g;
+	if(params.shadowing == ShadowingModel::SMITH) {
+		ge = geoshadowing_smith(excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(incidentTS, params.roughness, params.ndf);
+		g = geoshadowing_smith_reflection(gi, ge);
+	} else {
+		 ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
+		 gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+		 g = geoshadowing_vcavity_reflection(gi, ge);
+	}
+
 	if(ge == 0.0f || gi == 0.0f)
 		return math::BidirSampleValue {};
-	float g = geoshadowing_vcavity_reflection(gi, ge);
 
 	// Normal Density Term
 	float d = eval_ndf(params.ndf, params.roughness, halfTS);

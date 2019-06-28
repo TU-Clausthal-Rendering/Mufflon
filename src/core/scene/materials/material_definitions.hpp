@@ -154,6 +154,7 @@ struct MatOrenNayar {
 // ************************************************************************* //
 struct MatSampleTorrance {
 	Spectrum albedo;
+	ShadowingModel shadowing;
 	NDF ndf;
 	ei::Vec2 roughness;
 };
@@ -171,13 +172,15 @@ struct MatTorrance {
 
 	using SampleType = MatSampleTorrance;
 
-	MatTorrance(TextureHandle* texTable, int texOffset, TextureHandle albedo, TextureHandle roughness, NDF ndf) {
+	MatTorrance(TextureHandle* texTable, int texOffset, TextureHandle albedo, TextureHandle roughness, ShadowingModel shadowingModel, NDF ndf) {
 		texTable[ALBEDO+texOffset] = albedo;
 		texTable[ROUGHNESS+texOffset] = roughness;
+		nonTexParams.shadowing = shadowingModel;
 		nonTexParams.ndf = ndf;
 	}
 
 	struct NonTexParams {
+		ShadowingModel shadowing;
 		NDF ndf;
 	} nonTexParams;
 };
@@ -187,6 +190,7 @@ struct MatTorrance {
 // ************************************************************************* //
 struct MatSampleWalter {
 	Spectrum absorption; // Absorption λ per meter (transmission = exp(-λ*d))
+	ShadowingModel shadowing;
 	NDF ndf;
 	ei::Vec2 roughness;
 };
@@ -203,16 +207,18 @@ struct MatWalter {
 
 	using SampleType = MatSampleWalter;
 
-	MatWalter(TextureHandle* texTable, int texOffset, Spectrum absorption, float refractionIndex, TextureHandle roughness, NDF ndf) :
+	MatWalter(TextureHandle* texTable, int texOffset, Spectrum absorption, float refractionIndex, TextureHandle roughness, ShadowingModel shadowingModel, NDF ndf) :
 		refractionIndex(refractionIndex)
 	{
 		texTable[ROUGHNESS+texOffset] = roughness;
 		nonTexParams.absorption = absorption;
+		nonTexParams.shadowing = shadowingModel;
 		nonTexParams.ndf = ndf;
 	}
 
 	struct NonTexParams {
 		Spectrum absorption;
+		ShadowingModel shadowing;
 		NDF ndf;
 	} nonTexParams;
 	float refractionIndex;
@@ -227,6 +233,7 @@ struct MatWalter {
 // ************************************************************************* //
 struct MatSampleMicrofacet {
 	Spectrum absorption; // Absorption λ per meter (transmission = exp(-λ*d))
+	ShadowingModel shadowing;
 	NDF ndf;
 	ei::Vec2 roughness;
 };
@@ -243,16 +250,18 @@ struct MatMicrofacet {
 
 	using SampleType = MatSampleMicrofacet;
 
-	MatMicrofacet(TextureHandle* texTable, int texOffset, Spectrum absorption, float refractionIndex, TextureHandle roughness, NDF ndf) :
+	MatMicrofacet(TextureHandle* texTable, int texOffset, Spectrum absorption, float refractionIndex, TextureHandle roughness, ShadowingModel shadowingModel, NDF ndf) :
 		refractionIndex(refractionIndex)
 	{
 		texTable[ROUGHNESS+texOffset] = roughness;
 		nonTexParams.absorption = absorption;
+		nonTexParams.shadowing = shadowingModel;
 		nonTexParams.ndf = ndf;
 	}
 
 	struct NonTexParams {
 		Spectrum absorption;
+		ShadowingModel shadowing;
 		NDF ndf;
 	} nonTexParams;
 	float refractionIndex;

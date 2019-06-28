@@ -107,6 +107,11 @@ typedef enum {
 } TextureSampling;
 
 typedef enum {
+	SHADOWING_VCAVITY,
+	SHADOWING_SMITH
+} ShadowingModel;
+
+typedef enum {
 	NDF_BECKMANN,
 	NDF_GGX,
 	NDF_COSINE
@@ -211,11 +216,13 @@ typedef struct {
 } LambertParams;
 typedef struct {
 	TextureHdl roughness;
+	ShadowingModel shadowingModel;
 	NormalDistFunction ndf;
 	TextureHdl albedo;
 } TorranceParams;
 typedef struct {
 	TextureHdl roughness;
+	ShadowingModel shadowingModel;
 	NormalDistFunction ndf;
 	Vec3 absorption;
 	float refractionIndex;

@@ -626,6 +626,8 @@ public:
 		vert->m_incident = incident;
 		vert->m_extension = ExtensionT{};
 		vert->m_desc.surface.tangentSpace = tangentSpace;
+		//vert->m_desc.surface.tangentSpace.geoN *= -1;
+		//vert->m_desc.surface.tangentSpace.shadingN *= -1;
 		vert->m_desc.surface.primitiveId = hit.hitId;
 		vert->m_desc.surface.surfaceParams = hit.surfaceParams.st;
 		auto incidentPdf = vert->convert_pdf(prevEventType, prevPdf, {incident, incidentDistance * incidentDistance});
