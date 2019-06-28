@@ -97,20 +97,27 @@ std::tuple<RenderBuffer<dev1>, RenderBuffer<dev2>> OutputHandler::begin_iteratio
 		if(m_targets.is_set(flag)) {
 			if(m_targets.is_set(flag << 8)) { // Variance flag set?
 				// Variance case: needs to cumulate samples per iteration
-				rb1.m_targets[i] = (RenderTarget<dev1>)m_iterationTarget[i].acquire<dev1>();	// Allocates if necessary
-				rb2.m_targets[i] = (RenderTarget<dev2>)m_iterationTarget[i].acquire<dev2>();	// Allocates if necessary
+				rb1.m_targets[i] = (RenderTarget<dev1>)m_iterationTarget[i].acquire<dev1>(false);	// Allocates if necessary
+				// TODO: for this a "mark-out-of-sync without unloading" would be perfect
 				m_iterationTarget[i].mark_changed(dev1);
+				rb2.m_targets[i] = (RenderTarget<dev2>)m_iterationTarget[i].acquire<dev2>(false);	// Allocates if necessary
 				mem_set<dev1>(rb1.m_targets[i], 0, m_iterationTarget[i].size());
 				mem_set<dev2>(rb2.m_targets[i], 0, m_iterationTarget[i].size());
 				if(reset) {
-					auto cumT = (RenderTarget<dev1>)m_cumulativeTarget[i].acquire<dev1>();		// Allocates if necessary
-					mem_set<dev1>(cumT, 0, m_cumulativeTarget[i].size());
-					auto cumVarT = (RenderTarget<dev1>)m_cumulativeVarTarget[i].acquire<dev1>();		// Allocates if necessary
-					mem_set<dev1>(cumVarT, 0, m_cumulativeVarTarget[i].size());
+					auto cumT1 = (RenderTarget<dev1>)m_cumulativeTarget[i].acquire<dev1>(false);		// Allocates if necessary
+					auto cumT2 = (RenderTarget<dev2>)m_cumulativeTarget[i].acquire<dev2>(false);		// Allocates if necessary
+					auto cumVarT1 = (RenderTarget<dev1>)m_cumulativeVarTarget[i].acquire<dev1>(false);	// Allocates if necessary
+					auto cumVarT2 = (RenderTarget<dev2>)m_cumulativeVarTarget[i].acquire<dev2>(false);	// Allocates if necessary
+					mem_set<dev1>(cumT1, 0, m_cumulativeTarget[i].size());
+					mem_set<dev2>(cumT2, 0, m_cumulativeTarget[i].size());
+					mem_set<dev1>(cumVarT1, 0, m_cumulativeVarTarget[i].size());
+					mem_set<dev2>(cumVarT2, 0, m_cumulativeVarTarget[i].size());
 				}
 			} else {
 				rb1.m_targets[i] = (RenderTarget<dev1>)m_cumulativeTarget[i].acquire<dev1>(false);	// Allocates if necessary
-				rb2.m_targets[i] = (RenderTarget<dev2>)m_cumulativeTarget[i].acquire<dev2>(false);	// Allocates if necessary
+				// TODO: for this a "mark-out-of-sync without unloading" would be perfect
+				m_cumulativeTarget[i].mark_changed(dev1);
+				rb2.m_targets[i] = (RenderTarget<dev2>)m_cumulativeTarget[i].acquire<dev2>(!reset);	// Allocates if necessary
 				if(reset) {
 					mem_set<dev1>(rb1.m_targets[i], 0, m_cumulativeTarget[i].size());
 					mem_set<dev2>(rb2.m_targets[i], 0, m_cumulativeTarget[i].size());
@@ -129,11 +136,12 @@ template std::tuple<RenderBuffer<Device::CPU>, RenderBuffer<Device::CUDA>> Outpu
 template < Device from, Device to >
 void OutputHandler::sync_back(const int ySplit) {
 	const std::size_t actualSplit = std::min<std::size_t>(ySplit, get_height());
-	const std::size_t offset = get_width() * 3 * ATOMIC_F32_SIZE * actualSplit;
-	const std::size_t size = get_width() * 3 * ATOMIC_F32_SIZE * (get_height() - actualSplit);
 	for(u32 flag : OutputValue::iterator) {
 		int i = 0;
 		// Is this atttribute recorded at all?
+		const std::size_t components = i == RenderTargets::LIGHTNESS ? 1u : 3u;
+		const std::size_t offset = get_width() * components * ATOMIC_F32_SIZE * actualSplit;
+		const std::size_t size = get_width() * components * ATOMIC_F32_SIZE * (get_height() - actualSplit);
 		if(m_targets.is_set(flag)) {
 			if(m_targets.is_set(flag << 8)) { // Variance flag set?
 				ArrayDevHandle_t<to, char> dst = m_iterationTarget[i].acquire<to>(false);
