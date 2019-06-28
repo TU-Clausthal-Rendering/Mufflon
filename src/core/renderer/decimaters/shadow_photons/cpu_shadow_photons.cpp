@@ -15,10 +15,23 @@ ShadowPhotonVisualizer::~ShadowPhotonVisualizer() {
 void ShadowPhotonVisualizer::post_reset() {
 	const auto resetFlags = get_reset_event();
 	init_rngs(m_outputBuffer.get_num_pixels());
-	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE)) {// || resetFlags.is_set(ResetEvent::PARAMETER)) {
+	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE) || resetFlags.resolution_changed()) {
 		// TODO: proper capacity
-		m_densityShadowPhotons = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
-		m_densityPhotons = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
+#ifdef SPV_USE_OCTREE
+		m_densityShadowPhotons = std::make_unique<data_structs::DmHashGrid<USE_SMOOTHSTEP>>(1024 * 1024 * 32);
+		m_densityPhotons = std::make_unique<data_structs::DmHashGrid<USE_SMOOTHSTEP>>(1024 * 1024 * 32);
+		m_densityShadowPhotons->set_cell_size(m_params.cellSize);
+		m_densityPhotons->set_cell_size(m_params.cellSize);
+#else // SPV_USE_HASHGRID
+		m_densityShadowPhotons = std::make_unique<data_structs::DmOctree<USE_SMOOTHSTEP>>(m_sceneDesc.aabb, 1024 * 1024 * 32, 2.0f);
+		m_densityPhotons = std::make_unique<data_structs::DmOctree<USE_SMOOTHSTEP>>(m_sceneDesc.aabb, 1024 * 1024 * 32, 2.0f);
+#endif // SPV_USE_HASHGRID
+	}
+	if(resetFlags.is_set(ResetEvent::PARAMETER)) {
+#ifdef SPV_USE_HASHGRID
+		m_densityShadowPhotons->set_cell_size(m_params.cellSize);
+		m_densityPhotons->set_cell_size(m_params.cellSize);
+#endif // SPV_USE_HASHGRID
 	}
 	m_densityShadowPhotons->clear();
 	m_densityPhotons->clear();
@@ -34,6 +47,10 @@ void ShadowPhotonVisualizer::iterate() {
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed);
 	}
+#ifndef SPV_USE_HASHGRID
+	//m_densityPhotons->balance();
+	//m_densityShadowPhotons->balance();
+#endif // SPV_USE_HASHGRID
 
 	// Fetch densities
 

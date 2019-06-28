@@ -3,6 +3,7 @@
 #include "shadow_photons_params.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/data_structs/dm_octree.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
 #include <ei/vector.hpp>
 #include <optional>
 
@@ -21,6 +22,9 @@ struct SpvVertexExt {
 	}
 };
 using SpvPathVertex = PathVertex<SpvVertexExt>;
+
+//#define SPV_USE_OCTREE
+#define SPV_USE_SMOOTHSTEP
 
 class ShadowPhotonVisualizer final : public RendererBase<Device::CPU> {
 public:
@@ -46,8 +50,19 @@ private:
 
 	ShadowPhotonParameters m_params;
 	std::vector<math::Rng> m_rngs;
-	std::unique_ptr<data_structs::DmOctree> m_densityPhotons;
-	std::unique_ptr<data_structs::DmOctree> m_densityShadowPhotons;
+
+#ifdef SPV_USE_SMOOTHSTEP
+	static constexpr bool USE_SMOOTHSTEP = true;
+#else // SPV_USE_SMOOTHSTEP
+	static constexpr bool USE_SMOOTHSTEP = false;
+#endif // SPV_USE_SMOOTHSTEP
+#ifdef SPV_USE_OCTREE
+	std::unique_ptr<data_structs::DmHashGrid<USE_SMOOTHSTEP>> m_densityPhotons;
+	std::unique_ptr<data_structs::DmHashGrid<USE_SMOOTHSTEP>> m_densityShadowPhotons;
+#else // SPV_USE_OCTREE
+	std::unique_ptr<data_structs::DmOctree<USE_SMOOTHSTEP>> m_densityPhotons;
+	std::unique_ptr<data_structs::DmOctree<USE_SMOOTHSTEP>> m_densityShadowPhotons;
+#endif // SPV_USE_OCTREE
 };
 
 } // namespace mufflon::renderer::decimaters::spm

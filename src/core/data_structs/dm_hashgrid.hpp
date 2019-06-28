@@ -9,6 +9,7 @@
 namespace mufflon { namespace data_structs {
 
 // A lock-free atomic counter hash grid for fast density estimates.
+template < bool Smoothstep >
 class DmHashGrid {
 public:
 	// Create a hash grid with a fixed memory footprint. This hash grid does not
@@ -82,7 +83,7 @@ public:
 		return c * m_densityScale / area;
 	}
 
-	float get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal) const {
+	float get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal, ei::Vec3* gradient = nullptr) const {
 		// Get integer and interpolation coordinates
 		ei::Vec3 nrmPos = position / m_cellSize - 0.5f;
 		ei::IVec3 gridPosI = ei::floor(nrmPos);
@@ -100,9 +101,37 @@ public:
 			float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
 			float count = static_cast<float>(get_count(ei::UVec3{cellPos}));
 			// Compute trilinear interpolated result of count and area (running sum)
-			float w = ws[ix].x * ws[iy].y * ws[iz].z;
+			float w;
+			if constexpr(Smoothstep)
+				w = ei::smoothstep(ws[ix].x) * ei::smoothstep(ws[iy].y) * ei::smoothstep(ws[iz].z);
+			else
+				w = ws[ix].x * ws[iy].y * ws[iz].z;
+			const float weightedCount = count * w;
+			const float weightedArea = area * w;
+			if(gradient != nullptr) {
+				if constexpr(Smoothstep) {
+					// Derivative for smooth step
+					*gradient += ei::Vec3{
+						(ix ? -1.f : 1.f) * 6.f * ws[1].x * ws[0].x * ws[iy].y * ws[iz].z * count,
+						(iy ? -1.f : 1.f) * 6.f * ws[1].y * ws[0].y * ws[iy].x * ws[iz].z * count,
+						(iz ? -1.f : 1.f) * 6.f * ws[1].z * ws[0].z * ws[iy].x * ws[iz].y * count,
+					};
+				} else {
+					// Gradient for trilinear interpolation
+					*gradient += ei::Vec3{
+						(ix ? -1.f : 1.f) * ws[iy].y * ws[iz].z * count,
+						(iy ? -1.f : 1.f) * ws[ix].x * ws[iz].z * count,
+						(iz ? -1.f : 1.f) * ws[ix].x * ws[iy].y * count
+					};
+				}
+			}
+
 			areaSum += area * w;
-			countSum += count * w;
+			countSum += weightedCount;
+		}
+
+		if(gradient != nullptr) {
+			*gradient = sdiv(*gradient, areaSum);
 		}
 		return sdiv(countSum, areaSum) * m_densityScale;
 	}
