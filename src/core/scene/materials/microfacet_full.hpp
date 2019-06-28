@@ -38,7 +38,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 	float iDotH;
 	Direction halfTS;
 	AngularPdf cavityPdf;
-	u64 rnd = rndSet.i0 & 0xffffffff00000000;
+	u64 rnd = rndSet.i0;
 	if(params.shadowing == ShadowingModel::SMITH) {
 		halfTS = sample_visible_normal_smith(params.ndf, incidentTS, params.roughness, rndSet, rnd);
 		cavityPdf = AngularPdf(eval_ndf(params.ndf, params.roughness, halfTS));
@@ -55,24 +55,17 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		cavityPdf = cavityTS.pdf;
 	}
 	boundary.set_halfTS(halfTS);
+	mAssert(halfTS.z > 0);
 
-	if(halfTS.z <= 0)
-		debugBreak;
 	// Compute Fresnel term and refracted cosine
 	float n_i = boundary.incidentMedium.get_refraction_index().x;
 	float n_t = boundary.otherMedium.get_refraction_index().x;
 	float eta = n_i / n_t;
 	float iDotHabs = ei::abs(iDotH);
 	Refraction f = fresnel_dielectric(n_i, n_t, iDotHabs);
-	if(f.f <= 0.01f)
-		debugBreak;
-	//f.f = 1.0f;
 	// Randomly choose between refraction and reflection proportional to f.f.
 	// TIR is handled automatically through f.f = 1 -> independent of random number.
-	float rndf = float(rndSet.i0 & 0x00000000ffffffff) / float(std::numeric_limits<u32>::max()-1);
-
-	//bool reflect = rnd < math::percentage_of(std::numeric_limits<u64>::max(), f.f);
-	bool reflect = rndf < f.f;
+	bool reflect = (float(rnd) / float(std::numeric_limits<u64>::max() - 1)) < f.f;
 	float eDotH, eDotHabs;
 	Direction excidentTS;
 	if(reflect) {
@@ -99,8 +92,8 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 	// Get geometry and common factors for PDF and throughput computation
 	float ge, gi;
 	if(params.shadowing == ShadowingModel::SMITH) {
-		ge = geoshadowing_smith(excidentTS, params.roughness, params.ndf);
-		gi = geoshadowing_smith(incidentTS, params.roughness, params.ndf);
+		ge = geoshadowing_smith(eDotH, excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(iDotH, incidentTS, params.roughness, params.ndf);
 	} else {
 		ge = geoshadowing_vcavity(eDotH, excidentTS.z, halfTS.z, params.roughness);
 		gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
@@ -171,8 +164,8 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
 	// Geometry Term
 	float ge, gi;
 	if(params.shadowing == ShadowingModel::SMITH) {
-		ge = geoshadowing_smith(excidentTS, params.roughness, params.ndf);
-		gi = geoshadowing_smith(incidentTS, params.roughness, params.ndf);
+		ge = geoshadowing_smith(eDotH, excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(iDotH, incidentTS, params.roughness, params.ndf);
 	}
 	else {
 		ge = geoshadowing_vcavity(eDotH, excidentTS.z, halfTS.z, params.roughness);

@@ -70,8 +70,7 @@ enum class ShadowingModel : i16 {
 };
 
 // Geometry term (Selfshadow) for V-cavity model.
-CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDotN, float hDotN, const ei::Vec2 & roughness)
-{
+CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDotN, float hDotN, const ei::Vec2 & roughness) {
 	// For refraction the half vector can be the other way around than the surface. I.e. the
 	// microfacet would be seen from back-side, which is impossible.
 	if(wDotH * wDotN <= 0.0) return 0.0;
@@ -82,7 +81,10 @@ CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDot
 }
 
 // Geometry term (Selfshadow) for Smith model.
-CUDA_FUNCTION __forceinline__ float geoshadowing_smith(const ei::Vec3& w, const ei::Vec2& roughness, NDF ndf) {
+CUDA_FUNCTION __forceinline__ float geoshadowing_smith(float wDotH, const ei::Vec3& w, const ei::Vec2& roughness, NDF ndf) {
+	// For refraction the half vector can be the other way around than the surface. I.e. the
+	// microfacet would be seen from back-side, which is impossible.
+	if(wDotH * w.z <= 0.0) return 0.0;
 	switch (ndf) {
 		case NDF::GGX: {
 			// H14Understanding P.86

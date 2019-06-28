@@ -56,8 +56,8 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 	// Get geometry factors for PDF and throughput computation
 	float ge, gi, g;
 	if(params.shadowing == ShadowingModel::SMITH) {
-		ge = geoshadowing_smith(excidentTS, params.roughness, params.ndf);
-		gi = geoshadowing_smith(incidentTS, params.roughness, params.ndf);
+		ge = geoshadowing_smith(iDotH, excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(iDotH, incidentTS, params.roughness, params.ndf);
 		g = geoshadowing_smith_reflection(gi, ge);
 	} else {
 		ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
@@ -90,8 +90,8 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 	float iDotH = dot(incidentTS, halfTS);
 	float ge, gi, g;
 	if(params.shadowing == ShadowingModel::SMITH) {
-		ge = geoshadowing_smith(excidentTS, params.roughness, params.ndf);
-		gi = geoshadowing_smith(incidentTS, params.roughness, params.ndf);
+		ge = geoshadowing_smith(iDotH, excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(iDotH, incidentTS, params.roughness, params.ndf);
 		g = geoshadowing_smith_reflection(gi, ge);
 	} else {
 		 ge = geoshadowing_vcavity(iDotH, excidentTS.z, halfTS.z, params.roughness);
