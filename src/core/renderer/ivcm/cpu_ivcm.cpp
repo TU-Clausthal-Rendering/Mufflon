@@ -224,6 +224,9 @@ void CpuIvcm::iterate() {
 		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
 					 pixel, numPhotons, currentMergeRadius, incidentF, incidentB, vertexBuffer);
 	}
+
+	logInfo("[CpuIvcm::iterate] Density structure memory: ", m_density->mem_size() / (1024 * 1024), "MB, ",
+		ei::round((1000.0f * m_density->size()) / m_density->capacity()) / 10.0f, "%");
 }
 
 void CpuIvcm::post_reset() {
@@ -241,7 +244,8 @@ void CpuIvcm::post_reset() {
 	}
 	// TODO: reasonable density structure capacities
 	if(resetFlags.geometry_changed())
-		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
+		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb,
+			1024 * 1024 * 4, 64.0f, true);
 	//if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
 	//	m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
 	//m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
@@ -314,8 +318,8 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			float density = m_density->get_density(currentVertex->get_position(), currentVertex->get_normal());
-//			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
+//			float density = m_density->get_density(currentVertex->get_position(), currentVertex->get_normal());
+			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());

@@ -20,7 +20,7 @@ class DmOctree {
 	static constexpr int FILL_ITERATIONS = 1000;
 public:
 	// splitFactor: Number of photons in one cell (per iteration) before it is splitted.
-	DmOctree(const ei::Box& sceneBounds, int capacity, float splitFactor) {
+	DmOctree(const ei::Box& sceneBounds, int capacity, float splitFactor, bool progressive) {
 		if(splitFactor <= 1.0f)
 			logError("[DmOctree] Split factor must be larger than 1. Otherwise the tree will be split infinitely. Setting to 1.1 instead ", splitFactor);
 		// Slightly enlarge the volume to avoid numerical issues on the boundary
@@ -31,6 +31,7 @@ public:
 		m_capacity = 1 + ((capacity + 7) & (~7));
 		m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
 		m_splitFactor = ei::max(1.1f, splitFactor);
+		m_progression = progressive ? 0.1f : 1.0f;
 		clear();
 	}
 
@@ -40,7 +41,7 @@ public:
 		int iterClamp = ei::min(FILL_ITERATIONS, iter);
 		m_stopFilling = iter > FILL_ITERATIONS;
 		m_densityScale = 1.0f / iterClamp;
-		m_splitCountDensity = ei::ceil(m_splitFactor * iterClamp);
+		m_splitCountDensity = ei::ceil(m_splitFactor * powf(float(iterClamp), m_progression));
 	}
 
 	// Overwrite all counters with 0, but keep allocation and child pointers.
@@ -284,6 +285,7 @@ private:
 	float m_densityScale;		// 1/#iterations to normalize the counters into a density
 	float m_splitFactor;		// Number of photons per iteration before a cell is split
 	int m_splitCountDensity;	// Total number of photons before split
+	float m_progression;		// Exponent of the progressive update function (0-maximum speed, 1-no progression)
 	ei::Vec3 m_minBound;
 	ei::Vec3 m_sceneSizeInv;
 	ei::Vec3 m_sceneSize;
@@ -321,8 +323,8 @@ private:
 					m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
 					return 0;
 				}
-				// init_children(child, count, localPos, childCellSize, normal);
-				init_children(child, count);
+				init_children(child, count, currentDepth, gridPos, offPos, normal);
+				//init_children(child, count);
 				// We do not know anything about the distribution of of photons -> equally
 				// distribute. Therefore, all eight children are initilized with SPLIT_FACTOR on clear().
 				m_nodes[idx].store(-child);
@@ -381,6 +383,7 @@ private:
 			//area[i] = math::intersection_area_nrm(childCellSize * 1.5f, localPos - (childLocalPos - 0.25f) * childCellSize, normal);
 			areaSum += area[i];
 		}
+		int minCount = ei::ceil(count / 8.0f);
 		// Distribute the count proportional to the areas. To avoid loss we cannot
 		// simply round. https://stackoverflow.com/questions/13483430/how-to-make-rounded-percentages-add-up-to-100
 		float cumVal = 0.0f;
@@ -390,7 +393,9 @@ private:
 			int cumRounded = ei::round(cumVal);
 			// The min(count-1) is necessary to avoid a child cell which itself
 			// already has the split count -> would lead to a dead lock.
-			m_nodes[children + i].store(ei::min(count - 1, cumRounded - prevCumRounded));
+			//int subCount = ei::min(count - 1, cumRounded - prevCumRounded); // More correct
+			int subCount = ei::clamp(cumRounded - prevCumRounded, minCount, count - 1);
+			m_nodes[children + i].store(subCount);
 			prevCumRounded = cumRounded;
 		}
 	}
