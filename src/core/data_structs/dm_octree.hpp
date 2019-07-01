@@ -73,23 +73,25 @@ public:
 		m_depth.store(0);
 	}
 
-	void increase_count(const ei::Vec3& pos) {
+	void increase_count(const ei::Vec3& pos, const ei::Vec3& normal) {
 		if(m_stopFilling) return;
-		ei::Vec3 normPos = (pos - m_minBound) * m_sceneSizeInv;
+		ei::Vec3 offPos = pos - m_minBound;
+		ei::Vec3 normPos = offPos * m_sceneSizeInv;
 		int countOrChild = increment_if_positive(0);
-		countOrChild = split_node_if_necessary(0, countOrChild, 0);
+		countOrChild = split_node_if_necessary(0, countOrChild, 0, ei::IVec3{0}, offPos, normal);
 		int edgeL = 1;
 		int currentDepth = 0;
 		while(countOrChild < 0) {
 			edgeL *= 2;
 			++currentDepth;
 			// Get the relative index of the child [0,7]
-			ei::IVec3 intPos = (ei::IVec3{ normPos * edgeL }) & 1;
+			ei::IVec3 gridPos { normPos * edgeL };
+			ei::IVec3 intPos = gridPos & 1;
 			int idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
 			idx -= countOrChild;	// 'Add' global offset (which is stored negative)
 			countOrChild = increment_if_positive(idx);
 			//if(currentDepth == 3) break;
-			countOrChild = split_node_if_necessary(idx, countOrChild, currentDepth);
+			countOrChild = split_node_if_necessary(idx, countOrChild, currentDepth, gridPos, offPos, normal);
 		}
 	}
 
@@ -313,7 +315,11 @@ private:
 	}
 
 	// Returns the new child pointer or 0
-	int split_node_if_necessary(int idx, int count, int currentDepth) {
+	int split_node_if_necessary(int idx, int count, int currentDepth,
+		const ei::IVec3 gridPos, const ei::Vec3& offPos,
+		const ei::Vec3& normal) {
+		// Too large depths would break the integer arithmetic in the grid.
+		if(currentDepth > 30) return 0;
 		// The node must be split if its density gets too high
 		if(count >= m_splitCountDensity) {
 			// Only one thread is responsible to do the allocation
@@ -323,6 +329,9 @@ private:
 					m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
 					return 0;
 				}
+				/*ei::Vec3 childCellSize = m_sceneSize / (1 << (currentDepth + 1));
+				ei::Vec3 localPos = offPos - gridPos * 2 * childCellSize;
+				init_children(count, child, localPos, childCellSize, normal);//*/
 				// We do not know anything about the distribution of of photons -> equally
 				// distribute. Therefore, all eight children are initilized with SPLIT_FACTOR on clear().
 				m_nodes[idx].store(-child);
@@ -354,6 +363,33 @@ private:
 		}
 		m_nodes[idx].store(-child);
 		return -child;
+	}
+
+	void init_children(int count, int children,
+		const ei::Vec3& localPos, const ei::Vec3& childCellSize,
+		const ei::Vec3& normal) {
+		// Get the intersection areas of the eight children to distribute
+		// the count properly.
+		float area[8];
+		float areaSum = 0.0f;
+		for(int i = 0; i < 8; ++i) {
+			const ei::IVec3 childLocalPos { i & 1, (i>>1) & 1, i>>2 };
+			area[i] = math::intersection_area_nrm(childCellSize, localPos - childLocalPos * childCellSize, normal);
+			//area[i] = math::intersection_area_nrm(childCellSize * 1.5f, localPos - (childLocalPos - 0.25f) * childCellSize, normal);
+			areaSum += area[i];
+		}
+		// Distribute the count proportional to the areas. To avoid loss we cannot
+		// simply round. https://stackoverflow.com/questions/13483430/how-to-make-rounded-percentages-add-up-to-100
+		float cumVal = 0.0f;
+		int prevCumRounded = 0;
+		for(int i = 0; i < 8; ++i) {
+			cumVal += area[i] / areaSum * count;
+			int cumRounded = ei::round(cumVal);
+			// The min(count-1) is necessary to avoid a child cell which itself
+			// already has the split count -> would lead to a dead lock.
+			m_nodes[children + i].store(ei::min(count - 1, cumRounded - prevCumRounded));
+			prevCumRounded = cumRounded;
+		}
 	}
 };
 
