@@ -40,15 +40,7 @@ public:
 		int iterClamp = ei::min(FILL_ITERATIONS, iter);
 		m_stopFilling = iter > FILL_ITERATIONS;
 		m_densityScale = 1.0f / iterClamp;
-		m_splitCountDensity = ei::ceil(m_splitFactor) * iterClamp;
-		// Set the counter of all unused cells to the number of expected samples
-		// times 2. A planar surface will never extend to all eight cells. It might
-		// intersect 7 of them, but still the distribution is one of a surface.
-		// Therefore, the factor 2 (distribute among 4 cells) gives a much better initial
-		// value.
-		if(!m_stopFilling)
-			for(int i = m_allocationCounter.load(); i < m_capacity; ++i)
-				m_nodes[i].store(ei::ceil(iter * m_splitFactor / 4));
+		m_splitCountDensity = ei::ceil(m_splitFactor * iterClamp);
 	}
 
 	// Overwrite all counters with 0, but keep allocation and child pointers.
@@ -316,7 +308,7 @@ private:
 
 	// Returns the new child pointer or 0
 	int split_node_if_necessary(int idx, int count, int currentDepth,
-		const ei::IVec3 gridPos, const ei::Vec3& offPos,
+		const ei::IVec3& gridPos, const ei::Vec3& offPos,
 		const ei::Vec3& normal) {
 		// Too large depths would break the integer arithmetic in the grid.
 		if(currentDepth > 30) return 0;
@@ -329,9 +321,8 @@ private:
 					m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
 					return 0;
 				}
-				/*ei::Vec3 childCellSize = m_sceneSize / (1 << (currentDepth + 1));
-				ei::Vec3 localPos = offPos - gridPos * 2 * childCellSize;
-				init_children(count, child, localPos, childCellSize, normal);//*/
+				// init_children(child, count, localPos, childCellSize, normal);
+				init_children(child, count);
 				// We do not know anything about the distribution of of photons -> equally
 				// distribute. Therefore, all eight children are initilized with SPLIT_FACTOR on clear().
 				m_nodes[idx].store(-child);
@@ -365,9 +356,21 @@ private:
 		return -child;
 	}
 
-	void init_children(int count, int children,
-		const ei::Vec3& localPos, const ei::Vec3& childCellSize,
+	// Set the counter of all unused cells to the number of expected samples
+	// times 2. A planar surface will never extend to all eight cells. It might
+	// intersect 7 of them, but still the distribution is one of a surface.
+	// Therefore, the factor 2 (distribute among 4 cells) gives a much better initial
+	// value.
+	void init_children(int children, int count) {
+		for(int i = 0; i < 8; ++i)
+			m_nodes[children+i].store(ei::ceil(m_splitCountDensity / 4.0f));
+	}
+
+	void init_children(int children, int count, int currentDepth,
+		const ei::IVec3& gridPos, const ei::Vec3& offPos,
 		const ei::Vec3& normal) {
+		ei::Vec3 childCellSize = m_sceneSize / (1 << (currentDepth + 1));
+		ei::Vec3 localPos = offPos - gridPos * 2 * childCellSize;
 		// Get the intersection areas of the eight children to distribute
 		// the count properly.
 		float area[8];
