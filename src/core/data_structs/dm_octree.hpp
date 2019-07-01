@@ -30,15 +30,8 @@ public:
 		m_minBound = sceneBounds.min - sceneSize * (2.002f - 1.0f) / 2.0f;
 		m_capacity = 1 + ((capacity + 7) & (~7));
 		m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
-		// Root nodes have a count of 0
-		m_allocationCounter.store(1);
-		m_nodes[0].store(0);
-		// TODO: parallelize?
-		// The other nodes are only used if the parent is split
-		//for(int i = 1; i < m_capacity; ++i)
-		//	m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
-		m_depth.store(0);
 		m_splitFactor = ei::max(1.1f, splitFactor);
+		clear();
 	}
 
 	// Initialize iteration count dependent data (1-indexed).
@@ -69,8 +62,15 @@ public:
 	// Clear entire structure
 	void clear() {
 		m_allocationCounter.store(1);
-		m_nodes[0].store(0);
-		m_depth.store(0);
+		m_depth.store(3);
+		// Split the first 3 levels
+		constexpr int NUM_SPLIT_NODES = 1+8+64;
+		constexpr int NUM_LEAVES = 512;
+		for(int i = 0; i < NUM_SPLIT_NODES; ++i)
+			split(i);
+		// Set counters in leaf nodes to 0
+		for(int i = 0; i < NUM_LEAVES; ++i)
+			m_nodes[NUM_SPLIT_NODES+i].store(0);
 	}
 
 	void increase_count(const ei::Vec3& pos, const ei::Vec3& normal) {
