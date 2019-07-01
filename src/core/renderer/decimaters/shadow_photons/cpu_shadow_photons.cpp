@@ -15,44 +15,61 @@ ShadowPhotonVisualizer::~ShadowPhotonVisualizer() {
 void ShadowPhotonVisualizer::post_reset() {
 	const auto resetFlags = get_reset_event();
 	init_rngs(m_outputBuffer.get_num_pixels());
-	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE) || resetFlags.resolution_changed()) {
+	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE) || resetFlags.resolution_changed()
+	   || resetFlags.is_set(ResetEvent::PARAMETER)) {
 		// TODO: proper capacity
-#ifdef SPV_USE_OCTREE
-		m_densityShadowPhotons = std::make_unique<data_structs::DmHashGrid<USE_SMOOTHSTEP>>(1024 * 1024 * 32);
-		m_densityPhotons = std::make_unique<data_structs::DmHashGrid<USE_SMOOTHSTEP>>(1024 * 1024 * 32);
-		m_densityShadowPhotons->set_cell_size(m_params.cellSize);
-		m_densityPhotons->set_cell_size(m_params.cellSize);
-#else // SPV_USE_HASHGRID
-		m_densityShadowPhotons = std::make_unique<data_structs::DmOctree<USE_SMOOTHSTEP>>(m_sceneDesc.aabb, 1024 * 1024 * 32, 2.0f);
-		m_densityPhotons = std::make_unique<data_structs::DmOctree<USE_SMOOTHSTEP>>(m_sceneDesc.aabb, 1024 * 1024 * 32, 2.0f);
-#endif // SPV_USE_HASHGRID
+		// TODO: it would be much better to not have one per light...
+	
+		m_densityShadowPhotonsHashgrid.clear();
+		m_densityPhotonsHashgrid.clear();
+		m_densityShadowPhotonsOctree.clear();
+		m_densityPhotonsOctree.clear();
+		const std::size_t lightCount = 1u + m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount;
+		m_densityShadowPhotonsHashgrid.reserve(lightCount);
+		m_densityPhotonsHashgrid.reserve(lightCount);
+		m_densityShadowPhotonsOctree.reserve(lightCount);
+		m_densityPhotonsOctree.reserve(lightCount);
+		for(std::size_t i = 0u; i < lightCount; ++i) {
+			if(m_params.mode == PSpvMode::Values::OCTREE) {
+				m_densityShadowPhotonsOctree.emplace_back(m_sceneDesc.aabb, 1024 * 1024 * 32, m_params.splitFactor);
+				m_densityPhotonsOctree.emplace_back(m_sceneDesc.aabb, 1024 * 1024 * 32, m_params.splitFactor);
+				m_densityShadowPhotonsOctree.back().clear();
+				m_densityPhotonsOctree.back().clear();
+			} else if(m_params.mode == PSpvMode::Values::HASHGRID) {
+				m_densityShadowPhotonsHashgrid.emplace_back(1024 * 1024 * 32);
+				m_densityPhotonsHashgrid.emplace_back(1024 * 1024 * 32);
+				m_densityShadowPhotonsHashgrid.back().set_cell_size(m_params.cellSize);
+				m_densityPhotonsHashgrid.back().set_cell_size(m_params.cellSize);
+				m_densityShadowPhotonsHashgrid.back().clear();
+				m_densityPhotonsHashgrid.back().clear();
+			}
+		}
 	}
-	if(resetFlags.is_set(ResetEvent::PARAMETER)) {
-#ifdef SPV_USE_HASHGRID
-		m_densityShadowPhotons->set_cell_size(m_params.cellSize);
-		m_densityPhotons->set_cell_size(m_params.cellSize);
-#endif // SPV_USE_HASHGRID
-	}
-	m_densityShadowPhotons->clear();
-	m_densityPhotons->clear();
 }
 
 void ShadowPhotonVisualizer::iterate() {
-	m_densityPhotons->set_iteration(1 + m_currentIteration);
-	m_densityShadowPhotons->set_iteration(1 + m_currentIteration);
+	for(auto& density : m_densityPhotonsOctree)
+		density.set_iteration(1 + m_currentIteration);
+	for(auto& density : m_densityShadowPhotonsOctree)
+		density.set_iteration(1 + m_currentIteration);
+	for(auto& density : m_densityPhotonsHashgrid)
+		density.set_iteration(1 + m_currentIteration);
+	for(auto& density : m_densityShadowPhotonsHashgrid)
+		density.set_iteration(1 + m_currentIteration);
 
-	const u64 photonSeed = m_rngs[0].next();
-	const int numPhotons = m_outputBuffer.get_num_pixels();
+	if(m_params.mode == PSpvMode::Values::HASHGRID || m_params.mode == PSpvMode::Values::OCTREE) {
+		const u64 photonSeed = m_rngs[0].next();
+		const int numPhotons = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
-	for(int i = 0; i < numPhotons; ++i) {
-		this->trace_photon(i, numPhotons, photonSeed);
+		for(int i = 0; i < numPhotons; ++i) {
+			this->trace_photon(i, numPhotons, photonSeed);
+		}
 	}
-#ifndef SPV_USE_HASHGRID
-	//m_densityPhotons->balance();
-	//m_densityShadowPhotons->balance();
-#endif // SPV_USE_HASHGRID
 
-	// Fetch densities
+	if(m_params.mode == PSpvMode::Values::OCTREE) {
+		//m_densityPhotons->balance();
+		//m_densityShadowPhotons->balance();
+	}
 
 	const int numPixels = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
@@ -70,45 +87,133 @@ void ShadowPhotonVisualizer::iterate() {
 		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
 			continue;
 
-		ei::Vec3 shadowGradient{0.f};
-		const float photonDensity = query_photon_density(vertex);
-		const float shadowPhotonDensity = query_shadow_photon_density(vertex, &shadowGradient);
-		const float ratio = photonDensity / std::max(1.f, (photonDensity + shadowPhotonDensity));
+		if(m_sceneDesc.lightTree.dirLights.lightCount + m_sceneDesc.lightTree.posLights.lightCount + 1u > 3u)
+			logWarning("Too many lights for direct color mapping; only the first three lights will be displaced");
 
-		m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ photonDensity, 0.f, shadowPhotonDensity });
-		m_outputBuffer.set(coord, RenderTargets::POSITION, ei::Vec3{ photonDensity });
-		m_outputBuffer.set(coord, RenderTargets::ALBEDO, ei::Vec3{ shadowPhotonDensity });
-		if(ratio < 0.5f)
-			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 2.f * ratio });
-		else
-			m_outputBuffer.set(coord, RenderTargets::NORMAL, ei::Vec3{ 1.f - 2.f * (ratio - 0.5f) });
-		// We project the gradient onto the surface
-		if(std::abs(ratio - 0.5f) < 0.25f) {
-			const float projShadowGradient = ei::len(shadowGradient - ei::dot(shadowGradient, vertex.get_normal()) * vertex.get_normal());
-			m_outputBuffer.set(coord, RenderTargets::LIGHTNESS, ei::Vec3{ projShadowGradient });
+		if(m_params.mode == PSpvMode::Values::HASHGRID || m_params.mode == PSpvMode::Values::OCTREE) {
+			display_photon_densities(coord, vertex);
 		} else {
-			m_outputBuffer.set(coord, RenderTargets::LIGHTNESS, ei::Vec3{ 0.f });
+			// Find silhouette
+			// TODO
 		}
 	}
 }
 
-float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex, ei::Vec3* gradient) {
-	if(m_params.pointSampling)
-		return m_densityPhotons->get_density(vertex.get_position(), vertex.get_normal());
-	else
-		return m_densityPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal(), gradient);
+void ShadowPhotonVisualizer::display_photon_densities(const ei::IVec2& coord, const SpvPathVertex& vertex) {
+	ei::Vec3 photonDensities{ 0.f };
+	ei::Vec3 shadowPhotonDensities{ 0.f };
+	ei::Vec3 ratios{ 0.f };
+	ei::Vec3 shadowGradients{ 0.f };
+	// TODO: this only works for up to three lights (including background)
+	const std::size_t lightCount = 1u + m_sceneDesc.lightTree.dirLights.lightCount + m_sceneDesc.lightTree.posLights.lightCount;
+	for(std::size_t i = 0u; i < std::min<std::size_t>(3u, lightCount); ++i) {
+		ei::Vec3 currShadowGradient{ 0.f };
+		const float photonDensity = query_photon_density(vertex, i);
+		const float shadowPhotonDensity = query_shadow_photon_density(vertex, i, &currShadowGradient);
+		const float ratio = sdiv(photonDensity, photonDensity + shadowPhotonDensity);
+		const float projShadowGradient = ei::len(currShadowGradient - ei::dot(currShadowGradient, vertex.get_normal()) * vertex.get_normal());
+
+		ei::Vec3 colorMask{ 0.f };
+		switch(i) {
+			case 0: colorMask.x = 1.f; break;
+			case 1: colorMask.y = 1.f; break;
+			case 2: colorMask.z = 1.f; break;
+			default: break;
+		}
+
+		photonDensities += colorMask * photonDensity;
+		shadowPhotonDensities += colorMask * shadowPhotonDensity;
+		if(ratio < 0.5f)
+			ratios += colorMask * 2.f * ratio;
+		else
+			ratios += colorMask * (1.f - 2.f * (ratio - 0.5f));
+		if(std::abs(ratio - 0.5f) < 0.25f)
+			shadowGradients += colorMask * projShadowGradient;
+	}
+
+	//m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ photonDensity, 0.f, shadowPhotonDensity });
+	m_outputBuffer.set(coord, RenderTargets::RADIANCE, shadowGradients);
+	m_outputBuffer.set(coord, RenderTargets::POSITION, photonDensities);
+	m_outputBuffer.set(coord, RenderTargets::ALBEDO, shadowPhotonDensities);
+	m_outputBuffer.set(coord, RenderTargets::NORMAL, ratios);
 }
 
-float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& vertex, ei::Vec3* gradient) {
-	if(m_params.pointSampling)
-		return m_densityShadowPhotons->get_density(vertex.get_position(), vertex.get_normal());
-	else
-		return m_densityShadowPhotons->get_density_interpolated(vertex.get_position(), vertex.get_normal(), gradient);
+float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex, const std::size_t lightIndex,
+												   ei::Vec3* gradient) const {
+	switch(m_params.interpolation) {
+		case PInterpolate::Values::LINEAR:
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				return m_densityPhotonsHashgrid[lightIndex].get_density_interpolated<false>(vertex.get_position(),
+																							vertex.get_normal(), gradient);
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				return m_densityPhotonsOctree[lightIndex].get_density_interpolated<false>(vertex.get_position(),
+																						  vertex.get_normal(), gradient);
+			else
+				return 0.f;
+		case PInterpolate::Values::SMOOTHSTEP:
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				return m_densityPhotonsHashgrid[lightIndex].get_density_interpolated<true>(vertex.get_position(),
+																						   vertex.get_normal(), gradient);
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				return m_densityPhotonsOctree[lightIndex].get_density_interpolated<true>(vertex.get_position(),
+																						 vertex.get_normal(), gradient);
+			else
+				return 0.f;
+		default:
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				return m_densityPhotonsHashgrid[lightIndex].get_density(vertex.get_position(),
+																		vertex.get_normal());
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				return m_densityPhotonsOctree[lightIndex].get_density(vertex.get_position(),
+																	  vertex.get_normal());
+			else
+				return 0.f;
+	}
+}
+
+float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& vertex, const std::size_t lightIndex,
+														  ei::Vec3* gradient) const {
+	switch(m_params.interpolation) {
+		case PInterpolate::Values::LINEAR:
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				return m_densityShadowPhotonsHashgrid[lightIndex].get_density_interpolated<false>(vertex.get_position(),
+																								  vertex.get_normal(), gradient);
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				return m_densityShadowPhotonsOctree[lightIndex].get_density_interpolated<false>(vertex.get_position(),
+																								vertex.get_normal(), gradient);
+			else
+				return 0.f;
+		case PInterpolate::Values::SMOOTHSTEP:
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				return m_densityShadowPhotonsHashgrid[lightIndex].get_density_interpolated<true>(vertex.get_position(),
+																								 vertex.get_normal(), gradient);
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				return m_densityShadowPhotonsOctree[lightIndex].get_density_interpolated<true>(vertex.get_position(),
+																							   vertex.get_normal(), gradient);
+			else
+				return 0.f;
+		default:
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				return m_densityShadowPhotonsHashgrid[lightIndex].get_density(vertex.get_position(),
+																			  vertex.get_normal());
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				return m_densityShadowPhotonsOctree[lightIndex].get_density(vertex.get_position(),
+																			vertex.get_normal());
+			else
+				return 0.f;
+	}
 }
 
 void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, const u64 seed) {
 	math::RndSet2_1 rndStart{ m_rngs[idx].next(), m_rngs[idx].next() };
-	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
+	u32 lightIndex;
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart, &lightIndex);
+	if(p.type == scene::lights::LightType::DIRECTIONAL_LIGHT)
+		lightIndex += 1u; // Offset for envmap light
+	else if(p.type != scene::lights::LightType::DIRECTIONAL_LIGHT)
+		lightIndex += static_cast<u32>(1u + m_sceneDesc.lightTree.dirLights.lightCount); // Offset for envmap + dirlights
+
+
 	SpvPathVertex vertex[2];
 	SpvPathVertex::create_light(&vertex[0], nullptr, p);
 	math::Throughput throughput;
@@ -129,12 +234,19 @@ void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, c
 		otherV = 1 - currentV;
 
 		// Deposit regular photon
-		m_densityPhotons->increase_count(vertex[currentV].get_position());
+		if(m_params.mode == PSpvMode::Values::HASHGRID)
+			m_densityPhotonsHashgrid[lightIndex].increase_count(vertex[currentV].get_position());
+		else if(m_params.mode == PSpvMode::Values::OCTREE)
+			m_densityPhotonsOctree[lightIndex].increase_count(vertex[currentV].get_position());
 
 		// Trace shadow photon
 		std::optional<ei::Vec3> shadowPos = trace_shadow_photon(vertex[currentV], idx);
-		if(shadowPos.has_value())
-			m_densityShadowPhotons->increase_count(shadowPos.value());
+		if(shadowPos.has_value()) {
+			if(m_params.mode == PSpvMode::Values::HASHGRID)
+				m_densityShadowPhotonsHashgrid[lightIndex].increase_count(shadowPos.value());
+			else if(m_params.mode == PSpvMode::Values::OCTREE)
+				m_densityShadowPhotonsOctree[lightIndex].increase_count(shadowPos.value());
+		}
 	} while(pathLen < m_params.maxPathLength - 1); // -1 because there is at least one segment on the view path
 }
 

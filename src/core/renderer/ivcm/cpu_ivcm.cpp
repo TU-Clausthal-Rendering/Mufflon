@@ -243,7 +243,7 @@ void CpuIvcm::post_reset() {
 //	if(resetFlags.geometry_changed())
 //		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
 	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
-		m_density = std::make_unique<data_structs::DmHashGrid<false>>(1024 * 1024 * 32);
+		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
 	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
 	m_density->clear();
 }

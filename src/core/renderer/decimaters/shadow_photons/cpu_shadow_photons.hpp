@@ -6,6 +6,7 @@
 #include "core/data_structs/dm_hashgrid.hpp"
 #include <ei/vector.hpp>
 #include <optional>
+#include <vector>
 
 namespace mufflon::renderer::decimaters::spm {
 
@@ -23,9 +24,6 @@ struct SpvVertexExt {
 };
 using SpvPathVertex = PathVertex<SpvVertexExt>;
 
-//#define SPV_USE_OCTREE
-#define SPV_USE_SMOOTHSTEP
-
 class ShadowPhotonVisualizer final : public RendererBase<Device::CPU> {
 public:
 	ShadowPhotonVisualizer();
@@ -41,9 +39,13 @@ public:
 	void post_reset() final;
 
 private:
+	void display_photon_densities(const ei::IVec2& coord, const SpvPathVertex& vertex);
+
 	void trace_photon(const int idx, const int numPhotons, const u64 seed);
-	float query_photon_density(const SpvPathVertex& vertex, ei::Vec3* gradient = nullptr);
-	float query_shadow_photon_density(const SpvPathVertex& vertex, ei::Vec3* gradient = nullptr);
+	float query_photon_density(const SpvPathVertex& vertex, const std::size_t lightIndex,
+							   ei::Vec3* gradient = nullptr) const;
+	float query_shadow_photon_density(const SpvPathVertex& vertex, const std::size_t lightIndex,
+									  ei::Vec3* gradient = nullptr) const;
 	void init_rngs(const int num);
 
 	std::optional<ei::Vec3> trace_shadow_photon(const SpvPathVertex& vertex, const int idx);
@@ -51,18 +53,13 @@ private:
 	ShadowPhotonParameters m_params;
 	std::vector<math::Rng> m_rngs;
 
-#ifdef SPV_USE_SMOOTHSTEP
-	static constexpr bool USE_SMOOTHSTEP = true;
-#else // SPV_USE_SMOOTHSTEP
-	static constexpr bool USE_SMOOTHSTEP = false;
-#endif // SPV_USE_SMOOTHSTEP
-#ifdef SPV_USE_OCTREE
-	std::unique_ptr<data_structs::DmHashGrid<USE_SMOOTHSTEP>> m_densityPhotons;
-	std::unique_ptr<data_structs::DmHashGrid<USE_SMOOTHSTEP>> m_densityShadowPhotons;
-#else // SPV_USE_OCTREE
-	std::unique_ptr<data_structs::DmOctree<USE_SMOOTHSTEP>> m_densityPhotons;
-	std::unique_ptr<data_structs::DmOctree<USE_SMOOTHSTEP>> m_densityShadowPhotons;
-#endif // SPV_USE_OCTREE
+	// TODO: unify this in one data structure (possibly by storing which light a photon came from alongside count?)
+
+
+	std::vector<data_structs::DmOctree> m_densityPhotonsOctree;
+	std::vector<data_structs::DmOctree> m_densityShadowPhotonsOctree;
+	std::vector<data_structs::DmHashGrid> m_densityPhotonsHashgrid;
+	std::vector<data_structs::DmHashGrid> m_densityShadowPhotonsHashgrid;
 };
 
 } // namespace mufflon::renderer::decimaters::spm

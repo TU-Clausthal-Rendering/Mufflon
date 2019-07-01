@@ -18,6 +18,8 @@
     <ClCompile Include="..\..\src\core\cameras\camera.cpp" />
     <ClCompile Include="..\..\src\core\cameras\focus.cpp" />
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
+    <ClCompile Include="..\..\src\core\data_structs\dm_hashgrid.cpp" />
+    <ClCompile Include="..\..\src\core\data_structs\dm_octree.cpp" />
     <ClCompile Include="..\..\src\core\export\interface.cpp" />
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\memory\synchronize.cpp" />

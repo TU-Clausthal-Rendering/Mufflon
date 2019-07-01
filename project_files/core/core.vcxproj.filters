@@ -382,6 +382,12 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\shadow_photons\cpu_shadow_photons.cpp">
       <Filter>Source Files\core\renderer\decimaters\shadow_photons</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\data_structs\dm_hashgrid.cpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\data_structs\dm_octree.cpp">
+      <Filter>Source Files\core\data_structs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">

@@ -64,8 +64,8 @@ private:
 	std::vector<const IvcmPathVertex*> m_pathEndPoints;
 	std::vector<AreaPdf> m_tmpPathProbabilities;
 	std::vector<IvcmPathVertex> m_tmpViewPathVertices;
-	//std::unique_ptr<data_structs::DmOctree<false>> m_density;
-	std::unique_ptr<data_structs::DmHashGrid<false>> m_density;
+	//std::unique_ptr<data_structs::DmOctree> m_density;
+	std::unique_ptr<data_structs::DmHashGrid> m_density;
 };
 
 } // namespace mufflon::renderer

@@ -81,7 +81,7 @@ CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
 CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 						   const LightSubTree& tree, u64 left, u64 right,
 						   u64 rndChoice, float treeProb,
-						   const math::RndSet2& rnd) {
+						   const math::RndSet2& rnd, u32* lightIndex = nullptr) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -91,6 +91,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 	u64 intervalLeft = left;
 	u64 intervalRight = right;
 	float lightProb = treeProb;
+	u32 treeIndex = 1u;
 
 	// Iterate until we hit a leaf
 	while(type == LightSubTree::Node::INTERNAL_NODE_TYPE) {
@@ -101,6 +102,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 		float probLeft = currentNode->left.flux / (currentNode->left.flux + currentNode->right.flux);
 		// Compute the integer bounds
 		u64 intervalBoundary = intervalLeft + math::percentage_of(intervalRight - intervalLeft, probLeft);
+		treeIndex = treeIndex << 1u;
 		if(rndChoice < intervalBoundary) {
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
@@ -111,14 +113,20 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 			offset = currentNode->right.offset;
 			intervalLeft = intervalBoundary;
 			lightProb *= (1.0f-probLeft);
+			++treeIndex;
 		}
 		currentNode = tree.get_node(offset);
 	}
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
+	// If we want to know the index we need to compute the proper one
+	// (tracking left/right is not enough since the tree isn't fully balanced)
+	if(lightIndex != nullptr)
+		*lightIndex = (treeIndex - tree.internalNodeCount) - 1u;
+
 	// We got a light source! Sample it
 	return adjustPdf(sample_light(scene, static_cast<LightType>(type),
-							 tree.memory + offset, rnd), lightProb);
+								  tree.memory + offset, rnd), lightProb);
 }
 
 /**
@@ -132,7 +140,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
  */
 CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 						   u64 index, u64 numIndices, u64 seed,
-						   const math::RndSet2_1& rnd) {
+						   const math::RndSet2_1& rnd, u32* lightIndex = nullptr) {
 	using namespace lighttree_detail;
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// See connect() for details on the rndChoice
@@ -154,6 +162,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 		// Adjust pdf (but apply the probability to the directional pdf and NOT the pos.pdf)
 		photon.intensity /= envProb;
 		photon.source_param.dir.dirPdf *= envProb;
+		if(lightIndex != nullptr) *lightIndex = 0u;
 		return photon;
 	}
 	// ...then the directional lights come...
@@ -170,7 +179,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 		subTree = &tree.posLights;
 		p = posProb;
 	}
-	return emit(scene, *subTree, left, right, rndChoice, p, rnd);
+	return emit(scene, *subTree, left, right, rndChoice, p, rnd, lightIndex);
 }
 
 
