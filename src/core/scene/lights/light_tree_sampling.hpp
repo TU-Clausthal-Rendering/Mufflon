@@ -122,7 +122,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 	// If we want to know the index we need to compute the proper one
 	// (tracking left/right is not enough since the tree isn't fully balanced)
 	if(lightIndex != nullptr)
-		*lightIndex = (treeIndex - tree.internalNodeCount) - 1u;
+		*lightIndex += (treeIndex - tree.internalNodeCount) - 1u;
 
 	// We got a light source! Sample it
 	return adjustPdf(sample_light(scene, static_cast<LightType>(type),
@@ -145,7 +145,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// See connect() for details on the rndChoice
 	u64 rndChoice = numIndices > 0 ? seed + index * (std::numeric_limits<u64>::max() / numIndices)
-								   : seed;
+		: seed;
 	if(rndChoice == ~0ull) --rndChoice;
 
 	float fluxSum = ei::sum(tree.background.flux) + tree.dirLights.root.flux + tree.posLights.root.flux;
@@ -162,7 +162,8 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 		// Adjust pdf (but apply the probability to the directional pdf and NOT the pos.pdf)
 		photon.intensity /= envProb;
 		photon.source_param.dir.dirPdf *= envProb;
-		if(lightIndex != nullptr) *lightIndex = 0u;
+		if(lightIndex != nullptr)
+			*lightIndex = 0u;
 		return photon;
 	}
 	// ...then the directional lights come...
@@ -172,12 +173,16 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 	const LightSubTree* subTree = &tree.dirLights;
 	if(rndChoice < right) {
 		mAssert(tree.dirLights.lightCount > 0u);
+		if(lightIndex != nullptr)
+			*lightIndex = 1u; // Background
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
 		left = right;
 		right = std::numeric_limits<u64>::max();
 		subTree = &tree.posLights;
 		p = posProb;
+		if(lightIndex != nullptr)
+			*lightIndex = 1u + static_cast<u32>(tree.dirLights.lightCount); // Background and dir lights
 	}
 	return emit(scene, *subTree, left, right, rndChoice, p, rnd, lightIndex);
 }
@@ -191,7 +196,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 										  const LightSubTree& tree, u64 left, u64 right,
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const math::RndSet2& rnd,
-										  bool posGuide) {
+										  bool posGuide, u32* lightIndex = nullptr) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -201,8 +206,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 	u64 intervalLeft = left;
 	u64 intervalRight = right;
 	float lightProb = treeProb;
-	u32 nodeIndex = 0u;
-	u32 nodeLevel = 0u;
+	u32 treeIndex = 1u;
 
 	// Iterate until we hit a leaf
 	while(type == LightSubTree::Node::INTERNAL_NODE_TYPE) {
@@ -221,22 +225,27 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 		}
 		// Compute the integer bounds
 		u64 intervalBoundary = intervalLeft + math::percentage_of(intervalRight - intervalLeft, probLeft);
+		treeIndex = treeIndex << 1u;
 		if(rndChoice < intervalBoundary) {
-			nodeIndex += (1u << (nodeLevel++));
 			type = currentNode->left.type;
 			offset = currentNode->left.offset;
 			intervalRight = intervalBoundary;
 			lightProb *= probLeft;
 		} else {
-			nodeIndex += (1u << (nodeLevel++)) + 1u;
 			type = currentNode->right.type;
 			offset = currentNode->right.offset;
 			intervalLeft = intervalBoundary;
 			lightProb *= (1.0f-probLeft);
+			++treeIndex;
 		}
 
 		currentNode = tree.get_node(offset);
 	}
+
+	// If we want to know the index we need to compute the proper one
+	// (tracking left/right is not enough since the tree isn't fully balanced)
+	if(lightIndex != nullptr)
+		*lightIndex += (treeIndex - tree.internalNodeCount) - 1u;
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	// We got a light source! Sample it
@@ -263,7 +272,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
  */
 CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
-										  const math::RndSet2& rnd) {
+										  const math::RndSet2& rnd, u32* lightIndex = nullptr) {
 	using namespace lighttree_detail;
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// Scale the indices such that they sample the u64-intervall equally.
@@ -285,6 +294,8 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 	// First is envmap...
 	u64 rightEnv = math::percentage_of(std::numeric_limits<u64>::max(), envProb);
 	if(rndChoice < rightEnv) {
+		if(lightIndex != nullptr)
+			*lightIndex = 0u;
 		return adjustPdf(connect_light(tree.background, position, scene.aabb, rnd), envProb);
 	}
 	// ...then the directional lights come...
@@ -294,14 +305,19 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 	const LightSubTree* subTree = &tree.dirLights;
 	if(rndChoice < right) {
 		mAssert(tree.dirLights.lightCount > 0u);
+		if(lightIndex != nullptr)
+			*lightIndex = 1u; // Background
 	} else {
 		mAssert(tree.posLights.lightCount > 0u);
 		left = right;
 		right = std::numeric_limits<u64>::max();
 		subTree = &tree.posLights;
 		p = posProb;
+		if(lightIndex != nullptr)
+			*lightIndex = 1u + static_cast<u32>(tree.dirLights.lightCount); // Background and dir lights
 	}
-	return connect(scene, *subTree, left, right, rndChoice, p, position, rnd, tree.posGuide);
+	return connect(scene, *subTree, left, right, rndChoice, p, position, rnd, tree.posGuide,
+				   lightIndex);
 }
 
 /*

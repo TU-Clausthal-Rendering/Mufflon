@@ -12,9 +12,16 @@ struct PInterpolate {
 };
 
 struct PSpvMode {
-	PARAM_ENUM(mode, HASHGRID, OCTREE, HEURISTIC) = Values::HASHGRID;
+	PARAM_ENUM(mode, HASHGRID, OCTREE) = Values::HASHGRID;
 	static constexpr ParamDesc get_desc() {
 		return ParamDesc{ "Shadow mode", ParameterTypes::ENUM };
+	}
+};
+
+struct PUseHeuristic {
+	bool useHeuristic = false;
+	static constexpr ParamDesc get_desc() {
+		return ParamDesc{ "Use heuristic for light size instead of gradient", ParameterTypes::BOOL };
 	}
 };
 
@@ -32,6 +39,13 @@ struct PSplitFactor {
 	}
 };
 
+struct PBalanceOctree {
+	bool balanceOctree = false;
+	static constexpr ParamDesc get_desc() {
+		return ParamDesc{ "Balance octree every iteration", ParameterTypes::BOOL };
+	}
+};
+
 using ShadowPhotonParameters = ParameterHandler<
 	PSeed,
 	PMinPathLength,
@@ -39,8 +53,10 @@ using ShadowPhotonParameters = ParameterHandler<
 	PMergeRadius,
 	PInterpolate,
 	PSpvMode,
+	PUseHeuristic,
 	PCellSize,
-	PSplitFactor
+	PSplitFactor,
+	PBalanceOctree
 >;
 
 }}}} // namespace mufflon::renderer::decimaters::spm

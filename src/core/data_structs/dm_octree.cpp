@@ -14,7 +14,8 @@ void atomic_max(std::atomic<T>& a, T b) {
 
 } // namespace
 
-DmOctree::DmOctree(const ei::Box& sceneBounds, const int capacity, const float splitFactor) :
+template < class T >
+DmOctree<T>::DmOctree(const ei::Box& sceneBounds, const int capacity, const float splitFactor) :
 	m_splitFactor{ [](const float factor) {
 		if(factor <= 1.0f)
 			logError("[DmOctree] Split factor must be larger than 1. Otherwise the tree will be split infinitely. Setting to 1.1 instead of ", factor);
@@ -24,19 +25,20 @@ DmOctree::DmOctree(const ei::Box& sceneBounds, const int capacity, const float s
 	m_sceneSizeInv{ 1.f / m_sceneSize },
 	m_minBound{ sceneBounds.min - m_sceneSize * (2.002f - 1.f) / 2.f }, // Slightly enlarge the volume to avoid numerical issues on the boundary
 	m_capacity{ 1 + ((capacity + 7) & (~7)) },
-	m_nodes{ std::make_unique<std::atomic_int32_t[]>(m_capacity) },
+	m_nodes{ std::make_unique<std::atomic<T>[]>(m_capacity) },
 	m_allocationCounter{ 1 },
 	m_depth{ 0 },
 	m_stopFilling{ false }
 {
-	m_nodes[0].store(0);
+	m_nodes[0].store(T{ 0 });
 	// TODO: parallelize?
 	// The other nodes are only used if the parent is split
 	//for(int i = 1; i < m_capacity; ++i)
 	//	m_nodes[i].store(ei::ceil(SPLIT_FACTOR));
 }
 
-DmOctree::DmOctree(DmOctree&& octree) :
+template < class T >
+DmOctree<T>::DmOctree(DmOctree&& octree) :
 	m_densityScale(octree.m_densityScale),
 	m_splitFactor(octree.m_splitFactor),
 	m_splitCountDensity(octree.m_splitCountDensity),
@@ -50,7 +52,8 @@ DmOctree::DmOctree(DmOctree&& octree) :
 	m_stopFilling(octree.m_stopFilling)
 {}
 
-void DmOctree::set_iteration(const int iter) {
+template < class T >
+void DmOctree<T>::set_iteration(const int iter) {
 	int iterClamp = ei::min(FILL_ITERATIONS, iter);
 	m_stopFilling = iter > FILL_ITERATIONS;
 	m_densityScale = 1.0f / iterClamp;
@@ -62,61 +65,64 @@ void DmOctree::set_iteration(const int iter) {
 	// value.
 	if(!m_stopFilling)
 		for(int i = m_allocationCounter.load(); i < m_capacity; ++i)
-			m_nodes[i].store(ei::ceil(iter * m_splitFactor / 4));
+			m_nodes[i].store(static_cast<T>(ei::ceil(iter * m_splitFactor / 4)));
 }
 
-void DmOctree::clear_counters() {
+template < class T >
+void DmOctree<T>::clear_counters() {
 	int n = m_allocationCounter.load();
 	for(int i = 0; i < n; ++i)
-		if(m_nodes[i].load() > 0)
-			m_nodes[i].store(0);
+		if(m_nodes[i].load() > T{ 0 })
+			m_nodes[i].store(T{ 0 });
 }
 
-void DmOctree::clear() {
+template < class T >
+void DmOctree<T>::clear() {
 	m_allocationCounter.store(1);
-	m_nodes[0].store(0);
+	m_nodes[0].store(T{ 0 });
 	m_depth.store(0);
 }
 
-void DmOctree::increase_count(const ei::Vec3& pos) {
+template < class T >
+void DmOctree<T>::increase_count(const ei::Vec3& pos, const T value) {
+	// TODO: proper value
 	if(m_stopFilling) return;
 	ei::Vec3 normPos = (pos - m_minBound) * m_sceneSizeInv;
-	int countOrChild = increment_if_positive(0);
-	countOrChild = split_node_if_necessary(0, countOrChild, 0);
+	T countOrChild = increment_if_child_and_split_if_necessary(0, value, 0);
 	int edgeL = 1;
 	int currentDepth = 0;
-	while(countOrChild < 0) {
+	while(is_child_pointer(countOrChild)) {
 		edgeL *= 2;
 		++currentDepth;
 		// Get the relative index of the child [0,7]
 		ei::IVec3 intPos = (ei::IVec3{ normPos * edgeL }) & 1;
 		int idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
-		idx -= countOrChild;	// 'Add' global offset (which is stored negative)
-		countOrChild = increment_if_positive(idx);
-		//if(currentDepth == 3) break;
-		countOrChild = split_node_if_necessary(idx, countOrChild, currentDepth);
+		idx -= static_cast<int>(countOrChild);	// 'Add' global offset (which is stored negative)
+		countOrChild = increment_if_child_and_split_if_necessary(idx, value, currentDepth);
 	}
 }
 
-float DmOctree::get_density(const ei::Vec3& pos, const ei::Vec3& normal) const {
+template < class T >
+template < class V >
+V DmOctree<T>::get_density(const ei::Vec3& pos, const ei::Vec3& normal) const {
 	ei::Vec3 offPos = pos - m_minBound;
 	ei::Vec3 normPos = offPos * m_sceneSizeInv;
 	// Get the integer position on the finest level.
 	int gridRes = 1 << m_depth.load();
 	ei::IVec3 iPos{ normPos * gridRes };
 	// Get root value. This will most certainly be a child pointer...
-	int countOrChild = m_nodes[0].load();
+	T countOrChild = m_nodes[0].load();
 	// The most significant bit in iPos distinguishes the children of the root node.
 	// For each level, the next bit will be the relevant one.
 	int currentLvlMask = gridRes;
-	while(countOrChild < 0) {
+	while(is_child_pointer(countOrChild)) {
 		currentLvlMask >>= 1;
 		// Get the relative index of the child [0,7]
 		int idx = ((iPos.x & currentLvlMask) ? 1 : 0)
 			+ ((iPos.y & currentLvlMask) ? 2 : 0)
 			+ ((iPos.z & currentLvlMask) ? 4 : 0);
 		// 'Add' global offset (which is stored negative)
-		idx -= countOrChild;
+		idx -= static_cast<int>(countOrChild);
 		countOrChild = m_nodes[idx].load();
 	}
 	if(countOrChild > 0) {
@@ -131,11 +137,12 @@ float DmOctree::get_density(const ei::Vec3& pos, const ei::Vec3& normal) const {
 		return sdiv(m_densityScale * countOrChild, area);
 		//return m_densityScale * countOrChild;
 	}
-	return 0.0f;
+	return T{ 0 };
 }
 
-template < bool UseSmoothStep >
-float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const {
+template < class T >
+template < bool UseSmoothStep, class V >
+V DmOctree<T>::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const {
 	ei::Vec3 offPos = pos - m_minBound;
 	ei::Vec3 normPos = offPos * m_sceneSizeInv;
 	// Get the integer position on the finest level.
@@ -155,7 +162,7 @@ float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& no
 	}
 	int lvl = 0;
 	ei::IVec3 parentMinPos{ 0 };
-	bool anyHadChildren = m_nodes[0].load() < 0;
+	bool anyHadChildren = is_child_pointer(m_nodes[0].load());
 	while(anyHadChildren) {
 		++lvl;
 		std::swap(parents, current);
@@ -182,11 +189,11 @@ float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& no
 			int parentIdx = localParent.x + 2 * localParent.y + 4 * localParent.z;
 			// Check if parent node has children.
 			int parentAddress = parents[parentIdx];
-			int c = m_nodes[parentAddress].load();
-			if(c < 0) {
+			T c = m_nodes[parentAddress].load();
+			if(is_child_pointer(c)) {
 				// Insert the child node's address
 				int localChildIdx = (cellPos.x & 1) + 2 * (cellPos.y & 1) + 4 * (cellPos.z & 1);
-				current[i] = -c + localChildIdx;
+				current[i] = static_cast<int>(-c) + localChildIdx;
 				currentArea[i] = -1.0f;
 			} else { // Otherwise copy the parent to the next finer level.
 				current[i] = parentAddress;
@@ -199,11 +206,11 @@ float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& no
 		anyHadChildren = false;
 		const ei::Vec3 cellSize = m_sceneSize / lvlRes;
 		for(int i = 0; i < 8; ++i) {
-			const int c = m_nodes[current[i]].load();
-			anyHadChildren |= c < 0;
+			const T c = m_nodes[current[i]].load();
+			anyHadChildren |= is_child_pointer(c);
 			// Density not yet computed? Density might have been copied
 			// from parent in which case we do not need to compute it anew.
-			if(c >= 0 && currentArea[i] < 0.0f) {
+			if(!is_child_pointer(c) && currentArea[i] < 0.0f) {
 				const int ix = i & 1, iy = (i >> 1) & 1, iz = i >> 2;
 				const ei::Vec3 localPos = offPos - (lvlPos + ei::IVec3{ ix, iy, iz }) * cellSize;
 				const float area = math::intersection_area_nrm(cellSize, localPos, normal);
@@ -220,7 +227,7 @@ float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& no
 	ws[1] = tPos - gridPos;
 	ws[0] = 1.0f - ws[1];
 
-	float countSum = 0.0f, areaSum = 0.0f;
+	V countSum = 0.0f, areaSum = 0.0f;
 	const ei::Vec3 cellSize{ m_sceneSize / lvlRes };
 	const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
 	for(int i = 0; i < 8; ++i) {
@@ -233,8 +240,8 @@ float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& no
 		mAssert(m_nodes[current[i]].load() >= 0);
 		if(area > 0.0f && currentArea[i] > 0.0f) {
 			float lvlFactor = (area + avgArea * 0.01f) / (currentArea[i] + avgArea * 0.01f);
-			const float count = static_cast<float>(m_nodes[current[i]].load());
-			const float weightedCount = count * w * lvlFactor;
+			const V count = static_cast<V>(m_nodes[current[i]].load());
+			const V weightedCount = count * w * lvlFactor;
 			const float weightedArea = area * w;
 
 			if(gradient != nullptr) {
@@ -266,14 +273,15 @@ float DmOctree::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& no
 	return sdiv(countSum, areaSum) * m_densityScale;
 }
 
-void DmOctree::balance(const int current, const int nx, const int ny, const int nz,
-					   const int px, const int py, const int pz) {
+template < class T >
+void DmOctree<T>::balance(const int current, const int nx, const int ny, const int nz,
+						  const int px, const int py, const int pz) {
 	// Call balance for each child recursively, if the child has children itself.
 	// Otherwise balance is satisfied.
-	int children = -m_nodes[current].load();
+	int children = static_cast<int>(-m_nodes[current].load());
 	if(children <= 0) return;	// No tree here
 	for(int i = 0; i < 8; ++i) {
-		int childC = m_nodes[children + i].load();
+		T childC = m_nodes[children + i].load();
 		if(childC < 0) {
 			// To make the recursive call we need all the neighbors on the child-level.
 			// If they do not extist we need to split the respective cell.
@@ -289,8 +297,8 @@ void DmOctree::balance(const int current, const int nx, const int ny, const int 
 	}
 }
 
-
-int DmOctree::find_neighbor(const ei::IVec3& localPos, const int dim, const int dir,
+template < class T >
+int DmOctree<T>::find_neighbor(const ei::IVec3& localPos, const int dim, const int dir,
 							const int parentNeighbor, const int siblings) {
 	int cn = 0;	// Initialize to outer boundary
 	// The adoint position is the child index of the neighbor (indepndent of the parent).
@@ -300,44 +308,46 @@ int DmOctree::find_neighbor(const ei::IVec3& localPos, const int dim, const int 
 	adjointIdx += (dim == 1 ? 1 - localPos[1] : localPos[1]) * 2;
 	adjointIdx += (dim == 2 ? 1 - localPos[2] : localPos[2]) * 4;
 	if(localPos[dim] == dir && parentNeighbor > 0) { // Not on boundary
-		int nC = m_nodes[parentNeighbor].load();
-		if(nC >= 0) nC = split(parentNeighbor);
-		cn = -nC + adjointIdx;
+		T nC = m_nodes[parentNeighbor].load();
+		if(!is_child_pointer(nC)) nC = split(parentNeighbor);
+		cn = static_cast<int>(-nC) + adjointIdx;
 	} else if(localPos[dim] == (1 - dir)) {
 		cn = siblings + adjointIdx;
 	}
 	return cn;
 }
-int DmOctree::increment_if_positive(const int idx) {
-	int oldV = m_nodes[idx].load();
-	int newV;
-	do {
-		if(oldV < 0) return oldV;	// Do nothing, the value is a child pointer
-		newV = oldV + 1;			// Increment
-	} while(!m_nodes[idx].compare_exchange_weak(oldV, newV));	// Write if nobody destroyed the value
-	return newV;
-}
 
-int DmOctree::split_node_if_necessary(const int idx, const int count, const int currentDepth) {
+template < class T >
+T DmOctree<T>::increment_if_child_and_split_if_necessary(const int idx, const T value, const int currentDepth) 	{
+	T oldV = m_nodes[idx].load();
+	T newV;
+	do {
+		if(is_child_pointer(oldV)) return oldV;	// Do nothing, the value is a child pointer
+		newV = oldV + value;			// Increment
+	} while(!m_nodes[idx].compare_exchange_weak(oldV, newV));	// Write if nobody destroyed the value
+
+	// TODO: buggy
+	
 	// The node must be split if its density gets too high
-	if(count >= m_splitCountDensity) {
+	if(newV >= m_splitCountDensity) {
 		// Only one thread is responsible to do the allocation
-		if(count == m_splitCountDensity) {
-			int child = m_allocationCounter.fetch_add(8);
+		// We also only perform one split at a time
+		if(newV >= m_splitCountDensity && oldV < m_splitCountDensity) {
+			const int child = m_allocationCounter.fetch_add(8);
 			if(child >= m_capacity) { // Allocation overflow
 				m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
 				return 0;
 			}
 			// We do not know anything about the distribution of of photons -> equally
 			// distribute. Therefore, all eight children are initilized with SPLIT_FACTOR on clear().
-			m_nodes[idx].store(-child);
+			m_nodes[idx].store(mark_child_pointer(static_cast<T>(child)));
 			// Update depth
 			atomic_max(m_depth, currentDepth + 1);
 			// The current photon is already counted before the split -> return stop
 			return 0;
 		} else {
 			// Spin-lock until the responsible thread has set the child pointer
-			int child = m_nodes[idx].load();
+			T child = m_nodes[idx].load();
 			while(child > 0) {
 				// Check for allocation overflow
 				if(m_allocationCounter.load() > m_capacity)
@@ -347,20 +357,27 @@ int DmOctree::split_node_if_necessary(const int idx, const int count, const int 
 			return child;
 		}
 	}
-	return count;
+	return newV;
 }
 
-int DmOctree::split(const int idx) {
+template < class T >
+T DmOctree<T>::split(const int idx) {
 	int child = m_allocationCounter.fetch_add(8);
 	if(child >= m_capacity) { // Allocation overflow
 		m_allocationCounter.store(int(m_capacity + 1));	// Avoid overflow of the counter (but keep a large number)
 		return 0;
 	}
-	m_nodes[idx].store(-child);
-	return -child;
+	m_nodes[idx].store(mark_child_pointer(static_cast<T>(child)));
+	return mark_child_pointer(static_cast<T>(child));
 }
 
-template float DmOctree::get_density_interpolated<true>(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const;
-template float DmOctree::get_density_interpolated<false>(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const;
+template class DmOctree<i32>;
+template float DmOctree<i32>::get_density<float>(const ei::Vec3& pos, const ei::Vec3& normal) const;
+template float DmOctree<i32>::get_density_interpolated<true, float>(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const;
+template float DmOctree<i32>::get_density_interpolated<false, float>(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const;
+template class DmOctree<float>;
+template float DmOctree<float>::get_density<float>(const ei::Vec3& pos, const ei::Vec3& normal) const;
+template float DmOctree<float>::get_density_interpolated<true, float>(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const;
+template float DmOctree<float>::get_density_interpolated<false, float>(const ei::Vec3& pos, const ei::Vec3& normal, ei::Vec3* gradient) const;
 
 } // namespace mufflon::data_structs

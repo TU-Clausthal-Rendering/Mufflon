@@ -63,7 +63,7 @@ void GpuShadowSilhouettesPT::pre_reset() {
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 
-	GpuShadowSilhouettesPT::pre_reset();
+	RendererBase<Device::CUDA>::pre_reset();
 }
 
 void GpuShadowSilhouettesPT::on_world_clearing() {

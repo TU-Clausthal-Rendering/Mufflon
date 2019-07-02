@@ -89,7 +89,8 @@ struct RenderBuffer {
 	}
 
 	bool is_target_enabled(u32 target) const noexcept {
-		return (target < OutputValue::TARGET_COUNT) &&  scene::textures::is_valid(m_targets[target]);
+		// Targets are no longer texture handles, thus we check the array handle
+		return (target < OutputValue::TARGET_COUNT) && m_targets[target];
 	}
 
 	/*
@@ -181,9 +182,9 @@ struct RenderBuffer {
 				cuda::atomic_add<dev>(m_targets[RenderTargets::LIGHTNESS][idx], newVal.x);
 			} else {
 				size_t idx = (pixel.x + pixel.y * m_resolution.x) * 3;
-				cuda::atomic_add<dev>(m_targets[RenderTargets::LIGHTNESS][idx  ], newVal.x);
-				cuda::atomic_add<dev>(m_targets[RenderTargets::LIGHTNESS][idx+1], newVal.y);
-				cuda::atomic_add<dev>(m_targets[RenderTargets::LIGHTNESS][idx+2], newVal.z);
+				cuda::atomic_add<dev>(m_targets[target][idx  ], newVal.x);
+				cuda::atomic_add<dev>(m_targets[target][idx+1], newVal.y);
+				cuda::atomic_add<dev>(m_targets[target][idx+2], newVal.z);
 			}
 		}
 	}

@@ -35,7 +35,7 @@ public:
 
 	void clear() {
 		for(u32 i = 0; i < m_mapSize; ++i)
-			m_data[i].count.store(0u, std::memory_order_relaxed);
+			m_data[i].count.store(0, std::memory_order_relaxed);
 	}
 
 	// Cell size is the major influence parameter for the performance.
