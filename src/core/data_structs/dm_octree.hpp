@@ -31,7 +31,7 @@ public:
 		m_capacity = 1 + ((capacity + 7) & (~7));
 		m_nodes = std::make_unique<std::atomic_int32_t[]>(m_capacity);;
 		m_splitFactor = ei::max(1.1f, splitFactor);
-		m_progression = progressive ? 0.1f : 1.0f;
+		m_progression = progressive ? 0.0f : 1.0f;
 		clear();
 	}
 
@@ -70,22 +70,18 @@ public:
 		if(m_stopFilling) return;
 		ei::Vec3 offPos = pos - m_minBound;
 		ei::Vec3 normPos = offPos * m_sceneSizeInv;
-		int countOrChild = increment_if_positive(0);
-		countOrChild = split_node_if_necessary(0, countOrChild, 0, ei::IVec3{0}, offPos, normal);
-		int edgeL = 1;
-		int currentDepth = 0;
-		while(countOrChild < 0) {
-			edgeL *= 2;
-			++currentDepth;
+		ei::IVec3 iPos { normPos * (1 << 30) };
+		int countOrChild = -1;
+		int lvl = 1;
+		do {
 			// Get the relative index of the child [0,7]
-			ei::IVec3 gridPos { normPos * edgeL };
-			ei::IVec3 intPos = gridPos & 1;
-			int idx = intPos.x + 2 * (intPos.y + 2 * intPos.z);
+			ei::IVec3 gridPos = iPos >> (30 - lvl);
+			int idx = (gridPos.x&1) + 2 * (gridPos.y&1) + 4 * (gridPos.z&1);
 			idx -= countOrChild;	// 'Add' global offset (which is stored negative)
 			countOrChild = increment_if_positive(idx);
-			//if(currentDepth == 3) break;
-			countOrChild = split_node_if_necessary(idx, countOrChild, currentDepth, gridPos, offPos, normal);
-		}
+			countOrChild = split_node_if_necessary(idx, countOrChild, lvl, gridPos, offPos, normal);
+			++lvl;
+		} while(countOrChild < 0);
 	}
 
 	// Idea for truly smooth interpolation:
@@ -168,11 +164,11 @@ public:
 			ei::IVec3 lvlPos = nextLvlPos / 2 - 1 + (nextLvlPos & 1);	// Min coordinate of the 8 cells on next level
 			int lvlRes = 1 << lvl;
 			for(int i = 0; i < 8; ++i) {
-				ei::IVec3 cellPos = lvlPos + ei::IVec3{ i & 1, (i >> 1) & 1, i >> 2 };
+				ei::IVec3 cellPos = lvlPos + CELL_ITER[i];
 				// We need to find the parent in the 'parents' buffer array.
 				// Since the window of interpolation moves the reference coordinate
 				// we subtract 'parentMinPos' scaled to the current level.
-				ei::IVec3 localParent = (cellPos - parentMinPos * 2) / 2;
+				ei::IVec3 localParent = (cellPos - parentMinPos) / 2;
 				mAssert(localParent >= 0 && localParent <= 1);
 				//ei::IVec3 localParent = 1 - (clamp(cellPos, 1, lvlRes-2) & 1);
 				//ei::IVec3 localParent = 1 - (cellPos & 1);
@@ -190,7 +186,7 @@ public:
 					currentArea[i] = parentArea[parentIdx];
 				}
 			}
-			parentMinPos = lvlPos;
+			parentMinPos = lvlPos * 2;
 			// Check if any of the current nodes has children -> must proceed.
 			// Also, compute the areas of leaf nodes.
 			anyHadChildren = false;
@@ -201,8 +197,7 @@ public:
 				// Density not yet computed? Density might have been copied
 				// from parent in which case we do not need to compute it anew.
 				if(c >= 0 && currentArea[i] < 0.0f) {
-					const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
-					const ei::Vec3 localPos = offPos - (lvlPos + ei::IVec3{ix, iy, iz}) * cellSize;
+					const ei::Vec3 localPos = offPos - (lvlPos + CELL_ITER[i]) * cellSize;
 					const float area = math::intersection_area_nrm(cellSize, localPos, normal);
 					currentArea[i] = area;
 				}
@@ -220,13 +215,12 @@ public:
 		const ei::Vec3 cellSize { m_sceneSize / lvlRes };
 		const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
 		for(int i = 0; i < 8; ++i) {
-			const int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
-			const ei::Vec3 localPos = offPos - (gridPos + ei::IVec3{ix, iy, iz}) * cellSize;
+			const ei::Vec3 localPos = offPos - (gridPos + CELL_ITER[i]) * cellSize;
 			const float area = math::intersection_area_nrm(cellSize, localPos, normal);
 			// Compute trilinear interpolated result of count and area (running sum)
-			const float w = ws[ix].x * ws[iy].y * ws[iz].z;
 			mAssert(m_nodes[current[i]].load() >= 0);
 			if(area > 0.0f && currentArea[i] > 0.0f) {
+				const float w = ws[CELL_ITER[i].x].x * ws[CELL_ITER[i].y].y * ws[CELL_ITER[i].z].z;
 				float lvlFactor = (area + avgArea * 0.01f) / (currentArea[i] + avgArea * 0.01f);
 				countSum += m_nodes[current[i]].load() * w * lvlFactor;
 				areaSum += area * w;
@@ -297,6 +291,11 @@ private:
 	int m_capacity;
 	bool m_stopFilling;
 
+	static constexpr ei::IVec3 CELL_ITER[8] = {
+		{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+		{0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}
+	};
+
 	// Returns the new value
 	int increment_if_positive(int idx) {
 		int oldV = m_nodes[idx].load();
@@ -313,7 +312,7 @@ private:
 		const ei::IVec3& gridPos, const ei::Vec3& offPos,
 		const ei::Vec3& normal) {
 		// Too large depths would break the integer arithmetic in the grid.
-		if(currentDepth > 30) return 0;
+		if(currentDepth >= 30) return 0;
 		// The node must be split if its density gets too high
 		if(count >= m_splitCountDensity) {
 			// Only one thread is responsible to do the allocation
@@ -395,6 +394,7 @@ private:
 			// already has the split count -> would lead to a dead lock.
 			//int subCount = ei::min(count - 1, cumRounded - prevCumRounded); // More correct
 			int subCount = ei::clamp(cumRounded - prevCumRounded, minCount, count - 1);
+			//int subCount = minCount;
 			m_nodes[children + i].store(subCount);
 			prevCumRounded = cumRounded;
 		}

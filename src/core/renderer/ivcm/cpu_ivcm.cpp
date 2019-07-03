@@ -23,6 +23,7 @@ struct IvcmVertexExt {
 	AngularPdf pdfBack;
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
+	float density;
 
 
 	CUDA_FUNCTION void init(const IvcmPathVertex& thisVertex,
@@ -215,6 +216,15 @@ void CpuIvcm::iterate() {
 	}
 	//m_density->balance();
 
+	const int n = m_photonMap.size();
+#pragma PARALLEL_FOR
+	for(int i = 0; i < n; ++i) {
+		IvcmPathVertex& photon = m_photonMap.get_data_by_index(i);
+		//float density = m_density->get_density(photon.get_position(), photon.get_geometric_normal());
+		float density = m_density->get_density_interpolated(photon.get_position(), photon.get_geometric_normal());
+		photon.ext().density = density;
+	}
+
 	// Second pass: trace view paths and merge
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
@@ -245,7 +255,7 @@ void CpuIvcm::post_reset() {
 	// TODO: reasonable density structure capacities
 	if(resetFlags.geometry_changed())
 		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb,
-			1024 * 1024 * 4, 64.0f, true);
+			1024 * 1024 * 4, 16.0f, true);
 	//if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
 	//	m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
 	//m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
