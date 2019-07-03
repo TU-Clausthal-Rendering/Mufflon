@@ -17,6 +17,7 @@ public:
 	DmHashGrid(u32 numExpectedEntries) {
 		m_cellSize = ei::Vec3 { 1.0f };
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
+		m_maxProbes = m_mapSize / 2;
 		m_data.reset(new Entry[m_mapSize]);
 		m_densityScale = 1.0f;
 	}
@@ -52,17 +53,18 @@ public:
 		u32 i = h % m_mapSize;
 		int s = 1;
 		// Quadratic probing until we find the correct or the empty cell
-		while(true) {
+		while(s <= m_maxProbes) {
 			u32 expected = 0u;
 			// Check on empty and set a marker to allocate if empty
 			if(m_data[i].count.compare_exchange_strong(expected, ~0u)) {
 				// The cell was empty before -> initialize
 				m_data[i].cell = gridPos;
 				m_data[i].count.store(1u);	// Releases the lock at the same time as setting the correct count
+				m_dataCount.fetch_add(1u);
 				return;
 			} else if(expected != ~0u) { // Not a cell marked as 'in allocation'
 				if(m_data[i].cell == gridPos) {
-					m_data[i].count.fetch_add(1);
+					m_data[i].count.fetch_add(1u);
 					return;
 				}
 				// Next probe: non-empty cell with different coordinate found
@@ -107,6 +109,10 @@ public:
 		return sdiv(countSum, areaSum) * m_densityScale;
 	}
 
+	int capacity() const { return m_mapSize; }
+	int size() const { return m_dataCount.load(); }
+	// Get the size of the associated memory excluding this instance.
+	std::size_t mem_size() const { return sizeof(Entry) * m_mapSize; }
 private:
 	struct Entry {
 		ei::UVec3 cell;
@@ -118,7 +124,9 @@ private:
 	// in the map. Set to 1/iterationCount to get correct densities.
 	float m_densityScale;
 	u32 m_mapSize;
+	int m_maxProbes;
 	std::unique_ptr<Entry[]> m_data;
+	std::atomic_uint32_t m_dataCount;
 
 	u32 get_count(const ei::UVec3& gridPos) const {
 		u32 h = get_cell_hash(gridPos);
