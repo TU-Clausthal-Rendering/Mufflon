@@ -144,7 +144,7 @@ public:
 		float* currentArea = areaBuffer + 8;
 		for(int i=0; i<8; ++i) {
 			current[i] = 0;	// Initialize to root level
-			currentArea[i] = -1;
+			currentArea[i] = 0.0f;
 		}
 		int lvl = 0;
 		ei::IVec3 parentMinPos { 0 };
@@ -163,6 +163,8 @@ public:
 			ei::IVec3 nextLvlPos = iPos >> (maxLvl - lvl);	// Next level coordinate
 			ei::IVec3 lvlPos = nextLvlPos / 2 - 1 + (nextLvlPos & 1);	// Min coordinate of the 8 cells on next level
 			int lvlRes = 1 << lvl;
+			const ei::Vec3 cellSize = m_sceneSize / lvlRes;
+			anyHadChildren = false;	// Check for the new children inside the for loop
 			for(int i = 0; i < 8; ++i) {
 				ei::IVec3 cellPos = lvlPos + CELL_ITER[i];
 				// We need to find the parent in the 'parents' buffer array.
@@ -180,28 +182,21 @@ public:
 					// Insert the child node's address
 					int localChildIdx = (cellPos.x & 1) + 2 * (cellPos.y & 1) + 4 * (cellPos.z & 1);
 					current[i] = -c + localChildIdx;
-					currentArea[i] = -1.0f;
+					//currentArea[i] = -1.0f;
+					const int c = m_nodes[current[i]].load();
+					anyHadChildren |= c < 0;
+					// Compute the area if this is a leaf node
+					if(c >= 0) {
+						const ei::Vec3 localPos = offPos - cellPos * cellSize;
+						const float area = math::intersection_area_nrm(cellSize, localPos, normal);
+						currentArea[i] = -area; // Encode that this is new
+					}
 				} else { // Otherwise copy the parent to the next finer level.
 					current[i] = parentAddress;
-					currentArea[i] = parentArea[parentIdx];
+					currentArea[i] = ei::abs(parentArea[parentIdx]);
 				}
 			}
 			parentMinPos = lvlPos * 2;
-			// Check if any of the current nodes has children -> must proceed.
-			// Also, compute the areas of leaf nodes.
-			anyHadChildren = false;
-			const ei::Vec3 cellSize = m_sceneSize / lvlRes;
-			for(int i = 0; i < 8; ++i) {
-				const int c = m_nodes[current[i]].load();
-				anyHadChildren |= c < 0;
-				// Density not yet computed? Density might have been copied
-				// from parent in which case we do not need to compute it anew.
-				if(c >= 0 && currentArea[i] < 0.0f) {
-					const ei::Vec3 localPos = offPos - (lvlPos + CELL_ITER[i]) * cellSize;
-					const float area = math::intersection_area_nrm(cellSize, localPos, normal);
-					currentArea[i] = area;
-				}
-			}
 		}
 		// The loop terminates if all 8 cells in 'current' are leaves.
 		// This means we want to interpolate 'current' on 'lvl'.
@@ -213,15 +208,19 @@ public:
 		ws[0] = 1.0f - ws[1];
 		float countSum = 0.0f, areaSum = 0.0f;
 		const ei::Vec3 cellSize { m_sceneSize / lvlRes };
-		const float avgArea = (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z) / 3.0f;
+		const float eps = (0.01f / 3.0f) * (cellSize.x * cellSize.y + cellSize.x * cellSize.z + cellSize.y * cellSize.z);
 		for(int i = 0; i < 8; ++i) {
 			const ei::Vec3 localPos = offPos - (gridPos + CELL_ITER[i]) * cellSize;
-			const float area = math::intersection_area_nrm(cellSize, localPos, normal);
+			float lvlFactor = 1.0f;
+			float area;
+			if(currentArea[i] > 0.0f) { // Only needs compensation if not on the same level
+				area = math::intersection_area_nrm(cellSize, localPos, normal);
+				lvlFactor = (area + eps) / (currentArea[i] + eps);
+			} else area = ei::abs(currentArea[i]);
 			// Compute trilinear interpolated result of count and area (running sum)
 			mAssert(m_nodes[current[i]].load() >= 0);
-			if(area > 0.0f && currentArea[i] > 0.0f) {
+			if(area > 0.0f) {
 				const float w = ws[CELL_ITER[i].x].x * ws[CELL_ITER[i].y].y * ws[CELL_ITER[i].z].z;
-				float lvlFactor = (area + avgArea * 0.01f) / (currentArea[i] + avgArea * 0.01f);
 				countSum += m_nodes[current[i]].load() * w * lvlFactor;
 				areaSum += area * w;
 			}
