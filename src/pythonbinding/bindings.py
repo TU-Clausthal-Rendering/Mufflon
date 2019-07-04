@@ -40,7 +40,7 @@ class DllInterface:
         self.dllHolder.core.render_get_renderer_name.restype = c_char_p
         self.dllHolder.core.render_get_renderer_short_name.restype = c_char_p
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
-        self.dllHolder.core.renderer_get_parameter_enum_value.argtypes = [c_char_p, c_char_p, c_int32]
+        self.dllHolder.core.renderer_get_parameter_enum_value_from_name.argtypes = [c_char_p, c_char_p, c_int32]
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
@@ -79,7 +79,7 @@ class DllInterface:
 
     def renderer_get_parameter_enum_value(self, parameterName, valueName):
         value = 0
-        if not self.dllHolder.core.renderer_get_parameter_enum_value(c_char_p(parameterName.encode('utf-8')), c_char_p(valueName.encode('utf-8')), byref(value)):
+        if not self.dllHolder.core.renderer_get_parameter_enum_value_from_name(c_char_p(parameterName.encode('utf-8')), c_char_p(valueName.encode('utf-8')), byref(value)):
             raise Exception("Failed to retrieve enum parameter '" + parameterName + "' value '" + valueName + "'")
         return value
 
