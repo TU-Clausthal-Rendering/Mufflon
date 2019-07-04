@@ -19,6 +19,7 @@ public:
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
 		m_maxProbes = m_mapSize / 2;
 		m_data.reset(new Entry[m_mapSize]);
+		m_dataCount.store(0);
 		m_densityScale = 1.0f;
 	}
 
@@ -35,6 +36,7 @@ public:
 	void clear() {
 		for(u32 i = 0; i < m_mapSize; ++i)
 			m_data[i].count.store(0u, std::memory_order_relaxed);
+		m_dataCount.store(0);
 	}
 
 	// Cell size is the major influence parameter for the performance.
