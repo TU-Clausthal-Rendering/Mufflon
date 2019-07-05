@@ -296,14 +296,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
 	}
 
-    if(dev != Device::OPENGL) {
-		// Light tree
-	    // TODO: rebuild light tree if area light got tessellated
-		if (m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
-			sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
-			m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
-		}
+	// Light tree
+    // TODO: rebuild light tree if area light got tessellated
+	if(m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
+		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
+		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
+	}
 
+    if(dev != Device::OPENGL) {
 		// Rebuild Instance BVH?
 		if (m_accelStruct.needs_rebuild()) {
 			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
@@ -320,12 +320,10 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
 
-    if(dev != Device::OPENGL) {
-        if (m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
-	        m_lightTree.update_media(sceneDescriptor);
-		    m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
-	    }
-    }
+	if(m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
+		m_lightTree.update_media(sceneDescriptor);
+		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
+	}
 	
 	return sceneDescriptor;
 }

@@ -140,6 +140,8 @@ struct LightTree<Device::OPENGL> {
 		union { u32 material; float cosThetaMax; };
     };
 
+	static_assert(sizeof(SmallLight) == 4 * 4 * 3, "SmallLight invalid alignment");
+
     struct BigLight {
         // for area lights
 		ei::Vec3 pos;

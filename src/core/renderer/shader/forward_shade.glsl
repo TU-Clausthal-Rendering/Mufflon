@@ -10,6 +10,7 @@ struct ColorInfo
 {
 	vec3 color;
 	vec3 albedo;
+	vec3 light;
 };
 
 struct LightInfo
@@ -26,15 +27,57 @@ LightInfo calcDirLight(vec3 direction, vec3 radiance) {
 	return i;
 }
 
+LightInfo calcPointLight(vec3 pos, vec3 lightPos, vec3 radiance) {
+	LightInfo i;
+	i.direction = lightPos - pos;
+	float dist = length(i.direction);
+	i.direction /= dist;
+	i.color = radiance / (dist * dist);
+	//i.color = vec3(1.0);
+	return i;
+}
+
+
+
 void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 emission) {
 	c.color += emission;
+	c.light += emission;
 	c.albedo += albedo;
 
 	LightInfo light;
-	light = calcDirLight(vec3(-0.2, -1, 0.3), vec3(0.9));
 
-	float cosTheta = max(dot(light.direction, normal), 0.0);
-	c.color += albedo * light.color * cosTheta;
+	// iterate thought small lights
+	for(uint i = 0; i < numSmallLights; ++i) {
+		switch(smallLights[i].type) {
+		case LIGHT_TYPE_POINT:
+			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
+			break;
+		case LIGHT_TYPE_SPOT:
+			continue;
+			break;
+		case LIGHT_TYPE_SPHERE:
+			continue;
+			break;
+		case LIGHT_TYPE_DIRECTIONAL:
+			light = calcDirLight(smallLights[i].direction, smallLights[i].intensity);
+			break;
+		default: continue;
+		}
+
+		// add to material color
+		// TODO use microfacet for roughness?
+		float cosTheta = max(dot(light.direction, normal), 0.0);
+		c.color += albedo * light.color * cosTheta;
+		c.light += light.color * cosTheta;
+	}
+
+	for(uint i = 0; i < numBigLights; ++i) {
+
+	}
+
+	// TODO iterate thought big lights
+	//c.color = vec3(float(numSmallLights), float(numSmallLights) * 0.1f, float(numSmallLights) * 0.01f);
+	//c.color = c.light;
 }
 
 #define EMISSIVE 0u
@@ -116,6 +159,7 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	ColorInfo c;
 	c.color = vec3(0.0);
 	c.albedo = vec3(0.0);
+	c.light = vec3(0.0);
 	// next is medium handle => until (matOffset + 8)
 	matOffset += 8;
 
@@ -162,5 +206,5 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 
 	out_fragColor = vec4(c.color, 1.0);
 	out_albedo = c.albedo;
-	out_lightness = vec3(0.0);
+	out_lightness = c.light;
 }
