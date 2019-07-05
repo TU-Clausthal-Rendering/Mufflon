@@ -111,11 +111,7 @@ void GlRendererBase::end_frame() {
 void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 
-	if(attribs & Attribute::Material) {
-		mAssert(m_sceneDesc.materials.id);
-		mAssert(!m_sceneDesc.materials.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
-	}
+	bindStaticAttribs(pipe, attribs);
 
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
@@ -156,11 +152,7 @@ void GlRendererBase::draw_triangles(const gl::Pipeline& pipe, Attribute attribs)
 void GlRendererBase::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 
-    if(attribs & Attribute::Material) {
-		mAssert(m_sceneDesc.materials.id);
-		mAssert(!m_sceneDesc.materials.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
-    }
+	bindStaticAttribs(pipe, attribs);
 
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
@@ -190,11 +182,7 @@ void GlRendererBase::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 	mAssert(pipe.patch.vertices == 4);
 
-	if(attribs & Attribute::Material) {
-		mAssert(m_sceneDesc.materials.id);
-		mAssert(!m_sceneDesc.materials.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
-	}
+	bindStaticAttribs(pipe, attribs);
 
 	for(size_t i = 0; i < m_sceneDesc.numInstances; ++i) {
 		const auto idx = m_sceneDesc.lodIndices[i];
@@ -275,5 +263,24 @@ GlRendererBase::CameraTransforms GlRendererBase::get_camera_transforms() const {
 
 size_t GlRendererBase::get_aligned(size_t size, size_t alignment) {
 	return size / alignment + !!(size % alignment);
+}
+
+void GlRendererBase::bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs) {
+	if(attribs & Attribute::Material) {
+		mAssert(m_sceneDesc.materials.id);
+		mAssert(!m_sceneDesc.materials.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_sceneDesc.materials.id);
+	}
+
+	if(attribs & Attribute::Light) {
+		assert(m_sceneDesc.lightTree.smallLights.id);
+		assert(!m_sceneDesc.lightTree.smallLights.offset);
+		assert(m_sceneDesc.lightTree.bigLights.id);
+		assert(!m_sceneDesc.lightTree.bigLights.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_sceneDesc.lightTree.smallLights.id);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_sceneDesc.lightTree.bigLights.id);
+		glProgramUniform1ui(pipe.program, 10, m_sceneDesc.lightTree.numSmallLights);
+		glProgramUniform1ui(pipe.program, 11, m_sceneDesc.lightTree.numBigLights);
+	}
 }
 }

@@ -17,6 +17,7 @@ public:
 		Normal = 1 << 1,
 		Texcoord = 1 << 2,
         Material = 1 << 3,
+        Light = 1 << 4,
         All = 0xFFFFFFFF
 	};
 
@@ -75,6 +76,9 @@ protected:
 	gl::Texture m_colorTargets[OutputValue::TARGET_COUNT];
 	gl::Framebuffer m_framebuffer;
 private:
+    // bind some static attributes (light, material)
+	void bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs);
+
 	uint32_t m_depthAttachmentType;
 	gl::Program m_copyShader;
 	static const size_t WORK_GROUP_SIZE = 16;

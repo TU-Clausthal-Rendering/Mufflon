@@ -1053,9 +1053,6 @@
     <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp">
       <Filter>Source Files\core\data_structs</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp">
-      <Filter>Source Files\core\data_structs</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp">
       <Filter>Source Files\core\data_structs</Filter>
     </ClInclude>
@@ -1151,6 +1148,9 @@
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\material_id_binding.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\light_transforms.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>
