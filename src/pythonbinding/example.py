@@ -17,9 +17,10 @@ def render():
     renderer.load_json(sceneJson="pathToScene.json")
     renderer.load_scenario("ScenarioName")
     renderer.set_current_animation_frame(3)
-    print()
     print(renderer.get_start_animation_frame(), " - ", renderer.get_current_animation_frame(),
           " - ", renderer.get_end_animation_frame())
+    renderer.renderer_set_parameter_float("FloatParam", 1.0);
+    renderer.renderer_set_parameter_enum("EnumParam", "EnumValueName");
 
     renderer.render_for_seconds(10)
     # Printing defaults to False

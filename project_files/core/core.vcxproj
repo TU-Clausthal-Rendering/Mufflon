@@ -29,12 +29,14 @@
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\ivcm\cpu_ivcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\gpu_lt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\gl_forward.cpp" />
     <ClCompile Include="..\..\src\core\renderer\neb\cpu_neb.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\cpu_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\pt\gpu_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp" />
     <ClCompile Include="..\..\src\core\renderer\vcm\cpu_vcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
@@ -179,9 +181,14 @@
     <ClInclude Include="..\..\src\core\cuda\cuda_utils.hpp" />
     <ClInclude Include="..\..\src\core\cuda\cu_lib_wrapper.hpp" />
     <ClInclude Include="..\..\src\core\cuda\error.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\dm_hashgrid.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\dm_octree.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp" />
+    <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\export\api.h" />
     <ClInclude Include="..\..\src\core\export\interface.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
+    <ClInclude Include="..\..\src\core\math\intersection_areas.hpp" />
     <ClInclude Include="..\..\src\core\math\rng.hpp" />
     <ClInclude Include="..\..\src\core\math\sample_types.hpp" />
     <ClInclude Include="..\..\src\core\math\sampling.hpp" />
@@ -207,6 +214,8 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h" />
+    <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\gpu_lt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\lt_common.hpp" />
@@ -219,9 +228,9 @@
     <ClInclude Include="..\..\src\core\renderer\output_handler.hpp" />
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp" />
     <ClInclude Include="..\..\src\core\renderer\path_util.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\photon_map.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\cpu_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\gpu_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\pt\hybrid_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\pt\pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\random_walk.hpp" />
@@ -312,6 +321,7 @@
     <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu" />
     <CudaCompile Include="..\..\src\core\scene\accel_structs\build_lbvh.cu" />

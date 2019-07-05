@@ -5,9 +5,9 @@
 namespace mufflon::renderer {
 
 struct PForwardDummy {
-	float dummy = 0.0f;
-	static ParamDesc get_desc() noexcept {
-		return { "dummy", ParameterTypes::FLOAT };
+	PARAM_ENUM(dummy = Values::Dummy2, Dummy1= 4, Dummy2 = 8);
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "dummy", ParameterTypes::ENUM };
 	}
 };
 	

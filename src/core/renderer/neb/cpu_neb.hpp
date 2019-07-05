@@ -5,9 +5,9 @@
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/photon_map.hpp"
+#include "core/data_structs/photon_map.hpp"
 #include "density_octree.hpp"
-#include "core/scene/accel_structs/kdtree.hpp"
+#include "core/data_structs/kdtree.hpp"
 #include <vector>
 
 //#define NEB_KDTREE
@@ -99,14 +99,14 @@ private:
 
 	NebParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
-	HashGridManager<NebPathVertex> m_viewVertexMapManager;
-	HashGrid<Device::CPU, NebPathVertex> m_viewVertexMap;
+	data_structs::HashGridManager<NebPathVertex> m_viewVertexMapManager;
+	data_structs::HashGrid<Device::CPU, NebPathVertex> m_viewVertexMap;
 	std::vector<EmissionDesc> m_selfEmissiveEndVertices;
 	std::atomic_int32_t m_selfEmissionCount;
-	HashGridManager<PhotonDesc> m_photonMapManager;
-	HashGrid<Device::CPU, PhotonDesc> m_photonMap;
+	data_structs::HashGridManager<PhotonDesc> m_photonMapManager;
+	data_structs::HashGrid<Device::CPU, PhotonDesc> m_photonMap;
 #ifdef NEB_KDTREE
-	scene::accel_struct::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
+	data_structs::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
 #else
 	DensityOctree m_density;
 	//SplitDensityOctree m_density;

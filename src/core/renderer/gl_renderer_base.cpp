@@ -37,7 +37,7 @@ GlRendererBase::GlRendererBase(bool useDepth, bool useStencil) {
 
 void GlRendererBase::post_reset() {
 	// Check if the resolution might have changed
-	if(this->resolution_changed() || !m_framebuffer) {
+	if(this->get_reset_event().resolution_changed() || !m_framebuffer) {
 		// create requested color targets
 		uint32_t curTarget = 0;
 		for(auto t : OutputValue::iterator) {

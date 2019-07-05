@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace mufflon::scene::accel_struct {
+namespace mufflon::data_structs {
 
 /* General kd-tree container on CPU Device (TODO: GPU version? acquire()?).
  * Uses median splits to partitionate a set of points which was added iteratively before.
@@ -44,7 +44,11 @@ public:
 	int insert(const Vec& position, const Data& data) { return insert(position, Data{data}); }
 	int insert(const Vec& position, Data&& data) {
 		int dataIdx = m_dataCount.fetch_add(1);
-		// TODO: more robust overflow behavior?
+		// Overflow
+		if(dataIdx >= m_dataCapacity) {
+			m_dataCount.store(m_dataCapacity);
+			return -1;
+		}
 		m_data[dataIdx] = std::move(data);
 		m_positions[dataIdx] = position;
 		return dataIdx;

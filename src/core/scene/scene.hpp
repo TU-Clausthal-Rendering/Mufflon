@@ -30,7 +30,10 @@ public:
 	Scene(const Scenario& scenario, const u32 animationPathIndex) :
 		m_scenario(scenario),
 		m_animationPathIndex(animationPathIndex)
-	{}
+	{
+		m_boundingBox.min = ei::Vec3{std::numeric_limits<float>::max()};
+		m_boundingBox.max = ei::Vec3{-std::numeric_limits<float>::max()};
+	}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;

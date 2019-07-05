@@ -110,7 +110,11 @@ sample(const TangentSpace& tangentSpace,
 	Direction globalDir = res.excident.x * tangentSpace.shadingTX
 						+ res.excident.y * tangentSpace.shadingTY
 						+ res.excident.z * tangentSpace.shadingN;
-	mAssert(ei::approx(len(globalDir), 1.0f, 1e-4f));
+	mAssert(ei::approx(len(globalDir), 1.0f, 1e-3f));	// Check if a sampler is far away from normalized
+	// Although the samplers should return a normalized direction they can have
+	// a small numeric error. Renormalizing here avoids the accumullation of error
+	// in the next events.
+	globalDir = normalize(globalDir);
 
 	// Cancel the path if shadowed shading normal (excident)
 	float eDotG = dot(globalDir, tangentSpace.geoN);
