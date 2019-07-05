@@ -198,47 +198,6 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 CpuIvcm::CpuIvcm() {}
 CpuIvcm::~CpuIvcm() {}
 
-void CpuIvcm::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
-
-	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
-	if(m_params.progressive)
-		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
-	m_photonMap.clear(currentMergeRadius * 2.0001f);
-	m_density->set_iteration(m_currentIteration + 1);
-
-	// First pass: Create one photon path per view path
-	u64 photonSeed = m_rngs[0].next();
-	int numPhotons = m_outputBuffer.get_num_pixels();
-#pragma PARALLEL_FOR
-	for(int i = 0; i < numPhotons; ++i) {
-		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
-	}
-	//m_density->balance();
-
-	const int n = m_photonMap.size();
-#pragma PARALLEL_FOR
-	for(int i = 0; i < n; ++i) {
-		IvcmPathVertex& photon = m_photonMap.get_data_by_index(i);
-		//float density = m_density->get_density(photon.get_position(), photon.get_geometric_normal());
-		float density = m_density->get_density_interpolated(photon.get_position(), photon.get_geometric_normal());
-		photon.ext().density = density;
-	}
-
-	// Second pass: trace view paths and merge
-#pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
-		AreaPdf* incidentF = m_tmpPathProbabilities.data() + get_current_thread_idx() * 2 * (m_params.maxPathLength + 1);
-		AreaPdf* incidentB = incidentF + (m_params.maxPathLength + 1);
-		IvcmPathVertex* vertexBuffer = m_tmpViewPathVertices.data() + get_current_thread_idx() * (m_params.maxPathLength + 1);
-		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
-					 pixel, numPhotons, currentMergeRadius, incidentF, incidentB, vertexBuffer);
-	}
-
-	logInfo("[CpuIvcm::iterate] Density structure memory: ", m_density->mem_size() / (1024 * 1024), "MB, ",
-		ei::round((1000.0f * m_density->size()) / m_density->capacity()) / 10.0f, "%");
-}
-
 void CpuIvcm::post_reset() {
 	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
 								ResetEvent::ALL : get_reset_event() };
@@ -255,12 +214,84 @@ void CpuIvcm::post_reset() {
 	// TODO: reasonable density structure capacities
 	if(resetFlags.geometry_changed())
 		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb,
-			1024 * 1024 * 4, 16.0f, true);
-	//if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
-	//	m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
-	//m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+			1024 * 1024 * 4, 8.0f, true);//*/
+	/*if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
+		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024);
+	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);//*/
 	m_density->clear();
+
+	m_density2 = std::make_unique<data_structs::KdTree<char,3>>();
+	m_density2->reserve(1024 * 1024);
 }
+
+
+float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float currentMergeRadius) const {
+	//return m_density->get_density(pos, normal);
+	return m_density->get_density_interpolated(pos, normal);
+	/*currentMergeRadius *= currentMergeRadius;
+	auto it = m_photonMap.find_first(pos);
+	int count = 0;
+	while(it) {
+		if(lensq(it->get_position() - pos) < currentMergeRadius)
+			++count;
+		++it;
+	}
+	return count / (ei::PI*currentMergeRadius);//*/
+	/*int idx[5];
+	float rSq[5];
+	m_density2->query_euclidean(pos, 5, idx, rSq, currentMergeRadius * 10.0f);
+	int count = 0;
+	float kernelSum = 0.0f;
+	while(idx[count] != -1 && count < 4) {
+		kernelSum += 3.0f * ei::sq(1.0f - rSq[count] / rSq[4]);
+		++count;
+	}
+	return kernelSum / (ei::PI*rSq[4]);
+	if(idx[count] != -1) ++count;
+	return ei::max(0,count-1) / (ei::PI*rSq[4]);//*/
+}
+
+void CpuIvcm::iterate() {
+	auto scope = Profiler::instance().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
+
+	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
+	if(m_params.progressive)
+		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
+	m_photonMap.clear(currentMergeRadius * 2.0001f);
+	m_density->set_iteration(m_currentIteration + 1);
+	m_density2->clear();
+
+	// First pass: Create one photon path per view path
+	u64 photonSeed = m_rngs[0].next();
+	int numPhotons = m_outputBuffer.get_num_pixels();
+#pragma PARALLEL_FOR
+	for(int i = 0; i < numPhotons; ++i) {
+		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
+	}
+	//m_density->balance();
+
+	const int n = m_photonMap.size();
+	m_density2->build();
+#pragma PARALLEL_FOR
+	for(int i = 0; i < n; ++i) {
+		IvcmPathVertex& photon = m_photonMap.get_data_by_index(i);
+		photon.ext().density = get_density(photon.get_position(), photon.get_geometric_normal(), currentMergeRadius);
+	}
+
+	// Second pass: trace view paths and merge
+#pragma PARALLEL_FOR
+	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+		AreaPdf* incidentF = m_tmpPathProbabilities.data() + get_current_thread_idx() * 2 * (m_params.maxPathLength + 1);
+		AreaPdf* incidentB = incidentF + (m_params.maxPathLength + 1);
+		IvcmPathVertex* vertexBuffer = m_tmpViewPathVertices.data() + get_current_thread_idx() * (m_params.maxPathLength + 1);
+		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
+					 pixel, numPhotons, currentMergeRadius, incidentF, incidentB, vertexBuffer);
+	}
+
+	logInfo("[CpuIvcm::iterate] Density structure memory: ", m_density->mem_size() / (1024 * 1024), "MB, ",
+		ei::round((1000.0f * m_density->size()) / m_density->capacity()) / 10.0f, "%");
+}
+
 
 void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
@@ -285,6 +316,8 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 		// Store a photon to the photon map
 		previous = m_photonMap.insert(vertex.get_position(), vertex);
 		m_density->increase_count(vertex.get_position(), vertex.get_geometric_normal());
+		//m_density->increase_count(vertex.get_position());
+		m_density2->insert(vertex.get_position(), 0);
 	}
 
 	m_pathEndPoints[idx] = previous;
@@ -328,8 +361,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-//			float density = m_density->get_density(currentVertex->get_position(), currentVertex->get_normal());
-			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
+			float density = get_density(currentVertex->get_position(), currentVertex->get_normal(), currentMergeRadius);
 			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());

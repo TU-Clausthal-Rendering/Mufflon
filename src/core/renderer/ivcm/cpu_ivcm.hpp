@@ -8,6 +8,7 @@
 #include "core/data_structs/photon_map.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
 #include "core/data_structs/dm_octree.hpp"
+#include "core/data_structs/kdtree.hpp"
 #include <vector>
 
 namespace mufflon::cameras {
@@ -50,6 +51,7 @@ public:
 		float prevConversionFactor;				// 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	};*/
 private:
+	float get_density(const ei::Vec3& pos, const ei::Vec3& normal, float currentMergeRadius) const;
 	void trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius);
 	// Create one sample path (PT view path with merges)
 	void sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius,
@@ -66,6 +68,7 @@ private:
 	std::vector<IvcmPathVertex> m_tmpViewPathVertices;
 	std::unique_ptr<data_structs::DmOctree> m_density;
 	//std::unique_ptr<data_structs::DmHashGrid> m_density;
+	std::unique_ptr<data_structs::KdTree<char,3>> m_density2;
 };
 
 } // namespace mufflon::renderer
