@@ -37,7 +37,7 @@ LightInfo calcPointLight(vec3 pos, vec3 lightPos, vec3 radiance) {
 	return i;
 }
 
-
+vec3 getMaterialEmission(uint materialId);
 
 void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 emission) {
 	c.color += emission;
@@ -53,11 +53,14 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 em
 			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
 			break;
 		case LIGHT_TYPE_SPOT:
-			continue;
+			// TODO add spot light properties
+			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
 			break;
-		case LIGHT_TYPE_SPHERE:
-			continue;
-			break;
+		case LIGHT_TYPE_SPHERE: {
+			// project closest point
+			vec3 lightPos = smallLights[i].position + normalize(pos - smallLights[i].position) * smallLights[i].radiusOrFalloff;
+			light = calcPointLight(pos, lightPos, getMaterialEmission(floatBitsToUint(smallLights[i].materialOrTheta)));
+		} break;
 		case LIGHT_TYPE_DIRECTIONAL:
 			light = calcDirLight(smallLights[i].direction, smallLights[i].intensity);
 			break;
@@ -74,10 +77,6 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 em
 	for(uint i = 0; i < numBigLights; ++i) {
 
 	}
-
-	// TODO iterate thought big lights
-	//c.color = vec3(float(numSmallLights), float(numSmallLights) * 0.1f, float(numSmallLights) * 0.01f);
-	//c.color = c.light;
 }
 
 #define EMISSIVE 0u
@@ -207,4 +206,26 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	out_fragColor = vec4(c.color, 1.0);
 	out_albedo = c.albedo;
 	out_lightness = c.light;
+}
+
+vec3 getMaterialEmission(uint materialIndex) {
+	// read correct material
+	uint matOffset = u_materialData[materialIndex];
+	uint matType = readShort(matOffset);
+	uint matFlags = readShort(matOffset + 2);
+
+	// next is medium handle => until (matOffset + 8)
+	matOffset += 8;
+	switch(matType) {
+	case EMISSIVE: {
+		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset));
+		return texture(emissionTex, vec3(0.0)).rgb;
+	} break;
+	case LAMBERT_EMISSIVE: {
+		// TODO correct blending
+		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset + 8));
+		return texture(emissionTex, vec3(0.0)).rgb;
+	} break;
+	}
+	return vec3(0.0);
 }
