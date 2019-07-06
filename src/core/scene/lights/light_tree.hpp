@@ -159,7 +159,7 @@ struct LightTree<Device::OPENGL> {
 
 	LightTree(const std::vector<SmallLight>& smallLights, const std::vector<BigLight>& bigLights);
 	LightTree() noexcept { smallLights.id = 0; bigLights.id = 0; }
-	~LightTree();
+	//~LightTree();
 
 	ArrayDevHandle_t<DEVICE, SmallLight> smallLights;
 	ArrayDevHandle_t<DEVICE, BigLight> bigLights;

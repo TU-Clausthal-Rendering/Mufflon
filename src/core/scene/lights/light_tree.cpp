@@ -299,12 +299,12 @@ LightTree<Device::OPENGL>::LightTree(const std::vector<SmallLight>& smallLights,
 		copy(this->bigLights, bigLights.data(), numBigLights * sizeof(BigLight));
 }
 
-LightTree<Device::OPENGL>::~LightTree() {
+/*LightTree<Device::OPENGL>::~LightTree() {
 	if(smallLights != nullptr)
 		gl::deleteBuffer(smallLights.id);
 	if(bigLights != nullptr)
 		gl::deleteBuffer(bigLights.id);
-}
+}*/
 
 LightTreeBuilder::LightTreeBuilder() {}
 
@@ -490,7 +490,7 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
                 // test upload point light
 				auto& dst2 = smallLights.emplace_back();
                 dst2.type = uint32_t(LightType::POINT_LIGHT);
-				dst2.intensity = ei::Vec3(1.0f, 0.0f, 0.0f);
+				dst2.intensity = ei::Vec3(1.0f);
 				dst2.position = dst.pos + (dst.v1 + dst.v2) * 0.5f;
    			} break;
 			case LightType::AREA_LIGHT_QUAD: {
@@ -505,17 +505,17 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
                 // test iupload point light
 				auto& dst2 = smallLights.emplace_back();
 				dst2.type = uint32_t(LightType::POINT_LIGHT);
-				dst2.intensity = ei::Vec3(1.0f, 0.0f, 0.0f);
+				dst2.intensity = ei::Vec3(1.0f);
 				dst2.position = dst.pos + (dst.v1 + dst.v2 + dst.v3) * 0.33f;
 			} break;
-			//case LightType::AREA_LIGHT_SPHERE: {
-			//	auto light = reinterpret_cast<const AreaLightSphere<Device::CPU>*>(subTree.memory + offset);
-			//	auto& dst = smallLights.emplace_back();
-			//	dst.type = uint32_t(LightType::AREA_LIGHT_SPHERE);
-			//	dst.position = light->position;
-			//	dst.radius = light->radius;
-			//	dst.material = light->material;
-			//} break;
+			case LightType::AREA_LIGHT_SPHERE: {
+				auto light = reinterpret_cast<const AreaLightSphere<Device::CPU>*>(subTree.memory + offset);
+				auto& dst = smallLights.emplace_back();
+				dst.type = uint32_t(LightType::AREA_LIGHT_SPHERE);
+				dst.position = light->position;
+				dst.radius = light->radius;
+				dst.material = light->material;
+			} break;
 			case LightType::DIRECTIONAL_LIGHT: {
 				auto light = reinterpret_cast<const DirectionalLight*>(subTree.memory + offset);
 				auto& dst = smallLights.emplace_back();
@@ -554,6 +554,7 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 			addLight(0, m_treeCpu->posLights.root.type, m_treeCpu->posLights);
 
         // upload buffers
+		unload<Device::OPENGL>();
 		m_treeOpengl = std::make_unique<LightTree<Device::OPENGL>>(smallLights, bigLights);
 	}
 
@@ -633,11 +634,15 @@ template < Device dev >
 void LightTreeBuilder::unload() {
 	m_treeMemory.unload<dev>();
 	m_primToNodePath.unload<dev>();
-    switch (dev) {
+	switch(dev) {
 	case Device::CPU: m_treeCpu.reset(); break;
 	case Device::CUDA: m_treeCuda.reset(); break;
-	case Device::OPENGL: m_treeOpengl.reset(); break;
-    }
+	case Device::OPENGL: if(m_treeOpengl) {
+		gl::deleteBuffer(m_treeOpengl->smallLights.id);
+		gl::deleteBuffer(m_treeOpengl->bigLights.id);
+		m_treeOpengl.reset();
+	} break;
+	}
 	// TODO: unload envmap handle
 }
 
