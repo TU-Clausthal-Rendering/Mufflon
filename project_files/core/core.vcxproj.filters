@@ -1153,5 +1153,8 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\light_transforms.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

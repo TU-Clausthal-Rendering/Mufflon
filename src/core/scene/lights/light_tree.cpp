@@ -488,10 +488,10 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 				dst.v1 = light->posV[1];
 				dst.v2 = light->posV[2];
                 // test upload point light
-				auto& dst2 = smallLights.emplace_back();
-                dst2.type = uint32_t(LightType::POINT_LIGHT);
-				dst2.intensity = ei::Vec3(1.0f);
-				dst2.position = dst.pos + (dst.v1 + dst.v2) * 0.5f;
+				//auto& dst2 = smallLights.emplace_back();
+                //dst2.type = uint32_t(LightType::POINT_LIGHT);
+				//dst2.intensity = ei::Vec3(1.0f);
+				//dst2.position = dst.pos + (dst.v1 + dst.v2) * 0.5f;
    			} break;
 			case LightType::AREA_LIGHT_QUAD: {
 				auto light = reinterpret_cast<const AreaLightQuad<Device::CPU>*>(subTree.memory + offset);
@@ -502,11 +502,11 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 				dst.v3 = light->posV[1];
 				dst.v1 = light->posV[2];
 				dst.v2 = light->posV[3] + dst.v1 + dst.v3;
-                // test iupload point light
-				auto& dst2 = smallLights.emplace_back();
-				dst2.type = uint32_t(LightType::POINT_LIGHT);
-				dst2.intensity = ei::Vec3(1.0f);
-				dst2.position = dst.pos + (dst.v1 + dst.v2 + dst.v3) * 0.33f;
+                // test upload point light
+				//auto& dst2 = smallLights.emplace_back();
+				//dst2.type = uint32_t(LightType::POINT_LIGHT);
+				//dst2.intensity = ei::Vec3(1.0f);
+				//dst2.position = dst.pos + (dst.v1 + dst.v2 + dst.v3) * 0.33f;
 			} break;
 			case LightType::AREA_LIGHT_SPHERE: {
 				auto light = reinterpret_cast<const AreaLightSphere<Device::CPU>*>(subTree.memory + offset);

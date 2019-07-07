@@ -40,6 +40,8 @@ LightInfo calcPointLight(vec3 pos, vec3 lightPos, vec3 radiance) {
 vec3 getMaterialEmission(uint materialId);
 
 void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 emission) {
+	const vec3 view = normalize(u_cam.position - pos);
+
 	c.color += emission;
 	c.light += emission;
 	c.albedo += albedo;
@@ -75,7 +77,16 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 em
 	}
 
 	for(uint i = 0; i < numBigLights; ++i) {
+		vec3 points[4];
+		points[0] = bigLights[i].pos;
+		points[1] = bigLights[i].pos + bigLights[i].v1;
+		points[2] = bigLights[i].pos + bigLights[i].v2;
+		points[3] = bigLights[i].pos + bigLights[i].v3;
 
+		vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints));
+		vec3 lightColor = getMaterialEmission(bigLights[i].material);
+		c.light += luminance * lightColor;
+		c.color += albedo * luminance * lightColor;
 	}
 }
 
