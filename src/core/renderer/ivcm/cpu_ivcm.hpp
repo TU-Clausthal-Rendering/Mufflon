@@ -57,11 +57,13 @@ private:
 	void sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius,
 				AreaPdf* incidentF, AreaPdf* incidentB, IvcmPathVertex* vertexBuffer,
 				float* reuseCount);
-	void compute_counts(float* reuseCount, float mergeArea, int numPhotons,
+	void compute_counts(float* reuseCount, float mergeArea, int numPhotons, bool merge,
 						const IvcmPathVertex* path0, int pl0,
 						const IvcmPathVertex* path1, int pl1);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
+
+	bool needs_density() const { return m_params.heuristic == PHeuristic::Values::VCMPlus || m_params.heuristic == PHeuristic::Values::VCMStar; }
 
 	IvcmParameters m_params = {};
 	std::vector<math::Rng> m_rngs;

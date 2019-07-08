@@ -12,7 +12,7 @@ struct PShowDensity {
 };
 
 struct PHeuristic {
-	PARAM_ENUM(heuristic = Values::VCM, VCM, VCMPlus);
+	PARAM_ENUM(heuristic = Values::VCM, VCM, VCMPlus, VCMStar);
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Heuristic", ParameterTypes::ENUM };
 	}
