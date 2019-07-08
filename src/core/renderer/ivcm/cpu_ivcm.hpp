@@ -56,8 +56,8 @@ private:
 	// Create one sample path (PT view path with merges)
 	void sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius,
 				AreaPdf* incidentF, AreaPdf* incidentB, IvcmPathVertex* vertexBuffer,
-				int* reuseCount);
-	void compute_counts(int* reuseCount, float mergeArea, int numPhotons,
+				float* reuseCount);
+	void compute_counts(float* reuseCount, float mergeArea, int numPhotons,
 						const IvcmPathVertex* path0, int pl0,
 						const IvcmPathVertex* path1, int pl1);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
@@ -69,7 +69,7 @@ private:
 	data_structs::HashGrid<Device::CPU, IvcmPathVertex> m_photonMap;
 	std::vector<const IvcmPathVertex*> m_pathEndPoints;
 	std::vector<AreaPdf> m_tmpPathProbabilities;
-	std::vector<int> m_tmpReuseCounts;
+	std::vector<float> m_tmpReuseCounts;
 	std::vector<IvcmPathVertex> m_tmpViewPathVertices;
 	std::unique_ptr<data_structs::DmOctree> m_density;
 	//std::unique_ptr<data_structs::DmHashGrid> m_density;
