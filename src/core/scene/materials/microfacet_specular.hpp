@@ -35,6 +35,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 	if(params.shadowing == ShadowingModel::SMITH) {
 		halfTS = sample_visible_normal_smith(params.ndf, incidentTS, params.roughness, rndSet, rnd);
 		cavityPdf = AngularPdf(eval_ndf(params.ndf, params.roughness, halfTS));
+		cavityPdf *= halfTS.z;
 		iDotH = ei::dot(incidentTS, halfTS);
 	} else {
 		// Importance sampling for the ndf
@@ -47,11 +48,10 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 		cavityPdf = cavityTS.pdf;
 	}
 	boundary.set_halfTS(halfTS);
+	mAssert(halfTS.z > 0);
 
 	// Reflect the vector 
 	Direction excidentTS = (2.0f * iDotH) * halfTS - incidentTS;
-	if(incidentTS.z * excidentTS.z < 0.0f)
-		return math::PathSample{};
 
 	// Get geometry factors for PDF and throughput computation
 	float ge, gi, g;

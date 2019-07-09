@@ -37,6 +37,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 		// Find the visible half vector.
 		halfTS = sample_visible_normal_smith(params.ndf, incidentTS, params.roughness, rndSet, rnd);
 		cavityPdf = AngularPdf(eval_ndf(params.ndf, params.roughness, halfTS));
+		cavityPdf *= halfTS.z;
 		iDotH = ei::dot(incidentTS, halfTS);
 	} else {
 		// Importance sampling for the ndf
@@ -49,6 +50,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 		cavityPdf = cavityTS.pdf;
 	}
 	boundary.set_halfTS(halfTS);
+	mAssert(halfTS.z > 0);
 
 	// Compute the refraction index
 	float n_i = boundary.incidentMedium.get_refraction_index().x;

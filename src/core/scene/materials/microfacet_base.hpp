@@ -177,8 +177,8 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 	if(theta < 0.0001) {
 		const float r = sqrt(-log(rnd.u0));
 		const float phi = 6.28318530718f * rnd.u1;
-		slopeX = r * cos(phi);
-		slopeY = r * sin(phi);
+		slopeX = r * cosf(phi);
+		slopeY = r * sinf(phi);
 		return {slopeX, slopeY};
 	}
 	// precomputations
@@ -197,6 +197,8 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 
 	u64 ci = math::percentage_of(std::numeric_limits<u64>::max(), c);
 	if(rnd2 < ci) {
+		//rnd2 = math::rescale_sample(rnd2, 0, ci - 1);
+
 		const float w1 = 0.5f * SQRT_PI_INV * sinTheta * expA2;
 		const float w2 = cosTheta * (0.5f - 0.5f*erfA);
 		const float p = w1 / (w1 + w2);
@@ -206,19 +208,21 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 			rnd2 = math::rescale_sample(rnd2, 0, pi - 1);
 			slopeX = -sqrt(-log(rnd.u0*expA2));
 		} else {
-			rnd2 = math::rescale_sample(rnd2, pi, std::numeric_limits<u64>::max());
+			rnd2 = math::rescale_sample(rnd2, pi, ci - 1);
 			slopeX = math::erfInv(rnd.u0 - 1.0f - rnd.u0 * erfA);
 		}
 	} else {
+		//rnd2 = math::rescale_sample(rnd2, ci, std::numeric_limits<u64>::max());
+
 		slopeX = math::erfInv((-1.0f + 2.0f*rnd.u0)*erfA);
 		const float p = (-slopeX * sinTheta + cosTheta) / (2.0f*cosTheta);
 		u64 pi = ci + math::percentage_of(std::numeric_limits<u64>::max() - ci, p);
-		if(rnd2 > pi) {
+		if(rnd2 < pi) 
+			rnd2 = math::rescale_sample(rnd2, ci, pi - 1);
+		else {
 			rnd2 = math::rescale_sample(rnd2, pi, std::numeric_limits<u64>::max());
 			slopeX = -slopeX;
 		}
-		else
-			rnd2 = math::rescale_sample(rnd2, 0, pi - 1);
 	}
 	// sample slope Y
 	slopeY = math::erfInv(2.0f*rnd.u1 - 1.0f);
@@ -271,6 +275,7 @@ CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Directio
 	// normalize
 	omegaI = normalize(omegaI);
 	if(incidentTS.z < 0.0f) omegaI = -omegaI;
+	//if(incidentTS.z < 0.0f) omegaI.z = -omegaI.z;
 	// get polar coordinates of omegaI
 	float theta = 0.0f;
 	float phi = 0.0f;
@@ -283,6 +288,7 @@ CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Directio
 	switch (ndf) {
 		case NDF::BECKMANN: {
 			slopes = sample_slopes_beckmann(theta, roughness, rnd, rnd2);
+			//slopes.x = -slopes.x;
 		} break;
 		case NDF::GGX: {
 			slopes = sample_slopes_ggx(theta, rnd, rnd2);

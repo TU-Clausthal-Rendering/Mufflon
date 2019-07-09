@@ -46,7 +46,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
 
-	//if(coord == Pixel{407, 499-437}) __debugbreak();
+	if(coord == Pixel{264, 499-295}) __debugbreak();
 
 	int pathLen = 0;
 	do {
@@ -74,7 +74,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 									nee.dir.direction);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
-						float mis = 0;//1.f / params.neeCount;//1.0f / (params.neeCount + hitPdf / nee.creationPdf);
+						float mis = 0.f;//1.f / params.neeCount;//1.0f / (params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
 						outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 												value.cosOut, radiance * mis);

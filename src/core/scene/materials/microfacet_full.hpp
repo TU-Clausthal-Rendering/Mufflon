@@ -70,8 +70,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 	Direction excidentTS;
 	if(reflect) {
 		excidentTS = (2.0f * iDotH) * halfTS - incidentTS;
-		if(incidentTS.z * excidentTS.z <= 0.0f)
-			return math::PathSample{};
 		eDotH = iDotH;
 		eDotHabs = iDotHabs;
 	} else {
@@ -79,9 +77,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		eDotH = eDotHabs * -ei::sgn(iDotH); // Opposite to iDotH
 		// The refraction vector
 		excidentTS = ei::sgn(iDotH) * (eta * iDotHabs - eDotHabs) * halfTS - eta * incidentTS;
-		if(incidentTS.z * excidentTS.z >= 0.0f)
-			return math::PathSample{};
-
 		Direction htest = boundary.get_halfTS(incidentTS, excidentTS);
 		(void)htest;
 		mAssert(ei::approx(htest, halfTS));
