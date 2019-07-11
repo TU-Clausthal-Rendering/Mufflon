@@ -2,6 +2,7 @@
 #include <glad/glad.h>
 #include "core/opengl/program_builder.h"
 #include "core/opengl/vertex_array_builder.h"
+#include "core/export/interface.h"
 
 namespace mufflon::renderer {
 
@@ -9,7 +10,12 @@ GlForward::GlForward() :
     GlRendererBase(true, false) 
 {
     // programs
-	
+	m_ltcTexture = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_mat.dds",
+		TextureSampling::SAMPLING_LINEAR, 
+		MipmapType::MIPMAP_NONE
+    ));
+	mAssert(m_ltcTexture);
 }
 
 void GlForward::post_reset() {
@@ -99,6 +105,13 @@ void GlForward::init() {
 	m_spherePipe.program = m_sphereProgram;
 	m_spherePipe.vertexArray = m_spheresVao;
 	m_spherePipe.topology = gl::PrimitiveTopology::Points;
+
+    // set uniforms
+	// ltc data
+	const auto ltcTexHdl = m_ltcTexture->acquire_const<DEVICE>();
+	glProgramUniformHandleui64ARB(m_triangleProgram, 24, ltcTexHdl);
+	glProgramUniformHandleui64ARB(m_sphereProgram, 24, ltcTexHdl);
+	glProgramUniformHandleui64ARB(m_quadProgram, 24, ltcTexHdl);
 }
 
 void GlForward::iterate() {

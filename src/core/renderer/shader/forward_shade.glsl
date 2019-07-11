@@ -6,6 +6,8 @@ layout(location = 2) out vec3 out_albedo;
 layout(location = 3) out vec3 out_normal;
 layout(location = 4) out vec3 out_lightness;
 
+layout(bindless_sampler, location = 24) uniform sampler2DArray ltc_mat_tex;
+
 struct ColorInfo
 {
 	vec3 color;
@@ -85,8 +87,9 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 em
 
 		vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints));
 		vec3 lightColor = getMaterialEmission(bigLights[i].material);
-		c.light += luminance * lightColor;
-		c.color += albedo * luminance * lightColor;
+		vec3 lightness = luminance * lightColor * 0.159154943; // normalize with 1 / (2 * pi)
+		c.light += lightness;
+		c.color += albedo * lightness;
 	}
 }
 

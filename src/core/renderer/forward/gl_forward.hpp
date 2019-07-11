@@ -5,6 +5,10 @@
 #include "core/renderer/gl_renderer_base.h"
 #include "core/opengl/gl_pipeline.h"
 
+namespace mufflon::scene::textures {
+	class Texture;
+}
+
 namespace mufflon::renderer {
 	
 class GlForward final : public GlRendererBase {
@@ -39,6 +43,8 @@ private:
 	gl::VertexArray m_spheresVao;
 
 	gl::Buffer m_transformBuffer;
+
+	scene::textures::Texture* m_ltcTexture;
 };
 
 

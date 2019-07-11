@@ -1,0 +1,20 @@
+ltc_mat stores the inverse matrix for the ltc transformation:
+
+// Rescaled inverse of m:
+// a 0 b   inverse   1      0      -b
+// 0 c 0     ==>     0 (a - b*d)/c  0
+// d 0 1            -d      0       a
+
+// Store the variable terms
+data[n + 0] =  a;
+data[n + 1] = -b;
+data[n + 2] = (a - b*d) / c;
+data[n + 3] = -d;
+
+texture -> x == roughness
+texture -> y == incident angle
+
+mat[2][2] = texture.r
+mat[0][2] = texture.g
+mat[1][1] = texture.b
+mat[2][0] = texture.a

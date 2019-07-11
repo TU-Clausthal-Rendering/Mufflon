@@ -146,6 +146,12 @@
     <Filter Include="Source Files\core\data_structs">
       <UniqueIdentifier>{4ea1c992-03c5-4ac9-a3f1-951c1a12f616}</UniqueIdentifier>
     </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{ca4d5b49-1c2d-4505-9b83-4a78706b720b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources\ltc">
+      <UniqueIdentifier>{01be5c87-3959-4fec-992e-30087583e5f1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -1156,5 +1162,13 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_mat.dds">
+      <Filter>resources\ltc</Filter>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\resources\ltc\info.txt">
+      <Filter>resources\ltc</Filter>
+    </Text>
   </ItemGroup>
 </Project>
