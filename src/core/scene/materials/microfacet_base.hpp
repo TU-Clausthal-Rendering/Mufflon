@@ -101,9 +101,9 @@ CUDA_FUNCTION __forceinline__ float geoshadowing_smith(float wDotH, const ei::Ve
 		}
 		case NDF::BECKMANN: {
 			// http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
-			float c = sdiv(w.z, sqrt(w.x*w.x*roughness.x*roughness.x + w.y*w.y*roughness.y*roughness.y));
-			c = ei::clamp(c,-1e18f, 1e18f);
-			return c >= 1.6f ? 1.f : sdiv(3.535f*c + 2.181f*c*c, 1 + 2.276f*c + 2.577f*c*c);
+			float c = sdiv(w.z, sqrt(ei::sq(w.x * roughness.x) + ei::sq(w.y * roughness.y)));
+			c = ei::abs(c);
+			return c >= 1.6f ? 1.0f : (3.535f + 2.181f*c) / (1.0f/c + 2.276f + 2.577f*c);
 		}
 	}
 	mAssert(false);
@@ -274,7 +274,10 @@ CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Directio
 	Direction omegaI = incidentTS * ei::Vec3{ roughness , 1.0f };
 	// normalize
 	omegaI = normalize(omegaI);
-	if(incidentTS.z < 0.0f) omegaI = -omegaI;
+	if(incidentTS.z < 0.0f) {
+		//omegaI.x = -omegaI.x;
+		omegaI = -omegaI;
+	}
 	//if(incidentTS.z < 0.0f) omegaI.z = -omegaI.z;
 	// get polar coordinates of omegaI
 	float theta = 0.0f;

@@ -82,7 +82,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		mAssert(ei::approx(htest, halfTS));
 	}
 	mAssert(ei::approx(dot(excidentTS, halfTS), eDotH));
-	mAssert(iDotH * incidentTS.z > 0.0f);
 
 	// Get geometry and common factors for PDF and throughput computation
 	float ge, gi;
@@ -174,7 +173,6 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
 
 	// Fresnel (only dielectric allowed)
 	float f = fresnel_dielectric(n_i, n_t, ei::abs(iDotH)).f;
-	//f = 1.f;
 	if(isReflection) {
 		float g;
 		if(params.shadowing == ShadowingModel::SMITH)
