@@ -198,7 +198,18 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleWalter& params, const sc
 }
 
 CUDA_FUNCTION float pdf_max(const MatSampleWalter& params) {
-	return 1.0f / (ei::PI * params.roughness.x * params.roughness.y);
+	switch(params.ndf) {
+		case NDF::BECKMANN:
+			if(params.roughness < 1.f / std::sqrt(2.f))
+				return 1.f / (ei::PI * params.roughness.x * params.roughness.y);
+			else
+				return 4.f * params.roughness.x * params.roughness.y
+					* ei::exp(1.f / (params.roughness.x * params.roughness.y) - 2.f) / ei::PI;
+		case NDF::GGX:
+			return 1.f / (ei::PI * params.roughness.x * params.roughness.y);
+		default:
+			return 0.f;
+	}
 }
 
 template class MaterialSampleConcept<MatSampleWalter>;

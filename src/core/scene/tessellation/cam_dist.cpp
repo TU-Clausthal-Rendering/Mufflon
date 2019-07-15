@@ -4,6 +4,7 @@
 #include "core/cameras/focus.hpp"
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/materials/material_sampling.hpp"
 #include "core/scene/textures/interface.hpp"
 
 namespace mufflon::scene::tessellation {
@@ -51,13 +52,25 @@ ei::Vec2 get_min_max_displacement(const materials::IMaterial& mat, const ei::Vec
 	return ei::Vec2{ minDisp, maxDisp };
 }
 
-float get_displacement_factor(const float maxDisplacement, const float maxEdgeLen) {
-	constexpr float MAX_DISP_ERROR_FACTOR = 0.05f;
+float get_displacement_factor(const float maxDisplacement, const float maxShininess,
+							  const float maxEdgeLen) {
+	const float MAX_DISP_ERROR_FACTOR = 0.0005f / maxShininess;
 	// TODO: proper factor, for now we define a fixed threshold for error
 	if(maxDisplacement / maxEdgeLen > MAX_DISP_ERROR_FACTOR)
 		return 1.f;
 	// If we're below the threshold, we scale the factor down
 	return maxDisplacement / maxEdgeLen * 1.f/MAX_DISP_ERROR_FACTOR;
+}
+
+materials::ParameterPack get_mat_params(const materials::IMaterial& mat, const ei::Vec2& uvs) {
+	static thread_local std::vector<char> matDescBuffer;
+	matDescBuffer.clear();
+	matDescBuffer.resize(mat.get_descriptor_size(Device::CPU));
+	mat.get_descriptor(Device::CPU, matDescBuffer.data());
+	const auto& descriptor = *reinterpret_cast<const materials::MaterialDescriptorBase*>(matDescBuffer.data());
+	materials::ParameterPack params;
+	(void)materials::fetch(descriptor, uvs, &params);
+	return params;
 }
 
 } // namespace
@@ -99,6 +112,8 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 	const ei::Vec3 p1 = util::pun<ei::Vec3>(m_mesh->point(fromVertex));
 	const ei::Vec3 n0 = util::pun<ei::Vec3>(m_mesh->normal(toVertex));
 	const ei::Vec3 n1 = util::pun<ei::Vec3>(m_mesh->normal(fromVertex));
+	const ei::Vec2 uv0 = util::pun<ei::Vec2>(m_mesh->texcoord2D(toVertex));
+	const ei::Vec2 uv1 = util::pun<ei::Vec2>(m_mesh->texcoord2D(fromVertex));
 
 	float maxFactor = 0.f;
 	float maxEdgeLen = 0.f;
@@ -123,20 +138,19 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 		phongDisplacement = normalFactor * maxEdgeLen;
 	}
 
+	// Edge might be boundary, might not be boundary, thus we have up to two faces to check
+	const OpenMesh::FaceHandle f0 = m_mesh->face_handle(m_mesh->halfedge_handle(edge, 0));
+	const OpenMesh::FaceHandle f1 = m_mesh->face_handle(m_mesh->halfedge_handle(edge, 1));
+
 	float surfaceDisplacement = 0.f;
 	// Account for displacement if applicable
 	if(m_matHdl.is_valid()) {
-		// Compute min/max UV coordinates to later determine mipmap level
-		const ei::Vec2 fromUv = util::pun<ei::Vec2>(m_mesh->texcoord2D(fromVertex));
-		const ei::Vec2 toUv = util::pun<ei::Vec2>(m_mesh->texcoord2D(toVertex));
-		const ei::Vec2 minUv{ std::min(fromUv.u, toUv.u), std::min(fromUv.v, toUv.v) };
-		const ei::Vec2 maxUv{ std::max(fromUv.u, toUv.u), std::max(fromUv.v, toUv.v) };
-
 		float minDisp;
 		float maxDisp;
-		// Edge might be boundary, might not be boundary, thus we have up to two faces to check
-		const OpenMesh::FaceHandle f0 = m_mesh->face_handle(m_mesh->halfedge_handle(edge, 0));
-		const OpenMesh::FaceHandle f1 = m_mesh->face_handle(m_mesh->halfedge_handle(edge, 1));
+
+		// Compute min/max UV coordinates to later determine mipmap level
+		const ei::Vec2 minUv{ std::min(uv0.u, uv1.u), std::min(uv0.v, uv1.v) };
+		const ei::Vec2 maxUv{ std::max(uv0.u, uv1.u), std::max(uv0.v, uv1.v) };
 		if(f0.is_valid()) {
 			const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, f0));
 			const ei::Vec2 minMaxDisp = get_min_max_displacement(mat, minUv, maxUv);
@@ -155,8 +169,23 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 			surfaceDisplacement = maxDisp - minDisp;
 	}
 
+	// Account for material shininess
+	// TODO: use minimum roughness over edge instead of point samples!
+	float maxShininess{ 0.f };
+	if(f0.is_valid()) {
+		const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, f0));
+		maxShininess = ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+							   materials::pdf_max(get_mat_params(mat, uv1)));
+	}
+	if(f1.is_valid()) {
+		const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, f1));
+		maxShininess = ei::max(maxShininess, ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+													 materials::pdf_max(get_mat_params(mat, uv1))));
+	}
+
 	const float spannedPixels = std::max(1.f, maxFactor / m_projPixelHeight);
-	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement), maxEdgeLen);
+	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement),
+															 maxShininess, maxEdgeLen);
 	return static_cast<u32>(m_perPixelTessLevel * spannedPixels * displacementFactor);
 }
 
@@ -168,6 +197,9 @@ u32 CameraDistanceOracle::get_triangle_inner_tessellation_level(const OpenMesh::
 	const ei::Vec3 p0 = util::pun<ei::Vec3>(m_mesh->point(v0));
 	const ei::Vec3 p1 = util::pun<ei::Vec3>(m_mesh->point(v1));
 	const ei::Vec3 p2 = util::pun<ei::Vec3>(m_mesh->point(v2));
+	const ei::Vec2 uv0 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v0));
+	const ei::Vec2 uv1 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v1));
+	const ei::Vec2 uv2 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v2));
 
 	float maxFactor = 0.f;
 	float maxEdgeLen = 0.f;
@@ -206,9 +238,6 @@ u32 CameraDistanceOracle::get_triangle_inner_tessellation_level(const OpenMesh::
 	// Account for displacement if applicable
 	if(m_matHdl.is_valid()) {
 		// Compute min/max UV coordinates to later determine mipmap level
-		const ei::Vec2 uv0 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v0));
-		const ei::Vec2 uv1 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v1));
-		const ei::Vec2 uv2 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v2));
 		const ei::Vec2 minUv{
 			std::min(uv0.u, std::min(uv1.u, uv2.u)),
 			std::min(uv0.v, std::min(uv1.v, uv2.v))
@@ -226,8 +255,16 @@ u32 CameraDistanceOracle::get_triangle_inner_tessellation_level(const OpenMesh::
 			surfaceDisplacement = minMaxDisp.y - minMaxDisp.x;
 	}
 
+	// Account for material shininess
+	// TODO: use minimum roughness over edge instead of point samples!
+	const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, face));
+	const float maxShininess = ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+											   materials::pdf_max(get_mat_params(mat, uv1))),
+									   materials::pdf_max(get_mat_params(mat, uv2)));
+
 	const float spannedPixels = std::sqrt(maxFactor / (m_projPixelHeight * m_projPixelHeight));
-	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement), maxEdgeLen);
+	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement),
+															 maxShininess, maxEdgeLen);
 	return static_cast<u32>(m_perPixelTessLevel * spannedPixels * displacementFactor);
 }
 
@@ -241,6 +278,10 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 	const ei::Vec3 p1 = util::pun<ei::Vec3>(m_mesh->point(v1));
 	const ei::Vec3 p2 = util::pun<ei::Vec3>(m_mesh->point(v2));
 	const ei::Vec3 p3 = util::pun<ei::Vec3>(m_mesh->point(v3));
+	const ei::Vec2 uv0 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v0));
+	const ei::Vec2 uv1 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v1));
+	const ei::Vec2 uv2 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v2));
+	const ei::Vec2 uv3 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v3));
 
 	float maxFactorX = 0.f;
 	float maxFactorY = 0.f;
@@ -282,10 +323,6 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 	// Account for displacement if applicable
 	if(m_matHdl.is_valid()) {
 		// Compute min/max UV coordinates to later determine mipmap level
-		const ei::Vec2 uv0 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v0));
-		const ei::Vec2 uv1 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v1));
-		const ei::Vec2 uv2 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v2));
-		const ei::Vec2 uv3 = util::pun<ei::Vec2>(m_mesh->texcoord2D(v3));
 		const ei::Vec2 minUv{
 			std::min(uv0.u, std::min(uv1.u, std::min(uv2.u, uv3.u))),
 			std::min(uv0.v, std::min(uv1.v, std::min(uv2.v, uv3.v)))
@@ -303,7 +340,16 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 			surfaceDisplacement = minMaxDisp.y - minMaxDisp.x;
 	}
 
-	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement), maxEdgeLen);
+	// Account for material shininess
+	// TODO: use minimum roughness over edge instead of point samples!
+	const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, face));
+	const float maxShininess = ei::max(ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+													   materials::pdf_max(get_mat_params(mat, uv1))),
+											   materials::pdf_max(get_mat_params(mat, uv2))),
+									   materials::pdf_max(get_mat_params(mat, uv3)));
+
+	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement),
+															 maxShininess, maxEdgeLen);
 	return { static_cast<u32>(m_perPixelTessLevel * displacementFactor * maxFactorX / m_projPixelHeight),
 		static_cast<u32>(m_perPixelTessLevel * displacementFactor * maxFactorY / m_projPixelHeight) };
 }
