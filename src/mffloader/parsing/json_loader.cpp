@@ -181,6 +181,13 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 		} else if(type.compare("torrance") == 0) {
 			// Torrance material
 			mat->innerType = MaterialParamType::MATERIAL_TORRANCE;
+			StringView shadowingModel = read_opt<const char*>(m_state, material, "shadowingModel", "vcavity");
+			if(shadowingModel.compare("smith") == 0)
+				mat->inner.torrance.shadowingModel = ShadowingModel::SHADOWING_SMITH;
+			else if(shadowingModel.compare("vcavity") == 0)
+				mat->inner.torrance.shadowingModel = ShadowingModel::SHADOWING_VCAVITY;
+			else
+				throw std::runtime_error("Unknown shadowing model '" + std::string(shadowingModel) + "'");
 			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.torrance.ndf = NormalDistFunction::NDF_BECKMANN;
@@ -216,6 +223,13 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			mat->innerType = type.compare("walter") == 0
 				? MaterialParamType::MATERIAL_WALTER
 				: MaterialParamType::MATERIAL_MICROFACET;
+			StringView shadowingModel = read_opt<const char*>(m_state, material, "shadowingModel", "vcavity");
+			if(shadowingModel.compare("smith") == 0)
+				mat->inner.walter.shadowingModel = ShadowingModel::SHADOWING_SMITH;
+			else if(shadowingModel.compare("vcavity") == 0)
+				mat->inner.walter.shadowingModel = ShadowingModel::SHADOWING_VCAVITY;
+			else 
+				throw std::runtime_error("Unknown shadowing model '" + std::string(shadowingModel) + "'");
 			StringView ndf = read<const char*>(m_state, get(m_state, material, "ndf"));
 			if(ndf.compare("BS") == 0)
 				mat->inner.walter.ndf = NormalDistFunction::NDF_BECKMANN;

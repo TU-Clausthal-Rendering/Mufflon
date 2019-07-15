@@ -933,7 +933,9 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp">
       <Filter>Source Files\core\renderer\bpt</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
+    <ClInclude Include="..\..\src\core\math\functions.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp">

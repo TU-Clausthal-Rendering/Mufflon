@@ -1312,6 +1312,12 @@ ConstScenarioHdl world_get_current_scenario() {
 }
 
 namespace {
+materials::ShadowingModel convertShadowingModel(ShadowingModel shadowingModel) {
+	materials::ShadowingModel shadowingModelNew = materials::ShadowingModel::VCAVITY;
+	if(shadowingModel == SHADOWING_SMITH)
+		shadowingModelNew = materials::ShadowingModel::SMITH;
+	return shadowingModelNew;
+}
 materials::NDF convertNdf(NormalDistFunction ndf) {
 	materials::NDF ndfNew = materials::NDF::GGX;
 	if(ndf == NDF_BECKMANN) ndfNew = materials::NDF::BECKMANN;
@@ -1328,15 +1334,17 @@ std::tuple<TextureHandle, Spectrum> to_ctor_args(const EmissiveParams& params) {
 	return {static_cast<TextureHandle>(params.radiance),
 			util::pun<Spectrum>(params.scale)};
 }
-std::tuple<TextureHandle, TextureHandle, materials::NDF> to_ctor_args(const TorranceParams& params) {
+std::tuple<TextureHandle, TextureHandle, materials::ShadowingModel, materials::NDF> to_ctor_args(const TorranceParams& params) {
 	return {static_cast<TextureHandle>(params.albedo),
 			static_cast<TextureHandle>(params.roughness),
+			convertShadowingModel(params.shadowingModel),
 			convertNdf(params.ndf)};
 }
-std::tuple<Spectrum, float, TextureHandle, materials::NDF> to_ctor_args(const WalterParams& params) {
+std::tuple<Spectrum, float, TextureHandle, materials::ShadowingModel, materials::NDF> to_ctor_args(const WalterParams& params) {
 	return {util::pun<Spectrum>(params.absorption),
 			params.refractionIndex,
 			static_cast<TextureHandle>(params.roughness),
+			convertShadowingModel(params.shadowingModel),
 			convertNdf(params.ndf)};
 }
 std::unique_ptr<materials::IMaterial> convert_material(const char* name, const MaterialParams* mat) {
@@ -1353,17 +1361,17 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 		}	break;
 		case MATERIAL_TORRANCE: {
 			auto p = to_ctor_args(mat->inner.torrance);
-			newMaterial = std::make_unique<Material<Materials::TORRANCE>>( get<0>(p), get<1>(p), get<2>(p) );
+			newMaterial = std::make_unique<Material<Materials::TORRANCE>>( get<0>(p), get<1>(p), get<2>(p), get<3>(p));
 		}	break;
 		case MATERIAL_WALTER: {
 			auto p = to_ctor_args(mat->inner.walter);
 			newMaterial = std::make_unique<Material<Materials::WALTER>>(
-				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
+				get<0>(p), get<1>(p), get<2>(p), get<3>(p), get<4>(p) );
 		}	break;
 		case MATERIAL_MICROFACET: {
 			auto p = to_ctor_args(mat->inner.walter);	// Uses same parametrization as Walter
 			newMaterial = std::make_unique<Material<Materials::MICROFACET>>(
-				get<0>(p), get<1>(p), get<2>(p), get<3>(p) );
+				get<0>(p), get<1>(p), get<2>(p), get<3>(p), get<4>(p));
 		}	break;
 		case MATERIAL_EMISSIVE: {
 			auto p = to_ctor_args(mat->inner.emissive);

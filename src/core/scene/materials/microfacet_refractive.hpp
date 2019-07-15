@@ -17,6 +17,7 @@ CUDA_FUNCTION MatSampleWalter fetch(const textures::ConstTextureDevHandle_t<CURR
 		roughness.y = texValues[MatWalter::ROUGHNESS+texOffset].y;
 	return MatSampleWalter{
 		params.absorption,
+		params.shadowing,
 		params.ndf,
 		roughness
 	};
@@ -28,40 +29,61 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
 									  bool adjoint) {
-	// Importance sampling for the ndf
-	math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
-
-	// Find the visible half vector.
 	u64 rnd = rndSet.i0;
-	auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
+	float iDotH;
+	Direction halfTS;
+	AngularPdf cavityPdf;
+	if(params.shadowing == ShadowingModel::SMITH) {
+		// Find the visible half vector.
+		halfTS = sample_visible_normal_smith(params.ndf, incidentTS, params.roughness, rndSet, rnd);
+		cavityPdf = AngularPdf(eval_ndf(params.ndf, params.roughness, halfTS));
+		cavityPdf *= halfTS.z;
+		iDotH = ei::dot(incidentTS, halfTS);
+	} else {
+		// Importance sampling for the ndf
+		math::DirectionSample cavityTS = sample_ndf(params.ndf, params.roughness, rndSet);
 
-	boundary.set_halfTS(h.halfTS);
+		// Find the visible half vector.
+		auto h = sample_visible_normal_vcavity(incidentTS, cavityTS.direction, rnd);
+		halfTS = h.halfTS;
+		iDotH = h.cosI;
+		cavityPdf = cavityTS.pdf;
+	}
+	boundary.set_halfTS(halfTS);
+	mAssert(halfTS.z > 0);
 
 	// Compute the refraction index
 	float n_i = boundary.incidentMedium.get_refraction_index().x;
 	float n_e = boundary.otherMedium.get_refraction_index().x;
 	float eta = n_i / n_e;
 	float etaSq = eta * eta;
-	float iDotHabs = ei::abs(h.cosI);
+	float iDotHabs = ei::abs(iDotH);
 	Direction excidentTS;
 	float eDotH, eDotHabs;
 	// Snells law
 	float t = 1.0f - etaSq * (1.0f - iDotHabs * iDotHabs);
 	if(t <= 0.0f) { // Total internal reflection
-		excidentTS = (2.0f * h.cosI) * h.halfTS - incidentTS;
-		eDotH = h.cosI;
+		excidentTS = (2.0f * iDotH) * halfTS - incidentTS;
+		eDotH = iDotH;
 		eDotHabs = iDotHabs;
 	} else {
 		eDotHabs = sqrt(t);
-		eDotH = eDotHabs * -ei::sgn(h.cosI); // Opposite to iDotH
+		eDotH = eDotHabs * -ei::sgn(iDotH); // Opposite to iDotH
 		// The refraction vector
-		excidentTS = ei::sgn(h.cosI) * (eta * iDotHabs - eDotHabs) * h.halfTS - eta * incidentTS;
+		excidentTS = ei::sgn(iDotH) * (eta * iDotHabs - eDotHabs) * halfTS - eta * incidentTS;
 	}
 
 	// Get geometry and common factors for PDF and throughput computation
-	float ge = geoshadowing_vcavity(eDotH, excidentTS.z, h.halfTS.z, params.roughness);
-	float gi = geoshadowing_vcavity(h.cosI, incidentTS.z, h.halfTS.z, params.roughness);
-	if(ge == 0.0f || gi == 0.0f) // Completely nullyfy the invalid result
+	float ge, gi;
+	if(params.shadowing == ShadowingModel::SMITH) {
+		ge = geoshadowing_smith(eDotH, excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(iDotH, incidentTS, params.roughness, params.ndf);
+	} else {
+		ge = geoshadowing_vcavity(eDotH, excidentTS.z, halfTS.z, params.roughness);
+		gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+	}
+
+	if(ge == 0.0f || gi == 0.0f) // Completely nullify the invalid result
 		return math::PathSample {};
 
 	float throughput;
@@ -69,18 +91,26 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 	math::PathEventType eventType;
 	if(t <= 0.0f) {
 		eventType = math::PathEventType::REFLECTED;
-		float g = geoshadowing_vcavity_reflection(gi, ge);
+		float g;
+		if(params.shadowing == ShadowingModel::SMITH)
+			g = geoshadowing_smith_reflection(gi, ge);
+		else
+			g = geoshadowing_vcavity_reflection(gi, ge);
 		throughput = sdiv(g, gi);
-		pdfForw = cavityTS.pdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * h.halfTS.z));
-		pdfBack = cavityTS.pdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * h.halfTS.z));
+		pdfForw = cavityPdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z));
+		pdfBack = cavityPdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z));
 	} else {
 		eventType = math::PathEventType::REFRACTED;
-		float g = geoshadowing_vcavity_transmission(gi, ge);
+		float g;
+		if(params.shadowing == ShadowingModel::SMITH)
+			g = geoshadowing_smith_transmission(gi, ge);
+		else
+			g = geoshadowing_vcavity_transmission(gi, ge);
 		throughput = sdiv(g, gi);
 		if(adjoint)
 			throughput *= etaSq;
 
-		AngularPdf common = cavityTS.pdf * sdiv(iDotHabs * eDotHabs, ei::sq(n_i * h.cosI + n_e * eDotH) * h.halfTS.z);
+		AngularPdf common = cavityPdf * sdiv(iDotHabs * eDotHabs, ei::sq(n_i * iDotH + n_e * eDotH) * halfTS.z);
 		pdfForw = common * sdiv(gi * n_e * n_e, ei::abs(incidentTS.z));
 		pdfBack = common * sdiv(ge * n_i * n_i, ei::abs(excidentTS.z));
 	}
@@ -113,8 +143,14 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 	}
 
 	// Geometry Term
-	float ge = geoshadowing_vcavity(eDotH, excidentTS.z, halfTS.z, params.roughness);
-	float gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+	float ge, gi;
+	if(params.shadowing == ShadowingModel::SMITH) {
+		ge = geoshadowing_smith(eDotH, excidentTS, params.roughness, params.ndf);
+		gi = geoshadowing_smith(iDotH, incidentTS, params.roughness, params.ndf);
+	} else {
+		ge = geoshadowing_vcavity(eDotH, excidentTS.z, halfTS.z, params.roughness);
+		gi = geoshadowing_vcavity(iDotH, incidentTS.z, halfTS.z, params.roughness);
+	}
 	if(ge == 0.0f || gi == 0.0f)
 		return math::BidirSampleValue {};
 
@@ -124,7 +160,11 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 	// Fresnel is done as layer blending...
 
 	if(isReflection) { // Reflections are possible due to total internal reflection.
-		float g = geoshadowing_vcavity_reflection(gi, ge);
+		float g;
+		if(params.shadowing == ShadowingModel::SMITH) 
+			g = geoshadowing_smith_reflection(gi, ge);
+		else
+			g = geoshadowing_vcavity_reflection(gi, ge);
 		return math::BidirSampleValue {
 			Spectrum{ sdiv(g * d, 4.0f * incidentTS.z * excidentTS.z) },
 			AngularPdf{ sdiv(gi * d, 4.0f * ei::abs(incidentTS.z)) },
@@ -133,7 +173,11 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 	}
 
 	float common = sdiv(ei::abs(d * iDotH * eDotH), ei::sq(n_i * iDotH + n_e * eDotH));
-	float g = geoshadowing_vcavity_transmission(gi, ge);
+	float g;
+	if(params.shadowing == ShadowingModel::SMITH)
+		g = geoshadowing_smith_transmission(gi, ge);
+	else
+		g = geoshadowing_vcavity_transmission(gi, ge);
 	float bsdf = g * common * sdiv(n_e * n_e, ei::abs(incidentTS.z * excidentTS.z));
 	return math::BidirSampleValue {
 		Spectrum{bsdf},
