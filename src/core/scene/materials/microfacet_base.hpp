@@ -249,7 +249,7 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_ggx(float theta, const math::RndSet2& rnd, 
 	// sample slope_x
 	const float a = 2.0f*rnd.u0 / g1 - 1.0f;
 	const float tmp = sdiv(1.0f , a * a - 1.0f);
-	const float d = sqrtf(ei::sq(tanTheta * tmp) - (a * a - tanTheta * tanTheta) * tmp);
+	const float d = tmp * sqrtf(tanTheta * tanTheta - (a * a - tanTheta * tanTheta) / tmp);
 	const float slopeX1 = tanTheta * tmp - d;
 	const float slopeX2 = tanTheta * tmp + d;
 	slopeX = (a < 0.f || slopeX2 > 1.0f / tanTheta) ? slopeX1 : slopeX2;
