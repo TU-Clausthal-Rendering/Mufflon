@@ -225,7 +225,7 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 		}
 	}
 	// sample slope Y
-	slopeY = math::erfInv(2.0f*rnd.u1 - 1.0f);
+	slopeY = math::erfInv(ei::clamp(2.0f*rnd.u1 - 1.0f, -0.99999f, 0.99999f));
 	mAssert(!isnan(slopeX) && !isnan(slopeY));
 	return { slopeX, slopeY };
 }
