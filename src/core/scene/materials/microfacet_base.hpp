@@ -171,20 +171,16 @@ sample_visible_normal_vcavity(const Direction& incidentTS, const Direction& cavi
 }
 
 // Get the sampled slopes for the smith model with beckmann distribution
-CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
-	float slopeX, slopeY;
-	// special case (normal incidence)
-	if(theta < 0.0001) {
+CUDA_FUNCTION ei::Vec2 sample_visible_slopes_beckmann(float sinTheta, float cosTheta, float tanTheta, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
+	// Special case (normal incidence)
+	if(tanTheta < 0.0001) {
 		const float r = sqrt(-log(rnd.u0));
 		const float phi = 6.28318530718f * rnd.u1;
-		slopeX = r * cosf(phi);
-		slopeY = r * sinf(phi);
+		const float slopeX = r * cosf(phi);
+		const float slopeY = r * sinf(phi);
 		return {slopeX, slopeY};
 	}
 	// precomputations
-	const float sinTheta = sinf(theta);
-	const float cosTheta = cosf(theta);
-	const float tanTheta = sinTheta / cosTheta;
 	const float a = 1.0f / tanTheta;
 	const float erfA = erf(a);
 	const float expA2 = exp(-a * a);
@@ -194,11 +190,9 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 	const float c = 1.0f - g1 * erfA;
 
 	// sample slope X
-
+	float slopeX;
 	u64 ci = math::percentage_of(std::numeric_limits<u64>::max(), c);
 	if(rnd2 < ci) {
-		//rnd2 = math::rescale_sample(rnd2, 0, ci - 1);
-
 		const float w1 = 0.5f * SQRT_PI_INV * sinTheta * expA2;
 		const float w2 = cosTheta * (0.5f - 0.5f*erfA);
 		const float p = w1 / (w1 + w2);
@@ -212,8 +206,6 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 			slopeX = math::erfInv(rnd.u0 - 1.0f - rnd.u0 * erfA);
 		}
 	} else {
-		//rnd2 = math::rescale_sample(rnd2, ci, std::numeric_limits<u64>::max());
-
 		slopeX = math::erfInv((-1.0f + 2.0f*rnd.u0)*erfA);
 		const float p = (-slopeX * sinTheta + cosTheta) / (2.0f*cosTheta);
 		u64 pi = ci + math::percentage_of(std::numeric_limits<u64>::max() - ci, p);
@@ -225,25 +217,22 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_beckmann(float theta, const ei::Vec2& rough
 		}
 	}
 	// sample slope Y
-	slopeY = math::erfInv(ei::clamp(2.0f*rnd.u1 - 1.0f, -0.99999f, 0.99999f));
+	const float slopeY = math::erfInv(ei::clamp(2.0f*rnd.u1 - 1.0f, -0.99999f, 0.99999f));
 	mAssert(!isnan(slopeX) && !isnan(slopeY));
 	return { slopeX, slopeY };
 }
 
 // Get the sampled slopes for the smith model with ggx distribution
-CUDA_FUNCTION ei::Vec2 sample_slopes_ggx(float theta, const math::RndSet2& rnd, u64& rnd2) {
-	float slopeX, slopeY;
-	mAssert(theta >= 0.0f);
-	// special case (normal incidence)
-	if(theta < 0.0001) {
+CUDA_FUNCTION ei::Vec2 sample_visible_slopes_ggx(float tanTheta, const math::RndSet2& rnd, u64& rnd2) {
+	mAssert(tanTheta >= 0.0f);
+	// Special case (normal incidence)
+	if(tanTheta < 0.0001) {
 		const float r = sqrtf(sdiv(rnd.u0, (1.f-rnd.u0)));
 		const float phi = 6.28318530718f * rnd.u1;
-		slopeX = r * cosf(phi);
-		slopeY = r * sinf(phi);
+		const float slopeX = r * cosf(phi);
+		const float slopeY = r * sinf(phi);
 		return { slopeX, slopeY };
 	}
-	const float tanTheta = tanf(theta);
-	mAssert(tanTheta >= 0.0f);
 	const float a1 = 1.0f / tanTheta;
 	const float g1 = 2.f / (1.f + sqrtf(1.0f + 1.0f / (a1 * a1)));
 	// sample slope_x
@@ -252,7 +241,7 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_ggx(float theta, const math::RndSet2& rnd, 
 	const float d = tmp * sqrtf(tanTheta * tanTheta - (a * a - tanTheta * tanTheta) / tmp);
 	const float slopeX1 = tanTheta * tmp - d;
 	const float slopeX2 = tanTheta * tmp + d;
-	slopeX = (a < 0.f || slopeX2 > 1.0f / tanTheta) ? slopeX1 : slopeX2;
+	const float slopeX = (a < 0.f || slopeX2 > 1.0f / tanTheta) ? slopeX1 : slopeX2;
 	// sample slope_y
 	float s;
 	if(rnd2 & (1ull << 63)) {
@@ -264,56 +253,42 @@ CUDA_FUNCTION ei::Vec2 sample_slopes_ggx(float theta, const math::RndSet2& rnd, 
 	}
 	const float z = sdiv((rnd.u1 * (rnd.u1 * (rnd.u1 * 0.27385f - 0.73369f) + 0.46341f)), 
 		(rnd.u1 * (rnd.u1 * (rnd.u1 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f));
-	slopeY = s * z * sqrtf(1.0f + slopeX * slopeX);
+	const float slopeY = s * z * sqrtf(1.0f + slopeX * slopeX);
 	return { slopeX, slopeY };
 }
 
 // Get a normal of the cavity proportional to their visibility.
 CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Direction& incidentTS, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
-	// stretch incidentTS
-	Direction omegaI = incidentTS * ei::Vec3{ roughness , 1.0f };
-	// normalize
-	omegaI = normalize(omegaI);
-	if(incidentTS.z < 0.0f) {
-		//omegaI.x = -omegaI.x;
-		omegaI = -omegaI;
-	}
-	//if(incidentTS.z < 0.0f) omegaI.z = -omegaI.z;
-	// get polar coordinates of omegaI
-	float theta = 0.0f;
-	float phi = 0.0f;
-	if(omegaI[2] < 0.99999f) {
-		theta = acos(omegaI[2]);
-		phi = atan2(omegaI[1], omegaI[0]);
-	}
+	// Stretch incidentTS
+	Direction inStretched = incidentTS * ei::Vec3{ roughness , 1.0f };
+	inStretched = normalize(inStretched);
+	if(incidentTS.z < 0.0f)
+		inStretched = -inStretched;
+
+	const float sinTheta = sqrtf((1.0f - inStretched.z) * (1.0f + inStretched.z));
+	const float tanTheta = sinTheta / inStretched.z;
+	const float cosPhi = sinTheta > 1e-5f ? inStretched.x / sinTheta : 0.0f;
+	const float sinPhi = sinTheta > 1e-5f ? inStretched.y / sinTheta : 0.0f;
+
 	// sample
 	ei::Vec2 slopes;
 	switch (ndf) {
 		case NDF::BECKMANN: {
-			slopes = sample_slopes_beckmann(theta, roughness, rnd, rnd2);
-			//slopes.x = -slopes.x;
+			slopes = sample_visible_slopes_beckmann(sinTheta, inStretched.z, tanTheta, roughness, rnd, rnd2);
 		} break;
 		case NDF::GGX: {
-			slopes = sample_slopes_ggx(theta, rnd, rnd2);
-		}
+			slopes = sample_visible_slopes_ggx(tanTheta, rnd, rnd2);
+		} break;
 	}
 	// rotate
-	float sinPhi = sinf(phi);
-	float cosPhi = cosf(phi);
 	float tmp = cosPhi * slopes.x - sinPhi * slopes.y;
 	slopes.y = sinPhi * slopes.x + cosPhi * slopes.y;
 	slopes.x = tmp;
-	//unstrech
+	// Unstrech
 	slopes.x *= roughness.x;
 	slopes.y *= roughness.y;
-	// compute normal
-	Direction out;
-	float invOut;
-	invOut = sqrtf(slopes.x * slopes.x + slopes.y * slopes.y + 1.f);
-	out[0] = -slopes.x / invOut;
-	out[1] = -slopes.y / invOut;
-	out[2] = 1.f / invOut;
-	return out;
+	// Compute normal
+	return normalize(Direction{-slopes.x, -slopes.y, 1.0f});
 }
 
 // Evaluate any of the supported ndfs

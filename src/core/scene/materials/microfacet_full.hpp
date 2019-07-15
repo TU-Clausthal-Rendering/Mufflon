@@ -77,9 +77,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		eDotH = eDotHabs * -ei::sgn(iDotH); // Opposite to iDotH
 		// The refraction vector
 		excidentTS = ei::sgn(iDotH) * (eta * iDotHabs - eDotHabs) * halfTS - eta * incidentTS;
-		Direction htest = boundary.get_halfTS(incidentTS, excidentTS);
-		(void)htest;
-		mAssert(ei::approx(htest, halfTS));
 	}
 	mAssert(ei::approx(dot(excidentTS, halfTS), eDotH));
 
@@ -121,18 +118,6 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 		pdfForw = common * sdiv(gi * n_t * n_t, ei::abs(incidentTS.z));
 		pdfBack = common * sdiv(ge * n_i * n_i, ei::abs(excidentTS.z));
 	}
-
-	auto debugEval = evaluate(params, incidentTS, excidentTS, boundary);
-
-	if(!ei::approx((float)debugEval.pdf.back, (float)pdfBack, 1e-3f))
-		debugBreak;
-	if(!ei::approx((float)debugEval.pdf.forw, (float)pdfForw, 1e-3f))
-		debugBreak;
-	Spectrum brdf{throughput * (float)pdfForw/abs(excidentTS.z)};
-	if(!ei::approx(debugEval.value, brdf, 1e-3f))
-		debugBreak;
-
-	//if(!reflect) return  math::PathSample{};
 
 	return math::PathSample {
 		Spectrum { throughput },

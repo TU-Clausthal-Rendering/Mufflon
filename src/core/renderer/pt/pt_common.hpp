@@ -46,7 +46,7 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
 
-	if(coord == Pixel{264, 499-295}) __debugbreak();
+	//if(coord == Pixel{269, 499-347}) __debugbreak();
 
 	int pathLen = 0;
 	do {
@@ -74,14 +74,14 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 									nee.dir.direction);
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
-						float mis = 0.f;//1.f / params.neeCount;//1.0f / (params.neeCount + hitPdf / nee.creationPdf);
+						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
 						outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
 												value.cosOut, radiance * mis);
 					}
 				}
 			}
-		}
+		}//*/
 
 		// Walk
 		scene::Point lastPosition = vertex.get_position();
@@ -96,12 +96,12 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 			EmissionValue emission = vertex.get_emission(scene, lastPosition);
 			if(emission.value != 0.0f && pathLen > 1) {
 				// misWeight for pathLen==1 is always 1 -> skip computation
-				float misWeight = 1.0f;//1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
+				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= misWeight;
 			}
 			outputBuffer.contribute(coord, throughput, emission.value, vertex.get_position(),
 									vertex.get_normal(), vertex.get_albedo());
-		}
+		}//*/
 		if(vertex.is_end_point()) break;
 	} while(pathLen < params.maxPathLength);
 }
