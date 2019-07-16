@@ -200,7 +200,7 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleMicrofacet& params, cons
 CUDA_FUNCTION float pdf_max(const MatSampleMicrofacet& params) {
 	switch(params.ndf) {
 		case NDF::BECKMANN:
-			if(params.roughness < 1.f / ei::sqrt(2))
+			if(params.roughness < 1.f / std::sqrt(2))
 				return 1.f / (ei::PI * params.roughness.x * params.roughness.y);
 			else
 				return 4.f * params.roughness.x * params.roughness.y

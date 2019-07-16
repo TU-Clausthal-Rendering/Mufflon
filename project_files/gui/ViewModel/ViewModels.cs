@@ -6,6 +6,7 @@ using gui.ViewModel.Camera;
 using gui.ViewModel.Dialog;
 using gui.ViewModel.Light;
 using gui.ViewModel.Material;
+using System.IO;
 
 namespace gui.ViewModel
 {
@@ -41,6 +42,7 @@ namespace gui.ViewModel
         public ICommand SaveSceneCommand { get; }
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
+        public ICommand DenoiseImageCommand { get; }
 
         // For designer only
         public static bool NotInDesignMode { get; set; }
@@ -78,6 +80,11 @@ namespace gui.ViewModel
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(m_models);
+            DenoiseImageCommand = new ActionCommand(new System.Action(() => {
+                string filename = ScreenShotCommand.ReplaceCommonFilenameTags(m_models, m_models.Settings.ScreenshotNamePattern);
+                filename = ScreenShotCommand.ReplaceTargetFilenameTags(m_models, "denoised", false, filename);
+                Dll.Core.render_save_denoised_radiance(Path.Combine(m_models.Settings.ScreenshotFolder, filename));
+            }));
 
             KeyGestures = new KeyGestureViewModel(models);
         }

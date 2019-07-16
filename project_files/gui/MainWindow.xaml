@@ -98,6 +98,18 @@
                     <MenuItem Header="Settings"
                               Command="{Binding OpenSettingsCommand}"/>
                 </MenuItem>
+                <MenuItem Header="Postprocessing">
+                    <MenuItem Header="Save denoised radiance"
+                              Command="{Binding DenoiseImageCommand}">
+                        <MenuItem.ToolTip>
+                            <TextBlock>
+                                Uses Intel Open Image Denoiser to denoise the radiance target
+                                Albedo and normal (if selected as render targets) may improve the result,
+                                but also may worsen them since we don't render first-hit only guides
+                            </TextBlock>
+                        </MenuItem.ToolTip>
+                    </MenuItem>
+                </MenuItem>
                 <MenuItem Header="Help">
                     <MenuItem Header="About"/>
                 </MenuItem>

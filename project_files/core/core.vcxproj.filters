@@ -935,7 +935,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\math\functions.hpp">
       <Filter>Source Files\core\math</Filter>
-    </ClInclude>    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp">
       <Filter>Source Files\core\renderer\bpm</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp">

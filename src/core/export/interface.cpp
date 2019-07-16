@@ -23,6 +23,7 @@
 #include "core/scene/textures/interface.hpp"
 #include "mffloader/interface/interface.h"
 #include <glad/glad.h>
+#include <OpenImageDenoise/oidn.hpp>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <type_traits>
@@ -3287,6 +3288,97 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 		}
 	}
 	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.string(), "'");
+
+	return true;
+	CATCH_ALL(false)
+}
+
+CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
+	TRY
+	auto lock = std::scoped_lock(s_iterationMutex);
+	if(s_currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is currently set");
+		return false;
+	}
+	if(!s_outputTargets.is_set(renderer::OutputValue::RADIANCE)) {
+		logError("[", FUNCTION_NAME, "] The current rendering does not have its radiance target active");
+		return false;
+	}
+	if(s_imageOutput->get_current_iteration() == 0) {
+		logError("[", FUNCTION_NAME, "] At least a single iteration must have been rendered for denoising");
+		return false;
+	}
+
+	std::unique_ptr<float[]> radiance = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::RADIANCE });
+	std::unique_ptr<float[]> output = std::make_unique<float[]>(3 * s_imageOutput->get_num_pixels());
+	std::unique_ptr<float[]> normals;
+	std::unique_ptr<float[]> albedo;
+
+	oidn::DeviceRef filterDevice = oidn::newDevice();
+	filterDevice.commit();
+
+	oidn::FilterRef filter = filterDevice.newFilter("RT");
+	filter.setImage("color", radiance.get(), oidn::Format::Float3, s_imageOutput->get_width(),
+					s_imageOutput->get_height());
+	filter.setImage("output", output.get(), oidn::Format::Float3, s_imageOutput->get_width(),
+					s_imageOutput->get_height());
+	// TODO: incorporate albedo/normals if present? But currently they're noisy,
+	// and OIDN wants (mostly) first-hit info (I think)
+	if(s_outputTargets.is_set(renderer::OutputValue::NORMAL)) {
+		normals = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::NORMAL });
+		filter.setImage("normal", normals.get(), oidn::Format::Float3, s_imageOutput->get_width(),
+						s_imageOutput->get_height());
+		logPedantic("[", FUNCTION_NAME, "] Using normal guidance");
+	}
+	if(s_outputTargets.is_set(renderer::OutputValue::ALBEDO)) {
+		albedo = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::ALBEDO });
+		filter.setImage("albedo", albedo.get(), oidn::Format::Float3, s_imageOutput->get_width(),
+						s_imageOutput->get_height());
+		logPedantic("[", FUNCTION_NAME, "] Using albedo guidance");
+	}
+	filter.set("hdr", true);
+	filter.commit();
+	filter.execute();
+	const char* errorMsg = nullptr;
+	if(filterDevice.getError(errorMsg) != oidn::Error::None) {
+		logError("[", FUNCTION_NAME, "] ", errorMsg);
+		return false;
+	}
+
+	// Make the image a PFM by default
+	fs::path fileName = std::string(filename);
+	if(fileName.extension() != ".pfm")
+		fileName += ".pfm";
+	if(!fileName.is_absolute())
+		fileName = fs::absolute(fileName);
+
+	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
+	fs::path directory = fileName.parent_path();
+	if(!fs::exists(directory))
+		if(!fs::create_directories(directory))
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+					   "; the screenshot possibly may not be created");
+
+	const int numChannels = renderer::RenderTargets::NUM_CHANNELS[renderer::RenderTargets::RADIANCE];
+	TextureData texData;
+	texData.data = reinterpret_cast<uint8_t*>(output.get());
+	texData.components = numChannels;
+	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
+	texData.width = s_imageOutput->get_width();
+	texData.height = s_imageOutput->get_height();
+	texData.sRgb = false;
+	texData.layers = 1;
+
+	for(auto& plugin : s_plugins) {
+		if(plugin.is_loaded()) {
+			if(plugin.can_store_format(fileName.extension().string())) {
+				if(plugin.store(fileName.string(), &texData))
+					break;
+			}
+		}
+	}
+
+	logInfo("[", FUNCTION_NAME, "] Finished denoising '", filename, "'");
 
 	return true;
 	CATCH_ALL(false)

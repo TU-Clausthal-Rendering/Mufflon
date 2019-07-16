@@ -557,7 +557,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(SolutionDir)external\oidn-0.9\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -571,14 +571,17 @@
     <PostBuildEvent>
       <Command>xcopy /DQY "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)" &gt; nul
 xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshCored.dll" "$(OutDir)" &gt; nul
-xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToolsd.dll" "$(OutDir)" &gt; nul</Command>
+xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToolsd.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\tbb.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\tbbmalloc.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenoise.dll" "$(OutDir)" &gt; nul</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copied the necessary .dll's into the execution directory</Message>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;tbb.lib;tbbmalloc.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;$(SolutionDir)external\oidn-0.9\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
     </Link>
     <CudaCompile>
@@ -604,7 +607,7 @@ xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToo
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(SolutionDir)external\oidn-0.9\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -618,9 +621,9 @@ xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToo
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;tbb.lib;tbbmalloc.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;$(SolutionDir)external\oidn-0.9\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -638,7 +641,10 @@ xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshToo
       <Message>Copied the necessary .dll's into the execution directory</Message>
       <Command>xcopy /DQY "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)" &gt; nul
 xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshCore.dll" "$(OutDir)" &gt; nul
-xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)" &gt; nul</Command>
+xcopy /DQY "$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\bin\OpenMeshTools.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\tbb.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\tbbmalloc.dll" "$(OutDir)" &gt; nul
+xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenoise.dll" "$(OutDir)" &gt; nul</Command>
     </PostBuildEvent>
     <CudaLink>
       <PerformDeviceLink>true</PerformDeviceLink>
