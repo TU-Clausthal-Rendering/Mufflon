@@ -214,6 +214,7 @@
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
     <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp" />
