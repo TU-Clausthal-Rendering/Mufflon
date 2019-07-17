@@ -31,20 +31,29 @@ struct VcmVertexExt {
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
 
-
 	CUDA_FUNCTION void init(const VcmPathVertex& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosine,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		this->throughput = incidentThrougput.weight;
-		if(thisVertex.previous() && thisVertex.previous()->is_hitable()) {
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+		this->throughput = Spectrum{1.0f};
+	}
+
+	CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
+							  const VcmPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		this->throughput = throughput.weight;
+		if(prevVertex.is_hitable()) {
 			// Compute as much as possible from the conversion factor.
 			// At this point we do not know n and A for the photons. This quantities
 			// are added in the kernel after the walk.
-			this->prevConversionFactor = float(
-				thisVertex.previous()->convert_pdf(thisVertex.get_type(), AngularPdf{1.0f},
-				{ incident, incidentDistance * incidentDistance }).pdf );
+			float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
+			this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
 		}
 	}
 
@@ -190,12 +199,12 @@ void CpuVcm::post_reset() {
 }
 
 void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
-	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	math::RndSet2 rndStart { m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	VcmPathVertex vertex;
 	VcmPathVertex::create_light(&vertex, nullptr, p);
-	const VcmPathVertex* previous = m_photonMap.insert(p.pos.position, vertex);
+	const VcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
 	math::Throughput throughput;
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 

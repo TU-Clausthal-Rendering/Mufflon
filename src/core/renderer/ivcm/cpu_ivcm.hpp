@@ -3,6 +3,7 @@
 #include "ivcm_params.hpp"
 #include "core/scene/handles.hpp"
 #include "core/renderer/renderer_base.hpp"
+#include "core/renderer/footprint.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
 #include "core/data_structs/photon_map.hpp"

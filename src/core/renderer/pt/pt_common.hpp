@@ -15,17 +15,25 @@ struct PtVertexExt {
 	AreaPdf incidentPdf;
 
 	CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
-			  const scene::Direction& incident, const float incidentDistance,
-			  const AreaPdf incidentPdf, const float incidentCosineAbs,
-			  const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	}
+
+	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& prevVertex,
+							  const PathVertex<PtVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
 							  const scene::Direction& excident,
 							  const math::PdfPair& pdf) {
-		//excident = sample.excident;
-		//pdf = sample.pdfF;
 	}
 };
 

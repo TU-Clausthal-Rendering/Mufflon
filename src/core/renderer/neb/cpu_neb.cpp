@@ -48,13 +48,24 @@ struct NebVertexExt {
 	AreaPdf neeCreationPdf;
 	AreaPdf neeBackPdf;		// neeSamplePdf * cosθs / d²
 
-	void init(const PathVertex<NebVertexExt>& thisVertex,
-			  const scene::Direction& incident, const float incidentDistance,
-			  const AreaPdf incidentPdf, const float incidentCosineAbs,
-			  const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		this->throughput = incidentThrougput.weight;
-		this->incidentDist = incidentDistance;
+	CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& thisVertex,
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+		this->throughput = Spectrum{1.0f};
+	}
+
+	CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& prevVertex,
+							  const PathVertex<NebVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		this->throughput = throughput.weight;
+		this->incidentDist = incident.distance;
 	}
 
 	void update(const PathVertex<NebVertexExt>& thisVertex,
@@ -75,10 +86,11 @@ struct NebVertexExt {
 class NebPathVertex : public PathVertex<NebVertexExt> {
 public:
 	// Overload the vertex sample operator to have more RR control.
-	VertexSample sample(const scene::materials::Medium* media,
+	VertexSample sample(const ei::Box& sceneBounds,
+						const scene::materials::Medium* media,
 						const math::RndSet2_1& rndSet,
 						bool adjoint) const {
-		VertexSample s = PathVertex<NebVertexExt>::sample(media, rndSet, adjoint);
+		VertexSample s = PathVertex<NebVertexExt>::sample(sceneBounds, media, rndSet, adjoint);
 		// Conditionally kill the photon path tracing if we are on the
 		// NEE vertex. Goal: trace only photons which we cannot NEE.
 		if(adjoint && get_path_len() == 1) {
@@ -329,7 +341,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 }
 
 void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea) {
-	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	math::RndSet2 rndStart { m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	NebPathVertex vertex[2];
@@ -360,7 +372,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 			previous->pdfBack = sample.pdf.back;	// Set the previously unknown backward pdf
 			photon.sourceDensity = previous->sourceDensity;
 		} else {
-			photon.prev.creationPdf = p.pos.pdf;
+			photon.prev.creationPdf = vertex[0].ext().incidentPdf;
 #ifdef NEB_KDTREE
 			photon.sourceDensity = get_density(m_density, vertex[currentV].get_position());
 #else

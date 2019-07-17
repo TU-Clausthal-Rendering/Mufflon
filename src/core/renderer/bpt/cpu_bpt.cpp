@@ -22,15 +22,24 @@ struct BptVertexExt {
 	// the moment of the full connection.
 	// only valid after update().
 	float prevRelativeProbabilitySum{ 0.0f };
-
 	math::Throughput throughput;	// Throughput of the path up to this point
 
 	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosineAbs,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		this->throughput = incidentThrougput;
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	}
+
+	CUDA_FUNCTION void update(const BptPathVertex& prevVertex,
+							  const BptPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		this->throughput = throughput;
 	}
 
 	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
@@ -40,8 +49,7 @@ struct BptVertexExt {
 		// Also see PBRT p.1015.
 		const BptPathVertex* prev = thisVertex.previous();
 		if(prev) { // !prev: Current one is a start vertex. There is no previous sum
-			AreaPdf prevReversePdf = prev->convert_pdf(thisVertex.get_type(), pdf.back,
-				{thisVertex.get_incident_direction(), thisVertex.get_incident_dist_sq()}).pdf;
+			AreaPdf prevReversePdf = prev->convert_pdf(thisVertex.get_type(), pdf.back, thisVertex.get_incident_connection()).pdf;
 			// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
 			float relToPrev = prevReversePdf / prev->ext().incidentPdf;
 			prevRelativeProbabilitySum = relToPrev + relToPrev * prev->ext().prevRelativeProbabilitySum;
@@ -168,7 +176,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 								RenderBuffer<Device::CPU>& outputBuffer,
 								std::vector<BptPathVertex>& path) {
 	// Trace a light path
-	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	math::RndSet2 rndStart { m_rngs[idx].next() };
 	u64 lightTreeSeed = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, outputBuffer.get_num_pixels(),
 		lightTreeSeed, rndStart);

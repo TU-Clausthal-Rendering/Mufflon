@@ -15,10 +15,13 @@
 
 namespace mufflon { namespace scene { namespace lights {
 
-// Sampler result of positional light source sampling: a Lambertian Point emitter
+// Sampler result of positional light source sampling:
+//   a Lambertian point emitter OR a parallel plane emitter
 struct Emitter {
-	math::PositionSample pos;
-	Spectrum intensity;
+	ei::Vec3 initVec;		// Position or Direction
+	float pdf;				// 1/m²     or 1/sr
+	Spectrum intensity;		// W/sr     or W/m² (irradiance)
+	float pChoice;			// Probability to select this light source
 	LightType type;
 	materials::MediumHandle mediumIndex;
 	// Deliver some additional information dependent on the type.
@@ -27,7 +30,7 @@ struct Emitter {
 		CUDA_FUNCTION SourceParam() {}
 		CUDA_FUNCTION SourceParam(const scene::Direction& d, half cT, half cFS) : spot{d, cT, cFS} {}
 		CUDA_FUNCTION SourceParam(const scene::Direction& n, float a) : area{n, a} {}
-		CUDA_FUNCTION SourceParam(const scene::Direction& d, AngularPdf p) : dir{d, p} {}
+		CUDA_FUNCTION SourceParam(float pA) : dir{pA} {}
 		struct {
 			scene::Direction direction;
 			half cosThetaMax;
@@ -38,8 +41,7 @@ struct Emitter {
 			float area;		// TODO: remove? (ATM not used by the vertex)
 		} area;
 		struct {
-			scene::Direction direction;
-			AngularPdf dirPdf;
+			float projSceneArea;
 		} dir;
 	} source_param;
 };
@@ -72,20 +74,12 @@ struct LightPdfs {
 constexpr float DISTANCESQ_EPSILON = 1e-10f;
 
 
-// Transform a direction from tangent into world space (convention Z-up vs. Y-up)
-CUDA_FUNCTION __forceinline__ ei::Vec3 tangent2world(const ei::Vec3& dir,
-													 const ei::Vec3& tangentX,
-													 const ei::Vec3& tangentY,
-													 const ei::Vec3& normal) {
-	return dir.x * tangentY + dir.z * normal + dir.y * tangentY;
-}
-
 // Sample a light source
 // *** POINT LIGHT ***
 CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const PointLight& light,
 													   const math::RndSet2& rnd) {
-	return Emitter{ { light.position, AreaPdf::infinite() },
-				    light.intensity, LightType::POINT_LIGHT, light.mediumIndex };
+	return Emitter{ light.position, float(AreaPdf::infinite()),
+				    light.intensity, 0.0f, LightType::POINT_LIGHT, light.mediumIndex };
 }
 CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_point(const Spectrum& intensity,
 															   const math::RndSet2& rnd) {
@@ -97,8 +91,8 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_point(const Spectrum& i
 CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const SpotLight& light,
 													   const math::RndSet2& rnd
 ) {
-	return Emitter{ { light.position, AreaPdf::infinite() },
-					light.intensity, LightType::SPOT_LIGHT, light.mediumIndex,
+	return Emitter{ light.position, float(AreaPdf::infinite()),
+					light.intensity, 0.0f, LightType::SPOT_LIGHT, light.mediumIndex,
 					{ light.direction, light.cosThetaMax, light.cosFalloffStart } };
 }
 CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_spot(const Spectrum& intensity,
@@ -137,8 +131,8 @@ CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const SceneDescriptor<CUR
 	materials::fetch(mat, uv, &matParams);
 	const Spectrum radiance = materials::emission(matParams, Direction{0.0f, 0.0f, 1.0f}, Direction{0.0f, 0.0f, 1.0f}).value;
 	return Emitter{
-		{ position, AreaPdf{1.0f / area} },
-		radiance * area,
+		position, 1.0f / area,
+		radiance * area, 0.0f,
 		LightType::AREA_LIGHT_TRIANGLE, matParams.outerMedium,
 		{normal, area}
 	};
@@ -169,8 +163,8 @@ CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const SceneDescriptor<CUR
 	materials::fetch(mat, uv, &matParams);
 	const Spectrum radiance = materials::emission(matParams, Direction{0.0f, 0.0f, 1.0f}, Direction{0.0f, 0.0f, 1.0f}).value;
 
-	return Emitter{ { position, AreaPdf{ 1.0f / area } },
-		radiance * area,
+	return Emitter{ position, 1.0f / area,
+		radiance * area, 0.0f,
 		LightType::AREA_LIGHT_QUAD, matParams.outerMedium,
 		{normal, area} };
 }
@@ -192,9 +186,9 @@ CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const SceneDescriptor<CUR
 	const Spectrum radiance = materials::emission(matParams, Direction{0.0f, 0.0f, 1.0f}, Direction{0.0f, 0.0f, 1.0f}).value;
 	const float area = 4 * ei::PI * light.radius * light.radius;
 	return Emitter{
-		math::PositionSample{ light.position + normal.direction * light.radius,
-							  normal.pdf.to_area_pdf(1.f, light.radius*light.radius) },
-		radiance * area,
+		light.position + normal.direction * light.radius,
+		float(normal.pdf.to_area_pdf(1.0f, light.radius*light.radius)),
+		radiance * area, 0.0f,
 		LightType::AREA_LIGHT_SPHERE, matParams.outerMedium,
 		{normal.direction, area}
 	};
@@ -216,14 +210,11 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_area(const Spectrum& in
 
 // *** DIRECTIONAL LIGHT ***
 CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const DirectionalLight& light,
-													   const ei::Box& bounds,
-													   const math::RndSet2& rnd) {
-	// TODO: invalid unit? irradiance != intensity != flux, photons should have flux...
-	auto pos = math::sample_position(light.direction, bounds, rnd.u0, rnd.u1);
-	Spectrum flux = light.irradiance / float(pos.pdf);
+													   const ei::Box& sceneBounds) {
 	return Emitter{
-		pos, flux, LightType::DIRECTIONAL_LIGHT, materials::MediumHandle{},
-		{light.direction, AngularPdf::infinite()}
+		light.direction, float(AngularPdf::infinite()),
+		light.irradiance, 0.0f, LightType::DIRECTIONAL_LIGHT, materials::MediumHandle{},
+		{math::projected_area(light.direction, sceneBounds)}
 	};
 }
 
@@ -282,19 +273,16 @@ sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 }
 
 CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const BackgroundDesc<CURRENT_DEV>& light,
-													   const ei::Box& bounds,
-													   const math::RndSet2_1& rnd) {
+													   const ei::Box& sceneBounds,
+													   const math::RndSet2& rnd) {
 	auto sample = sample_light_dir(light, rnd.u0, rnd.u1);
 
-	// Sample a start position on the bounding box
-	math::RndSet2 rnd2{ rnd.i0 };
-	auto pos = math::sample_position(-sample.dir.direction, bounds, rnd2.u0, rnd2.u1);;
-
 	// Convert radiance to flux (applies division from Monte-Carlo)
-	Spectrum flux = sample.radiance / float(pos.pdf) / float(sample.dir.pdf);
+	Spectrum irradiance = sample.radiance / float(sample.dir.pdf);
 
-	return Emitter { pos, flux, LightType::ENVMAP_LIGHT, materials::MediumHandle{},
-					 Emitter::SourceParam{-sample.dir.direction, sample.dir.pdf} };
+	return Emitter { -sample.dir.direction, float(sample.dir.pdf), irradiance, 0.0f,
+					 LightType::ENVMAP_LIGHT, materials::MediumHandle{},
+					 { math::projected_area(sample.dir.direction, sceneBounds) } };
 }
 
 
@@ -344,7 +332,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescr
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	Emitter photon = sample_light_pos(scene, light, rnd);
-	ei::Vec3 direction = photon.pos.position - pos;
+	ei::Vec3 direction = photon.initVec - pos;
 	const float distSq = ei::lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
@@ -356,7 +344,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescr
 	materials::MediumHandle medium = scene.get_material(light.material).outerMedium;
 	diffIrradiance *= scene.media[medium].get_transmission( dist );
 	return NextEventEstimation{
-		photon.pos.position, photon.pos.pdf, {direction, value.pdf.forw},
+		photon.initVec, AreaPdf{photon.pdf}, {direction, value.pdf.forw},
 		value.cosOut, diffIrradiance, dist,
 		photon.source_param.area.normal, distSq
 	};
@@ -366,7 +354,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescr
 																const ei::Vec3& pos,
 																const math::RndSet2& rnd) {
 	Emitter photon = sample_light_pos(scene, light, rnd);
-	ei::Vec3 direction = photon.pos.position - pos;
+	ei::Vec3 direction = photon.initVec - pos;
 	const float distSq = ei::lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
 	direction /= dist;
@@ -378,7 +366,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescr
 	materials::MediumHandle medium = scene.get_material(light.material).outerMedium;
 	diffIrradiance *= scene.media[medium].get_transmission( dist );
 	return NextEventEstimation{
-		photon.pos.position, photon.pos.pdf, {direction, value.pdf.forw},
+		photon.initVec, AreaPdf{photon.pdf}, {direction, value.pdf.forw},
 		value.cosOut, diffIrradiance, dist,
 		photon.source_param.area.normal, distSq
 	};

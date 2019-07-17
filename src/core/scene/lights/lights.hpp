@@ -273,12 +273,8 @@ evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
-evaluate_dir(const Spectrum& flux, bool isEnvMap, AngularPdf pdf) {
-	// Special case: the incindent area PDF is directly projected.
-	// To avoid the wrong contribution values later we need to do its reversal here.
-	// 'pdf' contains 1 / projectedSceneArea
-	Spectrum intensity = flux * float(pdf);
-	return { intensity, 1.0f, pdf, AngularPdf{0.0f} };
+evaluate_dir(const Spectrum& irradiance, bool isEnvMap, float projSceneArea) {
+	return { irradiance, 1.0f, AngularPdf{ 1.0f / projSceneArea }, AngularPdf{0.0f} };
 }
 
 }}} // namespace mufflon::scene::lights

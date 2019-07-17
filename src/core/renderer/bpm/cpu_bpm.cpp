@@ -27,19 +27,28 @@ struct BpmVertexExt {
 
 
 	CUDA_FUNCTION void init(const BpmPathVertex& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosine,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		if(thisVertex.previous() && thisVertex.previous()->is_hitable()) {
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	}
+
+	CUDA_FUNCTION void update(const BpmPathVertex& prevVertex,
+							  const BpmPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		if(prevVertex.is_hitable()) {
 			// Compute as much as possible from the conversion factor.
 			// At this point we do not know n and A for the photons. This quantities
 			// are added in the kernel after the walk.
-			this->prevConversionFactor = float(
-				thisVertex.previous()->convert_pdf(thisVertex.get_type(), AngularPdf{1.0f},
-				{ incident, incidentDistance * incidentDistance }).pdf );
-			if(thisVertex.previous()->is_end_point())
-				this->prevConversionFactor /= float(thisVertex.previous()->ext().incidentPdf);
+			float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
+			this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
+			if(prevVertex.is_end_point())
+				this->prevConversionFactor /= float(prevVertex.ext().incidentPdf);
 		}
 	}
 
@@ -177,7 +186,7 @@ void CpuBidirPhotonMapper::post_reset() {
 }
 
 void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
-	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	math::RndSet2 rndStart { m_rngs[idx].next() };
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	BpmPathVertex vertex[2];
 	BpmPathVertex::create_light(&vertex[0], nullptr, p);
@@ -244,7 +253,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 		++viewPathLen;
 		currentV = otherV;
 
-		// Evaluate direct hit of area ligths and background
+		// Evaluate direct hit of area lights and background
 		if(viewPathLen >= m_params.minPathLength) {
 			EmissionValue emission = vertex[currentV].get_emission(m_sceneDesc, vertex[1-currentV].get_position());
 			if(emission.value != 0.0f && viewPathLen > 1) {

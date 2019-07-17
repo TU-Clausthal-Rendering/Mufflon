@@ -102,7 +102,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 	PtPathVertex vertex;
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, scene.camera.get(), coord, rng.next());
-	VertexSample sample = vertex.sample(scene.media, math::RndSet2_1{ rng.next(), rng.next() }, false);
+	VertexSample sample = vertex.sample(scene.aabb, scene.media, math::RndSet2_1{ rng.next(), rng.next() }, false);
 	ei::Ray ray{ sample.origin, sample.excident };
 	float totalDistance = 0.f;
 
