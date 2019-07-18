@@ -621,7 +621,7 @@ bool JsonLoader::load_lights() {
 										  static_cast<u32>(directions.size())); hdl.type == LIGHT_DIRECTIONAL) {
 				for(u32 i = 0u; i < static_cast<uint32_t>(directions.size()); ++i) {
 					world_set_dir_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
-					world_set_dir_light_irradiance(hdl, util::pun<Vec3>(radiances[i]), i);
+					world_set_dir_light_irradiance(hdl, util::pun<Vec3>(radiances[i] * scales[i]), i);
 				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add directional light");
