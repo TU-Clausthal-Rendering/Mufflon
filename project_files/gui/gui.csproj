@@ -107,6 +107,7 @@
     <Compile Include="Command\PerformIterationsCommand.cs" />
     <Compile Include="Command\PerformNIterationsCommand.cs" />
     <Compile Include="Command\ResetCameraCommand.cs" />
+    <Compile Include="Command\SaveDenoisedScreenshotCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
     <Compile Include="Command\ScreenShotCommand.cs" />
     <Compile Include="Command\SelectRendererCommand.cs" />
