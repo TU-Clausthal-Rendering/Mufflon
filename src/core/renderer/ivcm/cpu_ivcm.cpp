@@ -135,6 +135,7 @@ void copy_path_values(AreaPdf* incidentF, AreaPdf* incidentB,
 		incidentB[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
 		pdfBack = vert->ext().pdfBack;
 		connectionDir = vert->get_incident_connection();
+		prevType = vert->get_type();
 		vert = vert->previous();
 	}
 }
