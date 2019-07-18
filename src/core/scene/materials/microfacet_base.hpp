@@ -114,9 +114,9 @@ namespace detail {
 	// Johannes' personal hack for appearance of multibounce model (compensates energy loss)
 	CUDA_FUNCTION __forceinline__ float modify_G_multi_bounce(float g)
 	{
-		/*return g < 0.11f ? powf(g+0.74299714456847f, 8.0f) - 0.092874643071059f
+		return g < 0.11f ? powf(g+0.74299714456847f, 8.0f) - 0.092874643071059f
 								: ((1.139400367544197f * g - 3.317658394008854f) * g + 3.317115685385115f) * g - 0.13885765892046f;//*/
-		return g;
+		//return g;
 	}
 }
 

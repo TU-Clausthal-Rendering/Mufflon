@@ -389,7 +389,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			//m_outputBuffer.contribute(coord, throughput, Spectrum{currentVertex->ext().density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());
 			break;
-		}
+		}//*/
 		// Evaluate direct hit of area ligths and the background
 		if(viewPathLen >= m_params.minPathLength) {
 			EmissionValue emission = currentVertex->get_emission(m_sceneDesc, currentVertex->previous()->get_position());
@@ -398,7 +398,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				incidentB[viewPathLen] = emission.emitPdf;
 				copy_path_values(incidentF, incidentB, currentVertex->previous(), currentVertex->get_type(),
 					emission.pdf, currentVertex->get_incident_connection(), viewPathLen - 1, -1);
-				compute_counts(reuseCount, mergeArea, numPhotons, false, currentVertex, viewPathLen, nullptr, 0);
+				compute_counts(reuseCount, mergeArea, numPhotons, false, currentVertex, viewPathLen-1, nullptr, 0);
 				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, reuseCount);
 				emission.value *= misWeight;
 			}
@@ -450,7 +450,6 @@ void CpuIvcm::compute_counts(float* reuseCount, float mergeArea, int numPhotons,
 				path0 = path0->previous();
 				path1 = path1->previous();
 			}
-			int i = merge ? pl0-1 : pl0;
 			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
 				float expected = mergeArea * path0->ext().density;
 				reuseCount[i] = numPhotons / ei::max(1.0f, expected);

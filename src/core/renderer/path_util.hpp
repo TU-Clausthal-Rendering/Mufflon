@@ -144,11 +144,9 @@ public:
 
 	// The incident direction, or undefined for end vertices (may be abused by end vertices.
 	CUDA_FUNCTION scene::Direction get_incident_direction() const {
-		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		return m_incident;
 	}
 	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident, const PathVertex* previous) {
-		mAssertMsg(m_type != Interaction::LIGHT_POINT, "Incident direction for point lights is not defined. Hope your code did not expect a meaningful value.");
 		m_incident = incident;
 	}
 
