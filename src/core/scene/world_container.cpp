@@ -702,6 +702,8 @@ void WorldContainer::reload_scene(renderer::IRenderer* renderer) {
 		m_scenario->get_camera()->mark_clean();
 		renderer->on_camera_changed();
 	}
+	
+	this->load_scene_lights();
 }
 
 bool WorldContainer::load_scene_lights() {
