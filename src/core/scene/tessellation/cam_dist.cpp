@@ -174,8 +174,11 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 	float maxShininess{ 0.f };
 	if(f0.is_valid()) {
 		const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, f0));
-		maxShininess = ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
-							   materials::pdf_max(get_mat_params(mat, uv1)));
+		if(mat.get_properties().is_emissive())
+			maxShininess = 1.f;
+		else
+			maxShininess = ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+								   materials::pdf_max(get_mat_params(mat, uv1)));
 	}
 	if(f1.is_valid()) {
 		const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, f1));
@@ -258,9 +261,11 @@ u32 CameraDistanceOracle::get_triangle_inner_tessellation_level(const OpenMesh::
 	// Account for material shininess
 	// TODO: use minimum roughness over edge instead of point samples!
 	const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, face));
-	const float maxShininess = ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
-											   materials::pdf_max(get_mat_params(mat, uv1))),
-									   materials::pdf_max(get_mat_params(mat, uv2)));
+	const float maxShininess = mat.get_properties().is_emissive()
+								? 1.f
+								: ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+												  materials::pdf_max(get_mat_params(mat, uv1))),
+										  materials::pdf_max(get_mat_params(mat, uv2)));
 
 	const float spannedPixels = std::sqrt(maxFactor / (m_projPixelHeight * m_projPixelHeight));
 	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement),
@@ -343,10 +348,12 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 	// Account for material shininess
 	// TODO: use minimum roughness over edge instead of point samples!
 	const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, face));
-	const float maxShininess = ei::max(ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
-													   materials::pdf_max(get_mat_params(mat, uv1))),
-											   materials::pdf_max(get_mat_params(mat, uv2))),
-									   materials::pdf_max(get_mat_params(mat, uv3)));
+	const float maxShininess = mat.get_properties().is_emissive()
+								? 1.0
+								: ei::max(ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
+														  materials::pdf_max(get_mat_params(mat, uv1))),
+												  materials::pdf_max(get_mat_params(mat, uv2))),
+										  materials::pdf_max(get_mat_params(mat, uv3)));
 
 	const float displacementFactor = get_displacement_factor(std::max(surfaceDisplacement, phongDisplacement),
 															 maxShininess, maxEdgeLen);
