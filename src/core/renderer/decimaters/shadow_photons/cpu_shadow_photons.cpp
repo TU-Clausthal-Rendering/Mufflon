@@ -54,8 +54,9 @@ void ShadowPhotonVisualizer::post_reset() {
 		m_densityPhotonsOctree.reserve(lightCount);
 		for(std::size_t i = 0u; i < lightCount; ++i) {
 			if(m_params.mode == PSpvMode::Values::OCTREE) {
-				m_densityShadowPhotonsOctree.emplace_back(m_sceneDesc.aabb, 1024 * 1024 * 32, m_params.splitFactor);
-				m_densityPhotonsOctree.emplace_back(m_sceneDesc.aabb, 1024 * 1024 * 32, m_params.splitFactor);
+				m_densityShadowPhotonsOctree.emplace_back(m_sceneDesc.aabb, 1024 * 1024 * 32, m_params.splitFactor,
+														  1.f);
+				m_densityPhotonsOctree.emplace_back(m_sceneDesc.aabb, 1024 * 1024 * 32, m_params.splitFactor, 1.f);
 				m_densityShadowPhotonsOctree.back().clear();
 				m_densityPhotonsOctree.back().clear();
 			} else if(m_params.mode == PSpvMode::Values::HASHGRID) {
@@ -72,7 +73,8 @@ void ShadowPhotonVisualizer::post_reset() {
 	if(resetFlags.is_set(ResetEvent::SCENARIO)) {
 		m_photonMapManager.resize(m_params.maxPathLength * m_outputBuffer.get_num_pixels());
 		m_photonMap = m_photonMapManager.acquire<Device::CPU>();
-		m_importance = std::make_unique<data_structs::DmOctree<float>>(m_sceneDesc.aabb, 1024 * 1024 * 128, m_params.splitFactor);
+		m_importance = std::make_unique<data_structs::DmOctree<float>>(m_sceneDesc.aabb, 1024 * 1024 * 128, m_params.splitFactor,
+																	   1.f);
 
 		// Pre-split the octree (TODO: multithreaded)
 		m_importance->set_iteration(1);
@@ -82,7 +84,11 @@ void ShadowPhotonVisualizer::post_reset() {
 			const auto& polygon = lod.polygon;
 			for(u32 v = 0u; v < polygon.numVertices; ++v) {
 				const ei::Vec3 vertex = ei::transform(polygon.vertices[v], m_sceneDesc.instanceToWorld[i]);
-				m_importance->increase_count(vertex, 1.f);
+				// Transform the normal to world space (per-vertex normals are in object space)
+				// TODO: shouldn't we rather use the geometric normal?
+				const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ m_sceneDesc.worldToInstance[i] });
+				const ei::Vec3 vertexNormal = ei::normalize(rotationInvScale * polygon.normals[v]);
+				m_importance->increase_count(vertex, vertexNormal, 1.f);
 			}
 		}
 		m_importance->clear_counters();
@@ -151,7 +157,7 @@ void ShadowPhotonVisualizer::iterate() {
 			const int pathLen = viewPathLength + photonIt->pathLen;
 			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 			   && lensq(photonIt->position - vertex.get_position()) < mergeRadiusSq) {
-				m_importance->increase_count(photonIt->closestVertexPos, 1.f);
+				m_importance->increase_count(photonIt->closestVertexPos, photonIt->geoNormal, 1.f);
 				m_outputBuffer.contribute(coord, RenderTargets::NORMAL, photonIt->flux);
 				// Attribute importance for this and all previous photons
 				/*const auto* currPhotonData = &(*photonIt);
@@ -521,7 +527,8 @@ void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, c
 		if(m_params.mode == PSpvMode::Values::HASHGRID)
 			m_densityPhotonsHashgrid[lightIndex].increase_count(vertex[currentV].get_position());
 		else if(m_params.mode == PSpvMode::Values::OCTREE)
-			m_densityPhotonsOctree[lightIndex].increase_count(vertex[currentV].get_position());
+			m_densityPhotonsOctree[lightIndex].increase_count(vertex[currentV].get_position(),
+															  vertex[currentV].get_geometric_normal());
 
 		// Trace shadow photon
 		if(pathLen <= 1) {
@@ -530,7 +537,8 @@ void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, c
 				if(m_params.mode == PSpvMode::Values::HASHGRID)
 					m_densityShadowPhotonsHashgrid[lightIndex].increase_count(shadowPos.value());
 				else if(m_params.mode == PSpvMode::Values::OCTREE)
-					m_densityShadowPhotonsOctree[lightIndex].increase_count(shadowPos.value());
+					m_densityShadowPhotonsOctree[lightIndex].increase_count(shadowPos.value(),
+																			vertex[currentV].get_geometric_normal());
 			}
 		}
 	} while(pathLen < m_params.maxPathLength - 1); // -1 because there is at least one segment on the view path

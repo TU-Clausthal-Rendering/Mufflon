@@ -18,7 +18,7 @@ public:
 	// the expected number data is lost.
 	DmHashGrid(const u32 numExpectedEntries);
 	DmHashGrid(const DmHashGrid&) = delete;
-	DmHashGrid(DmHashGrid&&) = default;
+	DmHashGrid(DmHashGrid&& grid);
 	DmHashGrid& operator=(const DmHashGrid&) = delete;
 	DmHashGrid& operator=(DmHashGrid&&) = delete;
 	~DmHashGrid() = default;
@@ -35,7 +35,8 @@ public:
 
 	void clear() {
 		for(u32 i = 0; i < m_mapSize; ++i)
-			m_data[i].count.store(0, std::memory_order_relaxed);
+			m_data[i].count.store(0u, std::memory_order_relaxed);
+		m_dataCount.store(0);
 	}
 
 	// Cell size is the major influence parameter for the performance.
@@ -59,6 +60,10 @@ public:
 	template < bool UseSmoothStep = false >
 	float get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal, ei::Vec3* gradient = nullptr) const;
 
+	int capacity() const { return m_mapSize; }
+	int size() const { return m_dataCount.load(); }
+	// Get the size of the associated memory excluding this instance.
+	std::size_t mem_size() const { return sizeof(Entry) * m_mapSize; }
 private:
 	struct Entry {
 		ei::UVec3 cell;
@@ -72,7 +77,9 @@ private:
 	// in the map. Set to 1/iterationCount to get correct densities.
 	float m_densityScale;
 	const u32 m_mapSize;
+	const u32 m_maxProbes;
 	std::unique_ptr<Entry[]> m_data;
+	std::atomic_uint32_t m_dataCount;
 };
 
 }} // namespace mufflon::data_structs

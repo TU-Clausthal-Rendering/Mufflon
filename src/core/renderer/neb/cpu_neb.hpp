@@ -6,7 +6,7 @@
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
 #include "core/data_structs/photon_map.hpp"
-#include "density_octree.hpp"
+#include "core/data_structs/dm_octree.hpp"
 #include "core/data_structs/kdtree.hpp"
 #include <vector>
 
@@ -108,8 +108,7 @@ private:
 #ifdef NEB_KDTREE
 	data_structs::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
 #else
-	DensityOctree m_density;
-	//SplitDensityOctree m_density;
+	std::unique_ptr<data_structs::DmOctree<>> m_density;
 #endif
 };
 

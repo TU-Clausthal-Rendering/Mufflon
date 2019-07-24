@@ -107,6 +107,11 @@ typedef enum {
 } TextureSampling;
 
 typedef enum {
+	SHADOWING_VCAVITY,
+	SHADOWING_SMITH
+} ShadowingModel;
+
+typedef enum {
 	NDF_BECKMANN,
 	NDF_GGX,
 	NDF_COSINE
@@ -211,11 +216,13 @@ typedef struct {
 } LambertParams;
 typedef struct {
 	TextureHdl roughness;
+	ShadowingModel shadowingModel;
 	NormalDistFunction ndf;
 	TextureHdl albedo;
 } TorranceParams;
 typedef struct {
 	TextureHdl roughness;
+	ShadowingModel shadowingModel;
 	NormalDistFunction ndf;
 	Vec3 absorption;
 	float refractionIndex;
@@ -553,6 +560,7 @@ CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();
 // TODO: what do we pass to the GUI?
 CORE_API Boolean CDECL render_save_screenshot(const char* filename, uint32_t targetIndex, Boolean variance);
+CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename);
 CORE_API uint32_t render_get_render_target_count();
 CORE_API const char* render_get_render_target_name(uint32_t index);
 CORE_API Boolean CDECL render_enable_render_target(uint32_t index, Boolean variance);

@@ -17,7 +17,8 @@ public:
 	using CountType = T;
 
 	// splitFactor: Number of photons in one cell (per iteration) before it is splitted.
-	DmOctree(const ei::Box& sceneBounds, const int capacity, const float splitFactor);
+	DmOctree(const ei::Box& sceneBounds, const int capacity,
+			 const float splitFactor, const float progression);
 	DmOctree(const DmOctree&) = delete;
 	DmOctree(DmOctree&&);
 	DmOctree& operator=(const DmOctree&) = delete;
@@ -34,7 +35,7 @@ public:
 	// Clear entire structure
 	void clear();
 
-	void increase_count(const ei::Vec3& pos, const T value = T{ 1 });
+	void increase_count(const ei::Vec3& pos, const ei::Vec3& normal, const T value = T{ 1 });
 
 	template < class V = float >
 	V get_density(const ei::Vec3& pos, const ei::Vec3& normal) const;
@@ -63,13 +64,19 @@ public:
 	// Get the size of the associated memory excluding this instance.
 	std::size_t mem_size() const { return sizeof(std::atomic_int32_t) * m_capacity; }
 private:
+	static constexpr ei::IVec3 CELL_ITER[8] = {
+		{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+		{0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}
+	};
+
 	float m_densityScale;		// 1/#iterations to normalize the counters into a density
 	const float m_splitFactor;	// Number of photons per iteration before a cell is split
-	int m_splitCountDensity;	// Total number of photons before split
+	T m_splitCountDensity;	// Total number of photons before split
 	const ei::Vec3 m_sceneSize;
 	const ei::Vec3 m_sceneSizeInv;
 	const ei::Vec3 m_minBound;
 	const int m_capacity;
+	const float m_progression;
 	// Nodes consist of 8 atomic counters OR child indices. Each number is either a
 	// counter (positive) or a negated child index.
 	std::unique_ptr<std::atomic<CountType>[]> m_nodes;
@@ -86,7 +93,14 @@ private:
 	}
 
 	// Returns the new child pointer or 0
-	T increment_if_child_and_split_if_necessary(const int idx, const T value, const int currentDepth);
+	T increment_if_child_and_split_if_necessary(const int idx, const T value, const int currentDepth,
+												const ei::IVec3& gridPos, const ei::Vec3& offPos,
+												const ei::Vec3& normal);
+
+	void init_children(const int children, const T count);
+	void init_children(const int children, const T count, const int currentDepth,
+					   const ei::IVec3& gridPos, const ei::Vec3& offPos,
+					   const ei::Vec3& normal);
 
 	// Non-atomic unconditional split. Returns the new address
 	T split(const int idx);

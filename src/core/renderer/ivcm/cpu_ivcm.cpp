@@ -23,6 +23,7 @@ struct IvcmVertexExt {
 	AngularPdf pdfBack;
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
+	float density;
 
 
 	CUDA_FUNCTION void init(const IvcmPathVertex& thisVertex,
@@ -52,22 +53,22 @@ struct IvcmVertexExt {
 // n: path length in segments
 // idx: index of merge vertex
 float get_mis_weight_photon(const AreaPdf* incidentF, const AreaPdf* incidentB, int n, int idx,
-	float mergeArea, int numPhotons) {
+	float mergeArea, const float* reuseCount) {
 	if(idx == 0 || idx == n) return 0.0f;
 	// Start with camera connection
-	float relPdfSumV = 1.0f / (float(incidentF[1]) * mergeArea * numPhotons);
+	float relPdfSumV = 1.0f / (float(incidentF[1]) * mergeArea * reuseCount[1]);
 	// Collect merges and connections along view path
 	for(int i = 1; i < idx; ++i) {
-		float prevMerge = incidentB[i] / incidentF[i+1];
-		float prevConnect = 1.0f / (float(incidentF[i+1]) * mergeArea * numPhotons);
+		float prevMerge = (incidentB[i] / incidentF[i+1]) * (reuseCount[i] / reuseCount[i+1]);
+		float prevConnect = 1.0f / (float(incidentF[i+1]) * mergeArea * reuseCount[i+1]);
 		relPdfSumV = prevConnect + prevMerge * (1.0f + relPdfSumV);
 	}
 	// Collect merges/connect/hit along light path
-	float relPdfSumL = 1.0f / (numPhotons * mergeArea * float(incidentB[n-1]));	// Connection
+	float relPdfSumL = 1.0f / (reuseCount[n-1] * mergeArea * float(incidentB[n-1]));	// Connection
 	relPdfSumL += incidentF[n] / incidentB[n] * relPdfSumL;						// Random hit
 	for(int i = n-2; i >= idx; --i) {
-		float prevMerge = incidentF[i+1] / incidentB[i];
-		float prevConnect = 1.0f / (float(incidentB[i]) * mergeArea * numPhotons);
+		float prevMerge = (incidentF[i+1] / incidentB[i]) * (reuseCount[i+1] / reuseCount[i]);
+		float prevConnect = 1.0f / (float(incidentB[i]) * mergeArea * reuseCount[i]);
 		relPdfSumL = prevConnect + prevMerge * (1.0f + relPdfSumL);
 	}
 	return 1.0f / (1.0f + relPdfSumV + relPdfSumL);
@@ -77,31 +78,31 @@ float get_mis_weight_photon(const AreaPdf* incidentF, const AreaPdf* incidentB, 
 // n: path length in segments
 // idx: index of first connection vertex
 float get_mis_weight_connect(const AreaPdf* incidentF, const AreaPdf* incidentB, int n, int idx,
-	float mergeArea, int numPhotons) {
+	float mergeArea, const float* reuseCount) {
 	float relPdfSumV = 0.0f;
 	// Collect merges and connections along view path
 	for(int i = 1; i <= idx; ++i) {
 		float prevConnect = incidentB[i] / incidentF[i];
-		float curMerge = float(incidentB[i]) * mergeArea * numPhotons;
+		float curMerge = float(incidentB[i]) * mergeArea * reuseCount[i];
 		relPdfSumV = curMerge + prevConnect * (1.0f + relPdfSumV);
 	}
 	// Collect merges/connect/hit along light path
 	float relPdfSumL = incidentF[n] / incidentB[n];		// Random hit
 	for( int i = n-1; i > idx; --i) {
 		float prevConnect = incidentF[i] / incidentB[i];
-		float curMerge = float(incidentF[i]) * mergeArea * numPhotons;
+		float curMerge = float(incidentF[i]) * mergeArea * reuseCount[i];
 		relPdfSumL = curMerge + prevConnect * (1.0f + relPdfSumL);
 	}
 	return 1.0f / (1.0f + relPdfSumV + relPdfSumL);
 }
 
 float get_mis_weight_rhit(const AreaPdf* incidentF, const AreaPdf* incidentB, int n,
-	float mergeArea, int numPhotons) {
+	float mergeArea, const float* reuseCount) {
 	// Collect all connects/merges along the view path only
 	float relPdfSumV = 0.0f;
 	for(int i = 1; i < n; ++i) {
 		float prevConnect = incidentB[i] / incidentF[i];
-		float curMerge = float(incidentB[i]) * mergeArea * numPhotons;
+		float curMerge = float(incidentB[i]) * mergeArea * reuseCount[i];
 		relPdfSumV = curMerge + prevConnect * (1.0f + relPdfSumV);
 	}
 	float connectionRel = incidentB[n] / incidentF[n];
@@ -128,7 +129,7 @@ void copy_path_values(AreaPdf* incidentF, AreaPdf* incidentB,
 struct ConnectionValue { Spectrum bxdfs; float cosines; };
 ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
 						const scene::SceneDescriptor<Device::CPU>& scene,
-						Pixel& coord, float mergeArea, int numPhotons,
+						Pixel& coord, float mergeArea, const float* reuseCount,
 						AreaPdf* incidentF, AreaPdf* incidentB
 ) {
 	// Some vertices will always have a contribution of 0 if connected (e.g. directional light with camera).
@@ -161,7 +162,7 @@ ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1
 			incidentB[pl0+1] = path1.ext().incidentPdf;
 			copy_path_values(incidentB, incidentF, path1.previous(), path1.get_type(),
 				val1.pdf.back, path1.get_incident_connection(), pl0 + 2, pathLen + 1);
-			float misWeight = get_mis_weight_connect(incidentF, incidentB, pathLen, pl0, mergeArea, numPhotons);
+			float misWeight = get_mis_weight_connect(incidentF, incidentB, pathLen, pl0, mergeArea, reuseCount);
 			return {bxdfProd * (misWeight / connection.distanceSq), cosProd};
 		}
 	}
@@ -170,7 +171,7 @@ ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1
 
 Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 			   const scene::SceneDescriptor<Device::CPU>& scene,
-			   float mergeArea, int numPhotons,
+			   float mergeArea, const float* reuseCount,
 			   AreaPdf* incidentF, AreaPdf* incidentB) {
 	// Radiance estimate
 	Pixel tmpCoord;
@@ -187,7 +188,7 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 		bsdf.pdf.back, viewPath.get_incident_connection(), pl0 - 1, -1);
 	copy_path_values(incidentB, incidentF, photon.previous(), photon.get_type(),
 		bsdf.pdf.forw, photon.get_incident_connection(), pl0 + 1, pathLen + 1);
-	float misWeight = get_mis_weight_photon(incidentF, incidentB, pathLen, pl0, mergeArea, numPhotons);
+	float misWeight = get_mis_weight_photon(incidentF, incidentB, pathLen, pl0, mergeArea, reuseCount);
 	return bsdf.value * photon.ext().throughput * misWeight;
 }
 
@@ -196,35 +197,6 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 
 CpuIvcm::CpuIvcm() {}
 CpuIvcm::~CpuIvcm() {}
-
-void CpuIvcm::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
-
-	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
-	if(m_params.progressive)
-		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
-	m_photonMap.clear(currentMergeRadius * 2.0001f);
-	m_density->set_iteration(m_currentIteration + 1);
-
-	// First pass: Create one photon path per view path
-	u64 photonSeed = m_rngs[0].next();
-	int numPhotons = m_outputBuffer.get_num_pixels();
-#pragma PARALLEL_FOR
-	for(int i = 0; i < numPhotons; ++i) {
-		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
-	}
-	//m_density->balance();
-
-	// Second pass: trace view paths and merge
-#pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
-		AreaPdf* incidentF = m_tmpPathProbabilities.data() + get_current_thread_idx() * 2 * (m_params.maxPathLength + 1);
-		AreaPdf* incidentB = incidentF + (m_params.maxPathLength + 1);
-		IvcmPathVertex* vertexBuffer = m_tmpViewPathVertices.data() + get_current_thread_idx() * (m_params.maxPathLength + 1);
-		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
-					 pixel, numPhotons, currentMergeRadius, incidentF, incidentB, vertexBuffer);
-	}
-}
 
 void CpuIvcm::post_reset() {
 	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
@@ -238,15 +210,92 @@ void CpuIvcm::post_reset() {
 	if(resetFlags.is_set(ResetEvent::PARAMETER)) {
 		m_tmpPathProbabilities.resize(get_thread_num() * 2 * (m_params.maxPathLength + 1));
 		m_tmpViewPathVertices.resize(get_thread_num() * (m_params.maxPathLength + 1));
+		m_tmpReuseCounts.resize(get_thread_num() * (m_params.maxPathLength + 1));
 	}
 	// TODO: reasonable density structure capacities
-//	if(resetFlags.geometry_changed())
-//		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb, 1024 * 1024 * 32, 8.0f);
-	if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
-		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024 * 32);
-	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);
+	if(resetFlags.geometry_changed())
+		m_density = std::make_unique<data_structs::DmOctree<>>(m_sceneDesc.aabb,
+			1024 * 1024 * 4, 8.0f, true);//*/
+	/*if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
+		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024);
+	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);//*/
 	m_density->clear();
+
+	m_density2 = std::make_unique<data_structs::KdTree<char,3>>();
+	m_density2->reserve(1024 * 1024);
 }
+
+
+float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float currentMergeRadius) const {
+	//return m_density->get_density(pos, normal);
+	return m_density->get_density_interpolated(pos, normal);
+	/*currentMergeRadius *= currentMergeRadius;
+	auto it = m_photonMap.find_first(pos);
+	int count = 0;
+	while(it) {
+		if(lensq(it->get_position() - pos) < currentMergeRadius)
+			++count;
+		++it;
+	}
+	return count / (ei::PI*currentMergeRadius);//*/
+	/*int idx[5];
+	float rSq[5];
+	m_density2->query_euclidean(pos, 5, idx, rSq, currentMergeRadius * 10.0f);
+	int count = 0;
+	float kernelSum = 0.0f;
+	while(idx[count] != -1 && count < 4) {
+		kernelSum += 3.0f * ei::sq(1.0f - rSq[count] / rSq[4]);
+		++count;
+	}
+	return kernelSum / (ei::PI*rSq[4]);
+	if(idx[count] != -1) ++count;
+	return ei::max(0,count-1) / (ei::PI*rSq[4]);//*/
+}
+
+void CpuIvcm::iterate() {
+	auto scope = Profiler::instance().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
+
+	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
+	if(m_params.progressive)
+		currentMergeRadius *= powf(float(m_currentIteration + 1), -1.0f / 6.0f);
+	m_photonMap.clear(currentMergeRadius * 2.0001f);
+	m_density->set_iteration(m_currentIteration + 1);
+	//m_density2->clear();
+
+	// First pass: Create one photon path per view path
+	u64 photonSeed = m_rngs[0].next();
+	int numPhotons = m_outputBuffer.get_num_pixels();
+#pragma PARALLEL_FOR
+	for(int i = 0; i < numPhotons; ++i) {
+		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
+	}
+	//m_density->balance();
+
+	if(needs_density()) {
+		const int n = m_photonMap.size();
+		//m_density2->build();
+#pragma PARALLEL_FOR
+		for(int i = 0; i < n; ++i) {
+			IvcmPathVertex& photon = m_photonMap.get_data_by_index(i);
+			photon.ext().density = get_density(photon.get_position(), photon.get_geometric_normal(), currentMergeRadius);
+		}
+	}
+
+	// Second pass: trace view paths and merge
+#pragma PARALLEL_FOR
+	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+		AreaPdf* incidentF = m_tmpPathProbabilities.data() + get_current_thread_idx() * 2 * (m_params.maxPathLength + 1);
+		AreaPdf* incidentB = incidentF + (m_params.maxPathLength + 1);
+		IvcmPathVertex* vertexBuffer = m_tmpViewPathVertices.data() + get_current_thread_idx() * (m_params.maxPathLength + 1);
+		float* reuseCount = m_tmpReuseCounts.data() + get_current_thread_idx() * (m_params.maxPathLength + 1);
+		this->sample(Pixel{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() },
+					 pixel, numPhotons, currentMergeRadius, incidentF, incidentB, vertexBuffer, reuseCount);
+	}
+
+	logInfo("[CpuIvcm::iterate] Density structure memory: ", m_density->mem_size() / (1024 * 1024), "MB, ",
+		ei::round((1000.0f * m_density->size()) / m_density->capacity()) / 10.0f, "%");
+}
+
 
 void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
 	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
@@ -270,14 +319,17 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 
 		// Store a photon to the photon map
 		previous = m_photonMap.insert(vertex.get_position(), vertex);
-		m_density->increase_count(vertex.get_position());
+		m_density->increase_count(vertex.get_position(), vertex.get_geometric_normal());
+		//m_density->increase_count(vertex.get_position());
+		//m_density2->insert(vertex.get_position(), 0);
 	}
 
 	m_pathEndPoints[idx] = previous;
 }
 
 void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius,
-					 AreaPdf* incidentF, AreaPdf* incidentB, IvcmPathVertex* vertexBuffer) {
+					 AreaPdf* incidentF, AreaPdf* incidentB, IvcmPathVertex* vertexBuffer,
+					 float* reuseCount) {
 	float mergeRadiusSq = currentMergeRadius * currentMergeRadius;
 	float mergeArea = ei::PI * mergeRadiusSq;
 	u64 lightPathIdx = cn::WangHash{}(idx) % numPhotons;
@@ -291,10 +343,12 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		// Make a connection to any event on the light path
 		const IvcmPathVertex* lightVertex = m_pathEndPoints[lightPathIdx];
 		if(!m_params.showDensity) while(lightVertex) {
-			int pathLen = lightVertex->get_path_len() + 1 + viewPathLen;
+			int lightPathLen = lightVertex->get_path_len();
+			int pathLen = lightPathLen + 1 + viewPathLen;
 			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength) {
 				Pixel outCoord = coord;
-				auto conVal = connect(*currentVertex, *lightVertex, m_sceneDesc, outCoord, mergeArea, numPhotons, incidentF, incidentB);
+				compute_counts(reuseCount, mergeArea, numPhotons, false, currentVertex, viewPathLen, lightVertex, lightPathLen);
+				auto conVal = connect(*currentVertex, *lightVertex, m_sceneDesc, outCoord, mergeArea, reuseCount, incidentF, incidentB);
 				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(currentVertex->ext().throughput.x));
 				m_outputBuffer.contribute(outCoord, throughput, math::Throughput{lightVertex->ext().throughput, 1.0f}, conVal.cosines, conVal.bxdfs);
 			}
@@ -312,12 +366,13 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		++viewPathLen;
 		++currentVertex;
 
+		if(needs_density())
+			currentVertex->ext().density = get_density(currentVertex->get_position(), currentVertex->get_geometric_normal(), currentMergeRadius);
+
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			//float density = m_density->get_density(currentVertex->get_position(), currentVertex->get_normal());
-			float density = m_density->get_density_interpolated(currentVertex->get_position(), currentVertex->get_normal());
-			m_outputBuffer.set(coord, 0, Spectrum{density * (m_currentIteration + 1)});
-			//m_outputBuffer.contribute(coord, throughput, Spectrum{density}, currentVertex->get_position(),
+			m_outputBuffer.set(coord, 0, Spectrum{currentVertex->ext().density * (m_currentIteration + 1)});
+			//m_outputBuffer.contribute(coord, throughput, Spectrum{currentVertex->ext().density}, currentVertex->get_position(),
 			//							currentVertex->get_normal(), currentVertex->get_albedo());
 			break;
 		}
@@ -329,7 +384,8 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				incidentB[viewPathLen] = emission.emitPdf;
 				copy_path_values(incidentF, incidentB, currentVertex->previous(), currentVertex->get_type(),
 					emission.pdf, currentVertex->get_incident_connection(), viewPathLen - 1, -1);
-				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, numPhotons);
+				compute_counts(reuseCount, mergeArea, numPhotons, false, currentVertex, viewPathLen, nullptr, 0);
+				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, reuseCount);
 				emission.value *= misWeight;
 			}
 			mAssert(!isnan(emission.value.x));
@@ -346,10 +402,13 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			auto& photon = *photonIt;
 			// Only merge photons which are within the sphere around our position.
 			// and which have the correct full path length.
-			int pathLen = viewPathLen + photon.get_path_len();
-			if(photon.get_path_len() > 0 && pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
+			int lightPathLen = photon.get_path_len();
+			int pathLen = viewPathLen + lightPathLen;
+			if(lightPathLen > 0 && pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 				&& lensq(photon.get_position() - currentPos) < mergeRadiusSq) {
-				radiance += merge(*currentVertex, photon, m_sceneDesc, mergeArea, numPhotons,
+				compute_counts(reuseCount, mergeArea, numPhotons, true, currentVertex, viewPathLen, &photon, lightPathLen);
+				//reuseCount[viewPathLen] = numPhotons / ei::max(1.0f, 0.5f * (currentVertex->ext().density + photon.ext().density) * mergeArea);
+				radiance += merge(*currentVertex, photon, m_sceneDesc, mergeArea, reuseCount,
 								  incidentF, incidentB);
 			}
 			++photonIt;
@@ -358,6 +417,66 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
 			scene::Direction{0.0f}, Spectrum{0.0f});//*/
 	} while(viewPathLen < m_params.maxPathLength);
+}
+
+void CpuIvcm::compute_counts(float* reuseCount, float mergeArea, int numPhotons, bool merge,
+							 const IvcmPathVertex* path0, int pl0,
+							 const IvcmPathVertex* path1, int pl1) {
+	int pl = pl0 + pl1 + (merge ? 0 : 1);
+	reuseCount[0] = reuseCount[pl] = 0.0f;
+	switch(m_params.heuristic) {
+		case PHeuristic::Values::VCM: {
+			for(int i = 1; i < pl; ++i)
+				reuseCount[i] = static_cast<float>(numPhotons);
+		} break;
+		case PHeuristic::Values::VCMPlus: {
+			if(merge) {
+				float expected = mergeArea * 0.5f * (path0->ext().density + path1->ext().density);
+				reuseCount[pl0] = numPhotons / ei::max(1.0f, expected);
+				path0 = path0->previous();
+				path1 = path1->previous();
+			}
+			int i = merge ? pl0-1 : pl0;
+			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
+				float expected = mergeArea * path0->ext().density;
+				reuseCount[i] = numPhotons / ei::max(1.0f, expected);
+				path0 = path0->previous();
+			}
+			for(int i = pl0+1; i < pl; ++i) {
+				float expected = mergeArea * path1->ext().density;
+				reuseCount[i] = numPhotons / ei::max(1.0f, expected);
+				path1 = path1->previous();
+			}
+		} break;
+		case PHeuristic::Values::VCMStar: {
+			float divisorSum = 0.0f;
+			if(merge) {
+				float expected = mergeArea * 0.5f * (path0->ext().density + path1->ext().density);
+				float divisor = 1.0f / ei::max(1.0f, expected);
+				reuseCount[pl0] = numPhotons * divisor;
+				divisorSum += divisor;
+				path0 = path0->previous();
+				path1 = path1->previous();
+			}
+			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
+				float expected = mergeArea * path0->ext().density;
+				float divisor = 1.0f / ei::max(1.0f, expected);
+				reuseCount[i] = numPhotons * divisor;
+				divisorSum += divisor;
+				path0 = path0->previous();
+			}
+			for(int i = pl0+1; i < pl; ++i) {
+				float expected = mergeArea * path1->ext().density;
+				float divisor = 1.0f / ei::max(1.0f, expected);
+				reuseCount[i] = numPhotons * divisor;
+				divisorSum += divisor;
+				path1 = path1->previous();
+			}
+			float norm = (pl - 1) / divisorSum;
+			for(int i = 1; i < pl; ++i)
+				reuseCount[i] *= norm;
+		} break;
+	}
 }
 
 void CpuIvcm::init_rngs(int num) {

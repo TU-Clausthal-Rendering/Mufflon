@@ -47,13 +47,15 @@ inline float intersection_area(const ei::Vec3& bmin, const ei::Vec3& bmax, const
 // by bMin. I.e. the origin is the min-coordinate of the box.
 // The size of the box is not normalized.
 inline float intersection_area_nrm(const ei::Vec3& cellSize, const ei::Vec3& pos, const ei::Vec3& normal) {
-	ei::Vec3 absN = abs(normal);
+	bool isDimZero[3] = {normal.x < 1e-4f && normal.x > -1e-4f,
+						 normal.y < 1e-4f && normal.y > -1e-4f,
+						 normal.z < 1e-4f && normal.z > -1e-4f};
 	// 1D cases
-	if(ei::abs(absN.x - 1.0f) < 1e-3f) return (pos.x >= 0.0f && pos.x <= cellSize.x) ? cellSize.y * cellSize.z : 0.0f;
-	if(ei::abs(absN.y - 1.0f) < 1e-3f) return (pos.y >= 0.0f && pos.y <= cellSize.y) ? cellSize.x * cellSize.z : 0.0f;
-	if(ei::abs(absN.z - 1.0f) < 1e-3f) return (pos.z >= 0.0f && pos.z <= cellSize.z) ? cellSize.x * cellSize.y : 0.0f;
+	if(isDimZero[1] && isDimZero[2]) return (pos.x >= 0.0f && pos.x <= cellSize.x) ? cellSize.y * cellSize.z : 0.0f;
+	if(isDimZero[0] && isDimZero[2]) return (pos.y >= 0.0f && pos.y <= cellSize.y) ? cellSize.x * cellSize.z : 0.0f;
+	if(isDimZero[0] && isDimZero[1]) return (pos.z >= 0.0f && pos.z <= cellSize.z) ? cellSize.x * cellSize.y : 0.0f;
 	// 2D cases
-	for(int d = 0; d < 3; ++d) if(absN[d] < 1e-4f) {
+	for(int d = 0; d < 3; ++d) if(isDimZero[d]) {
 		int x = (d + 1) % 3;
 		int y = (d + 2) % 3;
 		// Use the formula from stackexchange: phi(t) = max(0,t)^2 / 2 m_1 m_2

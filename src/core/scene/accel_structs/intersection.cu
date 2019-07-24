@@ -591,8 +591,8 @@ RayIntersectionResult first_intersection(
 					duds.x, dudt.x,
 					duds.y, dudt.y,
 				};
-				float detDudst = dudst[0] * dudst[3] - dudst[1] * dudst[2];
-				if(detDudst >= 1e-5f || detDudst <= -1e5f)
+				const float detDudst = dudst[0] * dudst[3] - dudst[1] * dudst[2];
+				if(detDudst >= 1e-9f || detDudst <= -1e-9f)
 					tangentX = dxdst * ei::Vec2 { dudst[3] / detDudst, -dudst[2] / detDudst };
 				else tangentX = dxds;
 				//const ei::Mat2x2 dsduv = ei::invert(dudst);

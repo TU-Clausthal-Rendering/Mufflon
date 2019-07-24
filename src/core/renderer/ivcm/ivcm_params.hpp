@@ -11,13 +11,21 @@ struct PShowDensity {
 	}
 };
 
+struct PHeuristic {
+	PARAM_ENUM(heuristic = Values::VCM, VCM, VCMPlus, VCMStar);
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Heuristic", ParameterTypes::ENUM };
+	}
+};
+
 using IvcmParameters = ParameterHandler<
 	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PMergeRadius,
 	PProgressive,
-	PShowDensity
+	PShowDensity,
+	PHeuristic
 >;
 
 }} // namespace mufflon::renderer

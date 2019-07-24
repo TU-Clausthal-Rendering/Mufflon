@@ -6,7 +6,19 @@ DmHashGrid::DmHashGrid(const u32 numExpectedEntries) :
 	m_cellSize{ 1.f },
 	m_densityScale{ 1.f },
 	m_mapSize{ ei::nextPrime(u32(numExpectedEntries * 1.15f)) },
-	m_data{ std::make_unique<Entry[]>(m_mapSize) }
+	m_maxProbes{ m_mapSize / 2 },
+	m_data{ std::make_unique<Entry[]>(m_mapSize) },
+	m_dataCount{ 0u }
+{}
+
+
+DmHashGrid::DmHashGrid(DmHashGrid&& grid) :
+	m_cellSize(grid.m_cellSize),
+	m_densityScale(grid.m_densityScale),
+	m_mapSize(grid.m_mapSize),
+	m_maxProbes(grid.m_maxProbes),
+	m_data(std::move(grid.m_data)),
+	m_dataCount(grid.m_dataCount.load())
 {}
 
 void DmHashGrid::increase_count(const ei::Vec3& position) {
@@ -15,17 +27,18 @@ void DmHashGrid::increase_count(const ei::Vec3& position) {
 	u32 i = h % m_mapSize;
 	int s = 1;
 	// Quadratic probing until we find the correct or the empty cell
-	while(true) {
+	while(s <= static_cast<int>(m_maxProbes)) {
 		u32 expected = 0u;
 		// Check on empty and set a marker to allocate if empty
 		if(m_data[i].count.compare_exchange_strong(expected, ~0u)) {
 			// The cell was empty before -> initialize
 			m_data[i].cell = gridPos;
 			m_data[i].count.store(1u);	// Releases the lock at the same time as setting the correct count
+			m_dataCount.fetch_add(1u);
 			return;
 		} else if(expected != ~0u) { // Not a cell marked as 'in allocation'
 			if(m_data[i].cell == gridPos) {
-				m_data[i].count.fetch_add(1);
+				m_data[i].count.fetch_add(1u);
 				return;
 			}
 			// Next probe: non-empty cell with different coordinate found

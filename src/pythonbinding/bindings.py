@@ -40,14 +40,15 @@ class DllInterface:
         self.dllHolder.core.render_get_renderer_name.restype = c_char_p
         self.dllHolder.core.render_get_renderer_short_name.restype = c_char_p
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
+        self.dllHolder.core.renderer_get_parameter_enum_value_from_name.argtypes = [c_char_p, c_char_p, c_int32]
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
-        self.dllHolder.core.renderer_get_parameter_enum_value.argtypes = [c_char_p, c_char_p, c_int32]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
         self.dllHolder.core.world_set_frame_current.argtypes = [c_uint]
         self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
+        self.dllHolder.core.render_save_denoised_radiance.argtypes = [c_char_p]
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
@@ -79,7 +80,7 @@ class DllInterface:
 
     def renderer_get_parameter_enum_value(self, parameterName, valueName):
         value = 0
-        if not self.dllHolder.core.renderer_get_parameter_enum_value(c_char_p(parameterName.encode('utf-8')), c_char_p(valueName.encode('utf-8')), byref(value)):
+        if not self.dllHolder.core.renderer_get_parameter_enum_value_from_name(c_char_p(parameterName.encode('utf-8')), c_char_p(valueName.encode('utf-8')), byref(value)):
             raise Exception("Failed to retrieve enum parameter '" + parameterName + "' value '" + valueName + "'")
         return value
 
@@ -104,7 +105,10 @@ class DllInterface:
 
     def render_save_screenshot(self, fileName, targetIndex, variance):
         return self.dllHolder.core.render_save_screenshot(c_char_p(fileName.encode('utf-8')), c_uint32(targetIndex), c_uint32(variance))
-
+    
+    def render_save_denoised_radiance(self, fileName):
+        return self.dllHolder.core.render_save_denoised_radiance(c_char_p(fileName.encode('utf-8')))
+        
     def render_get_render_target_count(self):
         return self.dllHolder.core.render_get_render_target_count()
 
@@ -254,6 +258,22 @@ class RenderActions:
     def disable_render_target(self, targetIndex, variance):
       if not self.dllInterface.render_disable_render_target(targetIndex, variance):
             raise Exception("Failed to disable render target " + str(targetIndex) + " (variance: " + str(variance) + ")")
+            
+    def take_denoised_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
+        filename = self.screenshotPattern
+        filename = filename.replace("#scene", self.sceneName, 1)
+        filename = filename.replace("#scenario", self.dllInterface.render_get_active_scenario_name(), 1)
+        filename = filename.replace("#renderer", self.activeRendererName, 1)
+        filename = filename.replace("#iteration", str(iterationNr), 1)
+        filename = filename.replace("#iterateTime", str(iterateTime.microseconds / 1000) + "ms", 1)
+        filename = filename.replace("#preTime", str(iterateTime.microseconds / 1000) + "ms", 1)
+        filename = filename.replace("#postTime", str(iterateTime.microseconds / 1000) + "ms", 1)
+        filename = filename.replace("#iterateCycles", str(iterateTime.cycles / 1000000) + "MCycles", 1)
+        filename = filename.replace("#preCycles", str(preTime.cycles / 1000000) + "MCycles", 1)
+        filename = filename.replace("#postCycles", str(postTime.cycles / 1000000) + "MCycles", 1)
+        
+        fName = filename.replace("#target", "denoised", 1)
+        self.dllInterface.render_save_denoised_radiance(fName)
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
@@ -276,7 +296,7 @@ class RenderActions:
                 fName = filename.replace("#target", self.dllInterface.render_get_render_target_name(targetIndex) + "(Variance)", 1)
                 self.dllInterface.render_save_screenshot(fName, targetIndex, True)
 
-    def render_for_iterations(self, iterationCount, printProgress=False, progressSteps=1):
+    def render_for_iterations(self, iterationCount, printProgress=False, progressSteps=1, takeScreenshot=True, denoise=False):
         accumIterateTime = ProcessTime(0,0)
         accumPreTime = ProcessTime(0,0)
         accumPostTime = ProcessTime(0,0)
@@ -290,7 +310,11 @@ class RenderActions:
             accumPreTime.cycles += preTime.cycles
             accumPostTime.microseconds += postTime.microseconds
             accumPostTime.cycles += postTime.cycles
-        self.take_screenshot(self.dllInterface.render_get_current_iteration(), accumIterateTime, accumPreTime, accumPostTime)
+        if takeScreenshot:
+            if denoise:
+                self.take_denoised_screenshot(self.dllInterface.render_get_current_iteration(), accumIterateTime, accumPreTime, accumPostTime)
+            else:
+                self.take_screenshot(self.dllInterface.render_get_current_iteration(), accumIterateTime, accumPreTime, accumPostTime)
 
     def render_for_seconds(self, secondsToRender):
         startTime = process_time()

@@ -151,6 +151,7 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleOrenNayar& params, const
 }
 
 CUDA_FUNCTION float pdf_max(const MatSampleOrenNayar& params) {
+	// TODO: proper maximum
 	return 1.0f / ei::PI;
 }
 

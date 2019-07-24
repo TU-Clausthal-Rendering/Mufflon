@@ -444,6 +444,9 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_screenshot")]
         private static extern bool render_save_screenshot_(IntPtr filename, UInt32 targetIndex, UInt32 variance);
         internal static bool render_save_screenshot(string filename, UInt32 targetIndex, UInt32 variance) { return render_save_screenshot_(StringUtil.ToNativeUtf8(filename), targetIndex, variance); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_denoised_radiance")]
+        private static extern bool render_save_denoised_radiance_(IntPtr filename);
+        internal static bool render_save_denoised_radiance(string filename) { return render_save_denoised_radiance_(StringUtil.ToNativeUtf8(filename)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt32 render_get_render_target_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_render_target_name")]

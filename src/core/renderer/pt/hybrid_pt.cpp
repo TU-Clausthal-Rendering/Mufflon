@@ -5,6 +5,7 @@
 #include "profiler/cpu_profiler.hpp"
 #include "profiler/gpu_profiler.hpp"
 #include "util/parallel.hpp"
+#include <thread>
 
 namespace mufflon::renderer {
 
@@ -25,25 +26,29 @@ HybridPathTracer::HybridPathTracer() {
 
 
 void HybridPathTracer::iterate() {
-	m_currYSplit = static_cast<int>(std::clamp(m_params.split, 0.f, 1.f) * m_outputBufferCpu.get_height());
-
-	// TODO: load balancing
-	iterate_cuda();
+	// Measure the time each device takes for load balancing
+	std::promise<std::chrono::high_resolution_clock::duration> cudaPromise;
+	auto cudaFuture = cudaPromise.get_future();
+	const auto begin = std::chrono::high_resolution_clock::now();
+	std::thread cudaLaunch(&HybridPathTracer::iterate_cuda, this, begin, std::move(cudaPromise));
 	iterate_cpu();
+	const auto cpuDuration = std::chrono::high_resolution_clock::now() - begin;
+	cudaLaunch.join();
+	const auto cudaDuration = cudaFuture.get();
 
-	cudaDeviceSynchronize();
-	//cuda::check_error(cudaGetLastError());
+	const auto cpuTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(cpuDuration).count();
+	const auto cudaTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(cudaDuration).count();
+	// Compute the new screen split from the ratio of the times (including a dampening factor)
+	const auto fraction = static_cast<float>(cpuTimeMs) / static_cast<float>(cudaTimeMs);
+	// Dampening is based on the total time taken and uses a sigmoid (lower execution times are more
+	// volatile due to fluctuations in scheduler etc.)
+	const auto weight = 2 * (1.f / (1.f + std::exp(-2.f * (cpuTimeMs + cudaTimeMs) / 1000.f)) - 0.5f);
+	m_nextYSplit = std::min(m_outputBufferCpu.get_height() - 1,
+							std::max(0, m_currYSplit + static_cast<int>((1.f - fraction) * weight * m_outputBufferCpu.get_height())));
 }
 
 void HybridPathTracer::iterate_cpu() {
-	auto scope = Profiler::instance().start<CpuProfileState>("Hybrid PT CPU iteration", ProfileLevel::HIGH);
-
-	PtParameters ptParams;
-	ptParams.seed = m_params.seed;
-	ptParams.minPathLength = m_params.minPathLength;
-	ptParams.maxPathLength = m_params.maxPathLength;
-	ptParams.neeCount = m_params.neeCount;
-	ptParams.neeUsePositionGuide = m_params.neeUsePositionGuide;
+	//auto scope = Profiler::instance().start<CpuProfileState>("Hybrid PT CPU iteration", ProfileLevel::HIGH);
 
 	m_sceneDescCpu.lightTree.posGuide = m_params.neeUsePositionGuide;
 
@@ -54,24 +59,22 @@ void HybridPathTracer::iterate_cpu() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < PIXELS; ++pixel) {
 		Pixel coord{ pixel % m_outputBufferCpu.get_width(), pixel / m_outputBufferCpu.get_width() };
-		pt_sample(m_outputBufferCpu, m_sceneDescCpu, ptParams, coord, m_rngsCpu[pixel]);
+		pt_sample(m_outputBufferCpu, m_sceneDescCpu, m_params, coord, m_rngsCpu[pixel]);
 	}
 }
 
-void HybridPathTracer::iterate_cuda() {
-	auto scope = Profiler::instance().start<CpuProfileState>("Hybrid PT CUDA iteration", ProfileLevel::HIGH);
-	PtParameters ptParams;
-	ptParams.seed = m_params.seed;
-	ptParams.minPathLength = m_params.minPathLength;
-	ptParams.maxPathLength = m_params.maxPathLength;
-	ptParams.neeCount = m_params.neeCount;
-	ptParams.neeUsePositionGuide = m_params.neeUsePositionGuide;
+void HybridPathTracer::iterate_cuda(const std::chrono::high_resolution_clock::time_point& begin,
+									std::promise<std::chrono::high_resolution_clock::duration>&& duration) {
+	//auto scope = Profiler::instance().start<CpuProfileState>("Hybrid PT CUDA iteration", ProfileLevel::HIGH);
 
 	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 	copy(&m_sceneDescCuda->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
 	cuda::check_error(hybridpt_detail::call_kernel(std::move(m_outputBufferCuda),
 												   m_sceneDescCuda.get(), m_rngsCuda.get(),
-												   m_currYSplit, ptParams));
+												   m_currYSplit, m_params));
+	cudaDeviceSynchronize();
+	cuda::check_error(cudaGetLastError());
+	duration.set_value(std::chrono::high_resolution_clock::now() - begin);
 }
 
 void HybridPathTracer::post_reset() {
@@ -80,6 +83,10 @@ void HybridPathTracer::post_reset() {
 	int seed = m_params.seed * (m_outputBufferCuda.get_num_pixels() + 1);
 	hybridpt_detail::init_rngs(m_outputBufferCuda.get_num_pixels(), seed, m_rngsCuda.get());
 	this->init_rngs(m_outputBufferCpu.get_num_pixels());
+
+	// Set the initial load balancing guess to 50/50
+	if(get_reset_event().resolution_changed())
+		m_currYSplit = m_outputBufferCpu.get_height() / 2;
 }
 
 void HybridPathTracer::init_rngs(int num) {
@@ -110,6 +117,7 @@ bool HybridPathTracer::pre_iteration(OutputHandler& outputBuffer) {
 
 void HybridPathTracer::post_iteration(OutputHandler& outputBuffer) {
 	outputBuffer.sync_back<Device::CUDA, Device::CPU>(m_currYSplit);
+	m_currYSplit = m_nextYSplit;
 	outputBuffer.end_iteration<Device::CPU>();
 }
 

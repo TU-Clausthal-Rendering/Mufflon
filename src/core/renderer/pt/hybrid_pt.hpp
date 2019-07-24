@@ -5,6 +5,7 @@
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
+#include <future>
 #include <vector>
 
 namespace mufflon::cameras {
@@ -41,13 +42,15 @@ public:
 
 private:
 	void iterate_cpu();
-	void iterate_cuda();
+	void iterate_cuda(const std::chrono::high_resolution_clock::time_point& begin,
+					  std::promise<std::chrono::high_resolution_clock::duration>&& duration);
 
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
-	HybridPtParams m_params = {};
+	PtParameters m_params = {};
 	int m_currYSplit;
+	int m_nextYSplit;
 	std::vector<math::Rng> m_rngsCpu;
 	unique_device_ptr<Device::CUDA, math::Rng[]> m_rngsCuda;
 
