@@ -33,7 +33,6 @@ inline float get_luminance(const ei::Vec3& vec) {
 
 CpuShadowSilhouettesPT::CpuShadowSilhouettesPT()
 {
-	// TODO: init one RNG per thread?
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
@@ -50,6 +49,9 @@ void CpuShadowSilhouettesPT::pre_reset() {
 			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 		}
 	}
+
+	if(get_reset_event() & (ResetEvent::PARAMETER | ResetEvent::MANUAL))
+		m_currentDecimationIteration = 0u;
 
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
@@ -120,9 +122,9 @@ void CpuShadowSilhouettesPT::iterate() {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 			for(auto& decimater : m_decimaters)
 				decimater->copy_back_normalized_importance();
-			//compute_max_importance();
+			compute_max_importance();
 		}
-		//display_importance();
+		display_importance();
 	}
 }
 
