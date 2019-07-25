@@ -333,8 +333,13 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 					   std::vector<lights::DirectionalLight>&& dirLights) {
 	// Need the materials for area lights
-	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<Device::CPU>())
+	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<Device::CPU>()) {
 		load_materials<Device::CPU>();
+		// TODO: this is currently a workaround until we have have a resource class
+		// that semantically must carry the same information but deviated byte-wise
+		// (for e.g. texture handles)
+		m_materials.mark_changed(Device::CPU);
+	}
 	const int* materials = as<int>(m_materials.template acquire_const<Device::CPU>());
 
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
