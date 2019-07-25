@@ -50,7 +50,7 @@ void CpuShadowSilhouettesPT::pre_reset() {
 		}
 	}
 
-	if(get_reset_event() & (ResetEvent::PARAMETER | ResetEvent::MANUAL))
+	if(get_reset_event() & ResetEvent::PARAMETER)
 		m_currentDecimationIteration = 0u;
 
 	// Initialize the decimaters
@@ -120,11 +120,14 @@ void CpuShadowSilhouettesPT::iterate() {
 					"ms, ", cycles / 1'000'000, " MCycles)");
 	} else {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
-			for(auto& decimater : m_decimaters)
-				decimater->copy_back_normalized_importance();
-			compute_max_importance();
+			if(m_params.reduction == 0) {
+				for(auto& decimater : m_decimaters)
+					decimater->copy_back_normalized_importance();
+				compute_max_importance();
+			}
 		}
-		display_importance();
+		if(m_params.reduction == 0)
+			display_importance();
 	}
 }
 
@@ -134,13 +137,15 @@ void CpuShadowSilhouettesPT::gather_importance() {
 		m_importances[i] = m_decimaters[i]->start_iteration();
 
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+	for(int iter = 0; iter < m_params.importanceIterations; ++iter) {
 #pragma PARALLEL_FOR
-		for(int i = 0; i < m_params.importanceIterations * (int)NUM_PIXELS; ++i) {
-			const int pixel = i / m_params.importanceIterations;
+		for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 			silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
 										  m_importances.get(), m_importanceSums.get());
 		}
+		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
+	}
 	// TODO: allow for this with proper reset "events"
 }
 
@@ -189,7 +194,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CPU>>(lod, newLod, collapses,
+		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CPU>>(obj.first->get_name(), lod, newLod, collapses,
 																			 m_params.viewWeight, m_params.lightWeight,
 																			 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		m_importanceSums[i].shadowImportance.store(0.f);

@@ -36,10 +36,11 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 } // namespace
 
 template < Device dev >
-ImportanceDecimater<dev>::ImportanceDecimater(Lod& original, Lod& decimated,
+ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& original, Lod& decimated,
 											  const std::size_t initialCollapses,
 											  const float viewWeight, const float lightWeight,
 											  const float shadowWeight, const float shadowSilhouetteWeight) :
+	m_objectName(objectName),
 	m_original(original),
 	m_decimated(decimated),
 	m_originalPoly(m_original.template get_geometry<Polygons>()),
@@ -263,7 +264,7 @@ void ImportanceDecimater<dev>::iterate(const std::size_t minVertexCount, const f
 			this->recompute_geometric_vertex_normals();
 			m_decimated.clear_accel_structure();
 		}
-		logPedantic("Performed ", collapses, " collapses, remaining vertices: ", m_decimatedMesh->n_vertices());
+		logPedantic("Performed ", collapses, " collapses for object '", m_objectName, "', remaining vertices: ", m_decimatedMesh->n_vertices());
 	}
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "silhouette_pt_common.hpp"
+#include "util/string_view.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
@@ -14,10 +15,11 @@ public:
 	using VertexHandle = typename Mesh::VertexHandle;
 	static constexpr Device DEVICE = dev;
 
-	ImportanceDecimater(scene::Lod& original, scene::Lod& decimated,
-						   const std::size_t initialCollapses,
-						   const float viewWeight, const float lightWeight,
-						   const float shadowWeight, const float shadowSilhouetteWeight);
+	ImportanceDecimater(StringView objectName,
+						scene::Lod& original, scene::Lod& decimated,
+						const std::size_t initialCollapses,
+						const float viewWeight, const float lightWeight,
+						const float shadowWeight, const float shadowSilhouetteWeight);
 	ImportanceDecimater(const ImportanceDecimater&) = delete;
 	ImportanceDecimater(ImportanceDecimater&&);
 	ImportanceDecimater& operator=(const ImportanceDecimater&) = delete;
@@ -51,6 +53,7 @@ private:
 	// Recomputes normals for decimated mesh
 	void recompute_geometric_vertex_normals();
 
+	StringView m_objectName;
 	scene::Lod& m_original;
 	scene::Lod& m_decimated;
 	scene::geometry::Polygons& m_originalPoly;

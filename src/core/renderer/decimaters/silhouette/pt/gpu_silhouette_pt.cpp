@@ -207,7 +207,7 @@ void GpuShadowSilhouettesPT::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(lod, newLod, collapses,
+		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(obj.first->get_name(), lod, newLod, collapses,
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		// TODO: this reeeeally breaks instancing
