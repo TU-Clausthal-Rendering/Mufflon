@@ -196,7 +196,8 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 										  const LightSubTree& tree, u64 left, u64 right,
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const math::RndSet2& rnd,
-										  bool posGuide, u32* lightIndex = nullptr) {
+										  bool posGuide, u32* lightIndex = nullptr,
+										  LightType* lightType = nullptr) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -248,6 +249,8 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 		*lightIndex += (treeIndex - tree.internalNodeCount) - 1u;
 
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
+	if(lightType != nullptr)
+		*lightType = static_cast<LightType>(type);
 	// We got a light source! Sample it
 	return adjustPdf(connect_light(scene, static_cast<LightType>(type), tree.memory + offset,
 							 position, rnd), lightProb);
@@ -272,7 +275,8 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
  */
 CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
-										  const math::RndSet2& rnd, u32* lightIndex = nullptr) {
+										  const math::RndSet2& rnd, u32* lightIndex = nullptr,
+										  LightType* lightType = nullptr) {
 	using namespace lighttree_detail;
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// Scale the indices such that they sample the u64-intervall equally.
@@ -296,6 +300,8 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 	if(rndChoice < rightEnv) {
 		if(lightIndex != nullptr)
 			*lightIndex = 0u;
+		if(lightType != nullptr)
+			*lightType = LightType::ENVMAP_LIGHT;
 		return adjustPdf(connect_light(tree.background, position, scene.aabb, rnd), envProb);
 	}
 	// ...then the directional lights come...
@@ -317,7 +323,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 			*lightIndex = 1u + static_cast<u32>(tree.dirLights.lightCount); // Background and dir lights
 	}
 	return connect(scene, *subTree, left, right, rndChoice, p, position, rnd, tree.posGuide,
-				   lightIndex);
+				   lightIndex, lightType);
 }
 
 /*

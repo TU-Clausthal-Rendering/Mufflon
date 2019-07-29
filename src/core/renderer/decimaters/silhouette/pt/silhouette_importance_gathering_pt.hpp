@@ -227,7 +227,10 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 		if(pathLen > 0 && pathLen + 1 <= params.maxPathLength) {
 			u64 neeSeed = rng.next();
 			math::RndSet2 neeRnd = rng.next();
-			auto nee = scene::lights::connect(scene, 0, 1, neeSeed, vertices[pathLen].get_position(), neeRnd);
+			u32 lightIndex;
+			scene::lights::LightType lightType;
+			auto nee = scene::lights::connect(scene, 0, 1, neeSeed, vertices[pathLen].get_position(), neeRnd,
+											  &lightIndex, &lightType);
 			Pixel projCoord;
 			auto value = vertices[pathLen].evaluate(nee.dir.direction, scene.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
@@ -259,6 +262,22 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 					record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
 											 numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
 				} else {
+					// TODO: estimate light source size
+					float lightSolidAngleEstimate = 0.f;	// Valid for point and directional lights
+					switch(lightType) {
+						case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
+							break;
+						case scene::lights::LightType::AREA_LIGHT_QUAD:
+							break;
+						case scene::lights::LightType::AREA_LIGHT_SPHERE:
+							break;
+						case scene::lights::LightType::ENVMAP_LIGHT:
+							// TODO: pre-processed list of light areas
+							break;
+						default:
+							break;
+					}
+
 					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
 					trace_shadow(scene, sums, vertices[pathLen].ext().shadowRay, vertices[pathLen], weightedIrradianceLuminance);
 				}
