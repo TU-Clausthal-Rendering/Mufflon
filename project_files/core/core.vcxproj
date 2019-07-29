@@ -631,7 +631,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-extended-lambda -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
       <InterleaveSourceInPTX>true</InterleaveSourceInPTX>
@@ -673,7 +673,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-extended-lambda -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
     </CudaCompile>

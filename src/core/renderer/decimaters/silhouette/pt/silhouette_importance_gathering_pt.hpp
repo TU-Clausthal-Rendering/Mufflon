@@ -9,12 +9,75 @@
 #include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
+#include <utility>
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
 
 using namespace scene::lights;
 
 namespace {
+
+CUDA_FUNCTION std::array<ei::Vec3, 3u> get_world_triangle(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+														  const scene::PrimitiveHandle& hitId) {
+	const auto& polygon = scene.lods[scene.lodIndices[hitId.instanceId]].polygon;
+	return std::array<ei::Vec3, 3u>{{
+		ei::transform(polygon.vertices[3u * hitId.primId + 0], scene.worldToInstance[hitId.instanceId]),
+		ei::transform(polygon.vertices[3u * hitId.primId + 1], scene.worldToInstance[hitId.instanceId]),
+		ei::transform(polygon.vertices[3u * hitId.primId + 2], scene.worldToInstance[hitId.instanceId])
+	}};
+}
+
+CUDA_FUNCTION std::array<ei::Vec3, 4u> get_world_quad(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+													  const scene::PrimitiveHandle& hitId) {
+	const auto& polygon = scene.lods[scene.lodIndices[hitId.instanceId]].polygon;
+	const auto offset = 3u * polygon.numTriangles;
+	const auto quadId = hitId.primId - polygon.numTriangles;
+	return std::array<ei::Vec3, 4u>{{
+		ei::transform(polygon.vertices[offset + 4u * quadId + 0], scene.worldToInstance[hitId.instanceId]),
+		ei::transform(polygon.vertices[offset + 4u * quadId + 1], scene.worldToInstance[hitId.instanceId]),
+		ei::transform(polygon.vertices[offset + 4u * quadId + 2], scene.worldToInstance[hitId.instanceId]),
+		ei::transform(polygon.vertices[offset + 4u * quadId + 3], scene.worldToInstance[hitId.instanceId]),
+	}};
+}
+
+CUDA_FUNCTION std::array<ei::Vec3, 3u> get_world_light_triangle_sides(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+																	  const u32 offset) {
+	const auto* lightMemory = scene.lightTree.posLights.memory + offset;
+	const auto& light = *reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(lightMemory);
+	// Returns v1 - v0, v2 - v0, v1 - v2
+	return std::array<ei::Vec3, 3u>{{
+		light.posV[1], light.posV[2], light.posV[1] - light.posV[2]
+	}};
+}
+
+CUDA_FUNCTION std::array<ei::Vec3, 4u> get_world_light_quad_sides(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+																  const u32 offset) {
+	const auto* lightMemory = scene.lightTree.posLights.memory + offset;
+	const auto& light = *reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(lightMemory);
+	// Return v3-v0, v1-v0, v2-v1, v2-v3
+	return std::array<ei::Vec3, 4u>{{
+		light.posV[1], light.posV[2], light.posV[3] + light.posV[1], light.posV[3] + light.posV[2]
+	}};
+}
+
+template < class T, std::size_t N, class Functor >
+CUDA_FUNCTION std::array<T, N> apply(const std::array<T, N>& values, Functor&& functor) {
+	std::array<T, N> res;
+	for(std::size_t i = 0u; i < N; ++i)
+		res[i] = functor(values[i]);
+	return res;
+}
+
+template < class T, std::size_t N >
+CUDA_FUNCTION decltype(ei::len(std::declval<T>())) get_shortest_length(const std::array<T, N>& values) {
+	auto shortestLength = ei::len(values[0u]);
+	for(std::size_t i = 1u; i < N; ++i) {
+		const auto length = ei::len(values[i]);
+		if(length < shortestLength)
+			shortestLength = length;
+	}
+	return shortestLength;
+}
 
 CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
@@ -96,95 +159,62 @@ CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CU
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
 }
 
-CUDA_FUNCTION bool trace_shadow_silhouette(const scene::SceneDescriptor<CURRENT_DEV>& scene, Importances<CURRENT_DEV>** importances,
-										   DeviceImportanceSums<CURRENT_DEV>* sums, const ei::Ray& shadowRay,
-										   const SilPathVertex& vertex, const float importance) {
-	constexpr float DIST_EPSILON = 0.001f;
-
-	// TODO: worry about spheres?
-	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
-
-	const auto secondHit = scene::accel_struct::first_intersection(scene, backfaceRay, vertex.get_geometric_normal(),
-																   vertex.ext().lightDistance - vertex.ext().firstShadowDistance + DIST_EPSILON);
-	// We absolutely have to have a second hit - either us (since we weren't first hit) or something else
-	if(secondHit.hitId.instanceId >= 0 && secondHit.hitId != vertex.get_primitive_id()
-	   && secondHit.hitId.instanceId == vertex.ext().shadowHit.instanceId) {
-		// Check for silhouette - get the vertex indices of the primitives
-		const auto& obj = scene.lods[scene.lodIndices[vertex.ext().shadowHit.instanceId]];
-		const i32 firstNumVertices = vertex.ext().shadowHit.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
-		const i32 secondNumVertices = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
-		const i32 firstPrimIndex = vertex.ext().shadowHit.primId - (vertex.ext().shadowHit.primId < (i32)obj.polygon.numTriangles
-																	? 0 : (i32)obj.polygon.numTriangles);
-		const i32 secondPrimIndex = secondHit.hitId.primId - (secondHit.hitId.primId < (i32)obj.polygon.numTriangles
-															  ? 0 : (i32)obj.polygon.numTriangles);
-		const i32 firstVertOffset = vertex.ext().shadowHit.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
-		const i32 secondVertOffset = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
-
-		// Check if we have "shared" vertices: cannot do it by index, since they might be
-		// split vertices, but instead need to go by proximity
-		i32 sharedVertices = 0;
-		i32 edgeIdxFirst[2];
-		i32 edgeIdxSecond[2];
-		for(i32 i0 = 0; i0 < firstNumVertices; ++i0) {
-			for(i32 i1 = 0; i1 < secondNumVertices; ++i1) {
-				const i32 idx0 = obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + i0];
-				const i32 idx1 = obj.polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
-				const ei::Vec3& p0 = obj.polygon.vertices[idx0];
-				const ei::Vec3& p1 = obj.polygon.vertices[idx1];
-				if(idx0 == idx1 || p0 == p1) {
-					edgeIdxFirst[sharedVertices] = idx0;
-					edgeIdxSecond[sharedVertices] = idx1;
-					++sharedVertices;
-				}
-				if(sharedVertices >= 2)
-					break;
-			}
-		}
-
-		if(sharedVertices >= 1) {
-			// Got at least a silhouette point - now make sure we're seeing the silhouette
-			ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.distance), shadowRay.direction };
-
-			/*const auto thirdHit = scene::accel_struct::any_intersection(m_sceneDesc, silhouetteRay, secondHit.hitId,
-																		vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.distance + DIST_EPSILON);
-			if(!thirdHit) {*/
-			const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
-																		  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.distance + DIST_EPSILON);
-			if(thirdHit.hitId == vertex.get_primitive_id()) {
-				for(i32 i = 0; i < sharedVertices; ++i) {
-					const auto lodIdx = scene.lodIndices[vertex.ext().shadowHit.instanceId];
-					record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx], edgeIdxFirst[i], importance);
-					record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx], edgeIdxSecond[i], importance);
-				}
-				return true;
-			} else {
-				mAssert(thirdHit.hitId.instanceId >= 0);
-				// TODO: store a shadow photon?
-			}
-		}
-	}
-	return false;
-}
-
 CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
-								const ei::Ray& shadowRay, const SilPathVertex& vertex, const float importance) {
+								const ei::Ray& shadowRay, SilPathVertex& vertex, const float importance,
+								const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
+								const float firstShadowDistance) {
 	constexpr float DIST_EPSILON = 0.001f;
 
 	// TODO: worry about spheres?
-	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + DIST_EPSILON), shadowRay.direction };
+	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + DIST_EPSILON), shadowRay.direction };
 
 	const auto secondHit = scene::accel_struct::first_intersection(scene, backfaceRay, vertex.get_geometric_normal(),
-																   vertex.ext().lightDistance - vertex.ext().firstShadowDistance + DIST_EPSILON);
+																   lightDistance - firstShadowDistance + DIST_EPSILON);
 	if(secondHit.hitId.instanceId < 0 || secondHit.hitId == vertex.get_primitive_id())
 		return false;
 
-	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (vertex.ext().firstShadowDistance + secondHit.distance), shadowRay.direction };
+	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + secondHit.distance), shadowRay.direction };
 	const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
-																  vertex.ext().lightDistance - vertex.ext().firstShadowDistance - secondHit.distance + DIST_EPSILON);
+																  lightDistance - firstShadowDistance - secondHit.distance + DIST_EPSILON);
 	if(thirdHit.hitId == vertex.get_primitive_id()) {
-		const auto& hitId = vertex.ext().shadowHit;
-		const auto lodIdx = scene.lodIndices[hitId.instanceId];
+		const auto lodIdx = scene.lodIndices[shadowHitId.instanceId];
 		record_shadow(sums[lodIdx], importance);
+
+		// Also check for silhouette interaction here
+		if(secondHit.hitId.instanceId == vertex.get_primitive_id().instanceId) {
+			const auto& obj = scene.lods[scene.lodIndices[secondHit.hitId.instanceId]];
+			const i32 firstNumVertices = shadowHitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
+			const i32 secondNumVertices = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
+			const i32 firstPrimIndex = shadowHitId.primId - (shadowHitId.primId < (i32)obj.polygon.numTriangles
+																		? 0 : (i32)obj.polygon.numTriangles);
+			const i32 secondPrimIndex = secondHit.hitId.primId - (secondHit.hitId.primId < (i32)obj.polygon.numTriangles
+																  ? 0 : (i32)obj.polygon.numTriangles);
+			const i32 firstVertOffset = shadowHitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
+			const i32 secondVertOffset = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
+
+			// Check if we have "shared" vertices: cannot do it by index, since they might be
+			// split vertices, but instead need to go by proximity
+			i32 sharedVertices = 0;
+			for(i32 i0 = 0; i0 < firstNumVertices; ++i0) {
+				for(i32 i1 = 0; i1 < secondNumVertices; ++i1) {
+					const i32 idx0 = obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + i0];
+					const i32 idx1 = obj.polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
+					const ei::Vec3& p0 = obj.polygon.vertices[idx0];
+					const ei::Vec3& p1 = obj.polygon.vertices[idx1];
+					if(idx0 == idx1 || p0 == p1) {
+						vertex.ext().silhouetteVerticesFirst[sharedVertices] = idx0;
+						vertex.ext().silhouetteVerticesFirst[sharedVertices] = idx1;
+						// TODO: deal with boundaries/split vertices
+						++sharedVertices;
+					}
+					if(sharedVertices >= 2)
+						break;
+				}
+			}
+			if(sharedVertices >= 1)
+				vertex.ext().shadowInstanceId = secondHit.hitId.instanceId;
+		}
+
 		return true;
 	}
 	return false;
@@ -228,22 +258,21 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 			u64 neeSeed = rng.next();
 			math::RndSet2 neeRnd = rng.next();
 			u32 lightIndex;
+			u32 lightOffset;
 			scene::lights::LightType lightType;
 			auto nee = scene::lights::connect(scene, 0, 1, neeSeed, vertices[pathLen].get_position(), neeRnd,
-											  &lightIndex, &lightType);
+											  &lightIndex, &lightType, &lightOffset);
 			Pixel projCoord;
 			auto value = vertices[pathLen].evaluate(nee.dir.direction, scene.media, projCoord);
 			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 			Spectrum radiance = value.value * nee.diffIrradiance;
 			// TODO: use multiple NEEs
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				vertices[pathLen].ext().shadowRay = ei::Ray{ nee.position, -nee.dir.direction };
-				vertices[pathLen].ext().lightDistance = nee.dist;
+				ei::Ray shadowRay{ nee.position, -nee.dir.direction };
 
-				auto shadowHit = scene::accel_struct::first_intersection(scene, vertices[pathLen].ext().shadowRay,
+				auto shadowHit = scene::accel_struct::first_intersection(scene, shadowRay,
 																		 vertices[pathLen].get_geometric_normal(), nee.dist);
-				vertices[pathLen].ext().shadowHit = shadowHit.hitId;
-				vertices[pathLen].ext().firstShadowDistance = shadowHit.distance;
+				const float firstShadowDistance = shadowHit.distance;
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
@@ -262,24 +291,51 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 					record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
 											 numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
 				} else {
-					// TODO: estimate light source size
-					float lightSolidAngleEstimate = 0.f;	// Valid for point and directional lights
+					// The "importance" we add for general shadow casting (not part of a silhouette)
+					// scales inversely with the smallest light source size in the plane defined by
+					// the shadow ray. As an approximation of this we use the shortest projected
+					// border for triangles and quads.
+
+					float lengthEstimate = 0.f;	// Valid for point and directional lights
 					switch(lightType) {
-						case scene::lights::LightType::AREA_LIGHT_TRIANGLE:
-							break;
-						case scene::lights::LightType::AREA_LIGHT_QUAD:
-							break;
-						case scene::lights::LightType::AREA_LIGHT_SPHERE:
-							break;
+						case scene::lights::LightType::AREA_LIGHT_TRIANGLE: {
+							// Compute the projected sides and choose the shortest
+							const auto planeNormal = nee.dir.direction;
+							const auto sides = get_world_light_triangle_sides(scene, lightOffset);
+							const auto projected = apply(sides, [planeNormal] __host__ __device__ (const ei::Vec3& side) {
+								return side - ei::dot(side, planeNormal) * planeNormal;
+							});
+							lengthEstimate = get_shortest_length(projected);
+						}	break;
+						case scene::lights::LightType::AREA_LIGHT_QUAD: {
+							// Compute the projected sides and choose the shortest
+							const auto planeNormal = nee.dir.direction;
+							const auto sides = get_world_light_quad_sides(scene, lightOffset);
+							const auto projected = apply(sides, [planeNormal](const ei::Vec3& side) {
+								return side - ei::dot(side, planeNormal) * planeNormal;
+							});
+							lengthEstimate = get_shortest_length(projected);
+						}	break;
+						case scene::lights::LightType::AREA_LIGHT_SPHERE: {
+							const auto& light = *reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(scene.lightTree.posLights.memory + lightOffset);
+							lengthEstimate = light.radius;
+						}	break;
 						case scene::lights::LightType::ENVMAP_LIGHT:
-							// TODO: pre-processed list of light areas
+							// TODO: pre-processed list of light areas!
 							break;
 						default:
 							break;
 					}
 
+					// Compute the shadow size from intercept theorem
+					const float distShadowToOccluder = nee.dist - shadowHit.distance;
+					const float projectedLightSize = lengthEstimate * distShadowToOccluder / shadowHit.distance;
+					// Scale the irradiance with the predicted shadow size
+					const float shadowWeightedIrradiance = 1.f / (1.f + projectedLightSize) * weightedIrradianceLuminance;
+
 					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
-					trace_shadow(scene, sums, vertices[pathLen].ext().shadowRay, vertices[pathLen], weightedIrradianceLuminance);
+					trace_shadow(scene, sums, shadowRay, vertices[pathLen], shadowWeightedIrradiance,
+								 shadowHit.hitId, nee.dist, firstShadowDistance);
 				}
 			}
 		}
@@ -321,7 +377,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 	// Go back over the path and add up the irradiance from indirect illumination
 	ei::Vec3 accumRadiance{ 0.f };
 	for(int p = pathLen - 2; p >= 1; --p) {
-		accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().shadowHit.instanceId < 0 ?
+		accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().shadowInstanceId == 0 ?
 																		vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f });
 		const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
@@ -335,7 +391,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 		// TODO: store accumulated sharpness
 		// Check if it is sensible to keep shadow silhouettes intact
 		// TODO: replace threshold with something sensible
-		if(p == 1 && vertices[p].ext().shadowHit.instanceId >= 0) {
+		if(p == 1 && vertices[p].ext().shadowInstanceId >= 0) {
 			const float indirectLuminance = get_luminance(accumRadiance);
 			const float totalLuminance = get_luminance(vertices[p].ext().pathRadiance) + indirectLuminance;
 			const float ratio = totalLuminance / indirectLuminance - 1.f;
@@ -343,8 +399,16 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 				constexpr float FACTOR = 2'000.f;
 
 				// TODO: proper factor!
-				trace_shadow_silhouette(scene, importances, sums, vertices[p].ext().shadowRay, vertices[p],
-										params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance));
+				const auto lodIdx = scene.lodIndices[vertices[p].ext().shadowInstanceId];
+				for(i32 i = 0; i < 2; ++i) {
+					record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
+															vertices[p].ext().silhouetteVerticesFirst[i],
+															params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance));
+					if(vertices[p].ext().silhouetteVerticesFirst[i] != vertices[p].ext().silhouetteVerticesSecond[i])
+						record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
+															  vertices[p].ext().silhouetteVerticesSecond[i],
+															  params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance));
+				}
 			}
 		}
 	}

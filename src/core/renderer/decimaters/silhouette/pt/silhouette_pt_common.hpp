@@ -32,10 +32,9 @@ struct SilVertexExt {
 	ei::Vec3 accumThroughput;
 	float outCos;
 	ei::Vec3 pathRadiance;
-	ei::Ray shadowRay;
-	float lightDistance;
-	scene::PrimitiveHandle shadowHit;
-	float firstShadowDistance;
+	i32 shadowInstanceId = -1;
+	i32 silhouetteVerticesFirst[2u] = { -1, -1 };
+	i32 silhouetteVerticesSecond[2u] = { -1, -1 }; // Two arrays in case of split vertices
 
 
 	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,

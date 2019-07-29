@@ -197,7 +197,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const math::RndSet2& rnd,
 										  bool posGuide, u32* lightIndex = nullptr,
-										  LightType* lightType = nullptr) {
+										  LightType* lightType = nullptr, u32* lightOffset = nullptr) {
 	using namespace lighttree_detail;
 
 	// Traverse the tree to split chance between lights
@@ -251,6 +251,8 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 	mAssert(type != LightSubTree::Node::INTERNAL_NODE_TYPE);
 	if(lightType != nullptr)
 		*lightType = static_cast<LightType>(type);
+	if(lightOffset != nullptr)
+		*lightOffset = offset;
 	// We got a light source! Sample it
 	return adjustPdf(connect_light(scene, static_cast<LightType>(type), tree.memory + offset,
 							 position, rnd), lightProb);
@@ -276,7 +278,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
 										  const math::RndSet2& rnd, u32* lightIndex = nullptr,
-										  LightType* lightType = nullptr) {
+										  LightType* lightType = nullptr, u32* lightOffset = nullptr) {
 	using namespace lighttree_detail;
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// Scale the indices such that they sample the u64-intervall equally.
@@ -323,7 +325,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
 			*lightIndex = 1u + static_cast<u32>(tree.dirLights.lightCount); // Background and dir lights
 	}
 	return connect(scene, *subTree, left, right, rndChoice, p, position, rnd, tree.posGuide,
-				   lightIndex, lightType);
+				   lightIndex, lightType, lightOffset);
 }
 
 /*

@@ -1203,6 +1203,7 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\shadow_photons\shadow_photons_params.hpp">
       <Filter>Source Files\core\renderer\decimaters\shadow_photons</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\math\functions.hpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
