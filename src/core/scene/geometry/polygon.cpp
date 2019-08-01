@@ -1,4 +1,4 @@
-#include "polygon.hpp"
+﻿#include "polygon.hpp"
 #include "util/assert.hpp"
 #include "util/log.hpp"
 #include "util/parallel.hpp"
@@ -8,6 +8,7 @@
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/textures/interface.hpp"
+#include "core/math/curvature.hpp"
 #include <OpenMesh/Core/Mesh/Handles.hh>
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
@@ -481,6 +482,71 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
+
+void Polygons::compute_curvature() {
+	if(!m_meshData->has_vertex_normals())
+		throw std::runtime_error("Cannot compute curvature if the mesh has no vertex normals!");
+
+	// Add the attribute if not existent and get handle otherwise
+	VertexAttributeHandle curvHandle(0);
+	try {
+		curvHandle = m_vertexAttributes.get_attribute_handle("mean_curvature");
+	} catch(...) {
+		curvHandle = m_vertexAttributes.add_attribute<float>(std::string("mean_curvature"));
+	}
+
+	float* curv = m_vertexAttributes.acquire<Device::CPU, float>(curvHandle);
+
+	for(auto& v : m_meshData->vertices()) {
+		// Fetch data at reference vertex and create an orthogonal space
+		Point vPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(v));
+		Direction vNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(v));
+		float minusSinTheta = -sqrt((1.0f - vNrm.z) * (1.0f + vNrm.z)); // cos(π/2 + acos(z)) = -sinθ
+		float sinZratio = vNrm.z / (1e-20f - minusSinTheta);
+		Direction dirU { vNrm.x * sinZratio, vNrm.y * sinZratio, minusSinTheta };
+		mAssert(ei::approx(len(dirU), 1.0f, 1e-4f));
+		//Direction dirU = ei::perpendicular(vNrm);
+		Direction dirV = cross(vNrm, dirU);
+		// Construct an equation system which fits a paraboloid to the 1-ring.
+		// We need Aᵀ A x = Aᵀ b for the least squares system.
+		ei::Mat3x3 ATA { 0.0f };
+		ei::Vec3 ATb { 0.0f };
+		ei::Mat2x2 ATA2 { 0.0f };
+		ei::Vec2 ATb2 { 0.0f };
+		// For each edge add an equation
+		for(auto vi = m_meshData->vv_ccwiter(v); vi.is_valid(); ++vi) {
+			Point viPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vi));
+			ei::Vec3 edge = vPos - viPos;
+			const float xi = dot(dirU, edge);
+			const float yi = dot(dirV, edge);
+			const float zi = dot(vNrm, edge);
+			// 1/2 xi² e + xi yi f + 1/2 yi² g = zi
+			// with e,f,g  are the searched variables
+			float a = 0.5f * xi * xi, b = xi * yi, c = 0.5f * yi * yi;
+			ATb += zi * ei::Vec3{ a, b, c };
+			ATA += ei::Mat3x3{ a*a, a*b, a*c,
+							   a*b, b*b, b*c,
+							   a*c, b*c, c*c };
+			ATb2 += zi * ei::Vec2{ a, c };
+			ATA2 += ei::Mat2x2{ a*a, a*c, a*c, c*c };
+		}
+		// Solve with least squares
+		ei::Mat3x3 LU;
+		ei::UVec3 p;
+		ei::decomposeLUp(ATA, LU, p);
+		ei::Vec3 efg = ei::solveLUp(LU, p, ATb);
+		//float meanc = (efg.x + efg.z) * 0.5f;
+		float detA = determinant(ATA2);
+		float e = ATb2.x * ATA2.m11 - ATb2.y * ATA2.m10;
+		float g = ATA2.m00 * ATb2.y - ATA2.m01 * ATb2.x;
+		float meanc = (e + g) * 0.5f / (detA + 1e-30f);
+		curv[v.idx()] = meanc;
+		if(std::isnan(curv[v.idx()]))
+			__debugbreak();
+	}
+}
+
+
 template < Device dev >
 void Polygons::synchronize() {
 	m_vertexAttributes.synchronize<dev>();
@@ -533,6 +599,7 @@ PolygonsDescriptor<dev> Polygons::get_descriptor() {
 		this->acquire_const<dev, ei::Vec2>(this->get_uvs_hdl()),
 		this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
 		this->get_index_buffer<dev>(),
+		//	m_attribBuffer.template get<AttribBuffer<dev>>().vertex,
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
 	};
@@ -546,16 +613,20 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 	// Free the previous attribute array if no attributes are wanted
 	auto& buffer = m_attribBuffer.template get<AttribBuffer<dev>>();
 
-	if(vertexAttribs.size() == 0 && buffer.vertSize != 0) {
-		buffer.vertex = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize);
+	if(vertexAttribs.size() == 0) {
+		if(buffer.vertSize != 0)
+			buffer.vertex = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize);
+		// else keep current nullptr
 	} else {
 		if(buffer.vertSize == 0)
 			buffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(vertexAttribs.size());
 		else
 			buffer.vertex = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize, vertexAttribs.size());
 	}
-	if(faceAttribs.size() == 0 && buffer.faceSize != 0) {
-		buffer.face = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize);
+	if(faceAttribs.size() == 0) {
+		if(buffer.faceSize != 0)
+			buffer.face = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize);
+		// else keep current nullptr
 	} else {
 		if(buffer.faceSize == 0)
 			buffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(faceAttribs.size());
@@ -563,8 +634,10 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 			buffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize, faceAttribs.size());
 	}
 
-	std::vector<ArrayDevHandle_t<dev, void>> cpuVertexAttribs(vertexAttribs.size());
-	std::vector<ArrayDevHandle_t<dev, void>> cpuFaceAttribs(faceAttribs.size());
+	std::vector<ArrayDevHandle_t<dev, void>> cpuVertexAttribs;
+	std::vector<ArrayDevHandle_t<dev, void>> cpuFaceAttribs;
+	cpuVertexAttribs.reserve(vertexAttribs.size());
+	cpuFaceAttribs.reserve(faceAttribs.size());
 	for(const char* name : vertexAttribs)
 		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
 	for(const char* name : faceAttribs)

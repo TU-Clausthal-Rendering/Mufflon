@@ -13,7 +13,9 @@ class RendererBase : public IRenderer {
 public:
 	static constexpr Device DEVICE = dev;
 
-	RendererBase();
+	RendererBase(std::vector<const char*> vertexAttribs = {},
+				 std::vector<const char*> faceAttribs = {},
+				 std::vector<const char*> sphereAttribs = {});
 
 	bool uses_device(Device device) const noexcept override { return may_use_device(device); }
 	static constexpr bool may_use_device(Device device) noexcept { return DEVICE == device; }
@@ -24,6 +26,11 @@ public:
 protected:
 	RenderBuffer<DEVICE> m_outputBuffer;
 	OutputValue m_outputTargets;
+	// Hold tables with the vertex attributes to get the required data on
+	// scene-descriptor getters.
+	std::vector<const char*> m_vertexAttribs;
+	std::vector<const char*> m_faceAttribs;
+	std::vector<const char*> m_sphereAttribs;
 
 	// CPU gets the descriptor directly, everyone else gets a unique_ptr
 	std::conditional_t<DEVICE == Device::CPU || DEVICE == Device::OPENGL, scene::SceneDescriptor<DEVICE>,

@@ -269,11 +269,42 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 	return bsdf.value * photon.ext().throughput * misWeight;
 }
 
+CUDA_FUNCTION float fetch_curvature(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+		const scene::PrimitiveHandle& hitId, const ei::Vec2& surfParam) {
+	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
+	const u32* vertexIndices = object.polygon.vertexIndices;
+	const float* curvature = static_cast<const float*>(object.polygon.vertexAttributes[0]);
+	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
+		// Triangle
+		vertexIndices += 3u * hitId.primId;
+		return curvature[vertexIndices[0]] * surfParam.x
+			 + curvature[vertexIndices[1]] * surfParam.y
+			 + curvature[vertexIndices[2]] * (1.0f - surfParam.x - surfParam.y);
+	} else if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
+		// Quad
+		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
+		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
+		return ei::bilerp(curvature[vertexIndices[0]], curvature[vertexIndices[1]],
+						  curvature[vertexIndices[3]], curvature[vertexIndices[2]], surfParam.x, surfParam.y);
+	} else {
+		// Sphere
+		// Assume uniform scaling from instancing:
+		float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
+		return scale / object.spheres.spheres[hitId.primId].radius;
+	}
+}
+
 } // namespace ::
 
 
-CpuIvcm::CpuIvcm() {}
+CpuIvcm::CpuIvcm() :
+	RendererBase<Device::CPU>({"mean_curvature"}, {}, {})
+{}
 CpuIvcm::~CpuIvcm() {}
+
+void CpuIvcm::pre_reset() {
+	m_currentScene->compute_curvature();
+}
 
 void CpuIvcm::post_reset() {
 	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
@@ -444,8 +475,11 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		++currentVertex;
 
 		if(walkRes == WalkResult::HIT) {
-			float c = scene::accel_struct::compute_face_curvature(m_sceneDesc, currentVertex->get_primitive_id(), currentVertex->get_geometric_normal());
-			m_outputBuffer.contribute(coord, throughput, Spectrum{c}, scene::Point{0.0f},
+			float c = fetch_curvature(m_sceneDesc,
+				currentVertex->get_primitive_id(),
+				currentVertex->get_surface_params());
+			//float c = scene::accel_struct::compute_face_curvature(m_sceneDesc, currentVertex->get_primitive_id(), currentVertex->get_geometric_normal());
+			m_outputBuffer.contribute(coord, throughput, Spectrum{c}, scene::Point{ei::abs(c)},
 				scene::Direction{0.0f}, Spectrum{0.0f});
 		}
 		return;

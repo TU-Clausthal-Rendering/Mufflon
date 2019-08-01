@@ -79,7 +79,7 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 											 normals[vertexIndices[0]],
 											 normals[vertexIndices[1]],
 											 normals[vertexIndices[2]]);
-	} if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
+	} else if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
 		// Quad
 		return 100.0f;
 	} else {
