@@ -1,6 +1,7 @@
 #pragma once
 
 #include "intersection.hpp"
+//#include "core/math/curvature.hpp"
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
@@ -64,6 +65,29 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 	};
 }
 
+/*CUDA_FUNCTION float compute_face_curvature(const SceneDescriptor<CURRENT_DEV>& scene, const PrimitiveHandle& hitId) {
+	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
+	const u32* vertexIndices = object.polygon.vertexIndices;
+	const Direction* normals = object.polygon.normals;
+	const Point* positions = object.polygon.vertices;
+	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
+		// Triangle
+		vertexIndices += 3u * hitId.primId;
+		return math::compute_gauss_curvature(positions[vertexIndices[0]],
+											 positions[vertexIndices[1]],
+											 positions[vertexIndices[2]],
+											 normals[vertexIndices[0]],
+											 normals[vertexIndices[1]],
+											 normals[vertexIndices[2]]);
+	} if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
+		// Quad
+		return 100.0f;
+	} else {
+		// Sphere
+		float scale = det(scene.worldToInstance[hitId.instanceId]);
+		return 1.0f / object.spheres.spheres[hitId.primId].radius;
+	}
+}*/
 
 
 }}} // namespace mufflon::scene::accel_struct

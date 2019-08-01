@@ -349,7 +349,7 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 	// TODO: use minimum roughness over edge instead of point samples!
 	const materials::IMaterial& mat = *m_scenario->get_assigned_material(m_mesh->property(m_matHdl, face));
 	const float maxShininess = mat.get_properties().is_emissive()
-								? 1.0
+								? 1.0f
 								: ei::max(ei::max(ei::max(materials::pdf_max(get_mat_params(mat, uv0)),
 														  materials::pdf_max(get_mat_params(mat, uv1))),
 												  materials::pdf_max(get_mat_params(mat, uv2))),
