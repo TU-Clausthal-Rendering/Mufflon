@@ -151,6 +151,7 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
+
 	// Update our statistics: the importance density of each vertex
 	float importanceSum = 0.0;
 #pragma PARALLEL_REDUCTION(+, importanceSum)
@@ -205,6 +206,7 @@ ArrayDevHandle_t<dev, Importances<dev>> ImportanceDecimater<dev>::start_iteratio
 	// Resize importance map
 	m_importances = std::make_unique<Importances<dev>[]>(m_decimatedPoly->get_vertex_count());
 	m_devImportances = make_udevptr_array<dev, Importances<dev>, false>(m_decimatedPoly->get_vertex_count());
+	logWarning(m_decimatedPoly->get_vertex_count());
 	cuda::check_error(cudaMemset(m_devImportances.get(), 0, sizeof(Importances<dev>) * m_decimatedPoly->get_vertex_count()));
 	return m_devImportances.get();
 }

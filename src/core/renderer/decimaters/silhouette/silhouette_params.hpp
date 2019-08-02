@@ -1,8 +1,21 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include <tuple>
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette {
+
+struct PSelectiveImportance {
+	PARAM_ENUM(impSelection, ALL, VIEW, DIRECT, INDIRECT, SILHOUETTE) = Values::ALL;
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Selective importance", ParameterTypes::ENUM };
+	}
+
+	CUDA_FUNCTION bool show_view() const noexcept { return impSelection == Values::ALL || impSelection == Values::VIEW; }
+	CUDA_FUNCTION bool show_direct() const noexcept { return impSelection == Values::ALL || impSelection == Values::DIRECT; }
+	CUDA_FUNCTION bool show_indirect() const noexcept { return impSelection == Values::ALL || impSelection == Values::INDIRECT; }
+	CUDA_FUNCTION bool show_silhouette() const noexcept { return impSelection == Values::ALL || impSelection == Values::SILHOUETTE; }
+};
 
 struct PImportanceIterations {
 	int importanceIterations{ 100 };

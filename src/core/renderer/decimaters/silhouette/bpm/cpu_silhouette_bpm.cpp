@@ -127,6 +127,11 @@ void CpuShadowSilhouettesBPM::iterate() {
 }
 
 void CpuShadowSilhouettesBPM::gather_importance() {
+	if(m_params.maxPathLength >= 16u) {
+		logError("[CpuShadowSilhouettesBPM::gather_importance] Max. path length too long (max. 15 permitted)");
+		return;
+	}
+
 	// Re-upload the (possibly resized) importance buffers
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
 		m_importances[i] = m_decimaters[i]->start_iteration();

@@ -35,6 +35,7 @@ struct SilVertexExt {
 	i32 shadowInstanceId = -1;
 	i32 silhouetteVerticesFirst[2u] = { -1, -1 };
 	i32 silhouetteVerticesSecond[2u] = { -1, -1 }; // Two arrays in case of split vertices
+	float silhouetteRegionSize = 0.f;
 
 
 	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,

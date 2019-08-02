@@ -133,6 +133,11 @@ void GpuShadowSilhouettesPT::iterate() {
 }
 
 void GpuShadowSilhouettesPT::gather_importance() {
+	if(m_params.maxPathLength >= 16u) {
+		logError("[GpuShadowSilhouettesPT::gather_importance] Max. path length too long (max. 15 permitted)");
+		return;
+	}
+
 	// Re-upload the (possibly resized) importance buffers
 	std::unique_ptr<Importances<Device::CUDA>*[]> importancePtrs = std::make_unique<Importances<Device::CUDA>*[]>(m_decimaters.size());
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i)

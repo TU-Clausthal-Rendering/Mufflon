@@ -132,6 +132,11 @@ void CpuShadowSilhouettesPT::iterate() {
 }
 
 void CpuShadowSilhouettesPT::gather_importance() {
+	if(m_params.maxPathLength >= 16u) {
+		logError("[CpuShadowSilhouettesPT::gather_importance] Max. path length too long (max. 15 permitted)");
+		return;
+	}
+
 	// Re-upload the (possibly resized) importance buffers
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
 		m_importances[i] = m_decimaters[i]->start_iteration();
@@ -154,7 +159,8 @@ void CpuShadowSilhouettesPT::display_importance() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel], m_importances.get(), m_maxImportance);
+		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
+										  m_importances.get(), m_maxImportance == 0.f ? 1.f : m_maxImportance);
 	}
 }
 
