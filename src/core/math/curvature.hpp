@@ -174,10 +174,6 @@ Curvature compute_curvature(const scene::Direction& geoNormal,
 	const ei::Vec3 e02 = v2 - v0;
 	const ei::Vec3 e12 = v2 - v1;
 	// 1. Get an orthonormal tangent base
-	/*float minusSinTheta = -sqrt((1.0f - geoNormal.z) * (1.0f + geoNormal.z)); // cos(π/2 + acos(z)) = -sinθ
-	float sinZratio = ei::abs(geoNormal.z / minusSinTheta);
-	scene::Direction u { geoNormal.x * sinZratio, geoNormal.y * sinZratio, orthoZ };
-	mAssert(ei::approx(len(u), 1.0f));*/
 	scene::Direction u = normalize(e01);
 	scene::Direction v = cross(geoNormal, u);
 	// 2. Determine the 6 constraints from finite differences

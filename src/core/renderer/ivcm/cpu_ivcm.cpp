@@ -12,68 +12,6 @@
 
 #include <cn/rnd.hpp>
 
-
-#include "core/math/curvature.hpp"
-
-namespace mufflon { namespace scene { namespace accel_struct {
-	CUDA_FUNCTION float compute_face_curvature(
-		const SceneDescriptor<CURRENT_DEV>& scene,
-		const PrimitiveHandle& hitId,
-		const Direction& geoNormal) {
-	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
-	const u32* vertexIndices = object.polygon.vertexIndices;
-	const Direction* normals = object.polygon.normals;
-	const Point* positions = object.polygon.vertices;
-	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
-		// Triangle
-		vertexIndices += 3u * hitId.primId;
-		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
-		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
-		/*return math::compute_mean_curvature(transform * positions[vertexIndices[0]],
-											 transform * positions[vertexIndices[1]],
-											 transform * positions[vertexIndices[2]],
-											 normalize(rotationInvScale * normals[vertexIndices[0]]),
-											 normalize(rotationInvScale * normals[vertexIndices[1]]),
-											 normalize(rotationInvScale * normals[vertexIndices[2]]));*/
-		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
-											 transform * positions[vertexIndices[1]],
-											 transform * positions[vertexIndices[2]],
-											 normalize(rotationInvScale * normals[vertexIndices[0]]),
-											 normalize(rotationInvScale * normals[vertexIndices[1]]),
-											 normalize(rotationInvScale * normals[vertexIndices[2]]));
-		return c.get_mean_curvature();
-	} if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
-		// Quad
-		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
-		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
-		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
-		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
-		/*return math::compute_mean_curvature(transform * positions[vertexIndices[0]],
-											 transform * positions[vertexIndices[1]],
-											 transform * positions[vertexIndices[2]],
-											 transform * positions[vertexIndices[3]],
-											 normalize(rotationInvScale * normals[vertexIndices[0]]),
-											 normalize(rotationInvScale * normals[vertexIndices[1]]),
-											 normalize(rotationInvScale * normals[vertexIndices[2]]),
-											 normalize(rotationInvScale * normals[vertexIndices[3]]));*/
-		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
-											 transform * positions[vertexIndices[1]],
-											 transform * positions[vertexIndices[2]],
-											 transform * positions[vertexIndices[3]],
-											 normalize(rotationInvScale * normals[vertexIndices[0]]),
-											 normalize(rotationInvScale * normals[vertexIndices[1]]),
-											 normalize(rotationInvScale * normals[vertexIndices[2]]),
-											 normalize(rotationInvScale * normals[vertexIndices[3]]));
-		return c.get_mean_curvature();
-	} else {
-		// Sphere
-		// Assume uniform scaling from instancing:
-		float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
-		return scale / object.spheres.spheres[hitId.primId].radius;
-	}
-}}}} // namespace mufflon::scene::accel_struct
-
-
 namespace mufflon::renderer {
 
 namespace {
@@ -269,42 +207,6 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 	return bsdf.value * photon.ext().throughput * misWeight;
 }
 
-CUDA_FUNCTION float fetch_curvature(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-		const scene::PrimitiveHandle& hitId, const ei::Vec2& surfParam,
-		const scene::Direction& geoNormal) {
-	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
-	const u32* vertexIndices = object.polygon.vertexIndices;
-	const float* curvature = static_cast<const float*>(object.polygon.vertexAttributes[0]);
-	// The precomputed curvature values do not include the instance transformation,
-	// which might have a non-uniform scaling.
-	// The problem is that there are not enough information stored to reconstruct
-	// the scaling. It would be nesessary to know the entire Weingarten matrix
-	// and the tangent space which was used to compute it.
-	// Best approximative guess: get average scaling through the cubic root
-	// of the determinant.
-	float scale = pow(ei::abs(determinant(ei::Mat3x3{scene.worldToInstance[hitId.instanceId]})), 1/3.0f);
-	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
-		// Triangle
-		vertexIndices += 3u * hitId.primId;
-		return scale *
-			 (curvature[vertexIndices[0]] * surfParam.x
-			+ curvature[vertexIndices[1]] * surfParam.y
-			+ curvature[vertexIndices[2]] * (1.0f - surfParam.x - surfParam.y));
-	} else if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
-		// Quad
-		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
-		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
-		return scale * ei::bilerp(
-			curvature[vertexIndices[0]], curvature[vertexIndices[1]],
-			curvature[vertexIndices[3]], curvature[vertexIndices[2]], surfParam.x, surfParam.y);
-	} else {
-		// Sphere
-		// Assume uniform scaling from instancing:
-	//	float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
-		return scale / object.spheres.spheres[hitId.primId].radius;
-	}
-}
-
 } // namespace ::
 
 
@@ -384,7 +286,7 @@ void CpuIvcm::iterate() {
 	// First pass: Create one photon path per view path
 	u64 photonSeed = m_rngs[0].next();
 	int numPhotons = m_outputBuffer.get_num_pixels();
-/*#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
 	}
@@ -398,7 +300,7 @@ void CpuIvcm::iterate() {
 			IvcmPathVertex& photon = m_photonMap.get_data_by_index(i);
 			photon.ext().density = get_density(photon.get_position(), photon.get_geometric_normal(), currentMergeRadius);
 		}
-	}*/
+	}
 
 	// Second pass: trace view paths and merge
 #pragma PARALLEL_FOR
@@ -460,7 +362,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 	int viewPathLen = 0;
 	do {
 		// Make a connection to any event on the light path
-	/*	const IvcmPathVertex* lightVertex = m_pathEndPoints[lightPathIdx];
+		/*const IvcmPathVertex* lightVertex = m_pathEndPoints[lightPathIdx];
 		if(!m_params.showDensity) while(lightVertex) {
 			int lightPathLen = lightVertex->get_path_len();
 			int pathLen = lightPathLen + 1 + viewPathLen;
@@ -485,8 +387,8 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		++viewPathLen;
 		++currentVertex;
 
-		if(walkRes == WalkResult::HIT) {
-			float c = fetch_curvature(m_sceneDesc,
+		/*if(walkRes == WalkResult::HIT) {
+			float c = scene::accel_struct::fetch_curvature(m_sceneDesc,
 				currentVertex->get_primitive_id(),
 				currentVertex->get_surface_params(),
 				currentVertex->get_geometric_normal());
@@ -494,7 +396,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			m_outputBuffer.contribute(coord, throughput, Spectrum{ei::max(0.0f, c), ei::abs(c) / 16.0f, ei::max(0.0f, -c)}, scene::Point{ei::abs(c)},
 				scene::Direction{0.0f}, Spectrum{0.0f});
 		}
-		return;
+		return;//*/
 
 		if(needs_density())
 			currentVertex->ext().density = get_density(currentVertex->get_position(), currentVertex->get_geometric_normal(), currentMergeRadius);

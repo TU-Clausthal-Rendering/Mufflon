@@ -506,10 +506,6 @@ void Polygons::compute_curvature() {
 		// Fetch data at reference vertex and create an orthogonal space
 		Point vPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(v));
 		Direction vNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(v));
-		/*float minusSinTheta = -sqrt((1.0f - vNrm.z) * (1.0f + vNrm.z)); // cos(π/2 + acos(z)) = -sinθ
-		float sinZratio = vNrm.z / (1e-20f - minusSinTheta);
-		Direction dirU { vNrm.x * sinZratio, vNrm.y * sinZratio, minusSinTheta };
-		mAssert(ei::approx(len(dirU), 1.0f, 1e-4f));*/
 		Direction dirU = normalize(perpendicular(vNrm));
 		Direction dirV = cross(vNrm, dirU);
 		// Construct an equation system which fits a paraboloid to the 1-ring.
@@ -518,8 +514,6 @@ void Polygons::compute_curvature() {
 		// all three, if we are interested in mean curvature only.
 		ei::Mat2x2 ATA2 { 0.0f };
 		ei::Vec2 ATb2 { 0.0f };
-		//ei::Mat2x2 Aavg { 0.0f }; // For taubin
-		//float wSum = 1e-30f;
 		// For each edge add an equation
 		for(auto vi = m_meshData->vv_ccwiter(v); vi.is_valid(); ++vi) {
 			Point viPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vi));
@@ -544,32 +538,6 @@ void Polygons::compute_curvature() {
 
 			ATb2 += zi * ei::Vec2{ a, c };
 			ATA2 += ei::Mat2x2{ a*a, a*c, a*c, c*c };
-
-			/*/ Taubin 1995
-			float b = y.x * y.y / normSq;
-			auto viprev = vi; --viprev;
-			auto vinext = vi; ++vinext;
-			float w = 0.0f;
-			if(viprev.is_valid()) {
-				Point viNeighborPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*viprev));
-				ei::Vec3 edgeNeighbor = vPos - viNeighborPos;
-				const ei::Vec2 yN { dot(dirU, edgeNeighbor), dot(dirV, edgeNeighbor) };
-				const float normSqN = yN.x * yN.x + yN.y * yN.y;
-				const float cosT = (y.x * yN.x + y.y * yN.y) / sqrt(normSq * normSqN + 1e-30f);
-				//w += acos(ei::clamp(cosT, -1.0f, 1.0f));
-				w += ei::abs(cross(y, yN));
-			}
-			if(vinext.is_valid()) {
-				Point viNeighborPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vinext));
-				ei::Vec3 edgeNeighbor = vPos - viNeighborPos;
-				const ei::Vec2 yN { dot(dirU, edgeNeighbor), dot(dirV, edgeNeighbor) };
-				const float normSqN = yN.x * yN.x + yN.y * yN.y;
-				const float cosT = (y.x * yN.x + y.y * yN.y) / sqrt(normSq * normSqN + 1e-30f);
-				//w += acos(ei::clamp(cosT, -1.0f, 1.0f));
-				w += ei::abs(cross(y, yN));
-			}
-			Aavg += w * zi * ei::Mat2x2{ a, b, b, c };
-			wSum += w;*/
 		}
 		// Solve with least squares
 		float detA = determinant(ATA2);
@@ -578,14 +546,6 @@ void Polygons::compute_curvature() {
 		float meanc = (e + g) * 0.5f / (detA + 1e-30f);
 		mAssert(!std::isnan(meanc));
 		curv[v.idx()] = meanc;
-
-		// Taubin 1995
-		/*Aavg /= wSum;
-		ei::Mat2x2 Q;
-		ei::Vec2 l;
-		ei::decomposeQl(Aavg, Q, l);
-		curv[v.idx()] = (Aavg.m00 + Aavg.m11) * 0.5f;
-		//curv[v.idx()] = (l.x + l.y) * 0.5f;*/
 	}
 }
 

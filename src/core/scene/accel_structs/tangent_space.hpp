@@ -1,7 +1,7 @@
 #pragma once
 
 #include "intersection.hpp"
-//#include "core/math/curvature.hpp"
+#include "core/math/curvature.hpp"
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
@@ -65,7 +65,17 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 	};
 }
 
-/*CUDA_FUNCTION float compute_face_curvature(const SceneDescriptor<CURRENT_DEV>& scene, const PrimitiveHandle& hitId) {
+
+/*
+ * Compute the mean curvature of a primitive.
+ * The result is mostly correct, but very expensive due to lots of transformations
+ * which are necessary to support non-uniform scaling.
+ * The curvature is constant over the face.
+ */
+CUDA_FUNCTION float compute_face_curvature(
+		const SceneDescriptor<CURRENT_DEV>& scene,
+		const PrimitiveHandle& hitId,
+		const Direction& geoNormal) {
 	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
 	const u32* vertexIndices = object.polygon.vertexIndices;
 	const Direction* normals = object.polygon.normals;
@@ -73,21 +83,83 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
 	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
 		// Triangle
 		vertexIndices += 3u * hitId.primId;
-		return math::compute_gauss_curvature(positions[vertexIndices[0]],
-											 positions[vertexIndices[1]],
-											 positions[vertexIndices[2]],
-											 normals[vertexIndices[0]],
-											 normals[vertexIndices[1]],
-											 normals[vertexIndices[2]]);
-	} else if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
+		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
+		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
+										 transform * positions[vertexIndices[1]],
+										 transform * positions[vertexIndices[2]],
+										 normalize(rotationInvScale * normals[vertexIndices[0]]),
+										 normalize(rotationInvScale * normals[vertexIndices[1]]),
+										 normalize(rotationInvScale * normals[vertexIndices[2]]));
+		return c.get_mean_curvature();
+	} if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
 		// Quad
-		return 100.0f;
+		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
+		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
+		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
+		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
+										 transform * positions[vertexIndices[1]],
+										 transform * positions[vertexIndices[2]],
+										 transform * positions[vertexIndices[3]],
+										 normalize(rotationInvScale * normals[vertexIndices[0]]),
+										 normalize(rotationInvScale * normals[vertexIndices[1]]),
+										 normalize(rotationInvScale * normals[vertexIndices[2]]),
+										 normalize(rotationInvScale * normals[vertexIndices[3]]));
+		return c.get_mean_curvature();
 	} else {
 		// Sphere
-		float scale = det(scene.worldToInstance[hitId.instanceId]);
-		return 1.0f / object.spheres.spheres[hitId.primId].radius;
+		// Assume uniform scaling from instancing:
+		float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
+		return scale / object.spheres.spheres[hitId.primId].radius;
 	}
-}*/
+}
+
+
+/*
+ * Interpolate the mean curvature from precomputed vertex-curvatures.
+ * Requires: scene.compute_curvature() before the descriptor is fetched.
+ *
+ * Dependent on the tessellation this may have some error:
+ *	- low vertex adjacency -> high numerical error
+ *	- interpolation from high curvature vertices over large regions
+ *	  e.g. beveled box.
+ */
+CUDA_FUNCTION float fetch_curvature(const SceneDescriptor<CURRENT_DEV>& scene,
+		const PrimitiveHandle& hitId, const ei::Vec2& surfParam,
+		const Direction& geoNormal) {
+	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
+	const u32* vertexIndices = object.polygon.vertexIndices;
+	const float* curvature = static_cast<const float*>(object.polygon.vertexAttributes[0]);
+	// The precomputed curvature values do not include the instance transformation,
+	// which might have a non-uniform scaling.
+	// The problem is that there are not enough information stored to reconstruct
+	// the scaling. It would be nesessary to know the entire Weingarten matrix
+	// and the tangent space which was used to compute it.
+	// Best approximative guess: get average scaling through the cubic root
+	// of the determinant.
+	float scale = pow(ei::abs(determinant(ei::Mat3x3{scene.worldToInstance[hitId.instanceId]})), 1/3.0f);
+	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
+		// Triangle
+		vertexIndices += 3u * hitId.primId;
+		return scale *
+			 (curvature[vertexIndices[0]] * surfParam.x
+			+ curvature[vertexIndices[1]] * surfParam.y
+			+ curvature[vertexIndices[2]] * (1.0f - surfParam.x - surfParam.y));
+	} else if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
+		// Quad
+		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
+		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
+		return scale * ei::bilerp(
+			curvature[vertexIndices[0]], curvature[vertexIndices[1]],
+			curvature[vertexIndices[3]], curvature[vertexIndices[2]], surfParam.x, surfParam.y);
+	} else {
+		// Sphere
+		// Assume uniform scaling from instancing:
+	//	float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
+		return scale / object.spheres.spheres[hitId.primId].radius;
+	}
+}
 
 
 }}} // namespace mufflon::scene::accel_struct
