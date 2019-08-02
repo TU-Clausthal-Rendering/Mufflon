@@ -9,6 +9,12 @@
              mc:Ignorable="d" 
              d:DesignHeight="200" 
              d:DesignWidth="200">
+    <UserControl.Resources>
+        <Style x:Key="ParameterCellStyle"
+               TargetType="{x:Type DataGridCell}">
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+    </UserControl.Resources>
     <DataGrid Name="RendererPropertiesGrid"
               ItemsSource="{Binding Renderer.RendererProperties, UpdateSourceTrigger=PropertyChanged}"
               AutoGenerateColumns="False"
@@ -18,6 +24,7 @@
               CanUserResizeColumns="True"
               CanUserResizeRows="False"
               CanUserSortColumns="False"
+              KeyboardNavigation.TabNavigation="Cycle"
               RowHeaderWidth="0"
               Width="Auto">
         <DataGrid.Resources>
@@ -85,6 +92,7 @@
         </DataGrid.Resources>
         <DataGrid.Columns>
             <DataGridTextColumn Header="Parameter"
+                                CellStyle="{StaticResource ParameterCellStyle}"
                                 Binding="{Binding Name}"
                                 Width="*"
                                 IsReadOnly="True">
@@ -98,6 +106,7 @@
                 </DataGridTextColumn.ElementStyle>
             </DataGridTextColumn>
             <DataGridTemplateColumn Header="Value"
+                                    CellStyle="{StaticResource ParameterCellStyle}"
                                     Width="*"
                                     CellTemplateSelector="{StaticResource ColumnTemplateSelector}"/>
         </DataGrid.Columns>
