@@ -484,9 +484,6 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 
 
 void Polygons::compute_curvature() {
-	if(!m_meshData->has_vertex_normals())
-		throw std::runtime_error("Cannot compute curvature if the mesh has no vertex normals!");
-
 	// Add the attribute if not existent and get handle otherwise
 	VertexAttributeHandle curvHandle(0);
 	try {
@@ -497,52 +494,98 @@ void Polygons::compute_curvature() {
 
 	float* curv = m_vertexAttributes.acquire<Device::CPU, float>(curvHandle);
 
+	if(!m_meshData->has_vertex_normals()) {
+		// Without interpolated normals, the mesh is assumed to have only flat
+		// faces -> no curvature.
+		for(u32 i = 0; i < m_meshData->n_vertices(); ++i)
+			curv[i] = 0.0f;
+		return;
+	}
+
 	for(auto& v : m_meshData->vertices()) {
 		// Fetch data at reference vertex and create an orthogonal space
 		Point vPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(v));
 		Direction vNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(v));
-		float minusSinTheta = -sqrt((1.0f - vNrm.z) * (1.0f + vNrm.z)); // cos(π/2 + acos(z)) = -sinθ
+		/*float minusSinTheta = -sqrt((1.0f - vNrm.z) * (1.0f + vNrm.z)); // cos(π/2 + acos(z)) = -sinθ
 		float sinZratio = vNrm.z / (1e-20f - minusSinTheta);
 		Direction dirU { vNrm.x * sinZratio, vNrm.y * sinZratio, minusSinTheta };
-		mAssert(ei::approx(len(dirU), 1.0f, 1e-4f));
-		//Direction dirU = ei::perpendicular(vNrm);
+		mAssert(ei::approx(len(dirU), 1.0f, 1e-4f));*/
+		Direction dirU = normalize(perpendicular(vNrm));
 		Direction dirV = cross(vNrm, dirU);
 		// Construct an equation system which fits a paraboloid to the 1-ring.
 		// We need Aᵀ A x = Aᵀ b for the least squares system.
-		ei::Mat3x3 ATA { 0.0f };
-		ei::Vec3 ATb { 0.0f };
+		// Interestingly, it suffices to solve for two of the variables instead of
+		// all three, if we are interested in mean curvature only.
 		ei::Mat2x2 ATA2 { 0.0f };
 		ei::Vec2 ATb2 { 0.0f };
+		//ei::Mat2x2 Aavg { 0.0f }; // For taubin
+		//float wSum = 1e-30f;
 		// For each edge add an equation
 		for(auto vi = m_meshData->vv_ccwiter(v); vi.is_valid(); ++vi) {
 			Point viPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vi));
 			ei::Vec3 edge = vPos - viPos;
-			const float xi = dot(dirU, edge);
+			// 1. Method: parabolic fit
+			/*const float xi = dot(dirU, edge);
 			const float yi = dot(dirV, edge);
 			const float zi = dot(vNrm, edge);
 			// 1/2 xi² e + xi yi f + 1/2 yi² g = zi
-			// with e,f,g  are the searched variables
-			float a = 0.5f * xi * xi, b = xi * yi, c = 0.5f * yi * yi;
-			ATb += zi * ei::Vec3{ a, b, c };
-			ATA += ei::Mat3x3{ a*a, a*b, a*c,
-							   a*b, b*b, b*c,
-							   a*c, b*c, c*c };
+			// with e,f,g are the searched variables of which we need only e and g.
+			float a = 0.5f * xi * xi;
+			float c = 0.5f * yi * yi;//*/
+
+			// 2. Method: normal curvature
+			const ei::Vec2 y { dot(dirU, edge), dot(dirV, edge) };
+			//const float zi = 2.0f * dot(vNrm, edge) / (dot(edge, edge) + 1e-30f);
+			Direction viNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(*vi));
+			const float zi = dot(vNrm - viNrm, edge) / (dot(edge, edge) + 1e-30f);
+			const float normSq = y.x * y.x + y.y * y.y + 1e-30f;
+			float a = y.x * y.x / normSq;
+			float c = y.y * y.y / normSq;//*/
+
 			ATb2 += zi * ei::Vec2{ a, c };
 			ATA2 += ei::Mat2x2{ a*a, a*c, a*c, c*c };
+
+			/*/ Taubin 1995
+			float b = y.x * y.y / normSq;
+			auto viprev = vi; --viprev;
+			auto vinext = vi; ++vinext;
+			float w = 0.0f;
+			if(viprev.is_valid()) {
+				Point viNeighborPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*viprev));
+				ei::Vec3 edgeNeighbor = vPos - viNeighborPos;
+				const ei::Vec2 yN { dot(dirU, edgeNeighbor), dot(dirV, edgeNeighbor) };
+				const float normSqN = yN.x * yN.x + yN.y * yN.y;
+				const float cosT = (y.x * yN.x + y.y * yN.y) / sqrt(normSq * normSqN + 1e-30f);
+				//w += acos(ei::clamp(cosT, -1.0f, 1.0f));
+				w += ei::abs(cross(y, yN));
+			}
+			if(vinext.is_valid()) {
+				Point viNeighborPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vinext));
+				ei::Vec3 edgeNeighbor = vPos - viNeighborPos;
+				const ei::Vec2 yN { dot(dirU, edgeNeighbor), dot(dirV, edgeNeighbor) };
+				const float normSqN = yN.x * yN.x + yN.y * yN.y;
+				const float cosT = (y.x * yN.x + y.y * yN.y) / sqrt(normSq * normSqN + 1e-30f);
+				//w += acos(ei::clamp(cosT, -1.0f, 1.0f));
+				w += ei::abs(cross(y, yN));
+			}
+			Aavg += w * zi * ei::Mat2x2{ a, b, b, c };
+			wSum += w;*/
 		}
 		// Solve with least squares
-		ei::Mat3x3 LU;
-		ei::UVec3 p;
-		ei::decomposeLUp(ATA, LU, p);
-		ei::Vec3 efg = ei::solveLUp(LU, p, ATb);
-		//float meanc = (efg.x + efg.z) * 0.5f;
 		float detA = determinant(ATA2);
 		float e = ATb2.x * ATA2.m11 - ATb2.y * ATA2.m10;
 		float g = ATA2.m00 * ATb2.y - ATA2.m01 * ATb2.x;
 		float meanc = (e + g) * 0.5f / (detA + 1e-30f);
+		mAssert(!std::isnan(meanc));
 		curv[v.idx()] = meanc;
-		if(std::isnan(curv[v.idx()]))
-			__debugbreak();
+
+		// Taubin 1995
+		/*Aavg /= wSum;
+		ei::Mat2x2 Q;
+		ei::Vec2 l;
+		ei::decomposeQl(Aavg, Q, l);
+		curv[v.idx()] = (Aavg.m00 + Aavg.m11) * 0.5f;
+		//curv[v.idx()] = (l.x + l.y) * 0.5f;*/
 	}
 }
 

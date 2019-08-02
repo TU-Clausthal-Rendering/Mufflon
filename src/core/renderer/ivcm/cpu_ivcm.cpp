@@ -270,26 +270,37 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 }
 
 CUDA_FUNCTION float fetch_curvature(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-		const scene::PrimitiveHandle& hitId, const ei::Vec2& surfParam) {
+		const scene::PrimitiveHandle& hitId, const ei::Vec2& surfParam,
+		const scene::Direction& geoNormal) {
 	const scene::LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
 	const u32* vertexIndices = object.polygon.vertexIndices;
 	const float* curvature = static_cast<const float*>(object.polygon.vertexAttributes[0]);
+	// The precomputed curvature values do not include the instance transformation,
+	// which might have a non-uniform scaling.
+	// The problem is that there are not enough information stored to reconstruct
+	// the scaling. It would be nesessary to know the entire Weingarten matrix
+	// and the tangent space which was used to compute it.
+	// Best approximative guess: get average scaling through the cubic root
+	// of the determinant.
+	float scale = pow(ei::abs(determinant(ei::Mat3x3{scene.worldToInstance[hitId.instanceId]})), 1/3.0f);
 	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
 		// Triangle
 		vertexIndices += 3u * hitId.primId;
-		return curvature[vertexIndices[0]] * surfParam.x
-			 + curvature[vertexIndices[1]] * surfParam.y
-			 + curvature[vertexIndices[2]] * (1.0f - surfParam.x - surfParam.y);
+		return scale *
+			 (curvature[vertexIndices[0]] * surfParam.x
+			+ curvature[vertexIndices[1]] * surfParam.y
+			+ curvature[vertexIndices[2]] * (1.0f - surfParam.x - surfParam.y));
 	} else if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles + object.polygon.numQuads) {
 		// Quad
 		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
 		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
-		return ei::bilerp(curvature[vertexIndices[0]], curvature[vertexIndices[1]],
-						  curvature[vertexIndices[3]], curvature[vertexIndices[2]], surfParam.x, surfParam.y);
+		return scale * ei::bilerp(
+			curvature[vertexIndices[0]], curvature[vertexIndices[1]],
+			curvature[vertexIndices[3]], curvature[vertexIndices[2]], surfParam.x, surfParam.y);
 	} else {
 		// Sphere
 		// Assume uniform scaling from instancing:
-		float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
+	//	float scale = len(ei::Vec3{scene.worldToInstance[hitId.instanceId]});
 		return scale / object.spheres.spheres[hitId.primId].radius;
 	}
 }
@@ -477,9 +488,10 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		if(walkRes == WalkResult::HIT) {
 			float c = fetch_curvature(m_sceneDesc,
 				currentVertex->get_primitive_id(),
-				currentVertex->get_surface_params());
+				currentVertex->get_surface_params(),
+				currentVertex->get_geometric_normal());
 			//float c = scene::accel_struct::compute_face_curvature(m_sceneDesc, currentVertex->get_primitive_id(), currentVertex->get_geometric_normal());
-			m_outputBuffer.contribute(coord, throughput, Spectrum{c}, scene::Point{ei::abs(c)},
+			m_outputBuffer.contribute(coord, throughput, Spectrum{ei::max(0.0f, c), ei::abs(c) / 16.0f, ei::max(0.0f, -c)}, scene::Point{ei::abs(c)},
 				scene::Direction{0.0f}, Spectrum{0.0f});
 		}
 		return;
