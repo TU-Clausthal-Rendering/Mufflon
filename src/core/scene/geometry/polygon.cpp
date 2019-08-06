@@ -512,37 +512,30 @@ void Polygons::compute_curvature() {
 		// We need Aᵀ A x = Aᵀ b for the least squares system.
 		// Interestingly, it suffices to solve for two of the variables instead of
 		// all three, if we are interested in mean curvature only.
-		ei::Mat2x2 ATA2 { 0.0f };
-		ei::Vec2 ATb2 { 0.0f };
+		ei::Mat2x2 ATA { 0.0f };
+		ei::Vec2 ATb { 0.0f };
 		// For each edge add an equation
 		for(auto vi = m_meshData->vv_ccwiter(v); vi.is_valid(); ++vi) {
 			Point viPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vi));
-			ei::Vec3 edge = vPos - viPos;
-			// 1. Method: parabolic fit
-			/*const float xi = dot(dirU, edge);
-			const float yi = dot(dirV, edge);
-			const float zi = dot(vNrm, edge);
-			// 1/2 xi² e + xi yi f + 1/2 yi² g = zi
-			// with e,f,g are the searched variables of which we need only e and g.
-			float a = 0.5f * xi * xi;
-			float c = 0.5f * yi * yi;//*/
-
-			// 2. Method: normal curvature
-			const ei::Vec2 y { dot(dirU, edge), dot(dirV, edge) };
-			//const float zi = 2.0f * dot(vNrm, edge) / (dot(edge, edge) + 1e-30f);
 			Direction viNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(*vi));
-			const float zi = dot(vNrm - viNrm, edge) / (dot(edge, edge) + 1e-30f);
+			ei::Vec3 edge = vPos - viPos;
+			// Normal curvature fit with different curvature estimations
+			const ei::Vec2 y { dot(dirU, edge), dot(dirV, edge) };
 			const float normSq = y.x * y.x + y.y * y.y + 1e-30f;
+			//const float ki = 2.0f * dot(vNrm, edge) / (dot(edge, edge) + 1e-30f);		// Circular
+			//const float ki = dot(vNrm - viNrm, edge) / (dot(edge, edge) + 1e-30f);	// Circular projected
+			//const float ki = 2.0f * dot(vNrm, edge) / normSq;							// Parabolic
+			const float ki = dot(vNrm - viNrm, edge) / normSq;						// Parabolic projected
 			float a = y.x * y.x / normSq;
-			float c = y.y * y.y / normSq;//*/
+			float c = y.y * y.y / normSq;
 
-			ATb2 += zi * ei::Vec2{ a, c };
-			ATA2 += ei::Mat2x2{ a*a, a*c, a*c, c*c };
+			ATb += ki * ei::Vec2{ a, c };
+			ATA += ei::Mat2x2{ a*a, a*c, a*c, c*c };
 		}
 		// Solve with least squares
-		float detA = determinant(ATA2);
-		float e = ATb2.x * ATA2.m11 - ATb2.y * ATA2.m10;
-		float g = ATA2.m00 * ATb2.y - ATA2.m01 * ATb2.x;
+		float detA = determinant(ATA);
+		float e = ATb.x * ATA.m11 - ATb.y * ATA.m01;
+		float g = ATA.m00 * ATb.y - ATA.m10 * ATb.x;
 		float meanc = (e + g) * 0.5f / (detA + 1e-30f);
 		mAssert(!std::isnan(meanc));
 		curv[v.idx()] = meanc;

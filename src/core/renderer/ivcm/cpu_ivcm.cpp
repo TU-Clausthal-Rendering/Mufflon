@@ -362,7 +362,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 	int viewPathLen = 0;
 	do {
 		// Make a connection to any event on the light path
-		/*const IvcmPathVertex* lightVertex = m_pathEndPoints[lightPathIdx];
+		const IvcmPathVertex* lightVertex = m_pathEndPoints[lightPathIdx];
 		if(!m_params.showDensity) while(lightVertex) {
 			int lightPathLen = lightVertex->get_path_len();
 			int pathLen = lightPathLen + 1 + viewPathLen;
@@ -393,9 +393,11 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				currentVertex->get_surface_params(),
 				currentVertex->get_geometric_normal());
 			//float c = scene::accel_struct::compute_face_curvature(m_sceneDesc, currentVertex->get_primitive_id(), currentVertex->get_geometric_normal());
+			c /= 2.0f;
 			m_outputBuffer.contribute(coord, throughput, Spectrum{ei::max(0.0f, c), ei::abs(c) / 16.0f, ei::max(0.0f, -c)}, scene::Point{ei::abs(c)},
 				scene::Direction{0.0f}, Spectrum{0.0f});
-		}
+		} else m_outputBuffer.contribute(coord, throughput, Spectrum{1.0f}, scene::Point{0.0f},
+					scene::Direction{0.0f}, Spectrum{0.0f});
 		return;//*/
 
 		if(needs_density())
@@ -404,8 +406,6 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
 			m_outputBuffer.set(coord, 0, Spectrum{currentVertex->ext().density * (m_currentIteration + 1)});
-			//m_outputBuffer.contribute(coord, throughput, Spectrum{currentVertex->ext().density}, currentVertex->get_position(),
-			//							currentVertex->get_normal(), currentVertex->get_albedo());
 			break;
 		}//*/
 		// Evaluate direct hit of area ligths and the background
