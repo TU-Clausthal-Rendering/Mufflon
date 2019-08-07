@@ -40,7 +40,8 @@ class DllInterface:
         self.dllHolder.core.render_get_renderer_name.restype = c_char_p
         self.dllHolder.core.render_get_renderer_short_name.restype = c_char_p
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
-        self.dllHolder.core.renderer_get_parameter_enum_value_from_name.argtypes = [c_char_p, c_char_p, c_int32]
+        self.dllHolder.core.renderer_set_parameter_enum.argtypes = [c_char_p, c_int32]
+        self.dllHolder.core.renderer_get_parameter_enum_value_from_name.argtypes = [c_char_p, c_char_p, c_void_p]
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
@@ -49,6 +50,10 @@ class DllInterface:
         self.dllHolder.core.world_find_scenario.restype = c_void_p
         self.dllHolder.core.world_load_scenario.restype = c_void_p
         self.dllHolder.core.render_save_denoised_radiance.argtypes = [c_char_p]
+        self.dllHolder.core.world_get_camera.argtypes = [c_char_p]
+        self.dllHolder.core.world_get_camera.restype = c_void_p
+        self.dllHolder.core.scenario_set_camera.argtypes = [c_void_p, c_void_p]
+        self.dllHolder.core.world_get_current_scenario.restype = c_void_p
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
@@ -76,16 +81,16 @@ class DllInterface:
         return self.dllHolder.core.renderer_set_parameter_int(c_char_p(parameterName.encode('utf-8')), c_int32(value))
     
     def renderer_set_parameter_enum(self, parameterName, value):
-        return self.dllHolder.core.renderer_set_parameter_enum(c_char_p(parameterName.encode('utf-8')), c_int32(value))
+        return self.dllHolder.core.renderer_set_parameter_enum(c_char_p(parameterName.encode('utf-8')), value)
 
-    def renderer_get_parameter_enum_value(self, parameterName, valueName):
-        value = 0
+    def renderer_get_parameter_enum_value_from_name(self, parameterName, valueName):
+        value = c_int32(0)
         if not self.dllHolder.core.renderer_get_parameter_enum_value_from_name(c_char_p(parameterName.encode('utf-8')), c_char_p(valueName.encode('utf-8')), byref(value)):
             raise Exception("Failed to retrieve enum parameter '" + parameterName + "' value '" + valueName + "'")
         return value
 
     def renderer_get_parameter_enum_count(self, parameterName):
-        count = 0
+        count = c_int32(0)
         if not self.dllHolder.core.renderer_get_parameter_enum_count(c_char_p(parameterName.encode('utf-8')), byref(count)):
             raise Exception("Failed to retrieve enum parameter '" + parameterName + "' count")
         return count
@@ -171,6 +176,15 @@ class DllInterface:
 
     def world_get_tessellation_level(self):
         return self.dllHolder.core.world_get_tessellation_level()
+        
+    def world_get_camera(self, name):
+        return self.dllHolder.core.world_get_camera(c_char_p(name.encode('utf-8')))
+    
+    def world_get_current_scenario(self):
+        return self.dllHolder.core.world_get_current_scenario()
+        
+    def scenario_set_camera(self, scenario, cam):
+        return self.dllHolder.core.scenario_set_camera(scenario, cam)
 
     def scene_request_retessellation(self):
         return self.dllHolder.scene_request_retessellation()
@@ -220,6 +234,16 @@ class RenderActions:
             raise Exception("Failed to find scenario '" + scenarioName + "'")
         if not self.dllInterface.world_load_scenario(hdl):
             raise Exception("Failed to load scenario '" + scenarioName + "'")
+
+    def set_camera_for_current_scenario(self, cameraName):
+        scenario = self.dllInterface.world_get_current_scenario()
+        cam = self.dllInterface.world_get_camera(cameraName)
+        if not scenario:
+            raise Exception("Failed to retrieve current scenario")
+        if not cam:
+            raise Exception("Could not find camera '" + cameraName + "'")
+        if not self.dllInterface.scenario_set_camera(scenario, cam):
+            raise Exception("Failed to set camera '" + cameraName + "' for current scenario'")
 
     def set_current_animation_frame(self, frame):
         if not self.dllInterface.world_set_frame_current(frame):
@@ -337,4 +361,4 @@ class RenderActions:
         return self.dllInterface.renderer_set_parameter_int(parameterName, value)
 
     def renderer_set_parameter_enum(self, parameterName, valueName):
-        return self.dllInterface(renderer_set_parameter_enum(parameterName, self.dllInterface.renderer_get_parameter_enum_value(parameterName, valueName)))
+        return self.dllInterface.renderer_set_parameter_enum(parameterName, self.dllInterface.renderer_get_parameter_enum_value_from_name(parameterName, valueName))
