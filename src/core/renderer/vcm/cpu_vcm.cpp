@@ -43,7 +43,8 @@ struct VcmVertexExt {
 							  const VcmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const math::Throughput& throughput,
+							  int numPhotons, float area) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);

@@ -536,7 +536,8 @@ void Polygons::compute_curvature() {
 		float detA = determinant(ATA);
 		float e = ATb.x * ATA.m11 - ATb.y * ATA.m01;
 		float g = ATA.m00 * ATb.y - ATA.m10 * ATb.x;
-		float meanc = (e + g) * 0.5f / (detA + 1e-30f);
+		detA += (ATA.m00 + ATA.m11) * 1e-7f + 1e-30f; // Regularize with the trace
+		float meanc = (e + g) * 0.5f / detA;
 		mAssert(!std::isnan(meanc));
 		curv[v.idx()] = meanc;
 	}

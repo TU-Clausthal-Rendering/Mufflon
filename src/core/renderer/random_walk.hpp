@@ -109,7 +109,7 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// If we missed the scene, terminate the ray
 	if(nextHit.hitId.instanceId < 0) {
 		VertexType::create_void(&outVertex, &vertex, outSample.excident);
-		outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput);
+		outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput, args...);
 		return WalkResult::BACKGROUND;
 	}
 
@@ -120,7 +120,7 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Finalize
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(nextHit.hitId),
 				position, tangentSpace, outSample.excident);
-	outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput);
+	outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput, args...);
 	return WalkResult::HIT;
 }
 

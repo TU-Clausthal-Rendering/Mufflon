@@ -568,6 +568,8 @@ public:
 				vert->m_incident = lightSample.source_param.area.normal;
 				vert->m_desc.areaLight.intensity = lightSample.intensity;
 				vert->m_desc.areaLight.medium = lightSample.mediumIndex;
+			//	vert->m_desc.areaLight.primitiveId = lightSample.source_param.area.primId;
+			//	vert->m_desc.areaLight.surfaceParams = lightSample.source_param.area.surfaceParams;
 				vert->ext().init(*vert, AreaPdf{lightSample.pdf}, AngularPdf::infinite(), lightSample.pChoice);
 				return (int)round_to_align<8u>( this_size() + sizeof(AreaLightDesc) );
 			}
@@ -633,8 +635,11 @@ public:
 
 private:
 	struct AreaLightDesc {
-		scene::Direction intensity;
+		Spectrum intensity;
 		scene::materials::MediumHandle medium;
+		// TODO: area lights in the tree do not store their id -> needs more refactoring
+	//	scene::PrimitiveHandle primitiveId;
+	//	ei::Vec2 surfaceParams;
 	};
 	struct SpotLightDesc {
 		ei::Vec3 intensity;
