@@ -3407,6 +3407,18 @@ Boolean render_enable_render_target(uint32_t index, Boolean variance) {
 	CATCH_ALL(false)
 }
 
+Boolean render_enable_render_target_by_name(const char* target, Boolean variance) {
+	TRY
+	// Check if we have such a target
+	for(std::size_t i = 0u; i < renderer::OutputValue::TARGET_COUNT; ++i) {
+		if(renderer::get_render_target_name((u32)i).compare(target) == 0)
+			return render_enable_render_target((u32)i, variance);
+	}
+	logError("[", FUNCTION_NAME, "] Could not find a render target with the name'", target, "'");
+	return false;
+	CATCH_ALL(false)
+}
+
 Boolean render_disable_render_target(uint32_t index, Boolean variance) {
 	TRY
 	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
@@ -3417,6 +3429,18 @@ Boolean render_disable_render_target(uint32_t index, Boolean variance) {
 	if(s_imageOutput != nullptr)
 		s_imageOutput->set_targets(s_outputTargets);
 	return true;
+	CATCH_ALL(false)
+}
+
+Boolean render_disable_render_target_by_name(const char* target, Boolean variance) {
+	TRY
+		// Check if we have such a target
+		for(std::size_t i = 0u; i < renderer::OutputValue::TARGET_COUNT; ++i) {
+			if(renderer::get_render_target_name((u32)i).compare(target) == 0)
+				return render_disable_render_target((u32)i, variance);
+		}
+	logError("[", FUNCTION_NAME, "] Could not find a render target with the name'", target, "'");
+	return false;
 	CATCH_ALL(false)
 }
 
