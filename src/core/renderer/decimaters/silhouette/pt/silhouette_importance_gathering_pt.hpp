@@ -246,6 +246,8 @@ CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<
 																scene.instanceToWorld[shadowHitId.instanceId]),
 												  neePlane);
 			// Compute the 90° rotated vector
+			// TODO: end-points of silhouette edge may lie outside of light primitive!
+			// TODO: they can both be outside!
 			const ei::Vec3 rotatedB = a + ei::cross(neePlane.n, b - a);
 
 			size = intersect_quad_borders(quad, neePlane, ei::Segment{ a, rotatedB });
@@ -379,11 +381,23 @@ CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CU
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
 }
 
+CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParameters& params) {
+	switch(params.shadowSizeWeight) {
+		case PShadowSizeWeight::Values::INVERSE_SQR:
+			return ei::sq(1.f / (1.f + importance));
+		case PShadowSizeWeight::Values::INVERSE_EXP:
+			return ei::exp(1.f / (1.f + importance));
+		case PShadowSizeWeight::Values::INVERSE:
+		default:
+			return 1.f / (1.f + importance);
+	}
+}
+
 CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
 								const ei::Ray& shadowRay, SilPathVertex& vertex, const float importance,
 								const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
 								const float firstShadowDistance, const LightType lightType,
-								const u32 lightOffset) {
+								const u32 lightOffset, const SilhouetteParameters& params) {
 	constexpr float DIST_EPSILON = 0.001f;
 
 	// TODO: worry about spheres?
@@ -405,7 +419,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 																		  shadowRay, vertex, neePlane, firstShadowDistance,
 																		  lightDistance - firstShadowDistance);
 		// Scale the irradiance with the predicted shadow size
-		const float weightedImportance = importance;// 1.f / (1.f + shadowRegionSizeEstimate) * importance;
+		const float weightedImportance = importance * weight_shadow(shadowRegionSizeEstimate, params);
 
 		const auto lodIdx = scene.lodIndices[shadowHitId.instanceId];
 		record_shadow(sums[lodIdx], weightedImportance);
@@ -444,10 +458,16 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 			if(sharedVertices >= 2) {
 				vertex.ext().shadowInstanceId = secondHit.hitId.instanceId;
 				// Compute the (estimated) size of the shadow region
-				vertex.ext().silhouetteRegionSize = estimate_silhouette_light_size(scene, lightType, lightOffset,
+				// Originally we used the projected length of the shadow edge,
+				// but it isn't well defined and inconsistent with the shadow
+				// importance sum
+				vertex.ext().silhouetteRegionSize = estimate_shadow_light_size(scene, lightType, lightOffset,
+																			   shadowRay, vertex, neePlane,
+																			   firstShadowDistance, lightDistance - firstShadowDistance);
+				/*vertex.ext().silhouetteRegionSize = estimate_silhouette_light_size(scene, lightType, lightOffset,
 																				   shadowRay, shadowHitId, vertex,
 																				   neePlane, firstShadowDistance,
-																				   lightDistance - firstShadowDistance);
+																				   lightDistance - firstShadowDistance);*/
 			}
 		}
 
@@ -534,7 +554,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
 					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
 									shadowHit.hitId, nee.dist, firstShadowDistance,
-									lightType, lightOffset);
+									lightType, lightOffset, params);
 				}
 			}
 		}
@@ -607,7 +627,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 				constexpr float FACTOR = 2'000.f;
 
 				// TODO: proper factor!
-				const float silhouetteImportance = 1.f / (1.f + ext.silhouetteRegionSize)
+				const float silhouetteImportance = weight_shadow(ext.silhouetteRegionSize, params)
 					* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
 
 				const auto lodIdx = scene.lodIndices[ext.shadowInstanceId];

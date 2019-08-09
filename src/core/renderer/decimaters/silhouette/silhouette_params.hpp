@@ -17,6 +17,13 @@ struct PSelectiveImportance {
 	CUDA_FUNCTION bool show_silhouette() const noexcept { return impSelection == Values::ALL || impSelection == Values::SILHOUETTE; }
 };
 
+struct PShadowSizeWeight {
+	PARAM_ENUM(shadowSizeWeight, INVERSE, INVERSE_SQR, INVERSE_EXP) = Values::INVERSE;
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Shadow size weight", ParameterTypes::ENUM };
+	}
+};
+
 struct PImportanceIterations {
 	int importanceIterations{ 100 };
 	static constexpr ParamDesc get_desc() noexcept {

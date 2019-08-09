@@ -7,7 +7,7 @@ namespace mufflon { namespace renderer { namespace decimaters { namespace silhou
 using SilhouetteParameters = ParameterHandler<
 	PImportanceIterations, PDecimationIterations,
 	PTargetReduction, PInitialReduction, PVertexThreshold,
-	PSelectiveImportance,
+	PSelectiveImportance, PShadowSizeWeight,
 	PDirectIndirectRatio, PSharpnessFactor,
 	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,
 	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide
