@@ -9,6 +9,10 @@ namespace mufflon::renderer {
 
 constexpr size_t ATOMIC_F32_SIZE = ei::max(sizeof(cuda::Atomic<Device::CPU, float>), sizeof(cuda::Atomic<Device::CUDA, float>));
 
+// For CUDA NaN counting
+extern u32* get_cuda_nan_counter_ptr_and_set_zero();
+extern u32 get_cuda_nan_counter_value();
+
 OutputHandler::OutputHandler(u16 width, u16 height, OutputValue targets) :
 	// If a texture is created without data, it does not allocate data yet.
 	m_cumulativeTarget{
@@ -50,6 +54,15 @@ RenderBuffer<dev> OutputHandler::begin_iteration(bool reset) {
 	else ++m_iteration;
 
 	RenderBuffer<dev> rb;
+	// if we're in CUDA we gotta fetch the address, otherwise we can just take it.
+	// Also initialize to zero
+	if constexpr(dev == Device::CUDA) {
+		rb.nan_counter = get_cuda_nan_counter_ptr_and_set_zero();
+	} else {
+		rb.nan_counter = &m_nan_counter;
+		m_nan_counter.store(0u);
+	}
+
 	int i = 0;
 	for(u32 flag : OutputValue::iterator) {
 		// Is this atttribute recorded at all?
@@ -193,6 +206,17 @@ void OutputHandler::end_iteration() {
 		}
 		++i;
 	}
+
+	// Check the NaN counter
+	u32 counter;
+	if constexpr(dev == Device::CUDA) {
+		counter = get_cuda_nan_counter_value();
+	} else {
+		counter = m_nan_counter.load();
+	}
+
+	if(counter > 0u)
+		logWarning("[RenderBuffer] Detected NaN on output (", counter, " times). 0 was returned instead.");
 }
 
 template void OutputHandler::end_iteration<Device::CPU>();

@@ -31,4 +31,22 @@ void OutputHandler::update_variance_cuda(ConstRenderTarget<Device::CUDA> iterTar
 		iterTarget, cumTarget, varTarget, numChannels, m_width, m_height, float(m_iteration));
 }
 
+__device__ u32 *s_nan_counter;
+
+u32* get_cuda_nan_counter_ptr_and_set_zero() {
+	constexpr u32 zero = 0;
+	void* ptr = nullptr;
+	cuda::check_error(::cudaGetSymbolAddress(&ptr, s_nan_counter));
+	cuda::check_error(::cudaMemcpyToSymbolAsync(s_nan_counter, &zero, sizeof(zero),
+												0u, ::cudaMemcpyHostToDevice));
+	return reinterpret_cast<u32*>(ptr);
+}
+
+u32 get_cuda_nan_counter_value() {
+	u32 counter = 0;
+	cuda::check_error(::cudaMemcpyFromSymbolAsync(&counter, s_nan_counter, sizeof(counter),
+												  0u, ::cudaMemcpyDeviceToHost));
+	return counter;
+}
+
 }} // namespace mufflon::renderer
