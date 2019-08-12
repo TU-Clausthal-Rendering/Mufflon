@@ -102,7 +102,7 @@ namespace gui.ViewModel.Settings
 
         // the history should always be saved
         // TODO update this after selection change
-        public ObservableCollection<string> ScreenshotNamePatterns => m_models.Settings.ScreenshotNamePatternHistory;
+        public LimitedQueueStringCollection ScreenshotNamePatterns => m_models.Settings.ScreenshotNamePatternHistory;
 
         public ICommand SelectScreenshotFolderCommand { get; }
 
