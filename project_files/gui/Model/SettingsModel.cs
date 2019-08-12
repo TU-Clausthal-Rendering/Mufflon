@@ -1,113 +1,70 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Threading;
 using gui.Annotations;
 using gui.Dll;
 using gui.Properties;
 
 namespace gui.Model
 {
-    // Wrapper class for a string collection with limited entries (and limited operations).
-    // Takes a collection and limit as argument, when insert operations exceed the limit
-    // the last elements will be removed from the collection.
-    public class LimitedQueueStringCollection
-    {
-        private StringCollection m_collection;
-        private int m_limit;
-
-        public event NotifyCollectionChangedEventHandler CollectionChanged;
-
-        public LimitedQueueStringCollection(StringCollection collection, int limit)
-        {
-            m_collection = collection;
-            m_limit = limit;
-            // Initial trimming
-            prune();
-        }
-
-        public void PushFront(string val)
-        {
-            m_collection.Insert(0, val);
-            prune();
-            CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, 0));
-        }
-
-        public void RemoveAt(int index)
-        {
-            if (index >= m_collection.Count)
-                throw new ArgumentOutOfRangeException();
-            var item = m_collection[index];
-            m_collection.RemoveAt(index);
-            CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
-        }
-
-        public bool Empty { get => m_collection.Count == 0; }
-
-        public int IndexOf(string val)
-        {
-            return m_collection.IndexOf(val);
-        }
-
-        public bool Contains(string val)
-        {
-            return m_collection.Contains(val);
-        }
-
-        public StringEnumerator GetEnumerator()
-        {
-            return m_collection.GetEnumerator();
-        }
-
-        private void prune()
-        {
-            while (m_collection.Count > m_limit)
-                m_collection.RemoveAt(m_limit);
-        }
-    }
-
     public class SettingsModel : INotifyPropertyChanged
     {
         private static int MaxLastWorlds { get; } = 10;
         private static int MaxScreenshotNamingPatterns { get; } = 10;
         private readonly KeyGestureConverter m_gestureConverter = new KeyGestureConverter();
+        private Timer m_saveTimer;
 
         public SettingsModel()
         {
-            LastWorlds = new LimitedQueueStringCollection(Settings.Default.LastWorlds, MaxLastWorlds);
-            ScreenshotNamePatternHistory = new LimitedQueueStringCollection(Settings.Default.ScreenshotNamePatternHistory,
+            // Make sure the collections properly exist
+            if (Settings.Default.LastWorlds == null)
+                Settings.Default.LastWorlds = new StringCollection();
+            if (Settings.Default.ScreenshotNamePatternHistory == null)
+                Settings.Default.ScreenshotNamePatternHistory = new StringCollection();
+            if (Settings.Default.RendererParameters == null)
+                Settings.Default.RendererParameters = new StringCollection();
+
+            // Create wrappers for the limited "history-like" collections
+            LastWorlds = new LimitedStringCollection(Settings.Default.LastWorlds, MaxLastWorlds);
+            ScreenshotNamePatternHistory = new LimitedStringCollection(Settings.Default.ScreenshotNamePatternHistory,
                 MaxScreenshotNamingPatterns);
-            if(ScreenshotNamePatternHistory.Empty)
+            RendererParameters = new LimitedStringCollection(Settings.Default.RendererParameters, int.MaxValue);
+
+            LastWorlds.CollectionChanged += OnStringCollectionChanged;
+            ScreenshotNamePatternHistory.CollectionChanged += OnStringCollectionChanged;
+            RendererParameters.CollectionChanged += OnStringCollectionChanged;
+
+            // Screenshot history has to have at least one entry
+            if (ScreenshotNamePatternHistory.Empty)
                 ScreenshotNamePatternHistory.PushFront(ScreenshotNamePattern);
 
-            LoadGestures();
             SetLogLevel(LogLevel);
             SetProfilerLevels();
 
-            if (string.IsNullOrEmpty(Settings.Default.ScreenshotFolder))
-                Settings.Default.ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrEmpty(ScreenshotFolder))
+                ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
 
             // forward setting changed events
+            m_saveTimer = new Timer(_ => {
+                // TODO: idk why, but settings that weren't printed at least once are prone to not trigger
+                // a save at all (seems buggy)
+                Settings.Default.Save();
+                m_saveTimer.Change(int.MaxValue, int.MaxValue);
+            });
             Settings.Default.PropertyChanged += AppSettingsOnPropertyChanged;
         }
 
         public void Save()
         {
-            // save settings
-            Settings.Default.Save();
-        }
-
-        private void LoadGestures()
-        {
-            ToggleCameraMovementGestureString = Settings.Default.ToggleCameraMovementGesture;
+            // It appears that the settings object needs some time to make changes "visible"
+            // Thus we use an invokable on a short timer that saves the settings with a slight delay.
+            // Repeated "save" invokations simply reset the timer to avoid needless "double-saves".
+            m_saveTimer.Change(200, int.MaxValue);
         }
 
         private void SetLogLevel(Core.Severity severity)
@@ -127,9 +84,13 @@ namespace gui.Model
                 throw new Exception(Loader.loader_get_dll_error());
         }
 
+        private void OnStringCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
+        {
+            Save();
+        }
+
         private void AppSettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
-            Logger.log("App settings changed: " + args.PropertyName, Core.Severity.Warning);
             switch (args.PropertyName)
             {
                 case nameof(Settings.Default.LastWorldPath):
@@ -178,10 +139,12 @@ namespace gui.Model
                     OnPropertyChanged(nameof(MaxConsoleMessages));
                     break;
             }
+
+            Save();
         }
 
-        public LimitedQueueStringCollection LastWorlds { get; private set; }
-        public LimitedQueueStringCollection ScreenshotNamePatternHistory { get; private set; }
+        public LimitedStringCollection LastWorlds { get; private set; }
+        public LimitedStringCollection ScreenshotNamePatternHistory { get; private set; }
 
         // TODO couple with last worlds?
         public string LastWorldPath
@@ -361,6 +324,8 @@ namespace gui.Model
             set => Settings.Default.LastNIterationCommand = value;
         }
 
+        public LimitedStringCollection RendererParameters { get; private set; }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
@@ -369,33 +334,95 @@ namespace gui.Model
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        /// <summary>
-        /// modified collection that contains the maxItems strings
-        /// </summary>
-        public class LimitedCollection : ObservableCollection<string>
-        {
-            private readonly int m_maxItems;
 
-            public LimitedCollection(int maxItems)
+        // Wrapper class for a string collection with limited entries (and limited operations).
+        // Takes a collection and limit as argument, when insert operations exceed the limit
+        // the last elements will be removed from the collection.
+        public class LimitedStringCollection
+        {
+            private StringCollection m_collection;
+            private int m_limit;
+
+            public event NotifyCollectionChangedEventHandler CollectionChanged;
+
+            public LimitedStringCollection(StringCollection collection, int limit)
             {
-                this.m_maxItems = maxItems;
+                m_collection = collection;
+                m_limit = limit;
+                // Initial trimming
+                while (m_collection.Count > m_limit)
+                    m_collection.RemoveAt(m_limit);
             }
 
-            protected override void InsertItem(int index, string item)
+            public void Add(string val)
             {
-                // only add if not already in collection
-                if(Contains(item)) return;
-                
-                // this collection should not hold more than maxLastScenes scenes
-                if (Count + 1 >= m_maxItems)
-                {
-                    // dont insert this item (would be the last in the list)
-                    if(index == Count) return;
-                    // remove the last item
-                    RemoveAt(Count - 1);
-                }
+                int newIndex = m_collection.Count;
+                m_collection.Add(val);
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, newIndex));
+                PruneSingle();
+            }
 
-                base.InsertItem(index, item);
+            public void PushFront(string val)
+            {
+                m_collection.Insert(0, val);
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, 0));
+                PruneSingle();
+            }
+
+            public void RemoveAt(int index)
+            {
+                if (index >= Count)
+                    throw new ArgumentOutOfRangeException();
+                var item = m_collection[index];
+                m_collection.RemoveAt(index);
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
+            }
+
+            public void Clear()
+            {
+                m_collection.Clear();
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            }
+
+            public int Count { get => m_collection.Count; }
+            public bool Empty { get => Count == 0; }
+
+            public int IndexOf(string val)
+            {
+                return m_collection.IndexOf(val);
+            }
+
+            public bool Contains(string val)
+            {
+                return m_collection.Contains(val);
+            }
+
+            public string this[int key]
+            {
+                get => m_collection[key];
+                set
+                {
+                    if (key >= Count)
+                        throw new ArgumentOutOfRangeException();
+                    var oldItem = m_collection[key];
+                    m_collection[key] = value;
+                    CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, oldItem, key));
+                }
+            }
+
+            public StringEnumerator GetEnumerator()
+            {
+                return m_collection.GetEnumerator();
+            }
+
+            private void PruneSingle()
+            {
+                if(m_collection.Count > m_limit)
+                {
+                    var removed = m_collection[m_limit];
+                       m_collection.RemoveAt(m_limit);
+                    CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed, m_limit));
+                }
             }
         }
     }
