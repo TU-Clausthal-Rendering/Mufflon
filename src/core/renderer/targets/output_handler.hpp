@@ -496,7 +496,8 @@ private:
 			m_nanCounter.store(0u);
 			return &m_nanCounter;
 		} else {
-			// OpenGL doesn't get this luxury
+			m_nanCounter.store(0u);
+			// TODO: should OpenGL also get a NaN checker?
 			return {};
 		}
 	}
