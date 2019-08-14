@@ -8,8 +8,9 @@ namespace mufflon::gl {
 }
 
 namespace mufflon::renderer {
-    
-class GlRendererBase : public RendererBase<Device::OPENGL> {
+   
+template < class TL >
+class GlRendererBase : public RendererBase<Device::OPENGL, TL> {
 public:
 	enum class Attribute : uint32_t {
         None = 0,
@@ -26,6 +27,8 @@ public:
     // reload textures with appropriate size
     void post_reset() override;
 protected:
+	static constexpr u32 COLOR_ATTACHMENTS = TL::TARGET_COUNT;
+
 	struct CameraTransforms {
 		ei::Mat4x4 viewProj;
 		ei::Mat4x4 view;
@@ -72,18 +75,20 @@ protected:
 
 	uint32_t m_depthStencilFormat;
 	gl::Texture m_depthTarget;
-	gl::Texture m_colorTargets[OutputValue::TARGET_COUNT];
+	gl::Texture m_colorTargets[COLOR_ATTACHMENTS];
 	gl::Framebuffer m_framebuffer;
 private:
 	uint32_t m_depthAttachmentType;
 	gl::Program m_copyShader;
 	static const size_t WORK_GROUP_SIZE = 16;
+
+	// Pulled into scope due to ADL issues otherwise
+	friend Attribute operator|(Attribute l, Attribute r) {
+		return GlRendererBase<TL>::Attribute(uint32_t(l) | uint32_t(r));
+	}
+	friend bool operator&(Attribute l, Attribute r) {
+		return (uint32_t(l) & uint32_t(r)) != 0;
+	}
 };
 
-inline GlRendererBase::Attribute operator|(GlRendererBase::Attribute l, GlRendererBase::Attribute r) {
-    return GlRendererBase::Attribute(uint32_t(l) | uint32_t(r));
-}
-inline bool operator&(GlRendererBase::Attribute l, GlRendererBase::Attribute r) {
-    return (uint32_t(l) & uint32_t(r)) != 0;
-}
-}
+} // namespace mufflon::renderer

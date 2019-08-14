@@ -146,6 +146,9 @@
     <Filter Include="Source Files\core\data_structs">
       <UniqueIdentifier>{4ea1c992-03c5-4ac9-a3f1-951c1a12f616}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\targets">
+      <UniqueIdentifier>{3c330ca5-47e8-49f7-b828-171ff84692e4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -223,9 +226,6 @@
     <ClCompile Include="..\..\src\profiler\profiling.cpp">
       <Filter>Source Files\profiler</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\lights\lights.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
@@ -264,9 +264,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\util\parallel.cpp">
       <Filter>Source Files\util</Filter>
@@ -479,9 +476,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\output_handler.hpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\byte_io.hpp">
       <Filter>Source Files\util</Filter>
@@ -1071,6 +1065,21 @@
     <ClInclude Include="..\..\src\core\math\curvature.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\output_handler.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\render_target.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\render_targets.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\type_helpers.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\output_handler_variance.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1084,9 +1093,6 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu">
       <Filter>Source Files\core\scene\accel_structs</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
-      <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\lights\light_tree.cu">
       <Filter>Source Files\core\scene\lights</Filter>
@@ -1108,6 +1114,9 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cu">
       <Filter>Source Files\core\renderer\pt</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\targets\output_handler.cu">
+      <Filter>Source Files\core\renderer\targets</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>

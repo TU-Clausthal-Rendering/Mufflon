@@ -3,7 +3,6 @@
 #include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
@@ -277,7 +276,7 @@ Spectrum CpuIvcm::merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& ph
 
 
 CpuIvcm::CpuIvcm() :
-	RendererBase<Device::CPU>({"mean_curvature"}, {}, {})
+	RendererBase<Device::CPU, IvcmTargets>({"mean_curvature"}, {}, {})
 {}
 CpuIvcm::~CpuIvcm() {}
 
@@ -440,7 +439,10 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				Pixel outCoord = coord;
 				auto conVal = connect(*currentVertex, *lightVertex, outCoord, mergeArea, numPhotons, reuseCount, incidentF, incidentB);
 				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(currentVertex->ext().throughput.x));
-				m_outputBuffer.contribute(outCoord, throughput, math::Throughput{lightVertex->ext().throughput, 1.0f}, conVal.cosines, conVal.bxdfs);
+
+
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
+				m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * conVal.cosines);
 			}
 			lightVertex = lightVertex->previous();
 		}//*/
@@ -474,7 +476,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			m_outputBuffer.set(coord, 0, Spectrum{currentVertex->ext().density * (m_currentIteration + 1)});
+			m_outputBuffer.set<DensityTarget>(coord, currentVertex->ext().density * (m_currentIteration + 1));
 			break;
 		}//*/
 		// Evaluate direct hit of area ligths and the background
@@ -502,8 +504,12 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				emission.value *= misWeight;
 			}
 			mAssert(!isnan(emission.value.x));
-			m_outputBuffer.contribute(coord, throughput, emission.value, currentVertex->get_position(),
-									currentVertex->get_normal(), currentVertex->get_albedo());
+
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * currentVertex->get_position());
+			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * currentVertex->get_normal());
+			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * currentVertex->get_albedo());
+			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}//*/
 		if(currentVertex->is_end_point()) break;
 
@@ -527,8 +533,9 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			++photonIt;
 		}
 		radiance /= mergeArea * numPhotons;
-		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
-			scene::Direction{0.0f}, Spectrum{0.0f});//*/
+
+		m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * radiance);
+		m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(radiance));
 		//break;
 	} while(viewPathLen < m_params.maxPathLength);
 }

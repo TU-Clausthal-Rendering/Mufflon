@@ -61,12 +61,12 @@ namespace gui.Command
                 if (target.Enabled)
                 {
                     string file = ReplaceTargetFilenameTags(m_models, target.Name, false, filename);
-                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, file), target.TargetIndex, 0u);
+                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, file), target.Name, false);
                 }
                 if (target.VarianceEnabled)
                 {
                     string file = ReplaceTargetFilenameTags(m_models, target.Name, true, filename);
-                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, file), target.TargetIndex, 1u);
+                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, file), target.Name, true);
                 }
             }
         }

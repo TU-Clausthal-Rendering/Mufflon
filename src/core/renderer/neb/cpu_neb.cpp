@@ -3,7 +3,6 @@
 #include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/parameter.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -216,8 +215,8 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			// In the case that there is no previous, there is also no MIS and we
 			// contribute directly.
 			if(!previous) {
-				m_outputBuffer.contribute(coord, { Spectrum{1.0f}, 1.0f }, { Spectrum{1.0f}, 1.0f },
-											1.0f, emission.value);
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+				m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight);
 			} else if(emission.value != 0.0f) {
 				EmissionDesc emDesc;
 				emDesc.previous = static_cast<const NebPathVertex*>(vertex.previous());
@@ -648,10 +647,11 @@ void CpuNextEventBacktracking::iterate() {
 
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
-		m_outputBuffer.contribute(coord, { vertex.ext().throughput, 1.0f }, { Spectrum{1.0f}, 1.0f },
-								  1.0f, radiance);
+		m_outputBuffer.contribute<RadianceTarget>(coord, vertex.ext().throughput * radiance);
+		m_outputBuffer.contribute<LightnessTarget>(coord, 1.f);
+
 		/*if(vertex.get_path_len() == 1)
-			m_outputBuffer.set(coord, 0, ei::Vec3{vertex.ext().density * (m_currentIteration+1)});//*/
+			m_outputBuffer.set<DensityTarget>(coord, vertex.ext().density * (m_currentIteration+1));//*/
 	}
 
 	// Finialize the evaluation of emissive end vertices.
@@ -664,8 +664,9 @@ void CpuNextEventBacktracking::iterate() {
 		Spectrum emission = finalize_emission(neeMergeArea, photonMergeArea, m_selfEmissiveEndVertices[i], incidentPdfsF, incidentPdfsB, numStdPhotonPaths);
 		Pixel coord { m_selfEmissiveEndVertices[i].previous->ext().pixelIndex % m_outputBuffer.get_width(),
 					  m_selfEmissiveEndVertices[i].previous->ext().pixelIndex / m_outputBuffer.get_width() };
-		m_outputBuffer.contribute(coord, { Spectrum{1.0f}, 1.0f }, { Spectrum{1.0f}, 1.0f },
-								  1.0f, emission);
+		m_outputBuffer.contribute<RadianceTarget>(coord, emission);
+		m_outputBuffer.contribute<LightnessTarget>(coord, 1.f);
+
 	}//*/
 
 	logPedantic("[NEB] Memory occupation    View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),

@@ -13,10 +13,7 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
-class CpuPathTracer final : public RendererBase<Device::CPU> {
+class CpuPathTracer final : public RendererBase<Device::CPU, PtTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuPathTracer();

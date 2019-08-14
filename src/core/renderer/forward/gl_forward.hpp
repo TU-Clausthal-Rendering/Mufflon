@@ -7,7 +7,7 @@
 
 namespace mufflon::renderer {
 	
-class GlForward final : public GlRendererBase {
+class GlForward final : public GlRendererBase<ForwardTargets> {
 public:
 	// Initialize all resources required by this renderer
 	GlForward();

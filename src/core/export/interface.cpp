@@ -10,7 +10,6 @@
 #include "profiler/cpu_profiler.hpp"
 #include "profiler/gpu_profiler.hpp"
 #include "core/renderer/renderer.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/renderers.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"
@@ -95,8 +94,7 @@ constexpr int minMinorCC = 0;
 // static variables for interacting with the renderer
 renderer::IRenderer* s_currentRenderer;
 // Current iteration counter
-std::unique_ptr<renderer::OutputHandler> s_imageOutput;
-renderer::OutputValue s_outputTargets{ 0 };
+std::unique_ptr<renderer::IOutputHandler> s_imageOutput;
 std::unique_ptr<float[]> s_screenTexture;
 int s_screenTextureNumChannels;
 WorldContainer& s_world = WorldContainer::instance();
@@ -314,24 +312,17 @@ Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
 	CATCH_ALL(false)
 }
 
-Boolean core_get_target_image(uint32_t index, Boolean variance, const float** ptr) {
+Boolean core_get_target_image(const char* name, Boolean variance, const float** ptr) {
 	TRY
 	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
-	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	std::scoped_lock iterLock{ s_iterationMutex };
-	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
-	const renderer::OutputValue targetFlags{ flags };
-	if(!s_outputTargets.is_set(targetFlags)) {
-		logError("[", FUNCTION_NAME, "] Specified render target is not active");
-		return false;
-	}
 		
 	// If there's no output yet, we "return" a nullptr
 	if(s_imageOutput != nullptr) {
-		auto data = s_imageOutput->get_data(targetFlags);
+		auto data = s_imageOutput->get_data(name, variance);
 		std::scoped_lock screenLock{ s_screenTextureMutex };
 		s_screenTexture = std::move(data);
-		s_screenTextureNumChannels = renderer::RenderTargets::NUM_CHANNELS[index];
+		s_screenTextureNumChannels = s_imageOutput->get_num_channels(name);
 		if(ptr != nullptr)
 			*ptr = reinterpret_cast<const float*>(s_screenTexture.get());
 	} else if(ptr != nullptr) {
@@ -370,11 +361,13 @@ Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
 
 Boolean core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r, float* g, float* b, float* a) {
 	TRY
-	CHECK(borderClamp || ((int)x < s_imageOutput->get_width() && (int)y >= s_imageOutput->get_height()),
+	CHECK(borderClamp || ((int)x < s_imageOutput->get_width() && (int)y < s_imageOutput->get_height()),
 		  "Pixel coordinates are out of bounds", false);
 	*r = *g = *b = *a = 0.0f;
 	if(s_screenTexture) {
-		int idx = (x + y * s_imageOutput->get_width()) * s_screenTextureNumChannels;
+		auto coordX = std::min<std::uint32_t>(s_imageOutput->get_width() - 1, x);
+		auto coordY = std::min<std::uint32_t>(s_imageOutput->get_height() - 1, y);
+		int idx = (coordX + coordY * s_imageOutput->get_width()) * s_screenTextureNumChannels;
 		switch(s_screenTextureNumChannels) {
 			case 4: *a = s_screenTexture[idx+3]; // FALLTHROUGH
 			case 3: *b = s_screenTexture[idx+2]; // FALLTHROUGH
@@ -1744,9 +1737,10 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 		return nullptr;
 	}
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
-	if(s_currentRenderer != nullptr)
+	if(s_currentRenderer != nullptr) {
 		s_currentRenderer->load_scene(hdl);
-	s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
+		s_imageOutput = s_currentRenderer->create_output_handler(res.x, res.y);
+	}
 	s_screenTexture = nullptr;
 	return static_cast<SceneHdl>(hdl);
 	CATCH_ALL(nullptr)
@@ -3170,8 +3164,14 @@ Boolean render_enable_renderer(uint32_t index, uint32_t variation) {
 	CHECK(variation < s_renderers.get(index).size(), "renderer index out of bounds", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
 	s_currentRenderer = s_renderers.get(index)[variation].get();
-	if(s_world.get_current_scenario() != nullptr)
+	if(s_world.get_current_scenario() != nullptr) {
 		s_currentRenderer->load_scene(s_world.get_current_scene());
+		s_imageOutput = s_currentRenderer->create_output_handler(s_world.get_current_scenario()->get_resolution().x,
+																 s_world.get_current_scenario()->get_resolution().y);
+	} else {
+		// Placeholder output handler
+		s_imageOutput = s_currentRenderer->create_output_handler(1, 1);
+	}
 	s_currentRenderer->on_renderer_enable();
 	return true;
 	CATCH_ALL(false)
@@ -3196,9 +3196,10 @@ Boolean render_iterate(ProcessTime* time) {
 		}
 		SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(s_world.get_current_scenario()), s_currentRenderer);
 		ei::IVec2 res = s_world.get_current_scenario()->get_resolution();
-		if(s_currentRenderer != nullptr)
+		if(s_currentRenderer != nullptr) {
 			s_currentRenderer->load_scene(hdl);
-		s_imageOutput = std::make_unique<renderer::OutputHandler>(res.x, res.y, s_outputTargets);
+			s_imageOutput = s_currentRenderer->create_output_handler(res.x, res.y);
+		}
 		s_screenTexture = nullptr;
 	} else {
 		s_world.reload_scene(s_currentRenderer);
@@ -3238,16 +3239,11 @@ Boolean render_reset() {
 	CATCH_ALL(false)
 }
 
-Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boolean variance) {
+Boolean render_save_screenshot(const char* filename, const char* targetName, Boolean variance) {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
-		return false;
-	}
-
-	if(targetIndex >= renderer::OutputValue::TARGET_COUNT) {
-		logError("[", FUNCTION_NAME, "] Invalid target index (", targetIndex, ")");
 		return false;
 	}
 
@@ -3265,10 +3261,9 @@ Boolean render_save_screenshot(const char* filename, uint32_t targetIndex, Boole
 			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
 					   "; the screenshot possibly may not be created");
 
-	const u32 flags = variance ? renderer::OutputValue::make_variance(1u << targetIndex) : (1u << targetIndex);
-	auto data = s_imageOutput->get_data(renderer::OutputValue{ flags });
-	const int numChannels = renderer::RenderTargets::NUM_CHANNELS[targetIndex];
-	ei::IVec2 res = s_imageOutput->get_resolution();
+	auto data = s_imageOutput->get_data(targetName, variance);
+	const int numChannels = s_imageOutput->get_num_channels(targetName);
+	ei::IVec2 res{ s_imageOutput->get_width(), s_imageOutput->get_height() };
 
 	TextureData texData;
 	texData.data = reinterpret_cast<uint8_t*>(data.get());
@@ -3300,17 +3295,13 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
-	if(!s_outputTargets.is_set(renderer::OutputValue::RADIANCE)) {
-		logError("[", FUNCTION_NAME, "] The current rendering does not have its radiance target active");
-		return false;
-	}
 	if(s_imageOutput->get_current_iteration() == 0) {
 		logError("[", FUNCTION_NAME, "] At least a single iteration must have been rendered for denoising");
 		return false;
 	}
 
-	std::unique_ptr<float[]> radiance = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::RADIANCE });
-	std::unique_ptr<float[]> output = std::make_unique<float[]>(3 * s_imageOutput->get_num_pixels());
+	std::unique_ptr<float[]> radiance = s_imageOutput->get_data("Radiance", false);
+	std::unique_ptr<float[]> output = std::make_unique<float[]>(3 * s_imageOutput->get_width() * s_imageOutput->get_height());
 	std::unique_ptr<float[]> normals;
 	std::unique_ptr<float[]> albedo;
 
@@ -3324,7 +3315,7 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 					s_imageOutput->get_height());
 	// TODO: incorporate albedo/normals if present? But currently they're noisy,
 	// and OIDN wants (mostly) first-hit info (I think)
-	if(s_outputTargets.is_set(renderer::OutputValue::NORMAL)) {
+	/*if(s_outputTargets.is_set(renderer::OutputValue::NORMAL)) {
 		normals = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::NORMAL });
 		filter.setImage("normal", normals.get(), oidn::Format::Float3, s_imageOutput->get_width(),
 						s_imageOutput->get_height());
@@ -3335,7 +3326,7 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 		filter.setImage("albedo", albedo.get(), oidn::Format::Float3, s_imageOutput->get_width(),
 						s_imageOutput->get_height());
 		logPedantic("[", FUNCTION_NAME, "] Using albedo guidance");
-	}
+	}*/
 	filter.set("hdr", true);
 	filter.commit();
 	filter.execute();
@@ -3359,7 +3350,7 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
 					   "; the screenshot possibly may not be created");
 
-	const int numChannels = renderer::RenderTargets::NUM_CHANNELS[renderer::RenderTargets::RADIANCE];
+	const int numChannels = s_imageOutput->get_num_channels("Radiance");
 	TextureData texData;
 	texData.data = reinterpret_cast<uint8_t*>(output.get());
 	texData.components = numChannels;
@@ -3385,72 +3376,53 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 }
 
 uint32_t render_get_render_target_count() {
-	return renderer::OutputValue::TARGET_COUNT;
+	if(s_imageOutput == nullptr)
+		return 0u;
+	return static_cast<uint32_t>(s_imageOutput->get_render_target_count());
 }
 
 const char* render_get_render_target_name(uint32_t index) {
-	return renderer::get_render_target_name(index).data();
+	if(s_imageOutput == nullptr)
+		return "";
+	return s_imageOutput->get_render_target_name(index).data();
 }
 
-Boolean render_enable_render_target(uint32_t index, Boolean variance) {
+Boolean render_enable_render_target(const char* target, Boolean variance) {
 	TRY
-	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
-	s_outputTargets.set(renderer::OutputValue{ 1u << index });
-	if(variance)
-		s_outputTargets.set(renderer::OutputValue{ renderer::OutputValue::make_variance(1u << index) });
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	s_imageOutput->enable_render_target(target, variance);
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->on_render_target_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_enable_render_target_by_name(const char* target, Boolean variance) {
+Boolean render_disable_render_target(const char* target, Boolean variance) {
 	TRY
-	// Check if we have such a target
-	for(std::size_t i = 0u; i < renderer::OutputValue::TARGET_COUNT; ++i) {
-		if(renderer::get_render_target_name((u32)i).compare(target) == 0)
-			return render_enable_render_target((u32)i, variance);
-	}
-	logError("[", FUNCTION_NAME, "] Could not find a render target with the name'", target, "'");
-	return false;
-	CATCH_ALL(false)
-}
-
-Boolean render_disable_render_target(uint32_t index, Boolean variance) {
-	TRY
-	CHECK(index < renderer::OutputValue::TARGET_COUNT, "unknown render target", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
-	if(!variance)
-		s_outputTargets.clear(renderer::OutputValue{ 1u << index });
-	s_outputTargets.clear(renderer::OutputValue{ renderer::OutputValue::make_variance(1u << index) });
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	s_imageOutput->disable_render_target(target, variance);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->on_render_target_changed();
 	return true;
-	CATCH_ALL(false)
-}
-
-Boolean render_disable_render_target_by_name(const char* target, Boolean variance) {
-	TRY
-		// Check if we have such a target
-		for(std::size_t i = 0u; i < renderer::OutputValue::TARGET_COUNT; ++i) {
-			if(renderer::get_render_target_name((u32)i).compare(target) == 0)
-				return render_disable_render_target((u32)i, variance);
-		}
-	logError("[", FUNCTION_NAME, "] Could not find a render target with the name'", target, "'");
-	return false;
 	CATCH_ALL(false)
 }
 
 Boolean render_enable_non_variance_render_targets() {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
-	for(u32 target : renderer::OutputValue::iterator)
-		s_outputTargets.set(target);
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	s_imageOutput->enable_all_render_targets(false);
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->on_render_target_changed();
 	return true;
@@ -3460,12 +3432,11 @@ Boolean render_enable_non_variance_render_targets() {
 Boolean render_enable_all_render_targets() {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
-	for(u32 target : renderer::OutputValue::iterator) {
-		s_outputTargets.set(target);
-		s_outputTargets.set(renderer::OutputValue::make_variance(target));
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
 	}
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
+	s_imageOutput->enable_all_render_targets(true);
 	if(s_currentRenderer != nullptr)
 		s_currentRenderer->on_render_target_changed();
 	return true;
@@ -3475,10 +3446,13 @@ Boolean render_enable_all_render_targets() {
 Boolean render_disable_variance_render_targets() {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
-	for(u32 target : renderer::OutputValue::iterator)
-		s_outputTargets.clear(renderer::OutputValue::make_variance(target));
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	s_imageOutput->disable_all_render_targets(true);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->on_render_target_changed();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3486,17 +3460,24 @@ Boolean render_disable_variance_render_targets() {
 Boolean render_disable_all_render_targets() {
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
-	s_outputTargets.clear_all();
-	if(s_imageOutput != nullptr)
-		s_imageOutput->set_targets(s_outputTargets);
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	s_imageOutput->disable_all_render_targets(false);
+	if(s_currentRenderer != nullptr)
+		s_currentRenderer->on_render_target_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_is_render_target_enabled(uint32_t index, Boolean variance) {
+Boolean render_is_render_target_enabled(const char* name, Boolean variance) {
 	TRY
-	u32 flags = variance ? renderer::OutputValue::make_variance(1u << index) : 1u << index;
-	return s_outputTargets.is_set(renderer::OutputValue{ flags });
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	return s_imageOutput->is_render_target_enabled(name, variance);
 	CATCH_ALL(false)
 }
 

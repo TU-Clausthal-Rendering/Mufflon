@@ -22,19 +22,19 @@ namespace gui.Model
 
         public bool Enabled
         {
-            get => Core.render_is_render_target_enabled(TargetIndex, false);
+            get => Core.render_is_render_target_enabled(Name, false);
             set
             {
-                if (value == Core.render_is_render_target_enabled(TargetIndex, false)) return;
+                if (value == Core.render_is_render_target_enabled(Name, false)) return;
                 if (value)
                 {
-                    if (!Core.render_enable_render_target(TargetIndex, VarianceEnabled ? 1u : 0u))
+                    if (!Core.render_enable_render_target(Name, VarianceEnabled))
                         throw new Exception(Core.core_get_dll_error());
                 }
                 else
                 {
                     VarianceEnabled = false;
-                    if (!Core.render_disable_render_target(TargetIndex, 0u))
+                    if (!Core.render_disable_render_target(Name, false))
                         throw new Exception(Core.core_get_dll_error());
                 }
                 OnPropertyChanged(nameof(Enabled));
@@ -43,19 +43,19 @@ namespace gui.Model
 
         public bool VarianceEnabled
         {
-            get => Core.render_is_render_target_enabled(TargetIndex, true);
+            get => Core.render_is_render_target_enabled(Name, true);
             set
             {
-                if (value == Core.render_is_render_target_enabled(TargetIndex, true)) return;
+                if (value == Core.render_is_render_target_enabled(Name, true)) return;
                 if (value)
                 {
                     Enabled = true;
-                    if (!Core.render_enable_render_target(TargetIndex, 1u))
+                    if (!Core.render_enable_render_target(Name, true))
                         throw new Exception(Core.core_get_dll_error());
                 }
                 else
                 {
-                    if (!Core.render_disable_render_target(TargetIndex, 1u))
+                    if (!Core.render_disable_render_target(Name, true))
                         throw new Exception(Core.core_get_dll_error());
                 }
                 OnPropertyChanged(nameof(VarianceEnabled));
@@ -84,10 +84,20 @@ namespace gui.Model
 
         public RenderTargetSelectionModel()
         {
+            UpdateTargetList();
+        }
+
+        public void UpdateTargetList()
+        {
+            m_targetStatus.Clear();
             UInt32 targetCount = Core.render_get_render_target_count();
-            for(UInt32 i = 0u; i < targetCount; ++i)
+            for (UInt32 i = 0u; i < targetCount; ++i)
                 m_targetStatus.Add(new RenderTarget(i));
-            VisibleTarget = Targets[0];
+            OnPropertyChanged(nameof(Targets));
+            if (targetCount > 0)
+                VisibleTarget = Targets[0];
+            else
+                VisibleTarget = null;
         }
 
         public IReadOnlyList<RenderTarget> Targets { get => m_targetStatus; }

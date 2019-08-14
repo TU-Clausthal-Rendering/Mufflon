@@ -42,8 +42,8 @@ class DllInterface:
         self.dllHolder.core.render_get_render_target_name.restype = c_char_p
         self.dllHolder.core.renderer_set_parameter_enum.argtypes = [c_char_p, c_int32]
         self.dllHolder.core.renderer_get_parameter_enum_value_from_name.argtypes = [c_char_p, c_char_p, c_void_p]
-        self.dllHolder.core.render_enable_render_target_by_name.argtypes = [c_char_p, c_bool]
-        self.dllHolder.core.render_enable_render_target_by_name.argtypes = [c_char_p, c_bool]
+        self.dllHolder.core.render_enable_render_target.argtypes = [c_char_p, c_bool]
+        self.dllHolder.core.render_enable_render_target.argtypes = [c_char_p, c_bool]
         self.dllHolder.core.render_iterate.argtypes = [ POINTER(ProcessTime) ]
         self.dllHolder.core.scenario_get_name.restype = c_char_p
         self.dllHolder.core.scenario_get_name.argtypes = [c_void_p]
@@ -121,11 +121,11 @@ class DllInterface:
     def render_is_render_target_enabled(self, targetIndex, variance):
         return self.dllHolder.core.render_is_render_target_enabled(c_uint32(targetIndex), c_bool(variance))
 
-    def render_enable_render_target_by_name(self, targetName, variance):
-        return self.dllHolder.core.render_enable_render_target_by_name(c_char_p(targetName.encode('utf-8')), c_bool(variance))
+    def render_enable_render_target(self, targetName, variance):
+        return self.dllHolder.core.render_enable_render_target(c_char_p(targetName.encode('utf-8')), c_bool(variance))
     
-    def render_disable_render_target_by_name(self, targetName, variance):
-        return self.dllHolder.core.render_disable_render_target_by_name(c_char_p(targetName.encode('utf-8')), c_bool(variance))
+    def render_disable_render_target(self, targetName, variance):
+        return self.dllHolder.core.render_disable_render_target(c_char_p(targetName.encode('utf-8')), c_bool(variance))
 
     def render_enable_renderer(self, rendererIndex, variation):
         return self.dllHolder.core.render_enable_renderer(c_uint32(rendererIndex), c_uint32(variation))
@@ -255,11 +255,11 @@ class RenderActions:
             raise Exception("Failed to set log level to '" + logLevel.name + "'")
 
     def enable_render_target(self, targetName, variance):
-        if not self.dllInterface.render_enable_render_target_by_name(targetName, variance):
+        if not self.dllInterface.render_enable_render_target(targetName, variance):
             raise Exception("Failed to enable render target " + targetName + " (variance: " + str(variance) + ")")
         
     def disable_render_target(self, targetName, variance):
-      if not self.dllInterface.render_disable_render_target_by_name(targetName, variance):
+      if not self.dllInterface.render_disable_render_target(targetName, variance):
             raise Exception("Failed to disable render target " + targetName + " (variance: " + str(variance) + ")")
             
     def take_denoised_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):

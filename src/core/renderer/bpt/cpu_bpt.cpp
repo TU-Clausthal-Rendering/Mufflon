@@ -3,7 +3,6 @@
 #include "util/parallel.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/memory/dyntype_memory.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include <array>
@@ -173,7 +172,7 @@ void CpuBidirPathTracer::post_reset() {
 }
 
 void CpuBidirPathTracer::sample(const Pixel coord, int idx,
-								RenderBuffer<Device::CPU>& outputBuffer,
+								RenderBufferType& outputBuffer,
 								std::vector<BptPathVertex>& path) {
 	// Trace a light path
 	math::RndSet2 rndStart { m_rngs[idx].next() };
@@ -208,7 +207,9 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
 			mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
-			outputBuffer.contribute(outCoord, throughput, path[l].ext().throughput, conVal.cosines, conVal.bxdfs);
+
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * path[l].ext().throughput.weight * conVal.cosines * conVal.bxdfs);
+			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * path[l].ext().throughput.guideWeight * conVal.cosines);
 		}
 
 		// Walk
@@ -228,8 +229,12 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 				emission.value *= mis;
 			}
 			mAssert(!isnan(emission.value.x));
-			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
-									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
+
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex[currentV].get_position());
+			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex[currentV].get_normal());
+			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex[currentV].get_albedo());
+			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}
 		if(vertex[currentV].is_end_point()) break;
 	} while(viewPathLen < m_params.maxPathLength);

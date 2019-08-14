@@ -10,7 +10,7 @@ using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
 
-__global__ static void sample_lt(RenderBuffer<Device::CUDA> outputBuffer,
+__global__ static void sample_lt(LtTargets::RenderBufferType<Device::CUDA> outputBuffer,
 								 scene::SceneDescriptor<Device::CUDA>* scene,
 								 math::Rng* rngs, LtParameters params) {
 	Pixel coord{
@@ -29,7 +29,7 @@ __global__ static void sample_lt(RenderBuffer<Device::CUDA> outputBuffer,
 
 namespace gpult_detail {
 
-cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(LtTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const LtParameters& params) {
 	int minGridSize;

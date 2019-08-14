@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_targets.hpp"
 
 namespace mufflon::renderer {
 
@@ -12,5 +13,7 @@ struct PForwardDummy {
 };
 	
 using ForwardParameters = ParameterHandler<PForwardDummy>;
+
+using ForwardTargets = TargetList<RadianceTarget>;
 
 } // namespace mufflon::renderer

@@ -14,14 +14,11 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 template < typename ExtensionT >
 class PathVertex;
 namespace { using VcmPathVertex = PathVertex<struct VcmVertexExt>; }
 
-class CpuVcm final : public RendererBase<Device::CPU> {
+class CpuVcm final : public RendererBase<Device::CPU, VcmTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuVcm();

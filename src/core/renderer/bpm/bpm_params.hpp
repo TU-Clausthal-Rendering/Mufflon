@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_targets.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -18,6 +19,11 @@ using BpmParameters = ParameterHandler<
 	PMergeRadius,
 	PProgressive,
 	PkNN
+>;
+
+using BpmTargets = TargetList<
+	RadianceTarget, PositionTarget,
+	NormalTarget, AlbedoTarget, LightnessTarget
 >;
 
 }} // namespace mufflon::renderer

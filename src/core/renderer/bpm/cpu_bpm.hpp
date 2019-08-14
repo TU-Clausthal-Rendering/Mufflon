@@ -15,14 +15,11 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 template < typename ExtensionT >
 class PathVertex;
 namespace { using BpmPathVertex = PathVertex<struct BpmVertexExt>; }
 
-class CpuBidirPhotonMapper final : public RendererBase<Device::CPU> {
+class CpuBidirPhotonMapper final : public RendererBase<Device::CPU, BpmTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuBidirPhotonMapper();

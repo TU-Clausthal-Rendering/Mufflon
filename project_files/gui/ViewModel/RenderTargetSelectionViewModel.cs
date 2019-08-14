@@ -125,19 +125,38 @@ namespace gui.ViewModel
             m_models = models;
             m_reset = reset;
 
-            foreach(RenderTarget target in m_models.RenderTargetSelection.Targets)
+            UpdateTargetList();
+            m_models.RenderTargetSelection.PropertyChanged += OnModelChanged;
+            m_models.Renderer.PropertyChanged += OnRendererChanged;
+        }
+
+        private void UpdateTargetList()
+        {
+            TargetData.Clear();
+            foreach (RenderTarget target in m_models.RenderTargetSelection.Targets)
             {
                 TargetData.Add(new RenderTargetSelectionItem(target, m_models.RenderTargetSelection));
                 m_models.RenderTargetSelection.Targets[(int)target.TargetIndex].PropertyChanged += OnModelChanged;
             }
-            m_models.RenderTargetSelection.PropertyChanged += OnModelChanged;
             OnPropertyChanged(nameof(TargetData));
+        }
+
+        private void OnRendererChanged(object sender, PropertyChangedEventArgs args)
+        {
+            if(sender == m_models.Renderer && args.PropertyName == nameof(Model.RendererModel.RendererIndex))
+            {
+                // The renderer changed, thus we have to update the list of available render targets
+                m_models.RenderTargetSelection.UpdateTargetList();
+            }
         }
 
         private void OnModelChanged(object sender, PropertyChangedEventArgs args)
         {
             switch(args.PropertyName)
             {
+                case nameof(RenderTargetSelectionModel.Targets):
+                    UpdateTargetList();
+                    break;
                 case nameof(RenderTargetSelectionModel.VisibleTarget):
                     foreach (var data in TargetData)
                     {

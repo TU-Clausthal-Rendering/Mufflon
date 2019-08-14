@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_targets.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -26,6 +27,12 @@ using IvcmParameters = ParameterHandler<
 	PProgressive,
 	PShowDensity,
 	PHeuristic
+>;
+
+using IvcmTargets = TargetList<
+	RadianceTarget, PositionTarget,
+	NormalTarget, AlbedoTarget, LightnessTarget,
+	DensityTarget
 >;
 
 }} // namespace mufflon::renderer

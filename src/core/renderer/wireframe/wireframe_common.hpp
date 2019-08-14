@@ -3,7 +3,6 @@
 #include "wireframe_params.hpp"
 #include "core/math/rng.hpp"
 #include "core/memory/residency.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include <ei/vector.hpp>
@@ -93,12 +92,11 @@ CUDA_FUNCTION float computeDistToRim(const scene::SceneDescriptor<CURRENT_DEV>& 
 
 } // namespace 
 
-CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
+CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									scene::SceneDescriptor<CURRENT_DEV>& scene,
 									const WireframeParameters& params, math::Rng& rng, const Pixel& coord) {
 	constexpr ei::Vec3 borderColor{ 1.f };
 
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	PtPathVertex vertex;
 	// Create a start for the path
 	PtPathVertex::create_camera(&vertex, &vertex, scene.camera.get(), coord, rng.next());
@@ -113,9 +111,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 		if(nextHit.hitId.instanceId < 0) {
 			auto background = evaluate_background(scene.lightTree.background, ray.direction);
 			if(any(greater(background.value, 0.0f))) {
-				outputBuffer.contribute(coord, throughput, background.value,
-										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-										ei::Vec3{ 0, 0, 0 });
+				outputBuffer.contribute<BorderTarget>(coord, background.value);
 			}
 			break;
 		} else {
@@ -176,9 +172,7 @@ CUDA_FUNCTION void sample_wireframe(RenderBuffer<CURRENT_DEV>& outputBuffer,
 			if(projDistToRim > distThreshold) {
 				ray.origin = ray.origin + ray.direction * hitDist;
 			} else {
-				outputBuffer.contribute(coord, throughput, borderColor,
-										ei::Vec3{ 0, 0, 0 }, ei::Vec3{ 0, 0, 0 },
-										ei::Vec3{ 0, 0, 0 });
+				outputBuffer.contribute<BorderTarget>(coord, borderColor);
 				break;
 			}
 		}
