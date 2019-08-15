@@ -232,26 +232,27 @@ public:
 
 				const std::size_t PIXEL_SIZE_FROM = TargetType::NUM_CHANNELS * sizeof(cuda::Atomic<from, PixelType>);
 				const std::size_t PIXEL_SIZE_TO = TargetType::NUM_CHANNELS * sizeof(cuda::Atomic<to, PixelType>);
-				std::size_t offsetFrom = static_cast<std::size_t>(get_width() * actualSplit) * PIXEL_SIZE_FROM;
-				std::size_t offsetTo = static_cast<std::size_t>(get_width() * actualSplit) * PIXEL_SIZE_TO;
+				std::size_t index = static_cast<std::size_t>(get_width() * actualSplit);
+				src += index;
+				dst += index;
 
-				if constexpr(to == Device::CPU || from == Device::CPU) {
+				if constexpr((PIXEL_SIZE_FROM != PIXEL_SIZE_TO) && (to == Device::CPU || from == Device::CPU)) {
 					// We cannot simply memcpy due to the possibly differing sizes of atomics
 					for(int y = actualSplit; y < get_height(); ++y) {
 						for(int x = 0; x < get_width(); ++x) {
 							if constexpr(to == Device::CPU) {
 								cuda::Atomic<from, PixelType> val;
-								copy(&val, src + offsetFrom, PIXEL_SIZE_FROM);
+								copy(&val, src, PIXEL_SIZE_FROM);
 								const auto loaded = cuda::atomic_load<from, PixelType>(val);
-								cuda::atomic_exchange<to, PixelType>(*(dst + offsetTo), loaded);
+								cuda::atomic_exchange<to, PixelType>(*dst, loaded);
 							}
-							offsetFrom += PIXEL_SIZE_FROM;
-							offsetTo += PIXEL_SIZE_TO;
+							++index;
 						}
 					}
 				} else {
 					// Simple memcpy is enough
-					copy(dst + offsetTo, src + offsetFrom, get_width() * (get_height() - actualSplit) * PIXEL_SIZE_FROM);
+					copy((ArrayDevHandle_t<to, char>)dst, (ConstArrayDevHandle_t<from, char>)src,
+						 get_width() * (get_height() - actualSplit) * PIXEL_SIZE_FROM);
 				}
 				// TODO: mark changed?
 			}
