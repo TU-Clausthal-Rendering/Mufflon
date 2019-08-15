@@ -207,13 +207,13 @@ class RenderActions:
     def __init__(self):
         self.dllInterface = DllInterface()
 
-    def load_json(self, sceneJson):
+    def load_json(self, sceneJson, defaultRenderTarget="Radiance"):
         fileName = path_leaf(sceneJson)
         self.sceneName = fileName.split(".")[0]
         returnValue = self.dllInterface.loader_load_json(sceneJson)
         if returnValue != LoaderStatus.SUCCESS:
             raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + returnValue.name + ")")
-        self.enable_render_target("Radiance", False)
+        self.enable_render_target(defaultRenderTarget, False)
 
     def enable_renderer(self, rendererName, devices):
         for i in range(self.dllInterface.render_get_renderer_count()):
