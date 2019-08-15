@@ -16,7 +16,8 @@ def render():
     renderer.enable_render_target("Radiance", False);
     renderer.enable_render_target("Normal", True);
     
-    # Example file path to one of our testscenes
+    # Example file path to one of our testscenes (the default render target defaults to 'Radiance',
+	# which we don't care about because we already enabled them prior)
     renderer.load_json(sceneJson="../../testscenes/material/blender_mat_preview.json")
     renderer.load_scenario("Glossy Orange")
     # Animation frames are implicitly clipped in the available range and start at 0
