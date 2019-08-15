@@ -173,6 +173,9 @@
     <Filter Include="Source Files\core\renderer\shader">
       <UniqueIdentifier>{0794bf0f-2b18-4269-a38c-12ddf1099ca1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\targets">
+      <UniqueIdentifier>{c6de1cf0-1cc5-4602-918e-5375593b037b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -250,9 +253,6 @@
     <ClCompile Include="..\..\src\profiler\profiling.cpp">
       <Filter>Source Files\profiler</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\output_handler.cpp">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\lights\lights.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
@@ -291,9 +291,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp">
       <Filter>Source Files\core\renderer\wireframe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\renderer_base.cpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\util\parallel.cpp">
       <Filter>Source Files\util</Filter>
@@ -542,9 +539,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\textures\interface.hpp">
       <Filter>Source Files\core\scene\textures</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\output_handler.hpp">
-      <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\byte_io.hpp">
       <Filter>Source Files\util</Filter>
@@ -1203,7 +1197,30 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\shadow_photons\shadow_photons_params.hpp">
       <Filter>Source Files\core\renderer\decimaters\shadow_photons</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\math\functions.hpp" />
+    <ClInclude Include="..\..\src\core\math\functions.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\math\curvature.hpp">
+      <Filter>Source Files\core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\footprint.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\output_handler.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\output_handler_variance.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\render_target.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\targets\render_targets.hpp">
+      <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\type_helpers.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1217,9 +1234,6 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\accel_structs\accel_structs_commons.cu">
       <Filter>Source Files\core\scene\accel_structs</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\src\core\renderer\output_handler.cu">
-      <Filter>Source Files\core\renderer</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\scene\lights\light_tree.cu">
       <Filter>Source Files\core\scene\lights</Filter>
@@ -1247,6 +1261,9 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cu">
       <Filter>Source Files\core\renderer\decimaters\silhouette\pt</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\targets\output_handler.cu">
+      <Filter>Source Files\core\renderer\targets</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>

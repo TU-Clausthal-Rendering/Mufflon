@@ -288,6 +288,9 @@ public:
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
 
+	// Computes the "mean_curvature" attribute for all vertices
+	void compute_curvature();
+
 	// Gets a constant handle to the underlying mesh data.
 	const PolygonMeshType& native() const {
 		mAssert(m_meshData != nullptr);

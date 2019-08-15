@@ -108,7 +108,7 @@ namespace gui.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("#scene-#scenario-#renderer-#iteration")]
+        [global::System.Configuration.DefaultSettingValueAttribute("#scene-#scenario-#renderer-#iteration-#target")]
         public string ScreenshotNamePattern {
             get {
                 return ((string)(this["ScreenshotNamePattern"]));

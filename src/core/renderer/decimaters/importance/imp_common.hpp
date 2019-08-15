@@ -16,11 +16,17 @@ struct ImpVertexExt {
 
 
 	CUDA_FUNCTION void init(const PathVertex<ImpVertexExt>& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosineAbs,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
 	}
+
+	CUDA_FUNCTION void update(const PathVertex<ImpVertexExt>& prevVertex,
+							  const PathVertex<ImpVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {}
 
 	CUDA_FUNCTION void update(const PathVertex<ImpVertexExt>& thisVertex,
 							  const scene::Direction& excident,

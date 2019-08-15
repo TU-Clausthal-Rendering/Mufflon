@@ -3,6 +3,7 @@
 #include "ivcm_params.hpp"
 #include "core/scene/handles.hpp"
 #include "core/renderer/renderer_base.hpp"
+#include "core/renderer/footprint.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
 #include "core/data_structs/photon_map.hpp"
@@ -17,14 +18,14 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 template < typename ExtensionT >
 class PathVertex;
-namespace { using IvcmPathVertex = PathVertex<struct IvcmVertexExt>; }
+namespace {
+	using IvcmPathVertex = PathVertex<struct IvcmVertexExt>;
+	class VertexWrapper;
+}
 
-class CpuIvcm final : public RendererBase<Device::CPU> {
+class CpuIvcm final : public RendererBase<Device::CPU, IvcmTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuIvcm();
@@ -37,6 +38,7 @@ public:
 	StringView get_name() const noexcept final { return get_name_static(); }
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
+	void pre_reset() final;
 	void post_reset() final;
 
 	// Information which are stored in the photon map
@@ -57,9 +59,20 @@ private:
 	void sample(const Pixel coord, int idx, int numPhotons, float currentMergeRadius,
 				AreaPdf* incidentF, AreaPdf* incidentB, IvcmPathVertex* vertexBuffer,
 				float* reuseCount);
-	void compute_counts(float* reuseCount, float mergeArea, int numPhotons, bool merge,
-						const IvcmPathVertex* path0, int pl0,
-						const IvcmPathVertex* path1, int pl1);
+	struct ConnectionValue { Spectrum bxdfs; float cosines; };
+	ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
+							Pixel& coord, float mergeArea, int numPhotons, float* reuseCount,
+							AreaPdf* incidentF, AreaPdf* incidentB);
+	Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
+				   float mergeArea, int numPhotons, float* reuseCount,
+				   AreaPdf* incidentF, AreaPdf* incidentB);
+	// connectionDist: posititve value for connections and random hits, 0 for merges
+	// p0Pdf: PDF to go from path0 into direction of path1
+	// p1Pdf: PDF to go from path1 into direction of path0
+	void compute_counts(float* reuseCount, float mergeArea,
+						int numPhotons, float connectionDist,
+						VertexWrapper path0, int pl0,
+						VertexWrapper path1, int pl1);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 

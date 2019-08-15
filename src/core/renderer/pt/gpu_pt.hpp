@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pt_params.hpp"
+#include "core/math/rng.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/lights/light_tree.hpp"
@@ -12,10 +13,7 @@ enum class Device : unsigned char;
 
 namespace renderer {
 
-template < Device >
-struct RenderBuffer;
-
-class GpuPathTracer final : public RendererBase<Device::CUDA> {
+class GpuPathTracer final : public RendererBase<Device::CUDA, PtTargets> {
 public:
 	GpuPathTracer();
 	~GpuPathTracer() = default;

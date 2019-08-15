@@ -3,7 +3,6 @@
 #include "cpu_importance.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
@@ -137,7 +136,7 @@ void CpuImportanceDecimater::pre_reset() {
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 
-	RendererBase<Device::CPU>::pre_reset();
+	RendererBase<Device::CPU, importance::ImportanceTargets>::pre_reset();
 }
 
 void CpuImportanceDecimater::on_world_clearing() {
@@ -145,7 +144,7 @@ void CpuImportanceDecimater::on_world_clearing() {
 	m_currentDecimationIteration = 0u;
 }
 
-void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
+void CpuImportanceDecimater::post_iteration(IOutputHandler& outputBuffer) {
 	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 		// Finalize the decimation process
 		logInfo("Finished decimation process");
@@ -176,7 +175,7 @@ void CpuImportanceDecimater::post_iteration(OutputHandler& outputBuffer) {
 		this->on_manual_reset();
 		++m_currentDecimationIteration;
 	}
-	RendererBase<Device::CPU>::post_iteration(outputBuffer);
+	RendererBase<Device::CPU, importance::ImportanceTargets>::post_iteration(outputBuffer);
 }
 
 void CpuImportanceDecimater::iterate() {
@@ -199,7 +198,8 @@ void CpuImportanceDecimater::iterate() {
 				"ms, ", cycles / 1'000'000, " MCycles)");
 	}
 
-	if(m_params.renderUpdate || (int)m_currentDecimationIteration >= m_params.decimationIterations) {
+	if(m_outputBuffer.template is_target_enabled<RadianceTarget>()
+	   || (int)m_currentDecimationIteration >= m_params.decimationIterations) {
 		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 		for(int i = 0; i < (int)NUM_PIXELS; ++i) {
@@ -369,8 +369,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (m_params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
-						m_outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
-												value.cosOut, radiance * mis);
+						m_outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
 					}
 				}
 			}
@@ -391,8 +390,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 				float mis = 1.f / (1.f + m_params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= mis;
 			}
-			m_outputBuffer.contribute(coord, throughput, emission.value, vertex.get_position(),
-									vertex.get_normal(), vertex.get_albedo());
+			m_outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * emission.value);
 		}
 		if(vertex.is_end_point())
 			break;

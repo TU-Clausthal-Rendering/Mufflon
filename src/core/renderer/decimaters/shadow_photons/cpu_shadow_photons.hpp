@@ -1,6 +1,8 @@
 ﻿#pragma once
 
 #include "shadow_photons_params.hpp"
+#include "core/export/api.h"
+#include "core/renderer/path_util.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/data_structs/dm_octree.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
@@ -13,19 +15,23 @@ namespace mufflon::renderer::decimaters::spm {
 
 struct SpvVertexExt {
 	CUDA_FUNCTION void init(const PathVertex<SpvVertexExt>& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosineAbs,
-							const math::Throughput& incidentThrougput) {
-	}
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {}
 
 	CUDA_FUNCTION void update(const PathVertex<SpvVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair& pdf) {
-	}
+							  const math::PdfPair& pdf) {}
+
+	CUDA_FUNCTION void update(const PathVertex<SpvVertexExt>& prevVertex,
+							  const PathVertex<SpvVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {}
 };
 using SpvPathVertex = PathVertex<SpvVertexExt>;
 
-class ShadowPhotonVisualizer final : public RendererBase<Device::CPU> {
+class ShadowPhotonVisualizer final : public RendererBase<Device::CPU, ShadowPhotonTargets> {
 public:
 	ShadowPhotonVisualizer();
 	~ShadowPhotonVisualizer();

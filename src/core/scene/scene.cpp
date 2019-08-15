@@ -435,6 +435,37 @@ bool Scene::retessellate(const float tessLevel) {
 	return needLighttreeRebuild;
 }
 
+
+void Scene::compute_curvature() {
+	for(auto& obj : m_objects) {
+		printf(obj.first->get_name().cbegin());
+		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
+			if(obj.first->has_lod_available(level)) {
+				Lod& lod = obj.first->get_lod(level);
+				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
+				printf(" %lu lod: %llu po: %llu\n", level, u64(&lod), u64(&polygons));
+				fflush(stdout);
+				polygons.compute_curvature();
+			}
+		}
+	}
+}
+
+void Scene::remove_curvature() {
+	for(auto& obj : m_objects) {
+		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
+			if(obj.first->has_lod_available(level)) {
+				Lod& lod = obj.first->get_lod(level);
+				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
+				try {
+					polygons.remove_attribute("mean_curvature");
+				} catch(...) {}
+			}
+		}
+	}
+}
+
+
 template void Scene::load_materials<Device::CPU>();
 template void Scene::load_materials<Device::CUDA>();
 template void Scene::load_materials<Device::OPENGL>();

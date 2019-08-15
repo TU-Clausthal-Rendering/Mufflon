@@ -101,4 +101,16 @@ struct PShadowSilhouetteWeight {
 	}
 };
 
+
+struct ImportanceTarget {
+	static constexpr const char NAME[] = "Importance";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+struct PolyShareTarget {
+	static constexpr const char NAME[] = "Polygon share";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+
 }}}} // namespace mufflon::renderer::decimaters::silhouette

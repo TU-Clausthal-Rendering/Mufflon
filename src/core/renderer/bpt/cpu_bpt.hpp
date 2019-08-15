@@ -13,14 +13,11 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 template < typename ExtensionT >
 class PathVertex;
 namespace { using BptPathVertex = PathVertex<struct BptVertexExt>; }
 
-class CpuBidirPathTracer final : public RendererBase<Device::CPU> {
+class CpuBidirPathTracer final : public RendererBase<Device::CPU, BptTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuBidirPathTracer();
@@ -37,7 +34,7 @@ public:
 
 private:
 	// Create one sample path (actual BPT algorithm)
-	void sample(const Pixel coord, int pixel, RenderBuffer<Device::CPU>& outputBuffer,
+	void sample(const Pixel coord, int pixel, RenderBufferType& outputBuffer,
 				std::vector<BptPathVertex>& path);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);

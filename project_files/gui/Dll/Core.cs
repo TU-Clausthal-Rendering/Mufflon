@@ -147,8 +147,10 @@ namespace gui.Dll
 
         public delegate void LogCallback(string message, Severity severity);
 
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool core_get_target_image(UInt32 index, Boolean variance, out IntPtr ptr);
+
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "core_get_target_image")]
+        private static extern bool core_get_target_image_(IntPtr name, Boolean variance, out IntPtr ptr);
+        internal static bool core_get_target_image(string name, bool variance, out IntPtr ptr) { return core_get_target_image_(StringUtil.ToNativeUtf8(name), variance, out ptr); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool core_get_target_image_num_channels(IntPtr numChannels);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -442,8 +444,10 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt32 render_get_current_iteration();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_screenshot")]
-        private static extern bool render_save_screenshot_(IntPtr filename, UInt32 targetIndex, UInt32 variance);
-        internal static bool render_save_screenshot(string filename, UInt32 targetIndex, UInt32 variance) { return render_save_screenshot_(StringUtil.ToNativeUtf8(filename), targetIndex, variance); }
+        private static extern bool render_save_screenshot_(IntPtr filename, IntPtr targetName, Boolean variance);
+        internal static bool render_save_screenshot(string filename, string targetName, bool variance) {
+            return render_save_screenshot_(StringUtil.ToNativeUtf8(filename), StringUtil.ToNativeUtf8(targetName), variance);
+        }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_save_denoised_radiance")]
         private static extern bool render_save_denoised_radiance_(IntPtr filename);
         internal static bool render_save_denoised_radiance(string filename) { return render_save_denoised_radiance_(StringUtil.ToNativeUtf8(filename)); }
@@ -452,10 +456,12 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_render_target_name")]
         internal static extern IntPtr render_get_render_target_name_(UInt32 index);
         internal static string render_get_render_target_name(UInt32 index) { return StringUtil.FromNativeUTF8(render_get_render_target_name_(index)); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_render_target(UInt32 index, uint variance);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_disable_render_target(UInt32 inddex, uint variance);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_enable_render_target")]
+        internal static extern bool render_enable_render_target_(IntPtr name, Boolean variance);
+        internal static bool render_enable_render_target(string name, bool variance) { return render_enable_render_target_(StringUtil.ToNativeUtf8(name), variance); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_disable_render_target")]
+        internal static extern bool render_disable_render_target_(IntPtr name, Boolean variance);
+        internal static bool render_disable_render_target(string name, bool variance) { return render_disable_render_target_(StringUtil.ToNativeUtf8(name), variance); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_enable_non_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -464,8 +470,9 @@ namespace gui.Dll
         internal static extern bool render_disable_variance_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool render_disable_all_render_targets();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_is_render_target_enabled(UInt32 index, Boolean variance);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_is_render_target_enabled")]
+        internal static extern bool render_is_render_target_enabled_(IntPtr name, Boolean variance);
+        internal static bool render_is_render_target_enabled(string name, bool variance) { return render_is_render_target_enabled_(StringUtil.ToNativeUtf8(name), variance); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint renderer_get_num_parameters();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "renderer_get_parameter_desc")]

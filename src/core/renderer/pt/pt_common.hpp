@@ -6,7 +6,7 @@
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
-#include "core/renderer/output_handler.hpp"
+#include "core/renderer/targets/render_targets.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -16,17 +16,25 @@ struct PtVertexExt {
 	AreaPdf incidentPdf;
 
 	CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
-			  const scene::Direction& incident, const float incidentDistance,
-			  const AreaPdf incidentPdf, const float incidentCosineAbs,
-			  const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	}
+
+	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& prevVertex,
+							  const PathVertex<PtVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
 							  const scene::Direction& excident,
 							  const math::PdfPair& pdf) {
-		//excident = sample.excident;
-		//pdf = sample.pdfF;
 	}
 };
 
@@ -36,7 +44,7 @@ using PtPathVertex = PathVertex<PtVertexExt>;
 /*
  * Create one sample path (actual PT algorithm)
  */
-CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
+CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> outputBuffer,
 							 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 							 const PtParameters& params,
 							 const Pixel coord,
@@ -77,8 +85,9 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
-						outputBuffer.contribute(coord, throughput, { Spectrum{1.0f}, 1.0f },
-												value.cosOut, radiance * mis);
+						outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
+						outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * value.cosOut);
+
 					}
 				}
 			}
@@ -100,8 +109,11 @@ CUDA_FUNCTION void pt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= misWeight;
 			}
-			outputBuffer.contribute(coord, throughput, emission.value, vertex.get_position(),
-									vertex.get_normal(), vertex.get_albedo());
+			outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex.get_position());
+			outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex.get_normal());
+			outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex.get_albedo());
+			outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}
 		if(vertex.is_end_point()) break;
 	} while(pathLen < params.maxPathLength);

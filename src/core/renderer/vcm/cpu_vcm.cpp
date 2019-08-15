@@ -3,7 +3,6 @@
 #include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
@@ -31,20 +30,30 @@ struct VcmVertexExt {
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
 
-
 	CUDA_FUNCTION void init(const VcmPathVertex& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosine,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		this->throughput = incidentThrougput.weight;
-		if(thisVertex.previous() && thisVertex.previous()->is_hitable()) {
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+		this->throughput = Spectrum{1.0f};
+	}
+
+	CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
+							  const VcmPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput,
+							  int numPhotons, float area) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		this->throughput = throughput.weight;
+		if(prevVertex.is_hitable()) {
 			// Compute as much as possible from the conversion factor.
 			// At this point we do not know n and A for the photons. This quantities
 			// are added in the kernel after the walk.
-			this->prevConversionFactor = float(
-				thisVertex.previous()->convert_pdf(thisVertex.get_type(), AngularPdf{1.0f},
-				{ incident, incidentDistance * incidentDistance }).pdf );
+			float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
+			this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
 		}
 	}
 
@@ -190,12 +199,12 @@ void CpuVcm::post_reset() {
 }
 
 void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
-	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	math::RndSet2 rndStart { m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	VcmPathVertex vertex;
 	VcmPathVertex::create_light(&vertex, nullptr, p);
-	const VcmPathVertex* previous = m_photonMap.insert(p.pos.position, vertex);
+	const VcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
 	math::Throughput throughput;
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 
@@ -237,7 +246,8 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 				Pixel outCoord = coord;
 				auto conVal = connect(vertex[currentV], *lightVertex, m_sceneDesc, outCoord, numPhotons, mergeArea);
 				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(vertex[currentV].ext().throughput.x));
-				m_outputBuffer.contribute(outCoord, throughput, math::Throughput{lightVertex->ext().throughput, 1.0f}, conVal.cosines, conVal.bxdfs);
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
+				m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * conVal.cosines);
 			}
 			lightVertex = lightVertex->previous();
 		}//*/
@@ -261,8 +271,12 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 				emission.value *= misWeight;
 			}
 			mAssert(!isnan(emission.value.x));
-			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
-									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
+
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex[currentV].get_position());
+			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex[currentV].get_normal());
+			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex[currentV].get_albedo());
+			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}//*/
 		if(vertex[currentV].is_end_point()) break;
 
@@ -289,8 +303,8 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 			++photonIt;
 		}
 		radiance /= mergeArea * numPhotons;
-		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
-			scene::Direction{0.0f}, Spectrum{0.0f});//*/
+		m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * radiance);
+		m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(radiance));
 	} while(viewPathLen < m_params.maxPathLength);
 }
 

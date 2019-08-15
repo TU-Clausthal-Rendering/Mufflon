@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_targets.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -35,6 +36,12 @@ using NebParameters = ParameterHandler<
 	PNeeMergeRadius,
 	PTargetFlux,
 	PStdPhotons
+>;
+
+using NebTargets = TargetList<
+	RadianceTarget, PositionTarget,
+	NormalTarget, AlbedoTarget, LightnessTarget,
+	DensityTarget
 >;
 
 }} // namespace mufflon::renderer

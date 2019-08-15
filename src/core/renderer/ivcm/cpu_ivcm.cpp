@@ -3,7 +3,6 @@
 #include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
@@ -23,30 +22,94 @@ struct IvcmVertexExt {
 	AngularPdf pdfBack;
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
-	float density;
+	union {
+		float density;
+		float pChoice;
+	};
+	Footprint2D footprint;
 
 
 	CUDA_FUNCTION void init(const IvcmPathVertex& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosine,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		this->throughput = incidentThrougput.weight;
-		if(thisVertex.previous() && thisVertex.previous()->is_hitable()) {
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+		this->throughput = Spectrum{1.0f};
+		this->pChoice = pChoice;
+		float sourceCount = 1.0f;//pChoice * 800 * 600;
+		this->footprint.init(1.0f / (float(inAreaPdf) * sourceCount), 1.0f / (float(inDirPdf) * sourceCount));
+	}
+
+	CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
+							  const IvcmPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput,
+							  const scene::SceneDescriptor<Device::CPU>& scene,
+							  int numPhotons) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		this->throughput = throughput.weight;
+		this->pChoice = prevVertex.ext().pChoice;
+		float h = 0.0f; // Mean curvature for the footprint
+		if(prevVertex.is_hitable()) {
 			// Compute as much as possible from the conversion factor.
 			// At this point we do not know n and A for the photons. This quantities
 			// are added in the kernel after the walk.
-			this->prevConversionFactor = float(
-				thisVertex.previous()->convert_pdf(thisVertex.get_type(), AngularPdf{1.0f},
-				{ incident, incidentDistance * incidentDistance }).pdf );
+			this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
 		}
+		if(prevVertex.get_primitive_id().is_valid()) {
+			h = scene::accel_struct::fetch_curvature(scene,
+				prevVertex.get_primitive_id(),
+				prevVertex.get_surface_params(),
+				prevVertex.get_geometric_normal());
+			if(ei::abs(h) > 1e5f)
+				__debugbreak();
+		}
+		float pdfForw = float(pdf.forw);
+		if(prevVertex.is_camera())
+			pdfForw *= numPhotons; // == numPixels
+		this->footprint = prevVertex.ext().footprint.add_segment(
+			pdfForw, prevVertex.is_orthographic(), h, outCosAbs == 0.0f ? 1.0f : outCosAbs, incident.distance, inCosAbs);
 	}
 
 	CUDA_FUNCTION void update(const IvcmPathVertex& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair pdf) {
+							  const math::PdfPair pdf,
+							  const scene::SceneDescriptor<Device::CPU>& scene,
+							  int numPhotons) {
 		pdfBack = pdf.back;
 	}
+};
+
+// A wrapper to provide the vertex's current pdf without changing the original vertex.
+class VertexWrapper {
+	const IvcmPathVertex* m_vertex;
+	math::PdfPair m_pdfs;
+public:
+	VertexWrapper(const IvcmPathVertex* vertex, const math::PdfPair& pdfs) :
+		m_vertex(vertex),
+		m_pdfs(pdfs)
+	{}
+	VertexWrapper(const IvcmPathVertex& vertex) :
+		m_vertex(&vertex),
+		m_pdfs{AngularPdf{0.0f}, vertex.ext().pdfBack}
+	{}
+	const AngularPdf& pdf_forw() const noexcept { return m_pdfs.forw; }
+	const AngularPdf& pdf_back() const noexcept { return m_pdfs.back; }
+	VertexWrapper previous() const {
+		if(m_vertex->previous())
+			return {*m_vertex->previous()};
+		else return {nullptr, math::PdfPair{}};
+	}
+	float indist() const {
+		return m_vertex ? sqrt(m_vertex->get_incident_dist_sq()) : 0.0f;
+	}
+	bool is_orthographic() const noexcept { return m_vertex ? m_vertex->is_orthographic() : false; }
+	const Footprint2D& footprint() const { return m_vertex->ext().footprint; }
+	const IvcmVertexExt& ext() const { return m_vertex->ext(); }
 };
 
 // incidentF/incidentB: per vertex area pdfs
@@ -121,22 +184,24 @@ void copy_path_values(AreaPdf* incidentF, AreaPdf* incidentB,
 		incidentB[i] = vert->convert_pdf(prevType, pdfBack, connectionDir).pdf;
 		pdfBack = vert->ext().pdfBack;
 		connectionDir = vert->get_incident_connection();
+		prevType = vert->get_type();
 		vert = vert->previous();
 	}
 }
 
+} // namespace ::
 
-struct ConnectionValue { Spectrum bxdfs; float cosines; };
-ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
-						const scene::SceneDescriptor<Device::CPU>& scene,
-						Pixel& coord, float mergeArea, const float* reuseCount,
+
+CpuIvcm::ConnectionValue
+CpuIvcm::connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
+						Pixel& coord, float mergeArea, int numPhotons, float* reuseCount,
 						AreaPdf* incidentF, AreaPdf* incidentB
 ) {
 	// Some vertices will always have a contribution of 0 if connected (e.g. directional light with camera).
 	if(!IvcmPathVertex::is_connection_possible(path0, path1)) return {Spectrum{0.0f}, 0.0f};
 	Connection connection = IvcmPathVertex::get_connection(path0, path1);
-	auto val0 = path0.evaluate( connection.dir, scene.media, coord, false);
-	auto val1 = path1.evaluate(-connection.dir, scene.media, coord, true);
+	auto val0 = path0.evaluate( connection.dir, m_sceneDesc.media, coord, false);
+	auto val1 = path1.evaluate(-connection.dir, m_sceneDesc.media, coord, true);
 	// Cancel reprojections outside the screen
 	if(coord.x == -1) return {Spectrum{0.0f}, 0.0f};
 	Spectrum bxdfProd = val0.value * val1.value;
@@ -148,11 +213,19 @@ ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
 		// Shadow test
 		if(!scene::accel_struct::any_intersection(
-				scene,connection.v0, path1.get_position(connection.v0),
+				m_sceneDesc,connection.v0, path1.get_position(connection.v0),
 				path0.get_geometric_normal(),  path1.get_geometric_normal(), connection.dir)) {
-			bxdfProd *= scene.media[path0.get_medium(connection.dir)].get_transmission(connection.distance);
-			// Collect quantities for MIS
+			bxdfProd *= m_sceneDesc.media[path0.get_medium(connection.dir)].get_transmission(connection.distance);
+			// Compute reuse counts with varaying algorithms
 			int pl0 = path0.get_path_len();
+			int pl1 = path1.get_path_len();
+			math::PdfPair v0pdfs = val0.pdf;
+			if(path0.is_camera())
+				v0pdfs.forw *= float(numPhotons); // == numPixels!
+			compute_counts(reuseCount, mergeArea, numPhotons, connection.distance,
+				VertexWrapper{&path0, v0pdfs}, pl0, VertexWrapper{&path1,val1.pdf}, pl1);
+
+			// Collect quantities for MIS
 			incidentB[pl0] = path0.convert_pdf(path1.get_type(), val1.pdf.forw, connection).pdf;
 			incidentF[pl0] = path0.ext().incidentPdf;
 			copy_path_values(incidentF, incidentB, path0.previous(), path0.get_type(),
@@ -169,19 +242,26 @@ ConnectionValue connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1
 	return {Spectrum{0.0f}, 0.0f};
 }
 
-Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
-			   const scene::SceneDescriptor<Device::CPU>& scene,
-			   float mergeArea, const float* reuseCount,
+
+Spectrum CpuIvcm::merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
+			   float mergeArea, int numPhotons, float* reuseCount,
 			   AreaPdf* incidentF, AreaPdf* incidentB) {
 	// Radiance estimate
 	Pixel tmpCoord;
 	scene::Direction geoNormal = photon.get_geometric_normal();
 	auto bsdf = viewPath.evaluate(-photon.get_incident_direction(),
-								   scene.media, tmpCoord, false,
+								   m_sceneDesc.media, tmpCoord, false,
 								   &geoNormal);
-	// Collect values for mis
+	// Early out if no contribution
+	if(bsdf.value == Spectrum{0.0f})
+		return Spectrum{0.0f};
+
+	// Compute reuse factors with varaying methods.
 	int pl0 = viewPath.get_path_len();
-	int pathLen = pl0 + photon.get_path_len();
+	int pl1 = photon.get_path_len();
+	compute_counts(reuseCount, mergeArea, numPhotons, 0.0f, VertexWrapper{&viewPath,bsdf.pdf}, pl0, VertexWrapper{&photon,{bsdf.pdf.back, bsdf.pdf.forw}}, pl1);
+	// Collect values for mis
+	int pathLen = pl0 + pl1;
 	incidentF[pl0] = viewPath.ext().incidentPdf;
 	incidentB[pl0] = photon.ext().incidentPdf;
 	copy_path_values(incidentF, incidentB, viewPath.previous(), viewPath.get_type(),
@@ -192,11 +272,17 @@ Spectrum merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& photon,
 	return bsdf.value * photon.ext().throughput * misWeight;
 }
 
-} // namespace ::
 
 
-CpuIvcm::CpuIvcm() {}
+
+CpuIvcm::CpuIvcm() :
+	RendererBase<Device::CPU, IvcmTargets>({"mean_curvature"}, {}, {})
+{}
 CpuIvcm::~CpuIvcm() {}
+
+void CpuIvcm::pre_reset() {
+	m_currentScene->compute_curvature();
+}
 
 void CpuIvcm::post_reset() {
 	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
@@ -208,6 +294,10 @@ void CpuIvcm::post_reset() {
 		m_pathEndPoints.resize(m_outputBuffer.get_num_pixels());
 	}
 	if(resetFlags.is_set(ResetEvent::PARAMETER)) {
+		if(!resetFlags.resolution_changed()) {
+			m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
+			m_photonMap = m_photonMapManager.acquire<Device::CPU>();
+		}
 		m_tmpPathProbabilities.resize(get_thread_num() * 2 * (m_params.maxPathLength + 1));
 		m_tmpViewPathVertices.resize(get_thread_num() * (m_params.maxPathLength + 1));
 		m_tmpReuseCounts.resize(get_thread_num() * (m_params.maxPathLength + 1));
@@ -298,12 +388,12 @@ void CpuIvcm::iterate() {
 
 
 void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
-	math::RndSet2_1 rndStart { m_rngs[idx].next(), m_rngs[idx].next() };
+	math::RndSet2 rndStart { m_rngs[idx].next() };
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	IvcmPathVertex vertex;
 	IvcmPathVertex::create_light(&vertex, nullptr, p);
-	const IvcmPathVertex* previous = m_photonMap.insert(p.pos.position, vertex);
+	const IvcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
 	math::Throughput throughput;
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 
@@ -313,7 +403,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
+		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample, m_sceneDesc, numPhotons) != WalkResult::HIT)
 			break;
 		++pathLen;
 
@@ -347,10 +437,12 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			int pathLen = lightPathLen + 1 + viewPathLen;
 			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength) {
 				Pixel outCoord = coord;
-				compute_counts(reuseCount, mergeArea, numPhotons, false, currentVertex, viewPathLen, lightVertex, lightPathLen);
-				auto conVal = connect(*currentVertex, *lightVertex, m_sceneDesc, outCoord, mergeArea, reuseCount, incidentF, incidentB);
+				auto conVal = connect(*currentVertex, *lightVertex, outCoord, mergeArea, numPhotons, reuseCount, incidentF, incidentB);
 				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(currentVertex->ext().throughput.x));
-				m_outputBuffer.contribute(outCoord, throughput, math::Throughput{lightVertex->ext().throughput, 1.0f}, conVal.cosines, conVal.bxdfs);
+
+
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
+				m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * conVal.cosines);
 			}
 			lightVertex = lightVertex->previous();
 		}//*/
@@ -360,37 +452,64 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		const WalkResult walkRes = walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
-										*(currentVertex + 1), sample);
+										*(currentVertex + 1), sample, m_sceneDesc, numPhotons);
 		if(walkRes == WalkResult::CANCEL)
 			break;
 		++viewPathLen;
 		++currentVertex;
+
+		/*if(walkRes == WalkResult::HIT) {
+			float c = scene::accel_struct::fetch_curvature(m_sceneDesc,
+				currentVertex->get_primitive_id(),
+				currentVertex->get_surface_params(),
+				currentVertex->get_geometric_normal());
+			//float c = scene::accel_struct::compute_face_curvature(m_sceneDesc, currentVertex->get_primitive_id(), currentVertex->get_geometric_normal());
+			c /= 2.0f;
+			m_outputBuffer.contribute(coord, throughput, Spectrum{ei::max(0.0f, c), ei::abs(c) / 16.0f, ei::max(0.0f, -c)}, scene::Point{ei::abs(c)},
+				scene::Direction{0.0f}, Spectrum{0.0f});
+		} else m_outputBuffer.contribute(coord, throughput, Spectrum{1.0f}, scene::Point{0.0f},
+					scene::Direction{0.0f}, Spectrum{0.0f});
+		return;//*/
 
 		if(needs_density())
 			currentVertex->ext().density = get_density(currentVertex->get_position(), currentVertex->get_geometric_normal(), currentMergeRadius);
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			m_outputBuffer.set(coord, 0, Spectrum{currentVertex->ext().density * (m_currentIteration + 1)});
-			//m_outputBuffer.contribute(coord, throughput, Spectrum{currentVertex->ext().density}, currentVertex->get_position(),
-			//							currentVertex->get_normal(), currentVertex->get_albedo());
+			m_outputBuffer.set<DensityTarget>(coord, currentVertex->ext().density * (m_currentIteration + 1));
 			break;
-		}
+		}//*/
 		// Evaluate direct hit of area ligths and the background
 		if(viewPathLen >= m_params.minPathLength) {
 			EmissionValue emission = currentVertex->get_emission(m_sceneDesc, currentVertex->previous()->get_position());
 			if(emission.value != 0.0f) {
 				incidentF[viewPathLen] = currentVertex->ext().incidentPdf;
 				incidentB[viewPathLen] = emission.emitPdf;
+				auto inConnection = currentVertex->get_incident_connection();
 				copy_path_values(incidentF, incidentB, currentVertex->previous(), currentVertex->get_type(),
-					emission.pdf, currentVertex->get_incident_connection(), viewPathLen - 1, -1);
-				compute_counts(reuseCount, mergeArea, numPhotons, false, currentVertex, viewPathLen, nullptr, 0);
+					emission.pdf, inConnection, viewPathLen - 1, -1);
+				IvcmPathVertex light;
+				IvcmPathVertex::create_light(&light, nullptr, scene::lights::Emitter{
+					currentVertex->get_position(),
+					float(emission.emitPdf),
+					emission.value, 1.0f,
+					currentVertex->is_end_point() ? scene::lights::LightType::ENVMAP_LIGHT : scene::lights::LightType::AREA_LIGHT_QUAD,
+					currentVertex->get_medium(inConnection.dir),
+					{currentVertex->get_geometric_normal(), 0.0f}
+				});
+				compute_counts(reuseCount, mergeArea, numPhotons, 1.0f,
+					VertexWrapper{currentVertex, {AngularPdf{0.0}, emission.pdf}}, viewPathLen-1,
+					VertexWrapper{&light, {emission.pdf, AngularPdf{0.0}}}, 0);
 				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, reuseCount);
 				emission.value *= misWeight;
 			}
 			mAssert(!isnan(emission.value.x));
-			m_outputBuffer.contribute(coord, throughput, emission.value, currentVertex->get_position(),
-									currentVertex->get_normal(), currentVertex->get_albedo());
+
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * currentVertex->get_position());
+			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * currentVertex->get_normal());
+			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * currentVertex->get_albedo());
+			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}//*/
 		if(currentVertex->is_end_point()) break;
 
@@ -406,22 +525,35 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 			int pathLen = viewPathLen + lightPathLen;
 			if(lightPathLen > 0 && pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 				&& lensq(photon.get_position() - currentPos) < mergeRadiusSq) {
-				compute_counts(reuseCount, mergeArea, numPhotons, true, currentVertex, viewPathLen, &photon, lightPathLen);
-				//reuseCount[viewPathLen] = numPhotons / ei::max(1.0f, 0.5f * (currentVertex->ext().density + photon.ext().density) * mergeArea);
-				radiance += merge(*currentVertex, photon, m_sceneDesc, mergeArea, reuseCount,
-								  incidentF, incidentB);
+				radiance += merge(*currentVertex, photon, mergeArea,
+								  numPhotons, reuseCount, incidentF, incidentB);
+			//	radiance = Spectrum{1.0f / photon.ext().footprint.get_area()};
+			//	mergeRadiusSq = lensq(photon.get_position() - currentPos);
 			}
 			++photonIt;
 		}
 		radiance /= mergeArea * numPhotons;
-		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
-			scene::Direction{0.0f}, Spectrum{0.0f});//*/
+
+		m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * radiance);
+		m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(radiance));
+		//break;
 	} while(viewPathLen < m_params.maxPathLength);
 }
 
-void CpuIvcm::compute_counts(float* reuseCount, float mergeArea, int numPhotons, bool merge,
-							 const IvcmPathVertex* path0, int pl0,
-							 const IvcmPathVertex* path1, int pl1) {
+
+static float ivcm_heuristic(int numPhotons, float a0, float a1) {
+	//return (a0 + a1) / (a0 + a1 / numPhotons);
+	float aR = (a0 * a0) / (a1 * a1);
+	float count = (1.0f + aR) / (1.0f / numPhotons + aR);
+	mAssert(count >= 1.0f);
+	return count;
+}
+
+void CpuIvcm::compute_counts(float* reuseCount, float mergeArea,
+							 int numPhotons, float connectionDist,
+							 VertexWrapper path0, int pl0,
+							 VertexWrapper path1, int pl1) {
+	bool merge = connectionDist == 0.0f;
 	int pl = pl0 + pl1 + (merge ? 0 : 1);
 	reuseCount[0] = reuseCount[pl] = 0.0f;
 	switch(m_params.heuristic) {
@@ -431,50 +563,89 @@ void CpuIvcm::compute_counts(float* reuseCount, float mergeArea, int numPhotons,
 		} break;
 		case PHeuristic::Values::VCMPlus: {
 			if(merge) {
-				float expected = mergeArea * 0.5f * (path0->ext().density + path1->ext().density);
+				float expected = mergeArea * 0.5f * (path0.ext().density + path1.ext().density);
 				reuseCount[pl0] = numPhotons / ei::max(1.0f, expected);
-				path0 = path0->previous();
-				path1 = path1->previous();
+				path0 = path0.previous();
+				path1 = path1.previous();
 			}
-			int i = merge ? pl0-1 : pl0;
 			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
-				float expected = mergeArea * path0->ext().density;
+				float expected = mergeArea * path0.ext().density;
 				reuseCount[i] = numPhotons / ei::max(1.0f, expected);
-				path0 = path0->previous();
+				path0 = path0.previous();
 			}
 			for(int i = pl0+1; i < pl; ++i) {
-				float expected = mergeArea * path1->ext().density;
+				float expected = mergeArea * path1.ext().density;
 				reuseCount[i] = numPhotons / ei::max(1.0f, expected);
-				path1 = path1->previous();
+				path1 = path1.previous();
 			}
 		} break;
 		case PHeuristic::Values::VCMStar: {
 			float divisorSum = 0.0f;
 			if(merge) {
-				float expected = mergeArea * 0.5f * (path0->ext().density + path1->ext().density);
+				float expected = mergeArea * 0.5f * (path0.ext().density + path1.ext().density);
 				float divisor = 1.0f / ei::max(1.0f, expected);
 				reuseCount[pl0] = numPhotons * divisor;
 				divisorSum += divisor;
-				path0 = path0->previous();
-				path1 = path1->previous();
+				path0 = path0.previous();
+				path1 = path1.previous();
 			}
 			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
-				float expected = mergeArea * path0->ext().density;
+				float expected = mergeArea * path0.ext().density;
 				float divisor = 1.0f / ei::max(1.0f, expected);
 				reuseCount[i] = numPhotons * divisor;
 				divisorSum += divisor;
-				path0 = path0->previous();
+				path0 = path0.previous();
 			}
 			for(int i = pl0+1; i < pl; ++i) {
-				float expected = mergeArea * path1->ext().density;
+				float expected = mergeArea * path1.ext().density;
 				float divisor = 1.0f / ei::max(1.0f, expected);
 				reuseCount[i] = numPhotons * divisor;
 				divisorSum += divisor;
-				path1 = path1->previous();
+				path1 = path1.previous();
 			}
 			float norm = (pl - 1) / divisorSum;
 			for(int i = 1; i < pl; ++i)
 				reuseCount[i] *= norm;
+		} break;
+		case PHeuristic::Values::IVCM: {
+			Footprint2D f0 = path0.footprint();
+			Footprint2D f1 = path1.footprint();
+			bool p0Ortho = path0.is_orthographic();
+			bool p1Ortho = path1.is_orthographic();
+			float p0Dist = connectionDist, p1Dist = connectionDist;
+			float p0CosOutAbs = 1.0f, p0CosInAbs = 1.0f;
+			float p1CosOutAbs = 1.0f, p1CosInAbs = 1.0f;
+			float p0Pdf = float(path0.pdf_forw());
+			float p1Pdf = float(path1.pdf_forw());
+			if(merge) {
+				float a0 = path0.footprint().get_area() / path0.ext().pChoice;
+				float a1 = path1.footprint().get_area() / path1.ext().pChoice;
+				reuseCount[pl0] = ivcm_heuristic(numPhotons, a0, a1);
+				p0Dist = path1.indist();
+				p1Dist = path0.indist();
+				path0 = path0.previous();
+				path1 = path1.previous();
+			}
+			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
+				float a0 = path0.footprint().get_area() / path0.ext().pChoice;
+				f1 = f1.add_segment(p1Pdf, p1Ortho, 0.0f, p1CosOutAbs, p1Dist, p1CosInAbs);
+				float a1 = f1.get_area() / path1.ext().pChoice;
+				reuseCount[i] = ivcm_heuristic(numPhotons, a0, a1);
+				p1Pdf = float(path0.pdf_back());
+				p1Ortho = false;
+				p1Dist = path0.indist();
+				path0 = path0.previous();
+			}
+			for(int i = pl0+1; i < pl; ++i) {
+				float a1 = path1.footprint().get_area() / path1.ext().pChoice;
+				f0 = f0.add_segment(p0Pdf, p0Ortho, 0.0f, p0CosOutAbs, p0Dist, p0CosInAbs);
+				float a0 = f0.get_area() / path0.ext().pChoice;
+				reuseCount[i] = ivcm_heuristic(numPhotons, a0, a1);
+				p0Pdf = float(path1.pdf_back());
+				p0Ortho = false;
+				p0Dist = path1.indist();
+				path1 = path1.previous();
+			}
 		} break;
 	}
 }

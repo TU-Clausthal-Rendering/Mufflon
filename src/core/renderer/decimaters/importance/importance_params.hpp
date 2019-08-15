@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_target.hpp"
 
 namespace mufflon::renderer::decimaters::importance {
 
@@ -67,20 +68,25 @@ struct PLightWeight {
 	}
 };
 
-struct PRenderUpdate {
-	bool renderUpdate = false;
-	static constexpr ParamDesc get_desc() noexcept {
-		return { "Show update between decimations", ParameterTypes::BOOL };
-	}
-};
-
 using ImportanceParameters = ParameterHandler<
 	PImportanceIterations, PDecimationIterations,
 	PTargetReduction, PInitialReduction, PVertexThreshold,
 	PSharpnessFactor, PMaxNormalDeviation,
 	PViewWeight, PLightWeight,
-	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide,
-	PRenderUpdate
+	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide
 >;
+
+struct ImportanceTarget {
+	static constexpr const char NAME[] = "Importance";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+struct RadianceTarget {
+	static constexpr const char NAME[] = "Radiance";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
+
+using ImportanceTargets = TargetList<ImportanceTarget, RadianceTarget>;
 
 } // namespace mufflon::renderer::decimaters::importance

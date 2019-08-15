@@ -1,7 +1,6 @@
 #include "gpu_silhouette_pt.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
@@ -22,14 +21,14 @@ namespace mufflon::renderer::decimaters::silhouette {
 namespace pt::gpusil_details {
 
 cudaError_t call_importance_kernel(const dim3& gridDims, const dim3& blockDims,
-								   renderer::RenderBuffer<Device::CUDA>&& outputBuffer,
+								   pt::SilhouetteTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 								   scene::SceneDescriptor<Device::CUDA>* scene,
 								   const u32* seeds, const SilhouetteParameters& params,
 								   Importances<Device::CUDA>** importances,
 								   DeviceImportanceSums<Device::CUDA>* sums);
 
 cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
-							   renderer::RenderBuffer<Device::CUDA>&& outputBuffer,
+							   pt::SilhouetteTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 							   scene::SceneDescriptor<Device::CUDA>* scene,
 							   const u32* seeds, Importances<Device::CUDA>** importances,
 							   const float maxImportance);
@@ -63,7 +62,7 @@ void GpuShadowSilhouettesPT::pre_reset() {
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 
-	RendererBase<Device::CUDA>::pre_reset();
+	RendererBase<Device::CUDA, pt::SilhouetteTargets>::pre_reset();
 }
 
 void GpuShadowSilhouettesPT::on_world_clearing() {
@@ -71,7 +70,7 @@ void GpuShadowSilhouettesPT::on_world_clearing() {
 	m_currentDecimationIteration = 0u;
 }
 
-void GpuShadowSilhouettesPT::post_iteration(OutputHandler& outputBuffer) {
+void GpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 		// Finalize the decimation process
 		logInfo("Finished decimation process");
@@ -102,7 +101,7 @@ void GpuShadowSilhouettesPT::post_iteration(OutputHandler& outputBuffer) {
 		this->on_manual_reset();
 		++m_currentDecimationIteration;
 	}
-	RendererBase<Device::CUDA>::post_iteration(outputBuffer);
+	RendererBase<Device::CUDA, pt::SilhouetteTargets>::post_iteration(outputBuffer);
 }
 
 void GpuShadowSilhouettesPT::iterate() {

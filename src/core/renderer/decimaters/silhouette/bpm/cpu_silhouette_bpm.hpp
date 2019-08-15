@@ -14,7 +14,7 @@ namespace mufflon::renderer::decimaters::silhouette {
 template < Device >
 struct RenderBuffer;
 
-class CpuShadowSilhouettesBPM final : public RendererBase<Device::CPU> {
+class CpuShadowSilhouettesBPM final : public RendererBase<Device::CPU, bpm::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuShadowSilhouettesBPM();
@@ -29,7 +29,7 @@ public:
 
 	void on_world_clearing() final;
 	void pre_reset() final;
-	void post_iteration(OutputHandler& outputBuffer) final;
+	void post_iteration(IOutputHandler& outputBuffer) final;
 
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.

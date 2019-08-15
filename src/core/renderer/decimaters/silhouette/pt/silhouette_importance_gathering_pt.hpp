@@ -5,7 +5,6 @@
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
@@ -478,7 +477,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 
 } // namespace
 
-CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& outputBuffer,
+CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									 const SilhouetteParameters& params,
 									 const Pixel& coord, math::Rng& rng,
@@ -648,7 +647,7 @@ CUDA_FUNCTION void sample_importance(renderer::RenderBuffer<CURRENT_DEV>& output
 	}
 }
 
-CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& outputBuffer,
+CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,
@@ -681,7 +680,7 @@ CUDA_FUNCTION void sample_vis_importance(renderer::RenderBuffer<CURRENT_DEV>& ou
 			importance += importances[lodIdx][vertexIndex].viewImportance;
 		}
 
-		outputBuffer.contribute(coord, RenderTargets::RADIANCE, ei::Vec3{ importance / maxImportance });
+		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
 	}
 }
 

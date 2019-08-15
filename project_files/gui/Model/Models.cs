@@ -137,12 +137,12 @@ namespace gui.Model
             {
                 // Present, but not first
                 Settings.LastWorlds.RemoveAt(index);
-                Settings.LastWorlds.Insert(0, path);
+                Settings.LastWorlds.PushFront(path);
             }
             else if (index < 0)
             {
                 // Not present
-                Settings.LastWorlds.Insert(0, path);
+                Settings.LastWorlds.PushFront(path);
             }
         }
 

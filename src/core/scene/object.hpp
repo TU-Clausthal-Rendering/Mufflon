@@ -66,10 +66,14 @@ public:
 		return level < m_lods.size() && m_lods[level] != nullptr;
 	}
 
-	Lod& get_lod(u32 level) noexcept {
+	Lod& get_lod(u32 level) {
+		if(!has_lod_available(level))
+			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
 		return *m_lods[level];
 	}
-	const Lod& get_lod(u32 level) const noexcept {
+	const Lod& get_lod(u32 level) const {
+		if(!has_lod_available(level))
+			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
 		return *m_lods[level];
 	}
 

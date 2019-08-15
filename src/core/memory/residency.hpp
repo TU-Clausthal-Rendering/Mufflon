@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstdint>
 #include "core/opengl/gl_buffer.hpp"
 

@@ -52,20 +52,29 @@ struct SilVertexExt {
 	float prevConversionFactor{ 0.0f };
 
 
-	CUDA_FUNCTION void init(const SilPathVertex& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosine,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
-		if(thisVertex.previous() && thisVertex.previous()->is_hitable()) {
+	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	}
+
+	CUDA_FUNCTION void update(const PathVertex<SilVertexExt>& prevVertex,
+							  const PathVertex<SilVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		if(prevVertex.is_hitable()) {
 			// Compute as much as possible from the conversion factor.
 			// At this point we do not know n and A for the photons. This quantities
 			// are added in the kernel after the walk.
-			this->prevConversionFactor = float(
-				thisVertex.previous()->convert_pdf(thisVertex.get_type(), AngularPdf{ 1.0f },
-												   { incident, incidentDistance * incidentDistance }).pdf);
-			if(thisVertex.previous()->is_end_point())
-				this->prevConversionFactor /= float(thisVertex.previous()->ext().incidentPdf);
+			float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
+			this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
+			if(prevVertex.is_end_point())
+				this->prevConversionFactor /= float(prevVertex.ext().incidentPdf);
 		}
 	}
 

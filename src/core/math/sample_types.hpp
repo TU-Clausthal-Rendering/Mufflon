@@ -17,8 +17,10 @@ struct PositionSample {
 
 enum class PathEventType: u32 {
 	INVALID,						// Discard this sample
-	REFLECTED,						// Reflection or any start vertex emit
+	REFLECTED,						// Reflection
 	REFRACTED,						// Passed a material boundary
+	SOURCE,							// Emitted by the vertex (angular spread)
+	ORTHO_SOURCE,					// Emitted by an orthographic vertex
 };
 
 struct PdfPair {

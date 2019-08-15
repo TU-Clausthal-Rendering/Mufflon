@@ -39,10 +39,10 @@ struct SilVertexExt {
 
 
 	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,
-							const scene::Direction& incident, const float incidentDistance,
-							const AreaPdf incidentPdf, const float incidentCosineAbs,
-							const math::Throughput& incidentThrougput) {
-		this->incidentPdf = incidentPdf;
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice) {
+		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<SilVertexExt>& thisVertex,
@@ -52,6 +52,12 @@ struct SilVertexExt {
 		this->pdf = pdf.forw;
 		this->outCos = ei::dot(thisVertex.get_normal(), excident);
 	}
+
+	CUDA_FUNCTION void update(const PathVertex<SilVertexExt>& prevVertex,
+							  const PathVertex<SilVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const math::Throughput& throughput) {}
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
 		this->throughput = sample.throughput;

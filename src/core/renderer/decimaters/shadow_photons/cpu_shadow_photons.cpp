@@ -78,17 +78,19 @@ void ShadowPhotonVisualizer::post_reset() {
 
 		// Pre-split the octree (TODO: multithreaded)
 		m_importance->set_iteration(1);
-		logPedantic("Pre-splitting the octree");
-		for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
-			const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[i]];
-			const auto& polygon = lod.polygon;
-			for(u32 v = 0u; v < polygon.numVertices; ++v) {
-				const ei::Vec3 vertex = ei::transform(polygon.vertices[v], m_sceneDesc.instanceToWorld[i]);
-				// Transform the normal to world space (per-vertex normals are in object space)
-				// TODO: shouldn't we rather use the geometric normal?
-				const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ m_sceneDesc.worldToInstance[i] });
-				const ei::Vec3 vertexNormal = ei::normalize(rotationInvScale * polygon.normals[v]);
-				m_importance->increase_count(vertex, vertexNormal, 1.f);
+		if(m_params.mode == PSpvMode::Values::OCTREE) {
+			logPedantic("Pre-splitting the octree");
+			for(i32 i = 0u; i < m_sceneDesc.numInstances; ++i) {
+				const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[i]];
+				const auto& polygon = lod.polygon;
+				for(u32 v = 0u; v < polygon.numVertices; ++v) {
+					const ei::Vec3 vertex = ei::transform(polygon.vertices[v], m_sceneDesc.instanceToWorld[i]);
+					// Transform the normal to world space (per-vertex normals are in object space)
+					// TODO: shouldn't we rather use the geometric normal?
+					const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ m_sceneDesc.worldToInstance[i] });
+					const ei::Vec3 vertexNormal = ei::normalize(rotationInvScale * polygon.normals[v]);
+					m_importance->increase_count(vertex, vertexNormal, 1.f);
+				}
 			}
 		}
 		m_importance->clear_counters();
@@ -156,9 +158,8 @@ void ShadowPhotonVisualizer::iterate() {
 			// and which have the correct full path length.
 			const int pathLen = viewPathLength + photonIt->pathLen;
 			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
-			   && lensq(photonIt->position - vertex.get_position()) < mergeRadiusSq) {
+			   && ei::lensq(photonIt->position - vertex.get_position()) < mergeRadiusSq) {
 				m_importance->increase_count(photonIt->closestVertexPos, photonIt->geoNormal, 1.f);
-				m_outputBuffer.contribute(coord, RenderTargets::NORMAL, photonIt->flux);
 				// Attribute importance for this and all previous photons
 				/*const auto* currPhotonData = &(*photonIt);
 				while(currPhotonData != nullptr) {
@@ -171,13 +172,10 @@ void ShadowPhotonVisualizer::iterate() {
 			++photonIt;
 		}
 
-		/*if(m_params.useHeuristic)
-			display_silhouette(coord, pixel, vertex);
-		else
-			display_photon_densities(coord, vertex);*/
+		display_photon_densities(coord, vertex);
 	}
 
-	if(m_outputBuffer.is_target_enabled(RenderTargets::LIGHTNESS)) {
+	if(m_outputBuffer.template is_target_enabled<ImportanceTarget>()) {
 		// Query the importance
 		logPedantic("Querying importance...");
 
@@ -215,7 +213,7 @@ void ShadowPhotonVisualizer::iterate() {
 			if(closestVertex.has_value()) {
 				// Query the importance map
 				const float importanceDensity = m_importance->get_density(closestVertex.value().first, closestVertex.value().second);
-				m_outputBuffer.contribute(coord, RenderTargets::LIGHTNESS, ei::Vec3{ importanceDensity });
+				m_outputBuffer.template contribute<ImportanceTarget>(coord, importanceDensity);
 			}
 		}
 	}
@@ -265,16 +263,16 @@ void ShadowPhotonVisualizer::display_photon_densities(const ei::IVec2& coord, co
 	}
 
 	//m_outputBuffer.set(coord, RenderTargets::RADIANCE, ei::Vec3{ photonDensity, 0.f, shadowPhotonDensity });
-	m_outputBuffer.set(coord, RenderTargets::RADIANCE, shadowGradients);
-	m_outputBuffer.set(coord, RenderTargets::POSITION, photonDensities);
-	m_outputBuffer.set(coord, RenderTargets::ALBEDO, shadowPhotonDensities);
-	m_outputBuffer.set(coord, RenderTargets::NORMAL, ratios);
+	m_outputBuffer.template contribute<LightDensityTarget>(coord, photonDensities);
+	m_outputBuffer.template contribute<ShadowDensityTarget>(coord, photonDensities);
+	m_outputBuffer.template contribute<ShadowGradientTarget>(coord, shadowPhotonDensities);
 }
 
 void ShadowPhotonVisualizer::display_silhouette(const ei::IVec2& coord, const i32 index, const SpvPathVertex& vertex) {
 	// Find silhouette
 	// TODO: base this off of shadow photons?
 	// TODO: connect against n light sources
+#if 0
 	using namespace scene::lights;
 
 	math::Rng& rng = m_rngs[index];
@@ -290,6 +288,7 @@ void ShadowPhotonVisualizer::display_silhouette(const ei::IVec2& coord, const i3
 	const float ratio = sdiv(photonDensity, photonDensity + shadowPhotonDensity);
 
 	if(std::abs(ratio - 0.5f) < 0.45f) {
+
 		m_outputBuffer.contribute(coord, RenderTargets::POSITION, ei::Vec3{ 1.f });
 
 		// Check if we're actually shadowed
@@ -347,7 +346,7 @@ void ShadowPhotonVisualizer::display_silhouette(const ei::IVec2& coord, const i3
 			}
 		}
 	}
-
+#endif
 }
 
 bool ShadowPhotonVisualizer::trace_shadow_silhouette(const ei::Ray& shadowRay, const float shadowDistance,

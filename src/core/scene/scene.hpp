@@ -143,6 +143,17 @@ public:
 		return m_objects;
 	}
 
+
+	/*
+	 * Create a vertex attribute called "mean_curvature" for each polygonal mesh
+	 * and compute the curvature values.
+	 */
+	void compute_curvature();
+	/*
+	 * Remove the curvature attribute
+	 */
+	void remove_curvature();
+
 private:
 	template < Device dev >
 	struct ChangedFlag {

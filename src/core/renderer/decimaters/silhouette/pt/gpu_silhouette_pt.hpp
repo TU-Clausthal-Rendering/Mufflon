@@ -15,7 +15,7 @@ namespace mufflon::renderer::decimaters::silhouette {
 template < Device >
 struct RenderBuffer;
 
-class GpuShadowSilhouettesPT final : public RendererBase<Device::CUDA> {
+class GpuShadowSilhouettesPT final : public RendererBase<Device::CUDA, pt::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	GpuShadowSilhouettesPT();
@@ -30,7 +30,7 @@ public:
 
 	void pre_reset() final;
 	void on_world_clearing() final;
-	void post_iteration(OutputHandler& outputBuffer) final;
+	void post_iteration(IOutputHandler& outputBuffer) final;
 
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.

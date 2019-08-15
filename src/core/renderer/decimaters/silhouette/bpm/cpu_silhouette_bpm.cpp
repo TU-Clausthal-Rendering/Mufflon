@@ -2,7 +2,6 @@
 #include "silhouette_importance_gathering_bpm.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
@@ -56,7 +55,7 @@ void CpuShadowSilhouettesBPM::pre_reset() {
 	if(m_currentDecimationIteration == 0u)
 		this->initialize_decimaters();
 
-	RendererBase<Device::CPU>::pre_reset();
+	RendererBase<Device::CPU, bpm::SilhouetteTargets>::pre_reset();
 }
 
 void CpuShadowSilhouettesBPM::on_world_clearing() {
@@ -64,7 +63,7 @@ void CpuShadowSilhouettesBPM::on_world_clearing() {
 	m_currentDecimationIteration = 0u;
 }
 
-void CpuShadowSilhouettesBPM::post_iteration(OutputHandler& outputBuffer) {
+void CpuShadowSilhouettesBPM::post_iteration(IOutputHandler& outputBuffer) {
 	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 		// Finalize the decimation process
 		logInfo("Finished decimation process");
@@ -95,7 +94,7 @@ void CpuShadowSilhouettesBPM::post_iteration(OutputHandler& outputBuffer) {
 		this->on_manual_reset();
 		++m_currentDecimationIteration;
 	}
-	RendererBase<Device::CPU>::post_iteration(outputBuffer);
+	RendererBase<Device::CPU, bpm::SilhouetteTargets>::post_iteration(outputBuffer);
 }
 
 void CpuShadowSilhouettesBPM::iterate() {

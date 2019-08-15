@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Threading;
 using gui.Annotations;
 using gui.Dll;
 using gui.Properties;
@@ -21,47 +17,54 @@ namespace gui.Model
         private static int MaxLastWorlds { get; } = 10;
         private static int MaxScreenshotNamingPatterns { get; } = 10;
         private readonly KeyGestureConverter m_gestureConverter = new KeyGestureConverter();
+        private Timer m_saveTimer;
 
         public SettingsModel()
         {
-            SynchronizeStringCollectionWithObservable(Settings.Default.LastWorlds, LastWorlds);
-            SynchronizeStringCollectionWithObservable(Settings.Default.ScreenshotNamePatternHistory, ScreenshotNamePatternHistory);
-            if(ScreenshotNamePatternHistory.Count == 0)
-                ScreenshotNamePatternHistory.Add(ScreenshotNamePattern);
+            // Make sure the collections properly exist
+            if (Settings.Default.LastWorlds == null)
+                Settings.Default.LastWorlds = new StringCollection();
+            if (Settings.Default.ScreenshotNamePatternHistory == null)
+                Settings.Default.ScreenshotNamePatternHistory = new StringCollection();
+            if (Settings.Default.RendererParameters == null)
+                Settings.Default.RendererParameters = new StringCollection();
 
-            LoadGestures();
+            // Create wrappers for the limited "history-like" collections
+            LastWorlds = new LimitedStringCollection(Settings.Default.LastWorlds, MaxLastWorlds);
+            ScreenshotNamePatternHistory = new LimitedStringCollection(Settings.Default.ScreenshotNamePatternHistory,
+                MaxScreenshotNamingPatterns);
+            RendererParameters = new LimitedStringCollection(Settings.Default.RendererParameters, int.MaxValue);
+
+            LastWorlds.CollectionChanged += OnStringCollectionChanged;
+            ScreenshotNamePatternHistory.CollectionChanged += OnStringCollectionChanged;
+            RendererParameters.CollectionChanged += OnStringCollectionChanged;
+
+            // Screenshot history has to have at least one entry
+            if (Settings.Default.ScreenshotNamePatternHistory.Count == 0)
+                Settings.Default.ScreenshotNamePatternHistory.Add(ScreenshotNamePattern);
+
             SetLogLevel(LogLevel);
             SetProfilerLevels();
 
-            if (string.IsNullOrEmpty(Settings.Default.ScreenshotFolder))
-                Settings.Default.ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrEmpty(ScreenshotFolder))
+                ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
 
             // forward setting changed events
+            m_saveTimer = new Timer(_ => {
+                // TODO: idk why, but settings that weren't printed at least once are prone to not trigger
+                // a save at all (seems buggy)
+                Settings.Default.Save();
+                m_saveTimer.Change(int.MaxValue, int.MaxValue);
+            });
             Settings.Default.PropertyChanged += AppSettingsOnPropertyChanged;
         }
 
         public void Save()
         {
-            // store gestures
-            Settings.Default.ScreenshotGesture = ScreenshotGestureString;
-            Settings.Default.PlayPauseGesture = PlayPauseGestureString;
-            Settings.Default.ResetGesture = ResetGestureString;
-            Settings.Default.ToggleCameraMovementGesture = ToggleCameraMovementGestureString;
-
-            // store collections
-            Settings.Default.LastWorlds = ConvertToStringCollection(LastWorlds);
-            Settings.Default.ScreenshotNamePatternHistory = ConvertToStringCollection(ScreenshotNamePatternHistory);
-
-            // save settings
-            Settings.Default.Save();
-        }
-
-        private void LoadGestures()
-        {
-            ScreenshotGestureString = Settings.Default.ScreenshotGesture;
-            PlayPauseGestureString = Settings.Default.PlayPauseGesture;
-            ResetGestureString = Settings.Default.ResetGesture;
-            ToggleCameraMovementGestureString = Settings.Default.ToggleCameraMovementGesture;
+            // It appears that the settings object needs some time to make changes "visible"
+            // Thus we use an invokable on a short timer that saves the settings with a slight delay.
+            // Repeated "save" invokations simply reset the timer to avoid needless "double-saves".
+            m_saveTimer.Change(200, int.MaxValue);
         }
 
         private void SetLogLevel(Core.Severity severity)
@@ -81,32 +84,10 @@ namespace gui.Model
                 throw new Exception(Loader.loader_get_dll_error());
         }
 
-        /// <summary>
-        /// observable collection cannot be chosen in settings
-        /// => save string collection as observable in SettingsModel
-        /// </summary>
-        private void SynchronizeStringCollectionWithObservable(StringCollection src, ObservableCollection<string> dest)
+        private void OnStringCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
         {
-            dest.Clear();
-            if(src == null) return;
-
-            foreach (var world in src)
-            {
-                dest.Add(world);
-            }
+            Save();
         }
-
-        private StringCollection ConvertToStringCollection(ObservableCollection<string> src)
-        {
-            var res = new StringCollection();
-            foreach (var item in src)
-            {
-                res.Add(item);
-            }
-
-            return res;
-        }
-
 
         private void AppSettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
         {
@@ -158,7 +139,12 @@ namespace gui.Model
                     OnPropertyChanged(nameof(MaxConsoleMessages));
                     break;
             }
+
+            Save();
         }
+
+        public LimitedStringCollection LastWorlds { get; private set; }
+        public LimitedStringCollection ScreenshotNamePatternHistory { get; private set; }
 
         // TODO couple with last worlds?
         public string LastWorldPath
@@ -200,8 +186,6 @@ namespace gui.Model
                 Settings.Default.LastSelectedRenderTarget = value;
             }
         }
-
-        public LimitedCollection LastWorlds { get; } = new LimitedCollection(MaxLastWorlds);
 
         public int MaxConsoleMessages
         {
@@ -250,87 +234,76 @@ namespace gui.Model
             set => Settings.Default.ScreenshotFolder = value;
         }
 
-        // TODO use this
-        public LimitedCollection ScreenshotNamePatternHistory { get; } = new LimitedCollection(MaxScreenshotNamingPatterns);
-
-        private KeyGesture m_screenshotGesture;
-
         public KeyGesture ScreenshotGesture
         {
-            get => m_screenshotGesture;
-            set
-            {
-                if(m_screenshotGesture == value) return;
-                m_screenshotGesture = value;
-                OnPropertyChanged(nameof(ScreenshotGesture));
-                OnPropertyChanged(ScreenshotGestureString);
-            }
+            get => ScreenshotGestureString == null ? null
+                : (KeyGesture)m_gestureConverter.ConvertFromString(ScreenshotGestureString);
         }
 
         public string ScreenshotGestureString
         {
-            get => m_screenshotGesture == null ? "" : m_gestureConverter.ConvertToString(m_screenshotGesture);
-            set => ScreenshotGesture = (KeyGesture)m_gestureConverter.ConvertFromString(value);
+            get => Settings.Default.ScreenshotGesture;
+            set
+            {
+                if (value == Settings.Default.ScreenshotGesture) return;
+                Settings.Default.ScreenshotGesture = value;
+                OnPropertyChanged(nameof(ScreenshotGestureString));
+                OnPropertyChanged(nameof(ScreenshotGesture));
+            }
         }
-
-        private KeyGesture m_playPauseGesture;
         
         public KeyGesture PlayPauseGesture
         {
-            get => m_playPauseGesture;
-            set
-            {
-                if (m_playPauseGesture == value) return;
-                m_playPauseGesture = value;
-                OnPropertyChanged(nameof(PlayPauseGesture));
-                OnPropertyChanged(nameof(PlayPauseGestureString));
-            }
+            get => PlayPauseGestureString == null ? null
+                : (KeyGesture)m_gestureConverter.ConvertFromString(PlayPauseGestureString);
         }
 
         public string PlayPauseGestureString
         {
-            get => m_playPauseGesture == null ? "" : m_gestureConverter.ConvertToString(m_playPauseGesture);
-            set => PlayPauseGesture = (KeyGesture) m_gestureConverter.ConvertFromString(value);
+            get => Settings.Default.PlayPauseGesture;
+            set
+            {
+                if (value == Settings.Default.PlayPauseGesture) return;
+                Settings.Default.PlayPauseGesture = value;
+                OnPropertyChanged(nameof(PlayPauseGestureString));
+                OnPropertyChanged(nameof(PlayPauseGesture));
+            }
         }
-
-        private KeyGesture m_resetGesture;
         
         public KeyGesture ResetGesture
         {
-            get => m_resetGesture;
-            set
-            {
-                if(value == m_resetGesture) return;
-                m_resetGesture = value;
-                OnPropertyChanged(nameof(ResetGesture));
-            }
+            get => ResetGestureString == null ? null
+                : (KeyGesture)m_gestureConverter.ConvertFromString(ResetGestureString);
         }
 
         public string ResetGestureString
         {
-            get => m_resetGesture == null ? "" : m_gestureConverter.ConvertToString(m_resetGesture);
-            set => ResetGesture = (KeyGesture)m_gestureConverter.ConvertFromString(value);
+            get => Settings.Default.ResetGesture;
+            set
+            {
+                if (value == Settings.Default.ResetGesture) return;
+                Settings.Default.ResetGesture = value;
+                OnPropertyChanged(nameof(ResetGestureString));
+                OnPropertyChanged(nameof(ResetGesture));
+            }
         }
-
-        private KeyGesture m_toggleCameraMovementGesture;
         
         public KeyGesture ToggleCameraMovementGesture
         {
-            get => m_toggleCameraMovementGesture;
-            set
-            {
-                if(value == m_toggleCameraMovementGesture) return;
-                m_toggleCameraMovementGesture = value;
-                OnPropertyChanged(nameof(ToggleCameraMovementGesture));
-            }
+            get => ToggleCameraMovementGestureString == null ? null
+                : (KeyGesture)m_gestureConverter.ConvertFromString(ToggleCameraMovementGestureString);
         }
 
         public string ToggleCameraMovementGestureString
         {
-            get => m_toggleCameraMovementGesture == null
-                ? ""
-                : m_gestureConverter.ConvertToString(m_toggleCameraMovementGesture);
-            set => ToggleCameraMovementGesture = (KeyGesture)m_gestureConverter.ConvertFromString(value);
+            get => Settings.Default.ToggleCameraMovementGesture;
+            set
+            {
+                if (value == Settings.Default.ToggleCameraMovementGesture) return;
+                Settings.Default.ToggleCameraMovementGesture = value;
+                OnPropertyChanged(nameof(ToggleCameraMovementGestureString));
+                OnPropertyChanged(nameof(ToggleCameraMovementGesture));
+            }
         }
 
         public bool AllowCameraMovement
@@ -351,6 +324,8 @@ namespace gui.Model
             set => Settings.Default.LastNIterationCommand = value;
         }
 
+        public LimitedStringCollection RendererParameters { get; private set; }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
@@ -359,33 +334,95 @@ namespace gui.Model
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        /// <summary>
-        /// modified collection that contains the maxItems strings
-        /// </summary>
-        public class LimitedCollection : ObservableCollection<string>
-        {
-            private readonly int m_maxItems;
 
-            public LimitedCollection(int maxItems)
+        // Wrapper class for a string collection with limited entries (and limited operations).
+        // Takes a collection and limit as argument, when insert operations exceed the limit
+        // the last elements will be removed from the collection.
+        public class LimitedStringCollection
+        {
+            private StringCollection m_collection;
+            private int m_limit;
+
+            public event NotifyCollectionChangedEventHandler CollectionChanged;
+
+            public LimitedStringCollection(StringCollection collection, int limit)
             {
-                this.m_maxItems = maxItems;
+                m_collection = collection;
+                m_limit = limit;
+                // Initial trimming
+                while (m_collection.Count > m_limit)
+                    m_collection.RemoveAt(m_limit);
             }
 
-            protected override void InsertItem(int index, string item)
+            public void Add(string val)
             {
-                // only add if not already in collection
-                if(Contains(item)) return;
-                
-                // this collection should not hold more than maxLastScenes scenes
-                if (Count + 1 >= m_maxItems)
-                {
-                    // dont insert this item (would be the last in the list)
-                    if(index == Count) return;
-                    // remove the last item
-                    RemoveAt(Count - 1);
-                }
+                int newIndex = m_collection.Count;
+                m_collection.Add(val);
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, newIndex));
+                PruneSingle();
+            }
 
-                base.InsertItem(index, item);
+            public void PushFront(string val)
+            {
+                m_collection.Insert(0, val);
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, 0));
+                PruneSingle();
+            }
+
+            public void RemoveAt(int index)
+            {
+                if (index >= Count)
+                    throw new ArgumentOutOfRangeException();
+                var item = m_collection[index];
+                m_collection.RemoveAt(index);
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
+            }
+
+            public void Clear()
+            {
+                m_collection.Clear();
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            }
+
+            public int Count { get => m_collection.Count; }
+            public bool Empty { get => Count == 0; }
+
+            public int IndexOf(string val)
+            {
+                return m_collection.IndexOf(val);
+            }
+
+            public bool Contains(string val)
+            {
+                return m_collection.Contains(val);
+            }
+
+            public string this[int key]
+            {
+                get => m_collection[key];
+                set
+                {
+                    if (key >= Count)
+                        throw new ArgumentOutOfRangeException();
+                    var oldItem = m_collection[key];
+                    m_collection[key] = value;
+                    CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, oldItem, key));
+                }
+            }
+
+            public StringEnumerator GetEnumerator()
+            {
+                return m_collection.GetEnumerator();
+            }
+
+            private void PruneSingle()
+            {
+                if(m_collection.Count > m_limit)
+                {
+                    var removed = m_collection[m_limit];
+                       m_collection.RemoveAt(m_limit);
+                    CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed, m_limit));
+                }
             }
         }
     }

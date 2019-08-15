@@ -11,7 +11,7 @@ namespace mufflon::renderer {
 
 namespace hybridpt_detail {
 
-cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(HybridPathTracer::RenderBufferCuda&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const int yOffset,
 						const PtParameters& params);
@@ -96,29 +96,31 @@ void HybridPathTracer::init_rngs(int num) {
 		m_rngsCpu[i] = math::Rng(i + seed);
 }
 
-bool HybridPathTracer::pre_iteration(OutputHandler& outputBuffer) {
+bool HybridPathTracer::pre_iteration(IOutputHandler& outputBuffer) {
 	const bool needsReset = get_reset_event() != ResetEvent::NONE;
-	auto[rb1, rb2] = outputBuffer.begin_iteration_hybrid<Device::CPU, Device::CUDA>(needsReset);
+	auto& out = dynamic_cast<OutputHandlerType&>(outputBuffer);
+	auto[rb1, rb2] = out.template begin_iteration_hybrid<Device::CPU, Device::CUDA>(needsReset);
 	m_outputBufferCpu = std::move(rb1);
 	m_outputBufferCuda = std::move(rb2);
-	m_currentIteration = outputBuffer.get_current_iteration();
+	m_currentIteration = out.get_current_iteration();
 	if(needsReset) {
 		this->pre_reset();
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
-		auto desc = m_currentScene->get_descriptor<Device::CUDA>({}, {}, {});
+		auto desc = m_currentScene->template get_descriptor<Device::CUDA>({}, {}, {});
 		copy(m_sceneDescCuda.get(), &desc, sizeof(desc));
-		m_sceneDescCpu = m_currentScene->get_descriptor<Device::CPU>({}, {}, {});
+		m_sceneDescCpu = m_currentScene->template get_descriptor<Device::CPU>({}, {}, {});
 		this->clear_reset();
 		return true;
 	}
 	return false;
 }
 
-void HybridPathTracer::post_iteration(OutputHandler& outputBuffer) {
-	outputBuffer.sync_back<Device::CUDA, Device::CPU>(m_currYSplit);
+void HybridPathTracer::post_iteration(IOutputHandler& outputBuffer) {
+	auto& out = dynamic_cast<OutputHandlerType&>(outputBuffer);
+	out.template sync_back<Device::CUDA, Device::CPU>(m_currYSplit);
 	m_currYSplit = m_nextYSplit;
-	outputBuffer.end_iteration<Device::CPU>();
+	out.template end_iteration<Device::CPU>();
 }
 
 } // namespace mufflon::renderer

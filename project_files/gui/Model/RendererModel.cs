@@ -136,6 +136,7 @@ namespace gui.Model
     {
         public event EventHandler RequestWorldClear;
         public event EventHandler RequestRedraw;
+        public event EventHandler RequestParameterSave;
 
         private volatile bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
@@ -145,8 +146,6 @@ namespace gui.Model
         {
             // Initial state: renderer paused (this will always be in the main UI thread)
             PropertyChanged += OnRendererChanged;
-
-            RendererIndex = 0u;
         }
 
         // There are really only two places this should be touched: in IsRendering and the primary render loop
@@ -310,7 +309,6 @@ namespace gui.Model
                     Parameters = paramList;
                     m_name = Core.render_get_renderer_name(RendererIndex);
                     m_shortName = Core.render_get_renderer_short_name(RendererIndex);
-                    LoadRendererParameters();
                     OnPropertyChanged(nameof(Name));
                     OnPropertyChanged(nameof(ShortName));
                 }   break;
@@ -320,108 +318,42 @@ namespace gui.Model
         private void OnParameterChanged(object sender, PropertyChangedEventArgs args)
         {
             Reset();
-            SaveRendererParameters();
+            RequestParameterSave(this, null);
         }
 
-
-        // This method tries to find the settings index in the string collection
-        private static int FindRendererDictionaryIndex(string name)
+        // Takes a string in the form "param1;value1\nparam2;value2..." and loads it for the current renderer
+        public void LoadRendererParametersFromString(string codedParams)
         {
-            if (gui.Properties.Settings.Default.RendererParameters == null)
-                gui.Properties.Settings.Default.RendererParameters = new System.Collections.Specialized.StringCollection();
-            if (gui.Properties.Settings.Default.RendererParameters.Count % 2 != 0)
+            var splitParams = codedParams.Split('\n');
+            for (int i = 0; i < Math.Min(splitParams.Length, Parameters.Count); ++i)
             {
-                Logger.log("Invalid saved renderer properties; resetting all renderer properties to defaults", Core.Severity.Error);
-                gui.Properties.Settings.Default.RendererParameters.Clear();
-            }
-            for (int i = 0; i < gui.Properties.Settings.Default.RendererParameters.Count; i += 2)
-            {
-                if (gui.Properties.Settings.Default.RendererParameters[i].Equals(name))
-                    return i + 1;
-            }
-            return -1;
-        }
-
-        private string getSettingsKey()
-        {
-            string key = Name;
-            foreach (Core.RenderDevice dev in Enum.GetValues(typeof(Core.RenderDevice)))
-            {
-                if (UsesDevice(dev))
-                    key += "-" + Enum.GetName(typeof(Core.RenderDevice), dev);
-            }
-            return key;
-        }
-
-        // Saves the current renderer's parameters in textform in the application settings
-        private void SaveRendererParameters()
-        {
-            if (Parameters == null)
-                return;
-
-            string val = "";
-
-            foreach (var param in Parameters)
-                val += param.Name + ";" + Enum.GetName(typeof(Core.ParameterType), param.Type) + ";" + param.Value.ToString() + "\n";
-
-            string key = getSettingsKey();
-            int idx = FindRendererDictionaryIndex(key);
-            if (idx < 0)
-            {
-                gui.Properties.Settings.Default.RendererParameters.Add(key);
-                gui.Properties.Settings.Default.RendererParameters.Add(val);
-            }
-            else
-            {
-                gui.Properties.Settings.Default.RendererParameters[idx] = val;
-            }
-        }
-
-        // Restores the current renderer's parameters from the application settings
-        private void LoadRendererParameters()
-        {
-            string key = getSettingsKey();
-            int idx = FindRendererDictionaryIndex(key);
-            if (idx < 0)
-            {
-                gui.Properties.Settings.Default.RendererParameters.Add(key);
-                gui.Properties.Settings.Default.RendererParameters.Add("");
-            }
-            else
-            {
-                string parameters = gui.Properties.Settings.Default.RendererParameters[idx];
-
-                var splitParams = parameters.Split('\n');
-                for (int i = 0; i < Math.Min(splitParams.Length, Parameters.Count); ++i)
+                var paramVals = splitParams[i].Split(';');
+                if (paramVals.Length == 3 && Parameters[i].Name == paramVals[0])
                 {
-                    var paramVals = splitParams[i].Split(';');
-                    if (paramVals.Length == 3 && Parameters[i].Name == paramVals[0])
+                    if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Bool) && Parameters[i].Type == Core.ParameterType.Bool)
                     {
-                        if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Bool) && Parameters[i].Type == Core.ParameterType.Bool)
-                        {
-                            bool val;
-                            if (Boolean.TryParse(paramVals[2], out val))
-                                Parameters[i].Value = val;
-                        }
-                        else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Int) && Parameters[i].Type == Core.ParameterType.Int)
-                        {
-                            int val;
-                            if (Int32.TryParse(paramVals[2], out val))
-                                Parameters[i].Value = val;
-                        }
-                        else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Float) && Parameters[i].Type == Core.ParameterType.Float)
-                        {
-                            double val;
-                            if (Double.TryParse(paramVals[2], out val))
-                                Parameters[i].Value = (float)val;
-                        } else if(paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Enum) && Parameters[i].Type == Core.ParameterType.Enum)
-                        {
-                            Parameters[i].Value = paramVals[2];
-                        }
+                        bool val;
+                        if (Boolean.TryParse(paramVals[2], out val))
+                            Parameters[i].Value = val;
+                    }
+                    else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Int) && Parameters[i].Type == Core.ParameterType.Int)
+                    {
+                        int val;
+                        if (Int32.TryParse(paramVals[2], out val))
+                            Parameters[i].Value = val;
+                    }
+                    else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Float) && Parameters[i].Type == Core.ParameterType.Float)
+                    {
+                        double val;
+                        if (Double.TryParse(paramVals[2], out val))
+                            Parameters[i].Value = (float)val;
+                    }
+                    else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Enum) && Parameters[i].Type == Core.ParameterType.Enum)
+                    {
+                        Parameters[i].Value = paramVals[2];
                     }
                 }
             }
-
         }
 
         #region PropertyChanged

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_target.hpp"
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace spm {
 
@@ -15,13 +16,6 @@ struct PSpvMode {
 	PARAM_ENUM(mode, HASHGRID, OCTREE) = Values::HASHGRID;
 	static constexpr ParamDesc get_desc() {
 		return ParamDesc{ "Shadow mode", ParameterTypes::ENUM };
-	}
-};
-
-struct PUseHeuristic {
-	bool useHeuristic = false;
-	static constexpr ParamDesc get_desc() {
-		return ParamDesc{ "Use heuristic for light size instead of gradient", ParameterTypes::BOOL };
 	}
 };
 
@@ -53,10 +47,33 @@ using ShadowPhotonParameters = ParameterHandler<
 	PMergeRadius,
 	PInterpolate,
 	PSpvMode,
-	PUseHeuristic,
 	PCellSize,
 	PSplitFactor,
 	PBalanceOctree
 >;
+
+
+struct ImportanceTarget {
+	static constexpr const char NAME[] = "Importance";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+struct LightDensityTarget {
+	static constexpr const char NAME[] = "Photon density";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
+struct ShadowDensityTarget {
+	static constexpr const char NAME[] = "Shadow photon density";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
+struct ShadowGradientTarget {
+	static constexpr const char NAME[] = "Shadow photon gradient";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
+
+using ShadowPhotonTargets = TargetList<ImportanceTarget, LightDensityTarget, ShadowDensityTarget, ShadowGradientTarget>;
 
 }}}} // namespace mufflon::renderer::decimaters::spm

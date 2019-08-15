@@ -61,7 +61,7 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 							  Args&&... args
 ) {
 	// Sample the vertex's outgoing direction
-	outSample = vertex.sample(scene.media, rndSet, adjoint);
+	outSample = vertex.sample(scene.aabb, scene.media, rndSet, adjoint);
 	if(outSample.type == math::PathEventType::INVALID) {
 		throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
 		return WalkResult::CANCEL;
@@ -102,10 +102,14 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	throughput.guideWeight *= avg(transmission);
 	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
 
+	Connection connection {
+		ray.direction, ei::sq(nextHit.distance), ray.origin, nextHit.distance
+	};
+
 	// If we missed the scene, terminate the ray
 	if(nextHit.hitId.instanceId < 0) {
-		VertexType::create_void(&outVertex, &vertex, outSample.excident, outSample.pdf.forw,
-								throughput);
+		VertexType::create_void(&outVertex, &vertex, outSample.excident);
+		outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput, args...);
 		return WalkResult::BACKGROUND;
 	}
 
@@ -115,8 +119,8 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	const scene::TangentSpace tangentSpace = scene::accel_struct::tangent_space_geom_to_shader(scene, nextHit);
 	// Finalize
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(nextHit.hitId),
-				position, tangentSpace, outSample.excident, nextHit.distance,
-				outSample.pdf.forw, throughput);
+				position, tangentSpace, outSample.excident);
+	outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput, args...);
 	return WalkResult::HIT;
 }
 

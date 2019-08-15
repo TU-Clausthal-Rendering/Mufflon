@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lt_params.hpp"
+#include "core/math/rng.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/renderer/renderer_base.hpp"
 
@@ -11,10 +12,7 @@ enum class Device : unsigned char;
 
 namespace renderer {
 
-template < Device >
-struct RenderBuffer;
-
-class GpuLightTracer final : public RendererBase<Device::CUDA> {
+class GpuLightTracer final : public RendererBase<Device::CUDA, LtTargets> {
 public:
 	GpuLightTracer();
 	~GpuLightTracer() = default;

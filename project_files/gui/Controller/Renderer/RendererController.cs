@@ -34,6 +34,8 @@ namespace gui.Controller.Renderer
             m_models.App.GlHost.Destroy += OnDestroy;
             m_models.Renderer.RequestRedraw += OnRequestRedraw;
             m_models.Renderer.RequestWorldClear += OnRequestWorldClear;
+            m_models.Renderer.PropertyChanged += LoadRendererParameters;
+            m_models.Renderer.RequestParameterSave += SaveRendererParameters;
         }
         
         /* Performs one render loop iteration
@@ -85,7 +87,7 @@ namespace gui.Controller.Renderer
                 // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
                 if(m_shouldExit)
                     return;
-                m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
+                m_models.Display.Repaint(m_renderTarget.Name, m_varianceTarget);
             }
         }
 
@@ -101,15 +103,15 @@ namespace gui.Controller.Renderer
             // TODO: disable the old target?
             if(newTarget != m_renderTarget || newVarianceTarget != m_varianceTarget) {
                 if(m_renderTarget == null) {
-                    if (!Core.render_enable_render_target(newTarget.TargetIndex, newVarianceTarget ? 1u : 0u))
+                    if (!Core.render_enable_render_target(newTarget.Name, newVarianceTarget))
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());
-                } else if (!Core.render_is_render_target_enabled(newTarget.TargetIndex, newVarianceTarget)) {
+                } else if (!Core.render_is_render_target_enabled(newTarget.Name, newVarianceTarget)) {
                     // Disable previous render target
-                    if (!Core.render_disable_render_target(m_renderTarget.TargetIndex, m_varianceTarget ? 1u : 0u))
+                    if (!Core.render_disable_render_target(m_renderTarget.Name, m_varianceTarget))
                         throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_enable_render_target(newTarget.TargetIndex, newVarianceTarget ? 1u : 0u))
+                    if (!Core.render_enable_render_target(newTarget.Name, newVarianceTarget))
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());
@@ -145,6 +147,77 @@ namespace gui.Controller.Renderer
             m_clearWorld = true;
             m_models.Renderer.RenderLock.Set();
             m_clearedWorld.WaitOne();
+        }
+
+
+        private int FindRendererDictionaryIndex(string name)
+        {
+            if (m_models.Settings.RendererParameters.Count % 2 != 0)
+            {
+                Logger.log("Invalid saved renderer properties; resetting all renderer properties to defaults", Core.Severity.Error);
+                m_models.Settings.RendererParameters.Clear();
+            }
+            for (int i = 0; i < m_models.Settings.RendererParameters.Count; i += 2)
+            {
+                if (m_models.Settings.RendererParameters[i].Equals(name))
+                    return i + 1;
+            }
+            return -1;
+        }
+        private string getSettingsKey()
+        {
+            string key = m_models.Renderer.Name;
+            foreach (Core.RenderDevice dev in Enum.GetValues(typeof(Core.RenderDevice)))
+            {
+                if (m_models.Renderer.UsesDevice(dev))
+                    key += "-" + Enum.GetName(typeof(Core.RenderDevice), dev);
+            }
+            return key;
+        }
+
+        // Saves the current renderer's parameters in textform in the application settings
+        private void SaveRendererParameters(object sender, EventArgs ignored)
+        {
+            if (m_models.Renderer.Parameters == null)
+                return;
+
+            string val = "";
+
+            foreach (var param in m_models.Renderer.Parameters)
+                val += param.Name + ";" + Enum.GetName(typeof(Core.ParameterType), param.Type) + ";" + param.Value.ToString() + "\n";
+
+            string key = getSettingsKey();
+            int idx = FindRendererDictionaryIndex(key);
+            if (idx < 0)
+            {
+                m_models.Settings.RendererParameters.Add(key);
+                m_models.Settings.RendererParameters.Add(val);
+            }
+            else
+            {
+                m_models.Settings.RendererParameters[idx] = val;
+            }
+        }
+
+        // Restores the current renderer's parameters from the application settings
+        private void LoadRendererParameters(object sender, PropertyChangedEventArgs args)
+        {
+            if(args.PropertyName == nameof(Model.RendererModel.Name))
+            {
+                string key = getSettingsKey();
+                int idx = FindRendererDictionaryIndex(key);
+                if (idx < 0)
+                {
+                    m_models.Settings.RendererParameters.Add(key);
+                    m_models.Settings.RendererParameters.Add("");
+                }
+                else
+                {
+                    string parameters = m_models.Settings.RendererParameters[idx];
+
+                    m_models.Renderer.LoadRendererParametersFromString(parameters);
+                }
+            }
         }
     }
 }
