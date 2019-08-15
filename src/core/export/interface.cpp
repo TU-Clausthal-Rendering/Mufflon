@@ -3315,18 +3315,19 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 					s_imageOutput->get_height());
 	// TODO: incorporate albedo/normals if present? But currently they're noisy,
 	// and OIDN wants (mostly) first-hit info (I think)
-	/*if(s_outputTargets.is_set(renderer::OutputValue::NORMAL)) {
-		normals = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::NORMAL });
+	if(s_imageOutput->has_render_target("Normal") && s_imageOutput->is_render_target_enabled("Normal", false)) {
+		normals = s_imageOutput->get_data("Normal", false);
 		filter.setImage("normal", normals.get(), oidn::Format::Float3, s_imageOutput->get_width(),
 						s_imageOutput->get_height());
 		logPedantic("[", FUNCTION_NAME, "] Using normal guidance");
 	}
-	if(s_outputTargets.is_set(renderer::OutputValue::ALBEDO)) {
-		albedo = s_imageOutput->get_data(renderer::OutputValue{ renderer::OutputValue::ALBEDO });
+	if(s_imageOutput->has_render_target("Albedo") && s_imageOutput->is_render_target_enabled("Albedo", false)) {
+		albedo = s_imageOutput->get_data("Albedo", false);
 		filter.setImage("albedo", albedo.get(), oidn::Format::Float3, s_imageOutput->get_width(),
 						s_imageOutput->get_height());
 		logPedantic("[", FUNCTION_NAME, "] Using albedo guidance");
-	}*/
+	}
+
 	filter.set("hdr", true);
 	filter.commit();
 	filter.execute();
