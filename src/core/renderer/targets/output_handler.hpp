@@ -41,6 +41,7 @@ public:
 	virtual void disable_render_target(StringView name, const bool variance) = 0;
 	virtual void enable_all_render_targets(const bool includeVariance) noexcept = 0;
 	virtual void disable_all_render_targets(const bool varianceOnly) noexcept = 0;
+	virtual bool has_render_target(StringView name) const = 0;
 	virtual bool is_render_target_enabled(StringView name, const bool variance) const = 0;
 	virtual u32 get_num_channels(StringView targetName) const = 0;
 	virtual int get_width() const noexcept = 0;
@@ -434,6 +435,17 @@ public:
 				target.cumulative.template unload<Device::OPENGL>();
 			}
 		});
+	}
+
+	bool has_render_target(StringView name) const override {
+		bool foundTarget = false;
+		m_targets.for_each([name, &foundTarget](auto& target) {
+			using Type = std::decay_t<decltype(target)>;
+			using TargetType = typename Type::TargetType;
+			if(!foundTarget && name.compare(TargetType::NAME) == 0)
+				foundTarget = true;
+		});
+		return foundTarget;
 	}
 
 	bool is_render_target_enabled(StringView name, const bool variance) const override {
