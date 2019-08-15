@@ -14,7 +14,13 @@ namespace gui.Model
         {
             TargetIndex = targetIndex;
             Name = Core.render_get_render_target_name(TargetIndex);
+            LastEnabledStatus = Enabled;
+            LastVarianceEnabledStatus = VarianceEnabled;
         }
+
+        // Used to query enabled status after a renderer switch
+        public bool LastEnabledStatus { get; private set; }
+        public bool LastVarianceEnabledStatus { get; private set; }
 
         public UInt32 TargetIndex { get; private set; }
 
@@ -25,6 +31,7 @@ namespace gui.Model
             get => Core.render_is_render_target_enabled(Name, false);
             set
             {
+                LastEnabledStatus = value;
                 if (value == Core.render_is_render_target_enabled(Name, false)) return;
                 if (value)
                 {
@@ -46,6 +53,7 @@ namespace gui.Model
             get => Core.render_is_render_target_enabled(Name, true);
             set
             {
+                LastVarianceEnabledStatus = value;
                 if (value == Core.render_is_render_target_enabled(Name, true)) return;
                 if (value)
                 {
@@ -89,15 +97,47 @@ namespace gui.Model
 
         public void UpdateTargetList()
         {
-            m_targetStatus.Clear();
+            var newTargets = new List<RenderTarget>();
             UInt32 targetCount = Core.render_get_render_target_count();
             for (UInt32 i = 0u; i < targetCount; ++i)
-                m_targetStatus.Add(new RenderTarget(i));
+            {
+                var target = new RenderTarget(i);
+                newTargets.Add(target);
+                // Try to match enabled/disabled for equal names
+                var sameTargets = m_targetStatus.FindAll(x => x.Name == target.Name);
+                if(sameTargets.Count != 0)
+                {
+                    // Only use the first, equal names for same renderer are impossible anyway
+                    target.Enabled = sameTargets[0].LastEnabledStatus;
+                    target.VarianceEnabled = sameTargets[0].LastVarianceEnabledStatus;
+                }
+            }
+            m_targetStatus = newTargets;
             OnPropertyChanged(nameof(Targets));
             if (targetCount > 0)
-                VisibleTarget = Targets[0];
+            {
+                if(VisibleTarget != null)
+                {
+                    // Try to find a target with the same name as the previous target
+                    var sameTargets = m_targetStatus.FindAll(x => x.Name == VisibleTarget.Name);
+                    if (sameTargets.Count != 0)
+                    {
+                        // Only use the first, equal names for same renderer are impossible anyway
+                        VisibleTarget = sameTargets[0];
+                    }
+                    else
+                    {
+                        VisibleTarget = Targets[0];
+                    }
+                } else
+                {
+                    VisibleTarget = Targets[0];
+                }
+            }
             else
+            {
                 VisibleTarget = null;
+            }
         }
 
         public IReadOnlyList<RenderTarget> Targets { get => m_targetStatus; }

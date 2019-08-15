@@ -35,13 +35,13 @@ namespace gui.Model
                 MaxScreenshotNamingPatterns);
             RendererParameters = new LimitedStringCollection(Settings.Default.RendererParameters, int.MaxValue);
 
-            LastWorlds.CollectionChanged += OnStringCollectionChanged;
-            ScreenshotNamePatternHistory.CollectionChanged += OnStringCollectionChanged;
-            RendererParameters.CollectionChanged += OnStringCollectionChanged;
-
             // Screenshot history has to have at least one entry
             if (Settings.Default.ScreenshotNamePatternHistory.Count == 0)
                 Settings.Default.ScreenshotNamePatternHistory.Add(ScreenshotNamePattern);
+
+            LastWorlds.CollectionChanged += OnStringCollectionChanged;
+            ScreenshotNamePatternHistory.CollectionChanged += OnStringCollectionChanged;
+            RendererParameters.CollectionChanged += OnStringCollectionChanged;
 
             SetLogLevel(LogLevel);
             SetProfilerLevels();
