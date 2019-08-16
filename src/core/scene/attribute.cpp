@@ -71,8 +71,10 @@ void OpenMeshAttributePool<face>::reserve(std::size_t capacity) {
 	std::size_t currOffset = 0u;
 	// Adjust pool offsets for the attributes
 	for(auto& attrib : m_attributes) {
-		attrib.poolOffset = currOffset;
-		currOffset += attrib.elemSize * capacity;
+		if(attrib.accessor) {
+			attrib.poolOffset = currOffset;
+			currOffset += attrib.elemSize * capacity;
+		}
 	}
 
 	m_poolSize = currOffset;
@@ -133,18 +135,22 @@ void OpenMeshAttributePool<face>::synchronize() {
 				// Copy over dirty attributes
 				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
-					char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(cpuData, m_cudaPool + currOffset, attrib.elemSize * m_attribElemCount);
-					currOffset += attrib.elemSize * m_attribElemCount;
+					if(attrib.accessor) {
+						char* cpuData = attrib.accessor(m_mesh);
+						::mufflon::copy(cpuData, m_cudaPool + currOffset, attrib.elemSize * m_attribElemCount);
+						currOffset += attrib.elemSize * m_attribElemCount;
+					}
 				}
 				m_openMeshSynced = true;
 			} else if(m_openglPool != nullptr) {
 				// Copy over dirty attributes
 				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
-					char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(cpuData, m_openglPool + currOffset, attrib.elemSize * m_attribElemCount);
-					currOffset += attrib.elemSize * m_attribElemCount;
+					if(attrib.accessor) {
+						char* cpuData = attrib.accessor(m_mesh);
+						::mufflon::copy(cpuData, m_openglPool + currOffset, attrib.elemSize * m_attribElemCount);
+						currOffset += attrib.elemSize * m_attribElemCount;
+					}
 				}
 				m_openMeshSynced = true;
 			}
@@ -157,9 +163,11 @@ void OpenMeshAttributePool<face>::synchronize() {
 				// Copy over all attributes
 				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
-					const char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(m_cudaPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
-					currOffset += attrib.elemSize * m_attribElemCount;
+					if(attrib.accessor) {
+						const char* cpuData = attrib.accessor(m_mesh);
+						::mufflon::copy(m_cudaPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
+						currOffset += attrib.elemSize * m_attribElemCount;
+					}
 				}
 			} else if(m_openglPool != nullptr) {
 				//m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
@@ -174,9 +182,11 @@ void OpenMeshAttributePool<face>::synchronize() {
 				// Copy over all attributes
 				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
-					const char* cpuData = attrib.accessor(m_mesh);
-					::mufflon::copy(m_openglPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
-					currOffset += attrib.elemSize * m_attribElemCount;
+					if(attrib.accessor) {
+						const char* cpuData = attrib.accessor(m_mesh);
+						::mufflon::copy(m_openglPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
+						currOffset += attrib.elemSize * m_attribElemCount;
+					}
 				}
 			} else if(m_cudaPool != nullptr) {
 				//m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
@@ -217,6 +227,7 @@ template < bool face >
 std::size_t OpenMeshAttributePool<face>::restore(AttributeHandle hdl, util::IByteReader& attrStream,
 												 std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
+	mAssert(m_attributes[hdl.index].accessor);
 	this->synchronize<Device::CPU>();
 	if(start + count > m_attribElemCount)
 		this->resize(start + count);
@@ -234,6 +245,7 @@ template < bool face >
 std::size_t OpenMeshAttributePool<face>::store(AttributeHandle hdl, util::IByteWriter& attrStream,
 											   std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
+	mAssert(m_attributes[hdl.index].accessor);
 	this->synchronize<Device::CPU>();
 	std::size_t actualCount = count;
 	if(start + count > m_attribElemCount)
@@ -305,8 +317,10 @@ void AttributePool::reserve(std::size_t capacity) {
 	std::size_t currOffset = 0u;
 	// Adjust pool offsets for the attributes
 	for(auto& attrib : m_attributes) {
-		attrib.poolOffset = currOffset;
-		currOffset += attrib.elemSize * capacity;
+		if(!attrib.erased) {
+			attrib.poolOffset = currOffset;
+			currOffset += attrib.elemSize * capacity;
+		}
 	}
 
 	m_attribElemCapacity = capacity;
@@ -411,6 +425,7 @@ void AttributePool::unload() {
 std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrStream,
 					std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
+	mAssert(!m_attributes[hdl.index].erased);
 	this->synchronize<Device::CPU>();
 	if(start + count > m_attribElemCount)
 		this->resize(start + count);
@@ -427,6 +442,7 @@ std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrS
 std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStream,
 								 std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
+	mAssert(!m_attributes[hdl.index].erased);
 	this->synchronize<Device::CPU>();
 	std::size_t actualCount = count;
 	if(start + count > m_attribElemCount)
