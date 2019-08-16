@@ -143,7 +143,9 @@ namespace gui.ViewModel
 
         private void OnRendererChanged(object sender, PropertyChangedEventArgs args)
         {
-            if(sender == m_models.Renderer && args.PropertyName == nameof(Model.RendererModel.RendererIndex))
+            if(sender == m_models.Renderer &&
+                (args.PropertyName == nameof(Model.RendererModel.RendererIndex)
+                || args.PropertyName == nameof(Model.RendererModel.RendererVariation)))
             {
                 // The renderer changed, thus we have to update the list of available render targets
                 m_models.RenderTargetSelection.UpdateTargetList();

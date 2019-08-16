@@ -1183,7 +1183,6 @@ void world_clear_all() {
 		for(auto& renderer : s_renderers.get(i))
 			renderer->on_world_clearing();
 	WorldContainer::clear_instance();
-	s_imageOutput.reset();
 	s_screenTexture.reset();
 	CATCH_ALL(;)
 }
@@ -1739,7 +1738,7 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
 	if(s_currentRenderer != nullptr) {
 		s_currentRenderer->load_scene(hdl);
-		s_imageOutput = s_currentRenderer->create_output_handler(res.x, res.y);
+		s_imageOutput->resize(res.x, res.y);
 	}
 	s_screenTexture = nullptr;
 	return static_cast<SceneHdl>(hdl);
@@ -3198,7 +3197,7 @@ Boolean render_iterate(ProcessTime* time) {
 		ei::IVec2 res = s_world.get_current_scenario()->get_resolution();
 		if(s_currentRenderer != nullptr) {
 			s_currentRenderer->load_scene(hdl);
-			s_imageOutput = s_currentRenderer->create_output_handler(res.x, res.y);
+			s_imageOutput->resize(res.x, res.y);
 		}
 		s_screenTexture = nullptr;
 	} else {
