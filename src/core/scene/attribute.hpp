@@ -116,13 +116,15 @@ public:
 	AttributeHandle add_attribute(std::string name) {
 		if(m_nameMap.find(name) != m_nameMap.end())
 			throw std::runtime_error("Attribute '" + name + "' already exists");
-		this->unload<Device::CPU>();
+		this->unload<Device::CUDA>();
+		this->unload<Device::OPENGL>();
 		// Create the OpenMesh-Property
 		PropertyHandleType<T> propHandle;
 		m_mesh.add_property(propHandle, name);
 		if(!propHandle.is_valid())
 			throw std::runtime_error("Failed to add property '" + name + "' to OpenMesh");
 		// Create the accessor...
+		// TODO: account for alignment!
 		AttribInfo info{
 			sizeof(T),
 			m_poolSize,
@@ -133,9 +135,37 @@ public:
 		};
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
-		m_nameMap.emplace(std::move(name), m_attributes.size());
-		m_attributes.push_back(std::move(info));
-		return AttributeHandle{ m_attributes.size() - 1u };
+		const auto index = insert_attribute_at_first_empty(std::move(info));
+		m_nameMap.emplace(std::move(name), index);
+		return AttributeHandle{ index };
+	}
+
+	template < class T >
+	void remove(const std::string& name) {
+		if(auto iter = m_nameMap.find(name); iter == m_nameMap.cend()) {
+			throw std::runtime_error("Attribute '" + name + "'does not exist");
+		} else {
+			this->unload<Device::CUDA>();
+			this->unload<Device::OPENGL>();
+			// Adjust pool sizes for following attributes
+			const std::size_t segmentSize = (iter->second == m_attributes.size() - 1u)
+				? m_poolSize - m_attributes[iter->second].poolOffset
+				: m_attributes[iter->second + 1].poolOffset - m_attributes[iter->second].poolOffset;
+			for(std::size_t i = iter->second + 1; i < m_attributes.size(); ++i)
+				m_attributes[i].poolOffset -= segmentSize;
+
+			m_poolSize -= segmentSize;
+			
+			// Remove the attribute from bookkeeping
+			PropertyHandleType<T> prop;
+			m_mesh.get_property_handle(prop, name);
+			m_mesh.remove_property(prop);
+			if(iter->second == m_attributes.size() - 1u)
+				m_attributes.pop_back();
+			else
+				m_attributes[iter->second].accessor = {};
+			m_nameMap.erase(iter);
+		}
 	}
 
 	bool has_attribute(StringView name) const {
@@ -149,6 +179,7 @@ public:
 		if(m_nameMap.find(prop.name()) != m_nameMap.end())
 			throw std::runtime_error("Registered attribute '" + prop.name() + "' already exists");
 		this->unload<Device::CUDA>();
+		this->unload<Device::OPENGL>();
 		// Create the accessor...
 		AttribInfo info{
 			sizeof(T),
@@ -160,9 +191,9 @@ public:
 		};
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
-		m_nameMap.emplace(prop.name(), m_attributes.size());
-		m_attributes.push_back(std::move(info));
-		return AttributeHandle{ m_attributes.size() - 1u };
+		const auto index = insert_attribute_at_first_empty(std::move(info));
+		m_nameMap.emplace(prop.name(), index);
+		return AttributeHandle{ index };
 	}
 
 	// Reserving memory force-unloads other devices
@@ -181,6 +212,7 @@ public:
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
+		mAssert(m_attributes[hdl.index].accessor);
 		// Mark both the specific attribute flags and the flags that indicate a change is present
 		AcquireHelper<dev> helper(*this);
 		return helper.template acquire<T>(hdl.index);
@@ -194,6 +226,7 @@ public:
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
+		mAssert(m_attributes[hdl.index].accessor);
 		this->synchronize<dev>();
 		AcquireHelper<dev> helper(*const_cast<OpenMeshAttributePool<IsFace>*>(this));
 		return helper.template acquire<T>(hdl.index);
@@ -239,10 +272,6 @@ public:
 		return this->store(get_attribute_handle(name), attrStream, start, count);
 	}
 
-	std::size_t get_attribute_count() const noexcept {
-		return m_attributes.size();
-	}
-
 	std::size_t get_attribute_elem_count() const noexcept {
 		return m_attribElemCount;
 	}
@@ -258,8 +287,21 @@ private:
 	struct AttribInfo {
 		std::size_t elemSize = 0u;
 		std::size_t poolOffset = 0u;
+		// We also (ab-)use the accessor as an indicator whether the attribute
+		// is present or has been removed
 		std::function<char*(geometry::PolygonMeshType&)> accessor;
 	};
+
+	std::size_t insert_attribute_at_first_empty(AttribInfo&& info) {
+		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
+			if(!m_attributes[i].accessor) {
+				m_attributes[i] = info;
+				return i;
+			}
+		}
+		m_attributes.push_back(info);
+		return m_attributes.size() - 1u;
+	}
 
 	geometry::PolygonMeshType &m_mesh;	// References the OpenMesh mesh
 	std::map<std::string, std::size_t, std::less<>> m_nameMap;
@@ -295,6 +337,8 @@ public:
 	AttributeHandle add_attribute(std::string name) {
 		if(m_nameMap.find(name) != m_nameMap.end())
 			throw std::runtime_error("Attribute '" + name + "' already exists");
+		this->unload<Device::CUDA>();
+		this->unload<Device::OPENGL>();
 		// Create the OpenMesh-Property
 		// Create the accessor...
 		AttribInfo info{
@@ -303,13 +347,37 @@ public:
 		};
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
-		m_nameMap.emplace(std::move(name), m_attributes.size());
-		m_attributes.push_back(std::move(info));
-		return AttributeHandle{ m_attributes.size() - 1u };
+		const auto index = insert_attribute_at_first_empty(std::move(info));
+		m_nameMap.emplace(std::move(name), index);
+		return AttributeHandle{ index };
 	}
 
 	bool has_attribute(StringView name) const {
 		return m_nameMap.find(name) != m_nameMap.cend();
+	}
+
+	void remove(const std::string& name) {
+		if(auto iter = m_nameMap.find(name); iter == m_nameMap.cend()) {
+			throw std::runtime_error("Attribute '" + name + "'does not exist");
+		} else {
+			this->unload<Device::CUDA>();
+			this->unload<Device::OPENGL>();
+			// Adjust pool sizes for following attributes
+			const std::size_t segmentSize = (iter->second == m_attributes.size() - 1u)
+				? m_poolSize - m_attributes[iter->second].poolOffset
+				: m_attributes[iter->second + 1].poolOffset - m_attributes[iter->second].poolOffset;
+			for(std::size_t i = iter->second + 1; i < m_attributes.size(); ++i)
+				m_attributes[i].poolOffset -= segmentSize;
+
+			m_poolSize -= segmentSize;
+
+			// Remove the attribute from bookkeeping
+			if(iter->second == m_attributes.size() - 1u)
+				m_attributes.pop_back();
+			else
+				m_attributes[iter->second].erased = true;
+			m_nameMap.erase(iter);
+		}
 	}
 
 	// Causes force-unload on actual reserve
@@ -327,6 +395,7 @@ public:
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
+		mAssert(!m_attributes[hdl.index].erased);
 		this->synchronize<dev>();
 		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
 			m_pools.template get<PoolHandle<dev>>().handle + m_attributes[hdl.index].poolOffset);
@@ -335,6 +404,7 @@ public:
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(AttributeHandle hdl) {
 		mAssert(hdl.index < m_attributes.size());
+		mAssert(!m_attributes[hdl.index].erased);
 		this->synchronize<dev>();
 		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
 			m_pools.template get<PoolHandle<dev>>().handle + m_attributes[hdl.index].poolOffset);
@@ -376,10 +446,6 @@ public:
 		return this->store(get_attribute_handle(name), attrStream, start, count);
 	}*/
 
-	std::size_t get_attribute_count() const noexcept {
-		return m_attributes.size();
-	}
-
 	std::size_t get_attribute_elem_count() const noexcept {
 		return m_attribElemCount;
 	}
@@ -395,6 +461,8 @@ private:
 	struct AttribInfo {
 		std::size_t elemSize = 0u;
 		std::size_t poolOffset = 0u;
+		// Stores whether the attribute has been erased and can be overwritten
+		bool erased = false;
 	};
 
 	template < Device dev >
@@ -402,6 +470,17 @@ private:
 		static constexpr Device DEVICE = dev;
 		ArrayDevHandle_t<dev, char> handle = ArrayDevHandle_t<dev, char>{};
 	};
+
+	std::size_t insert_attribute_at_first_empty(AttribInfo&& info) {
+		for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
+			if(m_attributes[i].erased) {
+				m_attributes[i] = info;
+				return i;
+			}
+		}
+		m_attributes.push_back(info);
+		return m_attributes.size() - 1u;
+	}
 
 	std::map<std::string, std::size_t, std::less<>> m_nameMap;
 	std::size_t m_attribElemCount = 0u;

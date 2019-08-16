@@ -162,10 +162,6 @@ public:
 		return m_attributes.get_attribute_elem_count();
 	}
 
-	std::size_t get_attribute_count() const noexcept {
-		return m_attributes.get_attribute_count();
-	}
-
 	// Get a list of all materials which are referenced by any primitive
 	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
 		return m_uniqueMaterials;
