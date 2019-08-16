@@ -36,6 +36,7 @@ public:
 	virtual StringView get_render_target_name(std::size_t index) const = 0;
 	virtual std::unique_ptr<float[]> get_data(StringView name, const bool variance) = 0;
 	virtual ei::Vec4 get_pixel_value(Pixel pixel, StringView name, const bool variance) = 0;
+	virtual void resize(int width, int height) = 0;
 
 	virtual void enable_render_target(StringView name, const bool variance) = 0;
 	virtual void disable_render_target(StringView name, const bool variance) = 0;
@@ -77,9 +78,27 @@ public:
 				elem.iteration = GenericResource{ bytes };
 				elem.cumulativeVariance = GenericResource{ bytes };
 			});
+		}
+	}
 
-			// By default the first render target is enabled
-			m_targets.template get<0>().record = true;
+	void resize(int width, int height) override {
+		if(width <= 0 || height <= 0) {
+			logError("[OutputHandler::OutputHandler] Invalid resolution (<= 0)");
+		} else {
+			m_targets.for_each([width, height](auto& elem) {
+				using Type = std::decay_t<decltype(elem)>;
+				using TargetType = typename Type::TargetType;
+				using PixelType = typename TargetType::PixelType;
+				constexpr std::size_t PIXEL_TYPE_SIZE = std::max(sizeof(cuda::Atomic<Device::CPU, PixelType>),
+																 sizeof(cuda::Atomic<Device::CUDA, PixelType>));
+				const std::size_t bytes = width * height * TargetType::NUM_CHANNELS * PIXEL_TYPE_SIZE;
+				elem.cumulative.resize(bytes);
+				elem.iteration.resize(bytes);
+				elem.cumulativeVariance.resize(bytes);
+			});
+			m_width = width;
+			m_height = height;
+			m_iteration = -1;
 		}
 	}
 
