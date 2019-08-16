@@ -31,6 +31,7 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 							   pt::SilhouetteTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 							   scene::SceneDescriptor<Device::CUDA>* scene,
 							   const u32* seeds, Importances<Device::CUDA>** importances,
+							   DeviceImportanceSums<Device::CUDA>* sums,
 							   const float maxImportance);
 
 } // namespace pt::gpusil_details
@@ -173,7 +174,7 @@ void GpuShadowSilhouettesPT::display_importance() {
 
 	cuda::check_error(gpusil_details::call_impvis_kernel(gridDims, blockDims, std::move(m_outputBuffer),
 														 m_sceneDesc.get(), m_seedsPtr.get(), m_importances.get(),
-														 m_maxImportance));
+														 m_importanceSums.get(), m_maxImportance));
 }
 
 void GpuShadowSilhouettesPT::compute_max_importance() {

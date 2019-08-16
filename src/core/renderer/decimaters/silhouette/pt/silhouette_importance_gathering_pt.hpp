@@ -527,8 +527,10 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
 				ei::Ray shadowRay{ nee.position, -nee.dir.direction };
 
-				auto shadowHit = scene::accel_struct::first_intersection(scene, shadowRay,
-																		 vertices[pathLen].get_geometric_normal(), nee.dist);
+				// TODO: any_intersection-like method with both normals please...
+				const auto shadowHit = scene::accel_struct::first_intersection(scene, shadowRay,
+																			   nee.geoNormal,
+																			   nee.dist - 0.00125f);
 				const float firstShadowDistance = shadowHit.distance;
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
@@ -550,10 +552,12 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 													numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
 					}
 				} else {
+					if(pathLen == 1)
+						outputBuffer.template contribute<ShadowTarget>(coord, 1.f);
 					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
 					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
-									shadowHit.hitId, nee.dist, firstShadowDistance,
-									lightType, lightOffset, params);
+								 shadowHit.hitId, nee.dist, firstShadowDistance,
+								 lightType, lightOffset, params);
 				}
 			}
 		}
@@ -651,6 +655,7 @@ CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,
+										 DeviceImportanceSums<CURRENT_DEV>* sums,
 										 const float maxImportance) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	PtPathVertex vertex;
@@ -665,7 +670,8 @@ CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType
 		const auto& hitpoint = vertex.get_position();
 		const auto& hitId = vertex.get_primitive_id();
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];
-		const auto& polygon = scene.lods[lodIdx].polygon;
+		const auto& lod = scene.lods[lodIdx];
+		const auto& polygon = lod.polygon;
 		const u32 vertexCount = hitId.primId < (i32)polygon.numTriangles ? 3u : 4u;
 		const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 		const u32 primIdx = vertexCount == 3u ? hitId.primId : (hitId.primId - polygon.numTriangles);
@@ -681,6 +687,7 @@ CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType
 		}
 
 		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
+		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
 	}
 }
 

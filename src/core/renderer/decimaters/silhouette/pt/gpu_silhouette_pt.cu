@@ -27,9 +27,10 @@ __global__ static void silhouette_kernel(pt::SilhouetteTargets::RenderBufferType
 }
 
 __global__ static void impvis_kernel(pt::SilhouetteTargets::RenderBufferType<Device::CUDA> outputBuffer,
-									  scene::SceneDescriptor<Device::CUDA>* scene,
-									  const u32* seeds, Importances<Device::CUDA>** importances,
-									  const float maxImportance) {
+									 scene::SceneDescriptor<Device::CUDA>* scene,
+									 const u32* seeds, Importances<Device::CUDA>** importances,
+									 DeviceImportanceSums<Device::CUDA>* sums,
+									 const float maxImportance) {
 	Pixel coord{
 		threadIdx.x + blockDim.x * blockIdx.x,
 		threadIdx.y + blockDim.y * blockIdx.y
@@ -41,7 +42,7 @@ __global__ static void impvis_kernel(pt::SilhouetteTargets::RenderBufferType<Dev
 
 	math::Rng rng(seeds[pixel]);
 #ifdef __CUDA_ARCH__
-	sample_vis_importance(outputBuffer, *scene, coord, rng, importances, maxImportance);
+	sample_vis_importance(outputBuffer, *scene, coord, rng, importances, sums, maxImportance);
 #endif // __CUDA_ARCH__
 }
 
@@ -64,9 +65,10 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 							   pt::SilhouetteTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 							   scene::SceneDescriptor<Device::CUDA>* scene,
 							   const u32* seeds, Importances<Device::CUDA>** importances,
+							   DeviceImportanceSums<Device::CUDA>* sums,
 							   const float maxImportance) {
 	impvis_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
-										   seeds, importances, maxImportance);
+										   seeds, importances, sums, maxImportance);
 	cudaDeviceSynchronize();
 	return cudaGetLastError();
 }

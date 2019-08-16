@@ -108,7 +108,12 @@ struct ImportanceTarget {
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
 struct PolyShareTarget {
-	static constexpr const char NAME[] = "Polygon share";
+	static constexpr const char NAME[] = "ShadowSum";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+struct ShadowTarget {
+	static constexpr const char NAME[] = "Shadow Areas";
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };

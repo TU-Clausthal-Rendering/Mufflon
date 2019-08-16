@@ -105,6 +105,13 @@ void CpuShadowSilhouettesPT::iterate() {
 
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
+
+		// First we need to reset the importance sums (which we may have kept for visualization)
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			m_importanceSums[i].shadowImportance.store(0.f);
+			m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
+		}
+
 		gather_importance();
 
 		if(m_decimaters.size() == 0u)
@@ -159,7 +166,8 @@ void CpuShadowSilhouettesPT::display_importance() {
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
-										  m_importances.get(), m_maxImportance == 0.f ? 1.f : m_maxImportance);
+										  m_importances.get(), m_importanceSums.get(),
+										  m_maxImportance == 0.f ? 1.f : m_maxImportance);
 	}
 }
 
@@ -218,8 +226,6 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 			ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
 			m_decimaters[i]->update_importance_density(sums);
-			m_importanceSums[i].shadowImportance.store(0.f);
-			m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 			m_remainingVertexFactor.push_back(1.0);
 		}
 		return;
@@ -230,8 +236,6 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 		auto& decimater = m_decimaters[i];
 		ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
 		m_decimaters[i]->update_importance_density(sums);
-		m_importanceSums[i].shadowImportance.store(0.f);
-		m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 		if(decimater->get_original_vertex_count() > m_params.threshold) {
 			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
 			expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();

@@ -14,6 +14,6 @@ using SilhouetteParameters = ParameterHandler<
 	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide
 >;
 
-using SilhouetteTargets = TargetList<ImportanceTarget, PolyShareTarget>;
+using SilhouetteTargets = TargetList<ImportanceTarget, PolyShareTarget, ShadowTarget>;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::pt
