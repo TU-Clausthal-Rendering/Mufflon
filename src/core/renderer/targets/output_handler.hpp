@@ -292,7 +292,7 @@ public:
 		}
 
 		const int numValues = m_width * m_height * T::NUM_CHANNELS;
-		auto data = std::make_unique<PixelType[]>(numValues);
+		auto data = std::make_unique<float[]>(numValues);
 		// TODO: wtf does the normalizer do???
 		const bool isNormalized = !variance && target.recordVariance;
 		const float normalizer = isNormalized

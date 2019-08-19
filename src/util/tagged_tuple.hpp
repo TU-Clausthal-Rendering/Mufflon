@@ -64,10 +64,10 @@ public:
 		return std::get<get_index<T>()>(m_tuple);
 	}
 
-	// Checks whether
+	// Checks whether the given type is present in the tuple
 	template < class T >
 	static constexpr bool has() noexcept {
-		return get_index<T>() < size;
+		return IsOneOf<T, Args...>::value;
 	}
 
 	template < class Op, std::size_t I = 0u >
@@ -92,6 +92,13 @@ private:
 	// Recurse until we find the type and count the recursions
 	template < class T, class H, class... Tails >
 	struct Index<T, H, Tails...> : public std::integral_constant<std::size_t, 1 + Index<T, Tails...>::value> {};
+
+	template < class... Tails >
+	struct IsOneOf : std::false_type {};
+	template < class T, class H, class... Tails >
+	struct IsOneOf<T, H, Tails...> {
+		static constexpr bool value = std::is_same<T, H>::value || IsOneOf<T, Tails...>::value;
+	};
 
 	// Helper class because C++14 doesn't have constexpr yet...
 	template < class Op, std::size_t I >

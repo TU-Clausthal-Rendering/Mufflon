@@ -12,15 +12,15 @@ update_variance(ConstRenderTargetBuffer<CURRENT_DEV, T> iterTarget,
 				int x, int y, int num_channels, int width, float iteration) {
 	for(int c = 0; c < num_channels; ++c) {
 		int idx = c + (x + y * width) * num_channels;
-		auto iter = cuda::atomic_load<CURRENT_DEV, T>(iterTarget[idx]);
-		auto cum = cuda::atomic_load<CURRENT_DEV, T>(cumTarget[idx]);
-		auto var = cuda::atomic_load<CURRENT_DEV, T>(varTarget[idx]);
+		auto iter = static_cast<float>(cuda::atomic_load<CURRENT_DEV, T>(iterTarget[idx]));
+		auto cum = static_cast<float>(cuda::atomic_load<CURRENT_DEV, T>(cumTarget[idx]));
+		auto var = static_cast<float>(cuda::atomic_load<CURRENT_DEV, T>(varTarget[idx]));
 		// Use a stable addition scheme for the variance
 		auto diff = iter - cum;
 		cum += diff / ei::max(1.0f, iteration);
 		var += diff * (iter - cum);
-		cuda::atomic_exchange<CURRENT_DEV>(cumTarget[idx], cum);
-		cuda::atomic_exchange<CURRENT_DEV>(varTarget[idx], var);
+		cuda::atomic_exchange<CURRENT_DEV>(cumTarget[idx], static_cast<T>(cum));
+		cuda::atomic_exchange<CURRENT_DEV>(varTarget[idx], static_cast<T>(var));
 	}
 }
 

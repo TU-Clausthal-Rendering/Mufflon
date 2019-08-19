@@ -61,6 +61,8 @@ public:
 
 	template < class T >
 	CUDA_FUNCTION void contribute(const Pixel pixel, const ei::Vec<typename T::PixelType, T::NUM_CHANNELS>& value) {
+		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
+		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
 		using PixelType = typename T::PixelType;
 		auto& target = m_targets.template get<Target<T>>();
 		if(target.pixels) {
@@ -78,6 +80,8 @@ public:
 
 	template < class T >
 	CUDA_FUNCTION void set(Pixel pixel, const ei::Vec<typename T::PixelType, T::NUM_CHANNELS>& value) {
+		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
+		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
 		using PixelType = typename T::PixelType;
 		auto& target = m_targets.template get<Target<T>>();
 		if(target.pixels) {
@@ -95,6 +99,38 @@ public:
 	template < class T >
 	__host__ void set_target_buffer(RenderTarget<dev, T> buffer) {
 		m_targets.template get<Target<T>>().pixels = buffer;
+	}
+
+	// Retrieves the value; if target is not enabled, default value is returned
+	// CAREFUL: no clamping is performed, so you have to make sure that the coordinates
+	// are within screen limits
+	template < class T >
+	CUDA_FUNCTION std::enable_if_t<T::NUM_CHANNELS != 1, ei::Vec<typename T::PixelType, T::NUM_CHANNELS>> get(const Pixel pixel) const {
+		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
+		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
+		using PixelType = typename T::PixelType;
+		const auto& target = m_targets.template get<Target<T>>();
+		ei::Vec<typename T::PixelType, T::NUM_CHANNELS> res{ typename T::PixelType{0} };
+		if(target.pixels) {
+			const auto& pixels = reinterpret_cast<const cuda::Atomic<dev, PixelType>(*)[T::NUM_CHANNELS]>(target.pixels)[pixel.x + pixel.y * m_resolution.x];
+			for(u32 i = 0u; i < T::NUM_CHANNELS; ++i)
+				res[i] = cuda::atomic_load<dev, typename T::PixelType>(pixels[i]);
+		}
+		return res;
+	}
+	// Overload for single-value targets
+	template < class T >
+	CUDA_FUNCTION std::enable_if_t<T::NUM_CHANNELS == 1, typename T::PixelType> get(const Pixel pixel) const {
+		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
+		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
+		using PixelType = typename T::PixelType;
+		const auto& target = m_targets.template get<Target<T>>();
+		typename T::PixelType res{ 0 };
+		if(target.pixels) {
+			const auto& pixels = reinterpret_cast<const cuda::Atomic<dev, PixelType>*>(target.pixels)[pixel.x + pixel.y * m_resolution.x];
+			res = cuda::atomic_load<dev, typename T::PixelType>(pixels);
+		}
+		return res;
 	}
 
 	template < class T >
@@ -143,18 +179,28 @@ private:
 		RenderTarget<dev, TargetType> pixels = {};
 	};
 
-	CUDA_FUNCTION float check_nan(float x) {
+	using TargetTupleType = util::TaggedTuple<Target<Ts>...>;
+
+	// Two versions with enable_if so we don't have to use helper structs again: one
+	// for floating-point types, one for the rest (which doesn't have NaN-checks)
+	template < class T >
+	CUDA_FUNCTION std::enable_if_t<std::is_floating_point<T>::value, T> check_nan(const T x) {
 		if(isnan(x)) {
 			cuda::atomic_add<dev>(*m_nanCounter, 1u);
-			return 0.0f;
+			return T{ 0 };
 		}
+		return x;
+	}
+	template < class T >
+	__forceinline__ __host__ __device__ std::enable_if_t<!std::is_same<T, float>::value, T> check_nan(const T x) {
+		// No NaN possible for non-FP types
 		return x;
 	}
 
 	// The following texture handles may contain iteration only or all iterations summed
 	// information. The meaning of the variables is only known to the OutputHandler.
 	// The renderbuffer only needs to add values to all defined handles.
-	util::TaggedTuple<Target<Ts>...> m_targets;
+	TargetTupleType m_targets;
 	ei::IVec2 m_resolution;
 	// This holds the address of an atomic used to count the number of NaNs in an iteration
 	// TODO: this doesn't play nicely with OpenGL
