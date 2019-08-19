@@ -40,6 +40,8 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\cpu_silhouette_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\decimation_common_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_decimation_common_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
     <ClCompile Include="..\..\src\core\renderer\ivcm\cpu_ivcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
@@ -251,6 +253,11 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_importance_gathering_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_decimation_common_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_importance_gathering_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_common.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
     <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h" />

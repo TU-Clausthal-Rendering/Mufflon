@@ -5,7 +5,7 @@
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
 
-using SilhouetteParameters = ParameterHandler<
+using SilhouetteParameters = ParameterHandler <
 	PImportanceIterations, PDecimationIterations,
 	PTargetReduction, PInitialReduction, PVertexThreshold,
 	PSelectiveImportance, PShadowSizeWeight,
@@ -14,6 +14,6 @@ using SilhouetteParameters = ParameterHandler<
 	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide
 >;
 
-using SilhouetteTargets = TargetList<ImportanceTarget, PolyShareTarget, ShadowTarget>;
+using SilhouetteTargets = TargetList<ImportanceTarget, PolyShareTarget>;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::pt

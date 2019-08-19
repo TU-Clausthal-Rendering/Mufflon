@@ -1,5 +1,5 @@
-#include "silhouette_importance_gathering_pt.hpp"
-#include "cpu_silhouette_pt.hpp"
+#include "ss_importance_gathering_pt.hpp"
+#include "cpu_ss_sil_pt.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/path_util.hpp"
@@ -19,7 +19,7 @@
 
 namespace mufflon::renderer::decimaters::silhouette {
 
-using namespace pt;
+using namespace ss;
 
 namespace {
 
@@ -30,13 +30,12 @@ inline float get_luminance(const ei::Vec3& vec) {
 
 } // namespace
 
-CpuShadowSilhouettesPT::CpuShadowSilhouettesPT()
-{
+CpuSsSilPT::CpuSsSilPT() {
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
 }
 
-void CpuShadowSilhouettesPT::pre_reset() {
+void CpuSsSilPT::pre_reset() {
 	if((get_reset_event() & ResetEvent::CAMERA) != ResetEvent::NONE || get_reset_event().resolution_changed())
 		init_rngs(m_outputBuffer.get_num_pixels());
 
@@ -54,18 +53,23 @@ void CpuShadowSilhouettesPT::pre_reset() {
 
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
-	if(m_currentDecimationIteration == 0u)
+	if(m_currentDecimationIteration == 0u) {
 		this->initialize_decimaters();
-	
-	RendererBase<Device::CPU, pt::SilhouetteTargets>::pre_reset();
+		m_shadowPrims.clear();
+		m_shadowPrims.resize(m_params.importanceIterations * m_outputBuffer.get_num_pixels());
+		m_shadowCounts.clear();
+		m_shadowCounts.resize(m_outputBuffer.get_num_pixels());
+	}
+
+	RendererBase<Device::CPU, ss::SilhouetteTargets>::pre_reset();
 }
 
-void CpuShadowSilhouettesPT::on_world_clearing() {
+void CpuSsSilPT::on_world_clearing() {
 	m_decimaters.clear();
 	m_currentDecimationIteration = 0u;
 }
 
-void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
+void CpuSsSilPT::post_iteration(IOutputHandler& outputBuffer) {
 	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
 		// Finalize the decimation process
 		logInfo("Finished decimation process");
@@ -96,10 +100,10 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		this->on_manual_reset();
 		++m_currentDecimationIteration;
 	}
-	RendererBase<Device::CPU, pt::SilhouetteTargets>::post_iteration(outputBuffer);
+	RendererBase<Device::CPU, ss::SilhouetteTargets>::post_iteration(outputBuffer);
 }
 
-void CpuShadowSilhouettesPT::iterate() {
+void CpuSsSilPT::iterate() {
 	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")...");
 
@@ -122,8 +126,8 @@ void CpuShadowSilhouettesPT::iterate() {
 		//compute_max_importance();
 
 		logInfo("Finished importance gathering (",
-					std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
-					"ms, ", cycles / 1'000'000, " MCycles)");
+				std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
+				"ms, ", cycles / 1'000'000, " MCycles)");
 
 	} else {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
@@ -138,9 +142,9 @@ void CpuShadowSilhouettesPT::iterate() {
 	}
 }
 
-void CpuShadowSilhouettesPT::gather_importance() {
+void CpuSsSilPT::gather_importance() {
 	if(m_params.maxPathLength >= 16u) {
-		logError("[CpuShadowSilhouettesPT::gather_importance] Max. path length too long (max. 15 permitted)");
+		logError("[CpuSsSilPT::gather_importance] Max. path length too long (max. 15 permitted)");
 		return;
 	}
 
@@ -153,27 +157,83 @@ void CpuShadowSilhouettesPT::gather_importance() {
 #pragma PARALLEL_FOR
 		for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-			scene::PrimitiveHandle shadowPrim;
 			silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
-										  m_importances.get(), m_importanceSums.get());
+										  m_importances.data(), m_importanceSums.data(),
+										  m_shadowPrims[pixel]);
+			if(m_shadowPrims[pixel].hitId.is_valid())
+				++m_shadowCounts[pixel];
 		}
+
+		this->update_silhouette_importance();
+
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
 	}
 	// TODO: allow for this with proper reset "events"
 }
 
-void CpuShadowSilhouettesPT::display_importance() {
+void CpuSsSilPT::update_silhouette_importance() {
+	logPedantic("Detecting shadow edges...");
+#pragma PARALLEL_FOR
+	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
+		// Detect whether the pixel is at a shadow border
+		// TODO: what to do about overlapping shadows?
+		// TODO: is it enough to check the cross, not the whole border?
+		const auto shadowedness = m_shadowCounts[pixel];
+		if(shadowedness > 0u) {
+			bool isBorder = false;
+			for(int y = -1; y <= 1; ++y) {
+				for(int x = -1; x <= 1; ++x) {
+					if(x == 0 && y == 0)
+						continue;
+					const Pixel c{ coord.x + x, coord.y + y };
+					if(c.x < 0 || c.y < 0 || c.x >= m_outputBuffer.get_width() || c.y >= m_outputBuffer.get_height())
+						continue;
+					isBorder = isBorder || m_shadowCounts[c.x + c.y * m_outputBuffer.get_width()] < shadowedness;
+				}
+			}
+
+			if(isBorder) {
+				// TODO: only the edge vertices!
+				const auto shadowPrim = m_shadowPrims[pixel];
+				mAssert(shadowPrim.hitId.is_valid());
+
+				const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
+				const auto& lod = m_sceneDesc.lods[lodIdx];
+				const auto& polygon = lod.polygon;
+				if(static_cast<u32>(shadowPrim.hitId.primId) < (polygon.numTriangles + polygon.numQuads)) {
+					const bool isTriangle = static_cast<u32>(shadowPrim.hitId.primId) < polygon.numTriangles;
+					const auto vertexOffset = isTriangle ? 0u : 3u * polygon.numTriangles;
+					const auto vertexCount = isTriangle ? 3u : 4u;
+					const auto primIdx = static_cast<u32>(shadowPrim.hitId.primId) - (isTriangle ? 0u : polygon.numTriangles);
+					for(u32 i = 0u; i < vertexCount; ++i) {
+						const auto vertexId = vertexOffset + vertexCount * primIdx + i;
+						const auto vertexIdx = polygon.vertexIndices[vertexId];
+						mAssert(vertexIdx < (polygon.numTriangles + polygon.numQuads));
+						cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, shadowPrim.weight);
+						//cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowSilhouetteImportance, shadowPrim.weight);
+					}
+				}
+
+				m_outputBuffer.template contribute<SilhouetteTarget>(coord, 1u);
+				m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, shadowPrim.weight);
+			}
+		}
+	}
+}
+
+void CpuSsSilPT::display_importance() {
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
-										  m_importances.get(), m_importanceSums.get(),
+										  m_importances.data(), m_importanceSums.data(),
 										  m_maxImportance == 0.f ? 1.f : m_maxImportance);
 	}
 }
 
-void CpuShadowSilhouettesPT::compute_max_importance() {
+void CpuSsSilPT::compute_max_importance() {
 	m_maxImportance = 0.f;
 
 	// Compute the maximum normalized importance for visualization
@@ -181,15 +241,15 @@ void CpuShadowSilhouettesPT::compute_max_importance() {
 		m_maxImportance = std::max(m_maxImportance, m_decimaters[i]->get_current_max_importance());
 }
 
-void CpuShadowSilhouettesPT::initialize_decimaters() {
+void CpuSsSilPT::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
 	m_decimaters.resize(objects.size());
 	auto objIter = objects.begin();
 
 	const auto timeBegin = CpuProfileState::get_process_time();
-	m_importanceSums = make_udevptr_array<Device::CPU, DeviceImportanceSums<Device::CPU>, false>(m_decimaters.size());
-	m_importances = make_udevptr_array<Device::CPU, Importances<Device::CPU>*, false>(m_decimaters.size());
+	m_importanceSums = std::vector<ss::DeviceImportanceSums<Device::CPU>>(m_decimaters.size());
+	m_importances = std::vector<ArrayDevHandle_t<Device::CPU, ss::Importances<Device::CPU>>>(m_decimaters.size());
 
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < static_cast<i32>(objects.size()); ++i) {
@@ -209,9 +269,9 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 		}
 		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
 		auto& newLod = obj.first->add_lod(newLodLevel, lod);
-		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CPU>>(obj.first->get_name(), lod, newLod, collapses,
-																			 m_params.viewWeight, m_params.lightWeight,
-																			 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
+		m_decimaters[i] = std::make_unique<ss::ImportanceDecimater<Device::CPU>>(obj.first->get_name(), lod, newLod, collapses,
+																				 m_params.viewWeight, m_params.lightWeight,
+																				 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		m_importanceSums[i].shadowImportance.store(0.f);
 		m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 		// TODO: this reeeeally breaks instancing
@@ -221,12 +281,12 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
-void CpuShadowSilhouettesPT::update_reduction_factors() {
+void CpuSsSilPT::update_reduction_factors() {
 	m_remainingVertexFactor.clear();
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
+			ss::ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
 			m_decimaters[i]->update_importance_density(sums);
 			m_remainingVertexFactor.push_back(1.0);
 		}
@@ -236,7 +296,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 	double expectedVertexCount = 0.0;
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		auto& decimater = m_decimaters[i];
-		ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
+		ss::ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
 		m_decimaters[i]->update_importance_density(sums);
 		if(decimater->get_original_vertex_count() > m_params.threshold) {
 			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
@@ -270,7 +330,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 	}
 }
 
-void CpuShadowSilhouettesPT::init_rngs(int num) {
+void CpuSsSilPT::init_rngs(int num) {
 	m_rngs.resize(num);
 	// TODO: incude some global seed into the initialization
 	for(int i = 0; i < num; ++i)

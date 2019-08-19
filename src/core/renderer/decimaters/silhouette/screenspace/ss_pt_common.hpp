@@ -3,7 +3,13 @@
 #include "core/renderer/path_util.hpp"
 #include "core/cuda/cuda_utils.hpp"
 
-namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace ss {
+
+// TODO: do border vertices get reduced? I don't think so
+struct SilhouetteEdge {
+	scene::PrimitiveHandle hitId{};
+	float weight = 0;
+};
 
 template < Device dev >
 struct Importances {
@@ -31,9 +37,6 @@ struct SilVertexExt {
 	ei::Vec3 accumThroughput;
 	float outCos;
 	ei::Vec3 pathRadiance;
-	i32 shadowInstanceId = -1;
-	i32 silhouetteVerticesFirst[2u] = { -1, -1 };
-	i32 silhouetteVerticesSecond[2u] = { -1, -1 }; // Two arrays in case of split vertices
 	float silhouetteRegionSize = 0.f;
 
 
@@ -66,4 +69,4 @@ struct SilVertexExt {
 
 using SilPathVertex = PathVertex<SilVertexExt>;
 
-}}}}} // namespace mufflon::renderer::decimaters::silhouette::pt
+}}}}} // namespace mufflon::renderer::decimaters::silhouette::ss

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "silhouette_pt_common.hpp"
-#include "silhouette_pt_params.hpp"
+#include "ss_pt_params.hpp"
+#include "ss_pt_common.hpp"
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -11,7 +11,7 @@
 #include <ei/3dintersection.hpp>
 #include <utility>
 
-namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
+namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace ss {
 
 using namespace scene::lights;
 
@@ -208,64 +208,6 @@ CUDA_FUNCTION constexpr float get_shortest_length(const ei::Tetrahedron& quad) {
 	return ei::min(ei::min(ei::min(ei::len(quad.v0), ei::len(quad.v1)), ei::len(quad.v2)), ei::len(quad.v3));
 }
 
-CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-												   const LightType lightType, const u32 lightOffset,
-												   const ei::Ray& shadowRay, const scene::PrimitiveHandle shadowHitId,
-												   const SilPathVertex& vertex, const ei::Plane& neePlane,
-												   const float occluderLightDistance, const float occluderShadowDistance) {
-	float size = 0.f;
-	switch(lightType) {
-		case scene::lights::LightType::AREA_LIGHT_TRIANGLE: {
-			const ei::Triangle tri = get_world_light_triangle(scene, lightOffset);
-			// Project the silhouette edge onto the light plane
-			const auto& polygon = scene.lods[scene.lodIndices[shadowHitId.instanceId]].polygon;
-			mAssert(vertex.ext().silhouetteVerticesFirst[0] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[0]) < polygon.numVertices);
-			mAssert(vertex.ext().silhouetteVerticesFirst[1] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[1]) < polygon.numVertices);
-			const ei::Vec3 a = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[0]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
-												  neePlane);
-			const ei::Vec3 b = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[1]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
-												  neePlane);
-			// Compute the 90° rotated vector
-			const ei::Vec3 rotatedB = a + ei::cross(neePlane.n, b - a);
-
-			size = intersect_triangle_borders(tri, neePlane, ei::Segment{ a, rotatedB });
-		}	break;
-		case scene::lights::LightType::AREA_LIGHT_QUAD: {
-			const ei::Tetrahedron quad = get_world_light_quad(scene, lightOffset);
-			// Project the silhouette edge onto the light plane
-			const auto& polygon = scene.lods[scene.lodIndices[shadowHitId.instanceId]].polygon;
-			mAssert(vertex.ext().silhouetteVerticesFirst[0] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[0]) < polygon.numVertices);
-			mAssert(vertex.ext().silhouetteVerticesFirst[1] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[1]) < polygon.numVertices);
-			const ei::Vec3 a = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[0]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
-												  neePlane);
-			const ei::Vec3 b = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[1]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
-												  neePlane);
-			// Compute the 90° rotated vector
-			// TODO: end-points of silhouette edge may lie outside of light primitive!
-			// TODO: they can both be outside!
-			const ei::Vec3 rotatedB = a + ei::cross(neePlane.n, b - a);
-
-			size = intersect_quad_borders(quad, neePlane, ei::Segment{ a, rotatedB });
-		}	break;
-		case scene::lights::LightType::AREA_LIGHT_SPHERE: {
-			const auto& light = *reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(scene.lightTree.posLights.memory + lightOffset);
-			size = light.radius;
-		}	break;
-		case scene::lights::LightType::ENVMAP_LIGHT:
-			// TODO: pre-processed list of light areas!
-			break;
-		default:
-			break;
-	}
-
-	// Compute the shadow size from intercept theorem
-	return size * occluderShadowDistance / occluderLightDistance;
-}
-
 CUDA_FUNCTION float estimate_shadow_light_size(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 											   const LightType lightType, const u32 lightOffset,
 											   const ei::Ray& shadowRay, const SilPathVertex& vertex,
@@ -422,53 +364,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 
 		const auto lodIdx = scene.lodIndices[shadowHitId.instanceId];
 		record_shadow(sums[lodIdx], weightedImportance);
-
-		// Also check for silhouette interaction here
-		if(secondHit.hitId.instanceId == shadowHitId.instanceId) {
-			const auto& obj = scene.lods[scene.lodIndices[secondHit.hitId.instanceId]];
-			const i32 firstNumVertices = shadowHitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
-			const i32 secondNumVertices = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 3 : 4;
-			const i32 firstPrimIndex = shadowHitId.primId - (shadowHitId.primId < (i32)obj.polygon.numTriangles
-																		? 0 : (i32)obj.polygon.numTriangles);
-			const i32 secondPrimIndex = secondHit.hitId.primId - (secondHit.hitId.primId < (i32)obj.polygon.numTriangles
-																  ? 0 : (i32)obj.polygon.numTriangles);
-			const i32 firstVertOffset = shadowHitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
-			const i32 secondVertOffset = secondHit.hitId.primId < (i32)obj.polygon.numTriangles ? 0 : 3 * (i32)obj.polygon.numTriangles;
-
-			// Check if we have "shared" vertices: cannot do it by index, since they might be
-			// split vertices, but instead need to go by proximity
-			i32 sharedVertices = 0;
-			for(i32 i0 = 0; i0 < firstNumVertices; ++i0) {
-				for(i32 i1 = 0; i1 < secondNumVertices; ++i1) {
-					const i32 idx0 = obj.polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + i0];
-					const i32 idx1 = obj.polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
-					const ei::Vec3& p0 = obj.polygon.vertices[idx0];
-					const ei::Vec3& p1 = obj.polygon.vertices[idx1];
-					if(idx0 == idx1 || p0 == p1) {
-						vertex.ext().silhouetteVerticesFirst[sharedVertices] = idx0;
-						vertex.ext().silhouetteVerticesFirst[sharedVertices] = idx1;
-						// TODO: deal with boundaries/split vertices
-						++sharedVertices;
-					}
-					if(sharedVertices >= 2)
-						break;
-				}
-			}
-			if(sharedVertices >= 2) {
-				vertex.ext().shadowInstanceId = secondHit.hitId.instanceId;
-				// Compute the (estimated) size of the shadow region
-				// Originally we used the projected length of the shadow edge,
-				// but it isn't well defined and inconsistent with the shadow
-				// importance sum
-				vertex.ext().silhouetteRegionSize = estimate_shadow_light_size(scene, lightType, lightOffset,
-																			   shadowRay, vertex, neePlane,
-																			   firstShadowDistance, lightDistance - firstShadowDistance);
-				/*vertex.ext().silhouetteRegionSize = estimate_silhouette_light_size(scene, lightType, lightOffset,
-																				   shadowRay, shadowHitId, vertex,
-																				   neePlane, firstShadowDistance,
-																				   lightDistance - firstShadowDistance);*/
-			}
-		}
+		vertex.ext().silhouetteRegionSize = shadowRegionSizeEstimate;
 
 		return true;
 	}
@@ -477,12 +373,13 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 
 } // namespace
 
-CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									 const SilhouetteParameters& params,
 									 const Pixel& coord, math::Rng& rng,
 									 Importances<CURRENT_DEV>** importances,
-									 DeviceImportanceSums<CURRENT_DEV>* sums) {
+									 DeviceImportanceSums<CURRENT_DEV>* sums,
+									 SilhouetteEdge& shadowPrim) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -552,7 +449,11 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 													numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
 					}
 				} else {
-					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
+					if(pathLen == 1) {
+						outputBuffer.template contribute<ShadowTarget>(coord, 1u);
+						shadowPrim.hitId = shadowHit.hitId;
+					}
+
 					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
 								 shadowHit.hitId, nee.dist, firstShadowDistance,
 								 lightType, lightOffset, params);
@@ -601,7 +502,7 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 	for(int p = pathLen; p >= 1; --p) {
 		// Last vertex doesn't have indirect contribution
 		if(p < pathLen) {
-			accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().shadowInstanceId == 0 ?
+			accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().silhouetteRegionSize >= 0 ?
 																			vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f });
 			const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
@@ -619,7 +520,7 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 		// Check if it is sensible to keep shadow silhouettes intact
 		// TODO: replace threshold with something sensible
 		const auto& ext = vertices[p].ext();
-		if(p == 1 && ext.shadowInstanceId >= 0) {
+		if(p == 1 && ext.silhouetteRegionSize >= 0) {
 			// TODO: factor in background illumination too
 			const float indirectLuminance = get_luminance(accumRadiance);
 			const float totalLuminance = get_luminance(ext.pathRadiance) + indirectLuminance;
@@ -630,26 +531,13 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 				// TODO: proper factor!
 				const float silhouetteImportance = weight_shadow(ext.silhouetteRegionSize, params)
 					* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
-
-				const auto lodIdx = scene.lodIndices[ext.shadowInstanceId];
-				for(i32 i = 0; i < 2; ++i) {
-					mAssert(ext.silhouetteVerticesFirst[i] >= 0 && static_cast<u32>(ext.silhouetteVerticesFirst[i]) < scene.lods[lodIdx].polygon.numVertices);
-					record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
-														  ext.silhouetteVerticesFirst[i],
-														  silhouetteImportance);
-					if(ext.silhouetteVerticesSecond[i] >= 0 && ext.silhouetteVerticesFirst[i] != ext.silhouetteVerticesSecond[i]) {
-						mAssert(static_cast<u32>(ext.silhouetteVerticesSecond[i]) < scene.lods[lodIdx].polygon.numVertices);
-						record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
-															  ext.silhouetteVerticesSecond[i],
-															  silhouetteImportance);
-					}
-				}
+				shadowPrim.weight = silhouetteImportance;
 			}
 		}
 	}
 }
 
-CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+CUDA_FUNCTION void sample_vis_importance(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,
@@ -685,8 +573,7 @@ CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType
 		}
 
 		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
-		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
 	}
 }
 
-}}}}} // namespace mufflon::renderer::decimaters::silhouette::pt
+}}}}} // namespace mufflon::renderer::decimaters::silhouette::ss

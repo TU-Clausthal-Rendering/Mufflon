@@ -112,10 +112,5 @@ struct PolyShareTarget {
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
-struct ShadowTarget {
-	static constexpr const char NAME[] = "Shadow Areas";
-	using PixelType = float;
-	static constexpr u32 NUM_CHANNELS = 1u;
-};
 
 }}}} // namespace mufflon::renderer::decimaters::silhouette
