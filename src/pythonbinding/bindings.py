@@ -290,9 +290,6 @@ class RenderActions:
     def take_denoised_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
         filename = filename.replace("#scene", self.sceneName, 1)
-        filename = filename.replace("#scenario", self.dllInterface.render_get_active_scenario_name(), 1)
-        filename = filename.replace("#renderer", self.activeRendererName, 1)
-        filename = filename.replace("#iteration", str(iterationNr), 1)
         filename = filename.replace("#iterateTime", str(iterateTime.microseconds / 1000) + "ms", 1)
         filename = filename.replace("#preTime", str(iterateTime.microseconds / 1000) + "ms", 1)
         filename = filename.replace("#postTime", str(iterateTime.microseconds / 1000) + "ms", 1)
@@ -300,15 +297,11 @@ class RenderActions:
         filename = filename.replace("#preCycles", str(preTime.cycles / 1000000) + "MCycles", 1)
         filename = filename.replace("#postCycles", str(postTime.cycles / 1000000) + "MCycles", 1)
         
-        fName = filename.replace("#target", "denoised", 1)
         self.dllInterface.render_save_denoised_radiance(fName)
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
         filename = filename.replace("#scene", self.sceneName, 1)
-        filename = filename.replace("#scenario", self.dllInterface.render_get_active_scenario_name(), 1)
-        filename = filename.replace("#renderer", self.activeRendererName, 1)
-        filename = filename.replace("#iteration", str(iterationNr), 1)
         filename = filename.replace("#iterateTime", str(iterateTime.microseconds / 1000) + "ms", 1)
         filename = filename.replace("#preTime", str(iterateTime.microseconds / 1000) + "ms", 1)
         filename = filename.replace("#postTime", str(iterateTime.microseconds / 1000) + "ms", 1)
@@ -319,11 +312,9 @@ class RenderActions:
         for targetIndex in range(self.dllInterface.render_get_render_target_count()):
             targetName = self.dllInterface.render_get_render_target_name(targetIndex)
             if self.dllInterface.render_is_render_target_enabled(targetName, False):
-                fName = filename.replace("#target", targetName, 1)
-                self.dllInterface.render_save_screenshot(fName, targetName, False)
+                self.dllInterface.render_save_screenshot(filename, targetName, False)
             if self.dllInterface.render_is_render_target_enabled(targetName, True):
-                fName = filename.replace("#target", targetName + "(Variance)", 1)
-                self.dllInterface.render_save_screenshot(fName, targetName, True)
+                self.dllInterface.render_save_screenshot(filename, targetName, True)
 
     def render_for_iterations(self, iterationCount, printProgress=False, progressSteps=1, takeScreenshot=True, denoise=False):
         accumIterateTime = ProcessTime(0,0)
