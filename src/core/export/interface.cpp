@@ -273,6 +273,34 @@ inline void delegateLog(LogSeverity severity, const std::string& message) {
 	CATCH_ALL(;)
 }
 
+inline std::string replace_screenshot_filename_tags(std::string name, const StringView targetName,
+													const bool variance) {
+	// Replace tags in the file name
+	auto replacer = [](std::string str, const StringView from, const StringView to) {
+		if(const auto start = str.find(from.data()); start != std::string::npos) {
+			return str.replace(start, from.length(), to.data());
+		}
+		return str;
+	};
+	// Unfortunately we cannot replace the scene path since we don't know it,
+	// so that's still left to the front-end
+	name = replacer(name, "#scenario", s_world.get_current_scenario()->get_name());
+	name = replacer(name, "#renderer", s_currentRenderer->get_name());
+	name = replacer(name, "#shortrenderer", s_currentRenderer->get_short_name());
+	name = replacer(name, "#iteration", std::to_string(render_get_current_iteration()));
+	if(variance)
+		name = replacer(name, "#target", std::string(targetName) + "(Variance)");
+	else
+		name = replacer(name, "#target", targetName);
+	// TODO: enum to string would be nice here...
+	const std::string usedDevices = std::string(s_currentRenderer->uses_device(Device::CPU) ? ",CPU" : "")
+		+ std::string(s_currentRenderer->uses_device(Device::CUDA) ? ",CUDA" : "")
+		+ std::string(s_currentRenderer->uses_device(Device::OPENGL) ? ",OPENGL" : "");
+	name = replacer(name, "#devices", usedDevices.size() > 0 ? StringView(&usedDevices[1], usedDevices.size() - 1) : usedDevices);
+	name = replacer(name, "#camera", s_world.get_current_scenario()->get_camera()->get_name());
+	return name;
+}
+
 } // namespace
 
 const char* core_get_dll_error() {
@@ -3253,6 +3281,10 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
+	// Replace tags in the file name
+	const auto name = replace_screenshot_filename_tags(fileName.stem().string(), targetName, variance);
+	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
+
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
@@ -3342,6 +3374,9 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 		fileName += ".pfm";
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
+
+	const auto name = replace_screenshot_filename_tags(fileName.stem().string(), "Radiance(denoised)", false);
+	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
