@@ -29,10 +29,15 @@ struct SilhouetteWeightTarget {
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
+struct PenumbraTarget {
+	static constexpr const char NAME[] = "Penumbra";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
 
 using SilhouetteTargets = TargetList<
-	ImportanceTarget, ShadowTarget,
-	SilhouetteTarget, SilhouetteWeightTarget
+	ImportanceTarget, PolyShareTarget,
+	SilhouetteWeightTarget, PenumbraTarget
 >;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::ss

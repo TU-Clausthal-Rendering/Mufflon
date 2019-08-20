@@ -28,6 +28,7 @@ public:
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
 	void pre_reset() final;
+	void post_reset() final;
 	void on_world_clearing() final;
 	void post_iteration(IOutputHandler& outputBuffer) final;
 
@@ -50,7 +51,8 @@ private:
 	std::vector<ArrayDevHandle_t<Device::CPU, ss::Importances<Device::CPU>>> m_importances;
 	std::vector<ss::DeviceImportanceSums<Device::CPU>> m_importanceSums;
 	std::vector<ss::SilhouetteEdge> m_shadowPrims;
-	std::vector<u32> m_shadowCounts;
+	std::vector<u8> m_penumbra;	// 2 bits per light: 00 - not tested; 01 - shadowed; 10 - lit; 11 - both
+	std::size_t m_bytesPerPixel;
 	std::vector<double> m_remainingVertexFactor;
 
 	// Superfluous

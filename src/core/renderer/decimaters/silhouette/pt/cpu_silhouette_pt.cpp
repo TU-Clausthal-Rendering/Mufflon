@@ -54,8 +54,9 @@ void CpuShadowSilhouettesPT::pre_reset() {
 
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
-	if(m_currentDecimationIteration == 0u)
+	if(m_currentDecimationIteration == 0u) {
 		this->initialize_decimaters();
+	}
 	
 	RendererBase<Device::CPU, pt::SilhouetteTargets>::pre_reset();
 }

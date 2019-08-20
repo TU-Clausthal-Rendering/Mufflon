@@ -379,7 +379,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 									 const Pixel& coord, math::Rng& rng,
 									 Importances<CURRENT_DEV>** importances,
 									 DeviceImportanceSums<CURRENT_DEV>* sums,
-									 SilhouetteEdge& shadowPrim) {
+									 SilhouetteEdge& shadowPrim, u8* penumbraBits) {
 	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -434,8 +434,16 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
 				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 
+				// Entry into the bitmask
+				// Compute the appropriate index and shift
+				const auto bitIndex = lightIndex / 4u;
+				const auto bitShift = (lightIndex % 4u) * 2u;
+
 				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				if(shadowHit.hitId.instanceId < 0) {
+					if(pathLen == 1u) {
+						penumbraBits[bitIndex] |= 1u << (bitShift + 1u);
+					}
 					if(params.show_direct()) {
 						mAssert(!isnan(mis));
 						// Save the radiance for the later indirect lighting computation
@@ -450,8 +458,8 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 					}
 				} else {
 					if(pathLen == 1) {
-						outputBuffer.template contribute<ShadowTarget>(coord, 1u);
 						shadowPrim.hitId = shadowHit.hitId;
+						penumbraBits[bitIndex] |= 1u << bitShift;
 					}
 
 					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
@@ -573,6 +581,7 @@ CUDA_FUNCTION void sample_vis_importance(ss::SilhouetteTargets::RenderBufferType
 		}
 
 		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
+		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
 	}
 }
 

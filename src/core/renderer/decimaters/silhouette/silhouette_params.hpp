@@ -25,14 +25,14 @@ struct PShadowSizeWeight {
 };
 
 struct PImportanceIterations {
-	int importanceIterations{ 100 };
+	int importanceIterations{ 1 };
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Importance iterations", ParameterTypes::INT };
 	}
 };
 
 struct PTargetReduction {
-	float reduction{ 0.9f };
+	float reduction{ 0.f };
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Target mesh reduction", ParameterTypes::FLOAT };
 	}

@@ -57,11 +57,22 @@ void CpuSsSilPT::pre_reset() {
 		this->initialize_decimaters();
 		m_shadowPrims.clear();
 		m_shadowPrims.resize(m_params.importanceIterations * m_outputBuffer.get_num_pixels());
-		m_shadowCounts.clear();
-		m_shadowCounts.resize(m_outputBuffer.get_num_pixels());
 	}
 
 	RendererBase<Device::CPU, ss::SilhouetteTargets>::pre_reset();
+}
+
+void CpuSsSilPT::post_reset() {
+	// Post-reset because we need the light count
+	if(m_currentDecimationIteration == 0u) {
+		const auto lightCount = m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount
+			+ ((m_sceneDesc.lightTree.background.flux > 0.f) ? 1 : 0u);
+		// Initialize the penumbra bits: at least one byte per pixel to make my life easier
+		m_bytesPerPixel = (lightCount * 2u - 1u) / 8u + 1u;
+		m_penumbra.clear();
+		m_penumbra.resize(m_outputBuffer.get_num_pixels() * m_bytesPerPixel);
+	}
+
 }
 
 void CpuSsSilPT::on_world_clearing() {
@@ -118,6 +129,8 @@ void CpuSsSilPT::iterate() {
 
 		gather_importance();
 
+		this->update_silhouette_importance();
+
 		if(m_decimaters.size() == 0u)
 			return;
 
@@ -159,12 +172,9 @@ void CpuSsSilPT::gather_importance() {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 			silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
 										  m_importances.data(), m_importanceSums.data(),
-										  m_shadowPrims[pixel]);
-			if(m_shadowPrims[pixel].hitId.is_valid())
-				++m_shadowCounts[pixel];
+										  m_shadowPrims[iter * m_outputBuffer.get_num_pixels() + pixel],
+										  &m_penumbra[pixel * m_bytesPerPixel]);
 		}
-
-		this->update_silhouette_importance();
 
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
 	}
@@ -172,57 +182,96 @@ void CpuSsSilPT::gather_importance() {
 }
 
 void CpuSsSilPT::update_silhouette_importance() {
-	logPedantic("Detecting shadow edges...");
+	logPedantic("Detecting shadow edges and penumbra...");
+	const auto lightCount = m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount
+		+ 1u;
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		// Detect whether the pixel is at a shadow border
-		// TODO: what to do about overlapping shadows?
-		// TODO: is it enough to check the cross, not the whole border?
-		const auto shadowedness = m_shadowCounts[pixel];
-		if(shadowedness > 0u) {
-			bool isBorder = false;
-			for(int y = -1; y <= 1; ++y) {
-				for(int x = -1; x <= 1; ++x) {
-					if(x == 0 && y == 0)
-						continue;
-					const Pixel c{ coord.x + x, coord.y + y };
-					if(c.x < 0 || c.y < 0 || c.x >= m_outputBuffer.get_width() || c.y >= m_outputBuffer.get_height())
-						continue;
-					isBorder = isBorder || m_shadowCounts[c.x + c.y * m_outputBuffer.get_width()] < shadowedness;
-				}
-			}
 
-			if(isBorder) {
-				// TODO: only the edge vertices!
-				const auto shadowPrim = m_shadowPrims[pixel];
-				mAssert(shadowPrim.hitId.is_valid());
+		const u8* penumbraBits = &m_penumbra[pixel * m_bytesPerPixel];
+		for(std::size_t i = 0u; i < lightCount; ++i) {
+			// "Detect" penumbra
+			const auto bitIndex = i / 4u;
+			const auto bitOffset = 2u * (i % 4u);
+			const bool shadowed = penumbraBits[bitIndex] & (1u << bitOffset);
+			const bool lit = penumbraBits[bitIndex] & (1u << (bitOffset + 1u));
 
-				const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
-				const auto& lod = m_sceneDesc.lods[lodIdx];
-				const auto& polygon = lod.polygon;
-				if(static_cast<u32>(shadowPrim.hitId.primId) < (polygon.numTriangles + polygon.numQuads)) {
-					const bool isTriangle = static_cast<u32>(shadowPrim.hitId.primId) < polygon.numTriangles;
-					const auto vertexOffset = isTriangle ? 0u : 3u * polygon.numTriangles;
-					const auto vertexCount = isTriangle ? 3u : 4u;
-					const auto primIdx = static_cast<u32>(shadowPrim.hitId.primId) - (isTriangle ? 0u : polygon.numTriangles);
-					for(u32 i = 0u; i < vertexCount; ++i) {
-						const auto vertexId = vertexOffset + vertexCount * primIdx + i;
-						const auto vertexIdx = polygon.vertexIndices[vertexId];
-						mAssert(vertexIdx < (polygon.numTriangles + polygon.numQuads));
-						cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, shadowPrim.weight);
-						//cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowSilhouetteImportance, shadowPrim.weight);
+			// Tracks whether it's a hard shadow border
+			// Starting condition are viewport boundaries, otherwise purely shadowed pixels
+			// with purely lit in their vicinity
+			bool isBorder = coord.x == 0 || coord.y == 0 || coord.x == (m_outputBuffer.get_width() - 1)
+				|| coord.y == (m_outputBuffer.get_height() - 1);
+			// Tracks the - the transition from core shadow to penumbra
+			bool isPenumbraTransition = false;
+
+			if(shadowed && lit) {
+				m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.5f, 0.f, 0.5f });
+			} else if(shadowed) {
+				m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.f, 0.f, 0.3f });
+
+				// Detect silhouettes as shadowed pixels with lit ones as direct neighbors or viewport edge
+				for(int y = -1; y <= 1 && !(isBorder && isPenumbraTransition); ++y) {
+					for(int x = -1; x <= 1 && !(isBorder && isPenumbraTransition); ++x) {
+						if(x == 0 && y == 0)
+							continue;
+						const Pixel c{ coord.x + x, coord.y + y };
+						if(c.x < 0 || c.y < 0 || c.x >= m_outputBuffer.get_width() || c.y >= m_outputBuffer.get_height())
+							continue;
+						const auto index = c.x + c.y * m_outputBuffer.get_width();
+						const bool neighborShadowed = m_penumbra[index * m_bytesPerPixel + bitIndex] & (1u << bitOffset);
+						const bool neighborLit = m_penumbra[index * m_bytesPerPixel + bitIndex] & (1u << (bitOffset + 1u));
+						isBorder = isBorder || (neighborLit && !neighborShadowed);
+						isPenumbraTransition = isPenumbraTransition || (neighborLit && neighborShadowed);
 					}
 				}
 
-				m_outputBuffer.template contribute<SilhouetteTarget>(coord, 1u);
-				m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, shadowPrim.weight);
+				if(isBorder)
+					m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.f, 0.8f, 0.f });
+				if(isPenumbraTransition)
+					m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.8f, 0.8f, 0.8f });
+			} else if(lit) {
+				m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.3f, 0.f, 0.f });
 			}
+
+			// Attribute importance
+			if((shadowed && lit) || isBorder) {
+				float averageShadowWeight = 0.f;
+				// TODO: only the edge vertices!
+				for(int i = 0; i < m_params.importanceIterations; ++i) {
+					const auto shadowPrim = m_shadowPrims[i * m_outputBuffer.get_num_pixels() + pixel];
+					if(!shadowPrim.hitId.is_valid())
+						continue;
+
+					const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
+					const auto& lod = m_sceneDesc.lods[lodIdx];
+					const auto& polygon = lod.polygon;
+					if(static_cast<u32>(shadowPrim.hitId.primId) < (polygon.numTriangles + polygon.numQuads)) {
+						const bool isTriangle = static_cast<u32>(shadowPrim.hitId.primId) < polygon.numTriangles;
+						const auto vertexOffset = isTriangle ? 0u : 3u * polygon.numTriangles;
+						const auto vertexCount = isTriangle ? 3u : 4u;
+						const auto primIdx = static_cast<u32>(shadowPrim.hitId.primId) - (isTriangle ? 0u : polygon.numTriangles);
+						for(u32 i = 0u; i < vertexCount; ++i) {
+							const auto vertexId = vertexOffset + vertexCount * primIdx + i;
+							const auto vertexIdx = polygon.vertexIndices[vertexId];
+							mAssert(vertexIdx < (polygon.numTriangles + polygon.numQuads));
+							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, shadowPrim.weight);
+							cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowSilhouetteImportance, shadowPrim.weight);
+						}
+					}
+					averageShadowWeight += shadowPrim.weight;
+				}
+
+				averageShadowWeight /= static_cast<float>(m_params.importanceIterations);
+				m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, averageShadowWeight);
+			}
+
 		}
 	}
 }
 
 void CpuSsSilPT::display_importance() {
+	// TODO: disable the displaying after switching scenarios? May lead to crash
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
