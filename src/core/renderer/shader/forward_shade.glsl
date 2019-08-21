@@ -218,6 +218,7 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	}
 
 	out_fragColor = vec4(c.color, 1.0);
+	//out_fragColor = texture(ltc_mat_tex, uv);
 	out_albedo = c.albedo;
 	out_lightness = c.light;
 }

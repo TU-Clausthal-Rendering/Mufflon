@@ -9,13 +9,7 @@ namespace mufflon::renderer {
 GlForward::GlForward() :
     GlRendererBase(true, false) 
 {
-    // programs
-	m_ltcTexture = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
-		"resources/ltc/ltc_mat.dds",
-		TextureSampling::SAMPLING_LINEAR, 
-		MipmapType::MIPMAP_NONE
-    ));
-	mAssert(m_ltcTexture);
+   
 }
 
 void GlForward::post_reset() {
@@ -34,6 +28,13 @@ void GlForward::post_reset() {
 }
 
 void GlForward::init() {
+	m_ltcTexture = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_mat.dds",
+		TextureSampling::SAMPLING_LINEAR,
+		MipmapType::MIPMAP_NONE
+	));
+	mAssert(m_ltcTexture);
+
 	m_triangleProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
         .add_file("shader/light_transforms.glsl")

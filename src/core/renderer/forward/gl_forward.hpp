@@ -25,7 +25,6 @@ public:
 	StringView get_short_name() const noexcept final { return get_short_name_static(); }
 
     void post_reset() override;
-
 private:
 	void init();
 
