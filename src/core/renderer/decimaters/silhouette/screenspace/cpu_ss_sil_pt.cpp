@@ -185,7 +185,7 @@ void CpuSsSilPT::update_silhouette_importance() {
 	logPedantic("Detecting shadow edges and penumbra...");
 	const auto lightCount = m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount
 		+ 1u;
-#pragma PARALLEL_FOR
+//#pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 
@@ -254,7 +254,7 @@ void CpuSsSilPT::update_silhouette_importance() {
 						for(u32 i = 0u; i < vertexCount; ++i) {
 							const auto vertexId = vertexOffset + vertexCount * primIdx + i;
 							const auto vertexIdx = polygon.vertexIndices[vertexId];
-							mAssert(vertexIdx < (polygon.numTriangles + polygon.numQuads));
+							mAssert(vertexIdx < polygon.numVertices);
 							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, shadowPrim.weight);
 							cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowSilhouetteImportance, shadowPrim.weight);
 						}
