@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -6,65 +8,48 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Threading;
+using System.Windows.Forms.Design;
 using gui.Annotations;
 using gui.Dll;
 using gui.Properties;
+using Newtonsoft.Json;
 
 namespace gui.Model
 {
+    // note: in order to save 
     public class SettingsModel : INotifyPropertyChanged
     {
         private static int MaxLastWorlds { get; } = 10;
         private static int MaxScreenshotNamingPatterns { get; } = 10;
         private readonly KeyGestureConverter m_gestureConverter = new KeyGestureConverter();
-        private Timer m_saveTimer;
 
         public SettingsModel()
         {
-            // Make sure the collections properly exist
-            if (Settings.Default.LastWorlds == null)
-                Settings.Default.LastWorlds = new StringCollection();
-            if (Settings.Default.ScreenshotNamePatternHistory == null)
-                Settings.Default.ScreenshotNamePatternHistory = new StringCollection();
-            if (Settings.Default.RendererParameters == null)
-                Settings.Default.RendererParameters = new StringCollection();
-
-            // Create wrappers for the limited "history-like" collections
-            LastWorlds = new LimitedStringCollection(Settings.Default.LastWorlds, MaxLastWorlds);
-            ScreenshotNamePatternHistory = new LimitedStringCollection(Settings.Default.ScreenshotNamePatternHistory,
-                MaxScreenshotNamingPatterns);
-            RendererParameters = new LimitedStringCollection(Settings.Default.RendererParameters, int.MaxValue);
-
-            // Screenshot history has to have at least one entry
-            if (Settings.Default.ScreenshotNamePatternHistory.Count == 0)
-                Settings.Default.ScreenshotNamePatternHistory.Add(ScreenshotNamePattern);
-
-            LastWorlds.CollectionChanged += OnStringCollectionChanged;
-            ScreenshotNamePatternHistory.CollectionChanged += OnStringCollectionChanged;
-            RendererParameters.CollectionChanged += OnStringCollectionChanged;
-
             SetLogLevel(LogLevel);
             SetProfilerLevels();
-
-            if (string.IsNullOrEmpty(ScreenshotFolder))
-                ScreenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-
-            // forward setting changed events
-            m_saveTimer = new Timer(_ => {
-                // TODO: idk why, but settings that weren't printed at least once are prone to not trigger
-                // a save at all (seems buggy)
-                Settings.Default.Save();
-                m_saveTimer.Change(int.MaxValue, int.MaxValue);
-            });
-            Settings.Default.PropertyChanged += AppSettingsOnPropertyChanged;
         }
 
         public void Save()
         {
-            // It appears that the settings object needs some time to make changes "visible"
-            // Thus we use an invokable on a short timer that saves the settings with a slight delay.
-            // Repeated "save" invokations simply reset the timer to avoid needless "double-saves".
-            m_saveTimer.Change(200, int.MaxValue);
+            var json = JsonConvert.SerializeObject(this, Formatting.Indented);
+            File.WriteAllText("settings.json", json);
+        }
+
+        public static SettingsModel Load()
+        {
+            try
+            {
+                var json = File.ReadAllText("settings.json");
+                var res = JsonConvert.DeserializeObject<SettingsModel>(json);
+                return res;
+            }
+            catch (Exception) // use default settings
+            {
+                var res = new SettingsModel();
+                // init screenshot name pattern history
+                res.ScreenshotNamePatternHistory.Add(res.ScreenshotNamePattern);
+                return res;
+            }
         }
 
         private void SetLogLevel(Core.Severity severity)
@@ -78,352 +63,323 @@ namespace gui.Model
 
         private void SetProfilerLevels()
         {
-            if (!Core.profiling_set_level((Core.ProfilingLevel)CoreProfileLevel))
+            if (!Core.profiling_set_level(CoreProfileLevel))
                 throw new Exception(Core.core_get_dll_error());
-            if (!Loader.loader_profiling_set_level((Core.ProfilingLevel)LoaderProfileLevel))
+            if (!Loader.loader_profiling_set_level(LoaderProfileLevel))
                 throw new Exception(Loader.loader_get_dll_error());
         }
 
-        private void OnStringCollectionChanged(object sender, NotifyCollectionChangedEventArgs args)
-        {
-            Save();
-        }
+        // note: use AddWorld() to add items to this collection
+        public ObservableCollection<string> LastWorlds { get; } = new ObservableCollection<string>();
 
-        private void AppSettingsOnPropertyChanged(object sender, PropertyChangedEventArgs args)
+        private static void InsertIntoLimitedUniqueCollection(ObservableCollection<string> collection, string item, int limit)
         {
-            switch (args.PropertyName)
+            Debug.Assert(item != null);
+            var index = collection.IndexOf(item);
+
+            if (index > 0) // exists in list but not in the first spot
             {
-                case nameof(Settings.Default.LastWorldPath):
-                    OnPropertyChanged(nameof(LastWorldPath));
-                    break;
-                case nameof(Settings.Default.LastSelectedRenderer):
-                    OnPropertyChanged(nameof(LastSelectedRenderer));
-                    break;
-                case nameof(Settings.Default.LastWorlds):
-                    // can be ignored
-                    break;
-                case nameof(Settings.Default.AutoStartOnLoad):
-                    OnPropertyChanged(nameof(AutoStartOnLoad));
-                    break;
-                case nameof(Settings.Default.LogLevel):
-                    SetLogLevel(LogLevel);
-                    OnPropertyChanged(nameof(LogLevel));
-                    break;
-                case nameof(Settings.Default.CoreProfileLevel):
-                    OnPropertyChanged(nameof(CoreProfileLevel));
-                    if(CoreProfileLevel == Core.ProfilingLevel.Off)
-                        Core.profiling_disable();
-                    else if(!Core.profiling_set_level(CoreProfileLevel))
-                        throw new Exception(Core.core_get_dll_error());
-                    break;
-                case nameof(Settings.Default.LoaderProfileLevel):
-                    OnPropertyChanged(nameof(LoaderProfileLevel));
-                    if(LoaderProfileLevel == Core.ProfilingLevel.Off)
-                        Loader.loader_profiling_disable();
-                    else if(!Loader.loader_profiling_set_level(LoaderProfileLevel))
-                        throw new Exception(Loader.loader_get_dll_error());
-                    break;
-                case nameof(Settings.ScreenshotNamePattern):
-                    OnPropertyChanged(nameof(ScreenshotNamePattern));
-                    break;
-                case nameof(Settings.ScreenshotFolder):
-                    OnPropertyChanged(nameof(ScreenshotFolder));
-                    break;
-                case nameof(Settings.ScreenshotNamePatternHistory):
-                    // can be ignored
-                    break;
-                case nameof(Settings.AllowCameraMovement):
-                    OnPropertyChanged(nameof(AllowCameraMovement));
-                    break;
-                case nameof(Settings.MaxConsoleMessages):
-                    OnPropertyChanged(nameof(MaxConsoleMessages));
-                    break;
+                collection.RemoveAt(index);
+                collection.Insert(0, item);
             }
-
-            Save();
+            else if (index < 0) // does not exist yet
+            {
+                collection.Insert(0, item);
+                while (collection.Count > limit) // limit collection
+                {
+                    collection.RemoveAt(collection.Count - 1);
+                }
+            }
         }
 
-        public LimitedStringCollection LastWorlds { get; private set; }
-        public LimitedStringCollection ScreenshotNamePatternHistory { get; private set; }
+        public void AddWorld(string worldName)
+        {
+            InsertIntoLimitedUniqueCollection(LastWorlds, worldName, MaxLastWorlds);
+        }
 
-        // TODO couple with last worlds?
+        // note: use AddScreenshotPattern to add items to this collection
+        public ObservableCollection<string> ScreenshotNamePatternHistory { get; } = new ObservableCollection<string>();
+
+        public void AddScreenshotPattern(string pattern)
+        {
+            InsertIntoLimitedUniqueCollection(ScreenshotNamePatternHistory, pattern, MaxScreenshotNamingPatterns);
+        }
+
+        private string m_lastWorldPath = "";
         public string LastWorldPath
         {
-            get => Settings.Default.LastWorldPath;
+            get => m_lastWorldPath;
             set
             {
                 Debug.Assert(value != null);
-                Settings.Default.LastWorldPath = value;
+                if(value == m_lastWorldPath) return;
+                m_lastWorldPath = value;
+                OnPropertyChanged(nameof(LastWorldPath));
             }
         }
 
+        private uint m_lastSelectedRenderer = 0;
         public uint LastSelectedRenderer
         {
-            get => Settings.Default.LastSelectedRenderer;
+            get => m_lastSelectedRenderer;
             set
             {
-                Debug.Assert(value >= 0);
-                Settings.Default.LastSelectedRenderer = value;
+                if (value == m_lastSelectedRenderer) return;
+                m_lastSelectedRenderer = value;
+                OnPropertyChanged(nameof(LastSelectedRenderer));
             }
         }
 
+        private uint m_lastSelectedRendererVariation = 0;
         public uint LastSelectedRendererVariation
         {
-            get => Settings.Default.LastSelectedRendererVariation;
+            get => m_lastSelectedRendererVariation;
             set
             {
-                Debug.Assert(value >= 0);
-                Settings.Default.LastSelectedRendererVariation = value;
+                if(value == m_lastSelectedRendererVariation) return;
+                m_lastSelectedRendererVariation = value;
+                OnPropertyChanged(nameof(LastSelectedRendererVariation));
             }
         }
 
+        private int m_lastSelectedRendererTarget = 0;
         public int LastSelectedRenderTarget
         {
-            get => Settings.Default.LastSelectedRenderTarget;
+            get => m_lastSelectedRendererTarget;
             set
             {
                 Debug.Assert(value >= 0);
-                Settings.Default.LastSelectedRenderTarget = value;
+                if(value == m_lastSelectedRendererTarget) return;
+                m_lastSelectedRendererTarget = value;
+                OnPropertyChanged(nameof(LastSelectedRenderTarget));
             }
         }
 
+        private int m_maxConsoleMessages = 50;
         public int MaxConsoleMessages
         {
-            get => Settings.Default.MaxConsoleMessages;
-            set => Settings.Default.MaxConsoleMessages = value;
+            get => m_maxConsoleMessages;
+            set
+            {
+                if(value == m_maxConsoleMessages) return;
+                m_maxConsoleMessages = value;
+                OnPropertyChanged(nameof(MaxConsoleMessages));
+            }
         }
 
+        private bool m_autoStartOnLoad = true;
         public bool AutoStartOnLoad
         {
-            get => Settings.Default.AutoStartOnLoad;
-            set => Settings.Default.AutoStartOnLoad = value;
+            get => m_autoStartOnLoad;
+            set
+            {
+                if(value == m_autoStartOnLoad) return;
+                m_autoStartOnLoad = value;
+                OnPropertyChanged(nameof(AutoStartOnLoad));
+            }
         }
 
         // TODO use this
+        private Core.Severity m_logLevel = Core.Severity.Pedantic;
         public Core.Severity LogLevel
         {
-            get => (Core.Severity) Settings.Default.LogLevel;
-            set => Settings.Default.LogLevel = (int) value;
+            get => m_logLevel;
+            set
+            {
+                if(value == m_logLevel) return;
+                m_logLevel = value;
+                SetLogLevel(LogLevel);
+                OnPropertyChanged(nameof(LogLevel));
+            }
         }
 
         // TODO use this
+        private Core.ProfilingLevel m_coreProfileLevel = Core.ProfilingLevel.All;
         public Core.ProfilingLevel CoreProfileLevel
         {
-            get => (Core.ProfilingLevel) Settings.Default.CoreProfileLevel;
-            set => Settings.Default.CoreProfileLevel = (int) value;
+            get => m_coreProfileLevel;
+            set
+            {
+                if(m_coreProfileLevel == value) return;
+                m_coreProfileLevel = value;
+                if (CoreProfileLevel == Core.ProfilingLevel.Off)
+                    Core.profiling_disable();
+                else if (!Core.profiling_set_level(CoreProfileLevel))
+                    throw new Exception(Core.core_get_dll_error());
+                OnPropertyChanged(nameof(CoreProfileLevel));
+            }
         }
 
         // TODO use this
+        private Core.ProfilingLevel m_loaderProfileLevel = Core.ProfilingLevel.All;
         public Core.ProfilingLevel LoaderProfileLevel
         {
-            get => (Core.ProfilingLevel) Settings.Default.LoaderProfileLevel;
-            set => Settings.Default.LoaderProfileLevel = (int) value;
+            get => m_loaderProfileLevel;
+            set
+            {
+                if(m_loaderProfileLevel == value) return;
+                m_loaderProfileLevel = value;
+                if (LoaderProfileLevel == Core.ProfilingLevel.Off)
+                    Loader.loader_profiling_disable();
+                else if (!Loader.loader_profiling_set_level(LoaderProfileLevel))
+                    throw new Exception(Loader.loader_get_dll_error());
+                OnPropertyChanged(nameof(LoaderProfileLevel));
+            }
         }
 
-        // TODO use this
+        private string m_screenshotNamePattern = "#scene-#scenario-#renderer-#iteration";
         public string ScreenshotNamePattern
         {
-            get => Settings.Default.ScreenshotNamePattern;
-            set => Settings.Default.ScreenshotNamePattern = value;
+            get => m_screenshotNamePattern;
+            set
+            {
+                if(value == m_screenshotNamePattern) return;
+                m_screenshotNamePattern = value;
+                OnPropertyChanged(nameof(ScreenshotNamePattern));
+                // add new pattern to the history
+                AddScreenshotPattern(m_screenshotNamePattern);
+            }
         }
 
         // TODO use this
+        private string m_screenshotFolder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
         public string ScreenshotFolder
         {
-            get => Settings.Default.ScreenshotFolder;
-            set => Settings.Default.ScreenshotFolder = value;
+            get => m_screenshotFolder;
+            set
+            {
+                if(value == m_screenshotFolder) return;
+                m_screenshotFolder = value;
+                OnPropertyChanged(nameof(ScreenshotFolder));
+            }
         }
 
+        [JsonIgnore]
         public KeyGesture ScreenshotGesture
         {
             get => ScreenshotGestureString == null ? null
                 : (KeyGesture)m_gestureConverter.ConvertFromString(ScreenshotGestureString);
         }
 
+        private string m_screenshotGestureString = "F2";
         public string ScreenshotGestureString
         {
-            get => Settings.Default.ScreenshotGesture;
+            get => m_screenshotGestureString;
             set
             {
-                if (value == Settings.Default.ScreenshotGesture) return;
-                Settings.Default.ScreenshotGesture = value;
+                if (value == m_screenshotGestureString) return;
+                m_screenshotGestureString = value;
                 OnPropertyChanged(nameof(ScreenshotGestureString));
                 OnPropertyChanged(nameof(ScreenshotGesture));
             }
         }
         
+        [JsonIgnore]
         public KeyGesture PlayPauseGesture
         {
             get => PlayPauseGestureString == null ? null
                 : (KeyGesture)m_gestureConverter.ConvertFromString(PlayPauseGestureString);
         }
 
+        private string m_playPauseGestureString = "ALT+P";
         public string PlayPauseGestureString
         {
-            get => Settings.Default.PlayPauseGesture;
+            get => m_playPauseGestureString;
             set
             {
-                if (value == Settings.Default.PlayPauseGesture) return;
-                Settings.Default.PlayPauseGesture = value;
+                if (value == m_playPauseGestureString) return;
+                m_playPauseGestureString = value;
                 OnPropertyChanged(nameof(PlayPauseGestureString));
                 OnPropertyChanged(nameof(PlayPauseGesture));
             }
         }
         
+        [JsonIgnore]
         public KeyGesture ResetGesture
         {
             get => ResetGestureString == null ? null
                 : (KeyGesture)m_gestureConverter.ConvertFromString(ResetGestureString);
         }
 
+        private string m_resetGestureString = "ALT+R";
         public string ResetGestureString
         {
-            get => Settings.Default.ResetGesture;
+            get => m_resetGestureString;
             set
             {
-                if (value == Settings.Default.ResetGesture) return;
-                Settings.Default.ResetGesture = value;
+                if (value == m_resetGestureString) return;
+                m_resetGestureString = value;
                 OnPropertyChanged(nameof(ResetGestureString));
                 OnPropertyChanged(nameof(ResetGesture));
             }
         }
         
+        [JsonIgnore]
         public KeyGesture ToggleCameraMovementGesture
         {
             get => ToggleCameraMovementGestureString == null ? null
                 : (KeyGesture)m_gestureConverter.ConvertFromString(ToggleCameraMovementGestureString);
         }
 
+        private string m_toggleCameraMovementGestureString = "ALT+M";
         public string ToggleCameraMovementGestureString
         {
-            get => Settings.Default.ToggleCameraMovementGesture;
+            get => m_toggleCameraMovementGestureString;
             set
             {
-                if (value == Settings.Default.ToggleCameraMovementGesture) return;
-                Settings.Default.ToggleCameraMovementGesture = value;
+                if (value == m_toggleCameraMovementGestureString) return;
+                m_toggleCameraMovementGestureString = value;
                 OnPropertyChanged(nameof(ToggleCameraMovementGestureString));
                 OnPropertyChanged(nameof(ToggleCameraMovementGesture));
             }
         }
 
+        private bool m_allowCameraMovement = false;
         public bool AllowCameraMovement
         {
-            get => Settings.Default.AllowCameraMovement;
-            set => Settings.Default.AllowCameraMovement = value;
+            get => m_allowCameraMovement;
+            set
+            {
+                if(m_allowCameraMovement == value) return;
+                m_allowCameraMovement = value;
+                OnPropertyChanged(nameof(AllowCameraMovement));
+            }
         }
 
+        private bool m_invertCameraControls = false;
         public bool InvertCameraControls
         {
-            get => Settings.Default.InvertCameraControls;
-            set => Settings.Default.InvertCameraControls = value;
+            get => m_invertCameraControls;
+            set
+            {
+                if (value == m_invertCameraControls) return;
+                m_invertCameraControls = value;
+                OnPropertyChanged(nameof(InvertCameraControls));
+            }
         }
 
+        private uint m_lastNIterationCommand = 1000;
         public uint LastNIterationCommand
         {
-            get => Settings.Default.LastNIterationCommand;
-            set => Settings.Default.LastNIterationCommand = value;
+            get => m_lastNIterationCommand;
+            set
+            {
+                if(value == m_lastNIterationCommand) return;
+                m_lastNIterationCommand = value;
+                OnPropertyChanged(nameof(LastNIterationCommand));
+            }
         }
 
-        public LimitedStringCollection RendererParameters { get; private set; }
+        public ObservableCollection<string> RendererParameters { get; private set; } = new ObservableCollection<string>();
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
+            Save(); // TODO do we really want to save after each property change?
+
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-
-        // Wrapper class for a string collection with limited entries (and limited operations).
-        // Takes a collection and limit as argument, when insert operations exceed the limit
-        // the last elements will be removed from the collection.
-        public class LimitedStringCollection
-        {
-            private StringCollection m_collection;
-            private int m_limit;
-
-            public event NotifyCollectionChangedEventHandler CollectionChanged;
-
-            public LimitedStringCollection(StringCollection collection, int limit)
-            {
-                m_collection = collection;
-                m_limit = limit;
-                // Initial trimming
-                while (m_collection.Count > m_limit)
-                    m_collection.RemoveAt(m_limit);
-            }
-
-            public void Add(string val)
-            {
-                int newIndex = m_collection.Count;
-                m_collection.Add(val);
-                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, newIndex));
-                PruneSingle();
-            }
-
-            public void PushFront(string val)
-            {
-                m_collection.Insert(0, val);
-                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, val, 0));
-                PruneSingle();
-            }
-
-            public void RemoveAt(int index)
-            {
-                if (index >= Count)
-                    throw new ArgumentOutOfRangeException();
-                var item = m_collection[index];
-                m_collection.RemoveAt(index);
-                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
-            }
-
-            public void Clear()
-            {
-                m_collection.Clear();
-                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-            }
-
-            public int Count { get => m_collection.Count; }
-            public bool Empty { get => Count == 0; }
-
-            public int IndexOf(string val)
-            {
-                return m_collection.IndexOf(val);
-            }
-
-            public bool Contains(string val)
-            {
-                return m_collection.Contains(val);
-            }
-
-            public string this[int key]
-            {
-                get => m_collection[key];
-                set
-                {
-                    if (key >= Count)
-                        throw new ArgumentOutOfRangeException();
-                    var oldItem = m_collection[key];
-                    m_collection[key] = value;
-                    CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, value, oldItem, key));
-                }
-            }
-
-            public StringEnumerator GetEnumerator()
-            {
-                return m_collection.GetEnumerator();
-            }
-
-            private void PruneSingle()
-            {
-                if(m_collection.Count > m_limit)
-                {
-                    var removed = m_collection[m_limit];
-                       m_collection.RemoveAt(m_limit);
-                    CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed, m_limit));
-                }
-            }
         }
     }
 }
