@@ -226,6 +226,10 @@ public:
 		return false;
 	}
 
+	bool is_resident_anywhere() const {
+		return is_resident<Device::CPU>() || is_resident<Device::CUDA>() || is_resident<Device::OPENGL>();
+	}
+
 	// Get the function pointer for flux or fluxPos guide on the target device.
 //	template < Device dev >
 //	static GuideFunction get_guide_fptr(bool posGuide);

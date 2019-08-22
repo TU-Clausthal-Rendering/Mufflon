@@ -25,7 +25,7 @@ CUDA_FUNCTION void lt_sample(RenderBuffer<CURRENT_DEV> outputBuffer,
 	LtPathVertex vertex;
 	VertexSample sample;
 	// Create a start vertex for the path
-	math::RndSet2_1 rndStart { rng.next(), rng.next() };
+	math::RndSet2 rndStart { rng.next() };
 	u64 lightTreeSeed = rng.next();
 	scene::lights::Emitter p = scene::lights::emit(scene, idx, outputBuffer.get_num_pixels(),
 		lightTreeSeed, rndStart);

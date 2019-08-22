@@ -68,21 +68,22 @@ struct RenderBuffer {
 	// The renderbuffer only needs to add values to all defined handles.
 	RenderTarget<dev> m_targets[OutputValue::TARGET_COUNT] = {};
 	ei::IVec2 m_resolution;
+	// This holds the address of an atomic used to count the number of NaNs in an iteration
+	// TODO: this doesn't play nicely with OpenGL
+	std::conditional_t<dev == Device::OPENGL, ArrayDevHandle_t<Device::CPU, cuda::Atomic<Device::CPU, u32>>,
+		ArrayDevHandle_t<dev, cuda::Atomic<dev, u32>>> nan_counter;
+
 
 	__host__ __device__ float check_nan(float x) {
 		if(isnan(x)) {
-#ifndef  __CUDA_ARCH__
-			logWarning("[RenderBuffer] Detected NaN on output. Returning 0 instead.");
-#endif // ! __CUDA_ARCH__
+			cuda::atomic_add<dev>(*nan_counter, 1u);
 			return 0.0f;
 		}
 		return x;
 	}
 	__host__ __device__ ei::Vec3 check_nan(const ei::Vec3& x) {
 		if(isnan(x.x) || isnan(x.y) || isnan(x.z)) {
-#ifndef  __CUDA_ARCH__
-			logWarning("[RenderBuffer] Detected NaN on output. Returning 0 instead.");
-#endif // ! __CUDA_ARCH__
+			cuda::atomic_add<dev>(*nan_counter, 1u);
 			return ei::Vec3{ 0.0f };
 		}
 		return x;
@@ -257,6 +258,7 @@ private:
 	int m_iteration;			// Number of completed iterations / index of current one
 	int m_width;
 	int m_height;
+	cuda::Atomic<Device::CPU, u32> m_nan_counter;	// Counter for CPU-side renderers
 
 
 	void update_variance_cuda(ConstRenderTarget<Device::CUDA> iterTarget,

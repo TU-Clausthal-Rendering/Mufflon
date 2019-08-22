@@ -9,7 +9,7 @@ namespace lighttree_detail {
 
 // Helper to adjust PDF by the chance to pick light type
 CUDA_FUNCTION __forceinline__ Emitter adjustPdf(Emitter&& sample, float chance) {
-	sample.pos.pdf *= chance;
+	sample.pChoice = chance;
 	sample.intensity /= chance;
 	return sample;
 }
@@ -31,7 +31,7 @@ CUDA_FUNCTION Emitter sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
 		case LightType::AREA_LIGHT_TRIANGLE: return sample_light_pos(scene, *reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(light), rnd);
 		case LightType::AREA_LIGHT_QUAD: return sample_light_pos(scene, *reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(light), rnd);
 		case LightType::AREA_LIGHT_SPHERE: return sample_light_pos(scene, *reinterpret_cast<const AreaLightSphere<CURRENT_DEV>*>(light), rnd);
-		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), scene.aabb, rnd);
+		case LightType::DIRECTIONAL_LIGHT: return sample_light_pos(*reinterpret_cast<const DirectionalLight*>(light), scene.aabb);
 		default: mAssert(false); return {};
 	}
 }
@@ -131,7 +131,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
  */
 CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 						   u64 index, u64 numIndices, u64 seed,
-						   const math::RndSet2_1& rnd) {
+						   const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
 	const LightTree<CURRENT_DEV>& tree = scene.lightTree;
 	// See connect() for details on the rndChoice
@@ -152,7 +152,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 		auto photon = sample_light_pos(tree.background, scene.aabb, rnd);
 		// Adjust pdf (but apply the probability to the directional pdf and NOT the pos.pdf)
 		photon.intensity /= envProb;
-		photon.source_param.dir.dirPdf *= envProb;
+		photon.pChoice = envProb;
 		return photon;
 	}
 	// ...then the directional lights come...

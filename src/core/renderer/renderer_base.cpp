@@ -5,15 +5,26 @@
 namespace mufflon::renderer {
 
 template < Device dev >
-RendererBase<dev>::RendererBase() {
-	m_sceneDesc = make_udevptr<dev, mufflon::scene::SceneDescriptor<dev>>();
+RendererBase<dev>::RendererBase(std::vector<const char*> vertexAttribs,
+								std::vector<const char*> faceAttribs,
+								std::vector<const char*> sphereAttribs) :
+	m_vertexAttribs(std::move(vertexAttribs)),
+	m_faceAttribs(std::move(faceAttribs)),
+	m_sphereAttribs(std::move(sphereAttribs))
+{}
+
+template <>
+RendererBase<Device::CUDA>::RendererBase(std::vector<const char*> vertexAttribs,
+								std::vector<const char*> faceAttribs,
+								std::vector<const char*> sphereAttribs) :
+	m_vertexAttribs(std::move(vertexAttribs)),
+	m_faceAttribs(std::move(faceAttribs)),
+	m_sphereAttribs(std::move(sphereAttribs))
+{
+	m_sceneDesc = make_udevptr<Device::CUDA, mufflon::scene::SceneDescriptor<Device::CUDA>>();
 }
 
-template <>
-RendererBase<Device::CPU>::RendererBase() {}
 
-template <>
-RendererBase<Device::OPENGL>::RendererBase() {}
 
 template < Device dev >
 bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
@@ -24,7 +35,7 @@ bool RendererBase<dev>::pre_iteration(OutputHandler& outputBuffer) {
 		this->pre_reset();
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
-		auto desc = m_currentScene->get_descriptor<dev>({}, {}, {});
+		auto desc = m_currentScene->get_descriptor<dev>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs);
 		copy(m_sceneDesc.get(), &desc, sizeof(desc));
 		this->clear_reset();
 		return true;
@@ -41,7 +52,7 @@ bool RendererBase<Device::CPU>::pre_iteration(OutputHandler& outputBuffer) {
 		this->pre_reset();
 		if(m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
-		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>({}, {}, {});
+		m_sceneDesc = m_currentScene->get_descriptor<Device::CPU>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs);
 		this->clear_reset();
 		return true;
 	}
@@ -57,7 +68,7 @@ bool RendererBase<Device::OPENGL>::pre_iteration(OutputHandler& outputBuffer) {
 		this->pre_reset();
 		if (m_currentScene == nullptr)
 			throw std::runtime_error("No scene is set!");
-		m_sceneDesc = m_currentScene->get_descriptor<Device::OPENGL>({}, {}, {});
+		m_sceneDesc = m_currentScene->get_descriptor<Device::OPENGL>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs);
 		m_outputTargets = outputBuffer.get_target();
 		this->clear_reset();
 		return true;

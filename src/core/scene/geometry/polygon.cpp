@@ -1,4 +1,4 @@
-#include "polygon.hpp"
+﻿#include "polygon.hpp"
 #include "util/assert.hpp"
 #include "util/log.hpp"
 #include "util/parallel.hpp"
@@ -8,6 +8,7 @@
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/textures/interface.hpp"
+#include "core/math/curvature.hpp"
 #include <OpenMesh/Core/Mesh/Handles.hh>
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
@@ -481,6 +482,68 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
+
+void Polygons::compute_curvature() {
+	// Add the attribute if not existent and get handle otherwise
+	VertexAttributeHandle curvHandle(0);
+	try {
+		curvHandle = m_vertexAttributes.get_attribute_handle("mean_curvature");
+	} catch(...) {
+		curvHandle = m_vertexAttributes.add_attribute<float>(std::string("mean_curvature"));
+	}
+
+	float* curv = m_vertexAttributes.acquire<Device::CPU, float>(curvHandle);
+
+	if(!m_meshData->has_vertex_normals()) {
+		// Without interpolated normals, the mesh is assumed to have only flat
+		// faces -> no curvature.
+		for(u32 i = 0; i < m_meshData->n_vertices(); ++i)
+			curv[i] = 0.0f;
+		return;
+	}
+
+	for(auto& v : m_meshData->vertices()) {
+		// Fetch data at reference vertex and create an orthogonal space
+		Point vPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(v));
+		Direction vNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(v));
+		Direction dirU = normalize(perpendicular(vNrm));
+		Direction dirV = cross(vNrm, dirU);
+		// Construct an equation system which fits a paraboloid to the 1-ring.
+		// We need Aᵀ A x = Aᵀ b for the least squares system.
+		// Interestingly, it suffices to solve for two of the variables instead of
+		// all three, if we are interested in mean curvature only.
+		ei::Mat2x2 ATA { 0.0f };
+		ei::Vec2 ATb { 0.0f };
+		// For each edge add an equation
+		for(auto vi = m_meshData->vv_ccwiter(v); vi.is_valid(); ++vi) {
+			Point viPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vi));
+			Direction viNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(*vi));
+			ei::Vec3 edge = vPos - viPos;
+			// Normal curvature fit with different curvature estimations
+			const ei::Vec2 y { dot(dirU, edge), dot(dirV, edge) };
+			const float normSq = y.x * y.x + y.y * y.y + 1e-30f;
+			//const float ki = 2.0f * dot(vNrm, edge) / (dot(edge, edge) + 1e-30f);		// Circular
+			//const float ki = dot(vNrm - viNrm, edge) / (dot(edge, edge) + 1e-30f);	// Circular projected
+			//const float ki = 2.0f * dot(vNrm, edge) / normSq;							// Parabolic
+			const float ki = dot(vNrm - viNrm, edge) / normSq;						// Parabolic projected
+			float a = y.x * y.x / normSq;
+			float c = y.y * y.y / normSq;
+
+			ATb += ki * ei::Vec2{ a, c };
+			ATA += ei::Mat2x2{ a*a, a*c, a*c, c*c };
+		}
+		// Solve with least squares
+		float detA = determinant(ATA);
+		float e = ATb.x * ATA.m11 - ATb.y * ATA.m01;
+		float g = ATA.m00 * ATb.y - ATA.m10 * ATb.x;
+		detA += (ATA.m00 + ATA.m11) * 1e-7f + 1e-30f; // Regularize with the trace
+		float meanc = (e + g) * 0.5f / detA;
+		mAssert(!std::isnan(meanc));
+		curv[v.idx()] = meanc;
+	}
+}
+
+
 template < Device dev >
 void Polygons::synchronize() {
 	m_vertexAttributes.synchronize<dev>();
@@ -533,6 +596,7 @@ PolygonsDescriptor<dev> Polygons::get_descriptor() {
 		this->acquire_const<dev, ei::Vec2>(this->get_uvs_hdl()),
 		this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
 		this->get_index_buffer<dev>(),
+		//	m_attribBuffer.template get<AttribBuffer<dev>>().vertex,
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}
 	};
@@ -546,16 +610,20 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 	// Free the previous attribute array if no attributes are wanted
 	auto& buffer = m_attribBuffer.template get<AttribBuffer<dev>>();
 
-	if(vertexAttribs.size() == 0 && buffer.vertSize != 0) {
-		buffer.vertex = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize);
+	if(vertexAttribs.size() == 0) {
+		if(buffer.vertSize != 0)
+			buffer.vertex = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize);
+		// else keep current nullptr
 	} else {
 		if(buffer.vertSize == 0)
 			buffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(vertexAttribs.size());
 		else
 			buffer.vertex = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize, vertexAttribs.size());
 	}
-	if(faceAttribs.size() == 0 && buffer.faceSize != 0) {
-		buffer.face = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize);
+	if(faceAttribs.size() == 0) {
+		if(buffer.faceSize != 0)
+			buffer.face = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize);
+		// else keep current nullptr
 	} else {
 		if(buffer.faceSize == 0)
 			buffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(faceAttribs.size());
@@ -563,8 +631,10 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 			buffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize, faceAttribs.size());
 	}
 
-	std::vector<ArrayDevHandle_t<dev, void>> cpuVertexAttribs(vertexAttribs.size());
-	std::vector<ArrayDevHandle_t<dev, void>> cpuFaceAttribs(faceAttribs.size());
+	std::vector<ArrayDevHandle_t<dev, void>> cpuVertexAttribs;
+	std::vector<ArrayDevHandle_t<dev, void>> cpuFaceAttribs;
+	cpuVertexAttribs.reserve(vertexAttribs.size());
+	cpuFaceAttribs.reserve(faceAttribs.size());
 	for(const char* name : vertexAttribs)
 		cpuVertexAttribs.push_back(m_vertexAttributes.acquire<dev, void>(name));
 	for(const char* name : faceAttribs)

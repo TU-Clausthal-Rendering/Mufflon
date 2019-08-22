@@ -331,8 +331,13 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 					   std::vector<lights::DirectionalLight>&& dirLights) {
 	// Need the materials for area lights
-	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<Device::CPU>())
+	if(m_scenario.materials_dirty_reset() || !m_materials.template is_resident<Device::CPU>()) {
 		load_materials<Device::CPU>();
+		// TODO: this is currently a workaround until we have have a resource class
+		// that semantically must carry the same information but deviated byte-wise
+		// (for e.g. texture handles)
+		m_materials.mark_changed(Device::CPU);
+	}
 	const int* materials = as<int>(m_materials.template acquire_const<Device::CPU>());
 
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
@@ -427,6 +432,37 @@ bool Scene::retessellate(const float tessLevel) {
 
 	return needLighttreeRebuild;
 }
+
+
+void Scene::compute_curvature() {
+	for(auto& obj : m_objects) {
+		printf(obj.first->get_name().cbegin());
+		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
+			if(obj.first->has_lod_available(level)) {
+				Lod& lod = obj.first->get_lod(level);
+				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
+				printf(" %lu lod: %llu po: %llu\n", level, u64(&lod), u64(&polygons));
+				fflush(stdout);
+				polygons.compute_curvature();
+			}
+		}
+	}
+}
+
+void Scene::remove_curvature() {
+	for(auto& obj : m_objects) {
+		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
+			if(obj.first->has_lod_available(level)) {
+				Lod& lod = obj.first->get_lod(level);
+				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
+				try {
+					polygons.remove_attribute("mean_curvature");
+				} catch(...) {}
+			}
+		}
+	}
+}
+
 
 template void Scene::load_materials<Device::CPU>();
 template void Scene::load_materials<Device::CUDA>();

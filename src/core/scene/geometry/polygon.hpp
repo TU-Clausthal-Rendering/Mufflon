@@ -280,6 +280,9 @@ public:
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
 
+	// Computes the "mean_curvature" attribute for all vertices
+	void compute_curvature();
+
 	// Gets a constant handle to the underlying mesh data.
 	const PolygonMeshType& native() const {
 		mAssert(m_meshData != nullptr);
@@ -362,14 +365,6 @@ public:
 
 	std::size_t get_face_count() const noexcept {
 		return m_meshData->n_faces();
-	}
-
-	std::size_t get_vertex_attribute_count() const noexcept {
-		return m_vertexAttributes.get_attribute_count();
-	}
-
-	std::size_t get_face_attribute_count() const noexcept {
-		return m_faceAttributes.get_attribute_count();
 	}
 
 	// Get a list of all materials which are referenced by any primitive

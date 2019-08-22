@@ -6,6 +6,7 @@ using gui.ViewModel.Camera;
 using gui.ViewModel.Dialog;
 using gui.ViewModel.Light;
 using gui.ViewModel.Material;
+using System.IO;
 
 namespace gui.ViewModel
 {
@@ -41,6 +42,7 @@ namespace gui.ViewModel
         public ICommand SaveSceneCommand { get; }
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
+        public ICommand DenoiseImageCommand { get; }
 
         // For designer only
         public static bool NotInDesignMode { get; set; }
@@ -78,6 +80,7 @@ namespace gui.ViewModel
             SaveSceneCommand = new SaveSceneCommand(m_models);
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(m_models);
+            DenoiseImageCommand = new SaveDenoisedScreenshotCommand(m_models);
 
             KeyGestures = new KeyGestureViewModel(models);
         }
