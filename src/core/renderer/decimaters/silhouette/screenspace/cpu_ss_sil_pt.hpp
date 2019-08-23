@@ -41,6 +41,7 @@ private:
 	void compute_max_importance();
 	void display_importance();
 	void update_silhouette_importance();
+	void normalize_radiance();
 
 	ss::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;

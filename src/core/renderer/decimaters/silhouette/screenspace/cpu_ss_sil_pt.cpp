@@ -21,15 +21,6 @@ namespace mufflon::renderer::decimaters::silhouette {
 
 using namespace ss;
 
-namespace {
-
-inline float get_luminance(const ei::Vec3& vec) {
-	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
-	return ei::dot(LUM_WEIGHT, vec);
-}
-
-} // namespace
-
 CpuSsSilPT::CpuSsSilPT() {
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
@@ -129,6 +120,7 @@ void CpuSsSilPT::iterate() {
 
 		gather_importance();
 
+		this->normalize_radiance();
 		this->update_silhouette_importance();
 
 		if(m_decimaters.size() == 0u)
@@ -202,17 +194,21 @@ void CpuSsSilPT::update_silhouette_importance() {
 			// with purely lit in their vicinity
 			bool isBorder = coord.x == 0 || coord.y == 0 || coord.x == (m_outputBuffer.get_width() - 1)
 				|| coord.y == (m_outputBuffer.get_height() - 1);
-			// Tracks the - the transition from core shadow to penumbra
+			// Tracks the transition from core shadow to penumbra
 			bool isPenumbraTransition = false;
+			// Average radiance of the surrounding not-shadowed pixels
+			ei::Vec3 averageRadiance{ 0.f };
+			u32 radianceCount = 0u;
 
-			if(shadowed && lit) {
-				m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.5f, 0.f, 0.5f });
-			} else if(shadowed) {
-				m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.f, 0.f, 0.3f });
+			if(shadowed) {
+				if(lit)
+					m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::hsvToRgb(ei::Vec3{ (3.f * i + 1.f) / (3.f * lightCount), 1.f, 1.f }));
+				else
+					m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::hsvToRgb(ei::Vec3{ (3.f * i) / (3.f * lightCount), 1.f, 1.f }));
 
 				// Detect silhouettes as shadowed pixels with lit ones as direct neighbors or viewport edge
-				for(int y = -1; y <= 1 && !(isBorder && isPenumbraTransition); ++y) {
-					for(int x = -1; x <= 1 && !(isBorder && isPenumbraTransition); ++x) {
+				for(int y = -1; y <= 1; ++y) {
+					for(int x = -1; x <= 1; ++x) {
 						if(x == 0 && y == 0)
 							continue;
 						const Pixel c{ coord.x + x, coord.y + y };
@@ -223,20 +219,35 @@ void CpuSsSilPT::update_silhouette_importance() {
 						const bool neighborLit = m_penumbra[index * m_bytesPerPixel + bitIndex] & (1u << (bitOffset + 1u));
 						isBorder = isBorder || (neighborLit && !neighborShadowed);
 						isPenumbraTransition = isPenumbraTransition || (neighborLit && neighborShadowed);
+						if(neighborLit) {
+							averageRadiance += m_outputBuffer.template get<RadianceTarget>(c);
+							++radianceCount;
+						}
 					}
 				}
 
-				if(isBorder)
+				// Those flags are only valid if we're pure shadow
+				if(lit) {
+					isBorder = false;
+					isPenumbraTransition = false;
+				}
+
+				/*if(isBorder)
 					m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.f, 0.8f, 0.f });
 				if(isPenumbraTransition)
-					m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.8f, 0.8f, 0.8f });
+					m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.8f, 0.8f, 0.8f });*/
+				if(radianceCount > 0u) {
+					averageRadiance -= static_cast<float>(radianceCount) * m_outputBuffer.template get<RadianceTarget>(coord);
+					averageRadiance *= 1.f / static_cast<float>(radianceCount);
+					averageRadiance = ei::max(averageRadiance, ei::Vec3{ 0.f });
+				}
+				m_outputBuffer.template set<RadianceTransitionTarget>(coord, averageRadiance);
 			} else if(lit) {
-				m_outputBuffer.template set<PenumbraTarget>(coord, ei::Vec3{ 0.3f, 0.f, 0.f });
+				m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::hsvToRgb(ei::Vec3{ (3.f * i + 2.f) / (3.f * lightCount), 1.f, 1.f }));
 			}
 
-			// Attribute importance
-			if((shadowed && lit) || isBorder) {
-				float averageShadowWeight = 0.f;
+			// Add importance for transition from umbra to penumbra
+			if(isPenumbraTransition) {
 				// TODO: only the edge vertices!
 				for(int i = 0; i < m_params.importanceIterations; ++i) {
 					const auto shadowPrim = m_shadowPrims[i * m_outputBuffer.get_num_pixels() + pixel];
@@ -256,15 +267,45 @@ void CpuSsSilPT::update_silhouette_importance() {
 							const auto vertexIdx = polygon.vertexIndices[vertexId];
 							mAssert(vertexIdx < polygon.numVertices);
 							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, shadowPrim.weight);
-							cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowSilhouetteImportance, shadowPrim.weight);
 						}
 					}
-					averageShadowWeight += shadowPrim.weight;
+					cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowImportance, shadowPrim.weight);
+					cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].numSilhouettePixels, 1u);
+				}
+				m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::Vec3{ 1.f, 1.f, 1.f });
+			}
+
+			// Attribute importance
+			/*if((shadowed && lit)) {// || isBorder) {
+				const float importance = get_luminance(averageRadiance);
+				if(isnan(importance))
+					__debugbreak();
+				// TODO: only the edge vertices!
+				for(int i = 0; i < m_params.importanceIterations; ++i) {
+					const auto shadowPrim = m_shadowPrims[i * m_outputBuffer.get_num_pixels() + pixel];
+					if(!shadowPrim.hitId.is_valid())
+						continue;
+
+					const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
+					const auto& lod = m_sceneDesc.lods[lodIdx];
+					const auto& polygon = lod.polygon;
+					if(static_cast<u32>(shadowPrim.hitId.primId) < (polygon.numTriangles + polygon.numQuads)) {
+						const bool isTriangle = static_cast<u32>(shadowPrim.hitId.primId) < polygon.numTriangles;
+						const auto vertexOffset = isTriangle ? 0u : 3u * polygon.numTriangles;
+						const auto vertexCount = isTriangle ? 3u : 4u;
+						const auto primIdx = static_cast<u32>(shadowPrim.hitId.primId) - (isTriangle ? 0u : polygon.numTriangles);
+						for(u32 i = 0u; i < vertexCount; ++i) {
+							const auto vertexId = vertexOffset + vertexCount * primIdx + i;
+							const auto vertexIdx = polygon.vertexIndices[vertexId];
+							mAssert(vertexIdx < polygon.numVertices);
+							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, importance * shadowPrim.weight);
+							cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowImportance, importance * shadowPrim.weight);
+						}
+					}
 				}
 
-				averageShadowWeight /= static_cast<float>(m_params.importanceIterations);
-				m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, averageShadowWeight);
-			}
+				//m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, importance);
+			}*/
 
 		}
 	}
@@ -279,6 +320,18 @@ void CpuSsSilPT::display_importance() {
 		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
 										  m_importances.data(), m_importanceSums.data(),
 										  m_maxImportance == 0.f ? 1.f : m_maxImportance);
+	}
+}
+
+void CpuSsSilPT::normalize_radiance() {
+	// Since the output logic won't normalize the radiance
+	// target by the iteration count we have to do it
+	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
+#pragma PARALLEL_FOR
+	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
+		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
+		const auto radiance = m_outputBuffer.template get<RadianceTarget>(coord);
+		m_outputBuffer.template set<RadianceTarget>(coord, radiance * (1.f / static_cast<float>(m_params.importanceIterations)));
 	}
 }
 

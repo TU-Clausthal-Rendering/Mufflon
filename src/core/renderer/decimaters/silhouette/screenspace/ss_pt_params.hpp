@@ -14,6 +14,11 @@ using SilhouetteParameters = ParameterHandler<
 	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide
 >;
 
+struct RadianceTarget {
+	static constexpr const char NAME[] = "Radiance";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
 struct ShadowTarget {
 	static constexpr const char NAME[] = "Shadow Areas";
 	using PixelType = u32;
@@ -34,10 +39,21 @@ struct PenumbraTarget {
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 3u;
 };
+struct RadianceTransitionTarget {
+	static constexpr const char NAME[] = "Radiance transition";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
+struct NumShadowPixelsTarget {
+	static constexpr const char NAME[] = "Shadow pixel count";
+	using PixelType = u32;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
 
 using SilhouetteTargets = TargetList<
-	ImportanceTarget, PolyShareTarget,
-	SilhouetteWeightTarget, PenumbraTarget
+	RadianceTarget, ImportanceTarget, PolyShareTarget,
+	SilhouetteWeightTarget, PenumbraTarget, RadianceTransitionTarget,
+	NumShadowPixelsTarget
 >;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::ss

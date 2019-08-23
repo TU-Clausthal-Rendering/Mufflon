@@ -22,6 +22,7 @@ template < Device dev >
 struct DeviceImportanceSums {
 	cuda::Atomic<dev, float> shadowImportance;
 	cuda::Atomic<dev, float> shadowSilhouetteImportance;
+	cuda::Atomic<dev, u32> numSilhouettePixels;
 };
 
 struct ImportanceSums {
@@ -59,7 +60,11 @@ struct SilVertexExt {
 							  const PathVertex<SilVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {}
+							  const math::Throughput& throughput) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+	}
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
 		this->throughput = sample.throughput;

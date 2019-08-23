@@ -410,61 +410,65 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 		// Add direct contribution as importance as well
 		if(pathLen > 0 && pathLen + 1 <= params.maxPathLength) {
 			u64 neeSeed = rng.next();
-			math::RndSet2 neeRnd = rng.next();
-			u32 lightIndex;
-			u32 lightOffset;
-			scene::lights::LightType lightType;
-			auto nee = scene::lights::connect(scene, 0, 1, neeSeed, vertices[pathLen].get_position(), neeRnd,
-											  &lightIndex, &lightType, &lightOffset);
-			Pixel projCoord;
-			auto value = vertices[pathLen].evaluate(nee.dir.direction, scene.media, projCoord);
-			mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
-			Spectrum radiance = value.value * nee.diffIrradiance;
-			// TODO: use multiple NEEs
-			if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
-				ei::Ray shadowRay{ nee.position, -nee.dir.direction };
+			for(int i = 0; i < params.neeCount; ++i) {
+				math::RndSet2 neeRnd = rng.next();
+				u32 lightIndex;
+				u32 lightOffset;
+				scene::lights::LightType lightType;
+				auto nee = scene::lights::connect(scene, i, params.neeCount, neeSeed,
+												  vertices[pathLen].get_position(), neeRnd,
+												  &lightIndex, &lightType, &lightOffset);
+				Pixel projCoord;
+				auto value = vertices[pathLen].evaluate(nee.dir.direction, scene.media, projCoord);
+				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
+				Spectrum radiance = value.value * nee.diffIrradiance;
+				// TODO: use multiple NEEs
+				if(any(greater(radiance, 0.0f)) && value.cosOut > 0.0f) {
+					ei::Ray shadowRay{ nee.position, -nee.dir.direction };
 
-				// TODO: any_intersection-like method with both normals please...
-				const auto shadowHit = scene::accel_struct::first_intersection(scene, shadowRay,
-																			   nee.geoNormal,
-																			   nee.dist - 0.00125f);
-				const float firstShadowDistance = shadowHit.distance;
-				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
-				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
-				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
-				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
+					// TODO: any_intersection-like method with both normals please...
+					const auto shadowHit = scene::accel_struct::first_intersection(scene, shadowRay,
+																				   nee.geoNormal,
+																				   nee.dist - 0.0125f);
+					const float firstShadowDistance = shadowHit.distance;
+					AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
+					float mis = 1.0f / (1.0f + params.neeCount + hitPdf / nee.creationPdf);
+					const ei::Vec3 irradiance = mis * nee.diffIrradiance * value.cosOut; // [W/m²]
+					vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 
-				// Entry into the bitmask
-				// Compute the appropriate index and shift
-				const auto bitIndex = lightIndex / 4u;
-				const auto bitShift = (lightIndex % 4u) * 2u;
+					// Entry into the bitmask
+					// Compute the appropriate index and shift
+					const auto bitIndex = lightIndex / 4u;
+					const auto bitShift = (lightIndex % 4u) * 2u;
 
-				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
-				if(shadowHit.hitId.instanceId < 0) {
-					if(pathLen == 1u) {
-						penumbraBits[bitIndex] |= 1u << (bitShift + 1u);
+					const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
+					if(shadowHit.hitId.instanceId < 0) {
+						outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
+						if(pathLen == 1u) {
+							penumbraBits[bitIndex] |= 1u << (bitShift + 1u);
+						}
+						if(params.show_direct()) {
+							mAssert(!isnan(mis));
+							// Save the radiance for the later indirect lighting computation
+							// Compute how much radiance arrives at the previous vertex from the direct illumination
+							// Add the importance
+
+							const auto& hitId = vertices[pathLen].get_primitive_id();
+							const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
+							const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
+							record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
+													 numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
+						}
+					} else {
+						// TODO: use proper roughness weight instead?
+						if(sharpness > 0.95f) {
+							shadowPrim.hitId = shadowHit.hitId;
+							penumbraBits[bitIndex] |= 1u << bitShift;
+							trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
+										 shadowHit.hitId, nee.dist, firstShadowDistance,
+										 lightType, lightOffset, params);
+						}
 					}
-					if(params.show_direct()) {
-						mAssert(!isnan(mis));
-						// Save the radiance for the later indirect lighting computation
-						// Compute how much radiance arrives at the previous vertex from the direct illumination
-						// Add the importance
-
-						const auto& hitId = vertices[pathLen].get_primitive_id();
-						const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
-						const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
-						record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
-													numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
-					}
-				} else {
-					if(pathLen == 1) {
-						shadowPrim.hitId = shadowHit.hitId;
-						penumbraBits[bitIndex] |= 1u << bitShift;
-					}
-
-					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
-								 shadowHit.hitId, nee.dist, firstShadowDistance,
-								 lightType, lightOffset, params);
 				}
 			}
 		}
@@ -503,6 +507,18 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 							  params.viewWeight * sharpness);
 		}
 		++pathLen;
+
+		// Evaluate direct hit of area ligths
+		if(pathLen >= params.minPathLength) {
+			EmissionValue emission = vertices[pathLen].get_emission(scene, lastPosition);
+			if(emission.value != 0.0f && pathLen > 1) {
+				// misWeight for pathLen==1 is always 1 -> skip computation
+				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertices[pathLen].ext().incidentPdf));
+				emission.value *= misWeight;
+			}
+			outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+		}
+		if(vertices[pathLen].is_end_point()) break;
 	} while(pathLen < params.maxPathLength);
 
 	// Go back over the path and add up the irradiance from indirect illumination
@@ -539,7 +555,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 				// TODO: proper factor!
 				const float silhouetteImportance = weight_shadow(ext.silhouetteRegionSize, params)
 					* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
-				shadowPrim.weight = silhouetteImportance;
+				shadowPrim.weight = weight_shadow(ext.silhouetteRegionSize, params);// silhouetteImportance;
 			}
 		}
 	}
@@ -581,7 +597,8 @@ CUDA_FUNCTION void sample_vis_importance(ss::SilhouetteTargets::RenderBufferType
 		}
 
 		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
-		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
+		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance);// / static_cast<float>(lod.numPrimitives));
+		outputBuffer.contribute<NumShadowPixelsTarget>(coord, sums[lodIdx].numSilhouettePixels);
 	}
 }
 
