@@ -177,8 +177,24 @@ void CpuSsSilPT::update_silhouette_importance() {
 	logPedantic("Detecting shadow edges and penumbra...");
 	const auto lightCount = m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount
 		+ 1u;
+	const bool hasBackground = m_sceneDesc.lightTree.background.flux > 0.f;
+	const auto contributePenumbraColor = [actualLightCount = lightCount - (hasBackground ? 0 : 1)](const std::size_t i,
+																								   const bool shadowed,
+																								   const bool lit) {
+		if(shadowed) {
+			if(lit)
+				return ei::hsvToRgb(ei::Vec3{ (3.f * i + 1.f) / (3.f * actualLightCount), 1.f, 1.f });
+			else
+				return ei::hsvToRgb(ei::Vec3{ (3.f * i) / (3.f * actualLightCount), 1.f, 1.f });
+		} else if(lit) {
+			return ei::hsvToRgb(ei::Vec3{ (3.f * i + 2.f) / (3.f * actualLightCount), 1.f, 1.f });
+		}
+		return ei::Vec3{ 0.f };
+	};
+
+
 //#pragma PARALLEL_FOR
-	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
+	for(int pixel = hasBackground ? 0 : 1; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 
 		const u8* penumbraBits = &m_penumbra[pixel * m_bytesPerPixel];
@@ -188,6 +204,8 @@ void CpuSsSilPT::update_silhouette_importance() {
 			const auto bitOffset = 2u * (i % 4u);
 			const bool shadowed = penumbraBits[bitIndex] & (1u << bitOffset);
 			const bool lit = penumbraBits[bitIndex] & (1u << (bitOffset + 1u));
+
+			m_outputBuffer.template contribute<PenumbraTarget>(coord, contributePenumbraColor(i, shadowed, lit));
 
 			// Tracks whether it's a hard shadow border
 			// Starting condition are viewport boundaries, otherwise purely shadowed pixels
@@ -201,11 +219,6 @@ void CpuSsSilPT::update_silhouette_importance() {
 			u32 radianceCount = 0u;
 
 			if(shadowed) {
-				if(lit)
-					m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::hsvToRgb(ei::Vec3{ (3.f * i + 1.f) / (3.f * lightCount), 1.f, 1.f }));
-				else
-					m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::hsvToRgb(ei::Vec3{ (3.f * i) / (3.f * lightCount), 1.f, 1.f }));
-
 				// Detect silhouettes as shadowed pixels with lit ones as direct neighbors or viewport edge
 				for(int y = -1; y <= 1; ++y) {
 					for(int x = -1; x <= 1; ++x) {
@@ -242,17 +255,20 @@ void CpuSsSilPT::update_silhouette_importance() {
 					averageRadiance = ei::max(averageRadiance, ei::Vec3{ 0.f });
 				}
 				m_outputBuffer.template set<RadianceTransitionTarget>(coord, averageRadiance);
-			} else if(lit) {
-				m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::hsvToRgb(ei::Vec3{ (3.f * i + 2.f) / (3.f * lightCount), 1.f, 1.f }));
 			}
 
 			// Add importance for transition from umbra to penumbra
 			if(isPenumbraTransition) {
+				float averageImportance = 0.f;
+				u32 impCount = 0u;
+
 				// TODO: only the edge vertices!
 				for(int i = 0; i < m_params.importanceIterations; ++i) {
 					const auto shadowPrim = m_shadowPrims[i * m_outputBuffer.get_num_pixels() + pixel];
 					if(!shadowPrim.hitId.is_valid())
 						continue;
+
+					const auto importance = get_luminance(averageRadiance) / ei::pow(1.f + shadowPrim.weight, 3.f);
 
 					const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
 					const auto& lod = m_sceneDesc.lods[lodIdx];
@@ -266,13 +282,16 @@ void CpuSsSilPT::update_silhouette_importance() {
 							const auto vertexId = vertexOffset + vertexCount * primIdx + i;
 							const auto vertexIdx = polygon.vertexIndices[vertexId];
 							mAssert(vertexIdx < polygon.numVertices);
-							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, shadowPrim.weight);
+							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, importance);
 						}
 					}
-					cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowImportance, shadowPrim.weight);
+					cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowImportance, importance);
 					cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].numSilhouettePixels, 1u);
+					averageImportance += importance;
+					++impCount;
 				}
 				m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::Vec3{ 1.f, 1.f, 1.f });
+				m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, averageImportance / static_cast<float>(impCount));
 			}
 
 			// Attribute importance

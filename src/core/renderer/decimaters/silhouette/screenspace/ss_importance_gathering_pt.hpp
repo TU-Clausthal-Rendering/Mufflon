@@ -341,6 +341,14 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 								const u32 lightOffset, const SilhouetteParameters& params) {
 	constexpr float DIST_EPSILON = 0.001f;
 
+	// Compute the (estimated) size of the shadow region
+	// TODO: are there cases where we would not want to record this?
+	const ei::Plane neePlane{ shadowRay.direction, shadowRay.origin };
+	const float shadowRegionSizeEstimate = estimate_shadow_light_size(scene, lightType, lightOffset,
+																	  shadowRay, vertex, neePlane, firstShadowDistance,
+																	  lightDistance - firstShadowDistance);
+	vertex.ext().silhouetteRegionSize = shadowRegionSizeEstimate;
+
 	// TODO: worry about spheres?
 	// TODO: what about non-manifold meshes?
 	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + DIST_EPSILON), shadowRay.direction };
@@ -354,17 +362,11 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 	const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
 																  lightDistance - firstShadowDistance - secondHit.distance + DIST_EPSILON);
 	if(thirdHit.hitId == vertex.get_primitive_id()) {
-		// Compute the (estimated) size of the shadow region
-		const ei::Plane neePlane{ shadowRay.direction, shadowRay.origin };
-		const float shadowRegionSizeEstimate = estimate_shadow_light_size(scene, lightType, lightOffset,
-																		  shadowRay, vertex, neePlane, firstShadowDistance,
-																		  lightDistance - firstShadowDistance);
 		// Scale the irradiance with the predicted shadow size
 		const float weightedImportance = importance * weight_shadow(shadowRegionSizeEstimate, params);
 
 		const auto lodIdx = scene.lodIndices[shadowHitId.instanceId];
 		record_shadow(sums[lodIdx], weightedImportance);
-		vertex.ext().silhouetteRegionSize = shadowRegionSizeEstimate;
 
 		return true;
 	}
@@ -546,17 +548,8 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 		const auto& ext = vertices[p].ext();
 		if(p == 1 && ext.silhouetteRegionSize >= 0) {
 			// TODO: factor in background illumination too
-			const float indirectLuminance = get_luminance(accumRadiance);
-			const float totalLuminance = get_luminance(ext.pathRadiance) + indirectLuminance;
-			const float ratio = totalLuminance / indirectLuminance - 1.f;
-			if(ratio > 0.02f && params.show_silhouette()) {
-				constexpr float FACTOR = 2'000.f;
-
-				// TODO: proper factor!
-				const float silhouetteImportance = weight_shadow(ext.silhouetteRegionSize, params)
-					* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
-				shadowPrim.weight = weight_shadow(ext.silhouetteRegionSize, params);// silhouetteImportance;
-			}
+			//shadowPrim.weight = get_luminance(ext.pathRadiance) / std::pow(1.f + ext.silhouetteRegionSize, 3.f);
+			shadowPrim.weight = ext.silhouetteRegionSize;
 		}
 	}
 }
@@ -598,7 +591,7 @@ CUDA_FUNCTION void sample_vis_importance(ss::SilhouetteTargets::RenderBufferType
 
 		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
 		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance);// / static_cast<float>(lod.numPrimitives));
-		outputBuffer.contribute<NumShadowPixelsTarget>(coord, sums[lodIdx].numSilhouettePixels);
+		//outputBuffer.contribute<NumShadowPixelsTarget>(coord, sums[lodIdx].numSilhouettePixels);
 	}
 }
 

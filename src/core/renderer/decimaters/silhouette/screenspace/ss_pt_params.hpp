@@ -45,15 +45,24 @@ struct RadianceTransitionTarget {
 	static constexpr u32 NUM_CHANNELS = 3u;
 };
 struct NumShadowPixelsTarget {
-	static constexpr const char NAME[] = "Shadow pixel count";
+	static constexpr const char NAME[] = "Umbra pixel count";
 	using PixelType = u32;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+struct NumPenumbraPixelsTarget {
+	static constexpr const char NAME[] = "Penumbra pixel count";
+	using PixelType = u32;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+struct PenumbraSizeTarget {
+	static constexpr const char NAME[] = "Penumbra size";
+	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
 
 using SilhouetteTargets = TargetList<
 	RadianceTarget, ImportanceTarget, PolyShareTarget,
-	SilhouetteWeightTarget, PenumbraTarget, RadianceTransitionTarget,
-	NumShadowPixelsTarget
+	SilhouetteWeightTarget, PenumbraTarget, RadianceTransitionTarget
 >;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::ss
