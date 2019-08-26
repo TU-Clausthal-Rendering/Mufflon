@@ -3516,6 +3516,16 @@ Boolean render_is_render_target_enabled(const char* name, Boolean variance) {
 	CATCH_ALL(false)
 }
 
+Boolean render_is_render_target_required(const char* name, Boolean variance) {
+	TRY
+	if(s_imageOutput == nullptr) {
+		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
+		return false;
+	}
+	return s_imageOutput->is_render_target_required(name, variance);
+	CATCH_ALL(false)
+}
+
 uint32_t renderer_get_num_parameters() {
 	TRY
 	if(s_currentRenderer == nullptr) {

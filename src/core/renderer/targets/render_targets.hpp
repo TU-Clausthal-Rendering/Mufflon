@@ -15,12 +15,13 @@ struct RadianceTarget {
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 3u;
 
-	/*template < Device dev >
-	static void contribute(cuda::Atomic<dev, PixelType> (&pixel)[NUM_CHANNELS], const ei::Vec3& radiance) {
-		cuda::atomic_add<dev>(pixel[0], radiance.x);
-		cuda::atomic_add<dev>(pixel[1], radiance.y);
-		cuda::atomic_add<dev>(pixel[2], radiance.z);
-	}*/
+	// Optional: by defining these constants you can enforce the
+	// presence of render targets (whether they are visible in e.g.
+	// the GUI is another matter; our current read-back makes it
+	// such that they also appear turned on in the GUI and consequently
+	// will always be written to disk as part of a screenshot command)
+	//static constexpr bool REQUIRED = true;
+	//static constexpr bool VARIANCE_REQUIRED = true; // Implies REQUIRED
 };
 
 struct PositionTarget {
