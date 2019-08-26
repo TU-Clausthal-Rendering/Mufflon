@@ -3,6 +3,7 @@
 #include "core/cuda/error.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/parameter.hpp"
+#include "core/renderer/targets/render_target.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
@@ -10,7 +11,7 @@ using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
 
-__global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
+__global__ static void sample_pt(PtTargets::template RenderBufferType<Device::CUDA> outputBuffer,
 								 scene::SceneDescriptor<Device::CUDA>* scene,
 								 math::Rng* rngs, PtParameters params) {
 	Pixel coord{
@@ -29,7 +30,7 @@ __global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
 
 namespace gpupt_detail {
 
-cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(PtTargets::template RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const PtParameters& params) {
 	int minGridSize;

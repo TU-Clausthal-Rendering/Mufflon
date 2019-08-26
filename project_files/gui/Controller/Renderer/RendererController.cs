@@ -87,7 +87,7 @@ namespace gui.Controller.Renderer
                 // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
                 if(m_shouldExit)
                     return;
-                m_models.Display.Repaint(m_renderTarget.TargetIndex, m_varianceTarget);
+                m_models.Display.Repaint(m_renderTarget.Name, m_varianceTarget);
             }
         }
 
@@ -103,15 +103,15 @@ namespace gui.Controller.Renderer
             // TODO: disable the old target?
             if(newTarget != m_renderTarget || newVarianceTarget != m_varianceTarget) {
                 if(m_renderTarget == null) {
-                    if (!Core.render_enable_render_target(newTarget.TargetIndex, newVarianceTarget ? 1u : 0u))
+                    if (!Core.render_enable_render_target(newTarget.Name, newVarianceTarget))
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());
-                } else if (!Core.render_is_render_target_enabled(newTarget.TargetIndex, newVarianceTarget)) {
+                } else if (!Core.render_is_render_target_enabled(newTarget.Name, newVarianceTarget)) {
                     // Disable previous render target
-                    if (!Core.render_disable_render_target(m_renderTarget.TargetIndex, m_varianceTarget ? 1u : 0u))
+                    if (!Core.render_disable_render_target(m_renderTarget.Name, m_varianceTarget))
                         throw new Exception(Core.core_get_dll_error());
-                    if (!Core.render_enable_render_target(newTarget.TargetIndex, newVarianceTarget ? 1u : 0u))
+                    if (!Core.render_enable_render_target(newTarget.Name, newVarianceTarget))
                         throw new Exception(Core.core_get_dll_error());
                     if (!Core.render_reset())
                         throw new Exception(Core.core_get_dll_error());

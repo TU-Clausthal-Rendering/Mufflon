@@ -1,5 +1,4 @@
 #include "gpu_pt.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/world_container.hpp"
 #include "profiler/gpu_profiler.hpp"
@@ -9,7 +8,7 @@ namespace mufflon::renderer {
 
 namespace gpupt_detail {
 
-cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(PtTargets::template RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const PtParameters& params);
 

@@ -3,7 +3,6 @@
 #include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/math/rng.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
@@ -262,8 +261,12 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				if(isnan(emission.value.x)) __debugbreak();
 			}
 			mAssert(!isnan(emission.value.x));
-			m_outputBuffer.contribute(coord, throughput, emission.value, vertex[currentV].get_position(),
-									vertex[currentV].get_normal(), vertex[currentV].get_albedo());
+
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex[currentV].get_position());
+			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex[currentV].get_normal());
+			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex[currentV].get_albedo());
+			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}
 		if(vertex[currentV].is_end_point()) break;
 
@@ -304,8 +307,9 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 			if(isnan(radiance.x))
 				__debugbreak();
 		}
-		m_outputBuffer.contribute(coord, throughput, radiance, scene::Point{0.0f},
-			scene::Direction{0.0f}, Spectrum{0.0f});
+
+		m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * radiance);
+		m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(radiance));
 	} while(viewPathLen < m_params.maxPathLength);
 }
 

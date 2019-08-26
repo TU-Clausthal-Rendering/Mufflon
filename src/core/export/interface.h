@@ -559,19 +559,18 @@ CORE_API Boolean CDECL render_iterate(ProcessTime* time);
 CORE_API Boolean CDECL render_reset();
 CORE_API uint32_t CDECL render_get_current_iteration();
 // TODO: what do we pass to the GUI?
-CORE_API Boolean CDECL render_save_screenshot(const char* filename, uint32_t targetIndex, Boolean variance);
+CORE_API Boolean CDECL render_save_screenshot(const char* filename, const char* targetName, Boolean variance);
 CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename);
 CORE_API uint32_t render_get_render_target_count();
 CORE_API const char* render_get_render_target_name(uint32_t index);
-CORE_API Boolean CDECL render_enable_render_target(uint32_t index, Boolean variance);
-CORE_API Boolean CDECL render_enable_render_target_by_name(const char* target, Boolean variance);
-CORE_API Boolean CDECL render_disable_render_target(uint32_t index, Boolean variance);
-CORE_API Boolean CDECL render_disable_render_target_by_name(const char* target, Boolean variance);
+CORE_API Boolean CDECL render_enable_render_target(const char* name, Boolean variance);
+CORE_API Boolean CDECL render_disable_render_target(const char* target, Boolean variance);
 CORE_API Boolean CDECL render_enable_non_variance_render_targets();
 CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
-CORE_API Boolean CDECL render_is_render_target_enabled(uint32_t index, Boolean variance);
+CORE_API Boolean CDECL render_is_render_target_enabled(const char* name, Boolean variance);
+CORE_API Boolean CDECL render_is_render_target_required(const char* name, Boolean variance);
 CORE_API uint32_t CDECL renderer_get_num_parameters();
 CORE_API const char* CDECL renderer_get_parameter_desc(uint32_t idx, ParameterType* type);
 CORE_API Boolean CDECL renderer_set_parameter_int(const char* name, int32_t value);
@@ -617,9 +616,9 @@ CORE_API void CDECL mufflon_destroy();
 CORE_API void CDECL mufflon_destroy_opengl();
 
 
-CORE_API Boolean CDECL core_get_target_image(uint32_t index, Boolean variance, const float** ptr);
+CORE_API Boolean CDECL core_get_target_image(const char* name, Boolean variance, const float** ptr);
 CORE_API Boolean CDECL core_get_target_image_num_channels(int* numChannels);
-CORE_API Boolean CDECL core_get_target_image_rgba32(uint32_t index, Boolean variance, float* ptr);
+CORE_API Boolean CDECL core_get_target_image_rgba32(const char* name, Boolean variance, float* ptr);
 CORE_API Boolean CDECL core_copy_screen_texture_rgba32(Vec4* ptr, const float factor);
 CORE_API Boolean CDECL core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r,
 										   float* g, float* b, float* a);

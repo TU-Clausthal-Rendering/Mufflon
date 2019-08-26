@@ -1,5 +1,4 @@
 #include "gpu_lt.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/world_container.hpp"
 #include "profiler/gpu_profiler.hpp"
@@ -9,7 +8,7 @@ namespace mufflon::renderer {
 
 namespace gpult_detail {
 
-cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(LtTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const LtParameters& params);
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wireframe_params.hpp"
+#include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/lights/light_tree.hpp"
@@ -12,10 +13,7 @@ enum class Device : unsigned char;
 
 namespace renderer {
 
-template < Device >
-struct RenderBuffer;
-
-class GpuWireframe final : public RendererBase<Device::CUDA> {
+class GpuWireframe final : public RendererBase<Device::CUDA, WireframeTargets> {
 public:
 	GpuWireframe();
 	~GpuWireframe() = default;

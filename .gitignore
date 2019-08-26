@@ -4,3 +4,6 @@
 build/
 *.pdb
 *.user
+
+# nuget
+packages/

@@ -99,10 +99,10 @@ namespace gui.Model.Display
             }
         }
 
-        public void Repaint(uint targetIndex, bool paintVariance) {
+        public void Repaint(string targetName, bool paintVariance) {
             // Renew the display texture (we don't really care)
             IntPtr targetPtr = IntPtr.Zero;
-            if(!Core.core_get_target_image(targetIndex, paintVariance, out targetPtr))
+            if(!Core.core_get_target_image(targetName, paintVariance, out targetPtr))
                 throw new Exception(Core.core_get_dll_error());
 
             System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => {

@@ -88,7 +88,7 @@ namespace gui.ViewModel.Display
                 case nameof(DisplayModel.GammaFactor):
                     // We may directly repaint the display without going through the render thread
                     // because the factor gets multiplied in upon copy
-                    m_models.Display.Repaint(m_models.RenderTargetSelection.VisibleTarget.TargetIndex,
+                    m_models.Display.Repaint(m_models.RenderTargetSelection.VisibleTarget.Name,
                         m_models.RenderTargetSelection.IsVarianceVisible);
                     OnPropertyChanged(nameof(GammaFactor));
                     break;

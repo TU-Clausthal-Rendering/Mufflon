@@ -67,7 +67,7 @@ namespace gui.Model
         public Models(MainWindow window) {
             // init models first
             App = new AppModel(window);
-            Settings = new SettingsModel();
+            Settings = SettingsModel.Load();
             Display = new DisplayModel();
             Renderer = new RendererModel();
             RendererCamera = new RenderCameraModel();
@@ -107,7 +107,7 @@ namespace gui.Model
                         throw new Exception("World load was cancelled");
                     case Loader.LoaderStatus.SUCCESS:
                         World = new WorldModel(Renderer, path);
-                        RefreshLastScenes(path);
+                        Settings.AddWorld(path);
                         break;
                 }
             }
@@ -125,25 +125,6 @@ namespace gui.Model
         {
             if(!Loader.loader_abort())
                 throw new Exception(Core.core_get_dll_error());
-        }
-
-        private void RefreshLastScenes(string path)
-        {
-            Debug.Assert(path != null);
-            // Check if we had this scene in the last X
-            // Check if the scene is already present in the list
-            int index = Settings.LastWorlds.IndexOf(path);
-            if (index > 0)
-            {
-                // Present, but not first
-                Settings.LastWorlds.RemoveAt(index);
-                Settings.LastWorlds.PushFront(path);
-            }
-            else if (index < 0)
-            {
-                // Not present
-                Settings.LastWorlds.PushFront(path);
-            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

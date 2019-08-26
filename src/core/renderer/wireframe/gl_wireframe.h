@@ -5,8 +5,8 @@
 #include "core/opengl/gl_pipeline.h"
 
 namespace mufflon::renderer {
-    
-class GlWireframe final : public GlRendererBase {
+
+class GlWireframe final : public GlRendererBase<WireframeTargets> {
 public:
 	GlWireframe();
 	~GlWireframe() = default;

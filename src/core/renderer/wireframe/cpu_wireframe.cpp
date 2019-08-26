@@ -2,7 +2,6 @@
 #include "wireframe_common.hpp"
 #include "util/parallel.hpp"
 #include "core/renderer/path_util.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/scene/scene.hpp"
 #include <random>
 

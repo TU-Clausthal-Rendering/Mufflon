@@ -2,7 +2,6 @@
 #include "wireframe_common.hpp"
 #include "core/math/rng.hpp"
 #include "core/memory/residency.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/renderer/path_util.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_sampling.hpp"
@@ -17,7 +16,7 @@ using namespace mufflon::scene::lights;
 namespace mufflon {
 namespace renderer {
 
-__global__ static void wireframe_kernel(RenderBuffer<Device::CUDA> outputBuffer,
+__global__ static void wireframe_kernel(WireframeTargets::RenderBufferType<Device::CUDA> outputBuffer,
 										scene::SceneDescriptor<Device::CUDA>* scene,
 										const u32* seeds, WireframeParameters params) {
 	Pixel coord{
@@ -38,7 +37,7 @@ __global__ static void wireframe_kernel(RenderBuffer<Device::CUDA> outputBuffer,
 namespace gpuwireframe_detail {
 
 cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
-						RenderBuffer<Device::CUDA>&& outputBuffer,
+						WireframeTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						const u32* seeds, const WireframeParameters& params) {
 	wireframe_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene, seeds, params);
