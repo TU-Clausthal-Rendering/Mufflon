@@ -18,6 +18,7 @@ struct RadianceTarget {
 	static constexpr const char NAME[] = "Radiance";
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 3u;
+	static constexpr bool REQUIRED = true;
 };
 struct ShadowTarget {
 	static constexpr const char NAME[] = "Shadow Areas";
