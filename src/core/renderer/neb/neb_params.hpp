@@ -39,9 +39,7 @@ using NebParameters = ParameterHandler<
 >;
 
 using NebTargets = TargetList<
-	RadianceTarget, PositionTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget,
-	DensityTarget
+	RadianceTarget, DensityTarget
 >;
 
 }} // namespace mufflon::renderer

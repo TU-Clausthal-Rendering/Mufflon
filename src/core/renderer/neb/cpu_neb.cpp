@@ -216,7 +216,6 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			// contribute directly.
 			if(!previous) {
 				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
-				m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight);
 			} else if(emission.value != 0.0f) {
 				EmissionDesc emDesc;
 				emDesc.previous = static_cast<const NebPathVertex*>(vertex.previous());
@@ -330,6 +329,7 @@ void CpuNextEventBacktracking::sample_photon_path(float neeMergeArea, float phot
 			photon.prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / ei::sq(virtualLight.ext().incidentDist);
 			photon.pdfBack = AngularPdf{0.0f}; // Unknown (is set in the next iteration)
 			photon.sourceDensity = vertex.ext().density;
+			mAssert(photon.flux > 0.0f && !isinf(photon.flux.x));
 
 			// Store the new photon
 			previous = m_photonMap.insert(virtualLight.get_position(), photon);
@@ -617,8 +617,9 @@ void CpuNextEventBacktracking::iterate() {
 #ifdef NEB_KDTREE
 		vertex.ext().density = get_density(m_density, vertex.get_position());
 #else
-		//vertex.ext().density = m_density.get_density(vertex.get_position(), vertex.get_geometric_normal());
-		vertex.ext().density = m_density->get_density_interpolated(vertex.get_position(), vertex.get_geometric_normal());
+		vertex.ext().density = m_density->get_density(vertex.get_position(), vertex.get_geometric_normal());
+//		vertex.ext().density = ei::max(1.0f / (numStdPhotonPaths * (m_currentIteration+1)),
+	//		m_density->get_density_interpolated(vertex.get_position(), vertex.get_geometric_normal()));
 #endif
 		mAssert(vertex.ext().density < 1e38f);
 
@@ -648,10 +649,9 @@ void CpuNextEventBacktracking::iterate() {
 		Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute<RadianceTarget>(coord, vertex.ext().throughput * radiance);
-		m_outputBuffer.contribute<LightnessTarget>(coord, 1.f);
 
-		/*if(vertex.get_path_len() == 1)
-			m_outputBuffer.set<DensityTarget>(coord, vertex.ext().density * (m_currentIteration+1));//*/
+		if(vertex.get_path_len() == 1)
+			m_outputBuffer.set<DensityTarget>(coord, vertex.ext().density * (m_currentIteration+1));
 	}
 
 	// Finialize the evaluation of emissive end vertices.
@@ -665,8 +665,6 @@ void CpuNextEventBacktracking::iterate() {
 		Pixel coord { m_selfEmissiveEndVertices[i].previous->ext().pixelIndex % m_outputBuffer.get_width(),
 					  m_selfEmissiveEndVertices[i].previous->ext().pixelIndex / m_outputBuffer.get_width() };
 		m_outputBuffer.contribute<RadianceTarget>(coord, emission);
-		m_outputBuffer.contribute<LightnessTarget>(coord, 1.f);
-
 	}//*/
 
 	logPedantic("[NEB] Memory occupation    View-Vertices: ", m_viewVertexMap.size() * 100.0f / float(m_viewVertexMap.capacity()),
