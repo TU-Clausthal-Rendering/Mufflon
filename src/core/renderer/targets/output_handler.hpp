@@ -27,6 +27,16 @@ void update_variance_cuda(ConstRenderTargetBuffer<Device::CUDA, T> iterTarget,
 						  RenderTargetBuffer<Device::CUDA, T> varTarget,
 						  int numChannels, int width, int height, int iteration);
 
+// Helper structs to detect whether a render target is required (always on and not disable-able)
+template < class P, class Enable = void >
+struct IsRequired : std::false_type {};
+template < class P >
+struct IsRequired<P, std::enable_if_t<P::REQUIRED>> : std::true_type {};
+template < class P, class Enable = void >
+struct IsVarianceRequired : std::false_type {};
+template < class P >
+struct IsVarianceRequired<P, std::enable_if_t<P::VARIANCE_REQUIRED>> : std::true_type {};
+
 } // namespace output_handler_details 
 
 // Interface class for all output handlers
@@ -44,6 +54,7 @@ public:
 	virtual void disable_all_render_targets(const bool varianceOnly) noexcept = 0;
 	virtual bool has_render_target(StringView name) const = 0;
 	virtual bool is_render_target_enabled(StringView name, const bool variance) const = 0;
+	virtual bool is_render_target_required(StringView name, const bool variance) const = 0;
 	virtual u32 get_num_channels(StringView targetName) const = 0;
 	virtual int get_width() const noexcept = 0;
 	virtual int get_height() const noexcept = 0;
@@ -77,6 +88,12 @@ public:
 				elem.cumulative = GenericResource{ bytes };
 				elem.iteration = GenericResource{ bytes };
 				elem.cumulativeVariance = GenericResource{ bytes };
+				if(output_handler_details::IsRequired<TargetType>::value)
+					elem.record = true;
+				if(output_handler_details::IsVarianceRequired<TargetType>::value) {
+					elem.record = true;
+					elem.recordVariance = true;
+				}
 			});
 		}
 	}
@@ -95,6 +112,12 @@ public:
 				elem.cumulative.resize(bytes);
 				elem.iteration.resize(bytes);
 				elem.cumulativeVariance.resize(bytes);
+				if(output_handler_details::IsRequired<TargetType>::value)
+					elem.record = true;
+				if(output_handler_details::IsVarianceRequired<TargetType>::value) {
+					elem.record = true;
+					elem.recordVariance = true;
+				}
 			});
 			m_width = width;
 			m_height = height;
@@ -409,18 +432,20 @@ public:
 			using TargetType = typename Type::TargetType;
 			if(!foundTarget && name.compare(TargetType::NAME) == 0) {
 				foundTarget = true;
-				target.recordVariance = false;
-				target.cumulativeVariance.template unload<Device::CPU>();
-				target.cumulativeVariance.template unload<Device::CUDA>();
-				target.cumulativeVariance.template unload<Device::OPENGL>();
-				target.iteration.template unload<Device::CPU>();
-				target.iteration.template unload<Device::CUDA>();
-				target.iteration.template unload<Device::OPENGL>();
-				if(!variance) {
-					target.record = false;
-					target.cumulative.template unload<Device::CPU>();
-					target.cumulative.template unload<Device::CUDA>();
-					target.cumulative.template unload<Device::OPENGL>();
+				if(!output_handler_details::IsVarianceRequired<TargetType>::value) {
+					target.recordVariance = false;
+					target.cumulativeVariance.template unload<Device::CPU>();
+					target.cumulativeVariance.template unload<Device::CUDA>();
+					target.cumulativeVariance.template unload<Device::OPENGL>();
+					target.iteration.template unload<Device::CPU>();
+					target.iteration.template unload<Device::CUDA>();
+					target.iteration.template unload<Device::OPENGL>();
+					if(!variance && !output_handler_details::IsRequired<TargetType>::value) {
+						target.record = false;
+						target.cumulative.template unload<Device::CPU>();
+						target.cumulative.template unload<Device::CUDA>();
+						target.cumulative.template unload<Device::OPENGL>();
+					}
 				}
 			}
 		});
@@ -441,18 +466,20 @@ public:
 		m_targets.for_each([varianceOnly](auto& target) {
 			using Type = std::decay_t<decltype(target)>;
 			using TargetType = typename Type::TargetType;
-			target.recordVariance = false;
-			target.cumulativeVariance.template unload<Device::CPU>();
-			target.cumulativeVariance.template unload<Device::CUDA>();
-			target.cumulativeVariance.template unload<Device::OPENGL>();
-			target.iteration.template unload<Device::CPU>();
-			target.iteration.template unload<Device::CUDA>();
-			target.iteration.template unload<Device::OPENGL>();
-			if(!varianceOnly) {
-				target.record = false;
-				target.cumulative.template unload<Device::CPU>();
-				target.cumulative.template unload<Device::CUDA>();
-				target.cumulative.template unload<Device::OPENGL>();
+			if(!output_handler_details::IsVarianceRequired<TargetType>::value) {
+				target.recordVariance = false;
+				target.cumulativeVariance.template unload<Device::CPU>();
+				target.cumulativeVariance.template unload<Device::CUDA>();
+				target.cumulativeVariance.template unload<Device::OPENGL>();
+				target.iteration.template unload<Device::CPU>();
+				target.iteration.template unload<Device::CUDA>();
+				target.iteration.template unload<Device::OPENGL>();
+				if(!varianceOnly && !output_handler_details::IsRequired<TargetType>::value) {
+					target.record = false;
+					target.cumulative.template unload<Device::CPU>();
+					target.cumulative.template unload<Device::CUDA>();
+					target.cumulative.template unload<Device::OPENGL>();
+				}
 			}
 		});
 	}
@@ -484,6 +511,24 @@ public:
 		return enabled;
 	}
 
+	bool is_render_target_required(StringView name, const bool variance) const override {
+		bool foundTarget = false;
+		bool required = false;
+		m_targets.for_each([name, variance, &foundTarget, &required](auto& target) {
+			using Type = std::decay_t<decltype(target)>;
+			using TargetType = typename Type::TargetType;
+			if(!foundTarget && name.compare(TargetType::NAME) == 0) {
+				foundTarget = true;
+				required = variance
+					? output_handler_details::IsVarianceRequired<TargetType>::value
+					: output_handler_details::IsRequired<TargetType>::value;
+			}
+		});
+		if(!foundTarget)
+			throw std::runtime_error("Cannot find render target '" + std::string(name) + "'");
+		return required;
+	}
+
 	u32 get_num_channels(StringView targetName) const override{
 		bool foundTarget = false;
 		u32 numChannels = 0;
@@ -506,6 +551,7 @@ public:
 	int get_height() const noexcept override { return m_height; }
 	int get_num_pixels() const { return m_width * m_height; }
 	ei::IVec2 get_resolution() const { return { m_width, m_height }; }
+
 private:
 	// In each block either none, m_iter... only, or all three are defined.
 	// If variances is required all three will be used and m_iter resets every iteration.

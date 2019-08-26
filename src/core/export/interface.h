@@ -570,6 +570,7 @@ CORE_API Boolean CDECL render_enable_all_render_targets();
 CORE_API Boolean CDECL render_disable_variance_render_targets();
 CORE_API Boolean CDECL render_disable_all_render_targets();
 CORE_API Boolean CDECL render_is_render_target_enabled(const char* name, Boolean variance);
+CORE_API Boolean CDECL render_is_render_target_required(const char* name, Boolean variance);
 CORE_API uint32_t CDECL renderer_get_num_parameters();
 CORE_API const char* CDECL renderer_get_parameter_desc(uint32_t idx, ParameterType* type);
 CORE_API Boolean CDECL renderer_set_parameter_int(const char* name, int32_t value);
