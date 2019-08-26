@@ -13,6 +13,13 @@ using gui.Dll;
 
 namespace gui.Model
 {
+    [Serializable]
+    public struct SerializedRendererParameter
+    {
+        public Core.ParameterType Type { get; set; }
+        public string Value { get; set; }
+    }
+
     public class RendererParameter : INotifyPropertyChanged
     {
         private object m_value;
@@ -134,9 +141,11 @@ namespace gui.Model
     /// </summary>
     public class RendererModel : INotifyPropertyChanged
     {
+        public delegate void ParameterSaveHandler(RendererParameter param);
+
         public event EventHandler RequestWorldClear;
         public event EventHandler RequestRedraw;
-        public event EventHandler RequestParameterSave;
+        public event ParameterSaveHandler RequestParameterSave;
 
         private volatile bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
@@ -316,42 +325,7 @@ namespace gui.Model
         private void OnParameterChanged(object sender, PropertyChangedEventArgs args)
         {
             Reset();
-            RequestParameterSave(this, null);
-        }
-
-        // Takes a string in the form "param1;value1\nparam2;value2..." and loads it for the current renderer
-        public void LoadRendererParametersFromString(string codedParams)
-        {
-            var splitParams = codedParams.Split('\n');
-            for (int i = 0; i < Math.Min(splitParams.Length, Parameters.Count); ++i)
-            {
-                var paramVals = splitParams[i].Split(';');
-                if (paramVals.Length == 3 && Parameters[i].Name == paramVals[0])
-                {
-                    if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Bool) && Parameters[i].Type == Core.ParameterType.Bool)
-                    {
-                        bool val;
-                        if (Boolean.TryParse(paramVals[2], out val))
-                            Parameters[i].Value = val;
-                    }
-                    else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Int) && Parameters[i].Type == Core.ParameterType.Int)
-                    {
-                        int val;
-                        if (Int32.TryParse(paramVals[2], out val))
-                            Parameters[i].Value = val;
-                    }
-                    else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Float) && Parameters[i].Type == Core.ParameterType.Float)
-                    {
-                        double val;
-                        if (Double.TryParse(paramVals[2], out val))
-                            Parameters[i].Value = (float)val;
-                    }
-                    else if (paramVals[1] == Enum.GetName(typeof(Core.ParameterType), Core.ParameterType.Enum) && Parameters[i].Type == Core.ParameterType.Enum)
-                    {
-                        Parameters[i].Value = paramVals[2];
-                    }
-                }
-            }
+            RequestParameterSave(sender as RendererParameter);
         }
 
         #region PropertyChanged

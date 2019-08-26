@@ -1,5 +1,6 @@
 ﻿using gui.Dll;
 using gui.Model;
+using gui.Utility;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -35,7 +36,7 @@ namespace gui.Controller.Renderer
             m_models.Renderer.RequestRedraw += OnRequestRedraw;
             m_models.Renderer.RequestWorldClear += OnRequestWorldClear;
             m_models.Renderer.PropertyChanged += LoadRendererParameters;
-            m_models.Renderer.RequestParameterSave += SaveRendererParameters;
+            m_models.Renderer.RequestParameterSave += SaveRendererParameter;
         }
         
         /* Performs one render loop iteration
@@ -149,54 +150,19 @@ namespace gui.Controller.Renderer
             m_clearedWorld.WaitOne();
         }
 
-
-        private int FindRendererDictionaryIndex(string name)
-        {
-            if (m_models.Settings.RendererParameters.Count % 2 != 0)
-            {
-                Logger.log("Invalid saved renderer properties; resetting all renderer properties to defaults", Core.Severity.Error);
-                m_models.Settings.RendererParameters.Clear();
-            }
-            for (int i = 0; i < m_models.Settings.RendererParameters.Count; i += 2)
-            {
-                if (m_models.Settings.RendererParameters[i].Equals(name))
-                    return i + 1;
-            }
-            return -1;
-        }
-        private string getSettingsKey()
-        {
-            string key = m_models.Renderer.Name;
-            foreach (Core.RenderDevice dev in Enum.GetValues(typeof(Core.RenderDevice)))
-            {
-                if (m_models.Renderer.UsesDevice(dev))
-                    key += "-" + Enum.GetName(typeof(Core.RenderDevice), dev);
-            }
-            return key;
-        }
-
         // Saves the current renderer's parameters in textform in the application settings
-        private void SaveRendererParameters(object sender, EventArgs ignored)
+        private void SaveRendererParameter(RendererParameter param)
         {
-            if (m_models.Renderer.Parameters == null)
-                return;
-
-            string val = "";
-
-            foreach (var param in m_models.Renderer.Parameters)
-                val += param.Name + ";" + Enum.GetName(typeof(Core.ParameterType), param.Type) + ";" + param.Value.ToString() + "\n";
-
-            string key = getSettingsKey();
-            int idx = FindRendererDictionaryIndex(key);
-            if (idx < 0)
+            ObservableDictionary<string, SerializedRendererParameter> rendererParams;
+            if(!m_models.Settings.RendererParameters.TryGetValue(m_models.Renderer.Name, out rendererParams))
             {
-                m_models.Settings.RendererParameters.Add(key);
-                m_models.Settings.RendererParameters.Add(val);
+                rendererParams = new ObservableDictionary<string, SerializedRendererParameter>();
+                m_models.Settings.RendererParameters.Add(m_models.Renderer.Name, rendererParams);
             }
-            else
-            {
-                m_models.Settings.RendererParameters[idx] = val;
-            }
+            SerializedRendererParameter storedParam = new SerializedRendererParameter();
+            storedParam.Type = param.Type;
+            storedParam.Value = param.Value.ToString();
+            rendererParams[param.Name] = storedParam;
         }
 
         // Restores the current renderer's parameters from the application settings
@@ -204,18 +170,37 @@ namespace gui.Controller.Renderer
         {
             if(args.PropertyName == nameof(Model.RendererModel.Name))
             {
-                string key = getSettingsKey();
-                int idx = FindRendererDictionaryIndex(key);
-                if (idx < 0)
+                ObservableDictionary<string, SerializedRendererParameter> rendererParams;
+                if (m_models.Settings.RendererParameters.TryGetValue(m_models.Renderer.Name, out rendererParams))
                 {
-                    m_models.Settings.RendererParameters.Add(key);
-                    m_models.Settings.RendererParameters.Add("");
-                }
-                else
-                {
-                    string parameters = m_models.Settings.RendererParameters[idx];
-
-                    m_models.Renderer.LoadRendererParametersFromString(parameters);
+                    foreach (var param in m_models.Renderer.Parameters)
+                    {
+                        SerializedRendererParameter storedParam;
+                        if (rendererParams.TryGetValue(param.Name, out storedParam) && storedParam.Type == param.Type)
+                        {
+                            switch(param.Type)
+                            {
+                                case Core.ParameterType.Bool: {
+                                    bool val;
+                                    if (Boolean.TryParse(storedParam.Value, out val))
+                                        param.Value = val;
+                                }   break;
+                                case Core.ParameterType.Int: {
+                                    Int32 val;
+                                    if (Int32.TryParse(storedParam.Value, out val))
+                                        param.Value = val;
+                                }   break;
+                                case Core.ParameterType.Float: {
+                                    double val;
+                                    if (Double.TryParse(storedParam.Value, out val))
+                                        param.Value = (float)val;
+                                }   break;
+                                case Core.ParameterType.Enum:
+                                    param.Value = storedParam.Value;
+                                    break;
+                            }
+                        }
+                    }
                 }
             }
         }
