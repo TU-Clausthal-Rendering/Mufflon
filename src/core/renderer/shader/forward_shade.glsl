@@ -41,12 +41,11 @@ LightInfo calcPointLight(vec3 pos, vec3 lightPos, vec3 radiance) {
 
 vec3 getMaterialEmission(uint materialId);
 
-void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 emission) {
+void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 diffuse, vec3 emission, vec3 specular, float roughness) {
 	const vec3 view = normalize(u_cam.position - pos);
 
 	c.color += emission;
 	c.light += emission;
-	c.albedo += albedo;
 
 	LightInfo light;
 
@@ -74,9 +73,14 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 em
 		// add to material color
 		// TODO use microfacet for roughness?
 		float cosTheta = max(dot(light.direction, normal), 0.0);
-		c.color += albedo * light.color * cosTheta;
+		c.color += diffuse * light.color * cosTheta;
 		c.light += light.color * cosTheta;
+
+
 	}
+
+	// angle between normal and view
+	float NdotV = dot(normal, view);
 
 	for(uint i = 0; i < numBigLights; ++i) {
 		vec3 points[4];
@@ -85,11 +89,25 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 albedo, vec3 em
 		points[2] = bigLights[i].pos + bigLights[i].v2;
 		points[3] = bigLights[i].pos + bigLights[i].v3;
 
-		vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints));
 		vec3 lightColor = getMaterialEmission(bigLights[i].material);
-		vec3 lightness = luminance * lightColor * 0.159154943; // normalize with 1 / (2 * pi)
-		c.light += lightness;
-		c.color += albedo * lightness;
+
+		// diffuse part
+		{
+			vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints));
+			vec3 lightness = luminance * lightColor * 0.159154943; // normalize with 1 / (2 * pi)
+			c.light += lightness;
+			c.color += diffuse * lightness;
+		}
+		
+		// specular part
+		{
+			vec2 texCoords = LTC_Coords(NdotV, roughness);
+			mat3 Minv = LTC_Matrix(ltc_mat_tex, texCoords);
+			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints));
+			vec3 lightness = luminance * lightColor * 0.159154943; // normalize with 1 / (2 * pi)
+			c.light += lightness;
+			c.color += specular * lightness;
+		}
 	}
 }
 
@@ -125,38 +143,38 @@ uvec2 readTexHdl(uint byteOffset) {
 void shadeEmissive(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
 	sampler2DArray emissionTex = sampler2DArray(readTexHdl(offset));
 	offset += 8;
-	calcRadiance(c, pos, normal, vec3(0.0), texture(emissionTex, uv).rgb);
+	calcRadiance(c, pos, normal, vec3(0.0), texture(emissionTex, uv).rgb, vec3(0.0), 0.0);
 }
 
 void shadeLambert(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
 	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
 	offset += 8;
-	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0));
+	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0), vec3(0.0), 0.0);
 }
 
 void shadeOrennayar(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
 	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
 	offset += 8;
-	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0));
+	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0), vec3(0.0), 0.0);
 }
 
 void shadeTorrance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
-	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
-	//sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset + 8));
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset)); // specular
+	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset + 8));
 	offset += 16;
-	calcRadiance(c, pos, normal, texture(albedoTex, uv).rgb, vec3(0.0));
+	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0), texture(albedoTex, uv).rgb, texture(roughnessTex, uv).r);
 }
 
 void shadeWalter(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
-	//sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
+	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
 	offset += 8;
-	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0));
+	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0), vec3(1.0), texture(roughnessTex, uv).r);
 }
 
 void shadeMicrofacet(inout ColorInfo c, vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
-	//sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
+	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
 	offset += 8;
-	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0));
+	calcRadiance(c, pos, normal, vec3(0.0), vec3(0.0), vec3(1.0), texture(roughnessTex, uv).r);
 }
 
 void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
