@@ -60,6 +60,10 @@ unsigned char get_format(gli::format format, TextureData& texData) {
 		case gli::format::FORMAT_RG16_UINT_PACK16: texData.format = TextureFormat::FORMAT_RG16U; texData.sRgb = false; texData.components = 2u;  return 2u;
 		case gli::format::FORMAT_RGB16_UINT_PACK16: texData.format = TextureFormat::FORMAT_RGBA16U; texData.sRgb = false; texData.components = 4u;  return 3u;
 		case gli::format::FORMAT_RGBA16_UINT_PACK16: texData.format = TextureFormat::FORMAT_RGBA16U; texData.sRgb = false; texData.components = 4u;  return 4u;
+		case gli::format::FORMAT_R16_SFLOAT_PACK16: texData.format = TextureFormat::FORMAT_RG16F; texData.sRgb = false; texData.components = 1u; return 1u;
+		case gli::format::FORMAT_RG16_SFLOAT_PACK16: texData.format = TextureFormat::FORMAT_RG16F; texData.sRgb = false; texData.components = 2u; return 2u;
+		case gli::format::FORMAT_RGB16_SFLOAT_PACK16: texData.format = TextureFormat::FORMAT_RG16F; texData.sRgb = false; texData.components = 4u; return 3u;
+		case gli::format::FORMAT_RGBA16_SFLOAT_PACK16: texData.format = TextureFormat::FORMAT_RGBA16F; texData.sRgb = false; texData.components = 4u; return 4u;
 		case gli::format::FORMAT_R32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_R32F; texData.sRgb = false; texData.components = 1u;  return 1u;
 		case gli::format::FORMAT_RG32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_RG32F; texData.sRgb = false; texData.components = 2u;  return 2u;
 		case gli::format::FORMAT_RGB32_SFLOAT_PACK32: texData.format = TextureFormat::FORMAT_RGBA32F; texData.sRgb = false; texData.components = 4u;  return 3u;
@@ -80,6 +84,8 @@ gli::format get_format(const TextureData& texData) {
 	case TextureFormat::FORMAT_R32F: return gli::format::FORMAT_R32_SFLOAT_PACK32;
 	case TextureFormat::FORMAT_RG32F: return gli::format::FORMAT_RG32_SFLOAT_PACK32;
 	case TextureFormat::FORMAT_RGBA32F: return gli::format::FORMAT_RGBA32_SFLOAT_PACK32;
+	case TextureFormat::FORMAT_R16F: return gli::format::FORMAT_R16_SFLOAT_PACK16;
+	case TextureFormat::FORMAT_RG16F: return gli::format::FORMAT_RG16_SFLOAT_PACK16;
 	case TextureFormat::FORMAT_RGBA16F: return gli::format::FORMAT_RGBA16_SFLOAT_PACK16;
 	default:
 		throw std::runtime_error("Unsupported texture format");
