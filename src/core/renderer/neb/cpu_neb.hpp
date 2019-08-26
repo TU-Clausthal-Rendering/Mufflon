@@ -18,13 +18,10 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 class NebPathVertex;
 struct NebVertexExt;
 
-class CpuNextEventBacktracking final : public RendererBase<Device::CPU> {
+class CpuNextEventBacktracking final : public RendererBase<Device::CPU, NebTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuNextEventBacktracking();

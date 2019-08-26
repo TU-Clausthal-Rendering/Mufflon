@@ -11,7 +11,7 @@ using namespace mufflon::scene::lights;
 namespace mufflon {
 namespace renderer {
 
-__global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
+__global__ static void sample_pt(PtTargets::template RenderBufferType<Device::CUDA> outputBuffer,
 								 scene::SceneDescriptor<Device::CUDA>* scene,
 								 math::Rng* rngs, const int yOffset,
 								 PtParameters params) {
@@ -31,7 +31,7 @@ __global__ static void sample_pt(RenderBuffer<Device::CUDA> outputBuffer,
 
 namespace hybridpt_detail {
 
-cudaError_t call_kernel(RenderBuffer<Device::CUDA>&& outputBuffer,
+cudaError_t call_kernel(PtTargets::template RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const int yOffset,
 						const PtParameters& params) {

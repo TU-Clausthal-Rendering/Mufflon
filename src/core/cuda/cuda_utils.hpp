@@ -114,6 +114,8 @@ struct AtomicOps<Device::CUDA, T> {
 	__host__ __device__ static T load(const typename AtomicValue<Device::CUDA, T>::Type& atom) {
 #ifdef __CUDA_ARCH__
 		return atom;
+#else // __CUDA_ARCH__
+		return T{};
 #endif // __CUDA_ARCH__
 	}
 };

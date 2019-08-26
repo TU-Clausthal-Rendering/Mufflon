@@ -18,9 +18,6 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 template < typename ExtensionT >
 class PathVertex;
 namespace {
@@ -28,7 +25,7 @@ namespace {
 	class VertexWrapper;
 }
 
-class CpuIvcm final : public RendererBase<Device::CPU> {
+class CpuIvcm final : public RendererBase<Device::CPU, IvcmTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuIvcm();

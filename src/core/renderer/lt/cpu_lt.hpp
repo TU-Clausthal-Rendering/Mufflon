@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lt_params.hpp"
+#include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <vector>
 
@@ -10,10 +11,7 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
-class CpuLightTracer final : public RendererBase<Device::CPU> {
+class CpuLightTracer final : public RendererBase<Device::CPU, LtTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuLightTracer();

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "parameter.hpp"
-#include "core/scene/handles.hpp"
-#include "util/string_view.hpp"
 #include "util/flag.hpp"
+#include "util/string_view.hpp"
+#include "util/type_helpers.hpp"
+#include "core/renderer/targets/output_handler.hpp"
+#include "core/scene/handles.hpp"
 #include <ei/vector.hpp>
 
 namespace mufflon {
@@ -60,11 +62,11 @@ inline std::string to_string(const ResetEvent evt) {
 	return str;
 }
 
-class OutputHandler;
 class IParameterHandler;
 
 class IRenderer {
 public:
+	IRenderer() = default;
 	virtual ~IRenderer() = default;
 
 	virtual void iterate() = 0;
@@ -151,9 +153,13 @@ public:
 
 	ResetEvent get_reset_event() const noexcept { return m_lastReset; }
 
-	// Returns whether the scene was reset
-	virtual bool pre_iteration(OutputHandler& outputBuffer) = 0;
-	virtual void post_iteration(OutputHandler& outputBuffer) = 0;
+	// To avoid templatization of the base class, renderers have to
+	// upcast the output handler to their expected input
+	virtual bool pre_iteration(IOutputHandler& outputBuffer) = 0;
+	virtual void post_iteration(IOutputHandler& outputBuffer) = 0;
+
+	// TODO: should the renderer hold onto the output handler?
+	virtual std::unique_ptr<IOutputHandler> create_output_handler(int width, int height) = 0;
 
 protected:
 	// Gets called before/after the renderer reset is executed, ie. before

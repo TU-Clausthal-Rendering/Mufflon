@@ -1,48 +1,10 @@
 #pragma once
 
+#include "type_helpers.hpp"
 #include <tuple>
+#include <type_traits>
 
 namespace mufflon { namespace util {
-
-// Utility functions to ensure that all types are distinct
-namespace tagged_tuple_detail {
-
-/// Iterates all values of the variadic template and returns whether they are all true
-template < bool B, bool... Bs >
-struct and_pack {
-	static constexpr bool value = B && and_pack<Bs...>::value;
-};
-
-template < bool B >
-struct and_pack<B> {
-	static constexpr bool value = B;
-};
-
-/// Returns whether all types of the variadic template are distinct
-template < class H, class... Tails >
-struct is_all_distinct {
-	static constexpr bool value = and_pack<!std::is_same<H, Tails>::value...>::value
-		&& is_all_distinct<Tails...>::value;
-};
-
-template < class H >
-struct is_all_distinct<H> {
-	static constexpr bool value = true;
-};
-
-/// Returns whether all types of the variadic template are equal
-template < class H, class... Tails >
-struct is_all_same {
-	static constexpr bool value = and_pack<std::is_same<H, Tails>::value...>::value
-		&& is_all_same<Tails...>::value;
-};
-
-template < class H >
-struct is_all_same<H> {
-	static constexpr bool value = true;
-};
-
-} // namespace typelist_detail
 
 /**
  * Class containing a tagged tuple implementation.
@@ -53,7 +15,7 @@ struct is_all_same<H> {
 template < class... Args >
 class TaggedTuple {
 public:
-	static_assert(tagged_tuple_detail::is_all_distinct<Args...>::value,
+	static_assert(have_distinct_types<Args...>(),
 				  "The types of a tagged tuple must be distinct!");
 
 	using TupleType = std::tuple<Args...>;
@@ -102,10 +64,10 @@ public:
 		return std::get<get_index<T>()>(m_tuple);
 	}
 
-	// Checks whether
+	// Checks whether the given type is present in the tuple
 	template < class T >
 	static constexpr bool has() noexcept {
-		return get_index<T>() < size;
+		return IsOneOf<T, Args...>::value;
 	}
 
 	template < class Op, std::size_t I = 0u >
@@ -130,6 +92,13 @@ private:
 	// Recurse until we find the type and count the recursions
 	template < class T, class H, class... Tails >
 	struct Index<T, H, Tails...> : public std::integral_constant<std::size_t, 1 + Index<T, Tails...>::value> {};
+
+	template < class... Tails >
+	struct IsOneOf : std::false_type {};
+	template < class T, class H, class... Tails >
+	struct IsOneOf<T, H, Tails...> {
+		static constexpr bool value = std::is_same<T, H>::value || IsOneOf<T, Tails...>::value;
+	};
 
 	// Helper class because C++14 doesn't have constexpr yet...
 	template < class Op, std::size_t I >

@@ -5,6 +5,7 @@
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
+#include "core/renderer/targets/render_targets.hpp"
 #include <future>
 #include <vector>
 
@@ -14,11 +15,12 @@ struct CameraParams;
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
 class HybridPathTracer final : public IRenderer {
 public:
+	using RenderBufferCpu = typename PtTargets::template RenderBufferType<Device::CPU>;
+	using RenderBufferCuda = typename PtTargets::template RenderBufferType<Device::CUDA>;
+	using OutputHandlerType = typename PtTargets::OutputHandlerType;
+
 	// Initialize all resources required by this renderer.
 	HybridPathTracer();
 	~HybridPathTracer() = default;
@@ -35,10 +37,14 @@ public:
 		return Device::CPU == device || Device::CUDA == device;
 	}
 
-	bool pre_iteration(OutputHandler& outputBuffer) override;
-	void post_iteration(OutputHandler& outputBuffer) override;
+	bool pre_iteration(IOutputHandler& outputBuffer) override;
+	void post_iteration(IOutputHandler& outputBuffer) override;
 
 	void post_reset() final;
+
+	std::unique_ptr<IOutputHandler> create_output_handler(int width, int height) override {
+		return std::make_unique<OutputHandlerType>(width, height);
+	}
 
 private:
 	void iterate_cpu();
@@ -54,8 +60,8 @@ private:
 	std::vector<math::Rng> m_rngsCpu;
 	unique_device_ptr<Device::CUDA, math::Rng[]> m_rngsCuda;
 
-	RenderBuffer<Device::CPU> m_outputBufferCpu;
-	RenderBuffer<Device::CUDA> m_outputBufferCuda;
+	RenderBufferCpu m_outputBufferCpu;
+	RenderBufferCuda m_outputBufferCuda;
 
 	scene::SceneDescriptor<Device::CPU> m_sceneDescCpu;
 	unique_device_ptr<Device::CUDA, scene::SceneDescriptor<Device::CUDA>> m_sceneDescCuda;

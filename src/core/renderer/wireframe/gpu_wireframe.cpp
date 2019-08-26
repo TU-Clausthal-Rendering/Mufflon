@@ -1,5 +1,4 @@
 #include "gpu_wireframe.hpp"
-#include "core/renderer/output_handler.hpp"
 #include "core/scene/scene.hpp"
 #include "core/scene/world_container.hpp"
 #include "profiler/gpu_profiler.hpp"
@@ -10,7 +9,7 @@ namespace mufflon::renderer {
 namespace gpuwireframe_detail {
 
 cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
-						RenderBuffer<Device::CUDA>&& outputBuffer,
+						WireframeTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						const u32* seeds, const WireframeParameters& params);
 

@@ -7,10 +7,7 @@
 
 namespace mufflon::renderer {
 
-template < Device >
-struct RenderBuffer;
-
-class CpuWireframe final : public RendererBase<Device::CPU> {
+class CpuWireframe final : public RendererBase<Device::CPU, WireframeTargets> {
 public:
 	// Initialize all resources required by this renderer.
 	CpuWireframe() = default;
