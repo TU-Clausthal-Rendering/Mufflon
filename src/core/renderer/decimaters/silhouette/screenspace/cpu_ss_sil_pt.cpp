@@ -258,7 +258,7 @@ void CpuSsSilPT::update_silhouette_importance() {
 			}
 
 			// Add importance for transition from umbra to penumbra
-			if(isPenumbraTransition) {
+			if(isPenumbraTransition || isBorder) {
 				float averageImportance = 0.f;
 				u32 impCount = 0u;
 
@@ -268,7 +268,21 @@ void CpuSsSilPT::update_silhouette_importance() {
 					if(!shadowPrim.hitId.is_valid())
 						continue;
 
-					const auto importance = get_luminance(averageRadiance) / ei::pow(1.f + shadowPrim.weight, 3.f);
+					float importance;
+					switch(m_params.penumbraWeight) {
+						case PPenumbraWeight::Values::LDIVDP3:
+							importance = shadowPrim.weight;
+							break;
+						case PPenumbraWeight::Values::SMEAR:
+							importance = get_luminance(averageRadiance) / (1.f + shadowPrim.weight);
+							break;
+						case PPenumbraWeight::Values::SMEARDIV2:
+							importance = get_luminance(averageRadiance) / ei::pow(1.f + shadowPrim.weight, 2.f);
+							break;
+						case PPenumbraWeight::Values::SMEARDIV3:
+							importance = get_luminance(averageRadiance) / ei::pow(1.f + shadowPrim.weight, 3.f);
+							break;
+					}
 
 					const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
 					const auto& lod = m_sceneDesc.lods[lodIdx];
@@ -293,39 +307,6 @@ void CpuSsSilPT::update_silhouette_importance() {
 				m_outputBuffer.template contribute<PenumbraTarget>(coord, ei::Vec3{ 1.f, 1.f, 1.f });
 				m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, averageImportance / static_cast<float>(impCount));
 			}
-
-			// Attribute importance
-			/*if((shadowed && lit)) {// || isBorder) {
-				const float importance = get_luminance(averageRadiance);
-				if(isnan(importance))
-					__debugbreak();
-				// TODO: only the edge vertices!
-				for(int i = 0; i < m_params.importanceIterations; ++i) {
-					const auto shadowPrim = m_shadowPrims[i * m_outputBuffer.get_num_pixels() + pixel];
-					if(!shadowPrim.hitId.is_valid())
-						continue;
-
-					const auto lodIdx = m_sceneDesc.lodIndices[shadowPrim.hitId.instanceId];
-					const auto& lod = m_sceneDesc.lods[lodIdx];
-					const auto& polygon = lod.polygon;
-					if(static_cast<u32>(shadowPrim.hitId.primId) < (polygon.numTriangles + polygon.numQuads)) {
-						const bool isTriangle = static_cast<u32>(shadowPrim.hitId.primId) < polygon.numTriangles;
-						const auto vertexOffset = isTriangle ? 0u : 3u * polygon.numTriangles;
-						const auto vertexCount = isTriangle ? 3u : 4u;
-						const auto primIdx = static_cast<u32>(shadowPrim.hitId.primId) - (isTriangle ? 0u : polygon.numTriangles);
-						for(u32 i = 0u; i < vertexCount; ++i) {
-							const auto vertexId = vertexOffset + vertexCount * primIdx + i;
-							const auto vertexIdx = polygon.vertexIndices[vertexId];
-							mAssert(vertexIdx < polygon.numVertices);
-							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, importance * shadowPrim.weight);
-							cuda::atomic_add<Device::CPU>(m_importanceSums[lodIdx].shadowImportance, importance * shadowPrim.weight);
-						}
-					}
-				}
-
-				//m_outputBuffer.template contribute<SilhouetteWeightTarget>(coord, importance);
-			}*/
-
 		}
 	}
 }

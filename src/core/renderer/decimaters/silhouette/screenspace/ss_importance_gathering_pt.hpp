@@ -322,18 +322,6 @@ CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CU
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
 }
 
-CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParameters& params) {
-	switch(params.shadowSizeWeight) {
-		case PShadowSizeWeight::Values::INVERSE_SQR:
-			return ei::sq(1.f / (1.f + importance));
-		case PShadowSizeWeight::Values::INVERSE_EXP:
-			return ei::exp(1.f / (1.f + importance));
-		case PShadowSizeWeight::Values::INVERSE:
-		default:
-			return 1.f / (1.f + importance);
-	}
-}
-
 CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
 								const ei::Ray& shadowRay, SilPathVertex& vertex, const float importance,
 								const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
@@ -351,7 +339,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 
 	// TODO: worry about spheres?
 	// TODO: what about non-manifold meshes?
-	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + DIST_EPSILON), shadowRay.direction };
+	/*ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + DIST_EPSILON), shadowRay.direction };
 
 	const auto secondHit = scene::accel_struct::first_intersection(scene, backfaceRay, vertex.get_geometric_normal(),
 																   lightDistance - firstShadowDistance + DIST_EPSILON);
@@ -369,7 +357,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 		record_shadow(sums[lodIdx], weightedImportance);
 
 		return true;
-	}
+	}*/
 	return false;
 }
 
@@ -548,8 +536,14 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 		const auto& ext = vertices[p].ext();
 		if(p == 1 && ext.silhouetteRegionSize >= 0) {
 			// TODO: factor in background illumination too
-			//shadowPrim.weight = get_luminance(ext.pathRadiance) / std::pow(1.f + ext.silhouetteRegionSize, 3.f);
-			shadowPrim.weight = ext.silhouetteRegionSize;
+			switch(params.penumbraWeight) {
+				case PPenumbraWeight::Values::LDIVDP3:
+					shadowPrim.weight = get_luminance(ext.pathRadiance) / std::pow(1.f + ext.silhouetteRegionSize, 3.f);
+					break;
+				default:
+					shadowPrim.weight = ext.silhouetteRegionSize;
+					break;
+			}
 		}
 	}
 }
