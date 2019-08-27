@@ -20,7 +20,6 @@ void DisplacementMapper::set_edge_vertex(const float x, const OpenMesh::EdgeHand
 	Tessellater::set_edge_vertex(x, edge, vertex);
 	if constexpr(USE_CENTRAL_DIFFERENCE) {
 		mAssert(x >= 0.f && x <= 1.f);
-		ei::Vec3 normal{ 0.f };
 		float displacement = 0.f;
 		u32 faceCount = 0u;
 
@@ -229,7 +228,6 @@ void DisplacementMapper::post_tessellate() {
 #pragma PARALLEL_FOR
 		for(i64 i = 0; i < static_cast<i64>(m_mesh->n_vertices()); ++i) {
 			const auto vertex = m_mesh->vertex_handle(static_cast<u32>(i));
-			ei::Vec3 normal{ 0.f };
 			float displacement = 0.f;
 			u32 faceCount = 0u;
 			const ei::Vec2 uv = util::pun<ei::Vec2>(m_mesh->texcoord2D(vertex));
