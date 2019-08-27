@@ -39,15 +39,15 @@ float get_density(const std::unique_ptr<data_structs::DmOctree>& octree, const e
 
 
 struct NebVertexExt {
+	Spectrum throughput;
 	AngularPdf pdfBack;
 	AreaPdf incidentPdf { 0.0f };
-	Spectrum throughput;
 	union {
 		int pixelIndex;
-		float rnd;		// An additional random value (first vertex of light paths only).
+		float rnd;		// An additional input random value (first vertex of light paths only).
+		float incidentDistSq;	// Output: only defined after walk-function, will be overwritten from view path sampling with the pixel
 	};
 	float density { -1.0f };
-	float incidentDist;
 
 	CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& thisVertex,
 							const AreaPdf inAreaPdf,
@@ -66,7 +66,7 @@ struct NebVertexExt {
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 		this->throughput = throughput.weight;
-		this->incidentDist = incident.distance;
+		this->incidentDistSq = incident.distanceSq;
 	}
 
 	void update(const PathVertex<NebVertexExt>& thisVertex,
@@ -222,7 +222,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 				// include the difference between the two events in this PDF.
 				emDesc.samplePdf = pathLen == 1 ? AngularPdf{0.0f} : emission.pdf * (emission.emitPdf / emission.connectPdf);
 				emDesc.incident = sample.excident;
-				emDesc.incidentDistSq = ei::sq(vertex.ext().incidentDist);
+				emDesc.incidentDistSq = vertex.ext().incidentDistSq;
 				u32 idx = m_selfEmissionCount.fetch_add(1);
 				m_selfEmissiveEndVertices[idx] = emDesc;
 			}
@@ -301,7 +301,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 			
 			incidentF[pdfHead+1] = AreaPdf{float(sample.pdf.back) * prevConversionFactor};
 			--pdfHead;
-			prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / ei::sq(virtualLight.ext().incidentDist);
+			prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / virtualLight.ext().incidentDistSq;
 			prevNormal = virtualLight.get_geometric_normal();
 			merge_importons(photonMergeArea, virtualLight, incidentF, incidentB, numPhotons,
 				false, lightThroughput.weight * flux, pdfHead, prevConversionFactor, vertex.ext().density);
@@ -343,7 +343,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 		if(pdfHead < m_params.maxPathLength)
 			incidentF[pdfHead+1] = AreaPdf{float(sample.pdf.back) * prevConversionFactor};
 		--pdfHead;
-		prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / ei::sq(vertex[currentV].ext().incidentDist);
+		prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / vertex[currentV].ext().incidentDistSq;
 		prevNormal = vertex[currentV].get_geometric_normal();
 		merge_importons(photonMergeArea, vertex[currentV], incidentF, incidentB, numPhotons,
 			true, throughput.weight / numPhotons, pdfHead, prevConversionFactor, sourceDensity);
@@ -376,13 +376,13 @@ void CpuNextEventBacktracking::merge_importons(float photonMergeArea, const NebP
 				incidentF[pdfHead] = vvertex.ext().incidentPdf;
 				int pdfOffset = pdfHead - viewPathLen;
 				AngularPdf pdfBack = bsdf.pdf.back;
-				ConnectionDir connection { vvertex.get_incident_direction(), ei::sq(vvertex.ext().incidentDist) };
+				ConnectionDir connection = vvertex.get_incident_connection();
 				const auto* vert = vvertex.previous();
 				for(int i = viewPathLen - 1; i > 0; --i) {
 					incidentF[i+pdfOffset] = vert->ext().incidentPdf;
 					incidentB[i+pdfOffset] = vert->convert_pdf(Interaction::SURFACE, pdfBack, connection).pdf;
 					pdfBack = vert->ext().pdfBack;
-					connection = ConnectionDir{ vert->get_incident_direction(), ei::sq(vert->ext().incidentDist) };
+					connection = vert->get_incident_connection();
 					vert = vert->previous();
 				}
 				incidentF[pdfOffset] = AreaPdf{1.0f};
@@ -443,12 +443,12 @@ void CpuNextEventBacktracking::evaluate_nee(const NebPathVertex& vertex,
 	incidentB[n-1] = nee.backPdf;
 	const auto* vert = vertex.previous();
 	AngularPdf pdfBack = bsdf.pdf.back;
-	ConnectionDir connection { vertex.get_incident_direction(), ei::sq(vertex.ext().incidentDist) };
+	ConnectionDir connection = vertex.get_incident_connection();
 	for(int i = n-2; i > 0; --i) {
 		incidentF[i] = vert->ext().incidentPdf;
 		incidentB[i] = vert->convert_pdf(Interaction::SURFACE, pdfBack, connection).pdf;
 		pdfBack = vert->ext().pdfBack;
-		connection = ConnectionDir{ vert->get_incident_direction(), ei::sq(vert->ext().incidentDist) };
+		connection = vert->get_incident_connection();
 		vert = vert->previous();
 	}
 	incidentF[0] = AreaPdf{1.0f};
@@ -475,7 +475,7 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float photonMergeArea, cons
 			incidentF[i] = vert->ext().incidentPdf;
 			incidentB[i] = vert->convert_pdf(itype, pdfBack, connection).pdf;
 			pdfBack = vert->ext().pdfBack;
-			connection = ConnectionDir{ vert->get_incident_direction(), ei::sq(vert->ext().incidentDist) };
+			connection = vert->get_incident_connection();
 			vert = vert->previous();
 		}
 		incidentF[0] = AreaPdf{1.0f};
