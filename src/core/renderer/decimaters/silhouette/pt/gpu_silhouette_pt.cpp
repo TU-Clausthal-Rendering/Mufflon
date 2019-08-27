@@ -190,7 +190,6 @@ void GpuShadowSilhouettesPT::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
 	m_decimaters.resize(objects.size());
-	auto objIter = objects.begin();
 
 	const auto timeBegin = CpuProfileState::get_process_time();
 

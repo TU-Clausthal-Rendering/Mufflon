@@ -200,10 +200,10 @@ V DmOctree<T>::get_density_interpolated(const ei::Vec3& pos, const ei::Vec3& nor
 				int localChildIdx = (cellPos.x & 1) + 2 * (cellPos.y & 1) + 4 * (cellPos.z & 1);
 				current[i] = static_cast<int>(-c) + localChildIdx;
 				//currentArea[i] = -1.0f;
-				const T c = m_nodes[current[i]].load();
-				anyHadChildren |= is_child_pointer(c);
+				const T cc = m_nodes[current[i]].load();
+				anyHadChildren |= is_child_pointer(cc);
 				// Compute the area if this is a leaf node
-				if(!is_child_pointer(c)) {
+				if(!is_child_pointer(cc)) {
 					const ei::Vec3 localPos = offPos - cellPos * cellSize;
 					const float area = math::intersection_area_nrm(cellSize, localPos, normal);
 					currentArea[i] = -area;	// Encode that this is new

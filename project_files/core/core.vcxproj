@@ -618,6 +618,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <EnablePREfast>false</EnablePREfast>
       <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <TreatSpecificWarningsAsErrors>4457; 4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /DQY "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)" &gt; nul
@@ -668,6 +669,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <EnablePREfast>false</EnablePREfast>
       <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <TreatSpecificWarningsAsErrors>4457; 4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

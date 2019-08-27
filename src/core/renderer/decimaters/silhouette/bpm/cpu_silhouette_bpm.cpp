@@ -184,7 +184,6 @@ void CpuShadowSilhouettesBPM::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
 	m_decimaters.resize(objects.size());
-	auto objIter = objects.begin();
 
 	const auto timeBegin = CpuProfileState::get_process_time();
 	m_importanceSums = make_udevptr_array<Device::CPU, DeviceImportanceSums<Device::CPU>, false>(m_decimaters.size());

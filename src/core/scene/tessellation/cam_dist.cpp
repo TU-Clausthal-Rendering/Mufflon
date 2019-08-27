@@ -292,7 +292,7 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 	float maxFactorY = 0.f;
 	float maxEdgeLen = 0.f;
 	for(const auto& instTrans : m_instanceTransformations) {
-		auto iter = m_mesh->cfv_ccwbegin(face);
+		iter = m_mesh->cfv_ccwbegin(face);
 
 		const ei::Vec3 transP0 = ei::transform(util::pun<ei::Vec3>(p0), instTrans);
 		const ei::Vec3 transP1 = ei::transform(util::pun<ei::Vec3>(p1), instTrans);

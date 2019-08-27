@@ -198,14 +198,14 @@ void CpuSsSilPT::update_silhouette_importance() {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 
 		const u8* penumbraBits = &m_penumbra[pixel * m_bytesPerPixel];
-		for(std::size_t i = 0u; i < lightCount; ++i) {
+		for(std::size_t l = 0u; l < lightCount; ++l) {
 			// "Detect" penumbra
-			const auto bitIndex = i / 4u;
-			const auto bitOffset = 2u * (i % 4u);
+			const auto bitIndex = l / 4u;
+			const auto bitOffset = 2u * (l % 4u);
 			const bool shadowed = penumbraBits[bitIndex] & (1u << bitOffset);
 			const bool lit = penumbraBits[bitIndex] & (1u << (bitOffset + 1u));
 
-			m_outputBuffer.template contribute<PenumbraTarget>(coord, contributePenumbraColor(i, shadowed, lit));
+			m_outputBuffer.template contribute<PenumbraTarget>(coord, contributePenumbraColor(l, shadowed, lit));
 
 			// Tracks whether it's a hard shadow border
 			// Starting condition are viewport boundaries, otherwise purely shadowed pixels
@@ -292,8 +292,8 @@ void CpuSsSilPT::update_silhouette_importance() {
 						const auto vertexOffset = isTriangle ? 0u : 3u * polygon.numTriangles;
 						const auto vertexCount = isTriangle ? 3u : 4u;
 						const auto primIdx = static_cast<u32>(shadowPrim.hitId.primId) - (isTriangle ? 0u : polygon.numTriangles);
-						for(u32 i = 0u; i < vertexCount; ++i) {
-							const auto vertexId = vertexOffset + vertexCount * primIdx + i;
+						for(u32 v = 0u; v < vertexCount; ++v) {
+							const auto vertexId = vertexOffset + vertexCount * primIdx + v;
 							const auto vertexIdx = polygon.vertexIndices[vertexId];
 							mAssert(vertexIdx < polygon.numVertices);
 							cuda::atomic_add<Device::CPU>(m_importances[lodIdx][vertexIdx].viewImportance, importance);
@@ -347,7 +347,6 @@ void CpuSsSilPT::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	m_decimaters.clear();
 	m_decimaters.resize(objects.size());
-	auto objIter = objects.begin();
 
 	const auto timeBegin = CpuProfileState::get_process_time();
 	m_importanceSums = std::vector<ss::DeviceImportanceSums<Device::CPU>>(m_decimaters.size());
