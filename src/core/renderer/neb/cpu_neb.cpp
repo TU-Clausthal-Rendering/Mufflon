@@ -45,7 +45,6 @@ struct NebVertexExt {
 	union {
 		int pixelIndex;
 		float rnd;		// An additional input random value (first vertex of light paths only).
-		float incidentDistSq;	// Output: only defined after walk-function, will be overwritten from view path sampling with the pixel
 	};
 	float density { -1.0f };
 
@@ -66,7 +65,6 @@ struct NebVertexExt {
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 		this->throughput = throughput.weight;
-		this->incidentDistSq = incident.distanceSq;
 	}
 
 	void update(const PathVertex<NebVertexExt>& thisVertex,
@@ -222,7 +220,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 				// include the difference between the two events in this PDF.
 				emDesc.samplePdf = pathLen == 1 ? AngularPdf{0.0f} : emission.pdf * (emission.emitPdf / emission.connectPdf);
 				emDesc.incident = sample.excident;
-				emDesc.incidentDistSq = vertex.ext().incidentDistSq;
+				emDesc.incidentDistSq = vertex.get_incident_dist_sq();
 				u32 idx = m_selfEmissionCount.fetch_add(1);
 				m_selfEmissiveEndVertices[idx] = emDesc;
 			}
@@ -283,7 +281,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 	for(int i = 0; i < pFactors.photonCount; ++i) {
 		// Prepare a start vertex to begin the sampling of the photon event.
 		NebPathVertex virtualLight = vertex;
-		virtualLight.set_incident_direction(-nee.direction, nullptr);
+		virtualLight.set_incident_direction(-nee.direction, nee.distance);
 
 		// Trace a path
 		virtualLight.ext().rnd = math::sample_uniform(u32(rng.next()));
@@ -301,7 +299,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 			
 			incidentF[pdfHead+1] = AreaPdf{float(sample.pdf.back) * prevConversionFactor};
 			--pdfHead;
-			prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / virtualLight.ext().incidentDistSq;
+			prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / virtualLight.get_incident_dist_sq();
 			prevNormal = virtualLight.get_geometric_normal();
 			merge_importons(photonMergeArea, virtualLight, incidentF, incidentB, numPhotons,
 				false, lightThroughput.weight * flux, pdfHead, prevConversionFactor, vertex.ext().density);
@@ -343,7 +341,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 		if(pdfHead < m_params.maxPathLength)
 			incidentF[pdfHead+1] = AreaPdf{float(sample.pdf.back) * prevConversionFactor};
 		--pdfHead;
-		prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / vertex[currentV].ext().incidentDistSq;
+		prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / vertex[currentV].get_incident_dist_sq();
 		prevNormal = vertex[currentV].get_geometric_normal();
 		merge_importons(photonMergeArea, vertex[currentV], incidentF, incidentB, numPhotons,
 			true, throughput.weight / numPhotons, pdfHead, prevConversionFactor, sourceDensity);
@@ -420,7 +418,8 @@ CpuNextEventBacktracking::NeeDesc CpuNextEventBacktracking::compute_nee(math::Rn
 		nee.dir.direction,
 		nee.cosOut / nee.distSq,
 		nee.creationPdf,
-		nee.dir.pdf.to_area_pdf(ei::abs(vertex.get_geometric_factor(nee.dir.direction)), nee.distSq)
+		nee.dir.pdf.to_area_pdf(ei::abs(vertex.get_geometric_factor(nee.dir.direction)), nee.distSq),
+		nee.dist
 	};
 }
 

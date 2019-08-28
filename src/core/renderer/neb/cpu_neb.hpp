@@ -62,6 +62,7 @@ public:
 		float conversion;		// Partial evaluation of the relPdf for the next event: (cosθ / d²)
 		AreaPdf creationPdf;
 		AreaPdf backPdf;		// neeSamplePdf * cosθs / d²
+		float distance;
 	};
 private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
