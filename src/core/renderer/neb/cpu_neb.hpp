@@ -48,12 +48,13 @@ public:
 
 	struct EmissionDesc {
 		const NebPathVertex* previous;	// The previous vertex to compute the reuseCount after the density estimate
-		Spectrum radiance;				// emission.value
+		Spectrum radiance;				// emission.value * throughput
 		AreaPdf incidentPdf;			// From random hit
 		AreaPdf startPdf;				// connectPdf
 		AngularPdf samplePdf;			// samplePdf * emitPdf / connectPdf
 		scene::Direction incident;
 		float incidentDistSq;
+		float maxIrradiance;			// max(emission.value) * cosθprev / (connectPdf * d²)
 	};
 
 	struct NeeDesc {
@@ -79,6 +80,7 @@ private:
 	Spectrum finalize_emission(float photonMergeArea, const EmissionDesc& emission, AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons);
 
 	NebParameters m_params = {};
+	float m_targetFlux;
 	std::vector<math::Rng> m_rngs;
 	data_structs::HashGridManager<NebPathVertex> m_viewVertexMapManager;
 	data_structs::HashGrid<Device::CPU, NebPathVertex> m_viewVertexMap;

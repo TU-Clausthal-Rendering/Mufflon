@@ -99,22 +99,21 @@ public:
 
 namespace {
 
-int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, const NebParameters& params) {
-	return 1; // Disabled (MIS not yet capable again)
-	float smoothness = ei::min(1e30f, vertex.get_pdf_max() * ei::PI);
+int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, float targetFlux) {
+	//return 1; // Disabled
+	float smoothness = 1.0f;//ei::min(1e30f, vertex.get_pdf_max() * ei::PI);
 	if(smoothness < 1e-3f) // Max-pdf cannot be that small (except the surface does not reflect at all)
 		return 0;
-	return ei::ceil(maxFlux / (smoothness * params.targetFlux));
+	return ei::ceil(maxFlux / (smoothness * targetFlux));
 }
 
 struct PhotonConversionFactors { float toFlux; int photonCount; };
 PhotonConversionFactors
 get_photon_conversion_factors(const NebPathVertex& vertex,
-							  const CpuNextEventBacktracking::NeeDesc& nee, const NebParameters& params) {
+							  const CpuNextEventBacktracking::NeeDesc& nee, const float targetFlux) {
 	float toFlux = ei::abs(vertex.get_geometric_factor(nee.direction)) / vertex.ext().density;
-	float smoothness = ei::min(1e30f, vertex.get_pdf_max() * ei::PI);
 	float maxFlux = max(nee.irradiance) * toFlux;
-	int photonCount = get_photon_split_count(vertex, maxFlux, params);
+	int photonCount = get_photon_split_count(vertex, maxFlux, targetFlux);
 	return { toFlux / ei::max(1,photonCount), photonCount };
 }
 
@@ -221,6 +220,9 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 				emDesc.samplePdf = pathLen == 1 ? AngularPdf{0.0f} : emission.pdf * (emission.emitPdf / emission.connectPdf);
 				emDesc.incident = sample.excident;
 				emDesc.incidentDistSq = vertex.get_incident_dist_sq();
+				emDesc.maxIrradiance = max(emission.value)
+					* ei::abs(vertex.previous()->get_geometric_factor(sample.excident))
+					/ (float(emission.connectPdf) * emDesc.incidentDistSq);
 				u32 idx = m_selfEmissionCount.fetch_add(1);
 				m_selfEmissiveEndVertices[idx] = emDesc;
 			}
@@ -231,24 +233,6 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 		// Using NEE on random hit vertices has low contribution in general.
 		// Therefore, we store the preevaluated emission only.
 		if(pathLen < m_params.maxPathLength) {
-			// Simulate an NEE, but do not contribute. Instead store the resulting
-			// vertex for later use.
-			/*u64 neeSeed = m_rngs[pixelIdx].next();
-			math::RndSet2 neeRnd = m_rngs[pixelIdx].next();
-			auto nee = scene::lights::connect(m_sceneDesc, 0, 1, neeSeed, vertex.get_position(), neeRnd);
-			if(nee.cosOut != 0) nee.diffIrradiance *= nee.cosOut;
-			bool anyhit = scene::accel_struct::any_intersection(
-								m_sceneDesc, vertex.get_position(), nee.position,
-								vertex.get_geometric_normal(), nee.geoNormal, nee.dir.direction);
-			// Make sure the vertex for which we did the NEE knows it is shadowed.
-			if(anyhit)
-				nee.diffIrradiance = Spectrum{0.0f};
-			vertex.ext().neeIrradiance = nee.diffIrradiance;
-			vertex.ext().neeDirection = nee.dir.direction;
-			vertex.ext().neeConversion = nee.cosOut / nee.distSq;
-			vertex.ext().neeCreationPdf = nee.creationPdf;
-			vertex.ext().neeBackPdf = nee.dir.pdf.to_area_pdf(ei::abs(vertex.get_geometric_factor(nee.dir.direction)), nee.distSq);
-			*/
 			previous = m_viewVertexMap.insert(vertex.get_position(), vertex);
 			if(previous == nullptr) { mAssert(false); break; }	// OVERFLOW
 #ifdef NEB_KDTREE
@@ -264,21 +248,22 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::Rng& rng,
 	const NebPathVertex& vertex, const NeeDesc& nee,
 	AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons) {
-	float mergeRadiusSq = photonMergeArea / ei::PI;
+	const float mergeRadiusSq = photonMergeArea / ei::PI;
 	// Precomupte the irradiance -> flux factor and
 	// pplit photons on rough surfaces if their density is much smaller than necessary
-	auto pFactors = get_photon_conversion_factors(vertex, nee, m_params);
+	auto pFactors = get_photon_conversion_factors(vertex, nee, m_targetFlux);
 	Spectrum flux = nee.irradiance * pFactors.toFlux;
 	// Clamping for bad photons (due to errors in the density estimation)
 	//float expectedFluxMax = max(flux);
-	//flux *= ei::min(expectedFluxMax, m_params.targetFlux) / expectedFluxMax;
+	//flux *= ei::min(expectedFluxMax, m_targetFlux) / expectedFluxMax;
 	// Fill the pdf arrays on the fly.
 	int pdfHead = m_params.maxPathLength;
 	incidentB[pdfHead] = nee.creationPdf;
-	--pdfHead;
-	incidentB[pdfHead] = nee.backPdf;
+	incidentB[pdfHead-1] = nee.backPdf;
+	const float sourceDensity = vertex.ext().density * pFactors.photonCount;
 	float prevConversionFactor = nee.conversion;
 	for(int i = 0; i < pFactors.photonCount; ++i) {
+		pdfHead = m_params.maxPathLength - 1;
 		// Prepare a start vertex to begin the sampling of the photon event.
 		NebPathVertex virtualLight = vertex;
 		virtualLight.set_incident_direction(-nee.direction, nee.distance);
@@ -301,8 +286,9 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 			--pdfHead;
 			prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / virtualLight.get_incident_dist_sq();
 			prevNormal = virtualLight.get_geometric_normal();
-			merge_importons(photonMergeArea, virtualLight, incidentF, incidentB, numPhotons,
-				false, lightThroughput.weight * flux, pdfHead, prevConversionFactor, vertex.ext().density);
+			merge_importons(photonMergeArea, virtualLight, incidentF, incidentB,
+				numPhotons, false, lightThroughput.weight * flux, pdfHead,
+				prevConversionFactor, sourceDensity);
 		}
 	}
 }
@@ -336,8 +322,17 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 		++lightPathLength;
 		currentV = 1-currentV;
 
-		if(lightPathLength == 1)
+		if(lightPathLength == 1) {
 			sourceDensity = get_density(m_density, vertex[currentV].get_position(), vertex[currentV].get_geometric_normal());
+			// Need to simulate a next event irradiance for the first segment to find the split factor.
+			// maxFlux = max(nee.irradiance) * |vertex.get_geometric_factor(nee.direction)| / density;
+			const float inCos = ei::abs(vertex[currentV].get_geometric_factor(sample.excident));
+			Pixel tmpCoord;
+			auto evalVal = vertex[0].evaluate(sample.excident, m_sceneDesc.media, tmpCoord);
+			const float maxIrradiance = max(evalVal.value) * evalVal.cosOut / vertex[currentV].get_incident_dist_sq();
+			const float maxFlux = maxIrradiance * inCos / sourceDensity;
+			sourceDensity *= get_photon_split_count(vertex[currentV], maxFlux, m_targetFlux);
+		}
 		if(pdfHead < m_params.maxPathLength)
 			incidentF[pdfHead+1] = AreaPdf{float(sample.pdf.back) * prevConversionFactor};
 		--pdfHead;
@@ -452,7 +447,8 @@ void CpuNextEventBacktracking::evaluate_nee(const NebPathVertex& vertex,
 	}
 	incidentF[0] = AreaPdf{1.0f};
 	incidentB[0] = AreaPdf{0.0f};
-	float misWeight = mis_nee(incidentF, incidentB, n, vertex.ext().density, photonMergeArea, numPhotons, m_params.stdPhotons);
+	const float sourceDensity = vertex.ext().density * get_photon_conversion_factors(vertex, nee, m_targetFlux).photonCount;
+	float misWeight = mis_nee(incidentF, incidentB, n, sourceDensity, photonMergeArea, numPhotons, m_params.stdPhotons);
 	Spectrum radiance = vertex.ext().throughput * (misWeight * bsdf.cosOut) * bsdf.value * nee.irradiance;
 	Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 				  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
@@ -479,8 +475,10 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float photonMergeArea, cons
 		}
 		incidentF[0] = AreaPdf{1.0f};
 		incidentB[0] = AreaPdf{0.0f};
+		const float maxFlux = emission.maxIrradiance / emission.previous->ext().density;
+		const float sourceDensity = emission.previous->ext().density * get_photon_split_count(*emission.previous, maxFlux, m_targetFlux);
 		float misWeight = mis_rhit(incidentF, incidentB, n,
-			emission.previous->ext().density, photonMergeArea, numPhotons, m_params.stdPhotons);
+			sourceDensity, photonMergeArea, numPhotons, m_params.stdPhotons);
 		return emission.radiance * misWeight;
 	} else
 		return emission.radiance;
@@ -566,7 +564,6 @@ void CpuNextEventBacktracking::iterate() {
 		// Skip shadowed events
 		if(any(greater(nee.irradiance, 0.0f))) {
 			evaluate_nee(vertex, nee, incidentPdfsF, incidentPdfsB, numStdPhotonPaths, photonMergeArea);
-
 			sample_photon_path(photonMergeArea, m_rngs[rngIndex], vertex, nee, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);
 		}
 	}//*/
@@ -579,31 +576,6 @@ void CpuNextEventBacktracking::iterate() {
 			AreaPdf* incidentPdfsB = incidentPdfsF + m_params.maxPathLength+1;
 			sample_std_photon(pixel, numStdPhotonPaths, photonSeed, photonMergeArea, incidentPdfsF, incidentPdfsB);
 		}
-	}//*/
-
-	// Fourth pass: merge backtracked photons, average NEE events and compute random hit
-	//		contributions.
-/*#pragma PARALLEL_FOR
-	for(i32 i = 0; i < numViewVertices; ++i) {
-		auto& vertex = m_viewVertexMap.get_data_by_index(i);
-		// Secondary source vertices to not contribute (not connected to a pixel)
-		if(vertex.ext().pixelIndex < 0) continue;
-		scene::Point currentPos = vertex.get_position();
-		Spectrum radiance { 0.0f };
-		AreaPdf* incidentPdfsF = tmpPdfMem.data() + (m_params.maxPathLength+1)*2*get_current_thread_idx();
-		AreaPdf* incidentPdfsB = incidentPdfsF + m_params.maxPathLength+1;
-
-		radiance += merge_nees(neeMergeRadiusSq, photonMergeArea, vertex, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);//*/
-		//scene::Point lastPos = vertex.previous() ? vertex.previous()->get_position() : {0.0f};
-		//auto emission = vertex.get_emission(m_sceneDesc, lastPos);
-		//radiance += finalize_emission(neeMergeArea, photonMergeArea, emission, incidentPdfsF, incidentPdfsB, numStdPhotonPaths);//*/
-
-	/*	Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
-					  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
-		m_outputBuffer.contribute<RadianceTarget>(coord, vertex.ext().throughput * radiance);
-
-		if(vertex.get_path_len() == 1)
-			m_outputBuffer.set<DensityTarget>(coord, vertex.ext().density * (m_currentIteration+1));
 	}//*/
 
 	// Finialize the evaluation of emissive end vertices.
@@ -645,6 +617,8 @@ void CpuNextEventBacktracking::post_reset() {
 	m_density->clear();
 //	m_density.initialize(m_sceneDesc.aabb, m_outputBuffer.get_num_pixels() * m_params.maxPathLength * 2);
 #endif
+	// Automatically compute the splitting factor for photons.
+	m_targetFlux = m_params.targetFlux * m_sceneDesc.lightTree.get_flux() / m_outputBuffer.get_num_pixels();
 
 	logInfo("[NEB] View-Vertex map size: ", m_viewVertexMapManager.mem_size() / (1024*1024), " MB");
 #ifdef NEB_KDTREE

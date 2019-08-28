@@ -6,9 +6,9 @@
 namespace mufflon { namespace renderer {
 
 struct PTargetFlux {
-	float targetFlux { 0.0005f };
+	float targetFlux { 1.0f };
 	static constexpr ParamDesc get_desc() noexcept {
-		return {"Target flux", ParameterTypes::FLOAT};
+		return {"Target rel. flux", ParameterTypes::FLOAT};
 	}
 };
 
