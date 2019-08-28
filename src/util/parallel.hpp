@@ -3,7 +3,9 @@
 #include "util/assert.hpp"
 
 #ifndef DEBUG_ENABLED
-#define PARALLEL_FOR omp parallel for
+// The chunk size and scheduling type is an "best guess";
+// the default values are abysmal for our case
+#define PARALLEL_FOR omp parallel for schedule(static, 1000)
 #else // DEBUG_ENABLED
 #define PARALLEL_FOR
 #endif // DEBUG_ENABLED
