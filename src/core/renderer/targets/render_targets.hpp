@@ -22,6 +22,12 @@ struct RadianceTarget {
 	// will always be written to disk as part of a screenshot command)
 	//static constexpr bool REQUIRED = true;
 	//static constexpr bool VARIANCE_REQUIRED = true; // Implies REQUIRED
+
+	// Optional: Usually mean and variance will be available for
+	// each target. Enabling this constant produces 'iterResult' and
+	// mean instead. I.e. the 0st and 1st moment are recorded instead
+	// the 1st and 2nd.
+	//static constexpr bool REDUCE_MOMENTS = true;
 };
 
 struct PositionTarget {
@@ -52,6 +58,7 @@ struct DensityTarget {
 	static constexpr const char NAME[] = "Density";
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
+	static constexpr bool REDUCE_MOMENTS = true;
 };
 
 }} // namespace muffon::renderer

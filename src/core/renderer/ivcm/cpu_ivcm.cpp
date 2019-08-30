@@ -476,7 +476,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 		// Visualize density map (disables all other contributions)
 		if(m_params.showDensity && walkRes == WalkResult::HIT) {
-			m_outputBuffer.set<DensityTarget>(coord, currentVertex->ext().density * (m_currentIteration + 1));
+			m_outputBuffer.contribute<DensityTarget>(coord, currentVertex->ext().density);
 			break;
 		}//*/
 		// Evaluate direct hit of area ligths and the background

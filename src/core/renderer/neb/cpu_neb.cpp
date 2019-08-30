@@ -100,7 +100,7 @@ public:
 namespace {
 
 int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, float targetFlux) {
-	//return 1; // Disabled
+	return 1; // Disabled
 	float smoothness = 1.0f;//ei::min(1e30f, vertex.get_pdf_max() * ei::PI);
 	if(smoothness < 1e-3f) // Max-pdf cannot be that small (except the surface does not reflect at all)
 		return 0;
@@ -542,7 +542,7 @@ void CpuNextEventBacktracking::iterate() {
 		if(vertex.get_path_len() == 1) {
 			Pixel coord { vertex.ext().pixelIndex % m_outputBuffer.get_width(),
 						  vertex.ext().pixelIndex / m_outputBuffer.get_width() };
-			m_outputBuffer.set<DensityTarget>(coord, vertex.ext().density * (m_currentIteration+1));
+			m_outputBuffer.contribute<DensityTarget>(coord, vertex.ext().density);
 		}
 	}
 
