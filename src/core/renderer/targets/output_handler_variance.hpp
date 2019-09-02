@@ -17,7 +17,7 @@ struct UpdateIter {
 			auto cum = cuda::atomic_load<CURRENT_DEV, float>(cumTarget[idx]);
 			// Use a stable addition scheme for the mean and variance
 			auto diff = iter - cum;
-			cum += diff / ei::max(1.0f, iteration);
+			cum += diff / ei::max(1.0f, iteration+1);
 			cuda::atomic_exchange<CURRENT_DEV>(cumTarget[idx], cum);
 			if(varTarget) {
 				float var = cuda::atomic_load<CURRENT_DEV, float>(varTarget[idx]);
@@ -43,7 +43,7 @@ struct UpdateIter<PixelType, true> {
 				auto cum = cuda::atomic_load<CURRENT_DEV, float>(varTarget[idx]);
 				// Use a stable addition scheme for the mean
 				auto diff = iter - cum;
-				cum += diff / ei::max(1.0f, iteration);
+				cum += diff / ei::max(1.0f, iteration+1);
 				cuda::atomic_exchange<CURRENT_DEV>(varTarget[idx], cum);
 			}
 		}
