@@ -432,17 +432,17 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 	do {
 		// Make a connection to any event on the light path
 		const IvcmPathVertex* lightVertex = m_pathEndPoints[lightPathIdx];
-		if(!m_params.showDensity) while(lightVertex) {
+		while(lightVertex) {
 			int lightPathLen = lightVertex->get_path_len();
 			int pathLen = lightPathLen + 1 + viewPathLen;
 			if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength) {
 				Pixel outCoord = coord;
 				auto conVal = connect(*currentVertex, *lightVertex, outCoord, mergeArea, numPhotons, reuseCount, incidentF, incidentB);
-				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(currentVertex->ext().throughput.x));
-
-
-				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
-				m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * conVal.cosines);
+				if(outCoord.x != -1) {
+					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(currentVertex->ext().throughput.x));
+					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput.weight * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
+					m_outputBuffer.contribute<LightnessTarget>(outCoord, throughput.guideWeight * conVal.cosines);
+				}
 			}
 			lightVertex = lightVertex->previous();
 		}//*/
@@ -471,14 +471,13 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 					scene::Direction{0.0f}, Spectrum{0.0f});
 		return;//*/
 
-		if(needs_density())
+		if(needs_density() || m_outputBuffer.is_target_enabled<DensityTarget>())
 			currentVertex->ext().density = get_density(currentVertex->get_position(), currentVertex->get_geometric_normal(), currentMergeRadius);
 
-		// Visualize density map (disables all other contributions)
-		if(m_params.showDensity && walkRes == WalkResult::HIT) {
+		// Visualize density map
+		if(walkRes == WalkResult::HIT && viewPathLen == 1) {
 			m_outputBuffer.contribute<DensityTarget>(coord, currentVertex->ext().density);
-			break;
-		}//*/
+		}
 		// Evaluate direct hit of area ligths and the background
 		if(viewPathLen >= m_params.minPathLength) {
 			EmissionValue emission = currentVertex->get_emission(m_sceneDesc, currentVertex->previous()->get_position());

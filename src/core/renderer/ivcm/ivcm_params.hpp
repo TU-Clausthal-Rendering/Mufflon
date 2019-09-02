@@ -5,13 +5,6 @@
 
 namespace mufflon { namespace renderer {
 
-struct PShowDensity {
-	bool showDensity { false };
-	static constexpr ParamDesc get_desc() noexcept {
-		return {"Show Density", ParameterTypes::BOOL};
-	}
-};
-
 struct PHeuristic {
 	PARAM_ENUM(heuristic = Values::VCM, VCM, VCMPlus, VCMStar, IVCM);
 	static constexpr ParamDesc get_desc() noexcept {
@@ -25,7 +18,6 @@ using IvcmParameters = ParameterHandler<
 	PMaxPathLength,
 	PMergeRadius,
 	PProgressive,
-	PShowDensity,
 	PHeuristic
 >;
 
