@@ -12,7 +12,8 @@ using LtParameters = ParameterHandler<
 >;
 
 using LtTargets = TargetList<
-	RadianceTarget, LightnessTarget
+	RadianceTarget, LightnessTarget,
+	DensityTarget
 >;
 
 }} // namespace mufflon::renderer
