@@ -50,16 +50,20 @@ CUDA_FUNCTION void lt_sample(typename LtTargets::template RenderBufferType<CURRE
 				// Early out if there would not be a contribution (estimating the materials is usually
 				// cheaper than the any-hit test).
 				bool showDensity = outputBuffer.is_target_enabled<DensityTarget>();
-				if((showDensity || any(greater(bxdfProd, 0.0f))) && cosProd > 0.0f) {
+				if(showDensity || (any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f)) {
 					// Shadow test
 					if(!scene::accel_struct::any_intersection(
 						scene, connection.v0, vertex.get_position(connection.v0),
 						camera.get_geometric_normal(), vertex.get_geometric_normal(), connection.dir)) {
-						bxdfProd /= connection.distanceSq;
 
+						bxdfProd /= connection.distanceSq;
 						outputBuffer.contribute<RadianceTarget>(outPixel, throughput.weight * cosProd * bxdfProd);
 						outputBuffer.contribute<LightnessTarget>(outPixel, throughput.guideWeight * cosProd);
-						outputBuffer.contribute<DensityTarget>(outPixel, cval.value.x * cosProd / connection.distanceSq);
+						if(showDensity) {
+							float density = cval.value.x * cval.cosOut / connection.distanceSq;
+							density *= ei::abs(vertex.get_geometric_factor(connection.dir));
+							outputBuffer.contribute<DensityTarget>(outPixel, density);
+						}
 					}
 				}
 			}
