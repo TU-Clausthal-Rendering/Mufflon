@@ -5,11 +5,24 @@
 
 namespace mufflon { namespace renderer {
 
+struct PScale {
+	float m_curvScale;
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Curvature Scale", ParameterTypes::FLOAT };
+	}
+};
+
 struct PHeuristic {
 	PARAM_ENUM(heuristic = Values::VCM, VCM, VCMPlus, VCMStar, IVCM);
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Heuristic", ParameterTypes::ENUM };
 	}
+};
+
+struct FootprintTarget {
+	static constexpr const char NAME[] = "Footprint";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
 };
 
 using IvcmParameters = ParameterHandler<
@@ -18,13 +31,14 @@ using IvcmParameters = ParameterHandler<
 	PMaxPathLength,
 	PMergeRadius,
 	PProgressive,
-	PHeuristic
+	PHeuristic,
+	PScale
 >;
 
 using IvcmTargets = TargetList<
 	RadianceTarget, PositionTarget,
 	NormalTarget, AlbedoTarget, LightnessTarget,
-	DensityTarget
+	DensityTarget, FootprintTarget
 >;
 
 }} // namespace mufflon::renderer

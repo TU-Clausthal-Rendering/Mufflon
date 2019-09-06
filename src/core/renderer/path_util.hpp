@@ -142,7 +142,8 @@ public:
 		return m_position;
 	}
 
-	// The incident direction, or undefined for end vertices (may be abused by end vertices.
+	// The incident direction, or undefined for end vertices (may be abused by end vertices).
+	// The direction points towards the surface.
 	CUDA_FUNCTION scene::Direction get_incident_direction() const {
 		float z = ei::sgn(m_incidentEncoded.z) * sqrt(ei::clamp(1.0f - m_incidentEncoded.x * m_incidentEncoded.x - m_incidentEncoded.y * m_incidentEncoded.y, 0.0f, 1.0f));
 		return {m_incidentEncoded.x, m_incidentEncoded.y, z};
@@ -499,6 +500,25 @@ public:
 		return 0.0f;
 	}
 
+	// Get the ratio of incident refraction index to trancemitted IOR if applicable
+	struct RefractionInfo {
+		float eta;		// Ratio of incident IOR to trancemitted
+		float inCos;	// Incident cosine
+	//	float outCos;	// Outgoing cosine after Fresnel
+	};
+	CUDA_FUNCTION RefractionInfo get_eta(const scene::materials::Medium* media) const {
+		if(m_type == Interaction::SURFACE) {
+			float inCos = -dot(get_incident_direction(), m_desc.surface.tangentSpace.shadingN);
+			scene::materials::MediumHandle mIn = m_desc.surface.material.get_medium(inCos);
+			scene::materials::MediumHandle mOut = m_desc.surface.material.get_medium(-inCos);
+			float eta = media[mIn].get_refraction_index().x / media[mOut].get_refraction_index().x;
+			return { eta, inCos };
+		//	float outCos = sqrt(ei::max(0.0f, 1.0f - eta * eta * (1.0f - inCos * inCos)));
+		//	return { eta, inCos, outCos };
+		}
+		return { 1.0f, 1.0f };
+	}
+
 	/* *************************************************************************
 	 * Creation methods (factory)											   *
 	 * Memory management of vertices is quite challenging, because its size	   *
@@ -748,11 +768,14 @@ struct VertexExtension {
 	// This update function gets called after the completion of a segment,
 	// which is directly after the creation of the target vertex.
 	// throughput: Throughput of entire subpath (all events + absorption)
+	// continuationPropability: The probability of Russion roulette after
+	//	sampling at prevVertex.
 	CUDA_FUNCTION void update(const PathVertex<VertexExtension>& prevVertex,
 							  const PathVertex<VertexExtension>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& inDir,
 							  const math::Throughput& throughput)
+							//  const float continuationPropability)
 	{}
 
 	// Helper to convert the parameters of the update call into an incident pdf for mis
