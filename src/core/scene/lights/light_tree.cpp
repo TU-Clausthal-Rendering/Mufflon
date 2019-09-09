@@ -543,14 +543,14 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		};
 
         // do extraction
-		if(m_treeCpu->dirLights.internalNodeCount > 1)
+		if(m_treeCpu->dirLights.internalNodeCount >= 1)
 			extractNodes(m_treeCpu->dirLights.get_node(0), m_treeCpu->dirLights);
-		else if(m_treeCpu->dirLights.internalNodeCount == 1)
+		else if(m_treeCpu->dirLights.lightCount == 1)
 			addLight(0, m_treeCpu->dirLights.root.type, m_treeCpu->dirLights);
 
-		if(m_treeCpu->posLights.internalNodeCount > 1)
+		if(m_treeCpu->posLights.internalNodeCount >= 1)
 			extractNodes(m_treeCpu->posLights.get_node(0), m_treeCpu->posLights);
-		else if(m_treeCpu->posLights.internalNodeCount == 1)
+		else if(m_treeCpu->posLights.lightCount == 1)
 			addLight(0, m_treeCpu->posLights.root.type, m_treeCpu->posLights);
 
         // upload buffers

@@ -7,6 +7,7 @@ layout(location = 3) out vec3 out_normal;
 layout(location = 4) out vec3 out_lightness;
 
 layout(bindless_sampler, location = 24) uniform sampler2DArray ltc_mat_tex;
+layout(bindless_sampler, location = 26) uniform sampler2DArray ltc_fres_tex;
 
 struct ColorInfo
 {
@@ -80,7 +81,7 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 diffuse, vec3 e
 	}
 
 	// angle between normal and view
-	float NdotV = dot(normal, view);
+	float NdotV = max(dot(normal, view), 0.0);
 
 	for(uint i = 0; i < numBigLights; ++i) {
 		vec3 points[4];
@@ -93,22 +94,27 @@ void calcRadiance(inout ColorInfo c, vec3 pos, vec3 normal, vec3 diffuse, vec3 e
 
 		// diffuse part
 		{
-			vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints));
-			vec3 lightness = luminance * lightColor * 0.159154943; // normalize with 1 / (2 * pi)
+			vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints), ltc_fres_tex);
+			vec3 lightness = luminance * lightColor; //* 0.159154943; // normalize with 1 / (2 * pi)
 			c.light += lightness;
 			c.color += diffuse * lightness;
 		}
 		
 		// specular part
 		{
+			if (specular == vec3(0.0)) continue;
+
 			vec2 texCoords = LTC_Coords(NdotV, roughness);
 			mat3 Minv = LTC_Matrix(ltc_mat_tex, texCoords);
-			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints));
-			vec3 lightness = luminance * lightColor * 0.159154943; // normalize with 1 / (2 * pi)
+			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints), ltc_fres_tex);
+			vec3 lightness = luminance * lightColor;// *0.159154943; // normalize with 1 / (2 * pi)
 			c.light += lightness;
-			c.color += specular * lightness;
+			// BRDF shadowing and Fresnel
+			vec2 fresnel = textureLod(ltc_fres_tex, vec3(texCoords, 0.0), 0.0).rg;
+			c.color += lightness * (fresnel.x * specular + (1.0 - specular) * fresnel.y);
 		}
 	}
+
 }
 
 #define EMISSIVE 0u
@@ -236,7 +242,6 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	}
 
 	out_fragColor = vec4(c.color, 1.0);
-	//out_fragColor = texture(ltc_mat_tex, uv);
 	out_albedo = c.albedo;
 	out_lightness = c.light;
 }

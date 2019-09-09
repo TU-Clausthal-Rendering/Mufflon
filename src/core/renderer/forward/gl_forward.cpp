@@ -28,12 +28,18 @@ void GlForward::post_reset() {
 }
 
 void GlForward::init() {
-	m_ltcTexture = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
-		"resources/ltc/ltc_mat.dds",
+	auto ltcTexture = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_1.dds",
 		TextureSampling::SAMPLING_LINEAR,
 		MipmapType::MIPMAP_NONE
 	));
-	mAssert(m_ltcTexture);
+	auto ltcTexture2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_2.dds",
+		TextureSampling::SAMPLING_LINEAR,
+		MipmapType::MIPMAP_NONE
+	));
+	mAssert(ltcTexture);
+	mAssert(ltcTexture2);
 
 	m_triangleProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
@@ -109,10 +115,15 @@ void GlForward::init() {
 
     // set uniforms
 	// ltc data
-	const auto ltcTexHdl = m_ltcTexture->acquire_const<DEVICE>();
+	const auto ltcTexHdl = ltcTexture->acquire_const<DEVICE>();
 	glProgramUniformHandleui64ARB(m_triangleProgram, 24, ltcTexHdl);
 	glProgramUniformHandleui64ARB(m_sphereProgram, 24, ltcTexHdl);
 	glProgramUniformHandleui64ARB(m_quadProgram, 24, ltcTexHdl);
+	
+	const auto ltcTexHdl2 = ltcTexture2->acquire_const<DEVICE>();
+	glProgramUniformHandleui64ARB(m_triangleProgram, 26, ltcTexHdl2);
+	glProgramUniformHandleui64ARB(m_sphereProgram, 26, ltcTexHdl2);
+	glProgramUniformHandleui64ARB(m_quadProgram, 26, ltcTexHdl2);
 }
 
 void GlForward::iterate() {

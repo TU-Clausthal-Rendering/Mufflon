@@ -149,8 +149,8 @@
     <Filter Include="Source Files\core\renderer\targets">
       <UniqueIdentifier>{3c330ca5-47e8-49f7-b828-171ff84692e4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="resources\ltc">
-      <UniqueIdentifier>{01be5c87-3959-4fec-992e-30087583e5f1}</UniqueIdentifier>
+    <Filter Include="resources">
+      <UniqueIdentifier>{352125d9-a4bf-43f3-81ed-f75c721c170b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -1177,13 +1177,12 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_mat.dds">
-      <Filter>resources\ltc</Filter>
-    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_1.dds" />
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_2.dds" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\resources\ltc\info.txt">
-      <Filter>resources\ltc</Filter>
+      <Filter>resources</Filter>
     </Text>
   </ItemGroup>
 </Project>

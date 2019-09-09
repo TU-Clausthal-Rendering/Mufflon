@@ -42,8 +42,6 @@ private:
 	gl::VertexArray m_spheresVao;
 
 	gl::Buffer m_transformBuffer;
-
-	scene::textures::Texture* m_ltcTexture;
 };
 
 
