@@ -227,14 +227,13 @@ private:
 class FootprintV2 {
 public:
 	void init(float sourceArea, float initSolidAngle, float pChoice) {
-		// TODO: use 2π scaling like in BSDF for angle?
-		m_x = sqrt(sourceArea);
+		m_xx = sourceArea;
 		m_a = sqrt(initSolidAngle);
 		m_P = pChoice;
 	}
 
 	float get_area() const {
-		return m_x * m_x;
+		return m_xx;
 	}
 
 	// eta = ratio of refraction indices n_in / n_out
@@ -243,55 +242,48 @@ public:
 							float inCos, float pRoulette) const {
 		FootprintV2 f = *this;
 		if(orthographic) {
-			f.m_x = 1.0f / sqrt(pdf * ei::abs(inCos));
+			f.m_xx = 1.0f / (pdf * ei::abs(inCos));
 			//f.m_x = 1.0f / sqrt(pdf);
 		} else {
-			// Curvature was measured with respect to the surface normal ->
-			// invert if arrived from below.
-			//if(inCos < 0.0f) mean_curvature = -mean_curvature;
-			if(prevInCos * prevOutCos < 0.0f) {
-				// Refraction from thin to thick medium changes the sign.
-				//if(eta > 1.0f)
-				//	mean_curvature = -mean_curvature;
-				f.m_a = eta * f.m_a + (eta * prevInCos + prevOutCos) * m_x * mean_curvature;
-		//		f.m_a = eta * f.m_a - (eta * prevInCos - prevOutCos) * m_x * mean_curvature;
-		//		f.m_a = eta * f.m_a + prevInCos * (eta - 1.0f) * m_x * mean_curvature;
+		//	const float xNoProj = sqrt(f.m_xx * ei::abs(prevInCos));
+		//	const float Hs = mean_curvature * xNoProj * (1 + 1.0f / ei::abs(prevInCos)) * ei::sign(prevInCos);
+		//	const float Hs = mean_curvature * xNoProj * ei::sign(prevInCos);
+			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
+		//	const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
+			if(prevInCos * prevOutCos < 0.0f && ei::abs(eta) > 1e-5f) {
+				// Refraction
+				float da = Hs * sqrt(2 * ei::PI);
+				f.m_a = (f.m_a + da) * eta - da;
+			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos / prevOutCos)) * eta - Hs;
+			//	f.m_a = f.m_a + Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs;
+			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos)) * eta - Hs * ei::abs(prevOutCos);
 			} else {
 				// Reflection
-				f.m_a += 2.0f * mean_curvature * m_x * prevInCos;
-				//f.m_a += 2.0f * mean_curvature * m_x * ei::sgn(prevInCos);
-				//f.m_a += 2.0f * mean_curvature * m_x * ei::sgn(prevInCos) * sqrt(ei::abs(prevInCos));
-				//f.m_a += 2.0f * mean_curvature * m_x * prevInCos * sqrt(ei::abs(prevInCos));
-				//f.m_a += 2.0f * atan(mean_curvature * m_x * ei::sgn(prevInCos));
-				//float omega = 2 * ei::PI * (1.0f - 1.0f / sqrt(1.0f + mean_curvature * m_x));
-				//float omega = (1.0f - 1.0f / sqrt(1.0f + mean_curvature * m_x));
-				//f.m_a += sqrt(omega) * ei::sgn(prevInCos);
+				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * ei::sign(prevOutCos);
+		//		f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx / ei::abs(prevInCos)) * ei::sign(prevOutCos);
+				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * (prevOutCos);
+				f.m_a = f.m_a + 2 * Hs;
 			}
-			// BRDF
-			//f.m_a += 1.0f / sqrt(2 * ei::PI * pdf);
-				//+ ei::abs(mean_curvature) * m_x;
-				//+ mean_curvature * m_x / (2 * ei::PI);
-			f.m_a += 1.0f / sqrt(pdf);
 			// Leave tangent space
-			float cosRoot = sqrt(ei::abs(prevOutCos));
-			f.m_x *= cosRoot;
-			//f.m_a *= cosRoot;
+			f.m_xx *= ei::abs(prevOutCos);
+			// BRDF
+			f.m_a = f.m_a + 1.0f / (1e-6f + sqrt(pdf));
 			// Travel
-			f.m_x += f.m_a * distance;
-			if(f.m_x < 0.0f) {
-				f.m_x = -f.m_x;
+			f.m_xx += f.m_a * ei::abs(f.m_a) * distance * distance;
+			if(f.m_xx < 0.0f) {
+				f.m_xx = -f.m_xx;
 				f.m_a = -f.m_a;
 			}
 			// Enter tangent space
-			cosRoot = sqrt(ei::abs(inCos));
-			f.m_x /= cosRoot;
-		//	f.m_a /= cosRoot;
+			f.m_xx /= ei::abs(inCos);
+			if(f.m_xx > 1e30f)
+				__debugbreak();
 		}
 		f.m_P *= pRoulette;
 		return f;
 	}
 private:
-	float m_x = 0.0f;
+	float m_xx = 0.0f;
 	float m_a = 0.0f;
 	float m_P = 1.0f;
 };
@@ -317,17 +309,37 @@ public:
 			f.m_xx = 1.0f / (pdf * ei::abs(inCos));
 			//f.m_x = 1.0f / sqrt(pdf);
 		} else {
+			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f) {
 				// Refraction
-		//		f.m_aa = eta * f.m_a + (eta * prevInCos + prevOutCos) * m_x * mean_curvature;
+				f.m_aa = f.m_aa * eta * eta + (Hs * eta - Hs) * ei::abs(Hs * eta - Hs);
+			//	f.m_aa = sqrt(f.m_aa) * eta + (eta * prevInCos + prevOutCos) * sqrt(m_xx);
+			//	const float a = -ei::sign(prevOutCos) * sqrt(m_xx) * mean_curvature;
+			//	f.m_aa = (sqrt(f.m_aa) + a) * eta - a;
+			//	f.m_aa *= ei::abs(f.m_aa);
 			} else {
 				// Reflection
-		//		f.m_aa += 2.0f * mean_curvature * m_x * prevInCos;
+				f.m_aa += 4.0f * Hs * ei::abs(Hs);
+				//f.m_aa = sqrt(f.m_aa) + 2 * mean_curvature * prevInCos * sqrt(f.m_xx);
+			//	f.m_aa = sqrt(f.m_aa) + mean_curvature * sqrt(f.m_xx);
+			//	f.m_aa = sqrt(f.m_aa) + 2 * mean_curvature * sqrt(f.m_xx);
+			//	f.m_aa *= ei::abs(f.m_aa);
 			}
-			// BRDF
-			f.m_aa += 1.0f / pdf;
+			//f.m_aa += ei::PI * 2.0f * mean_curvature * mean_curvature * m_xx;
+		//	f.m_aa += 4.0f * mean_curvature * mean_curvature * m_xx;
+			//f.m_aa += 8.0f * mean_curvature * mean_curvature * m_xx;
+			//f.m_aa += ei::PI * 4.0f * mean_curvature * mean_curvature * m_xx;
+			//f.m_aa += ei::PI * 4.0f * mean_curvature * mean_curvature * m_xx * prevOutCos;
+			//f.m_aa += 4.0f * mean_curvature * mean_curvature * m_xx * prevOutCos * prevOutCos;
+			//f.m_aa += mean_curvature * ei::abs(mean_curvature) * m_xx * ei::sgn(prevOutCos);
+			//if(f.m_aa < 0.0f) f.m_aa = 0.0f;
 			// Leave tangent space
 			f.m_xx *= ei::abs(prevOutCos);
+			//f.m_aa *= ei::abs(prevOutCos);
+			// BRDF
+			f.m_aa += 1.0f / pdf;
+		//	f.m_aa += 2*ei::PI / pdf;
+		//	f.m_aa = ei::sq(sqrt(f.m_aa) + 1.0f / sqrt(pdf));
 			// Travel
 			f.m_xx += f.m_aa * distance * distance;
 			//float corr = distance * distance / (distance * distance + f.m_xx);
@@ -343,6 +355,7 @@ public:
 			}
 			// Enter tangent space
 			f.m_xx /= ei::abs(inCos);
+			//f.m_aa /= ei::abs(inCos);
 		}
 		f.m_P *= pRoulette;
 		return f;
@@ -355,6 +368,7 @@ private:
 
 
 //using Footprint2D = Footprint2DCov;
-using Footprint2D = FootprintV2Sq;
+//using Footprint2D = FootprintV0;
+using Footprint2D = FootprintV2;
 
 }} // namespace mufflon::renderer

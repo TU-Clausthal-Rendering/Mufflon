@@ -541,18 +541,20 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 					}
 					if((viewPathLen == 1) && m_outputBuffer.is_target_enabled<FootprintTarget>()) {
 						float area = photon.ext().footprint.get_area();
-				//		area /= ei::abs(dot(photon.get_normal(), photon.get_incident_direction()));
-						if(std::isnan(area))
-							__debugbreak();
-						if(area <= 0.0f)
-							__debugbreak();
-						//if(photonDist * ei::PI <= area / numPhotons)
-						//	density += 1.0f;// / area;
-						if(photonDist < closestDensityMerge) {
-							density = 1.0f / (area);
-							closestDensityMerge = photonDist;
+						// Correct incident normal
+						scene::Direction photonDir = photon.get_incident_direction();
+						float origCos = dot(photon.get_geometric_normal(), photonDir);
+						float newCos = dot(currentVertex->get_geometric_normal(), photonDir);
+						area *= ei::max(0.0f, origCos / newCos);
+						if(area > 0.0f && dot(currentVertex->get_geometric_normal(), photon.get_geometric_normal()) > 0.0f) {
+							if(std::isnan(area))
+								__debugbreak();
+							if(photonDist < closestDensityMerge) {
+							//if(1/area > density) {
+								density = 1.0f / (area + 1e-8f);
+								closestDensityMerge = photonDist;
+							}
 						}
-						//density = ei::max(density, 1.0f / area);
 					}
 				}
 			}
