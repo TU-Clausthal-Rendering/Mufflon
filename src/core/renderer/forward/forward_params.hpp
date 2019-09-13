@@ -14,6 +14,6 @@ struct PForwardDummy {
 	
 using ForwardParameters = ParameterHandler<PForwardDummy>;
 
-using ForwardTargets = TargetList<RadianceTarget>;
+using ForwardTargets = TargetList<RadianceTarget, PositionTarget, NormalTarget>;
 
 } // namespace mufflon::renderer
