@@ -49,6 +49,14 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 
 	LightInfo light;
 
+	// angle between normal and view
+	float NdotV = max(dot(normal, view), 0.0);
+
+	// some data for the microfacet modell
+	const float roughSquare = mat.roughness * mat.roughness;	
+	const float Go = 2.0 / (1.0 + sqrt(1.0 + roughSquare * (1.0 - NdotV * NdotV) / (NdotV * NdotV)));
+
+
 	// iterate thought small lights
 	for(uint i = 0; i < numSmallLights; ++i) {
 		switch(smallLights[i].type) {
@@ -57,10 +65,12 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 			break;
 		case LIGHT_TYPE_SPOT:
 			// TODO add spot light properties
+			continue;
 			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
 			break;
 		case LIGHT_TYPE_SPHERE: {
 			// project closest point
+			continue;
 			vec3 lightPos = smallLights[i].position + normalize(pos - smallLights[i].position) * smallLights[i].radiusOrFalloff;
 			light = calcPointLight(pos, lightPos, getMaterialEmission(floatBitsToUint(smallLights[i].materialOrTheta)));
 		} break;
@@ -70,16 +80,27 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 		default: continue;
 		}
 
-		// add to material color
-		// TODO use microfacet for roughness?
-		float cosTheta = max(dot(light.direction, normal), 0.0);
-		color += mat.diffuse * light.color * cosTheta;
+		// diffuse color
+		const float NdotI = max(dot(light.direction, normal), 0.0);
+		if (NdotI == 0.0) continue;
 
+		color += mat.diffuse * light.color * NdotI;
 
+		if (mat.specular == vec3(0.0)) continue;
+
+		// microfacet reflection
+		float NdotR = max(dot(normal, reflect(-light.direction, normal)), 0.0);
+		float NdotH = max(dot(normal, normalize(view + light.direction)), 0.0);
+		
+		float D = NdotH * NdotH * (roughSquare - 1.0) + 1.0;
+		D = roughSquare / (D * D);
+
+		float Gi = 2.0 / (1.0 + sqrt(1.0 + roughSquare * (1.0 - NdotI * NdotI) / (NdotI * NdotI)));
+		float G = Gi * Go;
+
+		// TODO add blend fresnel?
+		color += mat.specular * D * G * 0.25 / NdotR / NdotV;
 	}
-
-	// angle between normal and view
-	float NdotV = max(dot(normal, view), 0.0);
 
 	for(uint i = 0; i < numBigLights; ++i) {
 		vec3 points[4];
@@ -292,7 +313,7 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 		MaterialInfo m1 = getLambert(pos, normal, uv, matOffset);
 		// LayerB
 		MaterialInfo m2 = getEmissive(pos, normal, uv, matOffset);
-		// LayerB params (empty only padding for struct)
+		// LayerA params (empty only padding for struct)
 		matOffset += 4;
 		// LayerB params
 		vec3 scale;
@@ -378,12 +399,25 @@ vec3 getMaterialEmission(uint materialIndex) {
 	switch(matType) {
 	case EMISSIVE: {
 		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset));
-		return texture(emissionTex, vec3(0.0)).rgb;
+		matOffset += 8;
+		vec3 scale;
+		getEmissiveParams(matOffset, scale);
+		return texture(emissionTex, vec3(0.0)).rgb * scale;
 	} break;
 	case LAMBERT_EMISSIVE: {
-		// TODO correct blending
 		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset + 8));
-		return texture(emissionTex, vec3(0.0)).rgb;
+		matOffset += 16;
+		// LayerA params (empty only padding for struct)
+		matOffset += 4;
+
+		// LayerB params
+		vec3 scale;
+		getEmissiveParams(matOffset, scale);
+		// Blend
+		float factor1, factor2;
+		getBlendParams(matOffset, factor1, factor2);
+
+		return texture(emissionTex, vec3(0.0)).rgb * scale * factor2;
 	} break;
 	}
 	return vec3(0.0);

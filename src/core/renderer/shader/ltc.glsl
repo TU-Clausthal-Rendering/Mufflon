@@ -40,6 +40,7 @@ vec3 LTC_IntegrateEdge(vec3 v1, vec3 v2)
 vec3 LTC_Evaluate(
 	vec3 N, vec3 V, vec3 P, mat3 Minv, vec3 points[4], int nPoints, sampler2DArray helpTexture)
 {
+
 	if (nPoints > 3)
 	{
 		// swap 1 and 3
@@ -74,7 +75,7 @@ vec3 LTC_Evaluate(
 	// clipless approximation
 	vec3 dir = points[0] - P;
 	vec3 lightNormal = cross(points[1] - points[0], points[2] - points[0]);
-	bool behind = (dot(dir, lightNormal) <= 0.001);
+	bool behind = (dot(dir, lightNormal) <= 0.000);
 	if (behind) return vec3(0.0, 0.0, 0.0);
 	
 	//return vec3(0.0, 1.0, 0.0);
