@@ -292,6 +292,8 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 		MaterialInfo m1 = getLambert(pos, normal, uv, matOffset);
 		// LayerB
 		MaterialInfo m2 = getEmissive(pos, normal, uv, matOffset);
+		// LayerB params (empty only padding for struct)
+		matOffset += 4;
 		// LayerB params
 		vec3 scale;
 		getEmissiveParams(matOffset, scale);
@@ -309,6 +311,9 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 		// LayerA params
 		uint shadowing, ndf;
 		getTorranceParams(matOffset, shadowing, ndf);
+		// LayerB params (empty only padding for struct)
+		matOffset += 4;
+
 		// Blend
 		float factor1, factor2;
 		getBlendParams(matOffset, factor1, factor2);
@@ -322,6 +327,8 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 		// LayerA params
 		uint shadowing, ndf;
 		getTorranceParams(matOffset, shadowing, ndf);
+		// LayerB params (empty only padding for struct)
+		matOffset += 4;
 
 		mat = blendMaterial(m1, m2, 1.0, 1.0);
 	} break;
