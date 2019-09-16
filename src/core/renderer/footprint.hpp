@@ -252,22 +252,25 @@ public:
 		//	const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f && ei::abs(eta) > 1e-5f) {
 				// Refraction
-				float da = Hs * sqrt(2 * ei::PI);
-				f.m_a = (f.m_a + da) * eta - da;
+			//	float da = Hs * sqrt(2 * ei::PI);
+			//	f.m_a = (f.m_a + Hs) * eta - Hs;
 			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos / prevOutCos)) * eta - Hs;
 			//	f.m_a = f.m_a + Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs;
 			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos)) * eta - Hs * ei::abs(prevOutCos);
+			//	f.m_a = eta * f.m_a + (eta * prevInCos + prevOutCos) * Hs;
 			} else {
 				// Reflection
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * ei::sign(prevOutCos);
-		//		f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx / ei::abs(prevInCos)) * ei::sign(prevOutCos);
+				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx / ei::abs(prevInCos)) * ei::sign(prevOutCos);
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * (prevOutCos);
-				f.m_a = f.m_a + 2 * Hs;
+			//	f.m_a = f.m_a + 2 * Hs;
+				//f.m_a += 2.0f * Hs * prevInCos;
 			}
+			f.m_a += ei::abs(Hs);
 			// Leave tangent space
 			f.m_xx *= ei::abs(prevOutCos);
 			// BRDF
-			f.m_a = f.m_a + 1.0f / (1e-6f + sqrt(pdf));
+			f.m_a += 1.0f / (1e-6f + sqrt(pdf));
 			// Travel
 			f.m_xx += f.m_a * ei::abs(f.m_a) * distance * distance;
 			if(f.m_xx < 0.0f) {
@@ -275,9 +278,7 @@ public:
 				f.m_a = -f.m_a;
 			}
 			// Enter tangent space
-			f.m_xx /= ei::abs(inCos);
-			if(f.m_xx > 1e30f)
-				__debugbreak();
+			f.m_xx /= ei::abs(inCos) + 1e-6f;
 		}
 		f.m_P *= pRoulette;
 		return f;
@@ -289,6 +290,7 @@ private:
 };
 
 class FootprintV2Sq {
+	static float ssqrt(float x) { return ei::sgn(x) * sqrt(ei::abs(x)); }
 public:
 	void init(float sourceArea, float initSolidAngle, float pChoice) {
 		m_xx = sourceArea;
@@ -312,32 +314,33 @@ public:
 			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f) {
 				// Refraction
-				f.m_aa = f.m_aa * eta * eta + (Hs * eta - Hs) * ei::abs(Hs * eta - Hs);
-			//	f.m_aa = sqrt(f.m_aa) * eta + (eta * prevInCos + prevOutCos) * sqrt(m_xx);
+			//	f.m_aa = f.m_aa * eta * eta + (Hs * eta - Hs) * ei::abs(Hs * eta - Hs);
+				f.m_aa = ssqrt(f.m_aa) * eta + (eta * prevInCos + prevOutCos) * sqrt(m_xx);
 			//	const float a = -ei::sign(prevOutCos) * sqrt(m_xx) * mean_curvature;
 			//	f.m_aa = (sqrt(f.m_aa) + a) * eta - a;
-			//	f.m_aa *= ei::abs(f.m_aa);
+				f.m_aa *= ei::abs(f.m_aa);
 			} else {
 				// Reflection
-				f.m_aa += 4.0f * Hs * ei::abs(Hs);
-				//f.m_aa = sqrt(f.m_aa) + 2 * mean_curvature * prevInCos * sqrt(f.m_xx);
+			//	f.m_aa += 4.0f * Hs * ei::abs(Hs);
+				f.m_aa = ssqrt(f.m_aa) + 2 * mean_curvature * prevInCos * sqrt(f.m_xx);
 			//	f.m_aa = sqrt(f.m_aa) + mean_curvature * sqrt(f.m_xx);
 			//	f.m_aa = sqrt(f.m_aa) + 2 * mean_curvature * sqrt(f.m_xx);
-			//	f.m_aa *= ei::abs(f.m_aa);
+				f.m_aa *= ei::abs(f.m_aa);
 			}
 			//f.m_aa += ei::PI * 2.0f * mean_curvature * mean_curvature * m_xx;
-		//	f.m_aa += 4.0f * mean_curvature * mean_curvature * m_xx;
+			//f.m_aa += 4.0f * mean_curvature * mean_curvature * m_xx;
 			//f.m_aa += 8.0f * mean_curvature * mean_curvature * m_xx;
 			//f.m_aa += ei::PI * 4.0f * mean_curvature * mean_curvature * m_xx;
 			//f.m_aa += ei::PI * 4.0f * mean_curvature * mean_curvature * m_xx * prevOutCos;
 			//f.m_aa += 4.0f * mean_curvature * mean_curvature * m_xx * prevOutCos * prevOutCos;
 			//f.m_aa += mean_curvature * ei::abs(mean_curvature) * m_xx * ei::sgn(prevOutCos);
+			//f.m_aa += 4.0f * Hs * ei::abs(Hs);
 			//if(f.m_aa < 0.0f) f.m_aa = 0.0f;
 			// Leave tangent space
 			f.m_xx *= ei::abs(prevOutCos);
 			//f.m_aa *= ei::abs(prevOutCos);
 			// BRDF
-			f.m_aa += 1.0f / pdf;
+			f.m_aa += 1.0f / (pdf + 1e-6f);
 		//	f.m_aa += 2*ei::PI / pdf;
 		//	f.m_aa = ei::sq(sqrt(f.m_aa) + 1.0f / sqrt(pdf));
 			// Travel
@@ -354,7 +357,7 @@ public:
 				f.m_aa = -f.m_aa;
 			}
 			// Enter tangent space
-			f.m_xx /= ei::abs(inCos);
+			f.m_xx /= ei::abs(inCos) + 1e-6f;
 			//f.m_aa /= ei::abs(inCos);
 		}
 		f.m_P *= pRoulette;
@@ -368,7 +371,7 @@ private:
 
 
 //using Footprint2D = Footprint2DCov;
-//using Footprint2D = FootprintV0;
-using Footprint2D = FootprintV2;
+using Footprint2D = FootprintV0;
+//using Footprint2D = FootprintV2;
 
 }} // namespace mufflon::renderer

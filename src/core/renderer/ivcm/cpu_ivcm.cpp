@@ -115,6 +115,9 @@ public:
 	bool is_orthographic() const noexcept { return m_vertex ? m_vertex->is_orthographic() : false; }
 	const Footprint2D& footprint() const { return m_vertex->ext().footprint; }
 	const IvcmVertexExt& ext() const { return m_vertex->ext(); }
+	IvcmPathVertex::RefractionInfo eta(const scene::materials::Medium* media) const {
+		return m_vertex ? m_vertex->get_eta(media) : IvcmPathVertex::RefractionInfo{1.0f, 0.0f};
+	}
 };
 
 // incidentF/incidentB: per vertex area pdfs
@@ -572,7 +575,11 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 static float ivcm_heuristic(int numPhotons, float a0, float a1) {
 	//return (a0 + a1) / (a0 + a1 / numPhotons);
-	float aR = (a0 * a0) / (a1 * a1);
+	//float aR = (a0 * a0) / (a1 * a1);
+	float aR = a0 / a1;
+	if(aR > 1e12f) return 1.0f;
+	//aR = pow(aR, 2.5f);
+	aR *= aR;
 	float count = (1.0f + aR) / (1.0f / numPhotons + aR);
 	mAssert(count >= 1.0f);
 	if(std::isnan(count))
@@ -649,6 +656,8 @@ void CpuIvcm::compute_counts(float* reuseCount, float mergeArea,
 			float p1Pdf = float(path1.pdf_forw());
 			float p0H = path0.ext().curvature;
 			float p1H = path1.ext().curvature;
+			auto p0Eta = path0.eta(m_sceneDesc.media);
+			auto p1Eta = path1.eta(m_sceneDesc.media);
 			scene::Direction p0OutDir = connectionDir;
 			scene::Direction p1OutDir = -connectionDir;
 			if(merge) {
@@ -666,7 +675,7 @@ void CpuIvcm::compute_counts(float* reuseCount, float mergeArea,
 			for(int i = merge ? pl0-1 : pl0; i > 0; --i) {
 				float a0 = path0.footprint().get_area();
 				float nextInCos = -path0.cosine(p1OutDir);
-				f1 = f1.add_segment(p1Pdf, p1Ortho, p1H, 0.0f, p1CosOut, 1.0f, p1Dist, nextInCos, 1.0f);
+				f1 = f1.add_segment(p1Pdf, p1Ortho, p1H, p1Eta.inCos, p1CosOut, p1Eta.eta, p1Dist, nextInCos, 1.0f);
 				float a1 = f1.get_area();
 				reuseCount[i] = ivcm_heuristic(numPhotons, a0, a1);
 				p1Pdf = float(path0.pdf_back());
@@ -675,13 +684,14 @@ void CpuIvcm::compute_counts(float* reuseCount, float mergeArea,
 				p1H = path0.ext().curvature;
 				p1OutDir = -path0.indir();
 				p1CosOut = path0.cosine(p1OutDir);
+				p1Eta = path0.eta(m_sceneDesc.media);
 				path0 = path0.previous();
 			}
 			float p0CosOut = path0.cosine(p0OutDir);
 			for(int i = pl0+1; i < pl; ++i) {
 				float a1 = path1.footprint().get_area();
 				float nextInCos = -path1.cosine(p0OutDir);
-				f0 = f0.add_segment(p0Pdf, p0Ortho, p0H, 0.0f, p0CosOut, 1.0f, p0Dist, nextInCos, 1.0f);
+				f0 = f0.add_segment(p0Pdf, p0Ortho, p0H, p0Eta.inCos, p0CosOut, p0Eta.eta, p0Dist, nextInCos, 1.0f);
 				float a0 = f0.get_area();
 				reuseCount[i] = ivcm_heuristic(numPhotons, a0, a1);
 				p0Pdf = float(path1.pdf_back());
@@ -690,6 +700,7 @@ void CpuIvcm::compute_counts(float* reuseCount, float mergeArea,
 				p0H = path1.ext().curvature;
 				p0OutDir = -path1.indir();
 				p0CosOut = path1.cosine(p0OutDir);
+				p0Eta = path1.eta(m_sceneDesc.media);
 				path1 = path1.previous();
 			}
 		} break;
