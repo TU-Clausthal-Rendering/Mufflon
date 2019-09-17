@@ -25,8 +25,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            string filename = ScreenShotCommand.ReplaceCommonFilenameTags(m_models, m_models.Settings.ScreenshotNamePattern);
-            Dll.Core.render_save_denoised_radiance(Path.Combine(m_models.Settings.ScreenshotFolder, filename));
+            m_models.Renderer.TakeScreenshot(true);
         }
 
         public event EventHandler CanExecuteChanged
