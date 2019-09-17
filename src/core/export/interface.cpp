@@ -3404,7 +3404,7 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 		}
 	}
 
-	logInfo("[", FUNCTION_NAME, "] Finished denoising '", filename, "'");
+	logInfo("[", FUNCTION_NAME, "] Finished denoising '", fileName.string(), "'");
 
 	return true;
 	CATCH_ALL(false)
