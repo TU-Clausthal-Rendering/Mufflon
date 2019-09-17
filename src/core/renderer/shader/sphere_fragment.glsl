@@ -1,4 +1,4 @@
-layout(location = 0) in vec2 in_location;
+layout(location = 0) flat in vec3 in_center;
 layout(location = 1) flat in float in_radius;
 layout(location = 2) in vec3 in_position;
 layout(location = 3) flat in uint in_materialIndex;
@@ -11,18 +11,23 @@ vec3 toWorld(vec4 viewVec) {
 }
 
 void main() {
-	float curRadius = length(in_location);
-	if(curRadius > 1.0f)
+	float curRadius = distance(in_center, in_position);
+	if (curRadius > in_radius)
 		discard;
 
-	// view space normal
-	vec3 normal;
-	normal.xy = in_location;
-	normal.z = -sqrt(1.0 - curRadius);
+	// calculate ray-sphere intersection position
+	vec3 toPosition = normalize(in_position);
+	float tca = dot(in_center, toPosition);
+	vec3 closestToCenter = toPosition * tca; // points on the toPosition vector that is closest to the sphere center
+	
+	// distance from closest to center to the sphere center
+	float distToCenterSq = dot(closestToCenter - in_center, closestToCenter - in_center);
+	// distance form closest to center to the sphere hull in -toPosition direction
+	float thc = sqrt(in_radius * in_radius - distToCenterSq);
 
 	// view space position
-	vec3 position = in_position;
-	position.z += (normal * in_radius).z;
+	vec3 position = toPosition * (tca - thc);
+	vec3 normal = normalize(position - in_center);
 
 	// clip space position
 	vec4 clipPos = u_cam.projection * vec4(position, 1.0);
