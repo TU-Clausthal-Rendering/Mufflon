@@ -21,7 +21,9 @@ struct UpdateIter {
 			cuda::atomic_exchange<CURRENT_DEV>(cumTarget[idx], cum);
 			if(varTarget) {
 				float var = cuda::atomic_load<CURRENT_DEV, float>(varTarget[idx]);
-				var += diff * (iter - cum);
+				float varIter = diff * (iter - cum);
+				float varDiff = varIter - var;
+				var += varDiff / ei::max(1.0f, iteration);
 				cuda::atomic_exchange<CURRENT_DEV>(varTarget[idx], var);
 			}
 		}
