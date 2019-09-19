@@ -16,6 +16,7 @@ namespace mufflon::renderer {
 namespace {
 
 static float s_curvScale;
+static int s_numPhotons;
 
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct IvcmVertexExt {
@@ -127,7 +128,7 @@ float get_mis_weight_photon(const AreaPdf* incidentF, const AreaPdf* incidentB, 
 	float mergeArea, const float* reuseCount) {
 	if(idx == 0 || idx == n) return 0.0f;
 	// Start with camera connection
-	float relPdfSumV = 1.0f / (float(incidentF[1]) * mergeArea * reuseCount[1]);
+	float relPdfSumV = 1.0f / (float(incidentF[1]) * mergeArea * s_numPhotons); // = (1/(p * A * reuseCount[1]) * (reuseCount[1]/s_numPhotons)
 	// Collect merges and connections along view path
 	for(int i = 1; i < idx; ++i) {
 		float prevMerge = (incidentB[i] / incidentF[i+1]) * (reuseCount[i] / reuseCount[i+1]);
@@ -154,6 +155,7 @@ float get_mis_weight_connect(const AreaPdf* incidentF, const AreaPdf* incidentB,
 	// Collect merges and connections along view path
 	for(int i = 1; i <= idx; ++i) {
 		float prevConnect = incidentB[i] / incidentF[i];
+		if(i == 1) prevConnect *= reuseCount[1] / s_numPhotons;		// LT reuse
 		float curMerge = float(incidentB[i]) * mergeArea * reuseCount[i];
 		relPdfSumV = curMerge + prevConnect * (1.0f + relPdfSumV);
 	}
@@ -164,6 +166,8 @@ float get_mis_weight_connect(const AreaPdf* incidentF, const AreaPdf* incidentB,
 		float curMerge = float(incidentF[i]) * mergeArea * reuseCount[i];
 		relPdfSumL = curMerge + prevConnect * (1.0f + relPdfSumL);
 	}
+	if(idx == 0)
+		relPdfSumL *= s_numPhotons / reuseCount[1];	// LT reuse 2
 	return 1.0f / (1.0f + relPdfSumV + relPdfSumL);
 }
 
@@ -171,13 +175,14 @@ float get_mis_weight_rhit(const AreaPdf* incidentF, const AreaPdf* incidentB, in
 	float mergeArea, const float* reuseCount) {
 	// Collect all connects/merges along the view path only
 	float relPdfSumV = 0.0f;
-	for(int i = 1; i < n; ++i) {
+	for(int i = 1; i <= n; ++i) {
 		float prevConnect = incidentB[i] / incidentF[i];
-		float curMerge = float(incidentB[i]) * mergeArea * reuseCount[i];
+		if(i == 1) prevConnect *= reuseCount[1] / s_numPhotons;		// LT reuse
+		float curMerge = (i == n) ? 0.0f : float(incidentB[i]) * mergeArea * reuseCount[i];
 		relPdfSumV = curMerge + prevConnect * (1.0f + relPdfSumV);
 	}
-	float connectionRel = incidentB[n] / incidentF[n];
-	relPdfSumV = connectionRel * (1.0f + relPdfSumV);
+//	float connectionRel = incidentB[n] / incidentF[n];
+//	relPdfSumV = connectionRel * (1.0f + relPdfSumV);
 	return 1.0f / (1.0f + relPdfSumV);
 }
 
@@ -366,6 +371,7 @@ void CpuIvcm::iterate() {
 	// First pass: Create one photon path per view path
 	u64 photonSeed = m_rngs[0].next();
 	int numPhotons = m_outputBuffer.get_num_pixels();
+	s_numPhotons = numPhotons;
 #pragma PARALLEL_FOR
 	for(int i = 0; i < numPhotons; ++i) {
 		this->trace_photon(i, numPhotons, photonSeed, currentMergeRadius);
@@ -507,8 +513,9 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 					currentVertex->get_medium(inConnection.dir),
 					{currentVertex->get_geometric_normal(), 0.0f}
 				});
-				compute_counts(reuseCount, mergeArea, numPhotons, 1.0f, scene::Direction{0.0f},
-					VertexWrapper{currentVertex, {AngularPdf{0.0}, emission.pdf}}, viewPathLen-1,
+				compute_counts(reuseCount, mergeArea, numPhotons,
+					currentVertex->get_incident_dist(), inConnection.dir,
+					VertexWrapper{currentVertex->previous(), sample.pdf}, viewPathLen-1,
 					VertexWrapper{&light, {emission.pdf, AngularPdf{0.0}}}, 0);
 				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, reuseCount);
 				emission.value *= misWeight;
@@ -574,6 +581,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 
 static float ivcm_heuristic(int numPhotons, float a0, float a1) {
+	//a0 *= numPhotons; // Multiply instead divide a1/numPhotons
 	//return (a0 + a1) / (a0 + a1 / numPhotons);
 	//float aR = (a0 * a0) / (a1 * a1);
 	float aR = a0 / a1;
