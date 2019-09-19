@@ -104,6 +104,7 @@
 
                             <TextBlock Grid.Column="0"
                                        Text="{Binding General.ScreenshotFolder}"
+                                       ToolTip="{Binding General.ScreenshotFolder}"
                                        TextTrimming="CharacterEllipsis"
                                        HorizontalAlignment="Stretch"/>
                             <Button Grid.Column="1"

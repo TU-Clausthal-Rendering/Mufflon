@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -30,14 +31,26 @@ namespace gui.ViewModel.Settings
 
         private void ScreenshotFolderOnClick()
         {
-            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            // Trick taken from https://stackoverflow.com/questions/7330111/select-folder-path-with-savefiledialog/23024435#23024435
+            using(SaveFileDialog dialog = new SaveFileDialog())
+            {
+                dialog.FileName = "Save Here";
+                if(dialog.ShowDialog() == DialogResult.OK)
+                {
+                    ScreenshotFolder = Path.GetDirectoryName(dialog.FileName);
+                    OnPropertyChanged(nameof(ScreenshotFolder));
+                }
+            }
+
+
+            /*using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
                 if (dialog.ShowDialog() != DialogResult.OK ||
                     string.IsNullOrWhiteSpace(dialog.SelectedPath)) return;
 
                 ScreenshotFolder = dialog.SelectedPath;
                 OnPropertyChanged(nameof(ScreenshotFolder));
-            }
+            }*/
         }
 
         internal void LoadFromSettings()
