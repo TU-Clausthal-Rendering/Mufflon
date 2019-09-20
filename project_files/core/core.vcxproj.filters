@@ -1177,12 +1177,24 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_1.dds" />
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_2.dds" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\resources\ltc\info.txt">
       <Filter>resources</Filter>
     </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\..\resources\ltc\ltc_beckmann_1.dds">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="..\..\resources\ltc\ltc_beckmann_2.dds">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="..\..\resources\ltc\ltc_ggx_1.dds">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="..\..\resources\ltc\ltc_ggx_2.dds">
+      <Filter>resources</Filter>
+    </Image>
   </ItemGroup>
 </Project>

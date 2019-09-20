@@ -28,18 +28,30 @@ void GlForward::post_reset() {
 }
 
 void GlForward::init() {
-	auto ltcTexture = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
-		"resources/ltc/ltc_1.dds",
+	auto ltcGGX1 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_ggx_1.dds",
 		TextureSampling::SAMPLING_LINEAR,
 		MipmapType::MIPMAP_NONE
 	));
-	auto ltcTexture2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
-		"resources/ltc/ltc_2.dds",
+	auto ltcGGX2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_ggx_2.dds",
 		TextureSampling::SAMPLING_LINEAR,
 		MipmapType::MIPMAP_NONE
 	));
-	mAssert(ltcTexture);
-	mAssert(ltcTexture2);
+	auto ltcBeckmann1 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_beckmann_1.dds",
+		TextureSampling::SAMPLING_LINEAR,
+		MipmapType::MIPMAP_NONE
+	));
+	auto ltcBeckmann2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+		"resources/ltc/ltc_beckmann_2.dds",
+		TextureSampling::SAMPLING_LINEAR,
+		MipmapType::MIPMAP_NONE
+	));
+	mAssert(ltcGGX1);
+	mAssert(ltcGGX2);
+	mAssert(ltcBeckmann1);
+	mAssert(ltcBeckmann2);
 
 	m_triangleProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
@@ -115,15 +127,25 @@ void GlForward::init() {
 
     // set uniforms
 	// ltc data
-	const auto ltcTexHdl = ltcTexture->acquire_const<DEVICE>();
+	const auto ltcTexHdl = ltcGGX1->acquire_const<DEVICE>();
 	glProgramUniformHandleui64ARB(m_triangleProgram, 24, ltcTexHdl);
 	glProgramUniformHandleui64ARB(m_sphereProgram, 24, ltcTexHdl);
 	glProgramUniformHandleui64ARB(m_quadProgram, 24, ltcTexHdl);
 	
-	const auto ltcTexHdl2 = ltcTexture2->acquire_const<DEVICE>();
-	glProgramUniformHandleui64ARB(m_triangleProgram, 26, ltcTexHdl2);
-	glProgramUniformHandleui64ARB(m_sphereProgram, 26, ltcTexHdl2);
-	glProgramUniformHandleui64ARB(m_quadProgram, 26, ltcTexHdl2);
+	const auto ltcTexHdl2 = ltcGGX2->acquire_const<DEVICE>();
+	glProgramUniformHandleui64ARB(m_triangleProgram, 25, ltcTexHdl2);
+	glProgramUniformHandleui64ARB(m_sphereProgram, 25, ltcTexHdl2);
+	glProgramUniformHandleui64ARB(m_quadProgram, 25, ltcTexHdl2);
+
+	const auto ltcBeckmannHdl1 = ltcBeckmann1->acquire_const<DEVICE>();
+	glProgramUniformHandleui64ARB(m_triangleProgram, 26, ltcBeckmannHdl1);
+	glProgramUniformHandleui64ARB(m_sphereProgram, 26, ltcBeckmannHdl1);
+	glProgramUniformHandleui64ARB(m_quadProgram, 26, ltcBeckmannHdl1);
+
+	const auto ltcBeckmannHdl2 = ltcBeckmann2->acquire_const<DEVICE>();
+	glProgramUniformHandleui64ARB(m_triangleProgram, 27, ltcBeckmannHdl2);
+	glProgramUniformHandleui64ARB(m_sphereProgram, 27, ltcBeckmannHdl2);
+	glProgramUniformHandleui64ARB(m_quadProgram, 27, ltcBeckmannHdl2);
 }
 
 void GlForward::iterate() {

@@ -7,8 +7,10 @@ layout(location = 2) out vec3 out_fragColor;
 layout(location = 1) out vec3 out_position;
 layout(location = 0) out vec3 out_normal;
 
-layout(bindless_sampler, location = 24) uniform sampler2DArray ltc_mat_tex;
-layout(bindless_sampler, location = 26) uniform sampler2DArray ltc_fres_tex;
+layout(bindless_sampler, location = 24) uniform sampler2DArray ltc_ggx1_tex;
+layout(bindless_sampler, location = 25) uniform sampler2DArray ltc_ggx2_tex;
+layout(bindless_sampler, location = 26) uniform sampler2DArray ltc_beckmann1_tex;
+layout(bindless_sampler, location = 27) uniform sampler2DArray ltc_beckmann2_tex;
 
 struct LightInfo
 {
@@ -121,6 +123,14 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 		color += light.color * mat.specular * D * G * 0.25 / aNdotV;
 	}
 
+	sampler2DArray ltcTex1 = ltc_ggx1_tex;
+	sampler2DArray ltcTex2 = ltc_ggx2_tex;
+	if (mat.ndf == NDF_BECKMANN)
+	{
+		ltcTex1 = ltc_beckmann1_tex;
+		ltcTex2 = ltc_beckmann2_tex;
+	}
+
 	for(uint i = 0; i < numBigLights; ++i) {
 		vec3 points[4];
 		points[0] = bigLights[i].pos;
@@ -132,7 +142,7 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 
 		// diffuse part
 		{
-			vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints), ltc_fres_tex);
+			vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints), ltcTex2);
 			vec3 lightness = luminance * lightColor; //* 0.159154943; // normalize with 1 / (2 * pi)
 			color += mat.diffuse * lightness;
 		}
@@ -142,8 +152,9 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 			if (mat.specular == vec3(0.0)) continue;
 
 			vec2 texCoords = LTC_Coords(NdotV, mat.roughness);
-			mat3 Minv = LTC_Matrix(ltc_mat_tex, texCoords);
-			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints), ltc_fres_tex);
+
+			mat3 Minv = LTC_Matrix(ltcTex1, texCoords);
+			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints), ltcTex2);
 			vec3 lightness = luminance * lightColor;// *0.159154943; // normalize with 1 / (2 * pi)
 			// BRDF shadowing and Fresnel
 			color += lightness * mat.specular;
