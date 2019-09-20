@@ -53,12 +53,17 @@ LightInfo calcSpotLight(vec3 pos, vec3 lightPos, vec3 radiance, vec3 lightDir, f
 
 	float cosTheta = max(dot(lightDir, -i.direction), 0.0);
 	// pbrt type of spot light:
-	i.color = radiance * clamp((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 0.0, 1.0) / (dist * dist);
-	i.color *= i.color;
+	i.color = radiance * pow(clamp((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 0.0, 1.0), 2.0) / (dist * dist);
 	return i;
 }
 
 vec3 getMaterialEmission(uint materialId);
+
+float toSrgb(float c)
+{
+	if (c <= 0.0031308) return c * 12.92;
+	return 1.055 * pow(c, 1 / 2.4) - 0.055;
+}
 
 vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 	const vec3 view = normalize(u_cam.position - pos);
@@ -76,6 +81,17 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 	const float roughSquare = mat.roughness * mat.roughness;
 	const float pi = 3.14159265359;
 
+	// textures for ltc
+	sampler2DArray ltcTex1 = ltc_ggx1_tex;
+	sampler2DArray ltcTex2 = ltc_ggx2_tex;
+	if (mat.ndf == NDF_BECKMANN)
+	{
+		ltcTex1 = ltc_beckmann1_tex;
+		ltcTex2 = ltc_beckmann2_tex;
+	}
+	const vec2 texCoords = LTC_Coords(NdotV, mat.roughness);
+	const mat3 Minv = LTC_Matrix(ltcTex1, texCoords);
+
 	// iterate thought small lights
 	for(uint i = 0; i < numSmallLights; ++i) {
 		switch(smallLights[i].type) {
@@ -87,10 +103,17 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 				smallLights[i].direction, smallLights[i].radiusOrFalloff, smallLights[i].materialOrTheta);
 			break;
 		case LIGHT_TYPE_SPHERE: {
-			// project closest point
+			vec3 lightColor = getMaterialEmission(floatBitsToUint(smallLights[i].materialOrTheta));
+			//diffuse
+			{vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), smallLights[i].position, smallLights[i].radiusOrFalloff, ltcTex2);
+			vec3 lightness = luminance * lightColor;
+			color += mat.diffuse * lightness; }
+			// specular
+			if (mat.specular == vec3(0.0)) continue;
+			{vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, smallLights[i].position, smallLights[i].radiusOrFalloff, ltcTex2);
+			vec3 lightness = luminance * lightColor;
+			color += lightness * mat.specular; }
 			continue;
-			vec3 lightPos = smallLights[i].position + normalize(pos - smallLights[i].position) * smallLights[i].radiusOrFalloff;
-			light = calcPointLight(pos, lightPos, getMaterialEmission(floatBitsToUint(smallLights[i].materialOrTheta)));
 		} break;
 		case LIGHT_TYPE_DIRECTIONAL:
 			light = calcDirLight(smallLights[i].direction, smallLights[i].intensity);
@@ -137,14 +160,6 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 		color += light.color * mat.specular * D * G * 0.25 / aNdotV;
 	}
 
-	sampler2DArray ltcTex1 = ltc_ggx1_tex;
-	sampler2DArray ltcTex2 = ltc_ggx2_tex;
-	if (mat.ndf == NDF_BECKMANN)
-	{
-		ltcTex1 = ltc_beckmann1_tex;
-		ltcTex2 = ltc_beckmann2_tex;
-	}
-
 	for(uint i = 0; i < numBigLights; ++i) {
 		vec3 points[4];
 		points[0] = bigLights[i].pos;
@@ -165,9 +180,6 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 		{
 			if (mat.specular == vec3(0.0)) continue;
 
-			vec2 texCoords = LTC_Coords(abs(NdotV), mat.roughness);
-
-			mat3 Minv = LTC_Matrix(ltcTex1, texCoords);
 			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints), ltcTex2);
 			vec3 lightness = luminance * lightColor;// *0.159154943; // normalize with 1 / (2 * pi)
 			// BRDF shadowing and Fresnel
@@ -263,7 +275,7 @@ void getTorranceParams(inout uint offset, out uint shadowing, out uint ndf) {
 MaterialInfo getWalter(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
 	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
 	offset += 8;
-	return MaterialInfo(vec3(0.0), vec3(0.0), vec3(1.0), texture(roughnessTex, uv).r, 0);
+	return MaterialInfo(vec3(0.0), vec3(0.0), vec3(0.0), texture(roughnessTex, uv).r, 0);
 }
 
 void getWalterParams(inout uint offset, out vec3 absorption, out uint shadowing, out uint ndf) {
@@ -437,6 +449,7 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	} break;
 	}
 
+	mat.roughness = toSrgb(mat.roughness);
 	out_fragColor = calcRadiance(pos, normal, mat);
 }
 

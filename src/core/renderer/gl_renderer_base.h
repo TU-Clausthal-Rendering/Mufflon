@@ -36,9 +36,14 @@ protected:
 
 		ei::Vec3 position;
 		float near;
+
 		ei::Vec3 direction;
 		float far;
+
 		ei::UVec2 screen;
+		float padding1, padding2;
+
+		ei::Vec3 up;
 	};
 
 	virtual scene::SceneDescriptor<Device::OPENGL> get_scene_descriptor() = 0;
@@ -133,12 +138,13 @@ protected:
 
 		t.position = cam->get_position(0);
 		t.direction = cam->get_view_dir(0);
-
+		
 		t.near = cam->get_near();
 		t.far = cam->get_far();
 		t.screen.x = this->m_outputBuffer.get_width();
 		t.screen.y = this->m_outputBuffer.get_height();
-
+		t.up = cam->get_up_dir(0);
+		
 		float fov = 1.5f;
 		if(auto pcam = dynamic_cast<const cameras::Pinhole*>(cam)) {
 			fov = pcam->get_vertical_fov();
