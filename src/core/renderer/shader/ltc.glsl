@@ -40,6 +40,18 @@ vec3 LTC_IntegrateEdge(vec3 v1, vec3 v2)
 vec3 LTC_Evaluate(
 	vec3 N, vec3 V, vec3 P, mat3 Minv, vec3 points[4], int nPoints, sampler2DArray helpTexture)
 {
+	// do early behind test
+	{
+		bool isHidden = true;
+		for (uint i = 0; i < nPoints && i < 4; ++i) 
+		{
+			if (dot(normalize(P - points[i]), N) <= 0.4)
+				isHidden = false;
+		}
+
+		//if (isHidden) return vec3(1.0, 0.0, 0.0);
+	}
+
 
 	if (nPoints > 3)
 	{

@@ -43,8 +43,8 @@ void main() {
 	const float invPi = 1.0 / 3.14159265359;
 	shade(
 		toWorld(vec4(position, 1.0)), 
-		worldNormal, 
-		vec2(phi * invPi * 0.5 + 0.5, theta * invPi), 
+		worldNormal,  
+		vec2(phi * invPi * 0.5 + 0.5, 1.0f - theta * invPi), 
 		in_materialIndex
 	);
 #endif

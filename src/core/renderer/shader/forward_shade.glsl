@@ -44,18 +44,33 @@ LightInfo calcPointLight(vec3 pos, vec3 lightPos, vec3 radiance) {
 	return i;
 }
 
+LightInfo calcSpotLight(vec3 pos, vec3 lightPos, vec3 radiance, vec3 lightDir, float cosFalloffStart, float cosThetaMax)
+{
+	LightInfo i;
+	i.direction = lightPos - pos;
+	float dist = length(i.direction);
+	i.direction /= dist;
+
+	float cosTheta = max(dot(lightDir, -i.direction), 0.0);
+	// pbrt type of spot light:
+	i.color = radiance * clamp((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 0.0, 1.0) / (dist * dist);
+	i.color *= i.color;
+	return i;
+}
+
 vec3 getMaterialEmission(uint materialId);
 
 vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 	const vec3 view = normalize(u_cam.position - pos);
 
 	vec3 color = vec3(0.0);
-	color += mat.emission;
 
 	LightInfo light;
 
 	// angle between normal and view
 	const float NdotV = dot(normal, view);
+	if(NdotV > 0.0)
+		color += mat.emission;
 
 	// some data for the microfacet modell
 	const float roughSquare = mat.roughness * mat.roughness;
@@ -68,9 +83,8 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
 			break;
 		case LIGHT_TYPE_SPOT:
-			// TODO add spot light properties
-			continue;
-			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
+			light = calcSpotLight(pos, smallLights[i].position, smallLights[i].intensity,
+				smallLights[i].direction, smallLights[i].radiusOrFalloff, smallLights[i].materialOrTheta);
 			break;
 		case LIGHT_TYPE_SPHERE: {
 			// project closest point
@@ -151,7 +165,7 @@ vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
 		{
 			if (mat.specular == vec3(0.0)) continue;
 
-			vec2 texCoords = LTC_Coords(NdotV, mat.roughness);
+			vec2 texCoords = LTC_Coords(abs(NdotV), mat.roughness);
 
 			mat3 Minv = LTC_Matrix(ltcTex1, texCoords);
 			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints), ltcTex2);
@@ -455,7 +469,8 @@ vec3 getMaterialEmission(uint materialIndex) {
 		float factor1, factor2;
 		getBlendParams(matOffset, factor1, factor2);
 
-		return texture(emissionTex, vec3(0.0)).rgb * scale * factor2;
+		return vec3(0.0);
+		//return texture(emissionTex, vec3(0.0)).rgb * scale * factor2;
 	} break;
 	}
 	return vec3(0.0);
