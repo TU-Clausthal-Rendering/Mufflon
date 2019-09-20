@@ -36,6 +36,8 @@ struct SilVertexExt {
 	i32 silhouetteVerticesSecond[2u] = { -1, -1 }; // Two arrays in case of split vertices
 	float silhouetteRegionSize = 0.f;
 
+	ei::Vec3 otherNeeRadiance;
+
 
 	CUDA_FUNCTION void init(const PathVertex<SilVertexExt>& thisVertex,
 							const AreaPdf inAreaPdf,
