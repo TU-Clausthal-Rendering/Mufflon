@@ -1,9 +1,11 @@
-﻿using gui.Dll;
+﻿using gui.Command;
+using gui.Dll;
 using gui.Model;
 using gui.Utility;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -26,7 +28,9 @@ namespace gui.Controller.Renderer
         private int m_iterationsPerformed = 0;
         // Check if we got called to clear the world
         private bool m_clearWorld = false;
-        private ManualResetEvent m_clearedWorld = new ManualResetEvent(true);
+        private bool m_takeScreenshot = false;
+        private bool m_denoisedScreenshot = false;
+        private ManualResetEvent m_auxiliaryIteration = new ManualResetEvent(true);
 
         public RendererController(Models models)
         {
@@ -37,6 +41,7 @@ namespace gui.Controller.Renderer
             m_models.Renderer.RequestWorldClear += OnRequestWorldClear;
             m_models.Renderer.PropertyChanged += LoadRendererParameters;
             m_models.Renderer.RequestParameterSave += SaveRendererParameter;
+            m_models.Renderer.RequestScreenshot += OnRequestScreenshot;
         }
         
         /* Performs one render loop iteration
@@ -54,13 +59,33 @@ namespace gui.Controller.Renderer
             if(m_shouldExit)
                 return;
 
-            if(m_clearWorld)
+            if(m_takeScreenshot)
+            {
+                string filename = ScreenShotCommand.ReplaceCommonFilenameTags(m_models, m_models.Settings.ScreenshotNamePattern);
+                if(m_denoisedScreenshot)
+                {
+                    Core.render_save_denoised_radiance(Path.Combine(m_models.Settings.ScreenshotFolder, filename));
+                } else
+                {
+                    foreach (RenderTarget target in m_models.RenderTargetSelection.Targets)
+                    {
+                        if (target.Enabled)
+                            Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, filename), target.Name, false);
+                        if (target.VarianceEnabled)
+                            Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, filename), target.Name, true);
+                    }
+                }
+
+                m_takeScreenshot = false;
+                if(!m_models.Renderer.IsRendering || m_iterationsPerformed == 0)
+                    m_models.Renderer.RenderLock.Reset();
+            } else if(m_clearWorld)
             {
                 // Only clear the world, do nothing else
                 Core.world_clear_all();
                 m_clearWorld = false;
                 m_models.Renderer.RenderLock.Reset();
-                m_clearedWorld.Set();
+                m_auxiliaryIteration.Set();
             } else
             {
                 UpdateRenderTargets();
@@ -144,10 +169,17 @@ namespace gui.Controller.Renderer
 
         private void OnRequestWorldClear(object sender, EventArgs args)
         {
-            m_clearedWorld.Reset();
+            m_auxiliaryIteration.Reset();
             m_clearWorld = true;
             m_models.Renderer.RenderLock.Set();
-            m_clearedWorld.WaitOne();
+            m_auxiliaryIteration.WaitOne();
+        }
+
+        private void OnRequestScreenshot(bool denoised)
+        {
+            m_denoisedScreenshot = denoised;
+            m_takeScreenshot = true;
+            m_models.Renderer.RenderLock.Set();
         }
 
         // Saves the current renderer's parameters in textform in the application settings

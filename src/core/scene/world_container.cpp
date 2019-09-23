@@ -188,6 +188,10 @@ InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle ob
 	auto instance = std::make_unique<Instance>(move(name), *obj);
 	StringView nameRef = instance->get_name();
 	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
+		if(m_instances.find(nameRef) != m_instances.cend()) {
+			logError("[WorldContainer::create_instance] Non unique instance name");
+			return nullptr;
+		}			
 		m_instances[nameRef] = std::move(instance);
 		return m_instances[nameRef].get();
 	} else {
@@ -204,6 +208,10 @@ InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle ob
 		m_frameEnd = std::max(m_frameEnd, animationFrame);
 		if(m_animatedInstances[animationFrame] == nullptr)
 			m_animatedInstances[animationFrame] = std::make_unique<std::unordered_map<StringView, std::unique_ptr<Instance>>>();
+		if((*m_animatedInstances[animationFrame]).find(nameRef) != (*m_animatedInstances[animationFrame]).cend()) {
+			logError("[WorldContainer::create_instance] Non unique instance name");
+			return nullptr;
+		}
 		(*m_animatedInstances[animationFrame])[nameRef] = std::move(instance);
 		return (*m_animatedInstances[animationFrame])[nameRef].get();
 	}

@@ -30,16 +30,7 @@ namespace gui.Command
 
         public void Execute(object parameter)
         {
-            // First parse the current screenshot string and emplace the information
-            string filename = ReplaceCommonFilenameTags(m_models, m_models.Settings.ScreenshotNamePattern);
-
-            foreach (RenderTarget target in m_models.RenderTargetSelection.Targets)
-            {
-                if (target.Enabled)
-                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, filename), target.Name, false);
-                if (target.VarianceEnabled)
-                    Core.render_save_screenshot(Path.Combine(m_models.Settings.ScreenshotFolder, filename), target.Name, true);
-            }
+            m_models.Renderer.TakeScreenshot(false);
         }
 
         public event EventHandler CanExecuteChanged

@@ -7,3 +7,6 @@ build/
 
 # nuget
 packages/
+
+# private directories
+img/

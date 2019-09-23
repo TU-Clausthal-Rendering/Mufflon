@@ -79,24 +79,6 @@ public:
 	}
 
 	template < class T >
-	CUDA_FUNCTION void set(Pixel pixel, const ei::Vec<typename T::PixelType, T::NUM_CHANNELS>& value) {
-		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
-		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
-		using PixelType = typename T::PixelType;
-		auto& target = m_targets.template get<Target<T>>();
-		if(target.pixels) {
-			auto& pixels = reinterpret_cast<cuda::Atomic<dev, PixelType>(*)[T::NUM_CHANNELS]>(target.pixels)[pixel.x + pixel.y * m_resolution.x];
-			for(u32 i = 0u; i < T::NUM_CHANNELS; ++i)
-				cuda::atomic_exchange<dev>(pixels[i], check_nan(value[i]));
-		}
-	}
-	// Overload for single-value targets
-	template < class T >
-	CUDA_FUNCTION void set(const Pixel pixel, const typename T::PixelType& value) {
-		this->set<T>(pixel, ei::Vec<typename T::PixelType, T::NUM_CHANNELS>{ value });
-	}
-
-	template < class T >
 	__host__ void set_target_buffer(RenderTarget<dev, T> buffer) {
 		m_targets.template get<Target<T>>().pixels = buffer;
 	}
@@ -136,6 +118,25 @@ public:
 	template < class T >
 	CUDA_FUNCTION bool is_target_enabled() const noexcept {
 		return m_targets.template get<Target<T>>().pixels;
+	}
+
+	template < class T >
+	CUDA_FUNCTION void set(Pixel pixel, const ei::Vec<typename T::PixelType, T::NUM_CHANNELS>& value) {
+		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
+		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
+		using PixelType = typename T::PixelType;
+		auto& target = m_targets.template get<Target<T>>();
+
+		if(target.pixels) {
+			auto& pixels = reinterpret_cast<cuda::Atomic<dev, PixelType>(*)[T::NUM_CHANNELS]>(target.pixels)[pixel.x + pixel.y * m_resolution.x];
+			for(u32 i = 0u; i < T::NUM_CHANNELS; ++i)
+				cuda::atomic_exchange<dev>(pixels[i], check_nan(value[i]));
+		}
+	}
+
+	template < class T >
+	CUDA_FUNCTION void set(const Pixel pixel, const typename T::PixelType& value) {
+		this->set<T>(pixel, ei::Vec<typename T::PixelType, T::NUM_CHANNELS>{ value });
 	}
 
 	CUDA_FUNCTION bool is_target_enabled(const u32 index) const noexcept {

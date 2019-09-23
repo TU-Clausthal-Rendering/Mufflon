@@ -343,7 +343,7 @@ CUDA_FUNCTION LightPdfs light_pdf(const LightTree<CURRENT_DEV>& tree,
 	mAssert(primitive.instanceId != -1);
 	using namespace lighttree_detail;
 
-	float p = tree.posLights.root.flux / (tree.dirLights.root.flux + tree.posLights.root.flux + ei::sum(tree.background.flux));
+	float p = tree.posLights.root.flux / tree.get_flux();
 	u32 code = *tree.primToNodePath.find(primitive); // If crash here, you have hit an emissive surface which is not in the light tree. This is a fundamental problem and not only an access violation.
 
 	// Travers through the tree to compute the complete, guide dependent pdf

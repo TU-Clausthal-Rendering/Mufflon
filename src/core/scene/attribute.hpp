@@ -140,6 +140,10 @@ public:
 		return AttributeHandle{ index };
 	}
 
+	bool has_attribute(StringView name) const {
+		return m_nameMap.find(name) != m_nameMap.cend();
+	}
+
 	template < class T >
 	void remove(const std::string& name) {
 		if(auto iter = m_nameMap.find(name); iter == m_nameMap.cend()) {
@@ -166,10 +170,6 @@ public:
 				m_attributes[iter->second].accessor = {};
 			m_nameMap.erase(iter);
 		}
-	}
-
-	bool has_attribute(StringView name) const {
-		return m_nameMap.find(name) != m_nameMap.cend();
 	}
 
 	// Adds an attribute that OpenMesh supposedly already has

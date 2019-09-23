@@ -9,6 +9,7 @@
 #define PARALLEL_REDUCTION(op, var) omp parallel for schedule(static, 1000) reduction (op:var)
 #else // DEBUG_ENABLED
 #define PARALLEL_FOR
+#define PARALLEL_REDUCTION(op, var)
 #endif // DEBUG_ENABLED
 
 namespace mufflon {

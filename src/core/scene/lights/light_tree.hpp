@@ -134,6 +134,11 @@ struct LightTree {
 	// the tree must be traversed
 	HashMap<dev, PrimitiveHandle, u32> primToNodePath;
 	bool posGuide;
+
+	// Get the total flux of all lights
+	CUDA_FUNCTION float get_flux() const {
+		return dirLights.root.flux + posLights.root.flux + ei::sum(background.flux);
+	}
 };
 
 #ifndef __CUDACC__

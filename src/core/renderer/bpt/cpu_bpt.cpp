@@ -206,10 +206,11 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		for(int l = ei::max(0, m_params.minPathLength-viewPathLen-1); l < maxL; ++l) {
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
-			mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
-
-			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * path[l].ext().throughput.weight * conVal.cosines * conVal.bxdfs);
-			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * path[l].ext().throughput.guideWeight * conVal.cosines);
+			if(outCoord.x != -1) {
+				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
+				m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput.weight * path[l].ext().throughput.weight * conVal.cosines * conVal.bxdfs);
+				m_outputBuffer.contribute<LightnessTarget>(outCoord, throughput.guideWeight * path[l].ext().throughput.guideWeight * conVal.cosines);
+			}
 		}
 
 		// Walk

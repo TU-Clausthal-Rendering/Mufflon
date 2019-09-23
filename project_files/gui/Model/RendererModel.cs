@@ -141,11 +141,13 @@ namespace gui.Model
     /// </summary>
     public class RendererModel : INotifyPropertyChanged
     {
+        public delegate void ScreenshotHandler(bool denoised);
         public delegate void ParameterSaveHandler(RendererParameter param);
 
         public event EventHandler RequestWorldClear;
         public event EventHandler RequestRedraw;
         public event ParameterSaveHandler RequestParameterSave;
+        public event ScreenshotHandler RequestScreenshot;
 
         private volatile bool m_isRendering = false;
         private UInt32 m_rendererIndex = UInt32.MaxValue;
@@ -197,6 +199,12 @@ namespace gui.Model
             CurrentIterationTime = new Core.ProcessTime();
             OnPropertyChanged(nameof(CurrentIterationTime));
             UpdateIterationData();
+        }
+
+        // Takes screenshots of all active render targets
+        public void TakeScreenshot(bool denoised)
+        {
+            RequestScreenshot(denoised);
         }
 
         // Updates the rendering bitmap without actually rendering anything; should be used
