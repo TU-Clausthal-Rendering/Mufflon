@@ -234,21 +234,36 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 }
 
 void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, PrimitiveHandle, u32>& map) {
+	// 'Height' is the 'lower' height of the tree, ie. on what height the first light node is
 	int height = ei::ilog2(lights.size());
-	u32 extraNodes = u32(lights.size()) - (1u << height);
-	if(extraNodes > 0) ++height;
-	// Get the number of lights on level height.
-	// All lights with an higher index are on level height+1.
-	u32 numLeavesOnH = u32(lights.size()) - extraNodes * 2;
-	u32 i = 0;
-	for(const auto& light : lights) {
+	// Calculate the number of additional internal nodes compared to a full tree of 'height'
+	const u32 extraNodes = u32(lights.size()) - (1u << height);
+	// From this we can infer how many lights are on the lower level
+	const u32 lowerLightCount = u32(1u << height) - extraNodes;
+
+	u32 i = 0u;
+	// Special case: non-full light tree (not so special actually...)
+	if(extraNodes > 0) {
+		for(; i < lowerLightCount; ++i) {
+			const auto& light = lights[i];
+			if(light.primitive.instanceId != -1) {		// Hitable light source?
+			// We can compute the code 'backwards': (2^(height + 1) - 1) - (n-1 - i)
+				u32 code = ((1u << height) - 1) - (lowerLightCount - i - 1);
+				// Shift to left-align the code
+				code <<= (32 - height);
+				map.insert(light.primitive, code);
+			}
+		}
+		height += 1;
+	}
+
+	// Left-overs on the final tree level: count up the in-level index and shift
+	for(; i < lights.size(); ++i) {
+		const auto& light = lights[i];
 		if(light.primitive.instanceId != -1) {		// Hitable light source?
-			u32 code = i < numLeavesOnH ? 2*i+2*extraNodes : i-numLeavesOnH;
-			// Append zero -> most significant bit is the root branch
-			code <<= 32 - height;
+			const u32 code = (i - lowerLightCount) << (32 - height);
 			map.insert(light.primitive, code);
 		}
-		++i;
 	}
 }
 
