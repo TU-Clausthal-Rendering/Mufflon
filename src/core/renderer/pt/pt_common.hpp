@@ -87,7 +87,6 @@ CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> o
 						mAssert(!isnan(mis));
 						outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
 						outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * value.cosOut);
-
 					}
 				}
 			}

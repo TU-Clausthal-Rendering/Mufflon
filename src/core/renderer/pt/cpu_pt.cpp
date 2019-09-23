@@ -23,6 +23,8 @@ void CpuPathTracer::iterate() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < m_outputBuffer.get_num_pixels(); ++pixel) {
 		Pixel coord { pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
+		if(coord == Pixel{ 431, 399-59 })
+			__debugbreak();
 		pt_sample(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel]);
 	}
 }

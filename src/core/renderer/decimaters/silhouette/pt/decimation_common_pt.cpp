@@ -170,7 +170,7 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 	}
 
 	// Subtract the shadow silhouette importance and use shadow importance instead
-	logPedantic("Importance sum/shadow/silhouette: ", importanceSum, " ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
+	logPedantic("Importance sum/shadow/silhouette(", m_objectName, "): ", importanceSum, " ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
 	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
 
 	// Map the importance back to the original mesh

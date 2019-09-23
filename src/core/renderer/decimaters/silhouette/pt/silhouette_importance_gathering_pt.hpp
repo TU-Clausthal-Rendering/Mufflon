@@ -419,9 +419,11 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 																		  lightDistance - firstShadowDistance);
 		// Scale the irradiance with the predicted shadow size
 		const float weightedImportance = importance * weight_shadow(shadowRegionSizeEstimate, params);
+		vertex.ext().neeWeightedIrradiance = weightedImportance;
+		vertex.ext().shadowInstanceId = secondHit.hitId.instanceId;
 
-		const auto lodIdx = scene.lodIndices[shadowHitId.instanceId];
-		record_shadow(sums[lodIdx], weightedImportance);
+		//const auto lodIdx = scene.lodIndices[shadowHitId.instanceId];
+		//record_shadow(sums[lodIdx], weightedImportance);
 
 		// Also check for silhouette interaction here
 		if(secondHit.hitId.instanceId == shadowHitId.instanceId) {
@@ -455,7 +457,6 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 				}
 			}
 			if(sharedVertices >= 2) {
-				vertex.ext().shadowInstanceId = secondHit.hitId.instanceId;
 				// Compute the (estimated) size of the shadow region
 				// Originally we used the projected length of the shadow edge,
 				// but it isn't well defined and inconsistent with the shadow
@@ -529,13 +530,14 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 				// TODO: any_intersection-like method with both normals please...
 				const auto shadowHit = scene::accel_struct::first_intersection(scene, shadowRay,
 																			   nee.geoNormal,
-																			   nee.dist - 0.00125f);
+																			   nee.dist - 0.000125f);
 				const float firstShadowDistance = shadowHit.distance;
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
 				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 
+				const float weightedRadianceLuminance = get_luminance(throughput.weight * mis * radiance) * (1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				if(shadowHit.hitId.instanceId < 0) {
 					if(params.show_direct()) {
@@ -556,32 +558,39 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 					// Determine the "rest of the direct" radiance
 					const u64 ambientNeeSeed = rng.next();
 					ei::Vec3 rad{ 0.f };
-					const auto neeCount = std::max(1, params.neeCount);
+					const int neeCount = ei::max<int>(1, params.neeCount);
+					const scene::Point vertexPos = vertices[pathLen].get_position();
+					const scene::Point vertexNormal = vertices[pathLen].get_geometric_normal();
 					for (int i = 0; i < neeCount; ++i) {
 						math::RndSet2 currNeeRnd = rng.next();
 						auto currNee = scene::lights::connect(scene, i, neeCount,
-														  ambientNeeSeed, vertices[pathLen].get_position(), currNeeRnd);
+															  ambientNeeSeed, vertexPos,
+															  currNeeRnd);
 						Pixel outCoord;
 						auto currValue = vertices[pathLen].evaluate(currNee.dir.direction, scene.media, outCoord);
 						if (currNee.cosOut != 0) value.cosOut *= currNee.cosOut;
 						mAssert(!isnan(currValue.value.x) && !isnan(currValue.value.y) && !isnan(currValue.value.z));
-						Spectrum currRadiance = currValue.value * currNee.diffIrradiance;
+						const Spectrum currRadiance = currValue.value * currNee.diffIrradiance;
 						if (any(greater(currRadiance, 0.0f)) && currValue.cosOut > 0.0f) {
 							bool anyhit = scene::accel_struct::any_intersection(
-								scene, vertices[pathLen].get_position(), currNee.position,
-								vertices[pathLen].get_geometric_normal(), currNee.geoNormal,
+								scene, vertexPos, currNee.position,
+								vertexNormal, currNee.geoNormal,
 								currNee.dir.direction);
 							if (!anyhit) {
 								AreaPdf currHitPdf = currValue.pdf.forw.to_area_pdf(currNee.cosOut, currNee.distSq);
-								float curMis = 1.0f / (neeCount + currHitPdf / currNee.creationPdf);
+								// TODO: it seems that, since we're looking at irradiance here (and also did not weight
+								// the previous weightedIrradiance with 1/(neeCount + 1)) we must not use the regular
+								// MIS weight here
+								float curMis = 1.0f / (1 + currHitPdf / currNee.creationPdf);
 								mAssert(!isnan(curMis));
 								rad += currValue.cosOut * currRadiance * curMis;
 							}
 						}
 					}
 
+					vertices[pathLen].ext().otherNeeLuminance = get_luminance(rad);
 					// TODO: use this radiance to conditionally discard importance
-					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
+					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedRadianceLuminance,
 								 shadowHit.hitId, nee.dist, firstShadowDistance,
 								 lightType, lightOffset, rad * throughput.weight, params);
 				}
@@ -647,46 +656,53 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 		// Check if it is sensible to keep shadow silhouettes intact
 		// TODO: replace threshold with something sensible
 		const auto& ext = vertices[p].ext();
+
+
 		if(p == 1 && ext.shadowInstanceId >= 0) {
 			// TODO: factor in background illumination too
-			const float otherNeeLuminance = get_luminance(ext.otherNeeRadiance);
-			const float indirectLuminance = get_luminance(accumRadiance) + otherNeeLuminance;
+			const float indirectLuminance = get_luminance(accumRadiance) + ext.otherNeeLuminance;
 			const float totalLuminance = get_luminance(ext.pathRadiance) + indirectLuminance;
 			const float ratio = totalLuminance / indirectLuminance - 1.f;
-			if(ratio > 0.02f && params.show_silhouette()) {
-				constexpr float FACTOR = 2'000.f;
-				
+			if(ratio > params.directIndirectRatio && params.show_silhouette()) {
 				// Regular shadow importance
 				const auto lodIdx = scene.lodIndices[ext.shadowInstanceId];
-				record_shadow(sums[lodIdx], otherNeeLuminance);
+				record_shadow(sums[lodIdx], ext.neeWeightedIrradiance);
 
-				// Idea: we have one NEE for silhouette stuff and n other ones to estimate the
-				// brightness; all of them contribute to the direct irradiance thingy,
-				// but only one acts as a silhouette detector(?)
-				// Kinda sucks though
+				if(ext.silhouetteRegionSize >= 0.f) {
+					constexpr float FACTOR = 2'000.f;
 
-				/*trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
-					shadowHit.hitId, nee.dist, firstShadowDistance,
-					lightType, lightOffset, params);*/
+					// Idea: we have one NEE for silhouette stuff and n other ones to estimate the
+					// brightness; all of them contribute to the direct irradiance thingy,
+					// but only one acts as a silhouette detector(?)
+					// Kinda sucks though
 
-				// TODO: proper factor!
-				const float silhouetteImportance = weight_shadow(ext.silhouetteRegionSize, params)
-					* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
+					/*trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
+						shadowHit.hitId, nee.dist, firstShadowDistance,
+						lightType, lightOffset, params);*/
 
-				for(i32 i = 0; i < 2; ++i) {
-					mAssert(ext.silhouetteVerticesFirst[i] >= 0 && static_cast<u32>(ext.silhouetteVerticesFirst[i]) < scene.lods[lodIdx].polygon.numVertices);
-					record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
-														  ext.silhouetteVerticesFirst[i],
-														  silhouetteImportance);
-					if(ext.silhouetteVerticesSecond[i] >= 0 && ext.silhouetteVerticesFirst[i] != ext.silhouetteVerticesSecond[i]) {
-						mAssert(static_cast<u32>(ext.silhouetteVerticesSecond[i]) < scene.lods[lodIdx].polygon.numVertices);
+						// TODO: proper factor!
+					const float silhouetteImportance = weight_shadow(ext.silhouetteRegionSize, params)
+						* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
+
+					for(i32 i = 0; i < 2; ++i) {
+						mAssert(ext.silhouetteVerticesFirst[i] >= 0 && static_cast<u32>(ext.silhouetteVerticesFirst[i]) < scene.lods[lodIdx].polygon.numVertices);
 						record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
-															  ext.silhouetteVerticesSecond[i],
+															  ext.silhouetteVerticesFirst[i],
 															  silhouetteImportance);
+						if(ext.silhouetteVerticesSecond[i] >= 0 && ext.silhouetteVerticesFirst[i] != ext.silhouetteVerticesSecond[i]) {
+							mAssert(static_cast<u32>(ext.silhouetteVerticesSecond[i]) < scene.lods[lodIdx].polygon.numVertices);
+							record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
+																  ext.silhouetteVerticesSecond[i],
+																  silhouetteImportance);
+						}
 					}
 				}
+				outputBuffer.template contribute<PShadowRecorded>(coord, 1.f);
+			} else {
+				outputBuffer.template contribute<PShadowOmitted>(coord, 1.f);
 			}
 		}
+		
 	}
 }
 
