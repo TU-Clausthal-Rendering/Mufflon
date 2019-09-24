@@ -77,7 +77,8 @@ private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
-	bool needs_density() const { return m_params.heuristic == PHeuristic::Values::VCMPlus || m_params.heuristic == PHeuristic::Values::VCMStar; }
+	bool needs_density() const { return m_params.heuristic == PHeuristic::Values::VCMPlus
+		|| m_params.heuristic == PHeuristic::Values::VCMStar; }
 	bool path_len_valid(int pathLen) const { return pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength; }
 
 	IvcmParameters m_params = {};

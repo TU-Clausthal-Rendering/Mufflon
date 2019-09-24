@@ -128,7 +128,7 @@ float get_mis_weight_photon(const AreaPdf* incidentF, const AreaPdf* incidentB, 
 	float mergeArea, const float* reuseCount) {
 	if(idx == 0 || idx == n) return 0.0f;
 	// Start with camera connection
-	float relPdfSumV = 1.0f / (float(incidentF[1]) * mergeArea * s_numPhotons); // = (1/(p * A * reuseCount[1]) * (reuseCount[1]/s_numPhotons)
+	float relPdfSumV = 1.0f / (float(incidentF[1]) * mergeArea * reuseCount[1]); // = (1/(p * A * reuseCount[1]) * (reuseCount[1]/s_numPhotons)
 	// Collect merges and connections along view path
 	for(int i = 1; i < idx; ++i) {
 		float prevMerge = (incidentB[i] / incidentF[i+1]) * (reuseCount[i] / reuseCount[i+1]);
@@ -155,7 +155,7 @@ float get_mis_weight_connect(const AreaPdf* incidentF, const AreaPdf* incidentB,
 	// Collect merges and connections along view path
 	for(int i = 1; i <= idx; ++i) {
 		float prevConnect = incidentB[i] / incidentF[i];
-		if(i == 1) prevConnect *= reuseCount[1] / s_numPhotons;		// LT reuse
+	//	if(i == 1) prevConnect *= reuseCount[1] / s_numPhotons;		// LT reuse
 		float curMerge = float(incidentB[i]) * mergeArea * reuseCount[i];
 		relPdfSumV = curMerge + prevConnect * (1.0f + relPdfSumV);
 	}
@@ -166,8 +166,8 @@ float get_mis_weight_connect(const AreaPdf* incidentF, const AreaPdf* incidentB,
 		float curMerge = float(incidentF[i]) * mergeArea * reuseCount[i];
 		relPdfSumL = curMerge + prevConnect * (1.0f + relPdfSumL);
 	}
-	if(idx == 0)
-		relPdfSumL *= s_numPhotons / reuseCount[1];	// LT reuse 2
+	//if(idx == 0)
+	//	relPdfSumL *= s_numPhotons / reuseCount[1];	// LT reuse 2
 	return 1.0f / (1.0f + relPdfSumV + relPdfSumL);
 }
 
@@ -175,14 +175,15 @@ float get_mis_weight_rhit(const AreaPdf* incidentF, const AreaPdf* incidentB, in
 	float mergeArea, const float* reuseCount) {
 	// Collect all connects/merges along the view path only
 	float relPdfSumV = 0.0f;
-	for(int i = 1; i <= n; ++i) {
+	for(int i = 1; i < n; ++i) {
 		float prevConnect = incidentB[i] / incidentF[i];
-		if(i == 1) prevConnect *= reuseCount[1] / s_numPhotons;		// LT reuse
-		float curMerge = (i == n) ? 0.0f : float(incidentB[i]) * mergeArea * reuseCount[i];
+	//	if(i == 1) prevConnect *= reuseCount[1] / s_numPhotons;		// LT reuse
+	//	float curMerge = (i == n) ? 0.0f : float(incidentB[i]) * mergeArea * reuseCount[i];
+		float curMerge = float(incidentB[i]) * mergeArea * reuseCount[i];
 		relPdfSumV = curMerge + prevConnect * (1.0f + relPdfSumV);
 	}
-//	float connectionRel = incidentB[n] / incidentF[n];
-//	relPdfSumV = connectionRel * (1.0f + relPdfSumV);
+	float connectionRel = incidentB[n] / incidentF[n];
+	relPdfSumV = connectionRel * (1.0f + relPdfSumV);
 	return 1.0f / (1.0f + relPdfSumV);
 }
 
@@ -399,15 +400,17 @@ void CpuIvcm::iterate() {
 					 pixel, numPhotons, currentMergeRadius, incidentF, incidentB, vertexBuffer, reuseCount);
 	}
 
-	logInfo("[CpuIvcm::iterate] Density structure memory: ", m_density->mem_size() / (1024 * 1024), "MB, ",
-		ei::round((1000.0f * m_density->size()) / m_density->capacity()) / 10.0f, "%");
+	if(needs_density() || m_outputBuffer.is_target_enabled<DensityTarget>()) {
+		logInfo("[CpuIvcm::iterate] Density structure memory: ", m_density->mem_size() / (1024 * 1024), "MB, ",
+			ei::round((1000.0f * m_density->size()) / m_density->capacity()) / 10.0f, "%");
+	}
 }
 
 
 void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
 	math::RndSet2 rndStart { m_rngs[idx].next() };
-	//u64 lightTreeRnd = m_rngs[idx].next();
-	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
+	u64 lightTreeRnd = m_rngs[idx].next();
+	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, lightTreeRnd, rndStart);
 	IvcmPathVertex vertex;
 	IvcmPathVertex::create_light(&vertex, nullptr, p);
 	const IvcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
@@ -426,9 +429,11 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 
 		// Store a photon to the photon map
 		previous = m_photonMap.insert(vertex.get_position(), vertex);
-		m_density->increase_count(vertex.get_position(), vertex.get_geometric_normal());
-		//m_density->increase_count(vertex.get_position());
-		//m_density2->insert(vertex.get_position(), 0);
+		if(needs_density() || m_outputBuffer.is_target_enabled<DensityTarget>()) {
+			m_density->increase_count(vertex.get_position(), vertex.get_geometric_normal());
+			//m_density->increase_count(vertex.get_position());
+			//m_density2->insert(vertex.get_position(), 0);
+		}
 	}
 
 	m_pathEndPoints[idx] = previous;
@@ -439,7 +444,9 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 					 float* reuseCount) {
 	float mergeRadiusSq = currentMergeRadius * currentMergeRadius;
 	float mergeArea = ei::PI * mergeRadiusSq;
-	u64 lightPathIdx = cn::WangHash{}(idx) % numPhotons;
+	//u64 lightPathIdx = cn::WangHash{}(idx) % numPhotons;
+	//u64 lightPathIdx = (i64(idx) * 2147483647ll) % numPhotons;
+	u64 lightPathIdx = idx;
 	// Trace view path
 	// Create a start for the path
 	IvcmPathVertex* currentVertex = vertexBuffer;
@@ -519,10 +526,10 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 					VertexWrapper{&light, {emission.pdf, AngularPdf{0.0}}}, 0);
 				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, reuseCount);
 				emission.value *= misWeight;
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
 			}
 			mAssert(!isnan(emission.value.x));
 
-			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
 			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * currentVertex->get_position());
 			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * currentVertex->get_normal());
 			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * currentVertex->get_albedo());
@@ -581,7 +588,6 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 
 
 static float ivcm_heuristic(int numPhotons, float a0, float a1) {
-	//a0 *= numPhotons; // Multiply instead divide a1/numPhotons
 	//return (a0 + a1) / (a0 + a1 / numPhotons);
 	//float aR = (a0 * a0) / (a1 * a1);
 	float aR = a0 / a1;
