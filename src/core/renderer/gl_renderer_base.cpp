@@ -233,6 +233,10 @@ void GlRenderer::bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs)
 		mAssert(sceneDesc.materials.id);
 		mAssert(!sceneDesc.materials.offset);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, sceneDesc.materials.id);
+
+		mAssert(sceneDesc.alphaTextures.id);
+		mAssert(!sceneDesc.alphaTextures.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, sceneDesc.alphaTextures.id);
 	}
 
 	if (attribs & Attribute::Light) {

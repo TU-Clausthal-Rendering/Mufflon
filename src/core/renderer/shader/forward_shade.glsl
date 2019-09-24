@@ -208,6 +208,17 @@ layout(binding = 0) readonly buffer materialsBuffer {
 	uint u_materialData[];
 };
 
+layout(binding = 4) readonly buffer alphaTextureBuffer {
+	uvec2 u_alphaTextures[];
+};
+
+bool isMaskedOut(vec3 uv, uint materialIndex) {
+	uvec2 id = u_alphaTextures[materialIndex];
+	if (id == 0) return false;
+	sampler2DArray alphaTex = sampler2DArray(id);
+	return texture(alphaTex, uv).r <= 0.0f;
+}
+
 uint readShort(uint byteOffset) {
 	uint index = byteOffset / 4;
 	uint remainder = byteOffset % 4;
@@ -323,6 +334,8 @@ void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	out_normal = normal;
 	out_position = pos;
 	const vec3 uv = vec3(texcoord, 0.0); // all textures are sampler2DArrays with layer 0
+
+	if (isMaskedOut(uv, materialIndex)) discard;
 
 	// read correct material
 	uint matOffset = u_materialData[materialIndex];
