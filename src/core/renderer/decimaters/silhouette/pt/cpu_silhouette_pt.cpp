@@ -127,14 +127,14 @@ void CpuShadowSilhouettesPT::iterate() {
 					"ms, ", cycles / 1'000'000, " MCycles)");
 
 	} else {
-		if((int)m_currentDecimationIteration == m_params.decimationIterations) {
+		if((int)m_currentDecimationIteration == m_params.decimationIterations && m_params.decimationIterations > 0) {
 			if(m_params.reduction == 0) {
 				for(auto& decimater : m_decimaters)
 					decimater->copy_back_normalized_importance();
 				compute_max_importance();
 			}
 		}
-		if(m_params.reduction == 0)
+		if(m_params.reduction == 0 && m_params.decimationIterations > 0)
 			display_importance();
 	}
 }
