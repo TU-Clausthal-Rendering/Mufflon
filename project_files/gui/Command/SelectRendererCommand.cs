@@ -25,7 +25,7 @@ namespace gui.Command
             var data = new SelectRendererViewModel();
             var dialog = new SelectRendererDialog(data);
             if (dialog.ShowDialog() != true) return;
-            m_models.Renderer.RendererIndex = data.TypeValue;
+            m_models.Renderer.SetRenderer(data.TypeValue, 0);
             // TODO: display the current renderer somewhere
         }
 
