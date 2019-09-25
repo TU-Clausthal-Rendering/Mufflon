@@ -10,8 +10,11 @@
 namespace mufflon { namespace renderer {
 
 CUDA_FUNCTION void update_guide_heuristic(float& guideWeight, int pathLen, AngularPdf pdfForw) {
-	if(pathLen > 0)
-		guideWeight *= 1.0f - expf(-(pdfForw * pdfForw) / 5.0f);
+	if(pathLen > 0) {
+		float pSq = pdfForw * pdfForw;
+		//guideWeight *= 1.0f - expf(-pSq / 5.0f);
+		guideWeight *= pSq / (1000.0f + pSq);
+	}
 }
 
 struct PtVertexExt {
@@ -37,6 +40,7 @@ struct PtVertexExt {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+		guideWeight *= avg(transmission);
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
@@ -121,6 +125,7 @@ CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> o
 			}
 			outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			outputBuffer.contribute<PositionTarget>(coord, guideWeight * vertex.get_position());
+			outputBuffer.contribute<DepthTarget>(coord, guideWeight * vertex.get_incident_dist());
 			outputBuffer.contribute<NormalTarget>(coord, guideWeight * vertex.get_normal());
 			outputBuffer.contribute<AlbedoTarget>(coord, guideWeight * vertex.get_albedo());
 			outputBuffer.contribute<LightnessTarget>(coord, guideWeight * ei::avg(emission.value));
