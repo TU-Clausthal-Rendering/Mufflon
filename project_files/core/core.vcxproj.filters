@@ -328,6 +328,9 @@
     <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp">
       <Filter>Source Files\core\renderer\forward</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.cpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1089,6 +1092,9 @@
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp">
       <Filter>Source Files\core\renderer\forward</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1187,9 +1193,6 @@
     <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_2.dds" />
     <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_1.dds" />
     <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_2.dds" />
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment.glsl">
-      <Filter>Source Files\core\renderer\shader</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_geom.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
@@ -1197,6 +1200,12 @@
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\model_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_count.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_color.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

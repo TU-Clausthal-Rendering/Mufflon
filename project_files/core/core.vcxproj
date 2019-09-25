@@ -29,6 +29,7 @@
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
     <ClCompile Include="..\..\src\core\renderer\ivcm\cpu_ivcm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\lt\cpu_lt.cpp" />
@@ -217,6 +218,7 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp" />
     <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp" />
@@ -561,11 +563,6 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment.glsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\shader</DestinationFolders>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_geom.glsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <FileType>Document</FileType>
@@ -579,6 +576,18 @@
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\model_transforms.glsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\shader</DestinationFolders>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_color.glsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\shader</DestinationFolders>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_count.glsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <FileType>Document</FileType>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\shader</DestinationFolders>

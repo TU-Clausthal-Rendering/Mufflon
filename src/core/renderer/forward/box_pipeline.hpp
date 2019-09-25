@@ -14,10 +14,12 @@ public:
 	void draw(
 		const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box,
 		const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms,
-		uint32_t numBoxes) const;
+		uint32_t numBoxes, bool countingPass) const;
 private:
-	gl::Program m_program;
-	gl::Pipeline m_pipe;
+	gl::Program m_countProgram;
+	gl::Program m_colorProgram;
+	gl::Pipeline m_countPipe;
+	gl::Pipeline m_colorPipe;
 	gl::VertexArray m_vao;
 };
 }

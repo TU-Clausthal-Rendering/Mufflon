@@ -5,6 +5,7 @@
 #include "core/renderer/gl_renderer_base.h"
 #include "core/opengl/gl_pipeline.h"
 #include "core/renderer/forward/box_pipeline.hpp"
+#include "dynamic_fragment_buffer.hpp"
 
 namespace mufflon::scene::textures {
 	class Texture;
@@ -45,6 +46,7 @@ private:
 	gl::Buffer m_transformBuffer;
 
 	BoxPipeline m_boxPipe;
+	DynamicFragmentBuffer m_dynFragmentBuffer;
 };
 
 

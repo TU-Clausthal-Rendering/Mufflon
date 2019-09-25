@@ -27,6 +27,7 @@ void GlForward::post_reset() {
 	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
 
 	m_boxPipe.init(m_framebuffer);
+	m_dynFragmentBuffer.init(m_framebuffer, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 }
 
 void GlForward::init() {
@@ -165,7 +166,14 @@ void GlForward::iterate() {
 
 	// TODO only if bbox debugging is enabled
 	const auto& sceneDesc = this->get_scene_descriptor();
-	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.instanceToWorld, sceneDesc.numInstances);
+
+	// count transparent fragments
+	m_dynFragmentBuffer.bindCountBuffer();
+	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.instanceToWorld, sceneDesc.numInstances, true);
+	m_dynFragmentBuffer.prepareFragmentBuffer();
+	// draw transparent fragments with color
+	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.instanceToWorld, sceneDesc.numInstances, false);
+	m_dynFragmentBuffer.blendFragmentBuffer();
 
 	end_frame();
 }
