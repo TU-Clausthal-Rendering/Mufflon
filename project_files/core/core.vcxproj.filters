@@ -1196,6 +1196,9 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_vertex.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\model_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\resources\ltc\info.txt">

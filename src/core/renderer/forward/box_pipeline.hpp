@@ -11,7 +11,10 @@ class BoxPipeline {
 public:
 	BoxPipeline();
 	void init(gl::Framebuffer& framebuffer);
-	void draw(const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box, uint32_t numBoxes) const;
+	void draw(
+		const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box,
+		const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms,
+		uint32_t numBoxes) const;
 private:
 	gl::Program m_program;
 	gl::Pipeline m_pipe;

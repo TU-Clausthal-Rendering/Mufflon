@@ -57,6 +57,7 @@ void GlForward::init() {
 
 	m_triangleProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
         .add_file("shader/light_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
@@ -72,6 +73,7 @@ void GlForward::init() {
 	// add intermediate tesselation
 	m_quadProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/light_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
@@ -86,6 +88,7 @@ void GlForward::init() {
 
 	m_sphereProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/light_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
@@ -162,7 +165,7 @@ void GlForward::iterate() {
 
 	// TODO only if bbox debugging is enabled
 	const auto& sceneDesc = this->get_scene_descriptor();
-	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.numInstances);
+	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.instanceToWorld, sceneDesc.numInstances);
 
 	end_frame();
 }

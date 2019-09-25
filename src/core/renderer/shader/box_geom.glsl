@@ -2,16 +2,18 @@ layout(lines) in;
 layout(triangle_strip, max_vertices = 4 * 6) out;
 
 void draw_face(vec3 topLeft, vec3 topRight, vec3 botLeft, vec3 botRight) {
-	gl_Position = u_cam.viewProj * vec4(topLeft, 1.0);
+	mat4x3 model = getModelMatrix(gl_PrimitiveIDIn);
+	
+	gl_Position = u_cam.viewProj * vec4(model * vec4(topLeft, 1.0), 1.0);
 	EmitVertex();
 
-	gl_Position = u_cam.viewProj * vec4(topRight, 1.0);
+	gl_Position = u_cam.viewProj * vec4(model * vec4(topRight, 1.0), 1.0);
 	EmitVertex();
 
-	gl_Position = u_cam.viewProj * vec4(botLeft, 1.0);
+	gl_Position = u_cam.viewProj * vec4(model * vec4(botLeft, 1.0), 1.0);
 	EmitVertex();
 
-	gl_Position = u_cam.viewProj * vec4(botRight, 1.0);
+	gl_Position = u_cam.viewProj * vec4(model * vec4(botRight, 1.0), 1.0);
 	EmitVertex();
 
 	EndPrimitive();

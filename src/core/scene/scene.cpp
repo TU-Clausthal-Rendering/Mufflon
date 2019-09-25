@@ -218,8 +218,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodDescs.size());
 		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
-		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<NotGl<dev>, ei::Mat3x4[]>>();
-		instTransformsDesc = make_udevptr_array<NotGl<dev>, ei::Mat3x4>(instanceTransformations.size());
+		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
 		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
 		auto& invInstTransformsDesc = m_invInstTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();

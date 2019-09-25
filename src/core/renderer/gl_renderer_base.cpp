@@ -120,8 +120,8 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 
 		if(!lod.polygon.numTriangles) continue;
 
-		// Set the instance transformation matrix
-		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&sceneDesc.instanceToWorld[i]));
+		// instance if for lookup in instance transformation buffer
+		glProgramUniform1ui(pipe.program, 1, i);
 
 		// bind vertex and index buffer
         if(attribs & Attribute::Position) {
@@ -162,8 +162,8 @@ void GlRenderer::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 
 		if(!lod.spheres.numSpheres) continue;
 
-		// Set the instance transformation matrix
-		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&sceneDesc.instanceToWorld[i]));
+		// instance if for lookup in instance transformation buffer
+		glProgramUniform1ui(pipe.program, 1, i);
 
 		// bind vertex buffer
         if(attribs & Attribute::Position) {
@@ -193,8 +193,8 @@ void GlRenderer::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 
 		if(!lod.polygon.numQuads) continue;
 
-		// Set the instance transformation matrix
-		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&sceneDesc.instanceToWorld[i]));
+		// instance if for lookup in instance transformation buffer
+		glProgramUniform1ui(pipe.program, 1, i);
 
 		// bind vertex and index buffer
 		if(attribs & Attribute::Position) {
@@ -244,15 +244,20 @@ void GlRenderer::bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs)
 	}
 
 	if (attribs & Attribute::Light) {
-		assert(sceneDesc.lightTree.smallLights.id);
-		assert(!sceneDesc.lightTree.smallLights.offset);
-		assert(sceneDesc.lightTree.bigLights.id);
-		assert(!sceneDesc.lightTree.bigLights.offset);
+		mAssert(sceneDesc.lightTree.smallLights.id);
+		mAssert(!sceneDesc.lightTree.smallLights.offset);
+		mAssert(sceneDesc.lightTree.bigLights.id);
+		mAssert(!sceneDesc.lightTree.bigLights.offset);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sceneDesc.lightTree.smallLights.id);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, sceneDesc.lightTree.bigLights.id);
 		glProgramUniform1ui(pipe.program, 10, sceneDesc.lightTree.numSmallLights);
 		glProgramUniform1ui(pipe.program, 11, sceneDesc.lightTree.numBigLights);
 	}
+
+
+	mAssert(sceneDesc.instanceToWorld.id);
+	mAssert(!sceneDesc.instanceToWorld.offset);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, sceneDesc.instanceToWorld.id);
 }
 }
 

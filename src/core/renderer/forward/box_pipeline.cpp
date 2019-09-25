@@ -13,6 +13,7 @@ BoxPipeline::BoxPipeline() {
 void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 	m_program = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/box_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/box_geom.glsl", false)
@@ -35,9 +36,14 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 	m_pipe.rasterizer.fillMode = gl::FillMode::Wireframe;
 }
 
-void BoxPipeline::draw(const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box, uint32_t numBoxes) const
+void BoxPipeline::draw(const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms, uint32_t numBoxes) const
 {
 	gl::Context::set(m_pipe);
+
+	// bind transforms
+	mAssert(transforms.id);
+	mAssert(!transforms.offset);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, transforms.id);
 
 	// assumption about bbox layout
 	static_assert(sizeof(ei::Box) == sizeof(ei::Vec3) * 2);
