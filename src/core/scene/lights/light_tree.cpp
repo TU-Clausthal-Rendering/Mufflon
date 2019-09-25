@@ -234,6 +234,8 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 }
 
 void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, PrimitiveHandle, u32>& map) {
+	if(lights.size() == 0)
+		return;
 	// 'Height' is the 'lower' height of the tree, ie. on what height the first light node is
 	int height = ei::ilog2(lights.size());
 	// Calculate the number of additional internal nodes compared to a full tree of 'height'
