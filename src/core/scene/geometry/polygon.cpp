@@ -446,6 +446,8 @@ std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>&
 void Polygons::garbage_collect() {
 	m_meshData->garbage_collection();
 	this->rebuild_index_buffer();
+	m_vertexAttributes.shrink_to_fit();
+	m_faceAttributes.shrink_to_fit();
 }
 
 void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
