@@ -150,8 +150,6 @@ namespace gui.Model
         public event ScreenshotHandler RequestScreenshot;
 
         private volatile bool m_isRendering = false;
-        private UInt32 m_rendererIndex = UInt32.MaxValue;
-        private UInt32 m_rendererVariation = 0;
 
         public RendererModel()
         {
@@ -257,33 +255,25 @@ namespace gui.Model
         public UInt32 RendererCount { get => Core.render_get_renderer_count(); }
         public UInt32 RendererVariationsCount { get => Core.render_get_renderer_variations(RendererIndex); }
 
-        public UInt32 RendererIndex
-        {
-            get => m_rendererIndex;
-            set
-            {
-                if (m_rendererIndex == value) return;
-                // Quickly save the parameters before changing the renderer
-                m_rendererIndex = value;
-                if (!Core.render_enable_renderer(RendererIndex, RendererVariation))
-                    throw new Exception(Core.core_get_dll_error());
-                Reset();
-                OnPropertyChanged(nameof(RendererIndex));
-            }
-        }
+        public UInt32 RendererIndex { get; private set; } = UInt32.MaxValue;
+        public uint RendererVariation { get; private set; } = 0;
 
-        public uint RendererVariation
+        public void SetRenderer(uint index, uint variation)
         {
-            get => m_rendererVariation;
-            set
+            bool indexChanges = index != RendererIndex;
+            bool variationChanges = variation != RendererVariation;
+
+            if(indexChanges || variationChanges)
             {
-                if (m_rendererVariation == value) return;
-                // Quickly save the parameters before changing the renderer
-                m_rendererVariation = value;
+                RendererIndex = index;
+                RendererVariation = variation;
                 if (!Core.render_enable_renderer(RendererIndex, RendererVariation))
                     throw new Exception(Core.core_get_dll_error());
-                Reset();
-                OnPropertyChanged(nameof(RendererVariation));
+
+                if(indexChanges)
+                    OnPropertyChanged(nameof(RendererIndex));
+                if(variationChanges)
+                    OnPropertyChanged(nameof(RendererVariation));
             }
         }
 
