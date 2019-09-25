@@ -34,32 +34,37 @@ float get_flux(const void* light, u16 type, const ei::Vec3& aabbDiag, const int*
 }
 
 // Computes the offset of the i-th point light - positional ones need a sum table!
-// The offsets are relative to the trees node-memory.
+// The offsets are relative to the trees node-memory (which points to the internal nodes
+// first, then the lights).
 template < class LT >
-class LightOffset {
+class LightOffset;
+
+template <>
+class LightOffset<DirectionalLight> {
 public:
-	LightOffset(const std::vector<LT>& lights, u32 globalOffset) :
-		m_lightCount{ static_cast<u32>(lights.size()) },
+	LightOffset(const std::vector<DirectionalLight>& lights, std::size_t globalOffset) :
+		m_lightCount{ lights.size() },
 		m_globalOffset{ globalOffset }
 	{}
 	
 	constexpr u32 operator[](std::size_t lightIndex) const noexcept {
-		return m_globalOffset + static_cast<u32>(sizeof(LT) * lightIndex);
+		return static_cast<u32>(m_globalOffset + sizeof(DirectionalLight) * lightIndex);
 	}
 
 	std::size_t light_count() const noexcept {
 		return m_lightCount;
 	}
+
 	std::size_t mem_size() const noexcept {
-		return m_lightCount * sizeof(DirectionalLight);
+		return m_globalOffset + m_lightCount * sizeof(DirectionalLight);
 	}
 
 	u16 type(std::size_t lightIndex) const noexcept {
 		return u16(LightType::DIRECTIONAL_LIGHT);
 	}
 private:
-	u32 m_lightCount;
-	u32 m_globalOffset;
+	std::size_t m_lightCount;
+	std::size_t m_globalOffset;
 };
 
 // helper from https://en.cppreference.com/w/cpp/utility/variant/visit
@@ -362,8 +367,8 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 
 	// Compute a sum table for the light offsets for positional lights,
 	// nothing for directional ones (just create a compatible interface).
-	LightOffset<DirectionalLight> dirLightOffsets(dirLights, static_cast<u32>(m_treeCpu->dirLights.internalNodeCount * sizeof(LightSubTree::Node)));
-	LightOffset<PositionalLights> posLightOffsets(posLights, static_cast<u32>(m_treeCpu->posLights.internalNodeCount * sizeof(LightSubTree::Node)));
+	LightOffset<DirectionalLight> dirLightOffsets(dirLights, m_treeCpu->dirLights.internalNodeCount * sizeof(LightSubTree::Node));
+	LightOffset<PositionalLights> posLightOffsets(posLights, m_treeCpu->posLights.internalNodeCount * sizeof(LightSubTree::Node));
 
 	std::size_t treeMemSize = sizeof(LightSubTree::Node) * (m_treeCpu->dirLights.internalNodeCount + m_treeCpu->posLights.internalNodeCount)
 		+ dirLightOffsets.mem_size() + posLightOffsets.mem_size();
@@ -372,12 +377,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	char* memory = m_treeMemory.acquire<Device::CPU>();
 	// Set up the node pointers
 	m_treeCpu->dirLights.memory = memory;
-	m_treeCpu->posLights.memory = memory + dirLightOffsets[0] + dirLightOffsets.mem_size();
+	m_treeCpu->posLights.memory = memory + dirLightOffsets.mem_size();
 
 	// Copy the lights into the tree
 	// Directional lights are easier, because they have a fixed size
 	if(dirLights.size() > 0u) {
-		std::memcpy(m_treeCpu->dirLights.memory + dirLightOffsets[0], dirLights.data(), dirLightOffsets.mem_size());
+		std::memcpy(m_treeCpu->dirLights.memory + dirLightOffsets[0], dirLights.data(),
+					dirLightOffsets.mem_size() - dirLightOffsets[0]);
 	}
 	// Positional lights are more difficult since we don't know the concrete size
 	if(posLights.size() > 0u) {
