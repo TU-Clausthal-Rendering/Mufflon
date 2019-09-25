@@ -284,8 +284,7 @@ namespace gui.ViewModel
                 m_selectedRenderer = value;
                 m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Index;
                 // Reset the variation to first
-                m_models.Renderer.RendererVariation = 0;
-                m_models.Renderer.RendererIndex = m_selectedRenderer.Index;
+                m_models.Renderer.SetRenderer(m_selectedRenderer.Index, 0);
                 // The variants get updated in rendererChanged
                 OnPropertyChanged(nameof(SelectedRenderer));
             }
@@ -298,7 +297,7 @@ namespace gui.ViewModel
                 if (m_selectedRendererVariation == value || value == null) return;
                 m_selectedRendererVariation = value;
                 m_models.Settings.LastSelectedRendererVariation = m_selectedRendererVariation.Variation;
-                m_models.Renderer.RendererVariation = m_selectedRendererVariation.Variation;
+                m_models.Renderer.SetRenderer(m_models.Renderer.RendererIndex, m_selectedRendererVariation.Variation);
                 OnPropertyChanged(nameof(SelectedRendererVariation));
             }
         }
@@ -478,7 +477,7 @@ namespace gui.ViewModel
             if (m_models.Renderer.RendererIndex == SelectedRenderer.Index)
                 rendererChanged(m_models.Renderer, new PropertyChangedEventArgs(nameof(Models.Renderer.RendererIndex)));
             else
-                m_models.Renderer.RendererIndex = SelectedRenderer.Index;
+                m_models.Renderer.SetRenderer(m_selectedRenderer.Index, 0);
 
             // Set the active variant (the list has been build already)
             if (lastSelectedVariation >= SupportedRenderVariations.Count)
