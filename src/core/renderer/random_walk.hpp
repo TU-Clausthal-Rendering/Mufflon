@@ -9,23 +9,6 @@
 
 namespace mufflon { namespace renderer {
 
-// Collection of parameters produced or used by a random walk
-// TODO: vertex customization?
-struct PathHead {
-	math::Throughput throughput;	// General throughput with guide heuristics
-	scene::Point position;
-	AngularPdf pdfF;				// Forward PDF of the last sampling PDF
-	scene::Direction excident;		// May be zero-vector for start points
-
-	PathHead() {}
-/*	PathHead(const cameras::Importon& camSample) :
-		throughput{ei::Vec3{camSample.w / float(camSample.pdf)}, 1.0f},
-		position{camSample.origin},
-		pdfF{camSample.pdf},
-		excident{camSample.excident}
-	{}*/
-};
-
 enum class WalkResult {
 	CANCEL,			// The walk is cancled due to sampling related issus (e.g. self hit or Russian roulette)
 	BACKGROUND,		// The walk missed the scene, but created one last void vertex
@@ -55,7 +38,7 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 							  const VertexType& vertex,
 							  const math::RndSet2_1& rndSet, float u0,
 							  bool adjoint,
-							  math::Throughput& throughput,
+							  Spectrum& throughput,
 							  VertexType& outVertex,
 							  VertexSample& outSample,
 							  Args&&... args
@@ -63,28 +46,27 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Sample the vertex's outgoing direction
 	outSample = vertex.sample(scene.aabb, scene.media, rndSet, adjoint);
 	if(outSample.type == math::PathEventType::INVALID) {
-		throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
+		throughput = Spectrum { 0.0f };
 		return WalkResult::CANCEL;
 	}
 	mAssert(!isnan(outSample.excident.x) && !isnan(outSample.excident.y) && !isnan(outSample.excident.z)
 		&& !isnan(outSample.origin.x) && !isnan(outSample.origin.y) && !isnan(outSample.origin.z)
 		&& !isnan(float(outSample.pdf.forw)) && !isnan(float(outSample.pdf.back)));
-	vertex.ext().update(vertex, outSample.excident, outSample.pdf, args...);
+	vertex.ext().update(vertex, outSample.excident, outSample, args...);
 
 	// Update throughputs
-	throughput.weight *= outSample.throughput;
-	throughput.guideWeight *= 1.0f - expf(-(outSample.pdf.forw * outSample.pdf.forw) / 5.0f);
+	throughput *= outSample.throughput;
 
 	// Russian roulette
+	float continuationProbability = 1.0f;
 	if(u0 >= 0.0f) {
-		float continuationPropability = ei::min(max(throughput.weight) + 0.1f, 1.0f);
-		if(u0 >= continuationPropability) {	// The smaller the contribution the more likely the kill
-			throughput = math::Throughput{ Spectrum { 0.f }, 0.f };
+		continuationProbability = ei::min(max(throughput) + 0.1f, 1.0f);
+		if(u0 >= continuationProbability) {	// The smaller the contribution the more likely the kill
+			throughput = Spectrum { 0.0f };
 			return WalkResult::CANCEL;
 		} else {
 			// Continue and compensate if rouletteWeight < 1.
-			throughput.weight /= continuationPropability;
-			throughput.guideWeight /= continuationPropability;
+			throughput /= continuationProbability;
 		}
 	}
 
@@ -98,9 +80,8 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Compute attenuation
 	const scene::materials::Medium& currentMedium = scene.media[outSample.medium];
 	Spectrum transmission = currentMedium.get_transmission( nextHit.distance );
-	throughput.weight *= transmission;
-	throughput.guideWeight *= avg(transmission);
-	mAssert(!isnan(throughput.weight.x) && !isnan(throughput.weight.y) && !isnan(throughput.weight.z));
+	throughput *= transmission;
+	mAssert(!isnan(throughput.x) && !isnan(throughput.y) && !isnan(throughput.z));
 
 	Connection connection {
 		ray.direction, ei::sq(nextHit.distance), ray.origin, nextHit.distance
@@ -109,7 +90,8 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// If we missed the scene, terminate the ray
 	if(nextHit.hitId.instanceId < 0) {
 		VertexType::create_void(&outVertex, &vertex, outSample.excident);
-		outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput, args...);
+		outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput,
+			continuationProbability, transmission, args...);
 		return WalkResult::BACKGROUND;
 	}
 
@@ -120,7 +102,8 @@ CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 	// Finalize
 	VertexType::create_surface(&outVertex, &vertex, nextHit, scene.get_material(nextHit.hitId),
 				position, tangentSpace, outSample.excident);
-	outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput, args...);
+	outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput,
+		continuationProbability, transmission, args...);
 	return WalkResult::HIT;
 }
 

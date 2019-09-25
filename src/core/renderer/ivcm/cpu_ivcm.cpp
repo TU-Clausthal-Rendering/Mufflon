@@ -44,14 +44,16 @@ struct IvcmVertexExt {
 							  const IvcmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput,
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission,
 							  const scene::SceneDescriptor<Device::CPU>& scene,
 							  int numPhotons) {
 		float inCos = thisVertex.get_geometric_factor(incident.dir);
 		float outCos = prevVertex.get_geometric_factor(incident.dir);
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, ei::abs(inCos));
-		this->throughput = throughput.weight;
+		this->throughput = throughput;
 		if(prevVertex.is_hitable()) {
 			// Compute as much as possible from the conversion factor.
 			// At this point we do not know n and A for the photons. This quantities
@@ -77,10 +79,10 @@ struct IvcmVertexExt {
 
 	CUDA_FUNCTION void update(const IvcmPathVertex& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair pdf,
+							  const VertexSample& sample,
 							  const scene::SceneDescriptor<Device::CPU>& scene,
 							  int numPhotons) {
-		pdfBack = pdf.back;
+		pdfBack = sample.pdf.back;
 	}
 };
 
@@ -414,7 +416,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 	IvcmPathVertex vertex;
 	IvcmPathVertex::create_light(&vertex, nullptr, p);
 	const IvcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
-	math::Throughput throughput;
+	Spectrum throughput { 1.0f };
 	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 
 	int pathLen = 0;
@@ -451,7 +453,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 	// Create a start for the path
 	IvcmPathVertex* currentVertex = vertexBuffer;
 	IvcmPathVertex::create_camera(currentVertex, nullptr, m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
-	math::Throughput throughput;
+	Spectrum throughput { 1.0f };
 	int viewPathLen = 0;
 	do {
 		// Make a connection to any event on the light path
@@ -464,8 +466,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				auto conVal = connect(*currentVertex, *lightVertex, outCoord, mergeArea, numPhotons, reuseCount, incidentF, incidentB);
 				if(outCoord.x != -1) {
 					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(currentVertex->ext().throughput.x));
-					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput.weight * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
-					m_outputBuffer.contribute<LightnessTarget>(outCoord, throughput.guideWeight * conVal.cosines);
+					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
 				}
 			}
 			lightVertex = lightVertex->previous();
@@ -526,14 +527,9 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 					VertexWrapper{&light, {emission.pdf, AngularPdf{0.0}}}, 0);
 				float misWeight = get_mis_weight_rhit(incidentF, incidentB, viewPathLen, mergeArea, reuseCount);
 				emission.value *= misWeight;
-				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			}
 			mAssert(!isnan(emission.value.x));
-
-			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * currentVertex->get_position());
-			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * currentVertex->get_normal());
-			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * currentVertex->get_albedo());
-			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}//*/
 		if(currentVertex->is_end_point()) break;
 
@@ -579,8 +575,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		}
 		radiance /= mergeArea * numPhotons;
 
-		m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * radiance);
-		m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(radiance));
+		m_outputBuffer.contribute<RadianceTarget>(coord, throughput * radiance);
 		m_outputBuffer.contribute<FootprintTarget>(coord, density);
 		//break;
 	} while(viewPathLen < m_params.maxPathLength);
@@ -596,8 +591,8 @@ static float ivcm_heuristic(int numPhotons, float a0, float a1) {
 	aR *= aR;
 	float count = (1.0f + aR) / (1.0f / numPhotons + aR);
 	mAssert(count >= 1.0f);
-	if(std::isnan(count))
-		__debugbreak();
+//	if(std::isnan(count))
+//		__debugbreak();
 	return count;
 }
 

@@ -21,7 +21,7 @@ struct BptVertexExt {
 	// the moment of the full connection.
 	// only valid after update().
 	float prevRelativeProbabilitySum{ 0.0f };
-	math::Throughput throughput;	// Throughput of the path up to this point
+	Spectrum throughput{ 1.0f };	// Throughput of the path up to this point
 
 	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
 							const AreaPdf inAreaPdf,
@@ -34,7 +34,9 @@ struct BptVertexExt {
 							  const BptPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -43,12 +45,12 @@ struct BptVertexExt {
 
 	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair pdf) {
+							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
 		const BptPathVertex* prev = thisVertex.previous();
 		if(prev) { // !prev: Current one is a start vertex. There is no previous sum
-			AreaPdf prevReversePdf = prev->convert_pdf(thisVertex.get_type(), pdf.back, thisVertex.get_incident_connection()).pdf;
+			AreaPdf prevReversePdf = prev->convert_pdf(thisVertex.get_type(), sample.pdf.back, thisVertex.get_incident_connection()).pdf;
 			// Replace forward PDF with backward PDF (move connection one into the direction of the path-start)
 			float relToPrev = prevReversePdf / prev->ext().incidentPdf;
 			prevRelativeProbabilitySum = relToPrev + relToPrev * prev->ext().prevRelativeProbabilitySum;
@@ -180,7 +182,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, outputBuffer.get_num_pixels(),
 		lightTreeSeed, rndStart);
 	BptPathVertex::create_light(&path[0], nullptr, p);
-	math::Throughput throughput;
+	Spectrum throughput { 1.0f };
 	VertexSample sample;
 
 	int lightPathLen = 0;
@@ -198,7 +200,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 	// Create a start for the path
 	BptPathVertex::create_camera(&vertex[0], nullptr, m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
 	int currentV = 0;
-	throughput = math::Throughput{};
+	throughput = Spectrum { 1.0f };
 	int viewPathLen = 0;
 	do {
 		// Make a connection to any event on the light path
@@ -207,9 +209,10 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
 			if(outCoord.x != -1) {
-				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(path[l].ext().throughput.weight.x));
-				m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput.weight * path[l].ext().throughput.weight * conVal.cosines * conVal.bxdfs);
-				m_outputBuffer.contribute<LightnessTarget>(outCoord, throughput.guideWeight * path[l].ext().throughput.guideWeight * conVal.cosines);
+				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.x) && !isnan(path[l].ext().throughput.x));
+				Spectrum fullThroughput = throughput * path[l].ext().throughput;
+				m_outputBuffer.contribute<RadianceTarget>(outCoord, fullThroughput * conVal.cosines * conVal.bxdfs);
+				m_outputBuffer.contribute<LightnessTarget>(outCoord, avg(fullThroughput) * conVal.cosines);
 			}
 		}
 
@@ -231,11 +234,8 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 			}
 			mAssert(!isnan(emission.value.x));
 
-			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
-			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex[currentV].get_position());
-			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex[currentV].get_normal());
-			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex[currentV].get_albedo());
-			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
+			m_outputBuffer.contribute<LightnessTarget>(coord, avg(throughput) * ei::avg(emission.value));
 		}
 		if(vertex[currentV].is_end_point()) break;
 	} while(viewPathLen < m_params.maxPathLength);

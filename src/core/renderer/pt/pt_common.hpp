@@ -9,6 +9,11 @@
 
 namespace mufflon { namespace renderer {
 
+CUDA_FUNCTION void update_guide_heuristic(float& guideWeight, int pathLen, AngularPdf pdfForw) {
+	if(pathLen > 0)
+		guideWeight *= 1.0f - expf(-(pdfForw * pdfForw) / 5.0f);
+}
+
 struct PtVertexExt {
 	//scene::Direction excident;
 	//AngularPdf pdf;
@@ -25,7 +30,10 @@ struct PtVertexExt {
 							  const PathVertex<PtVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission,
+							  float& guideWeight) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -33,7 +41,9 @@ struct PtVertexExt {
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair& pdf) {
+							  const VertexSample& sample,
+							  float& guideWeight) {
+		update_guide_heuristic(guideWeight, thisVertex.get_path_len(), sample.pdf.forw);
 	}
 };
 
@@ -48,7 +58,8 @@ CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> o
 							 const PtParameters& params,
 							 const Pixel coord,
 							 math::Rng& rng) {
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput { 1.0f };
+	float guideWeight = 1.0f;
 	PtPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
@@ -84,8 +95,8 @@ CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> o
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
-						outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
-						outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * value.cosOut);
+						outputBuffer.contribute<RadianceTarget>(coord, throughput * value.cosOut * radiance * mis);
+						outputBuffer.contribute<LightnessTarget>(coord, guideWeight * value.cosOut);
 
 					}
 				}
@@ -96,7 +107,7 @@ CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> o
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::CANCEL)
+		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::CANCEL)
 			break;
 		++pathLen;
 
@@ -108,11 +119,11 @@ CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> o
 				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= misWeight;
 			}
-			outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
-			outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex.get_position());
-			outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex.get_normal());
-			outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex.get_albedo());
-			outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
+			outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
+			outputBuffer.contribute<PositionTarget>(coord, guideWeight * vertex.get_position());
+			outputBuffer.contribute<NormalTarget>(coord, guideWeight * vertex.get_normal());
+			outputBuffer.contribute<AlbedoTarget>(coord, guideWeight * vertex.get_albedo());
+			outputBuffer.contribute<LightnessTarget>(coord, guideWeight * ei::avg(emission.value));
 		}
 		if(vertex.is_end_point()) break;
 	} while(pathLen < params.maxPathLength);

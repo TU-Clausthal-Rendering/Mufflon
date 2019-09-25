@@ -21,7 +21,7 @@ CUDA_FUNCTION void lt_sample(typename LtTargets::template RenderBufferType<CURRE
 							 const LtParameters& params,
 							 const int idx,
 							 math::Rng& rng) {
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput { 1.0f };
 	LtPathVertex vertex;
 	VertexSample sample;
 	// Create a start vertex for the path
@@ -57,8 +57,8 @@ CUDA_FUNCTION void lt_sample(typename LtTargets::template RenderBufferType<CURRE
 						camera.get_geometric_normal(), vertex.get_geometric_normal(), connection.dir)) {
 
 						bxdfProd /= connection.distanceSq;
-						outputBuffer.contribute<RadianceTarget>(outPixel, throughput.weight * cosProd * bxdfProd);
-						outputBuffer.contribute<LightnessTarget>(outPixel, throughput.guideWeight * cosProd);
+						outputBuffer.contribute<RadianceTarget>(outPixel, throughput * cosProd * bxdfProd);
+						outputBuffer.contribute<LightnessTarget>(outPixel, avg(throughput) * cosProd);
 						if(showDensity) {
 							float density = cval.value.x * cval.cosOut / connection.distanceSq;
 							density *= ei::abs(vertex.get_geometric_factor(connection.dir));

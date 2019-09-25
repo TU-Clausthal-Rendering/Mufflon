@@ -14,8 +14,7 @@ using VcmParameters = ParameterHandler<
 >;
 
 using VcmTargets = TargetList<
-	RadianceTarget, PositionTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget
+	RadianceTarget, LightnessTarget
 >;
 
 }} // namespace mufflon::renderer
