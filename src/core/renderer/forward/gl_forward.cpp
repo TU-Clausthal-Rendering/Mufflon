@@ -25,6 +25,8 @@ void GlForward::post_reset() {
 	glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
 	auto curTransforms = get_camera_transforms();
 	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
+
+	m_boxPipe.init(m_framebuffer);
 }
 
 void GlForward::init() {
@@ -157,6 +159,10 @@ void GlForward::iterate() {
 	draw_triangles(m_trianglePipe, Attribute::All);
 	draw_quads(m_quadPipe, Attribute::All);
 	draw_spheres(m_spherePipe, Attribute::All);
+
+	// TODO only if bbox debugging is enabled
+	const auto& sceneDesc = this->get_scene_descriptor();
+	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.numInstances);
 
 	end_frame();
 }

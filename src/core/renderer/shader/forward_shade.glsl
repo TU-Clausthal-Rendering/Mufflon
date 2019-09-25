@@ -209,14 +209,14 @@ layout(binding = 0) readonly buffer materialsBuffer {
 };
 
 layout(binding = 4) readonly buffer alphaTextureBuffer {
-	uvec2 u_alphaTextures[];
+	uint u_alphaTextures[];
 };
 
 bool isMaskedOut(vec3 uv, uint materialIndex) {
-	uvec2 id = u_alphaTextures[materialIndex];
+	uvec2 id = uvec2(u_alphaTextures[materialIndex * 2], u_alphaTextures[materialIndex * 2 + 1]);
 	if (id == 0) return false;
 	sampler2DArray alphaTex = sampler2DArray(id);
-	return texture(alphaTex, uv).r <= 0.0f;
+	return textureLod(alphaTex, uv, 0.0).r <= 0.1;
 }
 
 uint readShort(uint byteOffset) {

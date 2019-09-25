@@ -78,6 +78,10 @@ void GlRenderer::begin_frame(ei::Vec4 clearColor, int width, int height) {
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
 	glViewport(0, 0, width, height);
 	glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
+
+	// must be enabled to clear buffers
+	gl::Context::enableDepthWrite();
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 

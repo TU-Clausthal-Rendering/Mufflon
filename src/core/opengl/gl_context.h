@@ -5,6 +5,8 @@ namespace mufflon::gl {
 class Context {
 public:
 	static void set(const Pipeline& pipeline);
+	// depth write must be enabled to clear depth buffer
+	static void enableDepthWrite();
 private:
 	Context();
 	static Context& get();

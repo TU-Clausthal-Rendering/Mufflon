@@ -4,6 +4,7 @@
 #include "core/opengl/gl_object.h"
 #include "core/renderer/gl_renderer_base.h"
 #include "core/opengl/gl_pipeline.h"
+#include "core/renderer/forward/box_pipeline.hpp"
 
 namespace mufflon::scene::textures {
 	class Texture;
@@ -42,6 +43,8 @@ private:
 	gl::VertexArray m_spheresVao;
 
 	gl::Buffer m_transformBuffer;
+
+	BoxPipeline m_boxPipe;
 };
 
 

@@ -325,6 +325,9 @@
     <ClCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cpp">
       <Filter>Source Files\core\renderer\pt</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1083,6 +1086,9 @@
     <ClInclude Include="..\..\src\core\renderer\targets\output_handler_variance.hpp">
       <Filter>Source Files\core\renderer\targets</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1177,24 +1183,23 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_1.dds" />
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_2.dds" />
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_1.dds" />
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_2.dds" />
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\resources\ltc\info.txt">
       <Filter>resources</Filter>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="..\..\resources\ltc\ltc_beckmann_1.dds">
-      <Filter>resources</Filter>
-    </Image>
-    <Image Include="..\..\resources\ltc\ltc_beckmann_2.dds">
-      <Filter>resources</Filter>
-    </Image>
-    <Image Include="..\..\resources\ltc\ltc_ggx_1.dds">
-      <Filter>resources</Filter>
-    </Image>
-    <Image Include="..\..\resources\ltc\ltc_ggx_2.dds">
-      <Filter>resources</Filter>
-    </Image>
   </ItemGroup>
 </Project>
