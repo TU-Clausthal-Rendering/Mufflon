@@ -90,10 +90,10 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
+		m_currentScene->clear_accel_structure();
 		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
 				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
 
-		m_currentScene->clear_accel_structure();
 		this->on_manual_reset();
 		++m_currentDecimationIteration;
 	}
@@ -218,6 +218,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
 
+	m_currentScene->clear_accel_structure();
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
