@@ -391,9 +391,6 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_decimation_common_pt.cpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1237,9 +1234,6 @@
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_params.hpp">
-      <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_decimation_common_pt.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_common.hpp">

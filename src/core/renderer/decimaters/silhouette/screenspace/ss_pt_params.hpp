@@ -13,11 +13,6 @@ struct PPenumbraWeight {
 };
 
 using SilhouetteParameters = ParameterHandler<
-	PImportanceIterations, PDecimationIterations,
-	PTargetReduction, PInitialReduction, PVertexThreshold,
-	PSelectiveImportance, PPenumbraWeight,
-	PDirectIndirectRatio, PSharpnessFactor,
-	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,
 	PMinPathLength, PMaxPathLength, PNeeCount, PNeePositionGuide
 >;
 
@@ -29,33 +24,17 @@ struct RadianceTarget {
 };
 struct ShadowTarget {
 	static constexpr const char NAME[] = "Shadow Areas";
-	using PixelType = u32;
-	static constexpr u32 NUM_CHANNELS = 1u;
-};
-struct SilhouetteTarget {
-	static constexpr const char NAME[] = "Shadow Silhouette";
-	using PixelType = u32;
-	static constexpr u32 NUM_CHANNELS = 1u;
-};
-struct SilhouetteWeightTarget {
-	static constexpr const char NAME[] = "Silhouette weight";
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
 struct PenumbraTarget {
-	static constexpr const char NAME[] = "Penumbra";
+	static constexpr const char NAME[] = "Shadow Areas";
 	using PixelType = float;
-	static constexpr u32 NUM_CHANNELS = 3u;
-};
-struct RadianceTransitionTarget {
-	static constexpr const char NAME[] = "Radiance transition";
-	using PixelType = float;
-	static constexpr u32 NUM_CHANNELS = 3u;
+	static constexpr u32 NUM_CHANNELS = 1u;
 };
 
 using SilhouetteTargets = TargetList<
-	RadianceTarget, ImportanceTarget, PolyShareTarget,
-	SilhouetteWeightTarget, PenumbraTarget, RadianceTransitionTarget
+	RadianceTarget, ShadowTarget
 >;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::ss
