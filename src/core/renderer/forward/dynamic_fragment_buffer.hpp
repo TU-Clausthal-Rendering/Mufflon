@@ -23,20 +23,24 @@ namespace mufflon::renderer {
 
 		void blendFragmentBuffer();
 	private:
+		void doScan();
+
 		gl::Buffer m_fragmentBuffer;
+		size_t m_numFragments = 0;
 
 		gl::Buffer m_fragmentCounts;
 		gl::Buffer m_stageBuffer;
 
-		gl::Pipeline m_countPipeline;
 		gl::Pipeline m_blendPipeline;
 
 		gl::Program m_scanProgram;
+		gl::Program m_scanPushProgram;
 		gl::Program m_blendProgram;
 
 		uint32_t m_curScanSize = 0;
 		uint32_t m_curLastIndex = 0;
 
 		std::vector<gl::Buffer> m_auxBuffer;
+		std::vector<uint32_t> m_numAuxBufferElements;
 	};
 }

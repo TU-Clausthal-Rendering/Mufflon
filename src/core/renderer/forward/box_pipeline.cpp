@@ -44,6 +44,8 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 	m_countPipe.rasterizer.colorWrite = false;
 	m_countPipe.topology = gl::PrimitiveTopology::Lines; // bbox max and bbox min points
 	m_countPipe.rasterizer.cullMode = gl::CullMode::None;
+	m_countPipe.depthStencil.polygonOffsetUnits = -1.0f;
+	m_countPipe.depthStencil.polygonOffsetFactor = -1.0f;
 
 	m_colorPipe = m_countPipe;
 	m_colorPipe.program = m_colorProgram;

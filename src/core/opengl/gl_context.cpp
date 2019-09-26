@@ -228,9 +228,10 @@ void Context::set(const Pipeline& pipeline) {
 void Context::enableDepthWrite()
 {
 	auto& state = get().m_state;
-	if (state.depthStencil.depthWrite) return;
-	state.depthStencil.depthWrite = true;
-	glDepthMask(GL_TRUE);
+	if (!state.depthStencil.depthWrite) {
+		state.depthStencil.depthWrite = true;
+		glDepthMask(GL_TRUE);
+	}
 }
 
 Context::Context() {

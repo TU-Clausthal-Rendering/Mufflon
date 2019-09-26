@@ -1208,6 +1208,18 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_color.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\scan.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\scanpush.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\quad.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sort_fragments.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\resources\ltc\info.txt">

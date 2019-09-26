@@ -171,7 +171,7 @@ void GlForward::iterate() {
 	m_dynFragmentBuffer.bindCountBuffer();
 	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.instanceToWorld, sceneDesc.numInstances, true);
 	m_dynFragmentBuffer.prepareFragmentBuffer();
-	// draw transparent fragments with color
+	//// draw transparent fragments with color
 	m_boxPipe.draw(sceneDesc.aabbs, sceneDesc.instanceToWorld, sceneDesc.numInstances, false);
 	m_dynFragmentBuffer.blendFragmentBuffer();
 
