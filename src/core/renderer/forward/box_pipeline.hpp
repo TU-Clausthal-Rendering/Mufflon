@@ -12,9 +12,11 @@ public:
 	BoxPipeline();
 	void init(gl::Framebuffer& framebuffer);
 	void draw(
-		const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box,
+		gl::Handle box,
 		const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms,
 		uint32_t numBoxes, bool countingPass) const;
+	void draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms, 
+		uint32_t instanceId, uint32_t numBoxes, bool countingPass) const ;
 private:
 	gl::Program m_countProgram;
 	gl::Program m_colorProgram;

@@ -51,9 +51,15 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 	m_colorPipe.program = m_colorProgram;
 }
 
-void BoxPipeline::draw(const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms, uint32_t numBoxes, bool countingPass) const
+void BoxPipeline::draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms, uint32_t numBoxes, bool countingPass) const
 {
-	if(countingPass)
+	draw(box, transforms, uint32_t(-1), numBoxes, countingPass);
+}
+
+void BoxPipeline::draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms,
+	uint32_t instanceId, uint32_t numBoxes, bool countingPass) const
+{
+	if (countingPass)
 	{
 		gl::Context::set(m_countPipe);
 	}
@@ -62,6 +68,9 @@ void BoxPipeline::draw(const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box, con
 		gl::Context::set(m_colorPipe);
 	}
 
+	// indicates if only a single matrix should be used or all matrices from the transform list
+	glUniform1i(1, instanceId);
+
 	// bind transforms
 	mAssert(transforms.id);
 	mAssert(!transforms.offset);
@@ -69,9 +78,9 @@ void BoxPipeline::draw(const ArrayDevHandle_t<Device::OPENGL, ei::Box>& box, con
 
 	// assumption about bbox layout
 	static_assert(sizeof(ei::Box) == sizeof(ei::Vec3) * 2);
-	mAssert(box.id);
-	glBindVertexBuffer(0, box.id, box.offset, sizeof(ei::Vec3));
-	
+	mAssert(box);
+	glBindVertexBuffer(0, box, 0, sizeof(ei::Vec3));
+
 	glDrawArrays(GLenum(m_countPipe.topology), 0, numBoxes * 2);
 }
 }

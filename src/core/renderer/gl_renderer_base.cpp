@@ -121,7 +121,7 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 		if(!lod.polygon.numTriangles) continue;
 
 		// instance if for lookup in instance transformation buffer
-		glProgramUniform1ui(pipe.program, 1, i);
+		glProgramUniform1ui(pipe.program, 1, GLuint(i));
 
 		// bind vertex and index buffer
         if(attribs & Attribute::Position) {
@@ -163,7 +163,7 @@ void GlRenderer::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 		if(!lod.spheres.numSpheres) continue;
 
 		// instance if for lookup in instance transformation buffer
-		glProgramUniform1ui(pipe.program, 1, i);
+		glProgramUniform1ui(pipe.program, 1, GLuint(i));
 
 		// bind vertex buffer
         if(attribs & Attribute::Position) {
@@ -194,7 +194,7 @@ void GlRenderer::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 		if(!lod.polygon.numQuads) continue;
 
 		// instance if for lookup in instance transformation buffer
-		glProgramUniform1ui(pipe.program, 1, i);
+		glProgramUniform1ui(pipe.program, 1, GLuint(i));
 
 		// bind vertex and index buffer
 		if(attribs & Attribute::Position) {

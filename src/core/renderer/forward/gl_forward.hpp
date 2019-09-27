@@ -47,6 +47,9 @@ private:
 
 	BoxPipeline m_boxPipe;
 	DynamicFragmentBuffer m_dynFragmentBuffer;
+	int m_lastBotLevelIndex = -1;
+	int m_botLevelNumBoxes = 0;
+	gl::Buffer m_botLevelBoxes;
 };
 
 

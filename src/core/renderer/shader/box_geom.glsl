@@ -1,8 +1,12 @@
 layout(lines) in;
 layout(triangle_strip, max_vertices = 4 * 6) out;
 
+// instance id to determine model matrix
+// => if u_instanceId < 0 use gl_PrimitiveIDIn
+layout(location = 1) uniform int u_instanceId;
+
 void draw_face(vec3 topLeft, vec3 topRight, vec3 botLeft, vec3 botRight) {
-	mat4x3 model = getModelMatrix(gl_PrimitiveIDIn);
+	mat4x3 model = getModelMatrix(u_instanceId < 0 ? gl_PrimitiveIDIn : u_instanceId);
 	
 	gl_Position = u_cam.viewProj * vec4(model * vec4(topLeft, 1.0), 1.0);
 	EmitVertex();
