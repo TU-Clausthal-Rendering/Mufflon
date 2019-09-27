@@ -17,18 +17,18 @@ namespace gui.ViewModel
                 m_models.World.PropertyChanged += OnFrameChanged;
         }
 
-        public uint? Current
+        public uint Current
         {
-            get => m_models.World == null ? default(uint?) : m_models.World.AnimationFrameCurrent;
+            get => m_models.World == null ? 0 : m_models.World.AnimationFrameCurrent;
             set
             {
-                if(m_models.World != null && value.HasValue)
-                    m_models.World.AnimationFrameCurrent = value.Value;
+                if(m_models.World != null)
+                    m_models.World.AnimationFrameCurrent = value;
             }
         }
 
-        public uint? Start { get => m_models.World == null ? default(uint?) : m_models.World.AnimationFrameStart; }
-        public uint? End { get => m_models.World == null ? default(uint?) : m_models.World.AnimationFrameEnd; }
+        public uint Start { get => m_models.World == null ? 0 : m_models.World.AnimationFrameStart; }
+        public uint End { get => m_models.World == null ? 0 : m_models.World.AnimationFrameEnd; }
 
         private void OnFrameChanged(object sender, PropertyChangedEventArgs args)
         {
