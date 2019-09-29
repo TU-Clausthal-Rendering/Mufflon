@@ -28,6 +28,7 @@
     <ClCompile Include="..\..\src\core\opengl\vertex_array_builder.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\debug\debug_bvh_renderer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
@@ -216,6 +217,8 @@
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_renderer.hpp" />
     <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp" />
@@ -623,6 +626,22 @@
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\shader</DestinationFolders>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\sort_fragments.glsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\shader</DestinationFolders>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\shader</DestinationFolders>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\ndotc_fragment.glsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\shader</DestinationFolders>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\shader</DestinationFolders>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\ndotc_shade.glsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>

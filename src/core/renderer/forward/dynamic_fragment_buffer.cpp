@@ -52,7 +52,6 @@ void DynamicFragmentBuffer::init(const gl::Framebuffer& framebuffer, int width, 
 	}
 
 	// create fragment buffer storage
-	m_numFragments = 65000 / 8;
 	glGenBuffers(1, &m_fragmentBuffer);
 	gl::bindBuffer(gl::BufferType::ShaderStorage, m_fragmentBuffer);
 	gl::bufferStorage(m_fragmentBuffer, 8 * m_numFragments, nullptr, gl::StorageFlags::DynamicStorage);
@@ -83,9 +82,9 @@ void DynamicFragmentBuffer::init(const gl::Framebuffer& framebuffer, int width, 
 	m_blendPipeline.depthStencil.depthWrite = false;
 	m_blendPipeline.rasterizer.cullMode = gl::CullMode::None;
 	m_blendPipeline.blend.enableBlending = gl::BlendMode::Blend;
-	m_blendPipeline.blend.renderTarget[2].colorBlendOp = gl::BlendOp::Add;
-	m_blendPipeline.blend.renderTarget[2].srcColorFactor = gl::BlendFactor::One;
-	m_blendPipeline.blend.renderTarget[2].dstColorFactor = gl::BlendFactor::SrcAlpha;
+	m_blendPipeline.blend.renderTarget[0].colorBlendOp = gl::BlendOp::Add;
+	m_blendPipeline.blend.renderTarget[0].srcColorFactor = gl::BlendFactor::One;
+	m_blendPipeline.blend.renderTarget[0].dstColorFactor = gl::BlendFactor::SrcAlpha;
 }
 
 void DynamicFragmentBuffer::bindCountBuffer() {

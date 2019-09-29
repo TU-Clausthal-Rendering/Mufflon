@@ -1,4 +1,4 @@
-layout(location = 2) out vec4 out_fragColor;
+layout(location = 0) out vec4 out_fragColor;
 
 layout(binding = 7, std430) readonly buffer ssbo_fragmentBase
 {

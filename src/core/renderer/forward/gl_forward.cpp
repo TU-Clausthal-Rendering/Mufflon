@@ -25,10 +25,6 @@ namespace mufflon::renderer
 		glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
 		auto curTransforms = get_camera_transforms();
 		glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
-
-		m_boxPipe.init(m_framebuffer);
-		m_dynFragmentBuffer.init(m_framebuffer, m_outputBuffer.get_width(), m_outputBuffer.get_height());
-		m_lastBotLevelIndex = -1;
 	}
 
 	void GlForward::init()
@@ -166,48 +162,6 @@ namespace mufflon::renderer
 		draw_triangles(m_trianglePipe, Attribute::All);
 		draw_quads(m_quadPipe, Attribute::All);
 		draw_spheres(m_spherePipe, Attribute::All);
-
-		bool showTopLevel = this->m_params.get_param_bool(PForwardTopLevel::name);
-		int botLevelIndex = this->m_params.get_param_int(PForwardBotLevel::name);
-		const auto& sceneDesc = this->get_scene_descriptor();
-		bool showBotLevel = (botLevelIndex >= 0 && botLevelIndex < sceneDesc.numInstances);
-
-		if (showTopLevel || showBotLevel) {
-			if(showBotLevel && botLevelIndex != m_lastBotLevelIndex) {
-				m_lastBotLevelIndex = botLevelIndex;
-				// create array with bounding boxes
-				auto blas = reinterpret_cast<const scene::accel_struct::LBVH<Device::OPENGL>*>(sceneDesc.lods[botLevelIndex].accelStruct.accelParameters);
-				mAssert(blas);
-
-				std::vector<ei::Box> bboxes;
-				m_botLevelNumBoxes = blas->numInternalNodes;
-				bboxes.resize(blas->numInternalNodes);
-				for(int i = 0; i < blas->numInternalNodes; ++i) {
-					bboxes[i] = blas->bvh[i].bb;
-				}
-
-				glGenBuffers(1, &m_botLevelBoxes);
-				gl::bindBuffer(gl::BufferType::ShaderStorage, m_botLevelBoxes);
-				gl::bufferStorage(m_botLevelBoxes, bboxes.size() * sizeof(bboxes[0]), bboxes.data(), gl::StorageFlags::None);
-			}
-
-			// count transparent fragments
-			m_dynFragmentBuffer.bindCountBuffer();
-			if(showTopLevel)
-				m_boxPipe.draw(sceneDesc.aabbs.id, sceneDesc.instanceToWorld, sceneDesc.numInstances, true);
-			if(showBotLevel)
-				m_boxPipe.draw(m_botLevelBoxes, sceneDesc.instanceToWorld, botLevelIndex, m_botLevelNumBoxes, true);
-
-
-			m_dynFragmentBuffer.prepareFragmentBuffer();
-			//// draw transparent fragments with color
-			if(showTopLevel)
-				m_boxPipe.draw(sceneDesc.aabbs.id, sceneDesc.instanceToWorld, sceneDesc.numInstances, false);
-			if(showBotLevel)
-				m_boxPipe.draw(m_botLevelBoxes, sceneDesc.instanceToWorld, botLevelIndex, m_botLevelNumBoxes, false);
-			
-			m_dynFragmentBuffer.blendFragmentBuffer();
-		}
 
 		end_frame();
 	}

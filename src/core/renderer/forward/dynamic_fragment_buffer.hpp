@@ -26,7 +26,7 @@ namespace mufflon::renderer {
 		void doScan();
 
 		gl::Buffer m_fragmentBuffer;
-		size_t m_numFragments = 0;
+		size_t m_numFragments = 65000 / 8;
 
 		gl::Buffer m_fragmentCounts;
 		gl::Buffer m_stageBuffer;

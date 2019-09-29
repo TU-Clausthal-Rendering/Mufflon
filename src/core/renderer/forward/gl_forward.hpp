@@ -4,8 +4,6 @@
 #include "core/opengl/gl_object.h"
 #include "core/renderer/gl_renderer_base.h"
 #include "core/opengl/gl_pipeline.h"
-#include "core/renderer/forward/box_pipeline.hpp"
-#include "dynamic_fragment_buffer.hpp"
 
 namespace mufflon::scene::textures {
 	class Texture;
@@ -17,7 +15,7 @@ class GlForward final : public GlRendererBase<ForwardTargets> {
 public:
 	// Initialize all resources required by this renderer
 	GlForward();
-	~GlForward() = default;
+	~GlForward() override = default;
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }
@@ -44,12 +42,6 @@ private:
 	gl::VertexArray m_spheresVao;
 
 	gl::Buffer m_transformBuffer;
-
-	BoxPipeline m_boxPipe;
-	DynamicFragmentBuffer m_dynFragmentBuffer;
-	int m_lastBotLevelIndex = -1;
-	int m_botLevelNumBoxes = 0;
-	gl::Buffer m_botLevelBoxes;
 };
 
 
