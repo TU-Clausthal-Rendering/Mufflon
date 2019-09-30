@@ -22,6 +22,18 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 		.build_shader(gl::ShaderType::Fragment)	
 		.build_program();
 
+	m_countProgramEx = gl::ProgramBuilder()
+		.add_file("shader/camera_transforms.glsl")
+		.add_define("SINGLE_MODEL")
+		.add_define("SHADE_LEVEL")
+		.add_file("shader/box_vertex.glsl", false)
+		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/box_geom.glsl", false)
+		.build_shader(gl::ShaderType::Geometry)
+		.add_file("shader/box_fragment_count.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
+		.build_program();
+
 	m_colorProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/model_transforms.glsl")
@@ -33,8 +45,24 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 		.build_shader(gl::ShaderType::Fragment)
 		.build_program();
 
+	m_colorProgramEx = gl::ProgramBuilder()
+		.add_file("shader/camera_transforms.glsl")
+		.add_define("SINGLE_MODEL")
+		.add_define("SHADE_LEVEL")
+		.add_file("shader/box_vertex.glsl", false)
+		.build_shader(gl::ShaderType::Vertex)
+		.add_file("shader/box_geom.glsl", false)
+		.build_shader(gl::ShaderType::Geometry)
+		.add_file("shader/box_fragment_color.glsl", false)
+		.build_shader(gl::ShaderType::Fragment)
+		.build_program();
+
 	// vao only positions
 	m_vao = gl::VertexArrayBuilder().add(0, 0, 3).build();
+	m_vaoExt = gl::VertexArrayBuilder()
+		.add(0, 0, 3)
+		.add(1, 1, 1, false)
+		.build();
 
 	m_countPipe.framebuffer = framebuffer;
 	m_countPipe.program = m_countProgram;
@@ -49,20 +77,51 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 
 	m_colorPipe = m_countPipe;
 	m_colorPipe.program = m_colorProgram;
+
+	m_countPipeEx = m_colorPipe;
+	m_countPipeEx.program = m_countProgramEx;
+	m_countPipeEx.vertexArray = m_vaoExt;
+
+	m_colorPipeEx = m_colorPipe;
+	m_colorPipeEx.program = m_colorProgramEx;
+	m_colorPipeEx.vertexArray = m_vaoExt;
 }
 
-void BoxPipeline::draw(gl::Handle box, uint32_t numBoxes, bool countingPass, const ei::Vec3& color) const
+void BoxPipeline::draw(gl::Handle box, gl::Handle levels, int numBoxes, int numLevel, bool countingPass,
+	const ei::Vec3& color) const
 {
-	draw(box, 0, uint32_t(-2), numBoxes, countingPass, color);
+	draw(box, levels, ei::Mat3x4(ei::identity4x4()), numBoxes, numLevel, countingPass, color);
+}
+
+void BoxPipeline::draw(gl::Handle box, gl::Handle levels, ei::Mat3x4 transforms, int numBoxes, int numLevel,
+	bool countingPass, const ei::Vec3& color) const
+{
+	if(countingPass)
+	{
+		gl::Context::set(m_countPipeEx);
+	}
+	else
+	{
+		gl::Context::set(m_colorPipeEx);
+		glUniform3f(2, color.r, color.g, color.b);
+		glUniform1i(10, numLevel);
+	}
+
+	// transform matrix
+	glUniformMatrix4x3fv(3, 1, GL_TRUE, reinterpret_cast<float*>(&transforms));
+
+	// assumption about bbox layout
+	static_assert(sizeof(ei::Box) == sizeof(ei::Vec3) * 2);
+	mAssert(box);
+	glBindVertexBuffer(0, box, 0, sizeof(ei::Vec3));
+
+	mAssert(levels);
+	glBindVertexBuffer(1, levels, 0, sizeof(int));
+
+	glDrawArrays(GLenum(m_countPipe.topology), 0, numBoxes * 2);
 }
 
 void BoxPipeline::draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms, uint32_t numBoxes, bool countingPass, const ei::Vec3& color) const
-{
-	draw(box, transforms, uint32_t(-1), numBoxes, countingPass, color);
-}
-
-void BoxPipeline::draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms,
-	uint32_t instanceId, uint32_t numBoxes, bool countingPass, const ei::Vec3& color) const
 {
 	if (countingPass)
 	{
@@ -74,16 +133,9 @@ void BoxPipeline::draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei
 		glUniform3f(2, color.r, color.g, color.b);
 	}
 
-	// indicates if only a single matrix should be used or all matrices from the transform list
-	glUniform1i(1, instanceId);
-
-	// bind transforms
-	if(instanceId != uint32_t(-2)) // -2 is code for no transformations
-	{
-		mAssert(transforms.id);
-		mAssert(!transforms.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, transforms.id);
-	}
+	mAssert(transforms.id);
+	mAssert(!transforms.offset);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, transforms.id);
 
 	// assumption about bbox layout
 	static_assert(sizeof(ei::Box) == sizeof(ei::Vec3) * 2);

@@ -1,16 +1,24 @@
 layout(lines) in;
 layout(triangle_strip, max_vertices = 4 * 6) out;
+layout(location = 0) in int in_level[];
+
 layout(location = 0) out vec2 texcoords;
+layout(location = 1) out flat int out_level;
 
 // instance id to determine model matrix
 // => if u_instanceId < 0 use gl_PrimitiveIDIn
 layout(location = 1) uniform int u_instanceId;
 
+#ifdef SINGLE_MODEL
+layout(location = 3) uniform mat4x3 model;
+#endif
+
 void draw_face(vec3 topLeft, vec3 topRight, vec3 botLeft, vec3 botRight) {
-	mat4x3 model = mat4x3(1.0);
-	if(u_instanceId != -2)
-		model = getModelMatrix(u_instanceId < 0 ? gl_PrimitiveIDIn : u_instanceId);
-	
+
+#ifndef SINGLE_MODEL
+	mat4x3 model = getModelMatrix(gl_PrimitiveIDIn);
+#endif
+
 	texcoords = vec2(0.0, 0.0);
 	gl_Position = u_cam.viewProj * vec4(model * vec4(topLeft, 1.0), 1.0);
 	EmitVertex();
@@ -40,6 +48,8 @@ void draw_face(vec3 topLeft, vec3 topRight, vec3 botLeft, vec3 botRight) {
 #define FRONT_BOT_RIGHT 7
 
 void main() {
+	out_level = in_level[0];
+
 	// draw cube
 	vec3 corners[8];
 

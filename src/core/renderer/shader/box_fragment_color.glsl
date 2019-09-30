@@ -1,6 +1,9 @@
 layout(early_fragment_tests) in;
 layout(location = 0) out vec4 out_fragColor;
 layout(location = 0) in vec2 texcoords;
+layout(location = 1) in flat int in_level;
+
+layout(location = 10) uniform int maxLevel;
 
 layout(binding = 6, std430) coherent buffer ssbo_fragmentCount
 {
@@ -32,6 +35,14 @@ void main() {
 	opacity = pow(opacity, 10.0);
 
 	vec4 color = vec4(color, opacity * 0.5);
+
+#ifdef SHADE_LEVEL
+	// level gradient
+	float levelFactor = float(in_level) / float(maxLevel);
+	//levelFactor = 1.0 - levelFactor;
+	
+	color.rgb *= levelFactor;
+#endif
 
 	// store color etc.
 	uint index = uint(gl_FragCoord.y) * uint(u_cam.screen.x) + uint(gl_FragCoord.x);

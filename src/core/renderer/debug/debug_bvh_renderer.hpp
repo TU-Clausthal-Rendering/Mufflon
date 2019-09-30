@@ -22,7 +22,7 @@ namespace mufflon::renderer {
 
 	private:
 		void init();
-		static void upload_box_array(const scene::AccelDescriptor& accel, gl::Buffer& dstBuffer, int& boxCount, const ei::Box& root);
+		static void upload_box_array(const scene::AccelDescriptor& accel, gl::Buffer& dstBoxBuffer, gl::Buffer& dstLevelBuffer, int& boxCount, int& maxLevel);
 
 		DebugBvhParameters m_params = {};
 
@@ -44,9 +44,13 @@ namespace mufflon::renderer {
 		DynamicFragmentBuffer m_dynFragmentBuffer;
 		int m_botLevelNumBoxes = 0;
 		gl::Buffer m_botLevelBoxes;
+		gl::Buffer m_botLevelLevels;
+		int m_botLevelMaxLevel = 0;
 
 		int m_topLevelNumBoxes = 0;
 		gl::Buffer m_topLevelBoxes;
+		gl::Buffer m_topLevelLevels;
+		int m_topLevelMaxLevel = 0;
 
 		gl::Buffer m_bboxes;
 
