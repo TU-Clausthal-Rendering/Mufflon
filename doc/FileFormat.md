@@ -198,7 +198,8 @@ Materials
 
 `"type": "emissive"`
 
-    "radiance": [r,g,b] | <texture>,    // Surface radiance in [W/m²sr]
+    "radiance": [r,g,b] | <texture> or
+	"temperature": T | <texture>,       // Surface radiance in [W/m²sr] or temperature in [K]
     "scale: [r,g,b]                     // Multiplier for radiance (HDR color, default 1,1,1)
 
 `"type": "orennayar"`

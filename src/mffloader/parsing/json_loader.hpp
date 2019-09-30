@@ -53,7 +53,8 @@ public:
 
 private:
 	TextureHdl load_texture(const char* name, TextureSampling sampling = TextureSampling::SAMPLING_LINEAR,
-							MipmapType mipmapType = MipmapType::MIPMAP_NONE, std::optional<TextureFormat> targetFormat = std::nullopt);
+							MipmapType mipmapType = MipmapType::MIPMAP_NONE, std::optional<TextureFormat> targetFormat = std::nullopt,
+							TextureCallback callback = nullptr, void* userParams = nullptr);
 	std::pair<TextureHdl, TextureHdl> load_displacement_map(const char* name);
 	MaterialParams* load_material(rapidjson::Value::ConstMemberIterator matIter);
 	void free_material(MaterialParams* mat);

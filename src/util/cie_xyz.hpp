@@ -9,6 +9,6 @@ struct Kelvin {
 	double value;
 };
 
-ei::Vec3 compute_black_body_color(const Kelvin temperature);
+ei::Vec3 compute_black_body_color(const Kelvin temperature, const bool normalize = true);
 
 } // namespace mufflon::spectrum

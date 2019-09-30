@@ -17,22 +17,23 @@ static constexpr size_t CIE_XYZ_SAMPLES = 471u;
 static constexpr double CIE_Y_INTEGRAL = 106.856895;
 
 // Physical constants bar their exponents for increased numerical precision
-static constexpr double PLANCK = 6.62607015;			//e-34	[J*s]
-static constexpr double BOLTZMANN = 1.380649;			//e-23	[J/K]
-static constexpr double SPEED_OF_LIGHT = 2.99792458;	//e8	[m]
+static constexpr double PLANCK = 6.62607015;				//e-34	[J*s]
+static constexpr double BOLTZMANN = 1.380649;				//e-23	[J/K]
+static constexpr double SPEED_OF_LIGHT = 2.99792458;		//e8	[m]
+static constexpr double WIEN_DISPLACEMENT = 2.8977721e-3;	//		[m]
 
 struct XyzBlackBodySpectrum {
 	double spectralRadiance[CIE_XYZ_SAMPLES];		//		[W / (s*m³)]
 };
 
-double compute_black_body_sample(const Nanometer v, const Kelvin T) {
+double compute_black_body_sample(const Nanometer lambda, const Kelvin T) {
 	// Planck's law: B_v(v, T) = 2hv³/(c²e^(hv/(kT)) - 1)
 	// Given wavelengths instead of frequencies this leads to
 	// S_λ = 2*h*c²/(λ^5 * e^(h*c/(λ*k*T)) - 1)
 	//, which computes the amount of energy rediated per unit time and unit area into a unit of solid angle perpendicular to the surface.
-	const double ePart = std::exp(PLANCK * SPEED_OF_LIGHT / (v.value * BOLTZMANN * T.value) * 1.0e6);
-	const double nominator = 2.0 * PLANCK * SPEED_OF_LIGHT;
-	const double denominator = (v.value*v.value)*(v.value*v.value)*v.value * (ePart - 1.0);
+	const double ePart = std::exp(PLANCK * SPEED_OF_LIGHT / (lambda.value * BOLTZMANN * T.value) * 1.0e6);
+	const double nominator = 2.0 * PLANCK * SPEED_OF_LIGHT * SPEED_OF_LIGHT;
+	const double denominator = (lambda.value*lambda.value)*(lambda.value*lambda.value)*lambda.value * (ePart - 1.0);
 	const double result = nominator * 1.0e27 / denominator;
 	return result;
 }
@@ -47,6 +48,16 @@ XyzBlackBodySpectrum compute_xyz_black_body_samples(const Kelvin temperature) {
 	}
 
 	return spectrum;
+}
+
+XyzBlackBodySpectrum normalize_spectrum(const XyzBlackBodySpectrum& spectrum, const Kelvin temperature) {
+	const Nanometer maxLambda{ WIEN_DISPLACEMENT * 1.0e9 / temperature.value };
+	const double maxSpectralRadiance = compute_black_body_sample(maxLambda, temperature);
+
+	XyzBlackBodySpectrum normSpectrum;
+	for(std::size_t i = 0u; i < CIE_XYZ_SAMPLES; ++i)
+		normSpectrum.spectralRadiance[i] = spectrum.spectralRadiance[i] / maxSpectralRadiance;
+	return normSpectrum;
 }
 
 const double CIE_X[CIE_XYZ_SAMPLES] = {
@@ -414,8 +425,11 @@ const double CIE_Z[CIE_XYZ_SAMPLES] = {
 
 } // namespace
 
-ei::Vec3 compute_black_body_color(const Kelvin temperature) {
-	const auto spectrum = compute_xyz_black_body_samples(temperature);
+ei::Vec3 compute_black_body_color(const Kelvin temperature, const bool normalize) {
+	auto spectrum = compute_xyz_black_body_samples(temperature);
+	//if(normalize)
+	//	spectrum = normalize_spectrum(spectrum, temperature);
+
 	ei::DVec3 xyz{ 0.f };
 	// Integrate black-body spextrum with XYZ response spectra
 	for(std::size_t i = 0u; i < CIE_XYZ_SAMPLES; ++i) {
@@ -430,7 +444,8 @@ ei::Vec3 compute_black_body_color(const Kelvin temperature) {
 	xyz.y *= scale;
 	xyz.z *= scale;
 
-	return ei::xyzToRgb(ei::Vec3{ xyz });
+	const auto rgb = ei::max(ei::Vec3{ 0.f }, ei::xyzToRgb(ei::Vec3{ xyz }));
+	return rgb / ei::max(rgb);
 }
 
 } // namespace mufflon::spectrum

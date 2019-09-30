@@ -1805,7 +1805,9 @@ TextureHdl world_get_texture(const char* path) {
 	CATCH_ALL(nullptr)
 }
 
-TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapType type) {
+TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapType type,
+							 TextureCallback callback, void* userParams) {
+
 	TRY
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
@@ -1832,19 +1834,36 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapT
 				 filePath.string(), "'");
 		return nullptr;
 	}
+
 	// The texture will take ownership of the pointer
 	auto texture = std::make_unique<textures::Texture>(path, texData.width, texData.height,
 													   texData.layers, static_cast<textures::MipmapType>(type),
 													   static_cast<textures::Format>(texData.format),
 													   static_cast<textures::SamplingMode>(sampling),
 													   texData.sRgb, false, std::unique_ptr<u8[]>(texData.data));
+	if(callback != nullptr) {
+		auto cpuTex = texture->template acquire<Device::CPU>();
+		const auto PIXELSIZE = textures::PIXEL_SIZE(static_cast<textures::Format>(texData.format));
+		for(uint32_t layer = 0u; layer < texData.layers; ++layer) {
+			for(uint32_t y = 0u; y < texData.height; ++y) {
+				for(uint32_t x = 0u; x < texData.width; ++x) {
+					const Pixel texel{ x, y };
+					const auto oldVal = util::pun<Vec4>(cpuTex->read(texel, layer));
+					const auto newVal = util::pun<ei::Vec4>(callback(x, y, layer, texData.format,
+																	 oldVal, userParams));
+					cpuTex->write(newVal, texel, layer);
+				}
+			}
+		}
+	}
+
 	hdl = s_world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
 TextureHdl world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat,
-									   MipmapType type) {
+									   MipmapType type, TextureCallback callback, void* userParams) {
 	TRY
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
@@ -1898,6 +1917,12 @@ TextureHdl world_add_texture_converted(const char* path, TextureSampling samplin
 			for(u32 x = 0u; x < texData.width; ++x) {
 				const Pixel texel{ x, y };
 				cpuFinalTex->write(tempTex.read(texel, layer), texel, layer);
+				if(callback != nullptr) {
+					const auto oldVal = util::pun<Vec4>(cpuFinalTex->read(texel, layer));
+					const auto newVal = util::pun<ei::Vec4>(callback(x, y, layer, texData.format,
+																	 oldVal, userParams));
+					cpuFinalTex->write(newVal, texel, layer);
+				}
 			}
 		}
 	}
@@ -1948,7 +1973,6 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
-
 
 CORE_API Boolean CDECL world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips) {
 	TRY

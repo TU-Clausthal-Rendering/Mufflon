@@ -224,8 +224,9 @@ namespace gui.Dll
         internal static string world_get_light_name(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_light_name_(hdl)); }
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_texture")]
-        private static extern IntPtr world_add_texture_(IntPtr path, TextureSampling sampling);
-        internal static IntPtr world_add_texture(string path, TextureSampling sampling) { return world_add_texture_(StringUtil.ToNativeUtf8(path), sampling); }
+        private static extern IntPtr world_add_texture_(IntPtr path, TextureSampling sampling, IntPtr callback, IntPtr userParams);
+        internal static IntPtr world_add_texture(string path, TextureSampling sampling) { return world_add_texture_(StringUtil.ToNativeUtf8(path), sampling,
+                                                                                                                    IntPtr.Zero, IntPtr.Zero); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_add_texture_value(out float[] value, int num, TextureSampling sampling);
 
