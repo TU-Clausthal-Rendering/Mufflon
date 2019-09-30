@@ -229,9 +229,16 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(invInstanceTransformations.size());
 		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), sizeof(ei::Mat3x4) * invInstanceTransformations.size());
 
-		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<NotGl<dev>, u32[]>>();
-		instLodIndicesDesc = make_udevptr_array<NotGl<dev>, u32>(lodIndices.size());
-		copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+		if constexpr(dev != Device::OPENGL) {
+			auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
+			instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
+			copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+			sceneDescriptor.lodIndices = instLodIndicesDesc.get();
+		} else {
+			// We cannot create a new lodIndices array here, because the type for OpenGL is the same as for the CPU side,
+			// which then overwrites the array in m_instLodIndicesDesc and leaves a dangling pointer in the CPU descriptor
+			sceneDescriptor.lodIndices = sceneDescriptor.cpuDescriptor->lodIndices;
+		}
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
@@ -245,7 +252,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
 		sceneDescriptor.instanceToWorld = instTransformsDesc.get();
 		sceneDescriptor.worldToInstance = invInstTransformsDesc.get();
-		sceneDescriptor.lodIndices = instLodIndicesDesc.get();
+
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them
 		std::vector<LodDescriptor<dev>> lodDescs;
