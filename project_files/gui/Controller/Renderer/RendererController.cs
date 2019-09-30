@@ -30,6 +30,8 @@ namespace gui.Controller.Renderer
         private bool m_clearWorld = false;
         private bool m_takeScreenshot = false;
         private bool m_denoisedScreenshot = false;
+        private bool m_repaint = false;
+
         private ManualResetEvent m_auxiliaryIteration = new ManualResetEvent(true);
 
         public RendererController(Models models)
@@ -42,6 +44,7 @@ namespace gui.Controller.Renderer
             m_models.Renderer.PropertyChanged += LoadRendererParameters;
             m_models.Renderer.RequestParameterSave += SaveRendererParameter;
             m_models.Renderer.RequestScreenshot += OnRequestScreenshot;
+            m_models.Display.RequestRepaint += OnRequestRepaint;
         }
         
         /* Performs one render loop iteration
@@ -52,20 +55,21 @@ namespace gui.Controller.Renderer
             m_models.Statusbar.UpdateMemory();
 
             // Try to acquire the lock - if we're waiting, we're not rendering
-            if(m_shouldExit)
+            if (m_shouldExit)
                 return;
             m_models.Renderer.RenderLock.WaitOne();
             // Check if we've been shut down
             if(m_shouldExit)
                 return;
 
-            if(m_takeScreenshot)
+            if (m_takeScreenshot)
             {
                 string filename = ScreenShotCommand.ReplaceCommonFilenameTags(m_models, m_models.Settings.ScreenshotNamePattern);
-                if(m_denoisedScreenshot)
+                if (m_denoisedScreenshot)
                 {
                     Core.render_save_denoised_radiance(Path.Combine(m_models.Settings.ScreenshotFolder, filename));
-                } else
+                }
+                else
                 {
                     foreach (RenderTarget target in m_models.RenderTargetSelection.Targets)
                     {
@@ -77,9 +81,9 @@ namespace gui.Controller.Renderer
                 }
 
                 m_takeScreenshot = false;
-                if(!m_models.Renderer.IsRendering || m_iterationsPerformed == 0)
+                if (!m_models.Renderer.IsRendering || m_iterationsPerformed == 0)
                     m_models.Renderer.RenderLock.Reset();
-            } else if(m_clearWorld)
+            } else if (m_clearWorld)
             {
                 // Only clear the world, do nothing else
                 Core.world_clear_all();
@@ -88,33 +92,55 @@ namespace gui.Controller.Renderer
                 m_auxiliaryIteration.Set();
             } else
             {
-                UpdateRenderTargets();
+                if(!m_repaint)
+                {
+                    UpdateRenderTargets();
 
-                if(m_models.Renderer.IsRendering) {
-                    if(m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
+                    if (m_models.Renderer.IsRendering)
                     {
-                        // Update camera movements and enter the render DLL
-                        if (m_models.Settings.AllowCameraMovement)
-                            m_models.RendererCamera.MoveCamera();
-                        m_models.Renderer.Iterate();
-                        ++m_iterationsPerformed;
-                    } else
+                        if (m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
+                        {
+                            // Update camera movements and enter the render DLL
+                            if (m_models.Settings.AllowCameraMovement)
+                                m_models.RendererCamera.MoveCamera();
+                            m_models.Renderer.Iterate();
+                            ++m_iterationsPerformed;
+                        }
+                        else
+                        {
+                            // No more iterations left -> we're done
+                            m_iterationsPerformed = 0;
+                            System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                            m_models.Renderer.RenderLock.Reset();
+                        }
+                    }
+                    else
                     {
-                        // No more iterations left -> we're done
                         m_iterationsPerformed = 0;
-                        System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
                         m_models.Renderer.RenderLock.Reset();
                     }
-                } else {
-                    m_iterationsPerformed = 0;
-                    m_models.Renderer.RenderLock.Reset();
+
+                    // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
+                    if (m_shouldExit)
+                        return;
                 }
 
-                // We release it to give the GUI a chance to block us (ie. rendering is supposed to pause/stop)
-                if(m_shouldExit)
-                    return;
-                m_models.Display.Repaint(m_renderTarget.Name, m_varianceTarget);
+                // Renew the display texture (we don't really care)
+                IntPtr targetTexture = IntPtr.Zero;
+                if (!Core.core_get_target_image(m_renderTarget.Name, m_varianceTarget, out targetTexture))
+                    throw new Exception(Core.core_get_dll_error());
+                m_models.Display.Repaint(!m_repaint);
+
+                if (m_repaint)
+                {
+                    m_repaint = false;
+                    if (!m_models.Renderer.IsRendering || m_iterationsPerformed == 0)
+                        m_models.Renderer.RenderLock.Reset();
+                    m_auxiliaryIteration.Set();
+                }
             }
+
+
         }
 
         // Handles changes in viewport size and render targets
@@ -180,6 +206,14 @@ namespace gui.Controller.Renderer
             m_denoisedScreenshot = denoised;
             m_takeScreenshot = true;
             m_models.Renderer.RenderLock.Set();
+        }
+
+        private void OnRequestRepaint()
+        {
+            m_auxiliaryIteration.Reset();
+            m_repaint = true;
+            m_models.Renderer.RenderLock.Set();
+            m_auxiliaryIteration.WaitOne();
         }
 
         // Saves the current renderer's parameters in textform in the application settings
