@@ -108,6 +108,8 @@ struct SceneDescriptor {
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
 	ConstArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>> alphaTextures;
 
+	struct Empty {};
+	std::conditional_t < dev == Device::OPENGL, const SceneDescriptor<Device::CPU>*, Empty> cpuDescriptor;
 
 	CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
 		const LodDescriptor<dev>& object = lods[lodIndices[primitive.instanceId]];

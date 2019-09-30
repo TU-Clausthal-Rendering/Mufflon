@@ -5,6 +5,13 @@
 
 namespace mufflon::renderer {
 
+	struct PDebugBoxes {
+		inline static constexpr const char* name = "Bounding Boxes";
+		bool showBbox = false;
+		static constexpr ParamDesc get_desc() noexcept {
+			return { name, ParameterTypes::BOOL };
+		}
+	};
 
 	struct PDebugTopLevel {
 		inline static constexpr const char* name = "Top level";
@@ -22,7 +29,15 @@ namespace mufflon::renderer {
 		}
 	};
 
-	using DebugBvhParameters = ParameterHandler<PDebugTopLevel, PDebugBotLevel>;
+	struct PDebugColorInstance {
+		inline static constexpr const char* name = "Instance color coding";
+		bool colorInstance = false;
+		static constexpr ParamDesc get_desc() noexcept {
+			return { name, ParameterTypes::BOOL };
+		}
+	};
+
+	using DebugBvhParameters = ParameterHandler<PDebugBoxes, PDebugTopLevel, PDebugBotLevel, PDebugColorInstance>;
 
 	using DebugBvhTargets = TargetList<RadianceTarget>;
 

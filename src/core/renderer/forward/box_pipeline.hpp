@@ -11,12 +11,13 @@ class BoxPipeline {
 public:
 	BoxPipeline();
 	void init(gl::Framebuffer& framebuffer);
+	void draw(gl::Handle box, uint32_t numBoxes, bool countingPass, const ei::Vec3& color) const;
 	void draw(
 		gl::Handle box,
 		const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms,
-		uint32_t numBoxes, bool countingPass) const;
+		uint32_t numBoxes, bool countingPass, const ei::Vec3& color) const;
 	void draw(gl::Handle box, const ArrayDevHandle_t<Device::OPENGL, ei::Mat3x4>& transforms, 
-		uint32_t instanceId, uint32_t numBoxes, bool countingPass) const ;
+		uint32_t instanceId, uint32_t numBoxes, bool countingPass, const ei::Vec3& color) const ;
 private:
 	gl::Program m_countProgram;
 	gl::Program m_colorProgram;

@@ -22,6 +22,7 @@ namespace mufflon::renderer {
 
 	private:
 		void init();
+		static void upload_box_array(const scene::AccelDescriptor& accel, gl::Buffer& dstBuffer, int& boxCount, const ei::Box& root);
 
 		DebugBvhParameters m_params = {};
 
@@ -44,6 +45,12 @@ namespace mufflon::renderer {
 		int m_botLevelNumBoxes = 0;
 		gl::Buffer m_botLevelBoxes;
 
+		int m_topLevelNumBoxes = 0;
+		gl::Buffer m_topLevelBoxes;
+
+		gl::Buffer m_bboxes;
+
+		bool m_showBoxes = false;
 		bool m_showTopLevel = false;
 		bool m_showBotLevel = false;
 		int m_botIdx = -1;

@@ -17,27 +17,36 @@ void mufflon::renderer::DebugBvhRenderer::iterate()
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_transformBuffer);
 
 	// draw background geometry
-	draw_triangles(m_trianglePipe, Attribute::All);
-	draw_quads(m_quadPipe, Attribute::All);
-	draw_spheres(m_spherePipe, Attribute::All);
+	const auto attribs = Attribute::Normal | Attribute::Position | Attribute::Texcoord | Attribute::Material;
+	draw_triangles(m_trianglePipe, attribs);
+	draw_quads(m_quadPipe, attribs);
+	draw_spheres(m_spherePipe, attribs);
 
 	const auto& sceneDesc = this->get_scene_descriptor();
 
+	static const ei::Vec3 TopColor = ei::Vec3(1.0f, 0.5f, 1.0f);
+	static const ei::Vec3 BotColor = ei::Vec3(0.0f, 0.5f, 1.0f);
+	static const ei::Vec3 BoxColor = ei::Vec3(0.7f, 0.0f, 0.07f);
+
 	// count transparent fragments
 	m_dynFragmentBuffer.bindCountBuffer();
+	if (m_showBoxes)
+		m_boxPipe.draw(m_bboxes, sceneDesc.instanceToWorld, sceneDesc.numInstances, true, BoxColor);
 	if (m_showTopLevel)
-		m_boxPipe.draw(sceneDesc.aabbs.id, sceneDesc.instanceToWorld, sceneDesc.numInstances, true);
+		m_boxPipe.draw(m_topLevelBoxes, m_topLevelNumBoxes, true, TopColor);
 	if (m_showBotLevel)
-		m_boxPipe.draw(m_botLevelBoxes, sceneDesc.instanceToWorld, m_botIdx, m_botLevelNumBoxes, true);
-
-
+		m_boxPipe.draw(m_botLevelBoxes, sceneDesc.instanceToWorld, m_botIdx, m_botLevelNumBoxes, true, BotColor);
+	
+	
 	m_dynFragmentBuffer.prepareFragmentBuffer();
 	//// draw transparent fragments with color
+	if (m_showBoxes)
+		m_boxPipe.draw(m_bboxes, sceneDesc.instanceToWorld, sceneDesc.numInstances, false, BoxColor);
 	if (m_showTopLevel)
-		m_boxPipe.draw(sceneDesc.aabbs.id, sceneDesc.instanceToWorld, sceneDesc.numInstances, false);
+		m_boxPipe.draw(m_topLevelBoxes, m_topLevelNumBoxes, false, TopColor);
 	if (m_showBotLevel)
-		m_boxPipe.draw(m_botLevelBoxes, sceneDesc.instanceToWorld, m_botIdx, m_botLevelNumBoxes, false);
-
+		m_boxPipe.draw(m_botLevelBoxes, sceneDesc.instanceToWorld, m_botIdx, m_botLevelNumBoxes, false, BotColor);
+	
 	m_dynFragmentBuffer.blendFragmentBuffer();
 
 	end_frame();
@@ -57,34 +66,44 @@ void mufflon::renderer::DebugBvhRenderer::post_reset()
 	m_dynFragmentBuffer.init(m_framebuffer, m_outputBuffer.get_width(), m_outputBuffer.get_height());
 
 	const auto& sceneDesc = this->get_scene_descriptor();
+	m_showBoxes = this->m_params.get_param_bool(PDebugBoxes::name);
 	m_showTopLevel = this->m_params.get_param_bool(PDebugTopLevel::name);
 	m_botIdx = this->m_params.get_param_int(PDebugBotLevel::name);
 	m_showBotLevel = m_botIdx >= 0 && m_botIdx < sceneDesc.numInstances;
 
-	if (m_showBotLevel) {
-		// create array with bounding boxes
-		auto blas = reinterpret_cast<const scene::accel_struct::LBVH<Device::OPENGL>*>(sceneDesc.lods[m_botIdx].accelStruct.accelParameters);
-		mAssert(blas);
+	if(m_showTopLevel)
+		upload_box_array(sceneDesc.cpuDescriptor->accelStruct, m_topLevelBoxes, m_topLevelNumBoxes, sceneDesc.aabb);
 
-		std::vector<ei::Box> bboxes;
-		m_botLevelNumBoxes = blas->numInternalNodes;
-		bboxes.resize(blas->numInternalNodes);
-		for (int i = 0; i < blas->numInternalNodes; ++i) {
-			bboxes[i] = blas->bvh[i].bb;
+	if (m_showBotLevel)
+		upload_box_array(sceneDesc.cpuDescriptor->lods[m_botIdx].accelStruct, m_botLevelBoxes, m_botLevelNumBoxes, sceneDesc.cpuDescriptor->aabbs[m_botIdx]);
+
+	if(m_showBoxes)
+	{
+		std::vector<ei::Box> bbox;
+		bbox.reserve(sceneDesc.numInstances);
+		for(int i = 0; i < sceneDesc.numInstances; ++i)
+		{
+			auto lodIdx = sceneDesc.lodIndices[i];
+			const auto& lod = sceneDesc.lods[lodIdx];
+			bbox.push_back(sceneDesc.cpuDescriptor->aabbs[lodIdx]);
 		}
 
-		glGenBuffers(1, &m_botLevelBoxes);
-		gl::bindBuffer(gl::BufferType::ShaderStorage, m_botLevelBoxes);
-		gl::bufferStorage(m_botLevelBoxes, bboxes.size() * sizeof(bboxes[0]), bboxes.data(), gl::StorageFlags::None);
+		glGenBuffers(1, &m_bboxes);
+		gl::bindBuffer(gl::BufferType::ShaderStorage, m_bboxes);
+		gl::bufferStorage(m_bboxes, bbox.size() * sizeof(bbox[0]), bbox.data(), gl::StorageFlags::None);
 	}
 }
 
 void mufflon::renderer::DebugBvhRenderer::init()
 {
-	if (m_isInit) return;
-	m_isInit = true;
+	// shader must be reloaded for changed color coding
+	//if (m_isInit) return;
+	//m_isInit = true;
+	const auto& sceneDesc = this->get_scene_descriptor();
+	auto colorCoding = this->m_params.get_param_bool(PDebugColorInstance::name);
 
 	m_triangleProgram = gl::ProgramBuilder()
+		.add_define("COLOR_INSTANCE", colorCoding, true)
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
@@ -99,6 +118,7 @@ void mufflon::renderer::DebugBvhRenderer::init()
 
 	// add intermediate tesselation
 	m_quadProgram = gl::ProgramBuilder()
+		.add_define("COLOR_INSTANCE", colorCoding, true)
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/forward_vertex.glsl", false)
@@ -112,6 +132,7 @@ void mufflon::renderer::DebugBvhRenderer::init()
 		.build_program();
 
 	m_sphereProgram = gl::ProgramBuilder()
+		.add_define("COLOR_INSTANCE", colorCoding, true)
 		.add_file("shader/camera_transforms.glsl")
 		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
@@ -158,4 +179,33 @@ void mufflon::renderer::DebugBvhRenderer::init()
 	glBindBuffer(GL_UNIFORM_BUFFER, m_transformBuffer);
 	auto curTransforms = get_camera_transforms();
 	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
+}
+
+void mufflon::renderer::DebugBvhRenderer::upload_box_array(const scene::AccelDescriptor& accel, gl::Buffer& dstBuffer,
+	int& boxCount, const ei::Box& root) {
+	// create array with bounding boxes
+	auto blas = reinterpret_cast<const scene::accel_struct::LBVH<Device::CPU>*>(accel.accelParameters);
+	mAssert(blas);
+
+	std::vector<ei::Box> bboxes;
+	//std::vector<scene::accel_struct::BvhNode> tst;
+
+	boxCount = blas->numInternalNodes * 2;
+	if (boxCount == 0)
+	{
+		// special case => show top level box
+		bboxes.push_back(root);
+		boxCount = 1;
+	}
+	else
+	{
+		bboxes.resize(boxCount);
+		for (int i = 0; i < boxCount; ++i) {
+			bboxes[i] = blas->bvh[i].bb;
+		}
+	}
+
+	glGenBuffers(1, &dstBuffer);
+	gl::bindBuffer(gl::BufferType::ShaderStorage, dstBuffer);
+	gl::bufferStorage(dstBuffer, bboxes.size() * sizeof(bboxes[0]), bboxes.data(), gl::StorageFlags::None);
 }

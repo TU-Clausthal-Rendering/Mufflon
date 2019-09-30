@@ -104,6 +104,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 												  const std::vector<const char*>& sphereAttribs) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
+	if constexpr(dev == Device::OPENGL) {
+		sceneDescriptor.cpuDescriptor = &get_descriptor<Device::CPU>(vertexAttribs, faceAttribs, sphereAttribs);
+	}
 
 	// Check if we need to update attributes
 	auto& lastVertexAttribs = m_lastAttributeNames.template get<AttributeNames<dev>>().lastVertexAttribs;

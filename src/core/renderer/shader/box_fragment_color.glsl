@@ -1,5 +1,6 @@
 layout(early_fragment_tests) in;
 layout(location = 0) out vec4 out_fragColor;
+layout(location = 0) in vec2 texcoords;
 
 layout(binding = 6, std430) coherent buffer ssbo_fragmentCount
 {
@@ -22,8 +23,15 @@ layout(binding = 8, std430) writeonly buffer ssbo_fragmentStore
 	Fragment b_fragmentDest[];
 };
 
+layout(location = 2) uniform vec3 color;
+
 void main() {
-	vec4 color = vec4(1.0, 0.0, 0.0, 0.1);
+	// opacient gradient based on distance to edges (edges have texoords of 1 or 0)
+	// transform to [0, 1.0] where 1.0 = border
+	float opacity = max(abs(texcoords.x - 0.5), abs(texcoords.y - 0.5)) * 2.0;
+	opacity = pow(opacity, 10.0);
+
+	vec4 color = vec4(color, opacity * 0.5);
 
 	// store color etc.
 	uint index = uint(gl_FragCoord.y) * uint(u_cam.screen.x) + uint(gl_FragCoord.x);
