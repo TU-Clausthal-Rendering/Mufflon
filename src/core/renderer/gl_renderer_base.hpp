@@ -17,8 +17,9 @@ public:
 		Position = 1,
 		Normal = 1 << 1,
 		Texcoord = 1 << 2,
-		Material = 1 << 3,
-		All = 0xFFFFFFFF
+        Material = 1 << 3,
+        Light = 1 << 4,
+        All = 0xFFFFFFFF
 	};
 
 protected:
@@ -35,9 +36,14 @@ protected:
 
 		ei::Vec3 position;
 		float near;
+
 		ei::Vec3 direction;
 		float far;
+
 		ei::UVec2 screen;
+		float padding1, padding2;
+
+		ei::Vec3 up;
 	};
 
 	virtual scene::SceneDescriptor<Device::OPENGL> get_scene_descriptor() = 0;
@@ -80,6 +86,9 @@ protected:
 	gl::Framebuffer m_framebuffer;
 
 private:
+    // bind some static attributes (light, material)
+	void bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs);
+
 	uint32_t m_depthAttachmentType;
 	gl::Program m_copyShader;
 	static const size_t WORK_GROUP_SIZE = 16;
@@ -131,12 +140,13 @@ protected:
 
 		t.position = cam->get_position(0);
 		t.direction = cam->get_view_dir(0);
-
+		
 		t.near = cam->get_near();
 		t.far = cam->get_far();
 		t.screen.x = this->m_outputBuffer.get_width();
 		t.screen.y = this->m_outputBuffer.get_height();
-
+		t.up = cam->get_up_dir(0);
+		
 		float fov = 1.5f;
 		if(auto pcam = dynamic_cast<const cameras::Pinhole*>(cam)) {
 			fov = pcam->get_vertical_fov();

@@ -1,11 +1,7 @@
 layout(location = 0) in vec3 in_position;
 
-layout(binding = 0) uniform u_camTrans
-{
-	CameraTransforms u_cam;
-};
-layout(location = 1) uniform mat4x3 u_instanceTrans;
+layout(location = 1) uniform uint u_instanceId;
 
 void main() {
-	gl_Position = u_cam.viewProj * vec4(u_instanceTrans * vec4(in_position, 1.0), 1.0);
+	gl_Position = u_cam.viewProj * vec4(getModelMatrix(u_instanceId) * vec4(in_position, 1.0), 1.0);
 }

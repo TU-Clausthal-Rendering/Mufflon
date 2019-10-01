@@ -19,6 +19,7 @@ namespace gl {
 	enum class StorageFlags {
 		None = 0,
 		DynamicStorage = 0x0100,
+		ClientStorage = 0x0200
 	};
 
     enum class TextureInternal {

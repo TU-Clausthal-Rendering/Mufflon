@@ -129,6 +129,49 @@ struct LightTree {
 	}
 };
 
+template<>
+struct LightTree<Device::OPENGL> {
+	static constexpr Device DEVICE = Device::OPENGL;
+    
+    struct SmallLight {
+        // for point light and spot
+		ei::Vec3 intensity;
+		u32 type;
+
+		ei::Vec3 position;
+		union { float radius; float cosFalloffStart; };
+		
+        ei::Vec3 direction;
+		union { u32 material; float cosThetaMax; };
+    };
+
+	static_assert(sizeof(SmallLight) == 4 * 4 * 3, "SmallLight invalid alignment");
+
+    struct BigLight {
+        // for area lights
+		ei::Vec3 pos;
+		u32 material;
+
+		ei::Vec3 v1; // to v1
+		u32 numPoints; // 3 or 4
+
+		ei::Vec3 v2; // to v2
+		float dummy0;
+
+		ei::Vec3 v3; // to v3
+		float dummy1;
+    };
+
+	LightTree(const std::vector<SmallLight>& smallLights, const std::vector<BigLight>& bigLights);
+	LightTree() noexcept { smallLights.id = 0; bigLights.id = 0; }
+	//~LightTree();
+
+	ArrayDevHandle_t<DEVICE, SmallLight> smallLights;
+	ArrayDevHandle_t<DEVICE, BigLight> bigLights;
+	u32 numSmallLights;
+	u32 numBigLights;
+};
+
 #ifndef __CUDACC__
 class LightTreeBuilder {
 public:

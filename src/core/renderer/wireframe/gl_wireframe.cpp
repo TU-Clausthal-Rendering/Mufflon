@@ -13,6 +13,7 @@ GlWireframe::GlWireframe() :
     // shader
 	m_triangleProgram = gl::ProgramBuilder()
         .add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
         .add_file("shader/wireframe_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)
         .add_file("shader/wireframe_fragment.glsl", false)
@@ -21,6 +22,7 @@ GlWireframe::GlWireframe() :
 
 	m_quadProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/wireframe_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/wireframe_tese.glsl", false)
@@ -33,6 +35,7 @@ GlWireframe::GlWireframe() :
 
     m_quadDepthProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/wireframe_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/wireframe_tese.glsl", false)
@@ -43,6 +46,7 @@ GlWireframe::GlWireframe() :
 
 	m_sphereProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
         .build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/wireframe_sgeom.glsl", false)
@@ -53,6 +57,7 @@ GlWireframe::GlWireframe() :
 
     m_sphereDepthProgram = gl::ProgramBuilder()
 		.add_file("shader/camera_transforms.glsl")
+		.add_file("shader/model_transforms.glsl")
 		.add_file("shader/sphere_vertex.glsl", false)
 		.build_shader(gl::ShaderType::Vertex)
 		.add_file("shader/sphere_geom.glsl", false)

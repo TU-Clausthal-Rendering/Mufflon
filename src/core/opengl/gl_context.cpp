@@ -164,8 +164,8 @@ void Context::set(const Pipeline& pipeline) {
 	if(state.blend.enableBlending != pipeline.blend.enableBlending)
 	{
 		if(pipeline.blend.enableBlending == BlendMode::Blend) {
-			glEnable(GL_BLEND);
 			glDisable(GL_COLOR_LOGIC_OP);
+			glEnable(GL_BLEND);
 		}
 		else if(pipeline.blend.enableBlending == BlendMode::Logic)
 			glEnable(GL_COLOR_LOGIC_OP);
@@ -223,6 +223,15 @@ void Context::set(const Pipeline& pipeline) {
 		glBindVertexArray(pipeline.vertexArray);
 	else // bind empty vertex format
 		glBindVertexArray(get().m_emptyVao);
+}
+
+void Context::enableDepthWrite()
+{
+	auto& state = get().m_state;
+	if (!state.depthStencil.depthWrite) {
+		state.depthStencil.depthWrite = true;
+		glDepthMask(GL_TRUE);
+	}
 }
 
 Context::Context() {

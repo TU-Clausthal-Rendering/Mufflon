@@ -1480,7 +1480,10 @@ void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
 							  const GLchar* message, const void* userParam) {
 	switch(severity) {
 		case GL_DEBUG_SEVERITY_HIGH: logError(message); break;
-		case GL_DEBUG_SEVERITY_MEDIUM: logWarning(message); break;
+		case GL_DEBUG_SEVERITY_MEDIUM:
+			if (id == 131186) break; // buffer moved from video memory to host
+			if (id == 131154) break; // copy buffer during 3d rendering
+			logWarning(message); break;
 		case GL_DEBUG_SEVERITY_LOW: logInfo(message); break;
 		default: logPedantic(message); break;
 	}
@@ -1762,6 +1765,7 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	auto lock = std::scoped_lock(s_iterationMutex);
+	auto screenLock = std::scoped_lock(s_screenTextureMutex);
 	SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(scenario), s_currentRenderer);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");

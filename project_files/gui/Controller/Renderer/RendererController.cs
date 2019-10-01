@@ -45,6 +45,8 @@ namespace gui.Controller.Renderer
             m_models.Renderer.RequestParameterSave += SaveRendererParameter;
             m_models.Renderer.RequestScreenshot += OnRequestScreenshot;
             m_models.Display.RequestRepaint += OnRequestRepaint;
+            m_models.Renderer.RequestScreenshot += OnRequestScreenshot;
+            m_models.Display.RequestRepaint += OnRequestRepaint;
         }
         
         /* Performs one render loop iteration
