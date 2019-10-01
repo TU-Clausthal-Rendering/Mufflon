@@ -29,6 +29,7 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
+#include <set>
 #include "glad/glad.h"
 
 #ifdef _WIN32
@@ -108,6 +109,9 @@ std::mutex s_iterationMutex{};
 std::mutex s_screenTextureMutex{};
 // Log file
 std::ofstream s_logFile;
+// Set of render targets to enable/disable
+std::set<std::pair<std::string, bool>> s_targetsToEnable;
+std::set<std::pair<std::string, bool>> s_targetsToDisable;
 
 // Plugin container
 std::vector<TextureLoaderPlugin> s_plugins;
@@ -3200,6 +3204,9 @@ Boolean render_enable_renderer(uint32_t index, uint32_t variation) {
 		s_imageOutput = s_currentRenderer->create_output_handler(1, 1);
 	}
 	s_currentRenderer->on_renderer_enable();
+
+	s_targetsToEnable.clear();
+	s_targetsToDisable.clear();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3215,6 +3222,19 @@ Boolean render_iterate(ProcessTime* time) {
 		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 		return false;
 	}
+
+	// First update the requested render targets
+	for(const auto& target : s_targetsToDisable)
+		s_imageOutput->disable_render_target(target.first, target.second);
+	for(const auto& target : s_targetsToEnable)
+		s_imageOutput->enable_render_target(target.first, target.second);
+
+	if(!(s_targetsToDisable.empty() && s_targetsToEnable.empty()))
+		s_currentRenderer->on_render_target_changed();
+
+	s_targetsToEnable.clear();
+	s_targetsToDisable.clear();
+
 	// Check if the scene needed a reload -> reset
 	if(s_world.get_current_scene() == nullptr) {
 		if(s_world.get_current_scenario() == nullptr) {
@@ -3424,84 +3444,18 @@ const char* render_get_render_target_name(uint32_t index) {
 
 Boolean render_enable_render_target(const char* target, Boolean variance) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
-		return false;
-	}
-	s_imageOutput->enable_render_target(target, variance);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_render_target_changed();
+	const std::string targetName = target;
+	s_targetsToDisable.erase({ targetName, variance });
+	s_targetsToEnable.insert({ targetName, variance });
 	return true;
 	CATCH_ALL(false)
 }
 
 Boolean render_disable_render_target(const char* target, Boolean variance) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
-		return false;
-	}
-	s_imageOutput->disable_render_target(target, variance);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_render_target_changed();
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean render_enable_non_variance_render_targets() {
-	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
-		return false;
-	}
-	s_imageOutput->enable_all_render_targets(false);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_render_target_changed();
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean render_enable_all_render_targets() {
-	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
-		return false;
-	}
-	s_imageOutput->enable_all_render_targets(true);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_render_target_changed();
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean render_disable_variance_render_targets() {
-	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
-		return false;
-	}
-	s_imageOutput->disable_all_render_targets(true);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_render_target_changed();
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean render_disable_all_render_targets() {
-	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_imageOutput == nullptr) {
-		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
-		return false;
-	}
-	s_imageOutput->disable_all_render_targets(false);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_render_target_changed();
+	const std::string targetName = target;
+	s_targetsToEnable.erase({ targetName, variance });
+	s_targetsToDisable.insert({ targetName, variance });
 	return true;
 	CATCH_ALL(false)
 }
@@ -3512,7 +3466,11 @@ Boolean render_is_render_target_enabled(const char* name, Boolean variance) {
 		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
 		return false;
 	}
-	return s_imageOutput->is_render_target_enabled(name, variance);
+	const std::string targetName = name;
+	// Check if we're planning on enabling/disabling first
+	return (s_targetsToEnable.find({ std::string(name), variance }) != s_targetsToEnable.cend())
+		|| ((s_targetsToDisable.find({ std::string(name), variance }) == s_targetsToDisable.cend())
+			&& s_imageOutput->is_render_target_enabled(name, variance));
 	CATCH_ALL(false)
 }
 

@@ -15,7 +15,6 @@
 #include "core/scene/lights/background.hpp"
 #include "core/scene/tessellation/cam_dist.hpp"
 #include "core/scene/tessellation/uniform.hpp"
-#include "mffloader/interface/interface.h"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/3dintersection.hpp>
 

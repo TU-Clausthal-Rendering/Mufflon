@@ -462,14 +462,6 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_disable_render_target")]
         internal static extern bool render_disable_render_target_(IntPtr name, Boolean variance);
         internal static bool render_disable_render_target(string name, bool variance) { return render_disable_render_target_(StringUtil.ToNativeUtf8(name), variance); }
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_non_variance_render_targets();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_enable_all_render_targets();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_disable_variance_render_targets();
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool render_disable_all_render_targets();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_is_render_target_enabled")]
         internal static extern bool render_is_render_target_enabled_(IntPtr name, Boolean variance);
         internal static bool render_is_render_target_enabled(string name, bool variance) { return render_is_render_target_enabled_(StringUtil.ToNativeUtf8(name), variance); }
