@@ -5,26 +5,62 @@
 #include "core/renderer/parameter.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <device_atomic_functions.h>
+#include <cooperative_groups.h>
 
 using namespace mufflon::scene::lights;
+using namespace cooperative_groups;
 
 namespace mufflon { namespace renderer {
 
-__global__ static void sample_lt(LtTargets::RenderBufferType<Device::CUDA> outputBuffer,
-								 scene::SceneDescriptor<Device::CUDA>* scene,
-								 math::Rng* rngs, LtParameters params) {
-	Pixel coord{
-		threadIdx.x + blockDim.x * blockIdx.x,
-		threadIdx.y + blockDim.y * blockIdx.y
-	};
-	if(coord.x >= outputBuffer.get_width() || coord.y >= outputBuffer.get_height())
-		return;
+// Contains the current warp grid index for the next warp
+__device__ int ltWarpGridIndex;
 
-	const int idx = coord.x + coord.y * outputBuffer.get_width();
+__global__ static void sample_lt_warp(LtTargets::template RenderBufferType<Device::CUDA> outputBuffer,
+									  scene::SceneDescriptor<Device::CUDA>* scene,
+									  math::Rng* rngs, LtParameters params) {
+	// To increase coherency, we group pixels into warp-sized blocks that are pulled from a queue
+	// (the queue in our case is a simple atomic being incremented, and the blocks are numbered
+	// row-major)
+	auto warp = coalesced_threads();
 
+	// The blocks are 8 pixels wide and as high as necessary (assuming warp-size % 8 == 0)
+	static constexpr int WARP_X_RES = 8;
+	const int WARP_Y_RES = warp.size() / WARP_X_RES;
+	const auto WIDTH = outputBuffer.get_width();
+	const auto HEIGHT = outputBuffer.get_height();
+	const auto PIXELS = outputBuffer.get_num_pixels();
+	const auto WARP_GRID_COUNT_X = 1 + (WIDTH - 1) / WARP_X_RES;
+	const auto WARP_GRID_COUNT_Y = 1 + (HEIGHT - 1) / WARP_Y_RES;
+	const auto WARP_GRID_COUNT = WARP_GRID_COUNT_X * WARP_GRID_COUNT_Y;
+
+	// The warp leader fetches a new block index and broadcasts it to all others
+	int gridIndex;
+	if(warp.thread_rank() == 0)
+		gridIndex = ::atomicAdd(&ltWarpGridIndex, 1);
+	gridIndex = warp.shfl(gridIndex, 0);
+
+	// As long as there are blocks not computed, we fetch new ones
+	while(gridIndex < WARP_GRID_COUNT) {
+		// Compute the pixel from the grid index and the local thread rank
+		const auto gridXIndex = gridIndex % WARP_GRID_COUNT_X;
+		const auto gridYIndex = gridIndex / WARP_GRID_COUNT_X;
+		const Pixel warpFirstPixel{ gridXIndex * WARP_X_RES, gridYIndex * WARP_Y_RES };
+		const Pixel innerWarpPixel{ warp.thread_rank() % WARP_X_RES, warp.thread_rank() / WARP_X_RES };
+		const Pixel coord = warpFirstPixel + innerWarpPixel;
+		const int pixel = coord.x + coord.y * WIDTH;
+
+		// Normal PT - ignore pixels out-of-bounds
+		if(coord.x < WIDTH && coord.y < HEIGHT) {
 #ifdef __CUDA_ARCH__
-	lt_sample(outputBuffer, *scene, params, idx, rngs[idx]);
+			lt_sample(outputBuffer, *scene, params, pixel, rngs[pixel]);
 #endif // __CUDA_ARCH__
+		}
+
+		if(warp.thread_rank() == 0)
+			gridIndex = ::atomicAdd(&ltWarpGridIndex, 1);
+		gridIndex = warp.shfl(gridIndex, 0);
+	}
 }
 
 namespace gpult_detail {
@@ -32,23 +68,35 @@ namespace gpult_detail {
 cudaError_t call_kernel(LtTargets::RenderBufferType<Device::CUDA>&& outputBuffer,
 						scene::SceneDescriptor<Device::CUDA>* scene,
 						math::Rng* rngs, const LtParameters& params) {
+
+	{
+		// Reset the grid index
+		void* ptr = nullptr;
+		cuda::check_error(::cudaGetSymbolAddress(&ptr, ltWarpGridIndex));
+		cuda::check_error(::cudaMemset(ptr, 0, sizeof(int)));
+	}
+
 	int minGridSize;
 	int blockSize;
-	cuda::check_error(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, sample_lt, 0));
+	cuda::check_error(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, sample_lt_warp, 0));
 
 	const dim3 blockDims{
 		16u,
 		static_cast<u32>(1 + (blockSize - 1) / 16),
 		1u
 	};
+
+	// TODO: what are the optimal values here? 16x less threads for regeneration seemed
+	// to do well on a GTX 980Ti
+	const int GRID_X_FACTOR = 4;
+	const int GRID_Y_FACTOR = 4;
 	const dim3 gridDims{
-		1u + static_cast<u32>(outputBuffer.get_width() - 1) / blockDims.x,
-		1u + static_cast<u32>(outputBuffer.get_height() - 1) / blockDims.y,
+		1u + static_cast<u32>(std::max(1, outputBuffer.get_width() / GRID_X_FACTOR) - 1) / blockDims.x,
+		1u + static_cast<u32>(std::max(1, outputBuffer.get_height() / GRID_Y_FACTOR) - 1) / blockDims.y,
 		1u
 	};
-
-	sample_lt<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
-									   rngs, params);
+	sample_lt_warp<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
+											rngs, params);
 	cudaDeviceSynchronize();
 	return cudaGetLastError();
 }
