@@ -1,8 +1,8 @@
 #include "dynamic_fragment_buffer.hpp"
 #include "glad/glad.h"
 #include "util/assert.hpp"
-#include "core/opengl/program_builder.h"
-#include "core/opengl/gl_context.h"
+#include "core/opengl/program_builder.hpp"
+#include "core/opengl/gl_context.hpp"
 
 static const int WORKGROUP_SIZE = 1024;
 static const int ELEM_PER_THREAD_SCAN = 8;

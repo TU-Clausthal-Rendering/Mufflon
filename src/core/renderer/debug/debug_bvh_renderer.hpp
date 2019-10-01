@@ -1,7 +1,7 @@
 #pragma once
-#include "core/renderer/gl_renderer_base.h"
+#include "core/renderer/gl_renderer_base.hpp"
 #include "debug_bvh_params.hpp"
-#include "core/opengl/gl_pipeline.h"
+#include "core/opengl/gl_pipeline.hpp"
 #include "core/renderer/forward/dynamic_fragment_buffer.hpp"
 #include "core/renderer/forward/box_pipeline.hpp"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "gl_pipeline.h"
+#include "gl_pipeline.hpp"
 
 namespace mufflon::gl {
 class Context {

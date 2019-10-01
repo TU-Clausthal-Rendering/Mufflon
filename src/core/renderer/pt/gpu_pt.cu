@@ -6,26 +6,27 @@
 #include "core/renderer/targets/render_target.hpp"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <device_atomic_functions.h>
 
 using namespace mufflon::scene::lights;
 
 namespace mufflon { namespace renderer {
 
+__device__ int queueCounter;
+
 __global__ static void sample_pt(PtTargets::template RenderBufferType<Device::CUDA> outputBuffer,
 								 scene::SceneDescriptor<Device::CUDA>* scene,
 								 math::Rng* rngs, PtParameters params) {
-	Pixel coord{
-		threadIdx.x + blockDim.x * blockIdx.x,
-		threadIdx.y + blockDim.y * blockIdx.y
-	};
-	if(coord.x >= outputBuffer.get_width() || coord.y >= outputBuffer.get_height())
-		return;
-
-	const int pixel = coord.x + coord.y * outputBuffer.get_width();
-
+	const auto WIDTH = outputBuffer.get_width();
+	const auto PIXELS = outputBuffer.get_num_pixels();
+	int pixel = ::atomicAdd(&queueCounter, 1);
+	while(pixel < PIXELS) {
+		Pixel coord{ pixel % WIDTH, pixel / WIDTH };
 #ifdef __CUDA_ARCH__
-	pt_sample(outputBuffer, *scene, params, coord, rngs[pixel]);
+		pt_sample(outputBuffer, *scene, params, coord, rngs[pixel]);
 #endif // __CUDA_ARCH__
+		pixel = ::atomicAdd(&queueCounter, 1);
+	}
 }
 
 namespace gpupt_detail {
@@ -42,11 +43,18 @@ cudaError_t call_kernel(PtTargets::template RenderBufferType<Device::CUDA>&& out
 		static_cast<u32>(1 + (blockSize - 1) / 16),
 		1u
 	};
+	// TODO: what are the optimal values here?
 	const dim3 gridDims{
-		1u + static_cast<u32>(outputBuffer.get_width() - 1) / blockDims.x,
-		1u + static_cast<u32>(outputBuffer.get_height() - 1) / blockDims.y,
+		1u + static_cast<u32>(std::max(1, outputBuffer.get_width() / 4) - 1) / blockDims.x,
+		1u + static_cast<u32>(std::max(1, outputBuffer.get_height() / 4) - 1) / blockDims.y,
 		1u
 	};
+
+	{
+		void* ptr = nullptr;
+		cuda::check_error(::cudaGetSymbolAddress(&ptr, queueCounter));
+		cuda::check_error(::cudaMemset(ptr, 0, sizeof(int)));
+	}
 
 	sample_pt<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
 									   rngs, params);

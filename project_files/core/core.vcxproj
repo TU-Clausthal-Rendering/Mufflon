@@ -207,13 +207,13 @@
     <ClInclude Include="..\..\src\core\memory\synchronize.hpp" />
     <ClInclude Include="..\..\src\core\memory\unique_device_ptr.h" />
     <ClInclude Include="..\..\src\core\opengl\gl_buffer.hpp" />
-    <ClInclude Include="..\..\src\core\opengl\gl_context.h" />
-    <ClInclude Include="..\..\src\core\opengl\gl_object.h" />
-    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.h" />
+    <ClInclude Include="..\..\src\core\opengl\gl_context.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_object.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.hpp" />
     <ClInclude Include="..\..\src\core\opengl\gl_texture.hpp" />
     <ClInclude Include="..\..\src\core\opengl\gl_wrapper.hpp" />
-    <ClInclude Include="..\..\src\core\opengl\program_builder.h" />
-    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h" />
+    <ClInclude Include="..\..\src\core\opengl\program_builder.hpp" />
+    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\bpm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpm\cpu_bpm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\bpt\bpt_params.hpp" />
@@ -221,10 +221,9 @@
     <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_renderer.hpp" />
     <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp" />
-    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h" />
-    <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp" />    <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\gpu_lt.hpp" />

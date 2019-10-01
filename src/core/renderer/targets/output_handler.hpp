@@ -226,7 +226,8 @@ public:
 						iterTarget, cumTarget, varTarget,
 						TargetType::NUM_CHANNELS, m_width, m_height, m_iteration);
 				} else {
-					// TODO: OpenGL
+					// Simple copy, since the OpenGL renderer take care of the iteration division
+					copy(cumTarget, iterTarget, m_width * m_height * TargetType::NUM_CHANNELS * sizeof(PixelType));
 				}
 			}
 		});

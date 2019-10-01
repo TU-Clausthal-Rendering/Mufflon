@@ -2,7 +2,7 @@
 
 #include "core/cameras/pinhole.hpp"
 #include "core/renderer/renderer_base.hpp"
-#include "core/opengl/gl_object.h"
+#include "core/opengl/gl_object.hpp"
 
 namespace mufflon::gl {
     struct Pipeline;
@@ -84,6 +84,7 @@ protected:
 	gl::Texture m_depthTarget;
 	std::vector<gl::Texture> m_colorTargets;
 	gl::Framebuffer m_framebuffer;
+
 private:
     // bind some static attributes (light, material)
 	void bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs);
@@ -117,6 +118,7 @@ protected:
 
     // enable framebuffer and clear textures
 	void begin_frame(ei::Vec4 clearColor) {
+
 		GlRenderer::begin_frame(clearColor, this->m_outputBuffer.get_width(), this->m_outputBuffer.get_height());
 	}
     // copy framebuffer to rendertarget buffer

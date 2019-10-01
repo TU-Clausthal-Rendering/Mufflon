@@ -1,10 +1,10 @@
-#include "gl_renderer_base.h"
+#include "gl_renderer_base.hpp"
 #include <glad/glad.h>
 // windows stuff...
 #undef near
 #undef far
-#include "core/opengl/program_builder.h"
-#include "core/opengl/gl_context.h"
+#include "core/opengl/program_builder.hpp"
+#include "core/opengl/gl_context.hpp"
 #include "core/scene/scene.hpp"
 #include "core/renderer/forward/forward_params.hpp"
 #include "core/renderer/wireframe/wireframe_params.hpp"

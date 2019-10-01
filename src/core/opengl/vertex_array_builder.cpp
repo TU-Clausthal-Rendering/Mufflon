@@ -1,5 +1,5 @@
 #include "util/assert.hpp"
-#include "vertex_array_builder.h"
+#include "vertex_array_builder.hpp"
 #include <glad/glad.h>
 
 namespace mufflon::gl {

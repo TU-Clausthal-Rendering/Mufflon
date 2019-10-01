@@ -1,9 +1,9 @@
 #pragma once
 
 #include "forward_params.hpp"
-#include "core/opengl/gl_object.h"
-#include "core/renderer/gl_renderer_base.h"
-#include "core/opengl/gl_pipeline.h"
+#include "core/opengl/gl_object.hpp"
+#include "core/renderer/gl_renderer_base.hpp"
+#include "core/opengl/gl_pipeline.hpp"
 
 namespace mufflon::scene::textures {
 	class Texture;

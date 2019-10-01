@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/opengl/gl_object.h"
-#include "core/opengl/gl_pipeline.h"
+#include "core/opengl/gl_object.hpp"
+#include "core/opengl/gl_pipeline.hpp"
 #include <vector>
 
 namespace mufflon::renderer {

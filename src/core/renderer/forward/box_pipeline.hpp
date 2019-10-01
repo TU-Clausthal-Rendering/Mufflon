@@ -1,6 +1,6 @@
 #pragma once
-#include "core/opengl/gl_object.h"
-#include "core/opengl/gl_pipeline.h"
+#include "core/opengl/gl_object.hpp"
+#include "core/opengl/gl_pipeline.hpp"
 #include "core/memory/residency.hpp"
 #include "ei/3dtypes.hpp"
 

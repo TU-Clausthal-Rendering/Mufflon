@@ -1,7 +1,7 @@
 #include "box_pipeline.hpp"
-#include "core/opengl/program_builder.h"
-#include "core/opengl/vertex_array_builder.h"
-#include "core/opengl/gl_context.h"
+#include "core/opengl/program_builder.hpp"
+#include "core/opengl/vertex_array_builder.hpp"
+#include "core/opengl/gl_context.hpp"
 #include <glad/glad.h>
 
 namespace mufflon::renderer {
