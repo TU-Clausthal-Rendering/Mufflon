@@ -77,6 +77,9 @@ void mufflon::renderer::DebugBvhRenderer::post_reset()
 	m_showBotLevel = m_botIdx >= 0 && m_botIdx < sceneDesc.numInstances;
 	m_levelHighlightIdx = this->m_params.get_param_int(PDebugLevelHighlight::name);
 	m_boxPipe.set_level_highlight(m_levelHighlightIdx);
+	m_minLevel = this->m_params.get_param_int(PDebugMinLevel::name);
+	m_maxLevel = this->m_params.get_param_int(PDebugMaxLevel::name);
+
 
 	if (m_showTopLevel) {
 		upload_box_array(sceneDesc.cpuDescriptor->accelStruct, m_topLevelBoxes, m_topLevelLevels, m_topLevelNumBoxes, m_topLevelMaxLevel);
@@ -247,6 +250,30 @@ void mufflon::renderer::DebugBvhRenderer::upload_box_array(const scene::AccelDes
 		level[nextIdx * 2 + 1] = e.level + 1;
 		level[nextIdx * 2 + 2] = e.level + 1;
 		level[nextIdx * 2 + 3] = e.level + 1;
+	}
+
+	// remove boxes for level filter
+	if (m_minLevel > 0 || m_maxLevel < maxLevel)
+	{
+		// filter out some boxes
+		int dst = 0;
+		for(int src = 0; src < boxCount; ++src)
+		{
+			const auto lvl = level[2 * src];
+			if(lvl < m_minLevel || lvl > m_maxLevel) continue; // skip data
+			// keep data
+			bboxes[dst] = bboxes[src];
+			level[dst * 2] = level[src * 2];
+			level[dst * 2 + 1] = level[src * 2];
+			++dst;
+		}
+
+		// resize buffer
+		bboxes.resize(dst);
+		level.resize(dst * 2);
+		boxCount = dst;
+
+		if (!boxCount) return;
 	}
 
 	glGenBuffers(1, &dstBoxBuffer);

@@ -37,6 +37,22 @@ namespace mufflon::renderer {
 		}
 	};
 
+	struct PDebugMinLevel {
+		inline static constexpr const char* name = "Min level";
+		int level = 0;
+		static constexpr  ParamDesc get_desc() noexcept {
+			return  { name, ParameterTypes::INT };
+		}
+	};
+
+	struct PDebugMaxLevel {
+		inline static constexpr const char* name = "Max level";
+		int level = 100;
+		static constexpr  ParamDesc get_desc() noexcept {
+			return  { name, ParameterTypes::INT };
+		}
+	};
+
 	struct PDebugColorInstance {
 		inline static constexpr const char* name = "Instance color coding";
 		bool colorInstance = false;
@@ -45,7 +61,7 @@ namespace mufflon::renderer {
 		}
 	};
 
-	using DebugBvhParameters = ParameterHandler<PDebugBoxes, PDebugTopLevel, PDebugBotLevel, PDebugLevelHighlight, PDebugColorInstance>;
+	using DebugBvhParameters = ParameterHandler<PDebugBoxes, PDebugTopLevel, PDebugBotLevel, PDebugLevelHighlight, PDebugMinLevel, PDebugMaxLevel, PDebugColorInstance>;
 
 	using DebugBvhTargets = TargetList<RadianceTarget>;
 
