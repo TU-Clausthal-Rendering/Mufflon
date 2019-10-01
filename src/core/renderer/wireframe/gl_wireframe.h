@@ -1,8 +1,8 @@
 #pragma once
 
 #include "wireframe_params.hpp"
-#include "core/renderer/gl_renderer_base.h"
-#include "core/opengl/gl_pipeline.h"
+#include "core/renderer/gl_renderer_base.hpp"
+#include "core/opengl/gl_pipeline.hpp"
 
 namespace mufflon::renderer {
 

@@ -1017,26 +1017,8 @@
     <ClInclude Include="..\..\src\util\flag.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\program_builder.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_object.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\wireframe\gl_wireframe.h">
       <Filter>Source Files\core\renderer\wireframe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_context.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h">
-      <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp">
       <Filter>Source Files\core\renderer\ivcm</Filter>
@@ -1085,6 +1067,24 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\cie_xyz.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_object.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_context.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\program_builder.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.hpp">
+      <Filter>Source Files\core\opengl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,7 @@
 #include "gl_forward.hpp"
 #include <glad/glad.h>
-#include "core/opengl/program_builder.h"
-#include "core/opengl/vertex_array_builder.h"
+#include "core/opengl/program_builder.hpp"
+#include "core/opengl/vertex_array_builder.hpp"
 
 namespace mufflon::renderer {
 

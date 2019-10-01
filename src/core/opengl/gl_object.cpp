@@ -1,4 +1,4 @@
-#include "gl_object.h"
+#include "gl_object.hpp"
 #include <glad/glad.h>
 
 void mufflon::gl::detail::TextureDeleter::del(gl::Handle handle) noexcept {

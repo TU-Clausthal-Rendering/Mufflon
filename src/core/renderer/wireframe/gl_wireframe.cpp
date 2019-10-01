@@ -1,9 +1,9 @@
 #include "gl_wireframe.h"
 #include "core/scene/scene.hpp"
 #include <glad/glad.h>
-#include "core/opengl/program_builder.h"
-#include "core/opengl/vertex_array_builder.h"
-#include "core/opengl/gl_context.h"
+#include "core/opengl/program_builder.hpp"
+#include "core/opengl/vertex_array_builder.hpp"
+#include "core/opengl/gl_context.hpp"
 
 namespace mufflon::renderer {
 

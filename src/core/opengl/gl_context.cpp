@@ -1,4 +1,4 @@
-#include "gl_context.h"
+#include "gl_context.hpp"
 #include "util/assert.hpp"
 #include <glad/glad.h>
 
