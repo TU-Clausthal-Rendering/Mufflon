@@ -58,6 +58,7 @@ namespace mufflon::renderer {
 		bool m_showTopLevel = false;
 		bool m_showBotLevel = false;
 		int m_botIdx = -1;
+		int m_levelHighlightIdx = -1;
 
 		// init tracking
 		bool m_isInit = false;

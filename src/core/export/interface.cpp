@@ -1480,7 +1480,10 @@ void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
 							  const GLchar* message, const void* userParam) {
 	switch(severity) {
 		case GL_DEBUG_SEVERITY_HIGH: logError(message); break;
-		case GL_DEBUG_SEVERITY_MEDIUM: logWarning(message); break;
+		case GL_DEBUG_SEVERITY_MEDIUM:
+			if (id == 131186) break; // buffer moved from video memory to host
+			if (id == 131154) break; // copy buffer during 3d rendering
+			logWarning(message); break;
 		case GL_DEBUG_SEVERITY_LOW: logInfo(message); break;
 		default: logPedantic(message); break;
 	}

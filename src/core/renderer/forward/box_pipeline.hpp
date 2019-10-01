@@ -11,6 +11,7 @@ class BoxPipeline {
 public:
 	BoxPipeline();
 	void init(gl::Framebuffer& framebuffer);
+	void set_level_highlight(int levelIdx);
 	void draw(gl::Handle box, gl::Handle levels, int numBoxes, int numLevel, bool countingPass, const ei::Vec3& color) const;
 	void draw(gl::Handle box, gl::Handle levels, ei::Mat3x4 transforms, int numBoxes, int numLevel, bool countingPass, const ei::Vec3& color) const;
 
@@ -28,5 +29,7 @@ private:
 	gl::Program m_countProgramEx;
 	gl::Program m_colorProgramEx;
 	gl::VertexArray m_vaoExt;
+
+	int m_levelHighlightIndex = -1;
 };
 }

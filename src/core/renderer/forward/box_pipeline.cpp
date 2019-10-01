@@ -87,6 +87,11 @@ void BoxPipeline::init(gl::Framebuffer& framebuffer) {
 	m_colorPipeEx.vertexArray = m_vaoExt;
 }
 
+void BoxPipeline::set_level_highlight(int levelIdx)
+{
+	m_levelHighlightIndex = levelIdx;
+}
+
 void BoxPipeline::draw(gl::Handle box, gl::Handle levels, int numBoxes, int numLevel, bool countingPass,
 	const ei::Vec3& color) const
 {
@@ -105,6 +110,7 @@ void BoxPipeline::draw(gl::Handle box, gl::Handle levels, ei::Mat3x4 transforms,
 		gl::Context::set(m_colorPipeEx);
 		glUniform3f(2, color.r, color.g, color.b);
 		glUniform1i(10, numLevel);
+		glUniform1i(11, m_levelHighlightIndex);
 	}
 
 	// transform matrix

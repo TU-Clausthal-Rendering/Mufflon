@@ -4,6 +4,7 @@ layout(location = 0) in vec2 texcoords;
 layout(location = 1) in flat int in_level;
 
 layout(location = 10) uniform int maxLevel;
+layout(location = 11) uniform int highlightLevel;
 
 layout(binding = 6, std430) coherent buffer ssbo_fragmentCount
 {
@@ -38,10 +39,14 @@ void main() {
 
 #ifdef SHADE_LEVEL
 	// level gradient
-	float levelFactor = float(in_level) / float(maxLevel);
+	//float levelFactor = float(in_level) / float(maxLevel);
 	//levelFactor = 1.0 - levelFactor;
 	
-	color.rgb *= levelFactor;
+	//color.rgb *= levelFactor;
+	if (in_level == highlightLevel)
+	{
+		color.rgb = vec3(1.0, 0.5, 0.0);
+	}
 #endif
 
 	// store color etc.

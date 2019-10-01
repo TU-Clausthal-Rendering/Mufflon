@@ -70,18 +70,26 @@ void mufflon::renderer::DebugBvhRenderer::post_reset()
 
 	const auto& sceneDesc = this->get_scene_descriptor();
 	m_showBoxes = this->m_params.get_param_bool(PDebugBoxes::name);
+	auto lastShowTopLevel = m_showTopLevel;
 	m_showTopLevel = this->m_params.get_param_bool(PDebugTopLevel::name);
+	auto lastBotIdx = m_botIdx;
 	m_botIdx = this->m_params.get_param_int(PDebugBotLevel::name);
 	m_showBotLevel = m_botIdx >= 0 && m_botIdx < sceneDesc.numInstances;
+	m_levelHighlightIdx = this->m_params.get_param_int(PDebugLevelHighlight::name);
+	m_boxPipe.set_level_highlight(m_levelHighlightIdx);
 
 	if (m_showTopLevel) {
 		upload_box_array(sceneDesc.cpuDescriptor->accelStruct, m_topLevelBoxes, m_topLevelLevels, m_topLevelNumBoxes, m_topLevelMaxLevel);
 		if (!m_topLevelNumBoxes) m_showTopLevel = false;
+		if(lastShowTopLevel != m_showTopLevel)
+			logInfo("top level count: ", m_topLevelMaxLevel);
 	}
 
 	if (m_showBotLevel) {
 		upload_box_array(sceneDesc.cpuDescriptor->lods[m_botIdx].accelStruct, m_botLevelBoxes, m_botLevelLevels, m_botLevelNumBoxes, m_botLevelMaxLevel);
 		if (!m_botLevelNumBoxes) m_showBotLevel = false;
+		if(lastBotIdx != m_botIdx)
+			logInfo("bottom level count: ", m_botLevelMaxLevel);
 	}
 
 	if(m_showBoxes)
