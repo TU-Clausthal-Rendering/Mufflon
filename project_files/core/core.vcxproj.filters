@@ -1201,10 +1201,6 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_1.dds" />
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_2.dds" />
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_1.dds" />
-    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_2.dds" />
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_geom.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
@@ -1237,6 +1233,18 @@
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\ndotc_shade.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_1.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_2.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_1.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_2.dds">
+      <Filter>resources</Filter>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
