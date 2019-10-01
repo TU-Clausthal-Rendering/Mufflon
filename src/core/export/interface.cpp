@@ -90,7 +90,7 @@ namespace {
 
 // Specifies the minimum compute capability requirements
 constexpr int minMajorCC = 5;
-constexpr int minMinorCC = 0;
+constexpr int minMinorCC = 2;
 
 // static variables for interacting with the renderer
 renderer::IRenderer* s_currentRenderer;
