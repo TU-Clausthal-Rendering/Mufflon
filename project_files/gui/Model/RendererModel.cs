@@ -180,6 +180,8 @@ namespace gui.Model
             }
         }
 
+        public Core.RenderDevice RenderDevices { get => Core.render_get_renderer_devices(RendererIndex, RendererVariation); }
+
         public uint Iteration => Core.render_get_current_iteration();
 
         public Core.ProcessTime CurrentIterationTime { get; private set; }
@@ -316,6 +318,7 @@ namespace gui.Model
                     m_shortName = Core.render_get_renderer_short_name(RendererIndex);
                     OnPropertyChanged(nameof(Name));
                     OnPropertyChanged(nameof(ShortName));
+                    OnPropertyChanged(nameof(RenderDevices));
                 }   break;
             }
         }
