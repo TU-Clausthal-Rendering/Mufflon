@@ -162,6 +162,7 @@
     <Compile Include="NegateBooleanConverter.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Utility\BoundingBox.cs" />
+    <Compile Include="Utility\ObservableDictionary.cs" />
     <Compile Include="Utility\ObservableHashSet.cs" />
     <Compile Include="Utility\StringUtil.cs" />
     <Compile Include="Utility\SynchronizedModelList.cs" />

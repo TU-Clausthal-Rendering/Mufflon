@@ -36,7 +36,9 @@ struct BpmVertexExt {
 							  const BpmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -53,13 +55,13 @@ struct BpmVertexExt {
 
 	CUDA_FUNCTION void update(const BpmPathVertex& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair pdf) {
+							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
 		const BpmPathVertex* prev = thisVertex.previous();
 		if(prev) { // !prev: Current one is a start vertex. There is no previous sum
 			// Replace forward PDF with backward PDF (move merge one into the direction of the path-start)
-			float relToPrev = float(pdf.back) * prevConversionFactor / float(thisVertex.ext().incidentPdf);
+			float relToPrev = float(sample.pdf.back) * prevConversionFactor / float(thisVertex.ext().incidentPdf);
 			prevRelativeProbabilitySum = relToPrev + relToPrev * prev->ext().prevRelativeProbabilitySum;
 		}
 	}
@@ -189,7 +191,7 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	BpmPathVertex vertex[2];
 	BpmPathVertex::create_light(&vertex[0], nullptr, p);
-	math::Throughput throughput;
+	Spectrum throughput { 1.0f };
 	float mergeArea = m_params.knn > 0 ? 1.0f :	// The merge area is dynamic in KNN searches
 		ei::PI * currentMergeRadius * currentMergeRadius;
 	int prevKdTreeIdx = -1;
@@ -217,14 +219,14 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 			m_photonMap.insert(vertex[currentV].get_position(), {
 				vertex[currentV].ext().incidentPdf,
 				vertex[currentV].get_incident_direction(), pathLen,
-				throughput.weight / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
 				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
 				vertex[currentV].get_position() });
 		else
 			prevKdTreeIdx = m_photonMapKd.insert(vertex[currentV].get_position(), {
 				vertex[currentV].ext().incidentPdf,
 				vertex[currentV].get_incident_direction(), pathLen,
-				throughput.weight / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
 				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
 				1.0f, prevKdTreeIdx });
 	} while(pathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
@@ -238,7 +240,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 	BpmPathVertex vertex[2];
 	// Create a start for the path
 	BpmPathVertex::create_camera(&vertex[0], nullptr, m_sceneDesc.camera.get(), coord, m_rngs[idx].next());
-	math::Throughput throughput;
+	Spectrum throughput { 1.0f };
 	int currentV = 0;
 	int viewPathLen = 0;
 	do {
@@ -259,14 +261,9 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, prevMergeArea);
 				emission.value *= misWeight;
 				if(isnan(emission.value.x)) __debugbreak();
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			}
 			mAssert(!isnan(emission.value.x));
-
-			m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
-			m_outputBuffer.contribute<PositionTarget>(coord, throughput.guideWeight * vertex[currentV].get_position());
-			m_outputBuffer.contribute<NormalTarget>(coord, throughput.guideWeight * vertex[currentV].get_normal());
-			m_outputBuffer.contribute<AlbedoTarget>(coord, throughput.guideWeight * vertex[currentV].get_albedo());
-			m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(emission.value));
 		}
 		if(vertex[currentV].is_end_point()) break;
 
@@ -308,8 +305,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				__debugbreak();
 		}
 
-		m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * radiance);
-		m_outputBuffer.contribute<LightnessTarget>(coord, throughput.guideWeight * ei::avg(radiance));
+		m_outputBuffer.contribute<RadianceTarget>(coord, throughput * radiance);
 	} while(viewPathLen < m_params.maxPathLength);
 }
 

@@ -662,11 +662,13 @@ void Tessellater::triangulate_strip(const u32 outerLevel, const u32 innerLevel,
 													util::pun<ei::Vec3>(m_mesh->point(m_stripVertices[1u])));
 				if(distSqLeft < distSqRight) {
 					// Middle triangle connecting both outer vertices
-					const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices[0u], m_stripVertices[1u],
-																		  m_stripVertices[2u + i]);
-					if(!newFace.is_valid())
-						throw std::runtime_error("Any: failed to add tessellated outer face (strip)");
-					this->set_triangle_face_outer(original, newFace);
+					{
+						const OpenMesh::FaceHandle newFace = m_mesh->add_face(m_stripVertices[0u], m_stripVertices[1u],
+																			  m_stripVertices[2u + i]);
+						if(!newFace.is_valid())
+							throw std::runtime_error("Any: failed to add tessellated outer face (strip)");
+						this->set_triangle_face_outer(original, newFace);
+					}
 
 					// Add the right-vertex triangles
 					while(i + 1u < innerLevel) {

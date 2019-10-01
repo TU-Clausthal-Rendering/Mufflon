@@ -328,6 +328,9 @@
     <ClCompile Include="..\..\src\core\renderer\pt\hybrid_pt.cpp">
       <Filter>Source Files\core\renderer\pt</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\cie_xyz.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp">
       <Filter>Source Files\core\renderer\forward</Filter>
     </ClCompile>
@@ -1094,6 +1097,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\targets\output_handler_variance.hpp">
       <Filter>Source Files\core\renderer\targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\cie_xyz.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp">
       <Filter>Source Files\core\renderer\forward</Filter>

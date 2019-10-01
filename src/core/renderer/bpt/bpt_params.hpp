@@ -12,8 +12,7 @@ using BptParameters = ParameterHandler<
 >;
 
 using BptTargets = TargetList<
-	RadianceTarget, PositionTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget
+	RadianceTarget, LightnessTarget
 >;
 
 }} // namespace mufflon::renderer

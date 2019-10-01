@@ -101,6 +101,7 @@
     <ClCompile Include="..\..\src\profiler\cpu_profiler.cpp" />
     <ClCompile Include="..\..\src\profiler\profiling.cpp" />
     <ClCompile Include="..\..\src\util\assert.cpp" />
+    <ClCompile Include="..\..\src\util\cie_xyz.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -128,6 +129,7 @@
     <ClInclude Include="..\..\src\profiler\cpu_profiler.hpp" />
     <ClInclude Include="..\..\src\profiler\profiling.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
+    <ClInclude Include="..\..\src\util\cie_xyz.hpp" />
     <ClInclude Include="..\..\src\util\degrad.hpp" />
     <ClInclude Include="..\..\src\util\filesystem.hpp" />
     <ClInclude Include="..\..\src\util\log.hpp" />

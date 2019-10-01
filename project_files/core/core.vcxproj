@@ -69,6 +69,7 @@
     <ClCompile Include="..\..\src\profiler\profiling.cpp" />
     <ClCompile Include="..\..\src\util\assert.cpp" />
     <ClCompile Include="..\..\src\util\byte_io.cpp" />
+    <ClCompile Include="..\..\src\util\cie_xyz.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
     <ClCompile Include="..\..\src\util\parallel.cpp" />
   </ItemGroup>
@@ -313,6 +314,7 @@
     <ClInclude Include="..\..\src\profiler\profiling.hpp" />
     <ClInclude Include="..\..\src\util\assert.hpp" />
     <ClInclude Include="..\..\src\util\byte_io.hpp" />
+    <ClInclude Include="..\..\src\util\cie_xyz.hpp" />
     <ClInclude Include="..\..\src\util\degrad.hpp" />
     <ClInclude Include="..\..\src\util\filesystem.hpp" />
     <ClInclude Include="..\..\src\util\flag.hpp" />
@@ -718,6 +720,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <EnablePREfast>false</EnablePREfast>
       <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <TreatSpecificWarningsAsErrors>4457; 4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /DQY "$(CudaToolkitBinDir)\cudart64_*.dll" "$(OutDir)" &gt; nul
@@ -768,6 +771,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <EnablePREfast>false</EnablePREfast>
       <AdditionalOptions>/bigobj /Zc:twoPhase- /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <TreatSpecificWarningsAsErrors>4457; 4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

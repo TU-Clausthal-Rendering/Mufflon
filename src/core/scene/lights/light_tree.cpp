@@ -35,24 +35,29 @@ float get_flux(const void* light, u16 type, const ei::Vec3& aabbDiag, const int*
 }
 
 // Computes the offset of the i-th point light - positional ones need a sum table!
-// The offsets are relative to the trees node-memory.
+// The offsets are relative to the trees node-memory (which points to the internal nodes
+// first, then the lights).
 template < class LT >
-class LightOffset {
+class LightOffset;
+
+template <>
+class LightOffset<DirectionalLight> {
 public:
-	LightOffset(const std::vector<LT>& lights, std::size_t globalOffset) :
+	LightOffset(const std::vector<DirectionalLight>& lights, std::size_t globalOffset) :
 		m_lightCount{ lights.size() },
 		m_globalOffset{ globalOffset }
 	{}
 	
 	constexpr u32 operator[](std::size_t lightIndex) const noexcept {
-		return static_cast<u32>(sizeof(LT) * lightIndex);
+		return static_cast<u32>(m_globalOffset + sizeof(DirectionalLight) * lightIndex);
 	}
 
 	std::size_t light_count() const noexcept {
 		return m_lightCount;
 	}
+
 	std::size_t mem_size() const noexcept {
-		return m_lightCount * sizeof(DirectionalLight);
+		return m_globalOffset + m_lightCount * sizeof(DirectionalLight);
 	}
 
 	u16 type(std::size_t lightIndex) const noexcept {
@@ -235,21 +240,38 @@ void create_light_tree(LightOffset<LightT>& lightOffsets, LightSubTree& tree,
 }
 
 void fill_map(const std::vector<PositionalLights>& lights, HashMap<Device::CPU, PrimitiveHandle, u32>& map) {
+	if(lights.size() == 0)
+		return;
+	// 'Height' is the 'lower' height of the tree, ie. on what height the first light node is
 	int height = ei::ilog2(lights.size());
-	u32 extraNodes = u32(lights.size()) - (1u << height);
-	if(extraNodes > 0) ++height;
-	// Get the number of lights on level height.
-	// All lights with an higher index are on level height+1.
-	u32 numLeavesOnH = u32(lights.size()) - extraNodes * 2;
-	u32 i = 0;
-	for(const auto& light : lights) {
+	// Calculate the number of additional internal nodes compared to a full tree of 'height'
+	const u32 extraNodes = u32(lights.size()) - (1u << height);
+	// From this we can infer how many lights are on the lower level
+	const u32 lowerLightCount = u32(1u << height) - extraNodes;
+
+	u32 i = 0u;
+	// Special case: non-full light tree (not so special actually...)
+	if(extraNodes > 0) {
+		for(; i < lowerLightCount; ++i) {
+			const auto& light = lights[i];
+			if(light.primitive.instanceId != -1) {		// Hitable light source?
+			// We can compute the code 'backwards': (2^(height + 1) - 1) - (n-1 - i)
+				u32 code = ((1u << height) - 1) - (lowerLightCount - i - 1);
+				// Shift to left-align the code
+				code <<= (32 - height);
+				map.insert(light.primitive, code);
+			}
+		}
+		height += 1;
+	}
+
+	// Left-overs on the final tree level: count up the in-level index and shift
+	for(; i < lights.size(); ++i) {
+		const auto& light = lights[i];
 		if(light.primitive.instanceId != -1) {		// Hitable light source?
-			u32 code = i < numLeavesOnH ? 2*i+2*extraNodes : i-numLeavesOnH;
-			// Append zero -> most significant bit is the root branch
-			code <<= 32 - height;
+			const u32 code = (i - lowerLightCount) << (32 - height);
 			map.insert(light.primitive, code);
 		}
-		++i;
 	}
 }
 
@@ -376,12 +398,13 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 	char* memory = m_treeMemory.acquire<Device::CPU>();
 	// Set up the node pointers
 	m_treeCpu->dirLights.memory = memory;
-	m_treeCpu->posLights.memory = memory + dirLightOffsets[0] + dirLightOffsets.mem_size();
+	m_treeCpu->posLights.memory = memory + dirLightOffsets.mem_size();
 
 	// Copy the lights into the tree
 	// Directional lights are easier, because they have a fixed size
 	if(dirLights.size() > 0u) {
-		std::memcpy(m_treeCpu->dirLights.memory + dirLightOffsets[0], dirLights.data(), dirLightOffsets.mem_size());
+		std::memcpy(m_treeCpu->dirLights.memory + dirLightOffsets[0], dirLights.data(),
+					dirLightOffsets.mem_size() - dirLightOffsets[0]);
 	}
 	// Positional lights are more difficult since we don't know the concrete size
 	if(posLights.size() > 0u) {

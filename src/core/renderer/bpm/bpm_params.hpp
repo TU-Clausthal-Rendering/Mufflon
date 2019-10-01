@@ -22,8 +22,7 @@ using BpmParameters = ParameterHandler<
 >;
 
 using BpmTargets = TargetList<
-	RadianceTarget, PositionTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget
+	RadianceTarget
 >;
 
 }} // namespace mufflon::renderer

@@ -4,40 +4,55 @@
 
 namespace mufflon { namespace renderer {
 
-template < class T >
-__global__ void update_variance_kernel(ConstRenderTargetBuffer<Device::CUDA, T> iterTarget,
-									   RenderTargetBuffer<Device::CUDA, T> cumTarget,
-									   RenderTargetBuffer<Device::CUDA, T> varTarget,
-									   int numChannels,
-									   int width, int height,
-									   float iteration) {
+template < class PixelType, bool ReduceMoments >
+__global__ void update_iter_kernel(ConstRenderTargetBuffer<Device::CUDA, PixelType> iterTarget,
+								   RenderTargetBuffer<Device::CUDA, float> cumTarget,
+								   RenderTargetBuffer<Device::CUDA, float> varTarget,
+								   int numChannels,
+								   int width, int height,
+								   float iteration) {
 #ifdef __CUDA_ARCH__
 	int x = int(blockIdx.x * blockDim.x + threadIdx.x);
 	int y = int(blockIdx.y * blockDim.y + threadIdx.y);
 	if(x < width && y < height)
-		output_handler_details::update_variance<T>(iterTarget, cumTarget, varTarget,
-												   x, y, numChannels, width, iteration);
+		output_handler_details::UpdateIter<PixelType, ReduceMoments>::f(iterTarget,
+				cumTarget, varTarget, x, y, numChannels, width, iteration);
 #endif
 }
 
 namespace output_handler_details {
 
-template < class T >
-void update_variance_cuda(ConstRenderTargetBuffer<Device::CUDA, T> iterTarget,
-						  RenderTargetBuffer<Device::CUDA, T> cumTarget,
-						  RenderTargetBuffer<Device::CUDA, T> varTarget,
-						  int numChannels, int width, int height, int iteration) {
+template < class PixelType, bool ReduceMoments >
+void update_iter_cuda(ConstRenderTargetBuffer<Device::CUDA, PixelType> iterTarget,
+					  RenderTargetBuffer<Device::CUDA, float> cumTarget,
+					  RenderTargetBuffer<Device::CUDA, float> varTarget,
+					  int numChannels, int width, int height, int iteration) {
 	dim3 dimBlock(16, 16);
 	dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x,
 		(height + dimBlock.y - 1) / dimBlock.y);
-	update_variance_kernel<T><<<dimGrid, dimBlock>>>(
+	update_iter_kernel<PixelType, ReduceMoments><<<dimGrid, dimBlock>>>(
 		iterTarget, cumTarget, varTarget, numChannels, width, height, float(iteration));
 }
 
-template void update_variance_cuda<float>(ConstRenderTargetBuffer<Device::CUDA, float>,
+template void update_iter_cuda<float, true>(ConstRenderTargetBuffer<Device::CUDA, float>,
+											RenderTargetBuffer<Device::CUDA, float>,
+											RenderTargetBuffer<Device::CUDA, float>,
+											int, int, int, int);
+
+template void update_iter_cuda<float, false>(ConstRenderTargetBuffer<Device::CUDA, float>,
+											 RenderTargetBuffer<Device::CUDA, float>,
+											 RenderTargetBuffer<Device::CUDA, float>,
+											 int, int, int, int);
+
+template void update_iter_cuda<i32, true>(ConstRenderTargetBuffer<Device::CUDA, i32>,
 										  RenderTargetBuffer<Device::CUDA, float>,
 										  RenderTargetBuffer<Device::CUDA, float>,
 										  int, int, int, int);
+
+template void update_iter_cuda<i32, false>(ConstRenderTargetBuffer<Device::CUDA, i32>,
+										   RenderTargetBuffer<Device::CUDA, float>,
+										   RenderTargetBuffer<Device::CUDA, float>,
+										   int, int, int, int);
 
 __device__ u32 *s_nan_counter;
 

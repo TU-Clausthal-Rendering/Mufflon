@@ -32,22 +32,26 @@ namespace mufflon::renderer
 		auto ltcGGX1 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
 			"resources/ltc/ltc_ggx_1.dds",
 			TextureSampling::SAMPLING_LINEAR,
-			MipmapType::MIPMAP_NONE
+			MipmapType::MIPMAP_NONE,
+			nullptr, nullptr
 		));
 		auto ltcGGX2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
 			"resources/ltc/ltc_ggx_2.dds",
 			TextureSampling::SAMPLING_LINEAR,
-			MipmapType::MIPMAP_NONE
+			MipmapType::MIPMAP_NONE,
+			nullptr, nullptr
 		));
 		auto ltcBeckmann1 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
 			"resources/ltc/ltc_beckmann_1.dds",
 			TextureSampling::SAMPLING_LINEAR,
-			MipmapType::MIPMAP_NONE
+			MipmapType::MIPMAP_NONE,
+			nullptr, nullptr
 		));
 		auto ltcBeckmann2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
 			"resources/ltc/ltc_beckmann_2.dds",
 			TextureSampling::SAMPLING_LINEAR,
-			MipmapType::MIPMAP_NONE
+			MipmapType::MIPMAP_NONE,
+			nullptr, nullptr
 		));
 		mAssert(ltcGGX1);
 		mAssert(ltcGGX2);

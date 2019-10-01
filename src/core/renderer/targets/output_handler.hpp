@@ -21,11 +21,11 @@ namespace output_handler_details {
 u32* get_cuda_nan_counter_ptr_and_set_zero();
 u32 get_cuda_nan_counter_value();
 
-template < class T >
-void update_variance_cuda(ConstRenderTargetBuffer<Device::CUDA, T> iterTarget,
-						  RenderTargetBuffer<Device::CUDA, T> cumTarget,
-						  RenderTargetBuffer<Device::CUDA, T> varTarget,
-						  int numChannels, int width, int height, int iteration);
+template < class PixelType, bool ReduceMoments >
+void update_iter_cuda(ConstRenderTargetBuffer<Device::CUDA, PixelType> iterTarget,
+					  RenderTargetBuffer<Device::CUDA, float> cumTarget,
+					  RenderTargetBuffer<Device::CUDA, float> varTarget,
+					  int numChannels, int width, int height, int iteration);
 
 // Helper structs to detect whether a render target is required (always on and not disable-able)
 template < class P, class Enable = void >
@@ -36,6 +36,10 @@ template < class P, class Enable = void >
 struct IsVarianceRequired : std::false_type {};
 template < class P >
 struct IsVarianceRequired<P, std::enable_if_t<P::VARIANCE_REQUIRED>> : std::true_type {};
+template < class P, class Enable = void >
+struct IsReduceMomentsEnabled : std::false_type {};
+template < class P >
+struct IsReduceMomentsEnabled<P, std::enable_if_t<P::REDUCE_MOMENTS>> : std::true_type {};
 
 } // namespace output_handler_details 
 
@@ -137,23 +141,19 @@ public:
 			using Type = std::decay_t<decltype(target)>;
 			using TargetType = typename Type::TargetType;
 			if(target.record) {
-				if(target.recordVariance) {
-					auto targetBuffer = (RenderTarget<dev, TargetType>)target.iteration.template acquire<dev>();
-					rb.template set_target_buffer<TargetType>(targetBuffer);
-					target.iteration.mark_changed(dev);
-					mem_set<dev>(targetBuffer, 0, target.iteration.size());
-					if(reset) {
-						auto cumTarget = target.cumulative.template acquire<dev>();
+				// Always accumulate per iteration and use a numerical more robust
+				// solution for summation afterwards.
+				auto targetBuffer = (RenderTarget<dev, TargetType>)target.iteration.template acquire<dev>();
+				rb.template set_target_buffer<TargetType>(targetBuffer);
+				target.iteration.mark_changed(dev);
+				mem_set<dev>(targetBuffer, 0, target.iteration.size());
+				if(reset) {
+					auto cumTarget = target.cumulative.template acquire<dev>();
+					mem_set<dev>(cumTarget, 0, target.cumulative.size());
+					if(target.recordVariance) {
 						auto cumVarTarget = target.cumulativeVariance.template acquire<dev>();
-						mem_set<dev>(cumTarget, 0, target.cumulative.size());
 						mem_set<dev>(cumVarTarget, 0, target.cumulativeVariance.size());
 					}
-				} else {
-					auto targetBuffer = (RenderTarget<dev, TargetType>)target.cumulative.template acquire<dev>();
-					rb.template set_target_buffer<TargetType>(targetBuffer);
-					target.cumulative.mark_changed(dev);
-					if(reset)
-						mem_set<dev>(targetBuffer, 0, target.cumulative.size());
 				}
 			}
 		});
@@ -172,35 +172,24 @@ public:
 			using Type = std::decay_t<decltype(target)>;
 			using TargetType = typename Type::TargetType;
 			if(target.record) {
-				if(target.recordVariance) {
-					auto targetBuffer1 = reinterpret_cast<RenderTarget<dev1, TargetType>>(target.iteration.template acquire<dev1>(false));
-					target.iteration.mark_changed(dev1);
-					auto targetBuffer2 = reinterpret_cast<RenderTarget<dev2, TargetType>>(target.iteration.template acquire<dev2>(false));
-					rb1.template set_target_buffer<TargetType>(targetBuffer1);
-					rb2.template set_target_buffer<TargetType>(targetBuffer2);
-					// TODO: for this a "mark-out-of-sync without unloading" would be perfect
-					mem_set<dev1>(targetBuffer1, 0, target.iteration.size());
-					mem_set<dev2>(targetBuffer2, 0, target.iteration.size());
-					if(reset) {
-						auto cumTarget1 = target.cumulative.template acquire<dev1>();
-						auto cumTarget2 = target.cumulative.template acquire<dev2>();
+				auto targetBuffer1 = reinterpret_cast<RenderTarget<dev1, TargetType>>(target.iteration.template acquire<dev1>(false));
+				target.iteration.mark_changed(dev1);
+				auto targetBuffer2 = reinterpret_cast<RenderTarget<dev2, TargetType>>(target.iteration.template acquire<dev2>(false));
+				rb1.template set_target_buffer<TargetType>(targetBuffer1);
+				rb2.template set_target_buffer<TargetType>(targetBuffer2);
+				// TODO: for this a "mark-out-of-sync without unloading" would be perfect
+				mem_set<dev1>(targetBuffer1, 0, target.iteration.size());
+				mem_set<dev2>(targetBuffer2, 0, target.iteration.size());
+				if(reset) {
+					auto cumTarget1 = target.cumulative.template acquire<dev1>();
+					auto cumTarget2 = target.cumulative.template acquire<dev2>();
+					mem_set<dev1>(cumTarget1, 0, target.cumulative.size());
+					mem_set<dev2>(cumTarget2, 0, target.cumulative.size());
+					if(target.recordVariance) {
 						auto cumVarTarget1 = target.cumulativeVariance.template acquire<dev1>();
 						auto cumVarTarget2 = target.cumulativeVariance.template acquire<dev2>();
-						mem_set<dev1>(cumTarget1, 0, target.cumulative.size());
-						mem_set<dev2>(cumTarget2, 0, target.cumulative.size());
 						mem_set<dev1>(cumVarTarget1, 0, target.cumulativeVariance.size());
 						mem_set<dev2>(cumVarTarget2, 0, target.cumulativeVariance.size());
-					}
-				} else {
-					auto targetBuffer1 = reinterpret_cast<RenderTarget<dev1, TargetType>>(target.cumulative.template acquire<dev1>(false));
-					// TODO: for this a "mark-out-of-sync without unloading" would be perfect
-					target.cumulative.mark_changed(dev1);
-					auto targetBuffer2 = reinterpret_cast<RenderTarget<dev2, TargetType>>(target.cumulative.template acquire<dev2>(!reset));
-					rb1.template set_target_buffer<TargetType>(targetBuffer1);
-					rb2.template set_target_buffer<TargetType>(targetBuffer2);
-					if(reset) {
-						mem_set<dev1>(targetBuffer1, 0, target.cumulative.size());
-						mem_set<dev2>(targetBuffer2, 0, target.cumulative.size());
 					}
 				}
 			}
@@ -216,22 +205,26 @@ public:
 			using Type = std::decay_t<decltype(target)>;
 			using TargetType = typename Type::TargetType;
 			using PixelType = typename TargetType::PixelType;
-			if(target.record && target.recordVariance) {
+			constexpr bool REDUCE_MOMENTS = output_handler_details::IsReduceMomentsEnabled<TargetType>::value;
+			if(target.record) {
 				auto iterTarget = (ConstRenderTarget<dev, TargetType>)target.iteration.template acquire_const<dev>();
-				auto cumTarget = (RenderTarget<dev, TargetType>)target.cumulative.template acquire<dev>();
-				auto varTarget = (RenderTarget<dev, TargetType>)target.cumulativeVariance.template acquire<dev>();
+				auto cumTarget = (RenderTargetBuffer<dev, float>)target.cumulative.template acquire<dev>();
 				target.cumulative.mark_changed(dev);
-				target.cumulativeVariance.mark_changed(dev);
+				RenderTargetBuffer<dev, float> varTarget = {};
+				if(target.recordVariance) {
+					varTarget = (RenderTargetBuffer<dev, float>)target.cumulativeVariance.template acquire<dev>();
+					target.cumulativeVariance.mark_changed(dev);
+				}
 				if constexpr(dev == Device::CPU) {
 					for(int y = 0; y < m_height; ++y) for(int x = 0; x < m_width; ++x)
-						output_handler_details::update_variance<PixelType>(iterTarget, cumTarget, varTarget, x, y,
-																		   TargetType::NUM_CHANNELS, m_width,
-																		   float(m_iteration));
+						output_handler_details::UpdateIter<PixelType, REDUCE_MOMENTS>::f(
+							iterTarget, cumTarget, varTarget, x, y,
+							TargetType::NUM_CHANNELS, m_width, float(m_iteration));
 
 				} else if constexpr(dev == Device::CUDA) {
-					output_handler_details::update_variance_cuda<PixelType>(iterTarget, cumTarget, varTarget,
-																			TargetType::NUM_CHANNELS, m_width,
-																			m_height, m_iteration);
+					output_handler_details::update_iter_cuda<PixelType, REDUCE_MOMENTS>(
+						iterTarget, cumTarget, varTarget,
+						TargetType::NUM_CHANNELS, m_width, m_height, m_iteration);
 				} else {
 					// TODO: OpenGL
 				}
@@ -264,13 +257,8 @@ public:
 			if(target.record) {
 				ArrayDevHandle_t<to, cuda::Atomic<to, PixelType>> dst;
 				ConstArrayDevHandle_t<from, cuda::Atomic<from, PixelType>> src;
-				if(target.recordVariance) {
-					dst = reinterpret_cast<ArrayDevHandle_t<to, cuda::Atomic<to, PixelType>>>(target.iteration.template acquire<to>(false));
-					src = reinterpret_cast<ConstArrayDevHandle_t<from, cuda::Atomic<from, PixelType>>>(target.iteration.template acquire<from>(false));
-				} else {
-					dst = reinterpret_cast<ArrayDevHandle_t<to, cuda::Atomic<to, PixelType>>>(target.cumulative.template acquire<to>(false));
-					src = reinterpret_cast<ConstArrayDevHandle_t<from, cuda::Atomic<from, PixelType>>>(target.cumulative.template acquire<from>(false));
-				}
+				dst = reinterpret_cast<ArrayDevHandle_t<to, cuda::Atomic<to, PixelType>>>(target.iteration.template acquire<to>(false));
+				src = reinterpret_cast<ConstArrayDevHandle_t<from, cuda::Atomic<from, PixelType>>>(target.iteration.template acquire<from>(false));
 
 				const std::size_t PIXEL_SIZE_FROM = TargetType::NUM_CHANNELS * sizeof(cuda::Atomic<from, PixelType>);
 				const std::size_t PIXEL_SIZE_TO = TargetType::NUM_CHANNELS * sizeof(cuda::Atomic<to, PixelType>);
@@ -305,62 +293,49 @@ public:
 	// which: The quantity to export. Causes an error if the quantity is not recorded.
 	// The returned buffer is either Vec3 or float, depending on the number of channels in
 	// the queried quantity.
-	template < class T >
+	template < class TargetType >
 	std::unique_ptr<float[]> get_data(const bool variance) {
-		using PixelType = typename T::PixelType;
-		auto& target = m_targets.template get<Target<T>>();
+		auto& target = m_targets.template get<Target<TargetType>>();
 		if(variance && !target.recordVariance) {
-			logError("[OutputHandler::get_data] Render target '", T::NAME, "' does not record variance!");
+			logError("[OutputHandler::get_data] Render target '", TargetType::NAME, "' does not record variance!");
 			return nullptr;
 		}
 
-		const int numValues = m_width * m_height * T::NUM_CHANNELS;
+		const int numValues = m_width * m_height * TargetType::NUM_CHANNELS;
 		auto data = std::make_unique<float[]>(numValues);
-		// TODO: wtf does the normalizer do???
-		const bool isNormalized = !variance && target.recordVariance;
-		const float normalizer = isNormalized
-			? 1.f
-			: (!variance ? 1.f / ei::max(1.f, static_cast<float>(m_iteration) + 1.f)
-			   : 1.f / ei::max(1.f, static_cast<float>(m_iteration)));
 		auto src = variance
-			? reinterpret_cast<ConstRenderTarget<Device::CPU, T>>(target.cumulativeVariance.template acquire_const<Device::CPU>())
-			: reinterpret_cast<ConstRenderTarget<Device::CPU, T>>(target.cumulative.template acquire_const<Device::CPU>());
+			? reinterpret_cast<ConstRenderTargetBuffer<Device::CPU, float>>(target.cumulativeVariance.template acquire_const<Device::CPU>())
+			: reinterpret_cast<ConstRenderTargetBuffer<Device::CPU, float>>(target.cumulative.template acquire_const<Device::CPU>());
 
 #pragma PARALLEL_FOR
 		for(int i = 0; i < numValues; ++i) {
-			const float value = static_cast<float>(cuda::atomic_load<Device::CPU, PixelType>(src[i]));
-			data[i] = value * normalizer;
+			const float value = cuda::atomic_load<Device::CPU, float>(src[i]);
+			data[i] = value;
 		}
 
 		return data;
 	}
 
 	// Returns the value of a pixel as a Vec4, regardless of the underlying format
-	template < class T >
+	template < class TargetType >
 	ei::Vec4 get_pixel_value(Pixel pixel, const bool variance) {
-		using PixelType = typename T::PixelType;
-		auto& target = m_targets.template get<Target<T>>();
+		auto& target = m_targets.template get<Target<TargetType>>();
 		if(variance && !target.recordVariance) {
-			logError("[OutputHandler::get_data] Render target '", T::NAME, "' does not record variance!");
+			logError("[OutputHandler::get_data] Render target '", TargetType::NAME, "' does not record variance!");
 			return ei::Vec4{0.f};
 		}
 
-		const bool isNormalized = !variance;
-		const float normalizer = isNormalized
-			? 1.f
-			: (!variance ? 1.f / ei::max(1.f, static_cast<float>(m_iteration) + 1.f)
-			   : 1.f / ei::max<float>(1.f, static_cast<float>(m_iteration)));
 		auto src = variance
-			? reinterpret_cast<ConstRenderTarget<Device::CPU, T>>(target.cumulativeVariance.template acquire_const<Device::CPU>())
-			: reinterpret_cast<ConstRenderTarget<Device::CPU, T>>(target.cumulative.template acquire_const<Device::CPU>());
+			? reinterpret_cast<ConstRenderTargetBuffer<Device::CPU, float>>(target.cumulativeVariance.template acquire_const<Device::CPU>())
+			: reinterpret_cast<ConstRenderTargetBuffer<Device::CPU, float>>(target.cumulative.template acquire_const<Device::CPU>());
 
-		const int idx = pixel.x + pixel.y * m_width * T::NUM_CHANNELS;
-		if(T::NUM_CHANNELS > 4)
+		const int idx = pixel.x + pixel.y * m_width * TargetType::NUM_CHANNELS;
+		if(TargetType::NUM_CHANNELS > 4)
 			logWarning("[OutputHandler::get_pixel_value] Render target has more than 4 channels (returning first 4)");
 		ei::Vec4 res{ 0.f };
-		for(u32 i = 0u; i < std::max(T::NUM_CHANNELS, 4u); ++i) {
-			const float channel = static_cast<float>(cuda::atomic_load<Device::CPU, PixelType>(src[idx + i]));
-			res[i] = channel * normalizer;
+		for(u32 i = 0u; i < std::max(TargetType::NUM_CHANNELS, 4u); ++i) {
+			const float channel = cuda::atomic_load<Device::CPU, float>(src[idx + i]);
+			res[i] = channel;
 		}
 		return res;
 	}
@@ -437,11 +412,11 @@ public:
 					target.cumulativeVariance.template unload<Device::CPU>();
 					target.cumulativeVariance.template unload<Device::CUDA>();
 					target.cumulativeVariance.template unload<Device::OPENGL>();
-					target.iteration.template unload<Device::CPU>();
-					target.iteration.template unload<Device::CUDA>();
-					target.iteration.template unload<Device::OPENGL>();
 					if(!variance && !output_handler_details::IsRequired<TargetType>::value) {
 						target.record = false;
+						target.iteration.template unload<Device::CPU>();
+						target.iteration.template unload<Device::CUDA>();
+						target.iteration.template unload<Device::OPENGL>();
 						target.cumulative.template unload<Device::CPU>();
 						target.cumulative.template unload<Device::CUDA>();
 						target.cumulative.template unload<Device::OPENGL>();
@@ -471,11 +446,11 @@ public:
 				target.cumulativeVariance.template unload<Device::CPU>();
 				target.cumulativeVariance.template unload<Device::CUDA>();
 				target.cumulativeVariance.template unload<Device::OPENGL>();
-				target.iteration.template unload<Device::CPU>();
-				target.iteration.template unload<Device::CUDA>();
-				target.iteration.template unload<Device::OPENGL>();
 				if(!varianceOnly && !output_handler_details::IsRequired<TargetType>::value) {
 					target.record = false;
+					target.iteration.template unload<Device::CPU>();
+					target.iteration.template unload<Device::CUDA>();
+					target.iteration.template unload<Device::OPENGL>();
 					target.cumulative.template unload<Device::CPU>();
 					target.cumulative.template unload<Device::CUDA>();
 					target.cumulative.template unload<Device::OPENGL>();

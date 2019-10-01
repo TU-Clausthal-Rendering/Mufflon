@@ -14,7 +14,7 @@ using PtParameters = ParameterHandler<
 >;
 
 using PtTargets = TargetList<
-	RadianceTarget, PositionTarget,
+	RadianceTarget, PositionTarget, DepthTarget,
 	NormalTarget, AlbedoTarget, LightnessTarget
 >;
 

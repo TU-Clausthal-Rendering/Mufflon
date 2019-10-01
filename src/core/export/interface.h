@@ -205,6 +205,10 @@ typedef void* TextureHdl;
 typedef const void* ConstCameraHdl;
 typedef const LightHdl ConstLightHdl;
 
+typedef Vec4(*TextureCallback)(uint32_t x, uint32_t y, uint32_t layer,
+							   TextureFormat format, Vec4 value,
+							   void* userParams);
+
 // Material types
 typedef struct {
 	Vec2 refractionIndex;
@@ -512,8 +516,10 @@ CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color);
 CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
-CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling, MipmapType type);
-CORE_API TextureHdl CDECL world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat, MipmapType type);
+CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling, MipmapType type,
+											TextureCallback callback, void* userParams);
+CORE_API TextureHdl CDECL world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat,
+													  MipmapType type, TextureCallback callback, void* userParams);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
 CORE_API Boolean CDECL world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips);
 CORE_API const char* CDECL world_get_texture_name(TextureHdl hdl);

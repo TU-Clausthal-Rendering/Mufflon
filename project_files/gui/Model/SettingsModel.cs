@@ -13,6 +13,7 @@ using gui.Annotations;
 using gui.Dll;
 using gui.Properties;
 using Newtonsoft.Json;
+using gui.Utility;
 
 namespace gui.Model
 {
@@ -27,6 +28,7 @@ namespace gui.Model
         {
             SetLogLevel(LogLevel);
             SetProfilerLevels();
+            RendererParameters.CollectionChanged += OnOuterParamsChanged;
         }
 
         public void Save()
@@ -370,7 +372,25 @@ namespace gui.Model
             }
         }
 
-        public ObservableCollection<string> RendererParameters { get; private set; } = new ObservableCollection<string>();
+        public ObservableDictionary<string, ObservableDictionary<string, Model.SerializedRendererParameter>> RendererParameters { get; private set; }
+            = new ObservableDictionary<string, ObservableDictionary<string, Model.SerializedRendererParameter>>();
+
+        private void OnOuterParamsChanged(object sender, NotifyCollectionChangedEventArgs args)
+        {
+            if(args.Action == NotifyCollectionChangedAction.Add)
+            {
+                foreach(var item in args.NewItems)
+                {
+                    var dict = (item as ObservableKeyValuePair<string, ObservableDictionary<string, Model.SerializedRendererParameter>>);
+                    dict.Value.CollectionChanged += OnInnerParamsChanged;
+                }
+                Save();
+            }
+        }
+        private void OnInnerParamsChanged(object sender, NotifyCollectionChangedEventArgs args)
+        {
+            Save();
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 

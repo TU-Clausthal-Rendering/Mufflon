@@ -183,10 +183,10 @@ public:
 					int localChildIdx = (cellPos.x & 1) + 2 * (cellPos.y & 1) + 4 * (cellPos.z & 1);
 					current[i] = -c + localChildIdx;
 					//currentArea[i] = -1.0f;
-					const int c = m_nodes[current[i]].load();
-					anyHadChildren |= c < 0;
+					const int cc = m_nodes[current[i]].load();
+					anyHadChildren |= cc < 0;
 					// Compute the area if this is a leaf node
-					if(c >= 0) {
+					if(cc >= 0) {
 						const ei::Vec3 localPos = offPos - cellPos * cellSize;
 						const float area = math::intersection_area_nrm(cellSize, localPos, normal);
 						currentArea[i] = -area; // Encode that this is new

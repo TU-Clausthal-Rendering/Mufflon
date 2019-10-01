@@ -5,10 +5,10 @@
 
 namespace mufflon { namespace renderer {
 
-struct PShowDensity {
-	bool showDensity { false };
+struct PScale {
+	float m_curvScale = 1.0f;
 	static constexpr ParamDesc get_desc() noexcept {
-		return {"Show Density", ParameterTypes::BOOL};
+		return { "Curvature Scale", ParameterTypes::FLOAT };
 	}
 };
 
@@ -19,20 +19,25 @@ struct PHeuristic {
 	}
 };
 
+struct FootprintTarget {
+	static constexpr const char NAME[] = "Footprint";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+
 using IvcmParameters = ParameterHandler<
 	PSeed,
 	PMinPathLength,
 	PMaxPathLength,
 	PMergeRadius,
 	PProgressive,
-	PShowDensity,
-	PHeuristic
+	PHeuristic,
+	PScale
 >;
 
 using IvcmTargets = TargetList<
-	RadianceTarget, PositionTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget,
-	DensityTarget
+	RadianceTarget,
+	DensityTarget, FootprintTarget
 >;
 
 }} // namespace mufflon::renderer

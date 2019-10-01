@@ -71,12 +71,15 @@ private:
 	// p1Pdf: PDF to go from path1 into direction of path0
 	void compute_counts(float* reuseCount, float mergeArea,
 						int numPhotons, float connectionDist,
+						const scene::Direction& connectionDir,
 						VertexWrapper path0, int pl0,
 						VertexWrapper path1, int pl1);
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 
-	bool needs_density() const { return m_params.heuristic == PHeuristic::Values::VCMPlus || m_params.heuristic == PHeuristic::Values::VCMStar; }
+	bool needs_density() const { return m_params.heuristic == PHeuristic::Values::VCMPlus
+		|| m_params.heuristic == PHeuristic::Values::VCMStar; }
+	bool path_len_valid(int pathLen) const { return pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength; }
 
 	IvcmParameters m_params = {};
 	std::vector<math::Rng> m_rngs;

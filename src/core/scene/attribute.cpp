@@ -39,6 +39,7 @@ void OpenMeshAttributePool<face>::copy(const OpenMeshAttributePool<face>& pool) 
 	m_attribElemCapacity = pool.m_attribElemCapacity;
 	m_poolSize = pool.m_poolSize;
 	m_attributes = pool.m_attributes;
+	m_openMeshSynced = pool.m_openMeshSynced;
 
 	if(m_poolSize == 0 || pool.m_cudaPool == ArrayDevHandle_t<Device::CUDA, char>{}) {
 		m_cudaPool = ArrayDevHandle_t<Device::CUDA, char>{};
@@ -101,6 +102,7 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 	m_mesh.garbage_collection();
 	if(m_attribElemCount == m_attribElemCapacity)
 		return;
+
 	if constexpr(IS_FACE)
 		m_mesh.resize(m_mesh.n_vertices(), m_mesh.n_edges(), m_attribElemCount);
 	else
@@ -120,6 +122,17 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 			m_openglPool = Allocator<Device::OPENGL>::free(m_openglPool, m_poolSize);
 		m_poolSize = 0u;
 	}
+
+	m_attribElemCapacity = m_attribElemCount;
+	// We also have to adjust the offsets
+	std::size_t currOffset = 0u;
+	// Adjust pool offsets for the attributes
+	for(auto& attrib : m_attributes) {
+		if(attrib.accessor) {
+			attrib.poolOffset = currOffset;
+			currOffset += attrib.elemSize * m_attribElemCapacity;
+		}
+	}
 }
 
 template < bool face >
@@ -133,23 +146,19 @@ void OpenMeshAttributePool<face>::synchronize() {
 				return;
 			if(m_cudaPool != nullptr) {
 				// Copy over dirty attributes
-				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
 					if(attrib.accessor) {
 						char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(cpuData, m_cudaPool + currOffset, attrib.elemSize * m_attribElemCount);
-						currOffset += attrib.elemSize * m_attribElemCount;
+						::mufflon::copy(cpuData, m_cudaPool + attrib.poolOffset, attrib.elemSize * m_attribElemCount);
 					}
 				}
 				m_openMeshSynced = true;
 			} else if(m_openglPool != nullptr) {
 				// Copy over dirty attributes
-				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
 					if(attrib.accessor) {
 						char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(cpuData, m_openglPool + currOffset, attrib.elemSize * m_attribElemCount);
-						currOffset += attrib.elemSize * m_attribElemCount;
+						::mufflon::copy(cpuData, m_openglPool + attrib.poolOffset, attrib.elemSize * m_attribElemCount);
 					}
 				}
 				m_openMeshSynced = true;
@@ -161,12 +170,10 @@ void OpenMeshAttributePool<face>::synchronize() {
 			if(m_openMeshSynced) {
 				m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
 				// Copy over all attributes
-				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
 					if(attrib.accessor) {
 						const char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(m_cudaPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
-						currOffset += attrib.elemSize * m_attribElemCount;
+						::mufflon::copy(m_cudaPool + attrib.poolOffset, cpuData, attrib.elemSize * m_attribElemCount);
 					}
 				}
 			} else if(m_openglPool != nullptr) {
@@ -180,12 +187,10 @@ void OpenMeshAttributePool<face>::synchronize() {
 			if(m_openMeshSynced) {
 				m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
 				// Copy over all attributes
-				std::size_t currOffset = 0u;
 				for(auto& attrib : m_attributes) {
 					if(attrib.accessor) {
 						const char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(m_openglPool + currOffset, cpuData, attrib.elemSize * m_attribElemCount);
-						currOffset += attrib.elemSize * m_attribElemCount;
+						::mufflon::copy(m_openglPool + attrib.poolOffset, cpuData, attrib.elemSize * m_attribElemCount);
 					}
 				}
 			} else if(m_cudaPool != nullptr) {
@@ -360,6 +365,17 @@ void AttributePool::shrink_to_fit() {
 				pool.handle = Allocator<ChangedBuffer::DEVICE>::template free<char>(pool.handle, prev);
 		});
 		m_poolSize = 0u;
+	}
+
+	m_attribElemCapacity = m_attribElemCount;
+	// We also have to adjust the offsets
+	std::size_t currOffset = 0u;
+	// Adjust pool offsets for the attributes
+	for(auto& attrib : m_attributes) {
+		if(!attrib.erased) {
+			attrib.poolOffset = currOffset;
+			currOffset += attrib.elemSize * m_attribElemCapacity;
+		}
 	}
 }
 
