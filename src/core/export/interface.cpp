@@ -1762,6 +1762,7 @@ SceneHdl world_load_scenario(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
 	auto lock = std::scoped_lock(s_iterationMutex);
+	auto screenLock = std::scoped_lock(s_screenTextureMutex);
 	SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(scenario), s_currentRenderer);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
