@@ -260,8 +260,11 @@ namespace gui.ViewModel
                             m_name += "OPENGL, ";
                         m_name = m_name.Substring(0, m_name.Length - 2);
                     }
+                    RenderDevices = devices;
                 }
             }
+
+            public Core.RenderDevice RenderDevices { get; private set; }
 
             public string Name { get => m_name; }
         }
@@ -282,10 +285,24 @@ namespace gui.ViewModel
             {
                 if (m_selectedRenderer == value) return;
                 m_selectedRenderer = value;
+                // Save the used devices
+                var usedDevices = Core.RenderDevice.None;
+                if(m_models.Renderer.RendererIndex < uint.MaxValue)
+                    usedDevices = m_models.Renderer.RenderDevices;
                 m_models.Settings.LastSelectedRenderer = m_selectedRenderer.Index;
                 // Reset the variation to first
                 m_models.Renderer.SetRenderer(m_selectedRenderer.Index, 0);
                 // The variants get updated in rendererChanged
+                // Restore the variant with same devices if applicable
+                foreach(var variant in SupportedRenderVariations)
+                {
+                    if(variant.RenderDevices == usedDevices)
+                    {
+                        SelectedRendererVariation = variant;
+                        break;
+                    }
+                }
+
                 OnPropertyChanged(nameof(SelectedRenderer));
             }
         }
