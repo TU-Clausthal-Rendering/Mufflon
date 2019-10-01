@@ -248,7 +248,7 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 				Pixel outCoord = coord;
 				auto conVal = connect(vertex[currentV], *lightVertex, m_sceneDesc, outCoord, numPhotons, mergeArea);
 				if(outCoord != -1) {
-					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.weight.x) && !isnan(vertex[currentV].ext().throughput.x));
+					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.x) && !isnan(vertex[currentV].ext().throughput.x));
 					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
 					m_outputBuffer.contribute<LightnessTarget>(outCoord, avg(throughput) * conVal.cosines);
 				}
