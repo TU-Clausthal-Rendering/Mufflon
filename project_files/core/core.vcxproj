@@ -747,7 +747,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
-      <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
       <InterleaveSourceInPTX>true</InterleaveSourceInPTX>
     </CudaCompile>
     <CudaLink>
@@ -790,7 +790,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
       <AdditionalOptions>--expt-relaxed-constexpr --expt-relaxed-constexpr -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
-      <CodeGeneration>compute_52,sm_52 </CodeGeneration>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
       <Message>Copied the necessary .dll's into the execution directory</Message>
