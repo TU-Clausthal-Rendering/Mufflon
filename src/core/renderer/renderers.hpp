@@ -22,6 +22,7 @@
 #include "core/renderer/ivcm/cpu_ivcm.hpp"
 #include "core/renderer/forward/gl_forward.hpp"
 #include "core/renderer/wireframe/gl_wireframe.h"
+#include "core/renderer/debug/debug_bvh_renderer.hpp"
 
 namespace mufflon::renderer {
 
@@ -33,7 +34,7 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
 	CpuVcm, CpuIvcm,
-	GlForward,
+	GlForward, DebugBvhRenderer,
 	decimaters::silhouette::CpuShadowSilhouettesPT, decimaters::silhouette::CpuSsSilPT, //, decimaters::silhouette::GpuShadowSilhouettesPT,
 	decimaters::silhouette::CpuShadowSilhouettesBPM,
 	decimaters::CpuImportanceDecimater,

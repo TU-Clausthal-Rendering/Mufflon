@@ -1,5 +1,5 @@
 #include "util/log.hpp"
-#include "program_builder.h"
+#include "program_builder.hpp"
 #include <glad/glad.h>
 #include <fstream>
 #include <sstream>

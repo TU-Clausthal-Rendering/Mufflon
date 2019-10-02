@@ -222,7 +222,7 @@ void CpuImportanceDecimater::gather_importance() {
 void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	thread_local std::vector<ImpPathVertex> vertices(std::max(2, m_params.maxPathLength + 1));
 	vertices.clear();
@@ -260,7 +260,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 				AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 				float mis = 1.0f / (1.0f + hitPdf / nee.creationPdf);
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
-				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
+				const float weightedIrradianceLuminance = get_luminance(throughput * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				if(shadowHit.hitId.instanceId < 0) {
 					mAssert(!isnan(mis));
 					// Save the radiance for the later indirect lighting computation
@@ -335,7 +335,8 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 	int pixel = coord.x + coord.y * m_outputBuffer.get_width();
 
 	auto& rng = m_rngs[pixel];
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ ei::Vec3{1.0f} };
+	float guideWeight = 1.f;
 	PtPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
@@ -369,7 +370,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (m_params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
-						m_outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
+						m_outputBuffer.template contribute<RadianceTarget>(coord, throughput * value.cosOut * radiance * mis);
 					}
 				}
 			}
@@ -379,7 +380,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample) != WalkResult::CANCEL)
+		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) != WalkResult::CANCEL)
 			break;
 		++pathLen;
 		
@@ -390,7 +391,7 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 				float mis = 1.f / (1.f + m_params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= mis;
 			}
-			m_outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			m_outputBuffer.template contribute<RadianceTarget>(coord, throughput * emission.value);
 		}
 		if(vertex.is_end_point())
 			break;

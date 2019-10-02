@@ -6,7 +6,7 @@
 namespace mufflon { namespace renderer {
 
 struct PScale {
-	float m_curvScale;
+	float m_curvScale = 1.0f;
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Curvature Scale", ParameterTypes::FLOAT };
 	}
@@ -36,8 +36,7 @@ using IvcmParameters = ParameterHandler<
 >;
 
 using IvcmTargets = TargetList<
-	RadianceTarget, PositionTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget,
+	RadianceTarget,
 	DensityTarget, FootprintTarget
 >;
 

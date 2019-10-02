@@ -49,9 +49,9 @@ struct SilVertexExt {
 
 	CUDA_FUNCTION void update(const PathVertex<SilVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair& pdf) {
+							  const VertexSample& sample) {
 		this->excident = excident;
-		this->pdf = pdf.forw;
+		this->pdf = sample.pdf.forw;
 		this->outCos = ei::dot(thisVertex.get_normal(), excident);
 	}
 
@@ -59,15 +59,17 @@ struct SilVertexExt {
 							  const PathVertex<SilVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 	}
 
-	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
+	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const Spectrum& accum) {
 		this->throughput = sample.throughput;
-		this->accumThroughput = accum.weight;
+		this->accumThroughput = accum;
 	}
 };
 

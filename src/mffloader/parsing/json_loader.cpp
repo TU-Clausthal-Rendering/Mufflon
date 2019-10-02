@@ -5,7 +5,9 @@
 #include "util/punning.hpp"
 #include "util/int_types.hpp"
 #include "util/degrad.hpp"
+#include "util/cie_xyz.hpp"
 #include "core/export/interface.h"
+#include "core/scene/handles.hpp"
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 #include <fstream>
@@ -96,7 +98,8 @@ void JsonLoader::clear_state() {
 }
 
 TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, MipmapType mipmapType,
-									std::optional<TextureFormat> targetFormat) {
+									std::optional<TextureFormat> targetFormat,
+									TextureCallback callback, void* userParams) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
@@ -108,9 +111,9 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 	path = fs::canonical(path);
 	TextureHdl tex;
 	if(targetFormat.has_value())
-		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value(), mipmapType);
+		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
 	else
-		tex = world_add_texture(path.string().c_str(), sampling, mipmapType);
+		tex = world_add_texture(path.string().c_str(), sampling, mipmapType, callback, userParams);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -262,14 +265,33 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			}
 			mat->innerType = MaterialParamType::MATERIAL_EMISSIVE;
 			mat->inner.emissive.scale = util::pun<Vec3>(read_opt<ei::Vec3>(m_state, material, "scale", ei::Vec3{ 1.0f, 1.0f, 1.0f }));
-			auto radianceIter = get(m_state, material, "radiance");
-			if(radianceIter->value.IsArray()) {
-				ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);
-				mat->inner.emissive.radiance = world_add_texture_value(reinterpret_cast<float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
-			} else if(radianceIter->value.IsString()) {
-				mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter));
-			} else
-				throw std::runtime_error("Invalid type for radiance");
+			if(auto radianceIter = get(m_state, material, "radiance", false); radianceIter != material.MemberEnd()) {
+				if(radianceIter->value.IsArray()) {
+					ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);
+					mat->inner.emissive.radiance = world_add_texture_value(reinterpret_cast<const float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
+				} else if(radianceIter->value.IsString()) {
+					mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter));
+				} else
+					throw std::runtime_error("Invalid type for radiance");
+			} else {
+				auto temperatureIter = get(m_state, material, "temperature");
+				if(temperatureIter->value.IsNumber()) {
+					const float temperature = read<float>(m_state, temperatureIter);
+					const auto radiance = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
+					mat->inner.emissive.radiance = world_add_texture_value(reinterpret_cast<const float*>(&radiance), 3, TextureSampling::SAMPLING_NEAREST);
+				} else if(temperatureIter->value.IsString()) {
+					mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter),
+																TextureSampling::SAMPLING_NEAREST, MipmapType::MIPMAP_NONE,
+																TextureFormat::FORMAT_RGBA32F,
+																[](uint32_t x, uint32_t y, uint32_t layer,
+																   TextureFormat format, Vec4 value,
+																   void* userParams) {
+						const auto radiance = spectrum::compute_black_body_color(spectrum::Kelvin{ value.x });
+						return Vec4{ radiance.x, radiance.y, radiance.z, 0.f };
+					}, nullptr);
+				} else
+					throw std::runtime_error("Invalid type for temperature");
+			}
 
 		} else if(type.compare("orennayar") == 0) {
 			// Oren-Nayar material
@@ -278,7 +300,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			auto albedoIter = get(m_state, material, "albedo");
 			if(albedoIter->value.IsArray()) {
 				ei::Vec3 rgb = read<ei::Vec3>(m_state, albedoIter);
-				mat->inner.orennayar.albedo = world_add_texture_value(reinterpret_cast<float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.orennayar.albedo = world_add_texture_value(reinterpret_cast<const float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
 			} else if(albedoIter->value.IsString()) {
 				mat->inner.orennayar.albedo = load_texture(read<const char*>(m_state, albedoIter));
 			} else
@@ -474,20 +496,33 @@ bool JsonLoader::load_lights() {
 			std::vector<ei::Vec3> intensities;
 			try {
 				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
-					read(m_state, get(m_state, light, "intensity"), intensities);
-				} else {
-					read(m_state, get(m_state, light, "flux"), intensities);
+					read(m_state, intensityIter, intensities);
+				} else if(auto fluxIter = get(m_state, light, "flux", false); fluxIter != light.MemberEnd()) {
+					read(m_state, fluxIter, intensities);
 					for(auto& flux : intensities)
 						flux /= (4.0f * ei::PI);
+				} else {
+					std::vector<float> temperatures;
+					read(m_state, get(m_state, light, "temperature"), temperatures);
+					intensities.reserve(temperatures.size());
+					for(const auto temp : temperatures) {
+						const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
+						intensities.push_back(rgb);
+					}
 				}
 			} catch(const ParserException& pe) {
 				(void)pe;
 				if(m_state.expected == ParserState::Value::NONE)
 					m_state.objectNames.pop_back();
-				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd())
-					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) };
-				else
-					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, get(m_state, light, "intensity")) / (4.0f * ei::PI) };
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, intensityIter) };
+				} else if(auto fluxIter = get(m_state, light, "flux", false); fluxIter != light.MemberEnd()) {
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, fluxIter) / (4.0f * ei::PI) };
+				} else {
+					const auto temperature = read<float>(m_state, get(m_state, light, "temperature"));
+					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
+					intensities = std::vector<ei::Vec3>{ rgb };
+				}
 			}
 
 			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(), scales.size()));
@@ -513,14 +548,40 @@ bool JsonLoader::load_lights() {
 			// Spot light
 			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
 			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
-			std::vector<ei::Vec3> intensities = read_opt_array<ei::Vec3>(m_state, light, "intensity");
+			// For backwards compatibility, we try to read a normal array as fallback
+			std::vector<ei::Vec3> intensities;
+			try {
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+					read(m_state, intensityIter, intensities);
+				} else {
+					std::vector<float> temperatures;
+					read(m_state, get(m_state, light, "temperature"), temperatures);
+					intensities.reserve(temperatures.size());
+					for(const auto temp : temperatures) {
+						const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
+						intensities.push_back(rgb);
+					}
+				}
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
+				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, intensityIter) };
+				} else {
+					const auto temperature = read<float>(m_state, get(m_state, light, "temperature"));
+					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
+					intensities = std::vector<ei::Vec3>{ rgb };
+				}
+			}
+
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			std::vector<float> angles;
 			std::vector<float> falloffStarts;
 			// For backwards compatibility, we try to read a normal array as fallback
 			try {
 				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
-					read(m_state, get(m_state, light, "cosWidth"), angles);
+					read(m_state, angleIter, angles);
 				else
 					read(m_state, get(m_state, light, "width"), angles);
 			} catch(const ParserException& pe) {
@@ -536,10 +597,10 @@ bool JsonLoader::load_lights() {
 			// and isn't given in the JSON but legal according to the file specs
 			try {
 				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd()) {
-					read(m_state, get(m_state, light, "cosFalloffStart"), falloffStarts);
+					read(m_state, falloffIter, falloffStarts);
 				} else {
-					if(get(m_state, light, "falloffStart", false) != light.MemberEnd()) {
-						read(m_state, get(m_state, light, "falloffStart"), falloffStarts);
+					if(auto angleIter = get(m_state, light, "falloffStart", false); angleIter != light.MemberEnd()) {
+						read(m_state, angleIter, falloffStarts);
 					} else {
 						falloffStarts.reserve(angles.size());
 						for(const auto& angle : angles)
@@ -602,7 +663,32 @@ bool JsonLoader::load_lights() {
 		} else if(type.compare("directional") == 0) {
 			// Directional light
 			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
-			std::vector<ei::Vec3> radiances = read_opt_array<ei::Vec3>(m_state, light, "radiance");
+			// For backwards compatibility, we try to read a normal array as fallback
+			std::vector<ei::Vec3> radiances;
+			try {
+				if(auto radianceIter = get(m_state, light, "radiance", false); radianceIter != light.MemberEnd()) {
+					read(m_state, radianceIter, radiances);
+				} else {
+					std::vector<float> temperatures;
+					read(m_state, get(m_state, light, "temperature"), temperatures);
+					radiances.reserve(temperatures.size());
+					for(const auto temp : temperatures) {
+						const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
+						radiances.push_back(rgb);
+					}
+				}
+			} catch(const ParserException& pe) {
+				(void)pe;
+				if(m_state.expected == ParserState::Value::NONE)
+					m_state.objectNames.pop_back();
+				if(auto radianceIter = get(m_state, light, "radiance", false); radianceIter != light.MemberEnd()) {
+					radiances = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, radianceIter) };
+				} else {
+					const auto temperature = read<float>(m_state, get(m_state, light, "temperature"));
+					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
+					radiances = std::vector<ei::Vec3>{ rgb };
+				}
+			}
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 
 			const std::size_t maxSize = std::max(directions.size(), std::max(radiances.size(), scales.size()));

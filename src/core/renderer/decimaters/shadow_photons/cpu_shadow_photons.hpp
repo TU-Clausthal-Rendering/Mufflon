@@ -21,13 +21,15 @@ struct SpvVertexExt {
 
 	CUDA_FUNCTION void update(const PathVertex<SpvVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair& pdf) {}
+							  const VertexSample& sample) {}
 
 	CUDA_FUNCTION void update(const PathVertex<SpvVertexExt>& prevVertex,
 							  const PathVertex<SpvVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {}
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {}
 };
 using SpvPathVertex = PathVertex<SpvVertexExt>;
 

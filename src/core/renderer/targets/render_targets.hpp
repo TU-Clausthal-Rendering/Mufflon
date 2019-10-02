@@ -54,6 +54,12 @@ struct LightnessTarget {
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
 
+struct DepthTarget {
+	static constexpr const char NAME[] = "Depth";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
+
 struct DensityTarget {
 	static constexpr const char NAME[] = "Density";
 	using PixelType = float;

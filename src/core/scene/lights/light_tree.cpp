@@ -13,6 +13,7 @@
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 
 namespace mufflon { namespace scene { namespace lights {
@@ -307,6 +308,26 @@ LightSubTree::Node::Node(const char* base,
 {}
 
 
+LightTree<Device::OPENGL>::LightTree(const std::vector<SmallLight>& smallLights, const std::vector<BigLight>& bigLights) {
+	numSmallLights = uint32_t(smallLights.size());
+	numBigLights = uint32_t(bigLights.size());
+    // alloc array storage (increase size to 1 if 0)
+	this->smallLights = Allocator<DEVICE>::alloc_array<SmallLight>(std::max<size_t>(numSmallLights, 1) );
+	this->bigLights = Allocator<DEVICE>::alloc_array<BigLight>(std::max<size_t>(numBigLights, 1));
+    // copy data
+	if(numSmallLights)
+		copy(this->smallLights, smallLights.data(), numSmallLights * sizeof(SmallLight));
+	if(numBigLights)
+		copy(this->bigLights, bigLights.data(), numBigLights * sizeof(BigLight));
+}
+
+/*LightTree<Device::OPENGL>::~LightTree() {
+	if(smallLights != nullptr)
+		gl::deleteBuffer(smallLights.id);
+	if(bigLights != nullptr)
+		gl::deleteBuffer(bigLights.id);
+}*/
+
 LightTreeBuilder::LightTreeBuilder() {}
 
 LightTreeBuilder::~LightTreeBuilder() {
@@ -454,7 +475,111 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 		m_treeCuda->dirLights.memory = lightMem;
 		m_treeCuda->posLights = m_treeCpu->posLights;
 		m_treeCuda->posLights.memory = lightMem + (m_treeCpu->posLights.memory - m_treeCpu->dirLights.memory);
-	} 
+	} else if(dev == Device::OPENGL) {
+		if(!m_treeCpu)
+			throw std::runtime_error("[LightTreeBuilder::synchronize] There is no source for light-tree synchronization!");
+
+		std::vector<LightTree<Device::OPENGL>::SmallLight> smallLights;
+		std::vector<LightTree<Device::OPENGL>::BigLight> bigLights;
+
+        // traverse tree
+        auto addLight = [&](u32 offset, u16 type, LightSubTree& subTree) {
+			switch(LightType(type)) {
+			case LightType::POINT_LIGHT: {
+				auto light = reinterpret_cast<const PointLight*>(subTree.memory + offset);
+				auto& dst = smallLights.emplace_back();
+				dst.type = uint32_t(LightType::POINT_LIGHT);
+			    dst.intensity = light->intensity;
+				dst.position = light->position;
+			} break;
+			case LightType::SPOT_LIGHT: {
+				auto light = reinterpret_cast<const SpotLight*>(subTree.memory + offset);
+				auto& dst = smallLights.emplace_back();
+				dst.type = uint32_t(LightType::SPOT_LIGHT);
+				dst.intensity = light->intensity;
+				dst.position = light->position;
+				dst.direction = light->direction;
+				dst.cosFalloffStart = light->cosFalloffStart;
+				dst.cosThetaMax = light->cosThetaMax;
+			} break;
+			case LightType::AREA_LIGHT_TRIANGLE: {
+				auto light = reinterpret_cast<const AreaLightTriangle<Device::CPU>*>(subTree.memory + offset);
+				auto& dst = bigLights.emplace_back();
+				dst.material = light->material;
+				dst.numPoints = 3;
+				dst.pos = light->posV[0];
+				dst.v1 = light->posV[1];
+				dst.v2 = light->posV[2];
+                // test upload point light
+				//auto& dst2 = smallLights.emplace_back();
+                //dst2.type = uint32_t(LightType::POINT_LIGHT);
+				//dst2.intensity = ei::Vec3(1.0f);
+				//dst2.position = dst.pos + (dst.v1 + dst.v2) * 0.5f;
+   			} break;
+			case LightType::AREA_LIGHT_QUAD: {
+				auto light = reinterpret_cast<const AreaLightQuad<Device::CPU>*>(subTree.memory + offset);
+				auto& dst = bigLights.emplace_back();
+				dst.material = light->material;
+				dst.numPoints = 4;
+				dst.pos = light->posV[0];
+				dst.v3 = light->posV[1];
+				dst.v1 = light->posV[2];
+				dst.v2 = light->posV[3] + dst.v1 + dst.v3;
+                // test upload point light
+				//auto& dst2 = smallLights.emplace_back();
+				//dst2.type = uint32_t(LightType::POINT_LIGHT);
+				//dst2.intensity = ei::Vec3(1.0f);
+				//dst2.position = dst.pos + (dst.v1 + dst.v2 + dst.v3) * 0.33f;
+			} break;
+			case LightType::AREA_LIGHT_SPHERE: {
+				auto light = reinterpret_cast<const AreaLightSphere<Device::CPU>*>(subTree.memory + offset);
+				auto& dst = smallLights.emplace_back();
+				dst.type = uint32_t(LightType::AREA_LIGHT_SPHERE);
+				dst.position = light->position;
+				dst.radius = light->radius;
+				dst.material = light->material;
+			} break;
+			case LightType::DIRECTIONAL_LIGHT: {
+				auto light = reinterpret_cast<const DirectionalLight*>(subTree.memory + offset);
+				auto& dst = smallLights.emplace_back();
+				dst.type = uint32_t(LightType::DIRECTIONAL_LIGHT);
+				dst.intensity = light->irradiance;
+				dst.direction = light->direction;
+			} break;
+			case LightType::ENVMAP_LIGHT: break;
+            }
+		};
+
+        // helper to extract lights from the tree
+		std::function<void(LightSubTree::Node*, LightSubTree&)> extractNodes;
+        extractNodes = [&](LightSubTree::Node* node, LightSubTree& subTree) {
+            if(node->left.is_light()) {
+				addLight(node->left.offset, node->left.type, subTree);
+            } else {
+				extractNodes(m_treeCpu->posLights.get_node(node->left.offset), subTree);
+            }
+            if(node->right.is_light()) {
+				addLight(node->right.offset, node->right.type, subTree);
+            } else {
+				extractNodes(m_treeCpu->posLights.get_node(node->right.offset), subTree);
+            }
+		};
+
+        // do extraction
+		if(m_treeCpu->dirLights.internalNodeCount >= 1)
+			extractNodes(m_treeCpu->dirLights.get_node(0), m_treeCpu->dirLights);
+		else if(m_treeCpu->dirLights.lightCount == 1)
+			addLight(0, m_treeCpu->dirLights.root.type, m_treeCpu->dirLights);
+
+		if(m_treeCpu->posLights.internalNodeCount >= 1)
+			extractNodes(m_treeCpu->posLights.get_node(0), m_treeCpu->posLights);
+		else if(m_treeCpu->posLights.lightCount == 1)
+			addLight(0, m_treeCpu->posLights.root.type, m_treeCpu->posLights);
+
+        // upload buffers
+		unload<Device::OPENGL>();
+		m_treeOpengl = std::make_unique<LightTree<Device::OPENGL>>(smallLights, bigLights);
+	}
 
 	// The background can always be outdated
 	mAssertMsg(m_envLight != nullptr, "Background should always be set!");
@@ -522,6 +647,8 @@ void LightTreeBuilder::update_media(const SceneDescriptor<dev>& scene) {
 		this->update_media_cpu(scene);
 	else if constexpr(dev == Device::CUDA)
 		update_media_cuda(scene, m_treeCuda->posLights);
+	else if constexpr(dev == Device::OPENGL)
+		; // TODO
 	else
 		mAssert(false);
 }
@@ -530,10 +657,14 @@ template < Device dev >
 void LightTreeBuilder::unload() {
 	m_treeMemory.unload<dev>();
 	m_primToNodePath.unload<dev>();
-	if(dev == Device::CPU && m_treeCpu) {
-		m_treeCpu = nullptr;
-	} else if(m_treeCuda) {
-		m_treeCuda = nullptr;
+	switch(dev) {
+	case Device::CPU: m_treeCpu.reset(); break;
+	case Device::CUDA: m_treeCuda.reset(); break;
+	case Device::OPENGL: if(m_treeOpengl) {
+		gl::deleteBuffer(m_treeOpengl->smallLights.id);
+		gl::deleteBuffer(m_treeOpengl->bigLights.id);
+		m_treeOpengl.reset();
+	} break;
 	}
 	// TODO: unload envmap handle
 }

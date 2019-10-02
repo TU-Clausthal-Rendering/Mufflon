@@ -179,6 +179,12 @@
     <Filter Include="Source Files\core\renderer\decimaters\silhouette\screenspace">
       <UniqueIdentifier>{9d98d54e-e510-4acb-8127-426567f48730}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\debug">
+      <UniqueIdentifier>{cd55a984-efd1-4987-91c2-259269248acc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{257f63ae-692a-445c-a64c-e00c6c9bc9f1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -390,6 +396,18 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\util\cie_xyz.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\debug\debug_bvh_renderer.cpp">
+      <Filter>Source Files\core\renderer\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.cpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1167,24 +1185,6 @@
     <ClInclude Include="..\..\src\core\math\intersection_areas.hpp">
       <Filter>Source Files\core\math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_context.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_object.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\program_builder.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.h">
-      <Filter>Source Files\core\opengl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.h">
-      <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp">
       <Filter>Source Files\core\renderer\ivcm</Filter>
     </ClInclude>
@@ -1238,6 +1238,36 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_common.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\cie_xyz.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_params.hpp">
+      <Filter>Source Files\core\renderer\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_renderer.hpp">
+      <Filter>Source Files\core\renderer\debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_context.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_object.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\gl_pipeline.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\program_builder.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\opengl\vertex_array_builder.hpp">
+      <Filter>Source Files\core\opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp">
+      <Filter>Source Files\core\renderer\forward</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1333,5 +1363,61 @@
     <CopyFileToFolders Include="..\..\src\core\renderer\shader\wireframe_tese.glsl">
       <Filter>Source Files\core\renderer\shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_color.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_fragment_count.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_geom.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\box_vertex.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\light_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\ltc.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\model_transforms.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\ndotc_fragment.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\ndotc_shade.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\quad.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\scan.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\scanpush.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\src\core\renderer\shader\sort_fragments.glsl">
+      <Filter>Source Files\core\renderer\shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_1.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_beckmann_2.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_1.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\..\resources\ltc\ltc_ggx_2.dds">
+      <Filter>resources</Filter>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\resources\ltc\info.txt">
+      <Filter>resources</Filter>
+    </Text>
   </ItemGroup>
 </Project>

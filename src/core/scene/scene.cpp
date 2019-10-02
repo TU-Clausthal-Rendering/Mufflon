@@ -15,7 +15,6 @@
 #include "core/scene/lights/background.hpp"
 #include "core/scene/tessellation/cam_dist.hpp"
 #include "core/scene/tessellation/uniform.hpp"
-#include "mffloader/interface/interface.h"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/3dintersection.hpp>
 
@@ -104,6 +103,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 												  const std::vector<const char*>& sphereAttribs) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
+	if constexpr(dev == Device::OPENGL) {
+		sceneDescriptor.cpuDescriptor = &get_descriptor<Device::CPU>(vertexAttribs, faceAttribs, sphereAttribs);
+	}
 
 	// Check if we need to update attributes
 	auto& lastVertexAttribs = m_lastAttributeNames.template get<AttributeNames<dev>>().lastVertexAttribs;
@@ -218,17 +220,24 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodDescs.size());
 		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
 
-		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<NotGl<dev>, ei::Mat3x4[]>>();
-		instTransformsDesc = make_udevptr_array<NotGl<dev>, ei::Mat3x4>(instanceTransformations.size());
+		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
 		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
 
 		auto& invInstTransformsDesc = m_invInstTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 		invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(invInstanceTransformations.size());
 		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), sizeof(ei::Mat3x4) * invInstanceTransformations.size());
 
-		auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<NotGl<dev>, u32[]>>();
-		instLodIndicesDesc = make_udevptr_array<NotGl<dev>, u32>(lodIndices.size());
-		copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+		if constexpr(dev != Device::OPENGL) {
+			auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
+			instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
+			copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+			sceneDescriptor.lodIndices = instLodIndicesDesc.get();
+		} else {
+			// We cannot create a new lodIndices array here, because the type for OpenGL is the same as for the CPU side,
+			// which then overwrites the array in m_instLodIndicesDesc and leaves a dangling pointer in the CPU descriptor
+			sceneDescriptor.lodIndices = sceneDescriptor.cpuDescriptor->lodIndices;
+		}
 
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
@@ -242,7 +251,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
 		sceneDescriptor.instanceToWorld = instTransformsDesc.get();
 		sceneDescriptor.worldToInstance = invInstTransformsDesc.get();
-		sceneDescriptor.lodIndices = instLodIndicesDesc.get();
+
 	} else if(!sameAttribs) {
 		// Only update the descriptors and reupload them
 		std::vector<LodDescriptor<dev>> lodDescs;
@@ -296,14 +305,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
 	}
 
-    if(dev != Device::OPENGL) {
-		// Light tree
-	    // TODO: rebuild light tree if area light got tessellated
-		if (m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
-			sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
-			m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
-		}
+	// Light tree
+    // TODO: rebuild light tree if area light got tessellated
+	if(m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed) {
+		sceneDescriptor.lightTree = m_lightTree.template acquire_const<dev>(m_boundingBox);
+		m_lightTreeDescChanged.template get<ChangedFlag<dev>>().changed = false;
+	}
 
+    if(dev != Device::OPENGL) {
 		// Rebuild Instance BVH?
 		if (m_accelStruct.needs_rebuild()) {
 			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
@@ -320,12 +329,10 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = false;
 	}
 
-    if(dev != Device::OPENGL) {
-        if (m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
-	        m_lightTree.update_media(sceneDescriptor);
-		    m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
-	    }
-    }
+	if(m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed) {
+		m_lightTree.update_media(sceneDescriptor);
+		m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = false;
+	}
 	
 	return sceneDescriptor;
 }

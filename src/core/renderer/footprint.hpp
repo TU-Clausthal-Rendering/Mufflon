@@ -372,6 +372,5 @@ private:
 
 //using Footprint2D = Footprint2DCov;
 using Footprint2D = FootprintV0;
-//using Footprint2D = FootprintV2;
 
 }} // namespace mufflon::renderer

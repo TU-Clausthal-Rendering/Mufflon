@@ -229,7 +229,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 	scene::lights::Emitter p = scene::lights::emit(scene, idx, photonCount, photonSeed, rndStart);
 	SilPathVertex vertex[2];
 	SilPathVertex::create_light(&vertex[0], nullptr, p);
-	math::Throughput throughput;
+	Spectrum throughput;
 	float mergeArea = ei::PI * mergeRadius * mergeRadius;
 
 	int pathLen = 0;
@@ -256,7 +256,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 		prevPhoton = photonMap.insert(vertex[currentV].get_position(),
 									  { vertex[currentV].get_position(), vertex[currentV].ext().incidentPdf,
 									  vertex[currentV].get_incident_direction(), pathLen,
-									  angle * throughput.weight / photonCount, vertex[otherV].ext().prevRelativeProbabilitySum,
+									  angle * throughput / photonCount, vertex[otherV].ext().prevRelativeProbabilitySum,
 									  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
 									  prevPhoton, vertex[currentV].get_primitive_id() });
 
@@ -277,7 +277,7 @@ CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& 
 	SilPathVertex vertex[2];
 	// Create a start for the path
 	SilPathVertex::create_camera(&vertex[0], nullptr, scene.camera.get(), coord, rng.next());
-	math::Throughput throughput;
+	Spectrum throughput{ ei::Vec3{ 1.f } };
 	int currentV = 0;
 	int viewPathLen = 0;
 	do {
@@ -333,7 +333,8 @@ CUDA_FUNCTION void sample_vis_importance(SilhouetteTargets::RenderBufferType<CUR
 										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,
 										 const float maxImportance) {
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ ei::Vec3{1.0f} };
+	float guideWeight = 1.f;
 	PtPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
@@ -342,7 +343,7 @@ CUDA_FUNCTION void sample_vis_importance(SilhouetteTargets::RenderBufferType<CUR
 	scene::Point lastPosition = vertex.get_position();
 	math::RndSet2_1 rnd{ rng.next(), rng.next() };
 	float rndRoulette = math::sample_uniform(u32(rng.next()));
-	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::HIT) {
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::HIT) {
 		const auto& hitpoint = vertex.get_position();
 		const auto& hitId = vertex.get_primitive_id();
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];

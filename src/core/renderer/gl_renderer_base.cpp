@@ -1,10 +1,10 @@
-#include "gl_renderer_base.h"
+#include "gl_renderer_base.hpp"
 #include <glad/glad.h>
 // windows stuff...
 #undef near
 #undef far
-#include "core/opengl/program_builder.h"
-#include "core/opengl/gl_context.h"
+#include "core/opengl/program_builder.hpp"
+#include "core/opengl/gl_context.hpp"
 #include "core/scene/scene.hpp"
 #include "core/renderer/forward/forward_params.hpp"
 #include "core/renderer/wireframe/wireframe_params.hpp"
@@ -77,6 +77,10 @@ void GlRenderer::reset(int width, int height) {
 void GlRenderer::begin_frame(ei::Vec4 clearColor, int width, int height) {
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
 	glViewport(0, 0, width, height);
+
+	// must be enabled to clear buffers
+	gl::Context::enableDepthWrite();
+
 	glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
@@ -108,11 +112,7 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 	const auto& sceneDesc = this->get_scene_descriptor();
 
-	if(attribs & Attribute::Material) {
-		mAssert(sceneDesc.materials.id);
-		mAssert(!sceneDesc.materials.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, sceneDesc.materials.id);
-	}
+	bindStaticAttribs(pipe, attribs);
 
 	for(size_t i = 0; i < sceneDesc.numInstances; ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
@@ -120,8 +120,8 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 
 		if(!lod.polygon.numTriangles) continue;
 
-		// Set the instance transformation matrix
-		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&sceneDesc.instanceToWorld[i]));
+		// instance if for lookup in instance transformation buffer
+		glProgramUniform1ui(pipe.program, 1, GLuint(i));
 
 		// bind vertex and index buffer
         if(attribs & Attribute::Position) {
@@ -154,11 +154,7 @@ void GlRenderer::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 	gl::Context::set(pipe);
 	const auto& sceneDesc = this->get_scene_descriptor();
 
-    if(attribs & Attribute::Material) {
-		mAssert(sceneDesc.materials.id);
-		mAssert(!sceneDesc.materials.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, sceneDesc.materials.id);
-    }
+	bindStaticAttribs(pipe, attribs);
 
 	for(size_t i = 0; i < sceneDesc.numInstances; ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
@@ -166,8 +162,8 @@ void GlRenderer::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 
 		if(!lod.spheres.numSpheres) continue;
 
-		// Set the instance transformation matrix
-		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&sceneDesc.instanceToWorld[i]));
+		// instance if for lookup in instance transformation buffer
+		glProgramUniform1ui(pipe.program, 1, GLuint(i));
 
 		// bind vertex buffer
         if(attribs & Attribute::Position) {
@@ -189,11 +185,7 @@ void GlRenderer::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 	const auto& sceneDesc = this->get_scene_descriptor();
 	mAssert(pipe.patch.vertices == 4);
 
-	if(attribs & Attribute::Material) {
-		mAssert(sceneDesc.materials.id);
-		mAssert(!sceneDesc.materials.offset);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, sceneDesc.materials.id);
-	}
+	bindStaticAttribs(pipe, attribs);
 
 	for(size_t i = 0; i < sceneDesc.numInstances; ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
@@ -201,8 +193,8 @@ void GlRenderer::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 
 		if(!lod.polygon.numQuads) continue;
 
-		// Set the instance transformation matrix
-		glProgramUniformMatrix4x3fv(pipe.program, 1, 1, GL_TRUE, reinterpret_cast<const float*>(&sceneDesc.instanceToWorld[i]));
+		// instance if for lookup in instance transformation buffer
+		glProgramUniform1ui(pipe.program, 1, GLuint(i));
 
 		// bind vertex and index buffer
 		if(attribs & Attribute::Position) {
@@ -237,4 +229,35 @@ size_t GlRenderer::get_aligned(size_t size, size_t alignment) {
 	return size / alignment + !!(size % alignment);
 }
 
+void GlRenderer::bindStaticAttribs(const gl::Pipeline& pipe, Attribute attribs)
+{
+	const auto& sceneDesc = this->get_scene_descriptor();
+
+	if (attribs & Attribute::Material) {
+		mAssert(sceneDesc.materials.id);
+		mAssert(!sceneDesc.materials.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, sceneDesc.materials.id);
+
+		mAssert(sceneDesc.alphaTextures.id);
+		mAssert(!sceneDesc.alphaTextures.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, sceneDesc.alphaTextures.id);
+	}
+
+	if (attribs & Attribute::Light) {
+		mAssert(sceneDesc.lightTree.smallLights.id);
+		mAssert(!sceneDesc.lightTree.smallLights.offset);
+		mAssert(sceneDesc.lightTree.bigLights.id);
+		mAssert(!sceneDesc.lightTree.bigLights.offset);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sceneDesc.lightTree.smallLights.id);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, sceneDesc.lightTree.bigLights.id);
+		glProgramUniform1ui(pipe.program, 10, sceneDesc.lightTree.numSmallLights);
+		glProgramUniform1ui(pipe.program, 11, sceneDesc.lightTree.numBigLights);
+	}
+
+
+	mAssert(sceneDesc.instanceToWorld.id);
+	mAssert(!sceneDesc.instanceToWorld.offset);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, sceneDesc.instanceToWorld.id);
 }
+}
+

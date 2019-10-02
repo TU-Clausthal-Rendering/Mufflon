@@ -28,7 +28,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 									 Importances<CURRENT_DEV>** importances,
 									 DeviceImportanceSums<CURRENT_DEV>* sums,
 									 SilhouetteEdge& shadowPrim, u8* penumbraBits) {*/
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ ei::Vec3{1.0f} };
 	SilPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
@@ -66,7 +66,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
-						outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
+						outputBuffer.template contribute<RadianceTarget>(coord, throughput * value.cosOut * radiance * mis);
 						shadowStatus[lightIndex * params.maxPathLength + pathLen].light += 1.f / (1.f + vertex.ext().footprint.get_area());
 					} else {
 						outputBuffer.template contribute<ShadowTarget>(coord, 1.f);
@@ -92,7 +92,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= misWeight;
 			}
-			outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+			outputBuffer.template contribute<RadianceTarget>(coord, throughput * emission.value);
 		}
 		if(vertex.is_end_point()) break;
 	} while(pathLen < params.maxPathLength);

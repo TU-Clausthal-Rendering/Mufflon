@@ -1,10 +1,196 @@
 #define FORWARD_SHADE
+#define NDF_GGX 0
+#define NDF_BECKMANN 1
+// brdf reference: http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
 
-layout(location = 0) out vec4 out_fragColor;
+layout(location = 2) out vec3 out_fragColor;
 layout(location = 1) out vec3 out_position;
-layout(location = 2) out vec3 out_albedo;
-layout(location = 3) out vec3 out_normal;
-layout(location = 4) out vec3 out_lightness;
+layout(location = 0) out vec3 out_normal;
+
+layout(bindless_sampler, location = 24) uniform sampler2DArray ltc_ggx1_tex;
+layout(bindless_sampler, location = 25) uniform sampler2DArray ltc_ggx2_tex;
+layout(bindless_sampler, location = 26) uniform sampler2DArray ltc_beckmann1_tex;
+layout(bindless_sampler, location = 27) uniform sampler2DArray ltc_beckmann2_tex;
+
+struct LightInfo
+{
+	vec3 color; // color multiplied with attenuation
+	vec3 direction; // outgoing from material, normalized
+};
+
+struct MaterialInfo
+{
+	vec3 diffuse;
+	vec3 emission;
+	vec3 specular;
+	float roughness;
+	uint ndf;
+};
+
+// light travel direction
+LightInfo calcDirLight(vec3 direction, vec3 radiance) {
+	LightInfo i;
+	i.color = radiance;
+	i.direction = normalize(-direction);
+	return i;
+}
+
+LightInfo calcPointLight(vec3 pos, vec3 lightPos, vec3 radiance) {
+	LightInfo i;
+	i.direction = lightPos - pos;
+	float dist = length(i.direction);
+	i.direction /= dist;
+	i.color = radiance / (dist * dist);
+	return i;
+}
+
+LightInfo calcSpotLight(vec3 pos, vec3 lightPos, vec3 radiance, vec3 lightDir, float cosFalloffStart, float cosThetaMax)
+{
+	LightInfo i;
+	i.direction = lightPos - pos;
+	float dist = length(i.direction);
+	i.direction /= dist;
+
+	float cosTheta = max(dot(lightDir, -i.direction), 0.0);
+	// pbrt type of spot light:
+	i.color = radiance * pow(clamp((cosTheta - cosThetaMax) / (cosFalloffStart - cosThetaMax), 0.0, 1.0), 2.0) / (dist * dist);
+	return i;
+}
+
+vec3 getMaterialEmission(uint materialId);
+
+float toSrgb(float c)
+{
+	if (c <= 0.0031308) return c * 12.92;
+	return 1.055 * pow(c, 1 / 2.4) - 0.055;
+}
+
+vec3 calcRadiance(vec3 pos, vec3 normal, MaterialInfo mat) {
+	const vec3 view = normalize(u_cam.position - pos);
+
+	vec3 color = vec3(0.0);
+
+	LightInfo light;
+
+	// angle between normal and view
+	const float NdotV = dot(normal, view);
+	if(NdotV > 0.0)
+		color += mat.emission;
+
+	// some data for the microfacet modell
+	const float roughSquare = mat.roughness * mat.roughness;
+	const float pi = 3.14159265359;
+
+	// textures for ltc
+	sampler2DArray ltcTex1 = ltc_ggx1_tex;
+	sampler2DArray ltcTex2 = ltc_ggx2_tex;
+	if (mat.ndf == NDF_BECKMANN)
+	{
+		ltcTex1 = ltc_beckmann1_tex;
+		ltcTex2 = ltc_beckmann2_tex;
+	}
+	const vec2 texCoords = LTC_Coords(NdotV, mat.roughness);
+	const mat3 Minv = LTC_Matrix(ltcTex1, texCoords);
+
+	// iterate thought small lights
+	for(uint i = 0; i < numSmallLights; ++i) {
+		switch(smallLights[i].type) {
+		case LIGHT_TYPE_POINT:
+			light = calcPointLight(pos, smallLights[i].position, smallLights[i].intensity);
+			break;
+		case LIGHT_TYPE_SPOT:
+			light = calcSpotLight(pos, smallLights[i].position, smallLights[i].intensity,
+				smallLights[i].direction, smallLights[i].radiusOrFalloff, smallLights[i].materialOrTheta);
+			break;
+		case LIGHT_TYPE_SPHERE: {
+			vec3 lightColor = getMaterialEmission(floatBitsToUint(smallLights[i].materialOrTheta));
+			//diffuse
+			{vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), smallLights[i].position, smallLights[i].radiusOrFalloff, ltcTex2);
+			vec3 lightness = luminance * lightColor;
+			color += mat.diffuse * lightness; }
+			// specular
+			if (mat.specular == vec3(0.0)) continue;
+			{vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, smallLights[i].position, smallLights[i].radiusOrFalloff, ltcTex2);
+			vec3 lightness = luminance * lightColor;
+			color += lightness * mat.specular; }
+			continue;
+		} break;
+		case LIGHT_TYPE_DIRECTIONAL:
+			light = calcDirLight(smallLights[i].direction, smallLights[i].intensity);
+			break;
+		default: continue;
+		}
+
+		// diffuse color
+		float NdotI = dot(normal, light.direction);
+		// refraction case?
+		if (NdotI * NdotV < 0.0) continue;
+
+		NdotI = abs(NdotI);
+		const float aNdotV = abs(NdotV);
+
+		color += mat.diffuse * light.color * NdotI / pi;
+
+		if (mat.specular == vec3(0.0)) continue;
+
+		// microfacet reflection
+		const float NdotH = abs(dot(normal, normalize(view + light.direction)));
+		const float VdotH = abs(dot(view, normalize(view + light.direction)));
+		const float NdotHsq = NdotH * NdotH;
+
+		float D = 0.0;
+		if (mat.ndf == NDF_GGX)
+		{
+			// denominator
+			D = NdotHsq * (roughSquare - 1.0) + 1.0;
+			// correct formula
+			D = roughSquare / (D * D * pi);
+		}
+		else // beckmann
+		{
+			D = exp((NdotHsq - 1.0) / (NdotHsq * roughSquare));
+			D /= pi * roughSquare * NdotHsq * NdotHsq;
+		}
+
+		// cook torrance G
+		float G = min(2.0 * NdotH * aNdotV / VdotH, 2.0 * NdotH * NdotI / VdotH);
+		G = min(G, 1.0);
+
+		// TODO add blend fresnel?
+		color += light.color * mat.specular * D * G * 0.25 / aNdotV;
+	}
+
+	for(uint i = 0; i < numBigLights; ++i) {
+		vec3 points[4];
+		points[0] = bigLights[i].pos;
+		points[1] = bigLights[i].pos + bigLights[i].v1;
+		points[2] = bigLights[i].pos + bigLights[i].v2;
+		points[3] = bigLights[i].pos + bigLights[i].v3;
+
+		vec3 lightColor = getMaterialEmission(bigLights[i].material);
+
+		// diffuse part
+		{
+			vec3 luminance = LTC_Evaluate(normal, view, pos, mat3(1.0), points, int(bigLights[i].numPoints), ltcTex2);
+			vec3 lightness = luminance * lightColor; //* 0.159154943; // normalize with 1 / (2 * pi)
+			color += mat.diffuse * lightness;
+		}
+		
+		// specular part
+		{
+			if (mat.specular == vec3(0.0)) continue;
+
+			vec3 luminance = LTC_Evaluate(normal, view, pos, Minv, points, int(bigLights[i].numPoints), ltcTex2);
+			vec3 lightness = luminance * lightColor;// *0.159154943; // normalize with 1 / (2 * pi)
+			// BRDF shadowing and Fresnel
+			color += lightness * mat.specular;
+			//vec2 fresnel = textureLod(ltc_fres_tex, vec3(texCoords, 0.0), 0.0).rg;
+			//color += lightness * (fresnel.x * mat.specular + (1.0 - mat.specular) * fresnel.y);
+		}
+	}
+
+	return color;
+}
 
 #define EMISSIVE 0u
 #define LAMBERT 1u
@@ -22,6 +208,17 @@ layout(binding = 0) readonly buffer materialsBuffer {
 	uint u_materialData[];
 };
 
+layout(binding = 4) readonly buffer alphaTextureBuffer {
+	uint u_alphaTextures[];
+};
+
+bool isMaskedOut(vec3 uv, uint materialIndex) {
+	uvec2 id = uvec2(u_alphaTextures[materialIndex * 2], u_alphaTextures[materialIndex * 2 + 1]);
+	if (id == 0) return false;
+	sampler2DArray alphaTex = sampler2DArray(id);
+	return textureLod(alphaTex, uv, 0.0).r <= 0.1;
+}
+
 uint readShort(uint byteOffset) {
 	uint index = byteOffset / 4;
 	uint remainder = byteOffset % 4;
@@ -35,48 +232,280 @@ uvec2 readTexHdl(uint byteOffset) {
 	return uvec2(u_materialData[index], u_materialData[index + 1]);
 }
 
+float readFloat(uint byteOffset)
+{
+	uint index = byteOffset / 4;
+	return uintBitsToFloat(u_materialData[index]);
+}
+
+MaterialInfo getEmissive(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray emissionTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	return MaterialInfo(vec3(0.0), texture(emissionTex, uv).rgb, vec3(0.0), 0.0, 0);
+}
+
+void getEmissiveParams(inout uint offset, out vec3 scale) {
+	scale = vec3(readFloat(offset), readFloat(offset + 4), readFloat(offset + 8));
+	offset += 12;
+}
+
+MaterialInfo getLambert(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	return MaterialInfo(texture(albedoTex, uv).rgb, vec3(0.0), vec3(0.0), 0.0, 0);
+}
+
+MaterialInfo getOrennayar(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	return MaterialInfo(texture(albedoTex, uv).rgb, vec3(0.0), vec3(0.0), 0.0, 0);
+}
+
+void getOrennayarParams(inout uint offset, out float a, out float b)
+{
+	a = readFloat(offset);
+	offset += 4;
+	b = readFloat(offset);
+	offset += 4;
+}
+
+MaterialInfo getTorrance(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray albedoTex = sampler2DArray(readTexHdl(offset)); // specular
+	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset + 8));
+	offset += 16;
+	return MaterialInfo(vec3(0.0), vec3(0.0), texture(albedoTex, uv).rgb, texture(roughnessTex, uv).r, 0);
+}
+
+void getTorranceParams(inout uint offset, out uint shadowing, out uint ndf) {
+	shadowing = readShort(offset);
+	offset += 2;
+	ndf = readShort(offset);
+	offset += 2;
+}
+
+MaterialInfo getWalter(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	return MaterialInfo(vec3(0.0), vec3(0.0), vec3(0.0), texture(roughnessTex, uv).r, 0);
+}
+
+void getWalterParams(inout uint offset, out vec3 absorption, out uint shadowing, out uint ndf) {
+	absorption = vec3(readFloat(offset), readFloat(offset + 4), readFloat(offset + 8));
+	offset += 12;
+	shadowing = readShort(offset);
+	offset += 2;
+	ndf = readShort(offset);
+	offset += 2;
+}
+
+MaterialInfo getMicrofacet(vec3 pos, vec3 normal, vec3 uv, inout uint offset) {
+	sampler2DArray roughnessTex = sampler2DArray(readTexHdl(offset));
+	offset += 8;
+	return MaterialInfo(vec3(0.0), vec3(0.0), vec3(1.0), texture(roughnessTex, uv).r, 0);
+}
+
+void getMicrofacetParams(inout uint offset, out vec3 absorption, out uint shadowing, out uint ndf) {
+	absorption = vec3(readFloat(offset), readFloat(offset + 4), readFloat(offset + 8));
+	offset += 12;
+	shadowing = readShort(offset);
+	offset += 2;
+	ndf = readShort(offset);
+	offset += 2;
+}
+
+void getBlendParams(inout uint offset, out float factor1, out float factor2) {
+	factor1 = readFloat(offset);
+	factor2 = readFloat(offset + 4);
+	offset += 8;
+}
+
+MaterialInfo blendMaterial(MaterialInfo mat1, MaterialInfo mate2, float factor1, float factor2)
+{
+	return MaterialInfo(
+		mat1.diffuse * factor1 + mate2.diffuse * factor2,
+		mat1.emission * factor1 + mate2.emission * factor2,
+		mat1.specular * factor1 + mate2.specular * factor2,
+		mat1.roughness * factor1 + mate2.roughness * factor2,
+		mat1.ndf + mate2.ndf
+	);
+}
+
 void shade(vec3 pos, vec3 normal, vec2 texcoord, uint materialIndex) {
 	out_normal = normal;
 	out_position = pos;
 	const vec3 uv = vec3(texcoord, 0.0); // all textures are sampler2DArrays with layer 0
 
+	if (isMaskedOut(uv, materialIndex)) discard;
+
+	// read correct material
+	uint matOffset = u_materialData[materialIndex];
+	uint matType = readShort(matOffset);
+	uint matFlags = readShort(matOffset + 2);
+	// next is medium handle => until (matOffset + 8)
+	matOffset += 8;
+
+	MaterialInfo mat;
+
+	out_fragColor = vec3(0.0, 0.0, 0.0);
+
+
+	switch (matType) {
+	case EMISSIVE: {
+		mat = getEmissive(pos, normal, uv, matOffset);
+		vec3 scale;
+		getEmissiveParams(matOffset, scale);
+		mat.emission *= scale;
+	} break;
+	case ORENNAYAR: {
+		mat = getOrennayar(pos, normal, uv, matOffset);
+		float a, b;
+		getOrennayarParams(matOffset, a, b);
+	} break;
+	case LAMBERT:
+		mat = getLambert(pos, normal, uv, matOffset);
+		break;
+	case TORRANCE: {
+		mat = getTorrance(pos, normal, uv, matOffset);
+		uint shadowing, ndf;
+		getTorranceParams(matOffset, shadowing, ndf);
+		mat.ndf = ndf;
+	} break;
+	case WALTER: {
+		mat = getWalter(pos, normal, uv, matOffset);
+		vec3 absorption; uint shadowing, ndf;
+		getWalterParams(matOffset, absorption, shadowing, ndf);
+		mat.ndf = ndf;
+	} break;
+	case MICROFACET: {
+		mat = getMicrofacet(pos, normal, uv, matOffset);
+		vec3 absorption; uint shadowing, ndf;
+		getMicrofacetParams(matOffset, absorption, shadowing, ndf);
+		mat.ndf = ndf;
+	} break;
+	case LAMBERT_EMISSIVE: {
+		// LayerA
+		MaterialInfo m1 = getLambert(pos, normal, uv, matOffset);
+		// LayerB
+		MaterialInfo m2 = getEmissive(pos, normal, uv, matOffset);
+		// LayerA params (empty only padding for struct)
+		matOffset += 4;
+		// LayerB params
+		vec3 scale;
+		getEmissiveParams(matOffset, scale);
+		m2.emission *= scale;
+		// Blend
+		float factor1, factor2;
+		getBlendParams(matOffset, factor1, factor2);
+		mat = blendMaterial(m1, m2, factor1, factor2);
+	} break;
+	case TORRANCE_LAMBERT: {
+		// LayerA
+		MaterialInfo m1 = getTorrance(pos, normal, uv, matOffset);
+		// LayerB
+		MaterialInfo m2 = getLambert(pos, normal, uv, matOffset);
+		// LayerA params
+		uint shadowing, ndf;
+		getTorranceParams(matOffset, shadowing, ndf);
+		// LayerB params (empty only padding for struct)
+		matOffset += 4;
+
+		// Blend
+		float factor1, factor2;
+		getBlendParams(matOffset, factor1, factor2);
+		mat = blendMaterial(m1, m2, factor1, factor2);
+		mat.ndf = ndf;
+	} break;
+	case FRESNEL_TORRANCE_LAMBERT: {
+		// LayerA
+		MaterialInfo m1 = getTorrance(pos, normal, uv, matOffset);
+		// LayerB
+		MaterialInfo m2 = getLambert(pos, normal, uv, matOffset);
+		// LayerA params
+		uint shadowing, ndf;
+		getTorranceParams(matOffset, shadowing, ndf);
+		// LayerB params (empty only padding for struct)
+		matOffset += 4;
+
+		mat = blendMaterial(m1, m2, 1.0, 1.0);
+	} break;
+	case WALTER_TORRANCE: {
+		// LayerA
+		MaterialInfo m1 = getWalter(pos, normal, uv, matOffset);
+		// LayerB
+		MaterialInfo m2 = getTorrance(pos, normal, uv, matOffset);
+		// LayerA params
+		vec3 absorption; uint shadowing, ndf;
+		getWalterParams(matOffset, absorption, shadowing, ndf);
+		// LayerB params
+		//uint shadowing, ndf;
+		getTorranceParams(matOffset, shadowing, ndf);
+		// Blend
+		float factor1, factor2;
+		getBlendParams(matOffset, factor1, factor2);
+		mat = blendMaterial(m1, m2, factor1, factor2);
+		mat.ndf = ndf;
+	} break;
+	case FRESNEL_TORRANCE_WALTER: {
+		// LayerA
+		MaterialInfo m1 = getTorrance(pos, normal, uv, matOffset);
+		// LayerB
+		MaterialInfo m2 = getWalter(pos, normal, uv, matOffset);
+		// LayerA params
+		uint shadowing, ndf;
+		getTorranceParams(matOffset, shadowing, ndf);
+		// LayerB params
+		vec3 absorption; //uint shadowing, ndf;
+		getWalterParams(matOffset, absorption, shadowing, ndf);
+
+		mat = blendMaterial(m1, m2, 1.0, 1.0);
+		mat.ndf = ndf;
+	} break;
+	}
+
+	mat.roughness = toSrgb(mat.roughness);
+	out_fragColor = calcRadiance(pos, normal, mat);
+}
+
+vec3 getMaterialEmission(uint materialIndex) {
 	// read correct material
 	uint matOffset = u_materialData[materialIndex];
 	uint matType = readShort(matOffset);
 	uint matFlags = readShort(matOffset + 2);
 
-	vec3 color = vec3(0.0);
 	// next is medium handle => until (matOffset + 8)
+	matOffset += 8;
 	switch(matType) {
 	case EMISSIVE: {
+		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset));
+		matOffset += 8;
+		vec3 scale;
+		getEmissiveParams(matOffset, scale);
+		return texture(emissionTex, vec3(0.0)).rgb * scale;
+	} break;
+	case LAMBERT_EMISSIVE: {
 		sampler2DArray emissionTex = sampler2DArray(readTexHdl(matOffset + 8));
-		color = texture(emissionTex, uv).rgb;
-	} break;
-	case ORENNAYAR:
-	case LAMBERT: {
-		sampler2DArray albedoTex = sampler2DArray(readTexHdl(matOffset + 8));
-		color = texture(albedoTex, uv).rgb;
-		out_albedo = color;
-	} break;
-	case TORRANCE: {
-		sampler2DArray albedoTex = sampler2DArray(readTexHdl(matOffset + 8));
-		sampler2DArray roughnessTex = sampler2DArray(readTexHdl(matOffset + 16));
-		out_albedo = texture(albedoTex, uv).rgb;
-		color = texture(roughnessTex, uv).rgb;
-	} break;
-	case WALTER: {
-		sampler2DArray roughnessTex = sampler2DArray(readTexHdl(matOffset + 8));
-		color = texture(roughnessTex, uv).rgb;
+		matOffset += 16;
+		// LayerA params (empty only padding for struct)
+		matOffset += 4;
+
+		// LayerB params
+		vec3 scale;
+		getEmissiveParams(matOffset, scale);
+		// Blend
+		float factor1, factor2;
+		getBlendParams(matOffset, factor1, factor2);
+
+		return vec3(0.0);
+		//return texture(emissionTex, vec3(0.0)).rgb * scale * factor2;
 	} break;
 	}
+	return vec3(0.0);
+}
 
-
-
-	//out_fragColor = vec4(normal * 0.5 + vec3(0.5), 1.0);
-	//out_fragColor = vec4(fract(texcoord), 1.0, 1.0);
-
-	out_fragColor = vec4(color, 1.0);
-
-	// TODO
-	out_lightness = vec3(0.0f);
+// debug helper function
+void shadeConst(vec3 color, vec3 position, vec3 normal)
+{
+	out_fragColor = color;
+	out_position = position;
+	out_normal = normal;
 }

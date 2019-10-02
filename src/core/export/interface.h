@@ -205,6 +205,10 @@ typedef void* TextureHdl;
 typedef const void* ConstCameraHdl;
 typedef const LightHdl ConstLightHdl;
 
+typedef Vec4(*TextureCallback)(uint32_t x, uint32_t y, uint32_t layer,
+							   TextureFormat format, Vec4 value,
+							   void* userParams);
+
 // Material types
 typedef struct {
 	Vec2 refractionIndex;
@@ -512,8 +516,10 @@ CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color);
 CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
-CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling, MipmapType type);
-CORE_API TextureHdl CDECL world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat, MipmapType type);
+CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling, MipmapType type,
+											TextureCallback callback, void* userParams);
+CORE_API TextureHdl CDECL world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat,
+													  MipmapType type, TextureCallback callback, void* userParams);
 CORE_API TextureHdl CDECL world_add_texture_value(const float* value, int num, TextureSampling sampling);
 CORE_API Boolean CDECL world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips);
 CORE_API const char* CDECL world_get_texture_name(TextureHdl hdl);
@@ -565,10 +571,6 @@ CORE_API uint32_t render_get_render_target_count();
 CORE_API const char* render_get_render_target_name(uint32_t index);
 CORE_API Boolean CDECL render_enable_render_target(const char* name, Boolean variance);
 CORE_API Boolean CDECL render_disable_render_target(const char* target, Boolean variance);
-CORE_API Boolean CDECL render_enable_non_variance_render_targets();
-CORE_API Boolean CDECL render_enable_all_render_targets();
-CORE_API Boolean CDECL render_disable_variance_render_targets();
-CORE_API Boolean CDECL render_disable_all_render_targets();
 CORE_API Boolean CDECL render_is_render_target_enabled(const char* name, Boolean variance);
 CORE_API Boolean CDECL render_is_render_target_required(const char* name, Boolean variance);
 CORE_API uint32_t CDECL renderer_get_num_parameters();

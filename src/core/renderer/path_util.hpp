@@ -221,9 +221,9 @@ public:
 	}
 
 	// Get the path length in segments up to this vertex.
-	int get_path_len() const { return m_pathLen; }
+	CUDA_FUNCTION int get_path_len() const { return m_pathLen; }
 	// Overwrite path length (e.g. if the previous element is not set/changed for this vertex)
-	void set_path_len(int l) { m_pathLen = l; }
+	CUDA_FUNCTION void set_path_len(int l) { m_pathLen = l; }
 
 	// Get the sampling PDFs of this vertex (not defined, if
 	// the vertex is an end point on a surface). Details at the members
@@ -774,8 +774,9 @@ struct VertexExtension {
 							  const PathVertex<VertexExtension>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& inDir,
-							  const math::Throughput& throughput)
-							//  const float continuationPropability)
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission)
 	{}
 
 	// Helper to convert the parameters of the update call into an incident pdf for mis
@@ -796,7 +797,7 @@ struct VertexExtension {
 	//		back = producing the incident vector)
 	CUDA_FUNCTION void update(const PathVertex<VertexExtension>& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair pdf) // TODO: ex cosine?, BRDF?
+							  const VertexSample& sample) // TODO: ex cosine?, BRDF?
 	{}
 };
 

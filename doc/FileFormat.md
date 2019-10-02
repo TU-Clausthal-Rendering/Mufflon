@@ -129,13 +129,15 @@ They each must match in length or be of length one.
 `"type": "point"`
 
     "position": [[x,y,z], ...],           // vec3 vec3 world space position in [m]
-    "flux" or "intensity: [[a,b,c], ...], // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3)
+    "flux" or "intensity: [[a,b,c], ...]
+		   or "temperature": [[T]],       // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3, or temperature [K] as float)
     "scale": [float, ...],                // Multiplier for "flux"/"intensity"
 
 `"type": "directional"`
 
     "direction": [[x,y,z], ...],          // Direction in which the light travels (incident direction), not necessarily normalized
-    "radiance": [[a,b,c], ...],           // Radiance [W/m²sr]
+    "radiance": [[a,b,c], ...] or
+	"temperature": [[T]],                 // Radiance [W/m²sr] or temperature [K]
     "scale": [float, ...],                // Multiplier for "radiance"
 
 `"type": "spot"`\
@@ -144,7 +146,8 @@ where "exponent" is set to 2.
 
     "position": [[x,y,z], ...],           // vec3 vec3 world space position in [m]
     "direction": [[x,y,z], ...],          // Direction in which the light travels (incident direction), not necessarily normalized
-    "intensity": [[a,b,c], ...],          // Peak intensity [W/sr]
+    "intensity": [[a,b,c], ...] or
+	"temperature": [[T]],                 // Peak intensity [W/sr] or temperature [K]
     "scale": [float, ...],                // Multiplier for "intensity"
     "cosWidth" or "width": [float, ...],  // An angle "width" in radians for the half-opening angle or the
                                           // cosine of this angle
@@ -195,7 +198,8 @@ Materials
 
 `"type": "emissive"`
 
-    "radiance": [r,g,b] | <texture>,    // Surface radiance in [W/m²sr]
+    "radiance": [r,g,b] | <texture> or
+	"temperature": T | <texture>,       // Surface radiance in [W/m²sr] or temperature in [K]
     "scale: [r,g,b]                     // Multiplier for radiance (HDR color, default 1,1,1)
 
 `"type": "orennayar"`

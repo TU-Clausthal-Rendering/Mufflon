@@ -226,7 +226,8 @@ public:
 						iterTarget, cumTarget, varTarget,
 						TargetType::NUM_CHANNELS, m_width, m_height, m_iteration);
 				} else {
-					// TODO: OpenGL
+					// Simple copy (this means that OpenGL renderers do not average their images!)
+					copy(cumTarget, iterTarget, m_width * m_height * TargetType::NUM_CHANNELS * sizeof(PixelType));
 				}
 			}
 		});

@@ -25,7 +25,9 @@ struct SilVertexExt {
 							  const VertexType& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput,
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission,
 							  const scene::SceneDescriptor<CURRENT_DEV>& scene) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
@@ -44,7 +46,7 @@ struct SilVertexExt {
 
 	CUDA_FUNCTION void update(const VertexType& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair& pdf,
+							  const VertexSample& sample,
 							  const scene::SceneDescriptor<CURRENT_DEV>& scene) {}
 };
 

@@ -76,6 +76,9 @@
     <ClCompile Include="..\..\src\mffloader\export\scene_exporter.cpp">
       <Filter>Source Files\mffloader\export</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\cie_xyz.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp">
@@ -160,6 +163,9 @@
       <Filter>Source Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\string_view.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\cie_xyz.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>

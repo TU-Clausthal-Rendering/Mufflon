@@ -138,7 +138,7 @@ void ShadowPhotonVisualizer::iterate() {
 		Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 
 		// Dummies, we don't care about that
-		math::Throughput throughput;
+		Spectrum throughput;
 		VertexSample sample;
 		SpvPathVertex vertex;
 		SpvPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
@@ -184,7 +184,7 @@ void ShadowPhotonVisualizer::iterate() {
 			Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 
 			// Dummies, we don't care about that
-			math::Throughput throughput;
+			Spectrum throughput;
 			VertexSample sample;
 			SpvPathVertex vertex;
 			SpvPathVertex::create_camera(&vertex, nullptr, m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
@@ -494,7 +494,7 @@ void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, c
 
 	SpvPathVertex vertex[2];
 	SpvPathVertex::create_light(&vertex[0], nullptr, p);
-	math::Throughput throughput;
+	Spectrum throughput;
 
 	// TODO: store path length in octree?
 	int pathLen = 0;
@@ -517,7 +517,7 @@ void ShadowPhotonVisualizer::trace_photon(const int idx, const int numPhotons, c
 			// Deposit regular photon
 			prevPhoton = m_photonMap.insert(vertex[currentV].get_position(), {
 				vertex[currentV].get_incident_direction(), pathLen,
-				throughput.weight / numPhotons, vertex[currentV].get_geometric_normal(),
+				throughput / numPhotons, vertex[currentV].get_geometric_normal(),
 				vertex[currentV].get_position(), closestVertex.value(), prevPhoton
 			});
 		}

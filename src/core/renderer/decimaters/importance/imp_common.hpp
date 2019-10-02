@@ -26,19 +26,21 @@ struct ImpVertexExt {
 							  const PathVertex<ImpVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {}
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {}
 
 	CUDA_FUNCTION void update(const PathVertex<ImpVertexExt>& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair& pdf) {
+							  const VertexSample& sample) {
 		this->excident = excident;
-		this->pdf = pdf.forw;
+		this->pdf = sample.pdf.forw;
 		this->outCos = -ei::dot(thisVertex.get_normal(), excident);
 	}
 
-	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const math::Throughput& accum) {
+	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const Spectrum& accum) {
 		this->throughput = sample.throughput;
-		this->accumThroughput = accum.weight;
+		this->accumThroughput = accum;
 	}
 };
 

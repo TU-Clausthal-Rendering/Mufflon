@@ -60,17 +60,19 @@ struct NebVertexExt {
 							  const PathVertex<NebVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
-		this->throughput = throughput.weight;
+		this->throughput = throughput;
 	}
 
 	void update(const PathVertex<NebVertexExt>& thisVertex,
 				const scene::Direction& excident,
-				const math::PdfPair& pdf) {
-		pdfBack = pdf.back;
+				const VertexSample& sample) {
+		pdfBack = sample.pdf.back;
 	}
 };
 
@@ -185,7 +187,7 @@ float mis_rhit(const AreaPdf* incidentF, const AreaPdf* incidentB, int n,
 
 
 void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pixelIdx) {
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ 1.0f };
 	NebPathVertex* previous = nullptr;
 	NebPathVertex vertex;
 	VertexSample sample;
@@ -207,11 +209,11 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 			// In the case that there is no previous, there is also no MIS and we
 			// contribute directly.
 			if(!previous) {
-				m_outputBuffer.contribute<RadianceTarget>(coord, throughput.weight * emission.value);
+				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			} else if(emission.value != 0.0f) {
 				EmissionDesc emDesc;
 				emDesc.previous = static_cast<const NebPathVertex*>(vertex.previous());
-				emDesc.radiance = emission.value * throughput.weight;
+				emDesc.radiance = throughput * emission.value;
 				emDesc.incidentPdf = vertex.ext().incidentPdf;
 				emDesc.startPdf = pathLen == 1 ? AreaPdf{0.0f} : emission.connectPdf;
 				// Special case: when photons are traced they use the emit pdf and not the connect pdf.
@@ -271,7 +273,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 		// Trace a path
 		virtualLight.ext().rnd = math::sample_uniform(u32(rng.next()));
 		int lightPathLength = 1;
-		math::Throughput lightThroughput { Spectrum{1.0f}, 0.0f };
+		Spectrum lightThroughput { 1.0f };
 		scene::Direction prevNormal = virtualLight.get_geometric_normal();
 		while(lightPathLength < m_params.maxPathLength-1) {
 			math::RndSet2_1 rnd { rng.next(), rng.next() };
@@ -287,7 +289,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 			prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / virtualLight.get_incident_dist_sq();
 			prevNormal = virtualLight.get_geometric_normal();
 			merge_importons(photonMergeArea, virtualLight, incidentF, incidentB,
-				numPhotons, false, lightThroughput.weight * flux, pdfHead,
+				numPhotons, false, lightThroughput * flux, pdfHead,
 				prevConversionFactor, sourceDensity);
 		}
 	}
@@ -302,7 +304,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 	NebPathVertex vertex[2];
 	NebPathVertex::create_light(&vertex[0], nullptr, p);
 
-	math::Throughput throughput;
+	Spectrum throughput { 1.0f };
 	scene::Direction prevNormal = vertex[0].get_geometric_normal();
 	float prevConversionFactor = 0.0f;
 	float sourceDensity = 0.0f;
@@ -339,7 +341,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 		prevConversionFactor = ei::abs(dot(prevNormal, sample.excident)) / vertex[currentV].get_incident_dist_sq();
 		prevNormal = vertex[currentV].get_geometric_normal();
 		merge_importons(photonMergeArea, vertex[currentV], incidentF, incidentB, numPhotons,
-			true, throughput.weight / numPhotons, pdfHead, prevConversionFactor, sourceDensity);
+			true, throughput / numPhotons, pdfHead, prevConversionFactor, sourceDensity);
 	}
 }
 

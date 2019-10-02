@@ -483,7 +483,7 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 									 const Pixel& coord, math::Rng& rng,
 									 Importances<CURRENT_DEV>** importances,
 									 DeviceImportanceSums<CURRENT_DEV>* sums) {
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
 #ifdef __CUDA_ARCH__
@@ -537,8 +537,8 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 				const ei::Vec3 irradiance = nee.diffIrradiance * value.cosOut; // [W/m²]
 				vertices[pathLen].ext().pathRadiance = mis * radiance * value.cosOut;
 
-				const float weightedRadianceLuminance = get_luminance(throughput.weight * mis * radiance) * (1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
-				const float weightedIrradianceLuminance = get_luminance(throughput.weight * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
+				const float weightedRadianceLuminance = get_luminance(throughput * mis * radiance) * (1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
+				const float weightedIrradianceLuminance = get_luminance(throughput * irradiance) *(1.f - ei::abs(vertices[pathLen - 1].ext().outCos));
 				if(shadowHit.hitId.instanceId < 0) {
 					if(params.show_direct()) {
 						mAssert(!isnan(mis));
@@ -592,7 +592,7 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 					// TODO: use this radiance to conditionally discard importance
 					trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedRadianceLuminance,
 								 shadowHit.hitId, nee.dist, firstShadowDistance,
-								 lightType, lightOffset, rad * throughput.weight, params);
+								 lightType, lightOffset, rad * throughput, params);
 				}
 			}
 		}
@@ -712,7 +712,8 @@ CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType
 										 Importances<CURRENT_DEV>** importances,
 										 DeviceImportanceSums<CURRENT_DEV>* sums,
 										 const float maxImportance) {
-	math::Throughput throughput{ ei::Vec3{1.0f}, 1.0f };
+	Spectrum throughput{ ei::Vec3{1.0f} };
+	float guideWeight = 1.0f;
 	PtPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
@@ -721,7 +722,7 @@ CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType
 	scene::Point lastPosition = vertex.get_position();
 	math::RndSet2_1 rnd{ rng.next(), rng.next() };
 	float rndRoulette = math::sample_uniform(u32(rng.next()));
-	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::HIT) {
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::HIT) {
 		const auto& hitpoint = vertex.get_position();
 		const auto& hitId = vertex.get_primitive_id();
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];

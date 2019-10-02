@@ -63,7 +63,9 @@ struct SilVertexExt {
 							  const PathVertex<SilVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const math::Throughput& throughput) {
+							  const Spectrum& throughput,
+							  const float continuationPropability,
+							  const Spectrum& transmission) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -80,13 +82,13 @@ struct SilVertexExt {
 
 	CUDA_FUNCTION void update(const SilPathVertex& thisVertex,
 							  const scene::Direction& excident,
-							  const math::PdfPair pdf) {
+							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
 		const SilPathVertex* prev = thisVertex.previous();
 		if(prev) { // !prev: Current one is a start vertex. There is no previous sum
 			// Replace forward PDF with backward PDF (move merge one into the direction of the path-start)
-			float relToPrev = float(pdf.back) * prevConversionFactor / float(thisVertex.ext().incidentPdf);
+			float relToPrev = float(sample.pdf.back) * prevConversionFactor / float(thisVertex.ext().incidentPdf);
 			prevRelativeProbabilitySum = relToPrev + relToPrev * prev->ext().prevRelativeProbabilitySum;
 		}
 	}
