@@ -32,10 +32,8 @@ void CpuSsSilPT::iterate() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel]);/* ,
-									  m_importances.data(), m_importanceSums.data(),
-									  m_shadowPrims[iter * m_outputBuffer.get_num_pixels() + pixel],
-									  &m_penumbra[pixel * m_bytesPerPixel]);*/
+		silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
+									  &m_shadowStatus[pixel * m_lightCount * m_params.maxPathLength]);
 	}
 
 	// Post-processing
@@ -43,12 +41,75 @@ void CpuSsSilPT::iterate() {
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 
+		/*if(m_lightCount <= 3u) {
+			ei::Vec3 statusRes{ 0.f };
+			for(std::size_t i = 0u; i < m_lightCount; ++i) {
+				ei::Vec3 color{ 0.f };
+				color[static_cast<eitypes::uint>(i)] = 1.f;
 
+				const auto status = m_shadowStatus[pixel * m_lightCount + i];
+				if(status.shadow > 0.f) {
+					if(status.light > 0.f) {
+						statusRes += color;
+					} else {
+						statusRes += color * 1.f / 3.f;
+					}
+				} else if(status.light > 0.f) {
+					statusRes += color * 2.f / 3.f;
+				}
+			}
+
+			m_outputBuffer.template set<ShadowStatusTarget>(coord, statusRes);
+		}*/
+
+		ei::Vec2 statii{ 0.f };
+		ei::Vec2 penumbra{ 0.f };
+		for(int d = 0; d < m_params.maxPathLength; ++d) {
+			for(std::size_t i = 0u; i < m_lightCount; ++i) {
+				const auto status = m_shadowStatus[pixel * m_lightCount * m_params.maxPathLength + i * m_params.maxPathLength + d];
+
+				// Detect if it is either penumbra or shadow edge
+
+				if(status.shadow > 0.f) {
+					const bool isPenumbra = status.light > 0.f;
+					bool isEdge = false;
+					for(int x = -1; x <= 1 && !isEdge; ++x) {
+						for(int y = -1; y <= 1 && !isEdge; ++y) {
+							if(x == y)
+								continue;
+							const auto currCoord = coord + Pixel{ x, y };
+							if(currCoord.x < 0 || currCoord.y < 0 ||
+							   currCoord.x >= m_outputBuffer.get_width() || currCoord.y >= m_outputBuffer.get_height())
+								continue;
+							const auto currPixel = currCoord.x + currCoord.y * m_outputBuffer.get_width();
+
+							const auto currStatus = m_shadowStatus[currPixel * m_lightCount * m_params.maxPathLength + i * m_params.maxPathLength + d];
+							if(currStatus.light > 0.f && currStatus.shadow == 0.f)
+								isEdge = true;
+						}
+					}
+
+					if(isPenumbra)
+						penumbra.x += status.shadow;
+					if(isEdge)
+						penumbra.y += status.shadow;
+				}
+				statii += ei::Vec2{ status.shadow, status.light };
+			}
+		}
+		m_outputBuffer.template set<ShadowTransitionTarget>(coord, statii / static_cast<float>(m_currentIteration + 1u));
+		m_outputBuffer.template set<PenumbraTarget>(coord, penumbra / static_cast<float>(m_currentIteration + 1u));
 	}
 }
 
 void CpuSsSilPT::post_reset() {
 	init_rngs(m_outputBuffer.get_num_pixels());
+
+	// Clear the shadow status array
+	m_shadowStatus.clear();
+	// We always account for the background, even if it may be black
+	m_lightCount = 1u + m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount;
+	m_shadowStatus.resize(m_params.maxPathLength * m_lightCount * static_cast<std::size_t>(m_outputBuffer.get_num_pixels()), { 0.f, 0.f });
 }
 
 #if 0

@@ -5,7 +5,6 @@
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
-#include "core/renderer/pt/pt_common.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include <ei/3dintersection.hpp>
@@ -24,7 +23,8 @@ namespace {
 CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									 const SilhouetteParameters& params,
-									 const Pixel& coord, math::Rng& rng) {/*,
+									 const Pixel& coord, math::Rng& rng,
+									 ShadowStatus* shadowStatus) {/*,
 									 Importances<CURRENT_DEV>** importances,
 									 DeviceImportanceSums<CURRENT_DEV>* sums,
 									 SilhouetteEdge& shadowPrim, u8* penumbraBits) {*/
@@ -32,7 +32,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 	SilPathVertex vertex;
 	VertexSample sample;
 	// Create a start for the path
-	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
+	SilPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
 
 	int pathLen = 0;
 	do {
@@ -46,8 +46,11 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 			u64 neeSeed = rng.next();
 			for(int i = 0; i < params.neeCount; ++i) {
 				math::RndSet2 neeRnd = rng.next();
+
+				u32 lightIndex;
 				auto nee = scene::lights::connect(scene, i, params.neeCount,
-												  neeSeed, vertex.get_position(), neeRnd);
+												  neeSeed, vertex.get_position(), neeRnd,
+												  &lightIndex);
 				Pixel outCoord;
 				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
@@ -58,13 +61,16 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 						scene, vertex.get_position(), nee.position,
 						vertex.get_geometric_normal(), nee.geoNormal,
 						nee.dir.direction);
+
 					if(!anyhit) {
 						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
 						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
 						mAssert(!isnan(mis));
 						outputBuffer.template contribute<RadianceTarget>(coord, throughput.weight * value.cosOut * radiance * mis);
+						shadowStatus[lightIndex * params.maxPathLength + pathLen].light += 1.f / (1.f + vertex.ext().footprint.get_area());
 					} else {
 						outputBuffer.template contribute<ShadowTarget>(coord, 1.f);
+						shadowStatus[lightIndex * params.maxPathLength + pathLen].shadow += 1.f / (1.f + vertex.ext().footprint.get_area());
 					}
 				}
 			}
@@ -74,7 +80,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::CANCEL)
+		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, scene) == WalkResult::CANCEL)
 			break;
 		++pathLen;
 

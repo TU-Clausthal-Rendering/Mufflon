@@ -27,14 +27,24 @@ struct ShadowTarget {
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
-struct PenumbraTarget {
-	static constexpr const char NAME[] = "Shadow Areas";
+struct ShadowStatusTarget {
+	static constexpr const char NAME[] = "Shadow Status";
 	using PixelType = float;
-	static constexpr u32 NUM_CHANNELS = 1u;
+	static constexpr u32 NUM_CHANNELS = 3u;
+};
+struct ShadowTransitionTarget {
+	static constexpr const char NAME[] = "Shadow Transitions";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 2u;
+};
+struct PenumbraTarget {
+	static constexpr const char NAME[] = "Penumbra";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 2u;
 };
 
 using SilhouetteTargets = TargetList<
-	RadianceTarget, ShadowTarget
+	RadianceTarget, ShadowTarget, ShadowStatusTarget, ShadowTransitionTarget, PenumbraTarget
 >;
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::ss
