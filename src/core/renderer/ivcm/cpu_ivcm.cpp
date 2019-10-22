@@ -329,8 +329,8 @@ void CpuIvcm::post_reset() {
 	m_density->set_cell_size(m_params.mergeRadius * m_sceneDesc.diagSize * 2.0001f);//*/
 	m_density->clear();
 
-	m_density2 = std::make_unique<data_structs::KdTree<char,3>>();
-	m_density2->reserve(1024 * 1024);
+	//m_density2 = std::make_unique<data_structs::KdTree<char,3>>();
+	//m_density2->reserve(1024 * 1024);
 	s_curvScale = m_params.m_curvScale;
 }
 

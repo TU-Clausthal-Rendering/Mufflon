@@ -17,7 +17,7 @@ public:
 	DmHashGrid(u32 numExpectedEntries) {
 		m_cellSize = ei::Vec3 { 1.0f };
 		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_maxProbes = m_mapSize / 2;
+		m_maxProbes = ei::min(int(m_mapSize)-1, 16);
 		m_data.reset(new Entry[m_mapSize]);
 		m_dataCount.store(0);
 		m_densityScale = 1.0f;

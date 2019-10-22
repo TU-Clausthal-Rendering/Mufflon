@@ -248,8 +248,8 @@ public:
 		//	const float xNoProj = sqrt(f.m_xx * ei::abs(prevInCos));
 		//	const float Hs = mean_curvature * xNoProj * (1 + 1.0f / ei::abs(prevInCos)) * ei::sign(prevInCos);
 		//	const float Hs = mean_curvature * xNoProj * ei::sign(prevInCos);
-			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
-		//	const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
+		//	const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
+			const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f && ei::abs(eta) > 1e-5f) {
 				// Refraction
 			//	float da = Hs * sqrt(2 * ei::PI);
@@ -279,6 +279,8 @@ public:
 			}
 			// Enter tangent space
 			f.m_xx /= ei::abs(inCos) + 1e-6f;
+		//	if(f.m_xx > 1e20f || isnan(f.m_xx))
+		//		__debugbreak();
 		}
 		f.m_P *= pRoulette;
 		return f;
