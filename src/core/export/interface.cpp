@@ -2394,7 +2394,7 @@ Boolean world_get_focus_camera_aperture(ConstCameraHdl cam, float* aperture) {
 	CHECK_NULLPTR(cam, "camera handle", false);
 	const auto& camera = *static_cast<const cameras::Focus*>(cam);
 	if(aperture != nullptr)
-		*aperture =  camera.get_focal_length() / (2.f * camera.get_lens_radius());
+		*aperture =  camera.get_aperture_in_f_stops();
 	return true;
 	CATCH_ALL(false)
 }
@@ -2431,7 +2431,7 @@ Boolean world_set_focus_camera_aperture(CameraHdl cam, float aperture) {
 	CHECK_NULLPTR(cam, "camera handle", false);
 	CHECK(aperture > 0.f, "aperture", false);
 	auto& camera = *static_cast<cameras::Focus*>(cam);
-	camera.set_lens_radius(camera.get_focal_length() / aperture);
+	camera.set_aperture_in_f_stops(aperture);
 	return true;
 	CATCH_ALL(false)
 }
