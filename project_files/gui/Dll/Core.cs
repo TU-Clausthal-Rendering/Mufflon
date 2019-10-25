@@ -67,7 +67,16 @@ namespace gui.Dll
             Point,
             Spot,
             Directional,
-            Envmap
+            Envmap,
+            Monochrome,
+            Sky
+        };
+
+        public enum BackgroundType
+        {
+            Monochrome,
+            Envmap,
+            SkyHosek
         };
 
         public static LightType FromModelLightType(LightModel.LightType type)
@@ -218,10 +227,14 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern ulong world_get_env_light_count();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern BackgroundType world_get_env_light_type(IntPtr hdl);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr world_get_light_handle(ulong index, LightType type);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_get_light_name")]
         private static extern IntPtr world_get_light_name_(IntPtr hdl);
         internal static string world_get_light_name(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_light_name_(hdl)); }
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern LightType world_get_light_type(IntPtr hdl);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_add_texture")]
         private static extern IntPtr world_add_texture_(IntPtr path, TextureSampling sampling, IntPtr callback, IntPtr userParams);
@@ -351,6 +364,27 @@ namespace gui.Dll
         internal static string world_get_env_light_map(IntPtr hdl) { return StringUtil.FromNativeUTF8(world_get_env_light_map_(hdl)); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_set_env_light_map(IntPtr hdl, IntPtr tex);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_sky_light_turbidity(IntPtr hdl, out float turbidity);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_sky_light_turbidity(IntPtr hdl, float turbidity);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_sky_light_albedo(IntPtr hdl, out float albedo);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_sky_light_albedo(IntPtr hdl, float albedo);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_sky_light_solar_radius(IntPtr hdl, out float radius);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_sky_light_solar_radius(IntPtr hdl, float radius);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_sky_light_sun_direction(IntPtr hdl, out Vec3 sunDir);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_sky_light_sun_direction(IntPtr hdl, Vec3 sunDir);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_get_env_light_color(IntPtr hdl, out Vec3 sunDir);
+        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool world_set_env_light_color(IntPtr hdl, Vec3 sunDir);
+
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void world_set_tessellation_level(float level);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]

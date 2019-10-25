@@ -712,22 +712,59 @@ bool JsonLoader::load_lights() {
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add directional light");
 		} else if(type.compare("envmap") == 0) {
-			// Environment-mapped light
-			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")), TextureSampling::SAMPLING_NEAREST);
-			auto scaleIter = get(m_state, light, "scale", false);
-			ei::Vec3 color { 1.0f };
-			if(scaleIter != light.MemberEnd()) {
+			ei::Vec3 color{ 1.0f };
+			if(const auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd()) {
 				if(scaleIter->value.IsArray())
 					color = read<ei::Vec3>(m_state, scaleIter);
 				else
 					color = ei::Vec3{ read<float>(m_state, scaleIter) };
 			}
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_ENVMAP, 1u); hdl.type == LIGHT_ENVMAP) {
-				world_set_env_light_map(hdl, texture);
-				world_set_env_light_scale(hdl, util::pun<Vec3>(color));
+			// Check if we have a proper envmap or a simple monochrome background
+			if(const auto mapIter = get(m_state, light, "map", false); mapIter != light.MemberEnd()) {
+				TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")), TextureSampling::SAMPLING_NEAREST);
+				if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_ENVMAP);
+				   hdl.type == LightType::LIGHT_ENVMAP) {
+					world_set_env_light_map(hdl, texture);
+					world_set_env_light_scale(hdl, util::pun<Vec3>(color));
+					m_lightMap.emplace(lightIter->name.GetString(), hdl);
+				} else throw std::runtime_error("Failed to add environment light");
+			} else {
+				if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_MONOCHROME);
+				   hdl.type == LightType::LIGHT_ENVMAP) {
+					world_set_env_light_color(hdl, util::pun<Vec3>(color));
+					m_lightMap.emplace(lightIter->name.GetString(), hdl);
+				} else throw std::runtime_error("Failed to add monochromatic environment light");
+			}
+		} else if(type.compare("sky") == 0) {
+			const auto turbidity = read_opt<float>(m_state, light, "turbidity", 1.f);
+			const auto albedo = read_opt<float>(m_state, light, "albedo", 0.f);
+			const auto solarRadius = read_opt<float>(m_state, light, "solarRadius", 0.00445059f);
+			const auto sunDir = read_opt<ei::Vec3>(m_state, light, "sunDir", ei::Vec3{ 0.f, 1.f, 0.f });
+			const auto modelName = read_opt<const char*>(m_state, light, "model", "hosek");
+			ei::Vec3 scale{ 1.0f };
+			if(const auto scaleIter = get(m_state, light, "scale", false); scaleIter != light.MemberEnd()) {
+				if(scaleIter->value.IsArray())
+					scale = read<ei::Vec3>(m_state, scaleIter);
+				else
+					scale = ei::Vec3{ read<float>(m_state, scaleIter) };
+			}
+			
+			BackgroundType type;
+			if(modelName == "hosek")
+				type = BackgroundType::BACKGROUND_SKY_HOSEK;
+			else // TODO: Preetham?
+				throw std::runtime_error("Unknown sky model '" + std::string(modelName) + "'");
+
+			if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_SKY_HOSEK);
+			   hdl.type == LightType::LIGHT_ENVMAP) {
+				world_set_sky_light_turbidity(hdl, turbidity);
+				world_set_sky_light_albedo(hdl, albedo);
+				world_set_sky_light_solar_radius(hdl, solarRadius);
+				world_set_sky_light_sun_direction(hdl, util::pun<Vec3>(sunDir));
+				world_set_env_light_scale(hdl, util::pun<Vec3>(scale));
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
-			} else throw std::runtime_error("Failed to add environment light");
+			} else throw std::runtime_error("Failed to add sky light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
 			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");

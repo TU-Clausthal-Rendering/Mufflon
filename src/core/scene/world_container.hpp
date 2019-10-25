@@ -129,8 +129,8 @@ public:
 	std::optional<u32> add_light(std::string name, const lights::PointLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, const lights::SpotLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, const lights::DirectionalLight& light, const u32 count);
-	std::optional<u32> add_light(std::string name, TextureHandle env);
-
+	std::optional<u32> add_light(std::string name, lights::BackgroundType type);
+	
 	// Replaces the texture of an envmap light; also updates its summed area table
 	void replace_envlight_texture(u32 index, TextureHandle replacement);
 

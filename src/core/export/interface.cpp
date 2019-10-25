@@ -1645,7 +1645,7 @@ Boolean world_remove_camera(CameraHdl hdl) {
 
 LightHdl world_add_light(const char* name, LightType type, const uint32_t count) {
 	TRY
-	CHECK_NULLPTR(name, "pointlight name", (LightHdl{7, 0}));
+	CHECK_NULLPTR(name, "light name", (LightHdl{7, 0}));
 	std::optional<u32> hdl;
 	switch(type) {
 		case LIGHT_POINT: {
@@ -1657,9 +1657,10 @@ LightHdl world_add_light(const char* name, LightType type, const uint32_t count)
 		case LIGHT_DIRECTIONAL: {
 			hdl = s_world.add_light(name, lights::DirectionalLight{}, count);
 		} break;
-		case LIGHT_ENVMAP: {
-			hdl = s_world.add_light(name, TextureHandle{});
-		} break;
+		case LIGHT_ENVMAP:
+			logError("[", FUNCTION_NAME, "] This function is not suited for adding background lights; "
+					 "please use 'world_add_background_light' instead");
+			return LightHdl{ u32(type), hdl.value() };
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown light type");
 			return LightHdl{ 7, 0 };
@@ -1670,6 +1671,32 @@ LightHdl world_add_light(const char* name, LightType type, const uint32_t count)
 	}
 	return LightHdl{u32(type), hdl.value()};
 	CATCH_ALL((LightHdl{7, 0}))
+}
+
+LightHdl world_add_background_light(const char* name, BackgroundType type) {
+	TRY
+	CHECK_NULLPTR(name, "light name", (LightHdl{ 7, 0 }));
+	std::optional<u32> hdl;
+	switch(type) {
+		case BackgroundType::BACKGROUND_MONOCHROME: {
+			hdl = s_world.add_light(name, lights::BackgroundType::COLORED);
+		}	break;
+		case BackgroundType::BACKGROUND_ENVMAP: {
+			hdl = s_world.add_light(name, lights::BackgroundType::ENVMAP);
+		}	break;
+		case BackgroundType::BACKGROUND_SKY_HOSEK: {
+			hdl = s_world.add_light(name, lights::BackgroundType::SKY_HOSEK);
+		}	break;
+		default:
+			logError("[", FUNCTION_NAME, "] Unknown background type");
+			return LightHdl{ 7, 0 };
+	}
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Error adding a background light");
+		return LightHdl{ 7, 0 };
+	}
+	return LightHdl{ (u32)LightType::LIGHT_ENVMAP, hdl.value() };
+	CATCH_ALL((LightHdl{ 7, 0 }))
 }
 
 CORE_API Boolean CDECL world_set_light_name(LightHdl hdl, const char* newName) {
@@ -1742,14 +1769,42 @@ size_t world_get_env_light_count() {
 	CATCH_ALL(0u)
 }
 
-CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type) {
+LightHdl world_get_light_handle(size_t index, LightType type) {
 	// Background indices start at 1 because we have a default background light
 	if(type == LightType::LIGHT_ENVMAP)
 		return LightHdl{ u32(type), u32(index + 1u) };
 	return LightHdl{u32(type), u32(index)};
 }
 
-CORE_API const char* CDECL world_get_light_name(LightHdl hdl) {
+LightType world_get_light_type(LightHdl hdl) {
+	return static_cast<LightType>(hdl.type);
+}
+
+BackgroundType world_get_env_light_type(LightHdl hdl) {
+	TRY
+	if(hdl.type == (u32)LightType::LIGHT_ENVMAP) {
+		// We also have to check if we actually have an envmap or a different background
+		const auto* background = s_world.get_background((u32)hdl.index);
+		CHECK(background, "background handle", BackgroundType::BACKGROUND_COUNT);
+		switch(background->get_type()) {
+			case lights::BackgroundType::COLORED:
+				return BackgroundType::BACKGROUND_MONOCHROME;
+			case lights::BackgroundType::ENVMAP:
+				return BackgroundType::BACKGROUND_ENVMAP;
+			case lights::BackgroundType::SKY_HOSEK:
+				return BackgroundType::BACKGROUND_SKY_HOSEK;
+			default:
+				logError("[", FUNCTION_NAME, "] Unknown background type");
+				return BackgroundType::BACKGROUND_COUNT;
+		}
+	} else {
+		logError("[", FUNCTION_NAME, "] Background type is only available for background lights");
+		return BackgroundType::BACKGROUND_COUNT;
+	}
+	CATCH_ALL(BackgroundType::BACKGROUND_COUNT)
+}
+
+const char* world_get_light_name(LightHdl hdl) {
 	TRY
 	constexpr lights::LightType TYPES[] = {
 		lights::LightType::POINT_LIGHT,
@@ -2571,7 +2626,7 @@ Boolean scenario_has_envmap_light(ScenarioHdl scenario) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);
-	return s_world.get_background(scen.get_background())->get_type() == lights::BackgroundType::ENVMAP;
+	return (s_world.get_background(scen.get_background()) != &s_world.get_default_background());
 	CATCH_ALL(INVALID_INDEX)
 }
 
@@ -3138,17 +3193,172 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	CATCH_ALL(nullptr)
 }
 
-CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color) {
+Boolean world_get_env_light_scale(LightHdl hdl, Vec3* color) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
 	const lights::Background* background = s_world.get_background(hdl.index);
-	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
+	if(background == nullptr) {
 		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
 		return false;
 	}
 	CHECK_NULLPTR(background, "environment-mapped light handle", false);
 	if(color)
 		*color = util::pun<Vec3>(background->get_scale());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_sky_light_turbidity(LightHdl hdl, float* turbidity) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	if(turbidity)
+		*turbidity = background->get_sky_turbidity();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_sky_light_turbidity(LightHdl hdl, float turbidity) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	background->set_sky_turbidity(turbidity);
+	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
+		s_currentRenderer->on_light_changed();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_sky_light_albedo(LightHdl hdl, float* albedo) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	if(albedo)
+		*albedo = background->get_sky_albedo();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_sky_light_albedo(LightHdl hdl, float albedo) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	background->set_sky_albedo(albedo);
+	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
+		s_currentRenderer->on_light_changed();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_sky_light_solar_radius(LightHdl hdl, float* radius) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	if(radius)
+		*radius = background->get_sky_solar_radius();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_sky_light_solar_radius(LightHdl hdl, float radius) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	background->set_sky_solar_radius(radius);
+	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
+		s_currentRenderer->on_light_changed();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_sky_light_sun_direction(LightHdl hdl, Vec3* sunDir) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	if(sunDir)
+		*sunDir = util::pun<Vec3>(background->get_sky_sun_direction());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_sky_light_sun_direction(LightHdl hdl, Vec3 sunDir) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
+		logError("[", FUNCTION_NAME, "] The background is not a sky light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "sky light handle", false);
+	background->set_sky_sun_direction(util::pun<ei::Vec3>(sunDir));
+	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
+		s_currentRenderer->on_light_changed();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_get_env_light_color(LightHdl hdl, Vec3* color) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be monochrom", false);
+	const lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::COLORED) {
+		logError("[", FUNCTION_NAME, "] The background is not a monochrom light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "background light handle", false);
+	if(color)
+		*color = util::pun<Vec3>(background->get_monochrom_color());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean world_set_env_light_color(LightHdl hdl, Vec3 color) {
+	TRY
+	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
+	lights::Background* background = s_world.get_background(hdl.index);
+	if(background == nullptr || background->get_type() != lights::BackgroundType::COLORED) {
+		logError("[", FUNCTION_NAME, "] The background is not a monochrom light");
+		return false;
+	}
+	CHECK_NULLPTR(background, "background light handle", false);
+	background->set_monochrom_color(util::pun<ei::Vec3>(color));
+	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
+		s_currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3165,12 +3375,12 @@ Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {
 	CATCH_ALL(false)
 }
 
-CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color) {
+Boolean world_set_env_light_scale(LightHdl hdl, Vec3 color) {
 	TRY
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
 	auto lock = std::scoped_lock(s_iterationMutex);
 	lights::Background* background = s_world.get_background(hdl.index);
-	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
+	if(background == nullptr) {
 		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
 		return false;
 	}

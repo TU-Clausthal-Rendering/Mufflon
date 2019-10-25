@@ -102,6 +102,14 @@ typedef enum {
 } LightType;
 
 typedef enum {
+	BACKGROUND_MONOCHROME,
+	BACKGROUND_ENVMAP,
+	BACKGROUND_SKY_HOSEK,
+	// TODO: Preetham
+	BACKGROUND_COUNT
+} BackgroundType;
+
+typedef enum {
 	SAMPLING_NEAREST,
 	SAMPLING_LINEAR
 } TextureSampling;
@@ -424,6 +432,7 @@ CORE_API CameraHdl CDECL world_add_focus_camera(const char* name, const Vec3* po
 												float lensRad, float chipHeight);
 CORE_API Boolean CDECL world_remove_camera(CameraHdl hdl);
 CORE_API LightHdl CDECL world_add_light(const char* name, LightType type, const uint32_t count);
+CORE_API LightHdl CDECL world_add_background_light(const char* name, BackgroundType type);
 CORE_API Boolean CDECL world_set_light_name(LightHdl hdl, const char* newName);
 CORE_API Boolean CDECL world_remove_light(LightHdl hdl);
 CORE_API Boolean CDECL world_find_light(const char* name, LightHdl* hdl);
@@ -435,6 +444,8 @@ CORE_API size_t CDECL world_get_spot_light_count();
 CORE_API size_t CDECL world_get_dir_light_count();
 CORE_API size_t CDECL world_get_env_light_count();
 CORE_API LightHdl CDECL world_get_light_handle(size_t index, LightType type);
+CORE_API LightType CDECL world_get_light_type(LightHdl hdl);
+CORE_API BackgroundType CDECL world_get_env_light_type(LightHdl hdl);
 CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
@@ -515,6 +526,16 @@ CORE_API const char* CDECL world_get_env_light_map(ConstLightHdl hdl);
 CORE_API Boolean CDECL world_get_env_light_scale(LightHdl hdl, Vec3* color);
 CORE_API Boolean CDECL world_set_env_light_map(LightHdl hdl, TextureHdl tex);
 CORE_API Boolean CDECL world_set_env_light_scale(LightHdl hdl, Vec3 color);
+CORE_API Boolean CDECL world_get_sky_light_turbidity(LightHdl hdl, float* turbidity);
+CORE_API Boolean CDECL world_set_sky_light_turbidity(LightHdl hdl, float turbidity);
+CORE_API Boolean CDECL world_get_sky_light_albedo(LightHdl hdl, float* albedo);
+CORE_API Boolean CDECL world_set_sky_light_albedo(LightHdl hdl, float albedo);
+CORE_API Boolean CDECL world_get_sky_light_solar_radius(LightHdl hdl, float* radius);
+CORE_API Boolean CDECL world_set_sky_light_solar_radius(LightHdl hdl, float radius);
+CORE_API Boolean CDECL world_get_sky_light_sun_direction(LightHdl hdl, Vec3* sunDir);
+CORE_API Boolean CDECL world_set_sky_light_sun_direction(LightHdl hdl, Vec3 sunDir);
+CORE_API Boolean CDECL world_get_env_light_color(LightHdl hdl, Vec3* color);
+CORE_API Boolean CDECL world_set_env_light_color(LightHdl hdl, Vec3 color);
 CORE_API TextureHdl CDECL world_get_texture(const char* path);
 CORE_API TextureHdl CDECL world_add_texture(const char* path, TextureSampling sampling, MipmapType type,
 											TextureCallback callback, void* userParams);
