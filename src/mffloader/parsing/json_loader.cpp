@@ -452,7 +452,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 			const float focalLength = read_opt<float>(m_state, camera, "focalLength", 35.f) / 1000.f;
 			const float focusDistance = read<float>(m_state, get(m_state, camera, "focusDistance"));
 			const float sensorHeight = read_opt<float>(m_state, camera, "chipHeight", 24.f) / 1000.f;
-			const float lensRadius = (focalLength / read_opt<float>(m_state, camera, "aperture", focalLength)) / 2.f;
+			const float lensRadius = (focalLength / (2.f * read_opt<float>(m_state, camera, "aperture", focalLength)));
 			if(world_add_focus_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
 									  reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
 									  static_cast<uint32_t>(camPath.size()), near, far, focalLength, focusDistance,
