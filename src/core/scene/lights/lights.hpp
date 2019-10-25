@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "hosek_sky_model.hpp"
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
 #include "core/export/api.h"
@@ -146,18 +147,37 @@ struct alignas(16) DirectionalLight {
 /**
  * Environment light.
  */
-enum class BackgroundType {
+enum class BackgroundType : int {
 	COLORED,
-	ENVMAP
+	ENVMAP,
+	SKY_HOSEK
 };
 
 template < Device dev >
 struct alignas(16) BackgroundDesc {
-	textures::ConstTextureDevHandle_t<dev> envmap;
-	textures::ConstTextureDevHandle_t<dev> summedAreaTable;
-	BackgroundType type;
-	Spectrum color;				// Color for uniform backgrounds OR scale in case of envLights
+	BackgroundDesc() :
+		flux{ 0.f },
+		type{ BackgroundType::COLORED },
+		scale{ 0.f },
+		monochromParams{ Spectrum{0.f} }
+	{}
+
 	Spectrum flux;
+	BackgroundType type;
+
+	// It is important to align this to 16 bytes, otherwise it's a read-error on CUDA side
+	// due to the 8 byte-sized handles
+	union {
+		struct {
+			Spectrum color;
+		} monochromParams;
+		struct alignas(16) {
+			textures::ConstTextureDevHandle_t<dev> envmap;
+			textures::ConstTextureDevHandle_t<dev> summedAreaTable;
+		} envmapParams;
+		HosekSkyModel skyParams;
+	};
+	Spectrum scale;
 };
 
 // Asserts to make sure the compiler actually followed our orders

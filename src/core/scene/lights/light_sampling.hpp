@@ -10,6 +10,7 @@
 #include "core/scene/textures/interface.hpp"
 #include "core/scene/materials/material_sampling.hpp"
 #include "core/scene/descriptors.hpp"
+#include "hosek_sky_model.hpp"
 #include <math.h>
 #include <cuda_runtime.h>
 
@@ -224,18 +225,34 @@ struct LightDirSampleResult{ math::DirectionSample dir; Spectrum radiance; };
 CUDA_FUNCTION LightDirSampleResult
 sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 				 const float u0, const float u1) {
-	if(light.type == BackgroundType::COLORED) return {};
+	if(light.type == BackgroundType::COLORED) {
+		// Uniform sampling
+		return {
+			math::sample_dir_sphere_uniform(u0, u1),
+			light.monochromParams.color * light.scale
+		};
+	} else if(light.type == BackgroundType::SKY_HOSEK) {
+		// TODO: importance sampling!
+		// For now we sample uniformly
+		// Uniform sampling
+		const auto dirSample = math::sample_dir_sphere_uniform(u0, u1);
+		// Transform to spherical
+		return {
+			dirSample,
+			get_hosek_sky_rgb_radiance(light.skyParams, dirSample.direction) * light.scale
+		};
+	}
 	// TODO: sample other types of backgrounds too.
 
 	// First we sample the envmap texel
-	EnvmapSampleResult sample = importance_sample_texture(light.summedAreaTable, u0, u1);
+	EnvmapSampleResult sample = importance_sample_texture(light.envmapParams.summedAreaTable, u0, u1);
 	// Depending on the type of envmap we will sample a different layer of the texture
-	const u16 layers = textures::get_texture_layers(light.envmap);
+	const u16 layers = textures::get_texture_layers(light.envmapParams.envmap);
 	int layer = 0u;
 	math::DirectionSample dir{};
 	if(layers == 6u) {
 		// Cubemap: adjust the layer and texel
-		const Pixel texSize = textures::get_texture_size(light.envmap);
+		const Pixel texSize = textures::get_texture_size(light.envmapParams.envmap);
 		layer = sample.texel.x / texSize.x;
 		sample.texel.x -= layer * texSize.x;
 		// Bring the UV into the interval as well
@@ -267,8 +284,8 @@ sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 	}
 
 	// Use always nearest sampling (otherwise the sampler is biased).
-	ei::Vec3 radiance { textures::read(light.envmap, sample.texel, layer) };
-	radiance *= light.color;
+	ei::Vec3 radiance { textures::read(light.envmapParams.envmap, sample.texel, layer) };
+	radiance *= light.scale;
 	return { dir, radiance };
 }
 
@@ -450,19 +467,23 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Background
 CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_DEV>& background,
 												  const ei::Vec3& direction) {
 	switch(background.type) {
-		case BackgroundType::COLORED: return { background.color, 1.0f, AngularPdf{0.0f}, 
-			AngularPdf{1.0f / (4.0f * ei::PI)} };
+		case BackgroundType::COLORED: return { background.monochromParams.color * background.scale,
+			1.0f, AngularPdf{0.0f}, AngularPdf{1.0f / (4.0f * ei::PI)} };
+		case BackgroundType::SKY_HOSEK: {
+			return { get_hosek_sky_rgb_radiance(background.skyParams, direction) * background.scale,
+				1.f, AngularPdf{0.f}, AngularPdf{1.0f / (4.0f * ei::PI)} };
+		}
 		case BackgroundType::ENVMAP: {
 			UvCoordinate uv;
-			Spectrum radiance { textures::sample(background.envmap, direction, uv) };
+			Spectrum radiance { textures::sample(background.envmapParams.envmap, direction, uv) };
 			// Get the p-value which was used to create the summed area table
 			constexpr Spectrum LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 			// Get the integral from the table
-			const Pixel texSize = textures::get_texture_size(background.summedAreaTable);
-			const float cdf = textures::read(background.summedAreaTable, texSize - 1).x / (texSize.y * texSize.x);
+			const Pixel texSize = textures::get_texture_size(background.envmapParams.summedAreaTable);
+			const float cdf = textures::read(background.envmapParams.summedAreaTable, texSize - 1).x / (texSize.y * texSize.x);
 			float pdfScale = dot(LUM_WEIGHT, radiance);
 			// To complete the PDF we need the Jacobians of the map
-			if(textures::get_texture_layers(background.envmap) == 6u) {
+			if(textures::get_texture_layers(background.envmapParams.envmap) == 6u) {
 				// Cube map
 				//ei::Vec3 projDir = direction / ei::max(direction);
 				//pdfScale = powf(lensq(projDir), 1.5f) / 24.0f;
@@ -478,7 +499,7 @@ CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_D
 				const float sinJac = sqrtf(1.0f - direction.y * direction.y);
 				pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
 			}
-			radiance *= background.color;
+			radiance *= background.scale;
 			return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
 		}
 		default: mAssert(false); return {};

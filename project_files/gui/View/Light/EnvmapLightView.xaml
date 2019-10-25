@@ -8,9 +8,14 @@
              mc:Ignorable="d" 
              d:DesignHeight="100" 
              d:DesignWidth="160">
-
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="boolToVis"/>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -30,12 +35,14 @@
                 Margin="{StaticResource RightPropertyMargin}"
                 Text="{Binding Scale}"/>
 
+        <!-- Parameters for Environment Map -->
         <TextBlock
+                Visibility="{Binding IsEnvmap, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
                 Grid.Column="0"
                 Grid.Row="1"
                 Text="Map:"
                 Margin="{StaticResource LeftPropertyMargin}"/>
-        <Grid
+        <Grid   Visibility="{Binding IsEnvmap, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
                 Grid.Column="1"
                 Grid.Row="1"
                 Margin="{StaticResource RightPropertyMargin}">
@@ -56,6 +63,124 @@
                 <Image
                         Source="../../Icons/open.png"/>
             </Button>
+        </Grid>
+        <TextBlock
+                Visibility="{Binding IsEnvmap, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="0"
+                Grid.Row="2"
+                Text="Scale:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <Grid
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="1"
+                Grid.Row="2"
+                Margin="{StaticResource RightPropertyMargin}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding SunDirX}"/>
+            <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding SunDirY}"/>
+            <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding SunDirZ}"/>
+        </Grid>
+
+        <!-- Parameters for monochromatic -->
+        <TextBlock
+                Visibility="{Binding IsMonochrome, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="0"
+                Grid.Row="1"
+                Text="Color:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <Grid
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="1"
+                Grid.Row="1"
+                Margin="{StaticResource RightPropertyMargin}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding ColorX}"/>
+            <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding ColorY}"/>
+            <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding ColorZ}"/>
+        </Grid>
+
+        <!-- Parameters for Hosek-Wilkie Skydome Model -->
+        <TextBlock 
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="0"
+                Grid.Row="1"
+                Text="Turbidity:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="1"
+                Grid.Row="1"
+                Text="{Binding Turbidity}"
+                Margin="{StaticResource RightPropertyMargin}"/>
+        <TextBlock 
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="0"
+                Grid.Row="2"
+                Text="Albedo:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="1"
+                Grid.Row="2"
+                Text="{Binding Albedo}"
+                Margin="{StaticResource RightPropertyMargin}"/>
+        <TextBlock 
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="0"
+                Grid.Row="3"
+                Text="Solar radius:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <helper:EnterTextBox
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="1"
+                Grid.Row="3"
+                Text="{Binding SolarRadius}"
+                Margin="{StaticResource RightPropertyMargin}"/>
+        <TextBlock
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="0"
+                Grid.Row="4"
+                Text="Sun dir:"
+                Margin="{StaticResource LeftPropertyMargin}"/>
+        <Grid
+                Visibility="{Binding IsSky, Converter={StaticResource boolToVis}, FallbackValue=Collapsed}"
+                Grid.Column="1"
+                Grid.Row="4"
+                Margin="{StaticResource RightPropertyMargin}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <helper:EnterTextBox
+                    Grid.Column="0"
+                    Text="{Binding SunDirX}"/>
+            <helper:EnterTextBox
+                    Grid.Column="1"
+                    Text="{Binding SunDirY}"/>
+            <helper:EnterTextBox
+                    Grid.Column="2"
+                    Text="{Binding SunDirZ}"/>
         </Grid>
     </Grid>
 </UserControl>

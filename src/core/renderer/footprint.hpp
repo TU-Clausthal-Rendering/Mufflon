@@ -136,17 +136,21 @@ private:
 
 class FootprintV0 {
 public:
-	void init(float sourceArea, float initSolidAngle, float pChoice) {
+	__host__ __device__ void init(float sourceArea, float initSolidAngle, float pChoice) {
 		m_x = sqrt(sourceArea);
 		m_a = sqrt(initSolidAngle);
 		m_P = pChoice;
 	}
 
-	float get_area() const {
+	__host__ __device__ float get_area() const {
 		return m_x * m_x / m_P;
 	}
 
-	FootprintV0 add_segment(float pdf, bool orthographic, float mean_curvature,
+	__host__ __device__ float get_solid_angle() const {
+		return m_a * m_a / m_P;
+	}
+
+	__host__ __device__ FootprintV0 add_segment(float pdf, bool orthographic, float mean_curvature,
 							float prevInCos, float prevOutCos, float eta, float distance,
 							float inCos, float pRoulette) const {
 		FootprintV0 f = *this;
@@ -167,17 +171,17 @@ private:
 
 class FootprintV0Sq {
 public:
-	void init(float sourceArea, float initSolidAngle, float pChoice) {
+	__host__ __device__ void init(float sourceArea, float initSolidAngle, float pChoice) {
 		m_x = sourceArea;
 		m_a = initSolidAngle;
 		m_P = pChoice;
 	}
 
-	float get_area() const {
+	__host__ __device__ float get_area() const {
 		return m_x / m_P;
 	}
 
-	FootprintV0Sq add_segment(float pdf, bool orthographic, float mean_curvature,
+	__host__ __device__ FootprintV0Sq add_segment(float pdf, bool orthographic, float mean_curvature,
 							float prevInCos, float prevOutCos, float eta, float distance,
 							float inCos, float pRoulette) const {
 		FootprintV0Sq f = *this;

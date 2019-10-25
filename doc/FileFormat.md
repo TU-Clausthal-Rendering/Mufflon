@@ -39,7 +39,7 @@ In the case of multiple type choices, details on further mandatory properties wi
         },
         "lights": {
             "<name1>": {
-                "type": "{point, directional, spot, envmap, goniometric}",
+                "type": "{point, directional, spot, envmap, sky, goniometric}",
                 ...
             } ...
         },
@@ -156,8 +156,23 @@ where "exponent" is set to 2.
 
 `"type": "envmap"`
 
-    "map": "<texture name>",        // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as radiance [W/m²sr]
+    "map": "<texture name>",        // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as radiance [W/m²sr].
+									// If not specified, the envmap will be treated as monochrome white (scaling allows for different colors).
     "scale": float | [r,g,b],       // An energy scaling factor for the environment map
+
+`"type": "sky"`
+
+	"model": "<model name>",        // The analytic sky model to be used; currently only "hosek" is allowed (may be expanded in the future).
+	                                // DEFAULT: "hosek"
+	"turbidity": float,             // The amount of dust/scattering of the atmosphere; must be between 1.0 and 10.0.
+	                                // DEFAULT: 1.0
+	"albedo" : float,               // The ground albedo, affecting the in-scattering from ground. Must be between 1.0 and 10.0.
+	                                // DEFAULT: 0.0
+	"solarRadius" : float,          // The solid angle of the sun in radians.
+	                                // DEFAULT: 0.00445059 (Earth's sun radius)
+	"sunDir" : [x, y, z],           // The direction in which the sun's center is visible.
+	                                // DEFAULT: [ 0.0, 1.0, 0.0 ]
+    "scale": float | [r,g,b]        // An energy scaling factor for the sky
 
 `"type": "goniometric"`\
 A measured light source. Similar to a point light

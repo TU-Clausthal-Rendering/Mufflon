@@ -114,7 +114,7 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	// Check for lights
 	if(!hasEmitters && hdl->get_point_lights().empty() && hdl->get_spot_lights().empty()
 	   && hdl->get_dir_lights().empty() && (m_envLights.get(hdl->get_background()).get_type() == lights::BackgroundType::COLORED
-											&& ei::prod(m_envLights.get(hdl->get_background()).get_color()) == 0))
+											&& ei::prod(m_envLights.get(hdl->get_background()).get_monochrom_color()) == 0))
 		return Sanity::NO_LIGHTS;
 	// Check for camera
 	if(hdl->get_camera() == nullptr)
@@ -352,17 +352,13 @@ std::optional<u32> WorldContainer::add_light(std::string name,
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
-											 TextureHandle env) {
+											 lights::BackgroundType type) {
 	if(m_envLights.find(name) != nullptr) {
-		logError("[WorldContainer::add_light] Envmap light with name '", name, "' already exists");
+		logError("[WorldContainer::add_light] Background light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	if(env) {
-		mAssertMsg(env->get_sampling_mode() == textures::SamplingMode::NEAREST,
-			"Sampling mode must be nearest, otherwise the importance sampling is biased.");
-		return m_envLights.insert(std::move(name), lights::Background::envmap(env));
-	}
-	return m_envLights.insert(std::move(name), lights::Background::black());
+
+	return m_envLights.insert(std::move(name), lights::Background{ type });
 }
 
 void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replacement) {
@@ -372,6 +368,8 @@ void WorldContainer::replace_envlight_texture(u32 index, TextureHandle replaceme
 	if(replacement) mAssertMsg(replacement->get_sampling_mode() == textures::SamplingMode::NEAREST,
 		"Sampling mode must be nearest, otherwise the importance sampling is biased.");
 	lights::Background& desc = m_envLights.get(index);
+	if(desc.get_type() != lights::BackgroundType::ENVMAP)
+		throw std::runtime_error("Background light is not of type 'envmap'");
 	if(replacement != desc.get_envmap()) {
 		this->unref_texture(desc.get_envmap());
 		desc = lights::Background::envmap(replacement);
@@ -385,8 +383,9 @@ std::optional<std::pair<u32, lights::LightType>> WorldContainer::find_light(cons
 		return std::make_pair(u32(m_spotLights.get_index(name)), lights::LightType::SPOT_LIGHT);
 	if(m_dirLights.find(name) != nullptr)
 		return std::make_pair(u32(m_dirLights.get_index(name)), lights::LightType::DIRECTIONAL_LIGHT);
-	if(m_envLights.find(name) != nullptr)
+	if(const auto& light = m_envLights.find(name); light != nullptr) {
 		return std::make_pair(u32(m_envLights.get_index(name)), lights::LightType::ENVMAP_LIGHT);
+	}
 	return std::nullopt;
 }
 
@@ -441,7 +440,6 @@ lights::Background* WorldContainer::get_background(u32 index) {
 									+ " >= " + std::to_string(m_envLights.size()));
 	return &m_envLights.get(index);
 }
-
 
 void WorldContainer::remove_light(u32 index, lights::LightType type) {
 	switch(type) {
@@ -547,14 +545,14 @@ bool WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 					return true;
 				}
 				break;
-			case lights::LightType::ENVMAP_LIGHT: {
-				// Check if the envmap is the current one
-				lights::Background& background = m_envLights.get(m_scenario->get_background());
-				if(&background == &m_envLights.get(index)) {
-					m_scene->set_background(background);
-					return true;
+			case lights::LightType::ENVMAP_LIGHT:
+				if(index >= m_envLights.size()) {
+					logError("[WorldContainer::mark_light_dirty]: Background light index out of bounds");
+					return false;
 				}
-			}	break;
+				// We have only one background light
+				m_scene->set_background(m_envLights.get(index));
+				return true;
 			default:
 				logWarning("[WorldContainer::mark_light_dirty]: Ignoring unknown light type");
 		}
