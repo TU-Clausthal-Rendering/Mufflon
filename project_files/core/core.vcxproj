@@ -42,6 +42,7 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\decimation_common_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
@@ -260,6 +261,7 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\pt\silhouette_pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_importance_gathering_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_params.hpp" />
@@ -378,6 +380,7 @@
     <CudaCompile Include="..\..\src\core\memory\allocator.cu" />
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\bpm\gpu_silhouette_bpm.cu" />
     <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cu" />
+    <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\lt\gpu_lt.cu" />
     <CudaCompile Include="..\..\src\core\renderer\targets\output_handler.cu" />
     <CudaCompile Include="..\..\src\core\renderer\pt\gpu_pt.cu" />

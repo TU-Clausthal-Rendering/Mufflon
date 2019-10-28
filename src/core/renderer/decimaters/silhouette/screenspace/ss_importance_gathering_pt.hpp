@@ -16,9 +16,58 @@ using namespace scene::lights;
 
 namespace {
 
-
+inline float get_luminance(const ei::Vec3& vec) {
+	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
+	return ei::dot(LUM_WEIGHT, vec);
+}
 
 } // namespace
+
+CUDA_FUNCTION void post_process_shadow(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+									   const scene::SceneDescriptor<CURRENT_DEV>& scene,
+									   const SilhouetteParameters& params,
+									   const Pixel& coord, const int pixel, const int iteration,
+									   ArrayDevHandle_t<CURRENT_DEV, ShadowStatus> shadowStatus) {
+	const auto lightCount = 1u + scene.lightTree.posLights.lightCount + scene.lightTree.dirLights.lightCount;
+
+	ei::Vec2 statii{ 0.f };
+	ei::Vec2 penumbra{ 0.f };
+	for(int d = 0; d < params.maxPathLength; ++d) {
+		for(std::size_t i = 0u; i < lightCount; ++i) {
+			const auto status = shadowStatus[pixel * lightCount * params.maxPathLength + i * params.maxPathLength + d];
+
+			// Detect if it is either penumbra or shadow edge
+
+			if(status.shadow > 0.f) {
+				const bool isPenumbra = status.light > 0.f;
+				bool isEdge = false;
+				for(int x = -1; x <= 1 && !isEdge; ++x) {
+					for(int y = -1; y <= 1 && !isEdge; ++y) {
+						if(x == y)
+							continue;
+						const auto currCoord = coord + Pixel{ x, y };
+						if(currCoord.x < 0 || currCoord.y < 0 ||
+						   currCoord.x >= outputBuffer.get_width() || currCoord.y >= outputBuffer.get_height())
+							continue;
+						const auto currPixel = currCoord.x + currCoord.y * outputBuffer.get_width();
+
+						const auto currStatus = shadowStatus[currPixel * lightCount * params.maxPathLength + i * params.maxPathLength + d];
+						if(currStatus.light > 0.f && currStatus.shadow == 0.f)
+							isEdge = true;
+					}
+				}
+
+				if(isPenumbra)
+					penumbra.x += status.shadow;
+				if(isEdge)
+					penumbra.y += status.shadow;
+			}
+			statii += ei::Vec2{ status.shadow, status.light };
+		}
+	}
+	outputBuffer.template set<ShadowTransitionTarget>(coord, statii / static_cast<float>(iteration + 1u));
+	outputBuffer.template set<PenumbraTarget>(coord, penumbra / static_cast<float>(iteration + 1u));
+}
 
 CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
@@ -52,7 +101,7 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 												  neeSeed, vertex.get_position(), neeRnd,
 												  &lightIndex);
 				Pixel outCoord;
-				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord);
+				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord, nee.dist);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
 				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 				Spectrum radiance = value.value * nee.diffIrradiance;
@@ -62,15 +111,16 @@ CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CUR
 						vertex.get_geometric_normal(), nee.geoNormal,
 						nee.dir.direction);
 
+					AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
+					float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
+					mAssert(!isnan(mis));
+					const auto contribution = throughput * value.cosOut * radiance * mis;
 					if(!anyhit) {
-						AreaPdf hitPdf = value.pdf.forw.to_area_pdf(nee.cosOut, nee.distSq);
-						float mis = 1.0f / (params.neeCount + hitPdf / nee.creationPdf);
-						mAssert(!isnan(mis));
-						outputBuffer.template contribute<RadianceTarget>(coord, throughput * value.cosOut * radiance * mis);
-						shadowStatus[lightIndex * params.maxPathLength + pathLen].light += 1.f / (1.f + vertex.ext().footprint.get_area());
+						outputBuffer.template contribute<RadianceTarget>(coord, contribution);
+						shadowStatus[lightIndex * params.maxPathLength + pathLen].light += 1.f / (1.f + vertex.ext().footprint.get_solid_angle());
 					} else {
 						outputBuffer.template contribute<ShadowTarget>(coord, 1.f);
-						shadowStatus[lightIndex * params.maxPathLength + pathLen].shadow += 1.f / (1.f + vertex.ext().footprint.get_area());
+						shadowStatus[lightIndex * params.maxPathLength + pathLen].shadow += get_luminance(contribution) / (1.f + vertex.ext().footprint.get_solid_angle());
 					}
 				}
 			}

@@ -33,15 +33,9 @@ struct SilVertexExt {
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 
-		float pdfForw = float(pdf.forw);
-		if(prevVertex.is_camera())
-			pdfForw *= 1.f;
-		auto prevEta = prevVertex.get_eta(scene.media);
-		float inCos = thisVertex.get_geometric_factor(incident.dir);
-		float outCos = prevVertex.get_geometric_factor(incident.dir);
 		this->footprint = prevVertex.ext().footprint.add_segment(
-			pdfForw, prevVertex.is_orthographic(), 0.f, prevEta.inCos, outCos,
-			prevEta.eta, incident.distance, inCos, 1.0f);
+			static_cast<float>(pdf.forw), prevVertex.is_orthographic(),
+			0.f, 0.f, 0.f, 1.f, incident.distance, 0.f, 1.0f);
 	}
 
 	CUDA_FUNCTION void update(const VertexType& thisVertex,

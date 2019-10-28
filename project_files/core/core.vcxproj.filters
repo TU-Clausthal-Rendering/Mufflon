@@ -412,6 +412,9 @@
     <ClCompile Include="..\..\src\core\scene\lights\hosek_sky_model.cpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.cpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1275,6 +1278,9 @@
     <ClInclude Include="..\..\src\core\scene\lights\hosek_sky_model.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.hpp">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1318,6 +1324,9 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\core\renderer\targets\output_handler.cu">
       <Filter>Source Files\core\renderer\targets</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.cu">
+      <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
