@@ -91,7 +91,7 @@ CameraDistanceOracle::CameraDistanceOracle(const float perPixelTessLevel, ConstC
 		}	break;
 		case CameraModel::FOCUS: {
 			const auto& focusCam = *reinterpret_cast<const Focus*>(cam);
-			m_projPixelHeight = std::tan(focusCam.get_vertical_fov() / 2.f) / static_cast<float>(resolution.y);
+			m_projPixelHeight = focusCam.get_sensor_height();
 		}	break;
 		case CameraModel::ORTHOGRAPHIC:
 		default:
