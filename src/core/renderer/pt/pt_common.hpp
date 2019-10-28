@@ -6,6 +6,7 @@
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/renderer/targets/render_targets.hpp"
+#include "core/renderer/footprint.hpp"
 
 namespace mufflon { namespace renderer {
 
@@ -14,6 +15,10 @@ CUDA_FUNCTION void update_guide_heuristic(float& guideWeight, int pathLen, Angul
 		float pSq = pdfForw * pdfForw;
 		//guideWeight *= 1.0f - expf(-pSq / 5.0f);
 		guideWeight *= pSq / (1000.0f + pSq);
+		//const auto roughness = ei::sqrt(1.f / (ei::PI * static_cast<float>(pdfForw)));
+		//guideWeight *= 0.5f * (1.f + std::tanh(-5.f * roughness + 3.f));
+		//guideWeight *= 0.5f * (1.f + std::tanh(0.03f * static_cast<float>(pdfForw) - 3.f));
+		guideWeight *= std::tanh(0.02f * static_cast<float>(pdfForw) + 0.1f);
 	}
 }
 
@@ -21,12 +26,18 @@ struct PtVertexExt {
 	//scene::Direction excident;
 	//AngularPdf pdf;
 	AreaPdf incidentPdf;
+	FootprintV0 footprint;
 
 	CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
 		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+		const float sourceCount = 1.f;
+		if(thisVertex.get_path_len() > 0)
+			this->footprint.init(1.0f / (float(inAreaPdf) * sourceCount), 1.0f / (float(inDirPdf) * sourceCount), pChoice);
+		else
+			this->footprint.init(0.f, 0.f, pChoice);
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& prevVertex,
@@ -40,15 +51,17 @@ struct PtVertexExt {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
-		guideWeight *= avg(transmission);
+
+		this->footprint = prevVertex.ext().footprint.add_segment(
+			static_cast<float>(pdf.forw), prevVertex.is_orthographic(),
+			0.f, 0.f, 0.f, 1.f, incident.distance, 0.f, 1.0f);
+		guideWeight = 1.f / (1.f + footprint.get_solid_angle());
 	}
 
 	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
 							  const scene::Direction& excident,
 							  const VertexSample& sample,
-							  float& guideWeight) {
-		update_guide_heuristic(guideWeight, thisVertex.get_path_len(), sample.pdf.forw);
-	}
+							  float& guideWeight) {}
 };
 
 using PtPathVertex = PathVertex<PtVertexExt>;
