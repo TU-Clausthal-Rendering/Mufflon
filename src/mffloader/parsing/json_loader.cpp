@@ -751,7 +751,7 @@ bool JsonLoader::load_lights() {
 			}
 			
 			BackgroundType type;
-			if(modelName == "hosek")
+			if(std::strncmp(modelName, "hosek", 5u) == 0)
 				type = BackgroundType::BACKGROUND_SKY_HOSEK;
 			else // TODO: Preetham?
 				throw std::runtime_error("Unknown sky model '" + std::string(modelName) + "'");
