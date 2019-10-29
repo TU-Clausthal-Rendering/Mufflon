@@ -2814,6 +2814,7 @@ Boolean scenario_remove_light(ScenarioHdl scenario, LightHdl hdl) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
+	// TODO: don't remove the light if it's the last remaining one
 
 	switch(hdl.type) {
 		case LightType::LIGHT_POINT: {
@@ -2832,9 +2833,12 @@ Boolean scenario_remove_light(ScenarioHdl scenario, LightHdl hdl) {
 				s_currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_ENVMAP: {
-			scen.remove_background();
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			// Make sure we only remove the background from the scenario if it is actually active
+			if(scen.get_background() == hdl.index) {
+				scen.remove_background();
+				if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
+					s_currentRenderer->on_light_changed();
+			}
 		}	break;
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown or invalid light type");
