@@ -23,6 +23,16 @@ namespace gui.Model.Light
 
         }
 
+        public override float Scale
+        {
+            get => 1f;
+            set
+            {
+                if (value == Scale) return;
+                OnPropertyChanged(nameof(Scale));
+            }
+        }
+
         private Vec3<float> m_position;
 
         public Vec3<float> Position

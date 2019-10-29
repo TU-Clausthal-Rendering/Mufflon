@@ -31,20 +31,7 @@ namespace gui.Model.Light
 
         public string Name => Core.world_get_light_name(Handle);
 
-        private float m_scale = 1.0f;
-
-        public float Scale
-        {
-            get => m_scale;
-            set
-            {
-                Debug.Assert(Scale >= 0.0f);
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (value == m_scale) return;
-                m_scale = value;
-                OnPropertyChanged(nameof(Scale));
-            }
-        }
+        public abstract float Scale { get; set; }
 
         public IntPtr Handle { get; }
 
