@@ -208,6 +208,13 @@ void Spheres::displace(tessellation::TessLevelOracle& oracle, const Scenario& sc
 	// There is no displacement we can perform for a perfect sphere (yet)
 }
 
+void Spheres::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
+						 const bool usePhong) {
+	(void)oracle;
+	(void)scenario;
+	// There is no tessellation we can/have to perform for a perfect sphere (yet)
+}
+
 template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
 template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
 template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>();

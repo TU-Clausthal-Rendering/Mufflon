@@ -2571,6 +2571,86 @@ Boolean scenario_mask_instance(ScenarioHdl scenario, InstanceHdl inst) {
 	CATCH_ALL(false)
 }
 
+Boolean scenario_set_object_tessellation_level(ScenarioHdl scenario, ObjectHdl hdl, float level) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	Scenario& scen = *static_cast<Scenario*>(scenario);
+	scen.set_tessellation_level(static_cast<ConstObjectHandle>(hdl), level);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_set_object_adaptive_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean value) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	Scenario& scen = *static_cast<Scenario*>(scenario);
+	scen.set_adaptive_tessellation(static_cast<ConstObjectHandle>(hdl), value);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_set_object_phong_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean value) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	Scenario& scen = *static_cast<Scenario*>(scenario);
+	scen.set_phong_tessellation(static_cast<ConstObjectHandle>(hdl), value);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_has_object_tessellation_info(ScenarioHdl scenario, ObjectHdl hdl, Boolean* value) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	const Scenario& scen = *static_cast<const Scenario*>(scenario);
+	if(value)
+		*value = scen.get_tessellation_info(static_cast<ConstObjectHandle>(hdl)).has_value();
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_get_object_tessellation_level(ScenarioHdl scenario, ObjectHdl hdl, float* level) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	const Scenario& scen = *static_cast<const Scenario*>(scenario);
+	const auto info = scen.get_tessellation_info(static_cast<ConstObjectHandle>(hdl));
+	CHECK(info, "object tessellation info", false);
+	if(level)
+		*level = info->level.value_or(s_world.get_tessellation_level());
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_get_object_adaptive_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean* value) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	const Scenario& scen = *static_cast<const Scenario*>(scenario);
+	const auto info = scen.get_tessellation_info(static_cast<ConstObjectHandle>(hdl));
+	CHECK(info, "object tessellation info", false);
+	if(value)
+		*value = info->adaptive;
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean scenario_get_object_phong_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean* value) {
+	TRY
+	CHECK_NULLPTR(scenario, "scenario handle", false);
+	CHECK_NULLPTR(hdl, "object handle", false);
+	const Scenario& scen = *static_cast<const Scenario*>(scenario);
+	const auto info = scen.get_tessellation_info(static_cast<ConstObjectHandle>(hdl));
+	CHECK(info, "object tessellation info", false);
+	if(value)
+		*value = info->usePhong;
+	return true;
+	CATCH_ALL(false)
+}
+
 LodLevel scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", Scenario::NO_CUSTOM_LOD);

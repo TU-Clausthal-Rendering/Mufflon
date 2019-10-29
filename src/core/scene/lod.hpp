@@ -120,6 +120,9 @@ public:
 
 	// Applies displacement mapping (if not already performed) to the LoD's geometry
 	void displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario);
+	// Tessellates the LoD. If scenario is not null, the tessellation is adaptive
+	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
+					const bool usePhong);
 
 private:
 	// Geometry data

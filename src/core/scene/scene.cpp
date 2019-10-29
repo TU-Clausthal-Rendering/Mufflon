@@ -390,7 +390,7 @@ void Scene::update_camera_medium_cpu(SceneDescriptor<Device::CPU>& scene) {
 }
 
 bool Scene::retessellate(const float tessLevel) {
-	if(!m_scenario.has_displacement_mapped_material())
+	if(!m_scenario.has_displacement_mapped_material() && !m_scenario.has_object_tessellation())
 		return false;
 
 	// Track if we did perform tessellation and if we need to rebuild the light tree
@@ -408,7 +408,7 @@ bool Scene::retessellate(const float tessLevel) {
 		}
 
 		for(const auto& mapping : lodMapping) {
-			// Check if we have displacement
+			// Check if we have displacement or plain tessellation
 			Lod* lod = &obj.first->get_lod(mapping.first);
 
 			if(lod->has_displacement_mapping(m_scenario)) {
@@ -430,9 +430,36 @@ bool Scene::retessellate(const float tessLevel) {
 					lod = &obj.first->get_lod(mapping.first);
 				}
 				lod->displace(tess, m_scenario);
-				lod->clear_accel_structure();
 				performedTessellation = true;
 				needLighttreeRebuild |= lod->is_emissive(m_scenario);
+			} else {
+				// We may not have displacement mapping, but still may wanna tessellate the object
+				const auto objTessInfo = m_scenario.get_tessellation_info(obj.first);
+				if(objTessInfo.has_value()) {
+					// Reload the LoD if it has been modified previously
+					if(lod->was_displacement_mapping_applied()) {
+						obj.first->remove_lod(mapping.first);
+						if(!WorldContainer::instance().load_lod(*obj.first, mapping.first))
+							throw std::runtime_error("Failed to re-load LoD for displacement map tessellation");
+						lod = &obj.first->get_lod(mapping.first);
+					}
+
+					const auto objTessLevel = objTessInfo->level.value_or(tessLevel);
+					if(objTessInfo->adaptive) {
+						// First get the relevant instance transformations
+						instTrans.clear();
+						for(InstanceHandle inst : mapping.second)
+							instTrans.push_back(inst->get_transformation_matrix());
+						tessellation::CameraDistanceOracle oracle{ objTessLevel, get_camera(), m_animationPathIndex,
+																	  m_scenario.get_resolution(), instTrans };
+						lod->tessellate(oracle, &m_scenario, objTessInfo->usePhong);
+					} else {
+						tessellation::Uniform oracle{ u32(objTessLevel), u32(objTessLevel) };
+						lod->tessellate(oracle, nullptr, objTessInfo->usePhong);
+					}
+					performedTessellation = true;
+					needLighttreeRebuild |= lod->is_emissive(m_scenario);
+				}
 			}
 		}
 	}

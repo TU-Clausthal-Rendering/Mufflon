@@ -44,6 +44,15 @@ void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& s
 	m_geometry.for_each([&tessellater, &scenario](auto& elem) {
 		elem.displace(tessellater, scenario);
 	});
+	m_accelStruct.mark_invalid();
+}
+
+void Lod::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
+					 const bool usePhong) {
+	m_geometry.for_each([&oracle, scenario, usePhong](auto& elem) {
+		elem.tessellate(oracle, scenario, usePhong);
+	});
+	m_accelStruct.mark_invalid();
 }
 
 template < Device dev >
