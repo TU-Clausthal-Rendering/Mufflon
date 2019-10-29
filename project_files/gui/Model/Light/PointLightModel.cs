@@ -25,6 +25,21 @@ namespace gui.Model.Light
 
         }
 
+        public override float Scale
+        {
+            get => 1f;
+            set
+            {
+                if (value == Scale) return;
+                uint frame;
+                if (!Core.world_get_frame_current(out frame))
+                    throw new Exception(Core.core_get_dll_error());
+                var intensity = Intensity;
+                Intensity = new Vec3<float>(intensity.X * value, intensity.Y * value, intensity.Z * value);
+                OnPropertyChanged(nameof(Scale));
+            }
+        }
+
         public Vec3<float> Position
         {
             get

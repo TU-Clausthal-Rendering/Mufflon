@@ -28,6 +28,23 @@ namespace gui.Model.Light
 
         public Core.BackgroundType EnvType { get; private set; }
 
+        public override float Scale
+        {
+            get
+            {
+                if(!Core.world_get_env_light_scale(Handle, out var scale))
+                    throw new Exception(Core.core_get_dll_error());
+                return scale.x; // TODO!
+            }
+            set
+            {
+                if (value == Scale) return;
+                if (!Core.world_set_env_light_scale(Handle, new Core.Vec3(value, value, value)))
+                    throw new Exception(Core.core_get_dll_error());
+                OnPropertyChanged(nameof(Scale));
+            }
+        }
+
         /// <summary>
         /// absolute path of the map
         /// </summary>
