@@ -886,6 +886,19 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 					&& read<bool>(m_state, maskIter))
 					if(!scenario_mask_object(scenarioHdl, objHdl))
 						throw std::runtime_error("Failed to set mask for object '" + std::string(objectName) + "'");
+				if(const auto tessIter = get(m_state, object, "tessellation", false); tessIter != object.MemberEnd()) {
+					const bool adaptive = read_opt<bool>(m_state, tessIter->value, "adaptive", true);
+					const bool usePhong = read_opt<bool>(m_state, tessIter->value, "usePhong", true);
+					if(!scenario_set_object_adaptive_tessellation(scenarioHdl, objHdl, adaptive))
+						throw std::runtime_error("Failed to set adaptive tesselation of object '" + std::string(objectName) + "'");
+					if(!scenario_set_object_phong_tessellation(scenarioHdl, objHdl, usePhong))
+						throw std::runtime_error("Failed to set phong tesselation of object '" + std::string(objectName) + "'");
+					if(const auto levelIter = get(m_state, tessIter->value, "level", false); levelIter != tessIter->value.MemberEnd()) {
+						const auto level = read<float>(m_state, levelIter);
+						if(!scenario_set_object_tessellation_level(scenarioHdl, objHdl, level))
+							throw std::runtime_error("Failed to set tesselation level of object '" + std::string(objectName) + "'");
+					}
+				}
 
 				m_state.objectNames.pop_back();
 			}
@@ -1093,8 +1106,7 @@ bool JsonLoader::load_file() {
 			m_state.objectNames.push_back(&objectName[0u]);
 			const Value& object = propIter->value;
 			assertObject(m_state, object);
-			auto lodIter = get(m_state, object, "lod", false);
-			if(lodIter != object.MemberEnd()) {
+			if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd()) {
 				const u32 localLod = read<u32>(m_state, lodIter);
 				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
 				defaultObjectLods.insert({ objectName, localLod });

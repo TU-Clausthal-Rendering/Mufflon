@@ -80,6 +80,17 @@ In the case of multiple type choices, details on further mandatory properties wi
                     "<object name (from binary)>": {    // OPTIONAL per object properties
                         "mask": bool,                   // Do not render this object (true=blacklisted)
                         "lod": int,                     // Use a specific LOD different/independent from global LOD
+                        "tessellation" : {              // OPTIONAL information about tessellation
+                                                        // If any associated material has a displacement map, this takes priority
+                            "adaptive" : bool,          // If true, the tessellation happens depending on some adaptive criteria,
+							                            // e.g. camera position, importance, ... (for now implementation-defined)
+                                                        // DEFAULT: true
+                            "level" : float,            // The tessellation level; if adaptive is true, this refers to primitives per pixel,
+                                                        // otherwise it is the number of subdivisions performed inside/on the primitive's edge
+                                                        // DEFAULT: initTessellationLevel
+                            "usePhong" : bool           // Specifies whether the tessellated should "bend" towards the local shading normal
+                                                        // DEFAULT: true
+                        }
                         // More meta information
                     },
                 },

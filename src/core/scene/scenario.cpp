@@ -118,19 +118,51 @@ u32 Scenario::get_effective_lod(ConstInstanceHandle hdl) const noexcept {
 }
 
 void Scenario::mask_object(ConstObjectHandle hdl) {
-	auto iter = m_perObjectCustomization.find(hdl);
-	if(iter != m_perObjectCustomization.end())
+	if(auto iter = m_perObjectCustomization.find(hdl); iter != m_perObjectCustomization.end())
 		iter->second.masked = true;
 	else
-		m_perObjectCustomization.insert({ hdl, CustomProperty{true, NO_CUSTOM_LOD} });
+		m_perObjectCustomization.insert({ hdl, CustomObjectProperty{{}, true, NO_CUSTOM_LOD} });
 }
 
 void Scenario::mask_instance(ConstInstanceHandle hdl) {
-	auto iter = m_perInstanceCustomization.find(hdl);
-	if(iter != m_perInstanceCustomization.end())
+	if(auto iter = m_perInstanceCustomization.find(hdl); iter != m_perInstanceCustomization.end())
 		iter->second.masked = true;
 	else
-		m_perInstanceCustomization.insert({ hdl, CustomProperty{true, NO_CUSTOM_LOD} });
+		m_perInstanceCustomization.insert({ hdl, CustomInstanceProperty{true, NO_CUSTOM_LOD} });
+}
+
+std::optional<Scenario::TessellationInfo> Scenario::get_tessellation_info(ConstObjectHandle hdl) const noexcept {
+	if(auto iter = m_perObjectCustomization.find(hdl); iter != m_perObjectCustomization.end())
+		return iter->second.tessInfo;
+	else
+		return std::nullopt;
+}
+void Scenario::set_tessellation_level(ConstObjectHandle hdl, const float level) {
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter == m_perObjectCustomization.end())
+		iter = m_perObjectCustomization.emplace(hdl, CustomObjectProperty{}).first;
+	if(!iter->second.tessInfo.has_value())
+		iter->second.tessInfo = TessellationInfo{};
+	iter->second.tessInfo->level = level;
+	m_hasObjectTessellation = true;
+}
+void Scenario::set_adaptive_tessellation(ConstObjectHandle hdl, const bool value) {
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter == m_perObjectCustomization.end())
+		iter = m_perObjectCustomization.emplace(hdl, CustomObjectProperty{}).first;
+	if(!iter->second.tessInfo.has_value())
+		iter->second.tessInfo = TessellationInfo{};
+	iter->second.tessInfo->adaptive = value;
+	m_hasObjectTessellation = true;
+}
+void Scenario::set_phong_tessellation(ConstObjectHandle hdl, const bool value) {
+	auto iter = m_perObjectCustomization.find(hdl);
+	if(iter == m_perObjectCustomization.end())
+		iter = m_perObjectCustomization.emplace(hdl, CustomObjectProperty{}).first;
+	if(!iter->second.tessInfo.has_value())
+		iter->second.tessInfo = TessellationInfo{};
+	iter->second.tessInfo->usePhong = value;
+	m_hasObjectTessellation = true;
 }
 
 void Scenario::set_custom_lod(ConstObjectHandle hdl, u32 level) {

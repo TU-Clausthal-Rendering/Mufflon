@@ -2,8 +2,9 @@
 
 #include "handles.hpp"
 #include "types.hpp"
-#include <map>
 #include "util/string_view.hpp"
+#include <map>
+#include <optional>
 #include <vector>
 
 namespace mufflon { namespace scene {
@@ -14,6 +15,12 @@ namespace mufflon { namespace scene {
  */
 class Scenario {
 public:
+	struct TessellationInfo {
+		std::optional<float> level{};
+		bool adaptive{ false };
+		bool usePhong{ true };
+	};
+
 	static constexpr u32 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
 
 	Scenario();
@@ -79,6 +86,11 @@ public:
 	void mask_instance(ConstInstanceHandle hdl);
 	void set_custom_lod(ConstObjectHandle hdl, u32 level);
 	void set_custom_lod(ConstInstanceHandle hdl, u32 level);
+
+	std::optional<TessellationInfo> get_tessellation_info(ConstObjectHandle hdl) const noexcept;
+	void set_tessellation_level(ConstObjectHandle hdl, const float level);
+	void set_adaptive_tessellation(ConstObjectHandle hdl, const bool value);
+	void set_phong_tessellation(ConstObjectHandle hdl, const bool value);
 
 	const StringView& get_name() const noexcept {
 		return m_name;
@@ -156,6 +168,9 @@ public:
 	bool has_displacement_mapped_material() const noexcept {
 		return m_hasDisplacement;
 	}
+	bool has_object_tessellation() const noexcept {
+		return m_hasObjectTessellation;
+	}
 
 private:
 	struct MaterialDesc {
@@ -163,7 +178,13 @@ private:
 		MaterialHandle material;
 	};
 
-	struct CustomProperty {
+	struct CustomInstanceProperty {
+		bool masked = false;
+		u32 lod = NO_CUSTOM_LOD;
+	};
+
+	struct CustomObjectProperty {
+		std::optional<TessellationInfo> tessInfo{};
 		bool masked = false;
 		u32 lod = NO_CUSTOM_LOD;
 	};
@@ -192,10 +213,11 @@ private:
 	CameraHandle m_camera = nullptr;
 	// Keep track of whether any assigned material has a displacement map
 	bool m_hasDisplacement = false;
+	bool m_hasObjectTessellation = false;
 
 	// Object blacklisting and other custom traits
-	std::map<ConstObjectHandle, CustomProperty > m_perObjectCustomization;
-	std::map<ConstInstanceHandle, CustomProperty > m_perInstanceCustomization;
+	std::map<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
+	std::map<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
 };
 
 }} // namespace mufflon::scene

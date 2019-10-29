@@ -269,7 +269,8 @@ public:
 						 std::size_t count, util::IByteReader& attrStream);
 
 	// Implements tessellation for the mesh
-	void tessellate(tessellation::Tessellater& tessellater);
+	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
+					const bool usePhong);
 	// Implements displacement mapping for the mesh
 	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
 

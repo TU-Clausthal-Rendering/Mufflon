@@ -2,6 +2,7 @@
 
 #include "core/scene/attribute.hpp"
 #include "core/scene/types.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
 #include <tuple>
@@ -177,6 +178,8 @@ public:
 	}
 
 	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
+	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
+					const bool usePhong);
 
 private:
 	template < Device dev >

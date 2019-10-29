@@ -374,12 +374,27 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	return { hdl, readPoints, 0u, readUvs };
 }
 
-void Polygons::tessellate(tessellation::Tessellater& tessellater) {
+void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
+						  const bool usePhong) {
+	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::tessellate");
 	this->synchronize<Device::CPU>();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
+
+	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
+	tessellation::Tessellater tessellater(oracle);
+	tessellater.set_phong_tessellation(true);
+
+	if(scenario != nullptr) {
+		OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
+		m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
+		oracle.set_mat_properties(*scenario, matIdxProp);
+	}
+
 	tessellater.tessellate(*m_meshData);
+	this->mark_changed(Device::CPU);
 	this->rebuild_index_buffer();
+	m_wasDisplaced = true;
 	logInfo("Tessellated polygon mesh (", prevTri, "/", prevQuad,
 			" -> ", m_triangles, "/", m_quads, ")");
 }

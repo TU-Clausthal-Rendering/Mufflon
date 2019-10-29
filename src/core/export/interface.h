@@ -468,6 +468,13 @@ CORE_API Boolean CDECL scenario_set_camera(ScenarioHdl scenario, CameraHdl cam);
 CORE_API Boolean CDECL scenario_is_object_masked(ScenarioHdl scenario, ObjectHdl obj);
 CORE_API Boolean CDECL scenario_mask_object(ScenarioHdl scenario, ObjectHdl inst);
 CORE_API Boolean CDECL scenario_mask_instance(ScenarioHdl scenario, InstanceHdl obj);
+CORE_API Boolean CDECL scenario_set_object_tessellation_level(ScenarioHdl scenario, ObjectHdl hdl, float level);
+CORE_API Boolean CDECL scenario_set_object_adaptive_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean value);
+CORE_API Boolean CDECL scenario_set_object_phong_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean value);
+CORE_API Boolean CDECL scenario_has_object_tessellation_info(ScenarioHdl scenario, ObjectHdl hdl, Boolean* value);
+CORE_API Boolean CDECL scenario_get_object_tessellation_level(ScenarioHdl scenario, ObjectHdl hdl, float* level);
+CORE_API Boolean CDECL scenario_get_object_adaptive_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean* value);
+CORE_API Boolean CDECL scenario_get_object_phong_tessellation(ScenarioHdl scenario, ObjectHdl hdl, Boolean* value);
 CORE_API LodLevel CDECL scenario_get_object_lod(ScenarioHdl scenario, ObjectHdl obj);
 CORE_API Boolean CDECL scenario_set_object_lod(ScenarioHdl scenario, ObjectHdl obj,
 										 LodLevel level);
