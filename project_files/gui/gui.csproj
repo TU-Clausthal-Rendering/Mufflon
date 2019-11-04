@@ -113,6 +113,7 @@
     <Compile Include="Command\OpenSettingsCommand.cs" />
     <Compile Include="Command\PerformIterationsCommand.cs" />
     <Compile Include="Command\PerformNIterationsCommand.cs" />
+    <Compile Include="Command\RenderSequenceCommand.cs" />
     <Compile Include="Command\ResetCameraCommand.cs" />
     <Compile Include="Command\SaveDenoisedScreenshotCommand.cs" />
     <Compile Include="Command\SaveSceneCommand.cs" />
@@ -558,6 +559,9 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Icons\iterate_n.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\iterate_animated.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

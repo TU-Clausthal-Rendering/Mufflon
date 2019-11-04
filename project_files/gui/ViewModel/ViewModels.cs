@@ -43,6 +43,7 @@ namespace gui.ViewModel
         public ICommand SelectRendererCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand DenoiseImageCommand { get; }
+        public ICommand RenderAnimatedSequenceCommand { get; }
 
         // For designer only
         public static bool NotInDesignMode { get; set; }
@@ -81,6 +82,7 @@ namespace gui.ViewModel
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(m_models);
             DenoiseImageCommand = new SaveDenoisedScreenshotCommand(m_models);
+            RenderAnimatedSequenceCommand = new RenderSequenceCommand(m_models, 0, int.MaxValue, 0, true);
 
             KeyGestures = new KeyGestureViewModel(models);
         }

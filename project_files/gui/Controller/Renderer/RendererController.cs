@@ -32,6 +32,11 @@ namespace gui.Controller.Renderer
         private bool m_denoisedScreenshot = false;
         private bool m_repaint = false;
 
+        // When rendering animation sequences, this indicates that the next loop iteration should increment the animation frame
+        private bool m_incrementFrame = false;
+        // Tracks if we were the last animation frame in previous iteration (not discernible unfortunatel)
+        private bool m_wasLastAnimFrame = false;
+
         private ManualResetEvent m_auxiliaryIteration = new ManualResetEvent(true);
 
         public RendererController(Models models)
@@ -100,6 +105,28 @@ namespace gui.Controller.Renderer
 
                     if (m_models.Renderer.IsRendering)
                     {
+                        if(m_incrementFrame)
+                        {
+                            m_incrementFrame = false;
+
+                            if (m_models.Renderer.AnimationStart < m_models.World.AnimationFrameStart)
+                            {
+                                if (m_models.World.AnimationFrameCurrent >= m_models.World.AnimationFrameEnd)
+                                    m_models.World.AnimationFrameCurrent = m_models.World.AnimationFrameStart;
+                                else
+                                    ++m_models.World.AnimationFrameCurrent;
+                            } else
+                            {
+                                if(m_models.World.AnimationFrameCurrent >= m_models.Renderer.AnimationEnd)
+                                {
+                                    m_iterationsPerformed = m_models.Renderer.RemainingIterations;
+                                    m_wasLastAnimFrame = true;
+                                }
+                                ++m_models.World.AnimationFrameCurrent;
+                            }
+                            m_iterationsPerformed = 0;
+                        }
+
                         if (m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
                         {
                             // Update camera movements and enter the render DLL
@@ -110,10 +137,35 @@ namespace gui.Controller.Renderer
                         }
                         else
                         {
-                            // No more iterations left -> we're done
-                            m_iterationsPerformed = 0;
-                            System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
-                            m_models.Renderer.RenderLock.Reset();
+                            if(m_models.Renderer.AnimationFrameComplete != null && !m_wasLastAnimFrame)
+                                m_models.Renderer.AnimationFrameComplete();
+
+                            // Check if we're animating
+                            if (m_models.Renderer.RenderAnimation)
+                            {
+                                // Check if we need to reset the animation frame
+                                if (m_models.Renderer.AnimationStart < m_models.World.AnimationFrameStart)
+                                {
+                                    m_incrementFrame = true;
+                                } else
+                                {
+                                    // Check if we should stop
+                                    if(m_models.World.AnimationFrameCurrent > m_models.Renderer.AnimationEnd || m_wasLastAnimFrame)
+                                    {
+                                        m_wasLastAnimFrame = false;
+                                        System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                                        m_models.Renderer.RenderLock.Reset();
+                                    } else
+                                    {
+                                        m_incrementFrame = true;
+                                    }
+                                }
+                            } else
+                            {
+                                // No more iterations left -> we're done
+                                System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                                m_models.Renderer.RenderLock.Reset();
+                            }
                         }
                     }
                     else

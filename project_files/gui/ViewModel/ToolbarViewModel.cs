@@ -26,6 +26,7 @@ namespace gui.ViewModel
             EnterFreeFlightMode = new EnterFreeFlightMode(models);
             OneIterationCommand = new PerformIterationsCommand(m_models, 1u);
             NIterationsCommand = new PerformNIterationsCommand(m_models);
+            ContinuousSequenceRenderCommand = new RenderSequenceCommand(m_models, -1, -1, -1, false);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;
@@ -79,6 +80,7 @@ namespace gui.ViewModel
         public ICommand EnterFreeFlightMode { get; }
         public ICommand OneIterationCommand { get; }
         public ICommand NIterationsCommand { get; }
+        public ICommand ContinuousSequenceRenderCommand { get; }
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

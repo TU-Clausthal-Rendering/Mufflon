@@ -109,6 +109,16 @@
                             </TextBlock>
                         </MenuItem.ToolTip>
                     </MenuItem>
+                    <MenuItem Header="Render animated sequence"
+                              Command="{Binding RenderAnimatedSequenceCommand}">
+                        <MenuItem.ToolTip>
+                            <TextBlock>
+                                Renders the entire animation sequence with the iteration count specified in
+                                the corresponding toolbar field to render N iterations. Saves screenshots for
+                                each frame.
+                            </TextBlock>
+                        </MenuItem.ToolTip>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Help">
                     <MenuItem Header="About"/>
