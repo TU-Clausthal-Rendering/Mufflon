@@ -143,6 +143,8 @@ namespace gui.Model
     {
         public delegate void ScreenshotHandler(bool denoised);
         public delegate void ParameterSaveHandler(RendererParameter param);
+        public delegate void FrameCompletionHandler();
+        public delegate void AnimationCompletionHandler();
 
         public event EventHandler RequestWorldClear;
         public event EventHandler RequestRedraw;
@@ -173,12 +175,24 @@ namespace gui.Model
                 if(m_isRendering == value) return;
                 m_isRendering = value;
                 if(value)
+                {
                     RenderLock.Set();
+                }
                 else
+                {
+                    RenderAnimation = false;
                     m_remainingIterations = -1;
+                }
                 OnPropertyChanged(nameof(IsRendering));
             }
         }
+
+        // Controls whether the rendering sequence will switch to the next frame
+        // upon completing the mandated number of iterations
+        public bool RenderAnimation { get; set; } = false;
+        public bool LoopAnimation { get; set; } = false;
+        public FrameCompletionHandler AnimationFrameComplete { get; set; } = null;
+        public AnimationCompletionHandler AnimationComplete { get; set; } = null;
 
         public Core.RenderDevice RenderDevices { get => Core.render_get_renderer_devices(RendererIndex, RendererVariation); }
 

@@ -7,7 +7,7 @@
              xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d"
              d:DesignStyle="{StaticResource DesignerStyle}"
-             d:DesignHeight="30" d:DesignWidth="320">
+             d:DesignHeight="30" d:DesignWidth="330">
     <UserControl.Resources>
         <Style TargetType="Button">
             <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -74,6 +74,10 @@
         <Button Command="{Binding NIterationsCommand}"
                 ToolTip="Advance rendering by n iterations">
             <Image Source="../Icons/iterate_n.png"/>
+        </Button>
+        <Button Command="{Binding ContinuousSequenceRenderCommand}"
+                ToolTip="Continously render animation">
+            <Image Source="../Icons/iterate_animated.png"/>
         </Button>
     </StackPanel>
 </UserControl>

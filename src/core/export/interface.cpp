@@ -175,6 +175,7 @@ inline std::string replace_screenshot_filename_tags(std::string name, const Stri
 	name = replacer(name, "#renderer", s_currentRenderer->get_name());
 	name = replacer(name, "#shortrenderer", s_currentRenderer->get_short_name());
 	name = replacer(name, "#iteration", std::to_string(render_get_current_iteration()));
+	name = replacer(name, "#frame", std::to_string(s_world.get_frame_current()));
 	if(variance)
 		name = replacer(name, "#target", std::string(targetName) + "(Variance)");
 	else
