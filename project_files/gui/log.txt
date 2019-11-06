@@ -1,0 +1,10 @@
+[mufflon_set_logger] Loaded texture plugin 'C:\Users\Florian\Desktop\Repos\mufflon\build\Release\plugins\gliloader.dll'
+[mufflon_set_logger] Loaded texture plugin 'C:\Users\Florian\Desktop\Repos\mufflon\build\Release\plugins\pfmloader.dll'
+[mufflon_set_logger] Loaded texture plugin 'C:\Users\Florian\Desktop\Repos\mufflon\build\Release\plugins\stbiloader.dll'
+[mufflon_set_logger] Found 1 CUDA-capable devices; initializing device 0 (GeForce GTX 980 Ti)
+[mufflon_initialize_opengl] Initialized OpenGL context (version 4.6)
+could not open shader file: shader/copy_output.glsl
+[mufflon_initialize_opengl] Exception caught: failed to link program Compute info
+------------
+(0) : error C7006: no work group size specified
+

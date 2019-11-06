@@ -1,0 +1,54 @@
+{
+  "LastWorlds": [
+    "Y:\\Scenes\\Buildings\\Villa\\villa.json",
+    "D:\\Bethe Daten\\Papers\\My Papers\\Preserving Shadow Silhouettes in Illumination-driven Mesh Reduction\\scenes and images\\silhouette_scenes\\testcase.json",
+    "D:\\Bethe Daten\\Papers\\My Papers\\Preserving Shadow Silhouettes in Illumination-driven Mesh Reduction\\scenes and images\\silhouette_scenes\\Failure-case-indirect-shadow.json"
+  ],
+  "ScreenshotNamePatternHistory": [
+    "#scene-#scenario-#renderer-#iteration-#target"
+  ],
+  "LastWorldPath": "Y:\\Scenes\\Buildings\\Villa",
+  "LastSelectedRenderer": 0,
+  "LastSelectedRendererVariation": 1,
+  "LastSelectedRenderTarget": 0,
+  "MaxConsoleMessages": 50,
+  "AutoStartOnLoad": false,
+  "LogLevel": 0,
+  "CoreProfileLevel": 0,
+  "LoaderProfileLevel": 0,
+  "ScreenshotNamePattern": "#scene-#scenario-#renderer-#iteration-#target",
+  "ScreenshotFolder": "C:\\Users\\Florian\\Desktop\\Repos\\mufflon\\build\\Release",
+  "ScreenshotGestureString": "F2",
+  "PlayPauseGestureString": "ALT+P",
+  "ResetGestureString": "ALT+R",
+  "ToggleCameraMovementGestureString": "ALT+M",
+  "AllowCameraMovement": false,
+  "InvertCameraControls": false,
+  "LastNIterationCommand": 10,
+  "RendererParameters": {
+    "Shadow Silhouette PT": {
+      "Selective importance": {
+        "Type": 3,
+        "Value": "ALL"
+      },
+      "Shadow size weight": {
+        "Type": 3,
+        "Value": "INVERSE"
+      },
+      "Decimation iterations": {
+        "Type": 0,
+        "Value": "0"
+      },
+      "Reduce mesh initially": {
+        "Type": 1,
+        "Value": "0.5"
+      }
+    },
+    "Pathtracer": {
+      "Max. path length": {
+        "Type": 0,
+        "Value": "4"
+      }
+    }
+  }
+}
