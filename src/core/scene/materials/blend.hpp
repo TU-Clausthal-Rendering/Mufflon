@@ -30,6 +30,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 	// Determine a probability for each layer.
 	float fa = params.factorA * sum(albedo(params.a));
 	float fb = params.factorB * sum(albedo(params.b));
+	if(fa + fb <= 0.0f) return math::PathSample{};
 	float p = fa / (fa + fb);
 	u64 probLayerA = math::percentage_of(std::numeric_limits<u64>::max() - 1, p);
 
