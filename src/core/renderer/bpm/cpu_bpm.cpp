@@ -260,10 +260,9 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 			if(emission.value != 0.0f && viewPathLen > 1) {
 				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, prevMergeArea);
 				emission.value *= misWeight;
-				if(isnan(emission.value.x)) __debugbreak();
-				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			}
 			mAssert(!isnan(emission.value.x));
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 		}
 		if(vertex[currentV].is_end_point()) break;
 
