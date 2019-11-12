@@ -22,7 +22,7 @@ In the case of multiple type choices, details on further mandatory properties wi
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
         "deinstance": bool                         // OPTIONAL deinstance the instances
-		"initTessellationLevel": float,            // OPTIONAL specifies the initial tessellation level in levels per pixel
+        "initTessellationLevel": float,            // OPTIONAL specifies the initial tessellation level in levels per pixel
         "cameras": {
             "<name1>": {
                 "type": "{pinhole, focus, ortho}",
@@ -52,10 +52,10 @@ In the case of multiple type choices, details on further mandatory properties wi
                                                 // OR complex number (vec2, for conductor)
                     "absorption": [r,g,b]       // Absorption λ per meter (transmission = exp(-λ*d)) [0,inf]^3
                 },
-				"alpha" : <texture>     // OPTIONAL: if red channel is < 0.5, the ray will continue as if unperturbed
-				                        // IMPORTANT: not valid for emissive materials!
+                "alpha" : <texture>     // OPTIONAL: if red channel is < 0.5, the ray will continue as if unperturbed
+                                        // IMPORTANT: not valid for emissive materials!
                 "displacement" : {      // OPTIONAL: specifies displacement mapping applied to every vertex
-				    "map":  <texture>,  // height map
+                "map":  <texture>,  // height map
                     "bias": float,      // OPTIONAL: offset added to the height map, defaults to 0,
                      "scale": float     // OPTIONAL: specifies the the scale the height map is multiplied with, defaults to 1
                 }
@@ -83,7 +83,7 @@ In the case of multiple type choices, details on further mandatory properties wi
                         "tessellation" : {              // OPTIONAL information about tessellation
                                                         // If any associated material has a displacement map, this takes priority
                             "adaptive" : bool,          // If true, the tessellation happens depending on some adaptive criteria,
-							                            // e.g. camera position, importance, ... (for now implementation-defined)
+                                                        // e.g. camera position, importance, ... (for now implementation-defined)
                                                         // DEFAULT: true
                             "level" : float,            // The tessellation level; if adaptive is true, this refers to primitives per pixel,
                                                         // otherwise it is the number of subdivisions performed inside/on the primitive's edge
@@ -141,14 +141,14 @@ They each must match in length or be of length one.
 
     "position": [[x,y,z], ...],           // vec3 vec3 world space position in [m]
     "flux" or "intensity: [[a,b,c], ...]
-		   or "temperature": [[T]],       // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3, or temperature [K] as float)
+           or "temperature": [[T]],       // Exclusive (either flux [W] or intensity [W/sr] must be specified as vec3, or temperature [K] as float)
     "scale": [float, ...],                // Multiplier for "flux"/"intensity"
 
 `"type": "directional"`
 
     "direction": [[x,y,z], ...],          // Direction in which the light travels (incident direction), not necessarily normalized
     "radiance": [[a,b,c], ...] or
-	"temperature": [[T]],                 // Radiance [W/m²sr] or temperature [K]
+    "temperature": [[T]],                 // Radiance [W/m²sr] or temperature [K]
     "scale": [float, ...],                // Multiplier for "radiance"
 
 `"type": "spot"`\
@@ -158,7 +158,7 @@ where "exponent" is set to 2.
     "position": [[x,y,z], ...],           // vec3 vec3 world space position in [m]
     "direction": [[x,y,z], ...],          // Direction in which the light travels (incident direction), not necessarily normalized
     "intensity": [[a,b,c], ...] or
-	"temperature": [[T]],                 // Peak intensity [W/sr] or temperature [K]
+    "temperature": [[T]],                 // Peak intensity [W/sr] or temperature [K]
     "scale": [float, ...],                // Multiplier for "intensity"
     "cosWidth" or "width": [float, ...],  // An angle "width" in radians for the half-opening angle or the
                                           // cosine of this angle
@@ -168,21 +168,21 @@ where "exponent" is set to 2.
 `"type": "envmap"`
 
     "map": "<texture name>",        // A 360° texture (polar-mapped, cubemap), relative to this file, interpreted as radiance [W/m²sr].
-									// If not specified, the envmap will be treated as monochrome white (scaling allows for different colors).
+                                    // If not specified, the envmap will be treated as monochrome white (scaling allows for different colors).
     "scale": float | [r,g,b],       // An energy scaling factor for the environment map
 
 `"type": "sky"`
 
-	"model": "<model name>",        // The analytic sky model to be used; currently only "hosek" is allowed (may be expanded in the future).
-	                                // DEFAULT: "hosek"
-	"turbidity": float,             // The amount of dust/scattering of the atmosphere; must be between 1.0 and 10.0.
-	                                // DEFAULT: 1.0
-	"albedo" : float,               // The ground albedo, affecting the in-scattering from ground. Must be between 1.0 and 10.0.
-	                                // DEFAULT: 0.0
-	"solarRadius" : float,          // The solid angle of the sun in radians.
-	                                // DEFAULT: 0.00445059 (Earth's sun radius)
-	"sunDir" : [x, y, z],           // The direction in which the sun's center is visible.
-	                                // DEFAULT: [ 0.0, 1.0, 0.0 ]
+    "model": "<model name>",        // The analytic sky model to be used; currently only "hosek" is allowed (may be expanded in the future).
+                                    // DEFAULT: "hosek"
+    "turbidity": float,             // The amount of dust/scattering of the atmosphere; must be between 1.0 and 10.0.
+                                    // DEFAULT: 1.0
+    "albedo" : float,               // The ground albedo, affecting the in-scattering from ground. Must be between 1.0 and 10.0.
+                                    // DEFAULT: 0.0
+    "solarRadius" : float,          // The solid angle of the sun in radians.
+                                    // DEFAULT: 0.00445059 (Earth's sun radius)
+    "sunDir" : [x, y, z],           // The direction in which the sun's center is visible.
+                                    // DEFAULT: [ 0.0, 1.0, 0.0 ]
     "scale": float | [r,g,b]        // An energy scaling factor for the sky
 
 `"type": "goniometric"`\
@@ -225,7 +225,7 @@ Materials
 `"type": "emissive"`
 
     "radiance": [r,g,b] | <texture> or
-	"temperature": T | <texture>,       // Surface radiance in [W/m²sr] or temperature in [K]
+    "temperature": T | <texture>,       // Surface radiance in [W/m²sr] or temperature in [K]
     "scale: [r,g,b]                     // Multiplier for radiance (HDR color, default 1,1,1)
 
 `"type": "orennayar"`
