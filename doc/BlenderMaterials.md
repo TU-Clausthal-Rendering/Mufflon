@@ -14,7 +14,7 @@ Glass BSDF
 Maps to `microfacet`.
 Must be used stand alone (not in mixed materials)
 
-Uses 1-`Color` as absorption coefficients.
+Uses (1/`Color`-1) as absorption coefficients.
 
 Only `Beckmann`, `GGX` and `SHARP` are valid choices of NDFs.
 
@@ -71,4 +71,6 @@ Custom Properties
 
 There is currently one custom property to specify the outer medium at an interface. This parametrization is unique to our renderer and has no mapping in blender.
 
-`outerMedium` must be a custom property of the material with 4 float values: [ior, r, g, b]. All values must match the values of a glass or refractive material around the object. The values r,g,b are the absorptions coefficients λ (used as exp(-d λ)). Note that the Glass BSDF uses 1-r,g,b.
+Look for the `Outer Medium` Panel in the material properties.
+All values must match the values of a glass or refractive material around the object.
+The color value is mapped exactly like in the Glass BSDF.
