@@ -86,8 +86,8 @@ private:
 	// TODO: unify this in one data structure (possibly by storing which light a photon came from alongside count?)
 	std::vector<data_structs::DmOctree<>> m_densityPhotonsOctree;
 	std::vector<data_structs::DmOctree<>> m_densityShadowPhotonsOctree;
-	std::vector<data_structs::DmHashGrid> m_densityPhotonsHashgrid;
-	std::vector<data_structs::DmHashGrid> m_densityShadowPhotonsHashgrid;
+	std::vector<data_structs::DmHashGrid<>> m_densityPhotonsHashgrid;
+	std::vector<data_structs::DmHashGrid<>> m_densityShadowPhotonsHashgrid;
 
 	data_structs::HashGridManager<PhotonDesc> m_photonMapManager;
 	data_structs::HashGrid<Device::CPU, PhotonDesc> m_photonMap;

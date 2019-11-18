@@ -11,6 +11,7 @@
 namespace mufflon { namespace data_structs {
 
 // A lock-free atomic counter hash grid for fast density estimates.
+template < class T = u32 >
 class DmHashGrid {
 public:
 	// Create a hash grid with a fixed memory footprint. This hash grid does not
@@ -49,7 +50,7 @@ public:
 	void set_iteration(int iter) { m_densityScale = 1.0f / iter; }
 
 	// Increase the counter for a cell using a world position.
-	void increase_count(const ei::Vec3& position);
+	void increase_count(const ei::Vec3& position, const T& value = T{ 1 });
 
 	// Returns the point-sampled density at the given position wrt. the area of the plane passing through the cell
 	float get_density(const ei::Vec3& position, const ei::Vec3& normal) const;
@@ -67,10 +68,10 @@ public:
 private:
 	struct Entry {
 		ei::UVec3 cell;
-		std::atomic_uint32_t count = 0;
+		std::atomic<T> count;
 	};
 
-	u32 get_count(const ei::UVec3& gridPos) const;
+	T get_count(const ei::UVec3& gridPos) const;
 
 	ei::Vec3 m_cellSize;
 	// The density scale can be used to if multiple iterations are accumulated

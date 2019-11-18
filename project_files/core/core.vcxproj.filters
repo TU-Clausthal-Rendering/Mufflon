@@ -185,6 +185,12 @@
     <Filter Include="resources">
       <UniqueIdentifier>{257f63ae-692a-445c-a64c-e00c6c9bc9f1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\animation">
+      <UniqueIdentifier>{8f1e0167-3394-4a10-bc9b-f0df62713ce6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\animation\pt">
+      <UniqueIdentifier>{0babb1e5-3e22-4117-b91b-f1d1d5e471f2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -414,6 +420,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.cpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\cpu_animation_pt.cpp">
+      <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.cpp">
+      <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1280,6 +1292,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.hpp">
       <Filter>Source Files\core\renderer\decimaters\silhouette\screenspace</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\cpu_animation_pt.hpp">
+      <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\animation_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\animation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_pt_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.hpp">
+      <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

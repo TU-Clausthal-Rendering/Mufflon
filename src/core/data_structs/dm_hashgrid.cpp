@@ -1,8 +1,27 @@
 #include "dm_hashgrid.hpp"
+#include <climits>
 
 namespace mufflon::data_structs {
 
-DmHashGrid::DmHashGrid(const u32 numExpectedEntries) :
+namespace {
+
+template < class T >
+void atomic_add(std::atomic<T>& atom, const T& value) {
+	T expected = atom.load();
+	T desired;
+	do {
+		desired = expected + value;
+	} while(!atom.compare_exchange_weak(expected, desired));
+}
+template <>
+void atomic_add<u32>(std::atomic<u32>& atom, const u32& value) {
+	atom.fetch_add(value);
+}
+
+} // namespace
+
+template < class T >
+DmHashGrid<T>::DmHashGrid(const u32 numExpectedEntries) :
 	m_cellSize{ 1.f },
 	m_densityScale{ 1.f },
 	m_mapSize{ ei::nextPrime(u32(numExpectedEntries * 1.15f)) },
@@ -11,8 +30,8 @@ DmHashGrid::DmHashGrid(const u32 numExpectedEntries) :
 	m_dataCount{ 0u }
 {}
 
-
-DmHashGrid::DmHashGrid(DmHashGrid&& grid) :
+template < class T >
+DmHashGrid<T>::DmHashGrid(DmHashGrid&& grid) :
 	m_cellSize(grid.m_cellSize),
 	m_densityScale(grid.m_densityScale),
 	m_mapSize(grid.m_mapSize),
@@ -21,24 +40,25 @@ DmHashGrid::DmHashGrid(DmHashGrid&& grid) :
 	m_dataCount(grid.m_dataCount.load())
 {}
 
-void DmHashGrid::increase_count(const ei::Vec3& position) {
+template < class T >
+void DmHashGrid<T>::increase_count(const ei::Vec3& position, const T& value) {
 	ei::UVec3 gridPos = get_grid_cell(position);
 	u32 h = get_cell_hash(gridPos);
 	u32 i = h % m_mapSize;
 	int s = 1;
 	// Quadratic probing until we find the correct or the empty cell
 	while(s <= static_cast<int>(m_maxProbes)) {
-		u32 expected = 0u;
+		T expected{};
 		// Check on empty and set a marker to allocate if empty
-		if(m_data[i].count.compare_exchange_strong(expected, ~0u)) {
+		if(m_data[i].count.compare_exchange_strong(expected, std::numeric_limits<T>::max())) {
 			// The cell was empty before -> initialize
 			m_data[i].cell = gridPos;
-			m_data[i].count.store(1u);	// Releases the lock at the same time as setting the correct count
+			m_data[i].count.store(value);	// Releases the lock at the same time as setting the correct count
 			m_dataCount.fetch_add(1u);
 			return;
-		} else if(expected != ~0u) { // Not a cell marked as 'in allocation'
+		} else if(expected != std::numeric_limits<T>::max()) { // Not a cell marked as 'in allocation'
 			if(m_data[i].cell == gridPos) {
-				m_data[i].count.fetch_add(1u);
+				atomic_add(m_data[i].count, value);
 				return;
 			}
 			// Next probe: non-empty cell with different coordinate found
@@ -47,18 +67,21 @@ void DmHashGrid::increase_count(const ei::Vec3& position) {
 		} // else spin-lock (achieved by not changing i)
 	}
 }
-float DmHashGrid::get_density(const ei::Vec3& position, const ei::Vec3& normal) const {
-	ei::IVec3 gridPosI = ei::floor(position / m_cellSize);
-	ei::UVec3 gridPos{ gridPosI };
-	u32 c = get_count(gridPos);
+
+template < class T >
+float DmHashGrid<T>::get_density(const ei::Vec3& position, const ei::Vec3& normal) const {
+	const ei::IVec3 gridPosI = ei::floor(position / m_cellSize);
+	const ei::UVec3 gridPos{ gridPosI };
+	const T c = get_count(gridPos);
 	// Determine intersection area between cell and query plane
 	ei::Vec3 localPos = position - gridPosI * m_cellSize;
 	float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
 	return c * m_densityScale / area;
 }
 
+template < class T >
 template < bool UseSmoothStep >
-float DmHashGrid::get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal, ei::Vec3* gradient) const {
+float DmHashGrid<T>::get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal, ei::Vec3* gradient) const {
 	// Get integer and interpolation coordinates
 	ei::Vec3 nrmPos = position / m_cellSize - 0.5f;
 	ei::IVec3 gridPosI = ei::floor(nrmPos);
@@ -106,11 +129,12 @@ float DmHashGrid::get_density_interpolated(const ei::Vec3& position, const ei::V
 	return sdiv(countSum, areaSum) * m_densityScale;
 }
 
-u32 DmHashGrid::get_count(const ei::UVec3& gridPos) const {
+template < class T >
+T DmHashGrid<T>::get_count(const ei::UVec3& gridPos) const {
 	u32 h = get_cell_hash(gridPos);
 	u32 i = h % m_mapSize;
 	int s = 1;
-	u32 c = m_data[i].count.load();
+	T c = m_data[i].count.load();
 	while(c > 0 && m_data[i].cell != gridPos) {
 		i = (h + (s & 1 ? s * s : -s * s) + m_mapSize) % m_mapSize;
 		++s;
@@ -119,7 +143,11 @@ u32 DmHashGrid::get_count(const ei::UVec3& gridPos) const {
 	return c;
 }
 
-template float DmHashGrid::get_density_interpolated<true>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
-template float DmHashGrid::get_density_interpolated<false>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
+template class DmHashGrid<u32>;
+template class DmHashGrid<float>;
+template float DmHashGrid<u32>::get_density_interpolated<true>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
+template float DmHashGrid<u32>::get_density_interpolated<false>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
+template float DmHashGrid<float>::get_density_interpolated<true>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
+template float DmHashGrid<float>::get_density_interpolated<false>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
 
 } // namespace mufflon::data_structs

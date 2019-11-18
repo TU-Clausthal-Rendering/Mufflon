@@ -6,7 +6,6 @@
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
 
-/*
 __global__ static void silhouette_kernel(pt::SilhouetteTargets::RenderBufferType<Device::CUDA> outputBuffer,
 										 scene::SceneDescriptor<Device::CUDA>* scene,
 										 const u32* seeds, SilhouetteParameters params,
@@ -45,7 +44,7 @@ __global__ static void impvis_kernel(pt::SilhouetteTargets::RenderBufferType<Dev
 #ifdef __CUDA_ARCH__
 	sample_vis_importance(outputBuffer, *scene, coord, rng, importances, sums, maxImportance);
 #endif // __CUDA_ARCH__
-}*/
+}
 
 namespace gpusil_details {
 
@@ -56,8 +55,8 @@ cudaError_t call_importance_kernel(const dim3& gridDims, const dim3& blockDims,
 								   const u32* seeds, const SilhouetteParameters& params,
 								   Importances<Device::CUDA>** importances,
 								   DeviceImportanceSums<Device::CUDA>* sums) {
-	//silhouette_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
-	//											  seeds, params, importances, sums);
+	silhouette_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
+												  seeds, params, importances, sums);
 	cudaDeviceSynchronize();
 	return cudaGetLastError();
 }
@@ -68,8 +67,8 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 							   const u32* seeds, Importances<Device::CUDA>** importances,
 							   DeviceImportanceSums<Device::CUDA>* sums,
 							   const float maxImportance) {
-	//impvis_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
-	//									   seeds, importances, sums, maxImportance);
+	impvis_kernel<<<gridDims, blockDims>>>(std::move(outputBuffer), scene,
+										   seeds, importances, sums, maxImportance);
 	cudaDeviceSynchronize();
 	return cudaGetLastError();
 }

@@ -1,4 +1,4 @@
-#include "decimation_common_pt.hpp"
+#include "animation_decimation_common_pt.hpp"
 #include "util/parallel.hpp"
 #include "util/punning.hpp"
 #include "core/renderer/decimaters/silhouette/modules/importance_quadrics.hpp"
@@ -8,7 +8,7 @@
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
-namespace mufflon::renderer::decimaters::silhouette::pt {
+namespace mufflon::renderer::decimaters::animation::pt {
 
 using namespace modules;
 using namespace mufflon::scene;
@@ -37,7 +37,7 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 template < Device dev >
 ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& original, Lod& decimated,
-											  const std::size_t initialCollapses,
+											  const std::size_t initialCollapses, const u32 windowSize,
 											  const float viewWeight, const float lightWeight,
 											  const float shadowWeight, const float shadowSilhouetteWeight) :
 	m_objectName(objectName),
@@ -47,8 +47,9 @@ ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& origin
 	m_decimatedPoly(&m_decimated.template get_geometry<Polygons>()),
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(&m_decimatedPoly->get_mesh()),
-	m_importances(nullptr),
-	m_devImportances(nullptr),
+	m_windowSize{ windowSize },
+	m_importances{},
+	m_devImportances{},
 	m_viewWeight(viewWeight),
 	m_lightWeight(lightWeight),
 	m_shadowWeight(shadowWeight),
@@ -126,7 +127,7 @@ ImportanceDecimater<dev>::~ImportanceDecimater() {
 template < Device dev >
 void ImportanceDecimater<dev>::copy_back_normalized_importance() {
 	(void)0;
-	copy(m_devImportances.get(), m_importances.get(), sizeof(Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
+	copy(m_devImportances.back().get(), m_importances.back().get(), sizeof(silhouette::pt::Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
 }
 
 template <>
@@ -137,7 +138,7 @@ void ImportanceDecimater<Device::CPU>::copy_back_normalized_importance() {
 
 template < Device dev >
 void ImportanceDecimater<dev>::pull_importance_from_device() {
-	copy(m_importances.get(), m_devImportances.get(), sizeof(Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
+	copy(m_importances.back().get(), m_devImportances.back().get(), sizeof(silhouette::pt::Importances<Device::CUDA>) * m_decimatedPoly->get_vertex_count());
 }
 
 template < >
@@ -147,7 +148,7 @@ void ImportanceDecimater<Device::CPU>::pull_importance_from_device() {
 }
 
 template < Device dev >
-void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum) {
+void ImportanceDecimater<dev>::update_importance_density(const silhouette::pt::ImportanceSums& sum) {
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
@@ -159,20 +160,23 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
 		// Important: only works for triangles!
 		const float area = compute_area(*m_decimatedMesh, vertex);
-		const float flux = m_importances[vertex.idx()].irradiance
-			/ std::max(1.f, static_cast<float>(m_importances[vertex.idx()].hitCounter));
-		const float viewImportance = m_importances[vertex.idx()].viewImportance;
+		const float flux = m_importances.back()[vertex.idx()].irradiance
+			/ std::max(1.f, static_cast<float>(m_importances.back()[vertex.idx()].hitCounter));
+		const float viewImportance = m_importances.back()[vertex.idx()].viewImportance;
 
 		const float importance = viewImportance + m_lightWeight * flux;
 
 		importanceSum += importance;
-		m_importances[vertex.idx()].viewImportance = importance / area;
+		m_importances.back()[vertex.idx()].viewImportance = importance / area;
 	}
 
 	// Subtract the shadow silhouette importance and use shadow importance instead
 	logPedantic("Importance sum/shadow/silhouette(", m_objectName, "): ", importanceSum, " ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
-	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
+	m_importanceSum.back() = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
+}
 
+template < Device dev >
+void ImportanceDecimater<dev>::upload_importance(const PImpWeightMethod::Values weighting) {
 	// Map the importance back to the original mesh
 	for(auto iter = m_originalMesh.vertices_begin(); iter != m_originalMesh.vertices_end(); ++iter) {
 		const auto vertex = *iter;
@@ -182,7 +186,22 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 			v = m_originalMesh.property(m_collapsedTo, v);
 
 		// Put importance into temporary storage
-		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance;
+		// TODO: end of frame sequence!
+		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = 0.f;
+		switch(weighting) {
+			case PImpWeightMethod::Values::AVERAGE:
+				for(const auto& imps : m_importances)
+					m_originalMesh.property(m_accumulatedImportanceDensity, vertex) += imps[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance;
+				m_originalMesh.property(m_accumulatedImportanceDensity, vertex) /= static_cast<float>(m_importances.size());
+				m_originalMesh.property(m_accumulatedImportanceDensity, vertex) /= static_cast<float>(m_importances.size());
+				break;
+			case PImpWeightMethod::Values::MAX:
+				for(const auto& imps : m_importances)
+					m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = std::max<float>(
+						m_originalMesh.property(m_accumulatedImportanceDensity, vertex),
+						imps[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance);
+				break;
+		}
 	}
 }
 
@@ -202,20 +221,46 @@ void ImportanceDecimater<dev>::recompute_geometric_vertex_normals() {
 }
 
 template < Device dev >
-ArrayDevHandle_t<dev, Importances<dev>> ImportanceDecimater<dev>::start_iteration() {
+ArrayDevHandle_t<dev, silhouette::pt::Importances<dev>> ImportanceDecimater<dev>::start_iteration() {
+	// If necessary, slide window
+	if(m_devImportances.size() >= m_windowSize) {
+	// TODO: reuse first buffer, does not need to be re-allocated
+		for(std::size_t i = 1u; i < m_devImportances.size(); ++i) {
+			m_devImportances[i - 1u] = std::move(m_devImportances[i]);
+			m_importances[i - 1u] = std::move(m_importances[i]);
+			m_importanceSum[i - 1u] = std::move(m_importanceSum[i]);
+		}
+		m_devImportances.pop_back();
+		m_importances.pop_back();
+		m_importanceSum.pop_back();
+	}
+
 	// Resize importance map
-	m_importances = std::make_unique<Importances<dev>[]>(m_decimatedPoly->get_vertex_count());
-	m_devImportances = make_udevptr_array<dev, Importances<dev>, false>(m_decimatedPoly->get_vertex_count());
-	cuda::check_error(cudaMemset(m_devImportances.get(), 0, sizeof(Importances<dev>) * m_decimatedPoly->get_vertex_count()));
-	return m_devImportances.get();
+	m_importances.push_back(std::make_unique<silhouette::pt::Importances<dev>[]>(m_decimatedPoly->get_vertex_count()));
+	m_devImportances.push_back(make_udevptr_array<dev, silhouette::pt::Importances<dev>, false>(m_decimatedPoly->get_vertex_count()));
+	m_importanceSum.push_back(0.0);
+	cuda::check_error(cudaMemset(m_devImportances.back().get(), 0, sizeof(silhouette::pt::Importances<dev>) * m_decimatedPoly->get_vertex_count()));
+	return m_devImportances.back().get();
 }
 
 template < >
-ArrayDevHandle_t<Device::CPU, Importances<Device::CPU>> ImportanceDecimater<Device::CPU>::start_iteration() {
+ArrayDevHandle_t<Device::CPU, silhouette::pt::Importances<Device::CPU>> ImportanceDecimater<Device::CPU>::start_iteration() {
+	// If necessary, slide window
+	if(m_importances.size() >= m_windowSize) {
+		// TODO: reuse first buffer, does not need to be re-allocated
+		for(std::size_t i = 1u; i < m_importances.size(); ++i) {
+			m_importances[i - 1u] = std::move(m_importances[i]);
+			m_importanceSum[i - 1u] = std::move(m_importanceSum[i]);
+		}
+		m_importances.pop_back();
+		m_importanceSum.pop_back();
+	}
+
 	// Resize importance map (only one on the CPU since we got direct access)
-	m_importances = std::make_unique<Importances<Device::CPU>[]>(m_decimatedPoly->get_vertex_count());
-	std::memset(m_importances.get(), 0, sizeof(Importances<Device::CPU>) * m_decimatedPoly->get_vertex_count());
-	return m_importances.get();
+	m_importances.push_back(std::make_unique<silhouette::pt::Importances<Device::CPU>[]>(m_decimatedPoly->get_vertex_count()));
+	m_importanceSum.push_back(0.0);
+	std::memset(m_importances.back().get(), 0, sizeof(silhouette::pt::Importances<Device::CPU>) * m_decimatedPoly->get_vertex_count());
+	return m_importances.back().get();
 }
 
 template < Device dev >
@@ -246,7 +291,7 @@ void ImportanceDecimater<dev>::iterate(const std::size_t minVertexCount, const f
 	// Perform decimation
 	auto decimater = m_decimatedPoly->create_decimater();
 	CollapseTrackerModule<>::Handle trackerHandle;
-	ImportanceDecimationModule<>::Handle impHandle;
+	silhouette::modules::ImportanceDecimationModule<>::Handle impHandle;
 	decimater.add(trackerHandle);
 	decimater.add(impHandle);
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
@@ -290,8 +335,8 @@ float ImportanceDecimater<dev>::get_current_max_importance() const {
 #pragma PARALLEL_FOR
 	for(i64 v = 0; v < static_cast<i64>(m_decimatedPoly->get_vertex_count()); ++v) {
 #pragma omp critical
-		if(m_importances[v].viewImportance > maxImp)
-			maxImp = m_importances[v].viewImportance;
+		if(m_importances.back()[v].viewImportance > maxImp)
+			maxImp = m_importances.back()[v].viewImportance;
 	}
 	return maxImp;
 }
@@ -336,4 +381,4 @@ void ImportanceDecimater<dev>::decimate_with_error_quadrics(const std::size_t co
 template class ImportanceDecimater<Device::CPU>;
 template class ImportanceDecimater<Device::CUDA>;
 
-} // namespace mufflon::renderer::decimaters::silhouette::pt
+} // namespace mufflon::renderer::animation::silhouette::pt

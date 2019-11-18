@@ -31,6 +31,8 @@
     <ClCompile Include="..\..\src\core\renderer\bpm\cpu_bpm.cpp" />
     <ClCompile Include="..\..\src\core\renderer\bpt\cpu_bpt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\debug\debug_bvh_renderer.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\cpu_animation_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_map.cpp" />
@@ -235,6 +237,10 @@
     <ClInclude Include="..\..\src\core\renderer\bpt\cpu_bpt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_renderer.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\animation_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\cpu_animation_pt.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_map.hpp" />

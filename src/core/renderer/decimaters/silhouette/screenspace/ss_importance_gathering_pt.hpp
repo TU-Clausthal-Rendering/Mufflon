@@ -16,7 +16,7 @@ using namespace scene::lights;
 
 namespace {
 
-inline float get_luminance(const ei::Vec3& vec) {
+CUDA_FUNCTION float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
 }
