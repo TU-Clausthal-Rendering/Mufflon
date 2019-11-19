@@ -77,15 +77,6 @@ void GpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		logInfo("Finished decimation process");
 		++m_currentDecimationIteration;
 		this->on_manual_reset();
-
-		// Fix up all other scenarios too (TODO: not a wise choice to do so indiscriminately...)
-		for(std::size_t i = 0u; i < scene::WorldContainer::instance().get_scenario_count(); ++i) {
-			auto handle = scene::WorldContainer::instance().get_scenario(i);
-			for(const auto& obj : m_currentScene->get_objects()) {
-				const auto newLodLevel = obj.first->get_lod_slot_count() - 1u;
-				handle->set_custom_lod(obj.first, static_cast<u32>(newLodLevel));
-			}
-		}
 	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
 		logInfo("Performing decimation iteration...");
 		const auto processTime = CpuProfileState::get_process_time();
@@ -200,8 +191,17 @@ void GpuShadowSilhouettesPT::initialize_decimaters() {
 			++objIter;
 		auto& obj = *objIter;
 
-		auto& lod = obj.first->get_lod(0u);
-		const auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+		const auto& scenario = *scene::WorldContainer::instance().get_current_scenario();
+		// Find the highest-res LoD referenced by an object's instances
+		u32 lowestLevel = scenario.get_custom_lod(obj.first);
+		for(const auto& inst : obj.second)
+			if(const auto level = scenario.get_effective_lod(inst); level < lowestLevel)
+				lowestLevel = level;
+
+		// TODO: this only works if instances don't specify LoD levels
+		auto& lod = obj.first->get_lod(lowestLevel);
+		auto& newLod = lod.create_reduced_version();
+		const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
 
 		std::size_t collapses = 0u;
 
@@ -209,13 +209,13 @@ void GpuShadowSilhouettesPT::initialize_decimaters() {
 			collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
-		const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count());
-		auto& newLod = obj.first->add_lod(newLodLevel, lod);
 		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(obj.first->get_name(), lod, newLod, collapses,
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
-		// TODO: this reeeeally breaks instancing
-		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
+
+		// Make sure that all LoDs reference the correct reduced version
+		for(const auto& inst : obj.second)
+			obj.first->get_lod(scenario.get_effective_lod(inst)).reference_reduced_version(lod);
 	}
 
 	m_importances = make_udevptr_array<Device::CUDA, Importances<Device::CUDA>*, false>(m_decimaters.size());

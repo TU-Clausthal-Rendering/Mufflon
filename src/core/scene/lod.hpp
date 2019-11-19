@@ -6,6 +6,7 @@
 #include "geometry/sphere.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
+#include <memory>
 
 namespace mufflon {
 
@@ -48,6 +49,24 @@ public:
 	auto& get_geometry() {
 		return m_geometry.template get<Geom>();
 	}
+
+	/* This set of functions interacts with LoDs created internally (e.g. importance-based geometry reduction).
+	 * A renderer may choose to create a reduced version (overwriting the previously existing one).
+	 * Reduced versions may also be shared between LoDs (e.g. creating a reduced version from a high-res LoD
+	 * and then having other low-res LoDs reference this).
+	 */
+	// Returns a pointer to the reduced version if present or nullptr if not
+	Lod* get_reduced_version() noexcept { return m_reducedVersion.get(); }
+	// Clears the reduced version of THIS LoD (other LoDs referencing it are unaffected)
+	void clear_reduced_version() { m_reducedVersion.reset(); }
+	// Creates a reduced version as a copy of the current LoD
+	Lod& create_reduced_version() {
+		m_reducedVersion = std::make_unique<Lod>(*this);
+		return *m_reducedVersion;
+	}
+	// Sets the reduced version to the reduced version of another LoD
+	void reference_reduced_version(const Lod& donor) noexcept { m_reducedVersion = donor.m_reducedVersion; }
+	
 
 	// Is there any emissive polygon in this object
 	// Requires the scenario for the material mapping.
@@ -130,6 +149,7 @@ private:
 	// Acceleration structure of the geometry
 	accel_struct::LBVHBuilder m_accelStruct;
 	const Object* m_parent;
+	std::shared_ptr<Lod> m_reducedVersion;
 };
 
 }} // mufflon::scene

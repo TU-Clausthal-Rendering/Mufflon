@@ -196,6 +196,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 				if(prevLevel != std::numeric_limits<u32>::max())
 					lodDescs.back().next = mapping.first;
 				Lod* lod = &obj.first->get_lod(mapping.first);
+				mAssert(lod != nullptr);
+				if(Lod* reduced = lod->get_reduced_version(); reduced != nullptr)
+					lod = reduced;
 
 				lodDescs.push_back(lod->template get_descriptor<dev>());
 				lodDescs.back().previous = prevLevel;
@@ -277,10 +280,12 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 				// Now we can do per-LoD things like displacement mapping
 				if(prevLevel != std::numeric_limits<u32>::max())
 					lodDescs.back().next = mapping.first;
-				Lod& lod = obj.first->get_lod(mapping.first);
-				lodDescs.push_back(lod.template get_descriptor<dev>());
+				Lod* lod = &obj.first->get_lod(mapping.first);
+				if(Lod* reduced = lod->get_reduced_version(); reduced != nullptr)
+					lod = reduced;
+				lodDescs.push_back(lod->template get_descriptor<dev>());
 				if(!sameAttribs)
-					lod.update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
+					lod->update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
 			}
 			lodDescs.back().previous = prevLevel;
 		}
