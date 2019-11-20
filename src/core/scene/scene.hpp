@@ -139,7 +139,7 @@ public:
 											   const std::vector<const char*>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
-	const std::map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
+	const std::unordered_map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
 		return m_objects;
 	}
 
@@ -175,7 +175,7 @@ private:
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
-	std::map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
+	std::unordered_map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
 	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 	GenericResource m_materials;		// Device instanciation of Material parameter packs and an offset table (first table then data).
