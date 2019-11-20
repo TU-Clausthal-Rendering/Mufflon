@@ -56,6 +56,7 @@ public:
 			if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
 				throw std::runtime_error("Failed to seek C file descriptor to desired position");
 			offset -= std::numeric_limits<long>::max();
+			origin = SEEK_CUR;
 		}
 		if(std::fseek(m_desc, static_cast<long>(offset), origin) != 0)
 			throw std::runtime_error("Failed to seek C file descriptor to desired position");
