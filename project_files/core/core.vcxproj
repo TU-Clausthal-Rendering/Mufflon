@@ -89,6 +89,7 @@
     <ClCompile Include="..\..\src\util\cie_xyz.cpp" />
     <ClCompile Include="..\..\src\util\log.cpp" />
     <ClCompile Include="..\..\src\util\parallel.cpp" />
+    <ClCompile Include="..\..\src\util\string_pool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp" />
@@ -376,6 +377,7 @@
     <ClInclude Include="..\..\src\util\parallel.hpp" />
     <ClInclude Include="..\..\src\util\punning.hpp" />
     <ClInclude Include="..\..\src\util\range.hpp" />
+    <ClInclude Include="..\..\src\util\string_pool.hpp" />
     <ClInclude Include="..\..\src\util\string_view.hpp" />
     <ClInclude Include="..\..\src\util\tagged_tuple.hpp" />
     <ClInclude Include="..\..\src\util\types.hpp" />

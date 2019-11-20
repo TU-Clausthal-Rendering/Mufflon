@@ -63,7 +63,7 @@ public:
 	StringView get_name() const noexcept {
 		return m_name;
 	}
-	void set_name(StringView name) { m_name = std::string(name); }
+	void set_name(StringView name) { m_name = name; }
 
 	u32 get_path_segment_count() const noexcept { return m_pathSegments; }
 
@@ -165,7 +165,7 @@ protected:
 	float m_far {1e10f};					// Optional far clipping distance
 	bool m_isDirty = true;
 private:
-	std::string m_name;
+	StringView m_name;
 	CameraModel m_model;
 	const u32 m_pathSegments;
 };

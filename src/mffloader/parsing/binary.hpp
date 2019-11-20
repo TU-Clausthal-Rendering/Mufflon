@@ -8,6 +8,7 @@
 #include <atomic>
 #include <fstream>
 #include <string>
+#include "util/string_pool.hpp"
 #include "util/string_view.hpp"
 #include <vector>
 #include <unordered_map>
@@ -63,7 +64,7 @@ private:
 	};*/
 
 	struct ObjectState {
-		std::string name;
+		mufflon::StringView name;
 		GlobalFlag globalFlags;
 		ObjectFlags flags;
 		ei::Box aabb;
@@ -130,13 +131,25 @@ private:
 		data += sizeof(T);
 		return val;
 	}
+	void read(std::string& str) {
+		str.clear();
+		str.resize(read<mufflon::u32>());
+		m_fileStream.read(str.data(), str.length());
+	}
+	void read(std::string& str, const unsigned char*& data) {
+		str.clear();
+		mufflon::u32 size = read<mufflon::u32>(data);
+		str.resize(size);
+		for(mufflon::u32 i = 0u; i < size; ++i)
+			str[i] = read<char>(data);
+	}
 
 	// Cleans up the internal data structures
 	void clear_state();
 
 	static AttribDesc map_bin_attrib_type(AttribType type);
 	// Uncompressed data
-	AttribState read_uncompressed_attribute(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_attribute(const ObjectState& object, const LodState& lod);
 	void read_normal_compressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_uncompressed_triangles(const ObjectState& object, const LodState& lod);
@@ -149,7 +162,7 @@ private:
 	void read_uncompressed_sphere_materials(const ObjectState& object, const LodState& lod);
 	// Deflated data
 	std::vector<unsigned char> decompress();
-	AttribState read_compressed_attribute(const unsigned char*& data);
+	void read_compressed_attribute(const unsigned char*& data);
 	void read_compressed_normal_compressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_compressed_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_compressed_triangles(const ObjectState& object, const LodState& lod);
@@ -171,6 +184,9 @@ private:
 	// Parser state
 	std::ifstream m_fileStream;
 	std::ifstream::pos_type m_fileStart;
+	mufflon::util::StringPool m_namePool;
+	AttribState m_attribStateBuffer;
+	std::string m_nameBuffer;
 	// Parsed data
 	// The material names are wrapped in [mat:...] for ease of use in the JSON parser
 	std::vector<std::string> m_materialNames;

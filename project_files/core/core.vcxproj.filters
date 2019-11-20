@@ -427,6 +427,9 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.cpp">
       <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\string_pool.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\scene\object.hpp">
@@ -1304,6 +1307,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.hpp">
       <Filter>Source Files\core\renderer\decimaters\animation\pt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\string_pool.hpp">
+      <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
