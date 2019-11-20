@@ -56,6 +56,7 @@ public:
 			if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
 				throw std::runtime_error("Failed to seek C file descriptor to desired position");
 			offset -= std::numeric_limits<long>::max();
+			origin = SEEK_CUR;
 		}
 		if(std::fseek(m_desc, static_cast<long>(offset), origin) != 0)
 			throw std::runtime_error("Failed to seek C file descriptor to desired position");
@@ -666,9 +667,7 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	// Remember where we were in the file
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
 	// Jump to the object
-	const std::ifstream::off_type test0 = m_fileStream.tellg() - m_fileStart;
 	m_fileStream.seekg(object.offset + sizeof(u32), std::ifstream::beg);
-	const std::ifstream::off_type test1 = m_fileStream.tellg() - m_fileStart;
 	// Skip the object name + find the jump table
 	m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
 	// Jump to the LoD
