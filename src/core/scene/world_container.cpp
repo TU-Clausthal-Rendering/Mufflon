@@ -12,7 +12,8 @@ namespace mufflon::scene {
 
 WorldContainer WorldContainer::s_container{};
 
-WorldContainer::WorldContainer() {
+WorldContainer::WorldContainer()
+{
 	m_envLights.insert("##DefaultBlack##", lights::Background::black());
 }
 
@@ -120,8 +121,9 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	return Sanity::SANE;
 }
 
-ObjectHandle WorldContainer::create_object(std::string name, ObjectFlags flags) {
-	auto hdl = m_objects.emplace(std::move(name), Object{static_cast<u32>(m_objects.size())});
+ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags flags) {
+	const auto pooledName = m_namePool.insert(name);
+	auto hdl = m_objects.emplace(pooledName, Object{static_cast<u32>(m_objects.size())});
 	if(!hdl.second)
 		return nullptr;
 	hdl.first->second.set_name(hdl.first->first);
@@ -136,8 +138,9 @@ ObjectHandle WorldContainer::get_object(const StringView& name) {
 	return nullptr;
 }
 
-ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, std::string newName) {
-	ObjectHandle newHdl = create_object(std::move(newName), hdl->get_flags());
+ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView newName) {
+	const auto pooledName = m_namePool.insert(newName);
+	ObjectHandle newHdl = create_object(pooledName, hdl->get_flags());
 	newHdl->copy_lods_from(*hdl);
 	return newHdl;
 }
@@ -147,10 +150,11 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 	const ei::Vec3& scale = hdl->get_scale();
 	ObjectHandle objectHandle = &hdl->get_object();
 	if(hdl->get_object().get_instance_counter() > 1) {
-		std::string newName(objectHandle->get_name().data());
+		static thread_local std::string newName(objectHandle->get_name().data());
 		newName.append("###");
 		newName.append(hdl->get_name().data());
-		objectHandle = duplicate_object(objectHandle, std::move(newName));
+		const auto pooledNewName = m_namePool.insert(newName);
+		objectHandle = duplicate_object(objectHandle, pooledNewName);
 		hdl->set_object(*objectHandle);
 	}
 	for(size_t i = 0; i < objectHandle->get_lod_slot_count(); i++) {
@@ -178,20 +182,21 @@ InstanceHandle WorldContainer::get_instance(const StringView& name, const u32 an
 	return nullptr;
 }
 
-InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle obj, const u32 animationFrame) {
+InstanceHandle WorldContainer::create_instance(const StringView name, ObjectHandle obj, const u32 animationFrame) {
 	if(obj == nullptr) {
 		logError("[WorldContainer::create_instance] Invalid object handle");
 		return nullptr;
 	}
-	auto instance = std::make_unique<Instance>(move(name), *obj);
-	StringView nameRef = instance->get_name();
+	
+	const auto pooledName = m_namePool.insert(name);
+	auto instance = std::make_unique<Instance>(pooledName, *obj);
 	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
-		if(m_instances.find(nameRef) != m_instances.cend()) {
+		if(m_instances.find(pooledName) != m_instances.cend()) {
 			logError("[WorldContainer::create_instance] Non unique instance name");
 			return nullptr;
 		}			
-		m_instances[nameRef] = std::move(instance);
-		return m_instances[nameRef].get();
+		m_instances[pooledName] = std::move(instance);
+		return m_instances[pooledName].get();
 	} else {
 		// Check if it's the first instance ever and set start+end frames accordingly
 		if(m_animatedInstances.size() == 0u) {
@@ -206,12 +211,12 @@ InstanceHandle WorldContainer::create_instance(std::string name, ObjectHandle ob
 		m_frameEnd = std::max(m_frameEnd, animationFrame);
 		if(m_animatedInstances[animationFrame] == nullptr)
 			m_animatedInstances[animationFrame] = std::make_unique<std::unordered_map<StringView, std::unique_ptr<Instance>>>();
-		if((*m_animatedInstances[animationFrame]).find(nameRef) != (*m_animatedInstances[animationFrame]).cend()) {
+		if((*m_animatedInstances[animationFrame]).find(pooledName) != (*m_animatedInstances[animationFrame]).cend()) {
 			logError("[WorldContainer::create_instance] Non unique instance name");
 			return nullptr;
 		}
-		(*m_animatedInstances[animationFrame])[nameRef] = std::move(instance);
-		return (*m_animatedInstances[animationFrame])[nameRef].get();
+		(*m_animatedInstances[animationFrame])[pooledName] = std::move(instance);
+		return (*m_animatedInstances[animationFrame])[pooledName].get();
 	}
 }
 
@@ -234,9 +239,10 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 	return nullptr;
 }
 
-ScenarioHandle WorldContainer::create_scenario(std::string name) {
+ScenarioHandle WorldContainer::create_scenario(const StringView name) {
+	const auto pooledName = m_namePool.insert(name);
 	// TODO: switch to pointer
-	auto hdl = m_scenarios.emplace(std::move(name), Scenario{}).first;
+	auto hdl = m_scenarios.emplace(pooledName, Scenario{ m_namePool }).first;
 	hdl->second.set_name(hdl->first);
 	return &hdl->second;
 }
@@ -273,11 +279,12 @@ materials::MediumHandle WorldContainer::add_medium(const materials::Medium& medi
 	return h;
 }
 
-CameraHandle WorldContainer::add_camera(std::string name, std::unique_ptr<cameras::Camera> camera) {
-	auto iter = m_cameras.emplace(name, move(camera));
+CameraHandle WorldContainer::add_camera(const StringView name, std::unique_ptr<cameras::Camera> camera) {
+	const auto pooledName = m_namePool.insert(name);
+	auto iter = m_cameras.emplace(pooledName, move(camera));
 	if(!iter.second)
 		return nullptr;
-	iter.first->second->set_name(iter.first->first);
+	iter.first->second->set_name(pooledName);
 	m_cameraHandles.push_back(iter.first);
 	m_frameEnd = std::max(m_frameEnd, m_frameStart + iter.first->second->get_path_segment_count() - 1u);
 	return iter.first->second.get();

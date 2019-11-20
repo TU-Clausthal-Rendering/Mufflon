@@ -15,7 +15,7 @@ public:
 	static constexpr u32 NO_ANIMATION_FRAME = std::numeric_limits<u32>::max();
 
 	// TODO: identity matrix
-	Instance(std::string name, Object& obj, ei::Mat3x4 trans = {
+	Instance(StringView name, Object& obj, ei::Mat3x4 trans = {
 				1.f, 0.f, 0.f, 0.f,
 				0.f, 1.f, 0.f, 0.f,
 				0.f, 0.f, 1.f, 0.f 
@@ -69,7 +69,7 @@ public:
 	}
 
 private:
-	std::string m_name;
+	StringView m_name;
 	Object* m_objRef;
 	ei::Mat3x4 m_transMat;
 	ei::Mat3x4 m_invTransMat;

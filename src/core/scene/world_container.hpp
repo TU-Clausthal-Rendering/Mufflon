@@ -10,6 +10,7 @@
 #include "core/scene/textures/cputexture.hpp"
 #include "core/renderer/renderer.hpp"
 #include "util/indexed_string_map.hpp"
+#include "util/string_pool.hpp"
 #include "core/scene/materials/medium.hpp"
 #include <map>
 #include <memory>
@@ -39,15 +40,12 @@ public:
 
 	static constexpr float SUGGESTED_MAX_SCENE_SIZE = 1024.f*1024.f;
 
-	WorldContainer(const WorldContainer&) = delete;
-	WorldContainer& operator=(const WorldContainer&) = delete;
-
 	// Create a new object to be filled
-	ObjectHandle create_object(std::string name, ObjectFlags flags);
+	ObjectHandle create_object(const StringView name, ObjectFlags flags);
 	// Finds an object by its name
 	ObjectHandle get_object(const StringView& name);
 	// Duplicates an object returns handle to the new duplicated object
-	ObjectHandle duplicate_object(ObjectHandle hdl, std::string newName);
+	ObjectHandle duplicate_object(ObjectHandle hdl, const StringView name);
 	// Applies transformation matrix to the object from the instance.
 	// Changes the object from the handle.
 	void apply_transformation(InstanceHandle hdl);
@@ -57,7 +55,7 @@ public:
 	InstanceHandle get_instance(const StringView& name, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	// Creates a new instance.
-	InstanceHandle create_instance(std::string name, ObjectHandle hdl, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
+	InstanceHandle create_instance(StringView name, ObjectHandle hdl, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	// This is for interfacing - get the number of instances and the name of each
 	std::size_t get_highest_instance_frame() const noexcept { return m_animatedInstances.size(); }
 	std::size_t get_instance_count(const u32 frame) const noexcept {
@@ -71,7 +69,7 @@ public:
 	};
 	// Gets the instance name - this reference invalidates when new instances are added!
 	// Add a created scenario and take ownership
-	ScenarioHandle create_scenario(std::string name);
+	ScenarioHandle create_scenario(const StringView name);
 	// Finds a scenario by its name
 	ScenarioHandle get_scenario(const StringView& name);
 	// Get the scenario for which load_scene() was called last.
@@ -108,7 +106,7 @@ public:
 	}
 
 	// Add a fully specfied camera to the pool of all cameras.
-	CameraHandle add_camera(std::string name, std::unique_ptr<cameras::Camera> camera);
+	CameraHandle add_camera(const StringView name, std::unique_ptr<cameras::Camera> camera);
 	void remove_camera(CameraHandle hdl);
 
 	// Find a camera dependent on its name.
@@ -217,7 +215,9 @@ public:
 
 private:
 	WorldContainer();
+	WorldContainer(const WorldContainer&) = delete;
 	WorldContainer(WorldContainer&&) = default;
+	WorldContainer& operator=(const WorldContainer&) = delete;
 	WorldContainer& operator=(WorldContainer&&) = default;
 	~WorldContainer() = default;
 
@@ -230,28 +230,31 @@ private:
 	// Function pointer for loading a LoD from a scene
 	std::uint32_t(CDECL *m_load_lod)(ObjectHandle obj, u32 lod) = nullptr;
 
+	// A pool for all names (keeps references valid until world clear)
+	util::StringPool m_namePool;
 	// All objects of the world.
-	std::map<std::string, Object, std::less<>> m_objects;
+	std::unordered_map<StringView, Object> m_objects;
 	// All instances of the world
 	std::unordered_map<StringView, std::unique_ptr<Instance>> m_instances;
 	std::vector<std::unique_ptr<std::unordered_map<StringView, std::unique_ptr<Instance>>>> m_animatedInstances;
 	// List of all scenarios available (mapped to their names)
-	std::map<std::string, Scenario, std::less<>> m_scenarios;
+	std::unordered_map<StringView, Scenario> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
 	// All media in the world (all with unique properties)
 	std::vector<materials::Medium> m_media;
 	// All available cameras mapped to their name.
-	std::map<std::string, std::unique_ptr<cameras::Camera>, std::less<>> m_cameras;
+	std::unordered_map<StringView, std::unique_ptr<cameras::Camera>> m_cameras;
 	std::vector<decltype(m_cameras)::iterator> m_cameraHandles;
 	// All light sources of the scene
+	// TODO: should we group these together as well? Would make sense for many-light-scenarios
 	util::IndexedStringMap<std::vector<lights::PointLight>> m_pointLights;
 	util::IndexedStringMap<std::vector<lights::SpotLight>> m_spotLights;
 	util::IndexedStringMap<std::vector<lights::DirectionalLight>> m_dirLights;
 	util::IndexedStringMap<lights::Background> m_envLights;
 	// Texture cache
 	std::unordered_map<StringView, std::unique_ptr<textures::Texture>> m_textures;
-	std::map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has
+	std::unordered_map<TextureHandle, std::size_t> m_texRefCount; // Counts how many remaining references a texture has
 
 	// Current scene
 	ScenarioHandle m_scenario = nullptr;

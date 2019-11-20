@@ -1238,7 +1238,7 @@ InstanceHdl world_create_instance(const char* name, ObjectHdl obj, const uint32_
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(std::string(name), hdl, animationFrame));
+	return static_cast<InstanceHdl>(s_world.create_instance(name, hdl, animationFrame));
 	CATCH_ALL(nullptr)
 }
 
@@ -2856,7 +2856,7 @@ MatIdx scenario_get_material_slot(ScenarioHdl scenario,
 const char* scenario_get_material_slot_name(ScenarioHdl scenario, MatIdx slot) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	return static_cast<const Scenario*>(scenario)->get_material_slot_name(slot).c_str();
+	return static_cast<const Scenario*>(scenario)->get_material_slot_name(slot).data();
 	CATCH_ALL(nullptr)
 }
 size_t scenario_get_material_slot_count(ScenarioHdl scenario){

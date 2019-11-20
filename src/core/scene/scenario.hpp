@@ -2,8 +2,9 @@
 
 #include "handles.hpp"
 #include "types.hpp"
+#include "util/string_pool.hpp"
 #include "util/string_view.hpp"
-#include <map>
+#include <unordered_map>
 #include <optional>
 #include <vector>
 
@@ -23,7 +24,7 @@ public:
 
 	static constexpr u32 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
 
-	Scenario();
+	Scenario(util::StringPool& namePool);
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
 	Scenario& operator=(const Scenario&) = delete;
@@ -39,7 +40,7 @@ public:
 	// Get the index of a slot from its name.
 	MaterialIndex get_material_slot_index(StringView binaryName) const;
 	// Get the slot name from its index
-	const std::string& get_material_slot_name(MaterialIndex slotIdx) const;
+	StringView get_material_slot_name(MaterialIndex slotIdx) const;
 	/*
 	 * Assigns a ready loaded material to a material entry.
 	 * The assignment can be changed if no renderer is in a running state.
@@ -174,7 +175,7 @@ public:
 
 private:
 	struct MaterialDesc {
-		std::string binaryName;
+		StringView binaryName;
 		MaterialHandle material;
 	};
 
@@ -199,7 +200,8 @@ private:
 	StringView m_name;
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
-	std::map<std::string, MaterialIndex, std::less<>> m_materialIndices;
+	util::StringPool& m_namePool;
+	std::unordered_map<StringView, MaterialIndex> m_materialIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// All lights which are enabled in this scenario
@@ -216,8 +218,8 @@ private:
 	bool m_hasObjectTessellation = false;
 
 	// Object blacklisting and other custom traits
-	std::map<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
-	std::map<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
+	std::unordered_map<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
+	std::unordered_map<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
 };
 
 }} // namespace mufflon::scene

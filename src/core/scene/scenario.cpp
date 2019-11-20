@@ -7,7 +7,8 @@
 
 namespace mufflon::scene {
 
-Scenario::Scenario()
+Scenario::Scenario(util::StringPool& namePool) :
+	m_namePool{ namePool }
 {
 	this->remove_background();
 }
@@ -22,8 +23,9 @@ MaterialIndex Scenario::declare_material_slot(StringView binaryName) {
 
 	// Add new slot
 	MaterialIndex newIndex = static_cast<MaterialIndex>(m_materialAssignment.size());
+	const auto pooledName = m_namePool.insert(binaryName);
 	m_materialAssignment.push_back(MaterialDesc{
-		std::string{binaryName}, nullptr
+		pooledName, nullptr
 	});
 	m_materialIndices.emplace(m_materialAssignment.back().binaryName, newIndex);
 	return newIndex;
@@ -39,7 +41,7 @@ MaterialIndex Scenario::get_material_slot_index(StringView binaryName) const {
 	return it->second;
 }
 
-const std::string& Scenario::get_material_slot_name(MaterialIndex slotIdx) const {
+StringView Scenario::get_material_slot_name(MaterialIndex slotIdx) const {
 	return m_materialAssignment.at(slotIdx).binaryName;
 }
 

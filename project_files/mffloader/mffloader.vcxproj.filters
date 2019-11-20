@@ -79,6 +79,9 @@
     <ClCompile Include="..\..\src\util\cie_xyz.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\util\string_pool.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\deps\chinoise\include\cn\chinoise.hpp">
@@ -166,6 +169,9 @@
       <Filter>Source Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\util\cie_xyz.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\string_pool.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
   </ItemGroup>
