@@ -15,6 +15,11 @@
 
 namespace mff_loader::binary {
 
+struct InstanceMapping {
+	mufflon::u32 customLod;
+	InstanceHdl handle;
+};
+
 class BinaryLoader {
 public:
 	BinaryLoader(std::string& stage) :
@@ -29,7 +34,7 @@ public:
 	 */
 	bool load_file(fs::path file, const mufflon::u32 globalLod,
 				   const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-				   const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods,
+				   std::unordered_map<mufflon::StringView, InstanceMapping>& instanceLods,
 				   bool deinstance);
 
 	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
@@ -177,7 +182,7 @@ private:
 
 	bool read_instances(const mufflon::u32 globalLod,
 						const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-						const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
+						std::unordered_map<mufflon::StringView, InstanceMapping>& instanceLods);
 	void deinstance();
 	void read_object();
 	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);

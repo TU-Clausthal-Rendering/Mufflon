@@ -767,12 +767,12 @@ void BinaryLoader::read_object() {
 
 bool BinaryLoader::read_instances(const u32 globalLod,
 								  const std::unordered_map<StringView, u32>& objectLods,
-								  const std::unordered_map<StringView, u32>& instanceLods) {
+								  std::unordered_map<StringView, InstanceMapping>& instanceLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
 	sprintf(m_loadingStage.data(), "Loading instances\0");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
-	world_reserve_instances(std::max(static_cast<std::size_t>(numInstances), m_objects.size()));
+	world_reserve_instances(static_cast<std::size_t>(numInstances) + m_objects.size());
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
@@ -788,16 +788,19 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		u32 lod = globalLod;
 		if(auto iter = objectLods.find(m_objects[objId].name); iter != objectLods.end())
 			lod = iter->second;
-		if(auto iter = instanceLods.find(name); iter != instanceLods.end())
-			lod = iter->second;
+		const auto instIter = instanceLods.find(name);
+		if(instIter != instanceLods.end())
+			lod = instIter->second.customLod;
 
 		// Only log below a certain threshold
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", name, "\'");
-		InstanceHdl instHdl = world_create_instance(name.data(), m_objects[objId].objHdl, keyframe);
+		InstanceHdl instHdl = world_create_instance(m_objects[objId].objHdl, keyframe);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
 									 + std::to_string(objId));
+		if(instIter != instanceLods.end())
+			instIter->second.handle = instHdl;
 
 		// We now have a valid instance: time to check if we have the required LoD
 		if(!object_has_lod(m_objects[objId].objHdl, lod)) {
@@ -840,7 +843,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			u32 lod = globalLod;
 			if(auto iter = objectLods.find(objName); iter != objectLods.end())
 				lod = iter->second;
-			InstanceHdl instHdl = world_create_instance(m_nameBuffer.c_str(), m_objects[i].objHdl, 0xFFFFFFFF);
+			InstanceHdl instHdl = world_create_instance(m_objects[i].objHdl, 0xFFFFFFFF);
 			if(instHdl == nullptr)
 				throw std::runtime_error("Failed to create instance for object ID "
 										 + std::to_string(i));
@@ -948,7 +951,7 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const std::unordered_map<StringView, mufflon::u32>& objectLods,
-							 const std::unordered_map<StringView, mufflon::u32>& instanceLods,
+							 std::unordered_map<StringView, InstanceMapping>& instanceLods,
 							 bool deinstance) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
 	m_filePath = std::move(file);

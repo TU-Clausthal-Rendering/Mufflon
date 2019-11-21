@@ -15,7 +15,7 @@ public:
 	static constexpr u32 NO_ANIMATION_FRAME = std::numeric_limits<u32>::max();
 
 	// TODO: identity matrix
-	Instance(StringView name, Object& obj, ei::Mat3x4 trans = {
+	Instance(Object& obj, ei::Mat3x4 trans = {
 				1.f, 0.f, 0.f, 0.f,
 				0.f, 1.f, 0.f, 0.f,
 				0.f, 0.f, 1.f, 0.f 
@@ -26,22 +26,17 @@ public:
 	Instance& operator=(Instance&&) = delete;
 	~Instance() = default;
 
-	StringView get_name() const noexcept {
-		return m_name;
-	}
-
 	void set_transformation_matrix(const ei::Mat3x4& mat) {
 		m_transMat = mat;
 		ei::Mat4x4 invRS = invert(ei::Mat4x4{mat});
-		m_invTransMat = ei::Mat3x4 { invRS };
 	}
 
 	const ei::Mat3x4& get_transformation_matrix() const noexcept {
 		return m_transMat;
 	}
 
-	const ei::Mat3x4& get_inverse_transformation_matrix() const noexcept {
-		return m_invTransMat;
+	ei::Mat3x4 compute_inverse_transformation_matrix() const noexcept {
+		return ei::Mat3x4{ invert(ei::Mat4x4{m_transMat}) };
 	}
 
 	ei::Vec3 extract_scale() const noexcept {
@@ -70,10 +65,8 @@ public:
 	}
 
 private:
-	StringView m_name;
-	Object* m_objRef;
 	ei::Mat3x4 m_transMat;
-	ei::Mat3x4 m_invTransMat;
+	Object* m_objRef;
 	u32 m_animationFrame;
 };
 

@@ -16,6 +16,11 @@ namespace mufflon { namespace scene {
  */
 class Scenario {
 public:
+	struct CustomInstanceProperty {
+		bool masked = false;
+		u32 lod = NO_CUSTOM_LOD;
+	};
+
 	struct TessellationInfo {
 		std::optional<float> level{};
 		bool adaptive{ false };
@@ -177,11 +182,6 @@ private:
 	struct MaterialDesc {
 		StringView binaryName;
 		MaterialHandle material;
-	};
-
-	struct CustomInstanceProperty {
-		bool masked = false;
-		u32 lod = NO_CUSTOM_LOD;
 	};
 
 	struct CustomObjectProperty {
