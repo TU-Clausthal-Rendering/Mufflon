@@ -141,7 +141,7 @@ public:
 		return m_matIndicesHdl;
 	}
 	// Transforms sphere data
-	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
+	void transform(const ei::Mat3x4& transMat);
 
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
