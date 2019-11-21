@@ -32,9 +32,6 @@ public:
 
 	void set_transformation_matrix(const ei::Mat3x4& mat) {
 		m_transMat = mat;
-		m_scale.x = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 0u));
-		m_scale.y = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 1u));
-		m_scale.z = ei::len(ei::Vec<float, 3>(m_transMat, 0u, 2u));
 		ei::Mat4x4 invRS = invert(ei::Mat4x4{mat});
 		m_invTransMat = ei::Mat3x4 { invRS };
 	}
@@ -47,8 +44,12 @@ public:
 		return m_invTransMat;
 	}
 
-	ei::Vec3 get_scale() const noexcept {
-		return m_scale;
+	ei::Vec3 extract_scale() const noexcept {
+		return ei::Vec3{
+			ei::len(ei::Vec<float, 3>(m_transMat, 0u, 0u)),
+			ei::len(ei::Vec<float, 3>(m_transMat, 0u, 1u)),
+			ei::len(ei::Vec<float, 3>(m_transMat, 0u, 2u))
+		};
 	}
 
 	ei::Box get_bounding_box(u32 lod) const noexcept;
@@ -73,7 +74,6 @@ private:
 	Object* m_objRef;
 	ei::Mat3x4 m_transMat;
 	ei::Mat3x4 m_invTransMat;
-	ei::Vec3 m_scale;
 	u32 m_animationFrame;
 };
 

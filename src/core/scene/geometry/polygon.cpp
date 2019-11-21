@@ -466,7 +466,7 @@ void Polygons::garbage_collect() {
 	m_faceAttributes.shrink_to_fit();
 }
 
-void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
+void Polygons::transform(const ei::Mat3x4& transMat) {
 	this->synchronize<Device::CPU>();
 	if(this->get_vertex_count() == 0) return;
 	// Invalidate bounding box
@@ -485,7 +485,6 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 	ei::Vec3 translation(transMat[3], transMat[7], transMat[11]);
 	ei::Vec3* vertices = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_pointsHdl);
 	for(size_t i = 0; i < this->get_vertex_count(); i++) {
-		vertices[i] *= scale;
 		vertices[i] = rotation * vertices[i];
 		vertices[i] += translation;
 		m_boundingBox.max = ei::max(vertices[i], m_boundingBox.max);
@@ -494,8 +493,7 @@ void Polygons::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 	// Transform normals
 	ei::Vec3* normals = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_normalsHdl);
 	for(size_t i = 0; i < this->get_vertex_count(); i++) { // one normal per vertex
-		normals[i] /= scale;
-		normals[i] = rotation * normals[i];
+		normals[i] = ei::normalize(rotation * normals[i]);
 	}
 	m_vertexAttributes.mark_changed(Device::CPU);
 }

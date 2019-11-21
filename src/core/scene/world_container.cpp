@@ -804,10 +804,11 @@ bool WorldContainer::load_scene_lights() {
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
 					if(mat->get_properties().is_emissive()) {
-						mAssert(ei::approx(inst->get_scale().x, inst->get_scale().y) && ei::approx(inst->get_scale().x, inst->get_scale().z));
+						const auto scale = inst->extract_scale();
+						mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
 						lights::AreaLightSphereDesc al{
 							transform(spheresData[i].center, inst->get_transformation_matrix()),
-							inst->get_scale().x * spheresData[i].radius,
+							scale.x * spheresData[i].radius,
 							materials[i]
 						};
 						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });

@@ -279,7 +279,7 @@ public:
 	void garbage_collect();
 
 	// Transforms polygon data
-	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
+	void transform(const ei::Mat3x4& transMat);
 
 	// Computes the "mean_curvature" attribute for all vertices
 	void compute_curvature();

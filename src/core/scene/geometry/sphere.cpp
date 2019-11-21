@@ -133,7 +133,7 @@ std::size_t Spheres::add_bulk(SphereAttributeHandle hdl, const SphereHandle& sta
 	return numRead;
 }
 
-void Spheres::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
+void Spheres::transform(const ei::Mat3x4& transMat) {
 	if (this->get_sphere_count() == 0) return;
 	// Invalidate bounding box
 	m_boundingBox.min = {
@@ -148,9 +148,10 @@ void Spheres::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 	};
 	// Transform mesh
 	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
+	const float scale = ei::len(ei::Vec<float, 3>(transMat, 0u, 0u));
 	for (size_t i = 0; i < this->get_sphere_count(); i++) {
 		mAssert(scale.x == scale.y && scale.y == scale.z);
-		spheres[i].radius *= scale.x;
+		spheres[i].radius *= scale;
 		spheres[i].center = ei::transform(spheres[i].center, transMat);
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(spheres[i].center + ei::Vec3(spheres[i].radius)), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(spheres[i].center - ei::Vec3(spheres[i].radius)), m_boundingBox.min);
