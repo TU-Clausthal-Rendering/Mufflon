@@ -9,7 +9,6 @@
 #include <ei/conversions.hpp>
 #include <windows.h>
 
-
 namespace mufflon::scene {
 
 WorldContainer WorldContainer::s_container{};
@@ -21,6 +20,11 @@ WorldContainer::WorldContainer()
 
 void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
+}
+
+bool WorldContainer::finalize() {
+	// TODO: set scenario flags
+	return true;
 }
 
 bool WorldContainer::set_frame_current(const u32 frameCurrent) {
@@ -67,12 +71,12 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	// Check for objects (and check for emitters as well)
 	// Gotta check both animated and stationary instances
 	for(const auto& instance : m_instances) {
-		if(hdl->is_masked(instance.second.get()))
+		if(hdl->is_masked(&instance.second))
 			continue;
 
 		hasObjects = true;
-		const Object& object = instance.second->get_object();
-		const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
+		const Object& object = instance.second.get_object();
+		const u32 lodLevel = hdl->get_effective_lod(&instance.second);
 		if(object.has_lod_available(lodLevel)) {
 			const Lod& lod = object.get_lod(lodLevel);
 			if(lod.is_emissive(*hdl)) {
@@ -89,12 +93,12 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 		if(frameInstances != nullptr) {
 			// Check the animated instances
 			for(const auto& instance : *frameInstances) {
-				if(hdl->is_masked(instance.second.get()))
+				if(hdl->is_masked(&instance.second))
 					continue;
 
 				hasObjects = true;
-				const Object& object = instance.second->get_object();
-				const u32 lodLevel = hdl->get_effective_lod(instance.second.get());
+				const Object& object = instance.second.get_object();
+				const u32 lodLevel = hdl->get_effective_lod(&instance.second);
 				if(object.has_lod_available(lodLevel)) {
 					const Lod& lod = object.get_lod(lodLevel);
 					if(lod.is_emissive(*hdl)) {
@@ -123,6 +127,14 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	return Sanity::SANE;
 }
 
+void WorldContainer::reserve_objects(const std::size_t count) {
+	m_objects.reserve(count);
+}
+
+void WorldContainer::reserve_instances(const std::size_t count) {
+	m_instances.reserve(count);
+}
+
 ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags flags) {
 	const auto pooledName = m_namePool.insert(name);
 	auto hdl = m_objects.emplace(pooledName, Object{static_cast<u32>(m_objects.size())});
@@ -149,7 +161,6 @@ ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView
 
 void WorldContainer::apply_transformation(InstanceHandle hdl) {
 	const ei::Mat3x4&  transMat = hdl->get_transformation_matrix();
-	const ei::Vec3& scale = hdl->get_scale();
 	ObjectHandle objectHandle = &hdl->get_object();
 	if(hdl->get_object().get_instance_counter() > 1) {
 		static thread_local std::string newName(objectHandle->get_name().data());
@@ -163,9 +174,9 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 		if(objectHandle->has_lod_available(u32(i))) {
 			Lod& lod = objectHandle->get_lod(u32(i));
 			auto& polygons = lod.get_geometry<geometry::Polygons>();
-			polygons.transform(transMat, scale);
+			polygons.transform(transMat);
 			auto& spheres = lod.get_geometry<geometry::Spheres>();
-			spheres.transform(transMat, scale);
+			spheres.transform(transMat);
 		}
 	}
 	hdl->set_transformation_matrix(ei::Mat3x4{ ei::identity4x4() });
@@ -175,11 +186,11 @@ InstanceHandle WorldContainer::get_instance(const StringView& name, const u32 an
 	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
 		auto iter = m_instances.find(name);
 		if(iter != m_instances.end())
-			return iter->second.get();
+			return &iter->second;
 	} else if(animationFrame < m_animatedInstances.size() && m_animatedInstances[animationFrame] != nullptr) {
 		auto iter = m_animatedInstances[animationFrame]->find(name);
 		if(iter != m_animatedInstances[animationFrame]->end())
-			return iter->second.get();
+			return &iter->second;
 	}
 	return nullptr;
 }
@@ -196,9 +207,8 @@ InstanceHandle WorldContainer::create_instance(const StringView name, ObjectHand
 		if(m_instances.find(pooledName) != m_instances.cend()) {
 			logError("[WorldContainer::create_instance] Non unique instance name");
 			return nullptr;
-		}			
-		m_instances[pooledName] = std::move(instance);
-		return m_instances[pooledName].get();
+		}
+		return &m_instances.emplace(pooledName, Instance{ pooledName, *obj }).first->second;
 	} else {
 		// Check if it's the first instance ever and set start+end frames accordingly
 		if(m_animatedInstances.size() == 0u) {
@@ -212,13 +222,12 @@ InstanceHandle WorldContainer::create_instance(const StringView name, ObjectHand
 		m_frameStart = std::min(m_frameStart, animationFrame);
 		m_frameEnd = std::max(m_frameEnd, animationFrame);
 		if(m_animatedInstances[animationFrame] == nullptr)
-			m_animatedInstances[animationFrame] = std::make_unique<std::unordered_map<StringView, std::unique_ptr<Instance>>>();
+			m_animatedInstances[animationFrame] = std::make_unique<std::unordered_map<StringView, Instance>>();
 		if((*m_animatedInstances[animationFrame]).find(pooledName) != (*m_animatedInstances[animationFrame]).cend()) {
 			logError("[WorldContainer::create_instance] Non unique instance name");
 			return nullptr;
 		}
-		(*m_animatedInstances[animationFrame])[pooledName] = std::move(instance);
-		return (*m_animatedInstances[animationFrame])[pooledName].get();
+		return &(*m_animatedInstances[animationFrame]).emplace(pooledName, Instance{ pooledName, *obj }).first->second;
 	}
 }
 
@@ -229,14 +238,14 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 		for(std::size_t i = 0; iter != m_instances.end() && i < index; ++i)
 			++iter;
 		if(iter != m_instances.end())
-			return iter->second.get();
+			return &iter->second;
 	} else if(animationFrame < m_animatedInstances.size() && m_animatedInstances[animationFrame] != nullptr) {
 		// TODO: use index string map?
 		auto iter = m_animatedInstances[animationFrame]->begin();
 		for(std::size_t i = 0; iter != m_animatedInstances[animationFrame]->end() && i < index; ++i)
 			++iter;
 		if(iter != m_animatedInstances[animationFrame]->end())
-			return iter->second.get();
+			return &iter->second;
 	}
 	return nullptr;
 }
@@ -660,13 +669,16 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		}
 	};
 
-
+	// Reserve the (likely and maximum) number of instances
+	const bool hasAnimatedInsts = m_animatedInstances.size() > m_frameCurrent && m_animatedInstances[m_frameCurrent] != nullptr;
+	const std::size_t animatedInstCount = hasAnimatedInsts ? m_animatedInstances[m_frameCurrent]->size() : 0u;
+	m_scene->reserve_instances(m_instances.size() + animatedInstCount);
 	// Load non-animated and animated instances
 	for(auto& instance : m_instances)
-		addObjAndInstance(*instance.second);
-	if(m_animatedInstances.size() > m_frameCurrent && m_animatedInstances[m_frameCurrent] != nullptr)
+		addObjAndInstance(instance.second);
+	if(hasAnimatedInsts)
 		for(auto& instance : *m_animatedInstances[m_frameCurrent])
-			addObjAndInstance(*instance.second);
+			addObjAndInstance(instance.second);
 
 	// Check if the resulting scene has issues with size
 	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
@@ -747,7 +759,10 @@ bool WorldContainer::load_scene_lights() {
 		for(auto& obj : m_scene->get_objects()) {
 			// Object contains area lights.
 			// Create one light source per polygone and instance
-			for(auto& inst : obj.second) {
+			const auto& instances = m_scene->get_instances();
+			const auto endIndex = obj.second.offset + obj.second.count;
+			for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
+				InstanceHandle inst = instances[idx];
 				mAssertMsg(obj.first->has_lod_available(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
 				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
 				if(!lod.is_emissive(*m_scenario)) {

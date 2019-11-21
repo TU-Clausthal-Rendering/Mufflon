@@ -34,10 +34,12 @@ public:
 	static constexpr float DEFAULT_FAR_PLANE = 2.f;
 
 	JsonLoader(fs::path file) :
-		m_filePath(fs::canonical(file))
+		m_filePath(fs::canonical(file)),
+		m_binLoader{ m_loadingStage }
 	{
 		if(!fs::exists(m_filePath))
 			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
+		m_loadingStage.resize(1024);
 	}
 
 	fs::path get_binary_file() const {
@@ -47,6 +49,8 @@ public:
 	// This may be called from a different thread and leads to the current load being cancelled
 	void abort_load() { m_abort = true; m_binLoader.abort_load(); }
 	bool was_aborted() { return m_abort; }
+
+	const std::string& get_loading_stage() const noexcept { return m_loadingStage; }
 
 	bool load_file();
 	void clear_state();
@@ -85,6 +89,7 @@ private:
 
 	// These are for aborting a load and keeping track of progress
 	std::atomic_bool m_abort = false;
+	std::string m_loadingStage;
 };
 
 } // namespace mff_loader::json

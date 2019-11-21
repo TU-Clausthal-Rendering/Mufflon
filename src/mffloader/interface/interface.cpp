@@ -177,7 +177,8 @@ Boolean loader_load_lod(ObjectHdl obj, u32 lod) {
 	u32 objId;
 	if(!object_get_id(obj, &objId))
 		return false;
-	binary::BinaryLoader loader;
+	std::string status;
+	binary::BinaryLoader loader{ status };
 	loader.load_lod(s_binPath, objId, lod);
 	return true;
 	CATCH_ALL(false)
@@ -190,6 +191,12 @@ Boolean loader_abort() {
 	}
 	logError("[", FUNCTION_NAME, "] No loader running that could be aborted");
 	return false;
+}
+
+const char* loader_get_loading_status() {
+	if(json::JsonLoader* loader = s_jsonLoader.load(); loader != nullptr)
+		return loader->get_loading_stage().c_str();
+	return "";
 }
 
 void loader_profiling_enable() {

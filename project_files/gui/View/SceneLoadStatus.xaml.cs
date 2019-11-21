@@ -24,9 +24,11 @@ namespace gui.View
     {
         private Button m_cancelButton;
         private TextBlock m_loadingText;
+        private bool m_visible = true;
 
         private bool m_canceled = false;
         public bool Canceled { get => m_canceled; }
+        public String LoadingText { get; private set; }
 
         public SceneLoadStatus(string sceneName)
         {
@@ -36,8 +38,20 @@ namespace gui.View
             m_cancelButton = (Button)FindName("CancelLoadButton");
             m_loadingText = (TextBlock)FindName("LoadingTextBlock");
             m_loadingText.Text = "Loading '" + sceneName + "'...";
+            UpdateLoadingStatus();
+
             Show();
             Owner.IsEnabled = false;
+        }
+
+        private async void UpdateLoadingStatus()
+        {
+            while (m_visible)
+            {
+                LoadingText = Dll.Loader.loader_get_loading_status();
+                OnPropertyChanged(nameof(LoadingText));
+                await Task.Delay(1000);
+            }
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -51,6 +65,7 @@ namespace gui.View
         {
             base.OnClosed(e);
             Owner.IsEnabled = true;
+            m_visible = false;
         }
 
         #region PropertyChanged

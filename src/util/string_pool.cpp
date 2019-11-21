@@ -55,6 +55,12 @@ StringPool& StringPool::operator=(StringPool&&) = default;
 StringPool::~StringPool() = default;
 
 StringView StringPool::insert(const StringView str) {
+	// Only allocate once we actually have data to store
+	if(!m_head) {
+		m_tree = std::make_unique<Node>();
+		m_head = m_tree.get();
+	}
+
 	if(str.size() > Node::CHARS)
 		throw std::runtime_error("String too large to fit into a single node!");
 	// TODO: this is slightly wasteful, since worst case we could do small -> large -> small,
@@ -68,8 +74,8 @@ StringView StringPool::insert(const StringView str) {
 }
 
 void StringPool::clear() {
-	m_tree = std::make_unique<Node>();
-	m_head = m_tree.get();
+	m_tree = {};
+	m_head = nullptr;
 }
 
 } // namespace mufflon::util

@@ -29,6 +29,9 @@ namespace gui.Dll
         internal static extern LoaderStatus loader_save_scene(string path);
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool loader_abort();
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_get_loading_status")]
+        private static extern IntPtr loader_get_loading_status_();
+        internal static string loader_get_loading_status() { return StringUtil.FromNativeUTF8(loader_get_loading_status_()); }
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void loader_profiling_enable();
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]

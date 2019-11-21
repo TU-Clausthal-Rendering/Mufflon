@@ -65,8 +65,8 @@ public:
 	}
 
 	template < class T >
-	SphereAttributeHandle add_attribute(std::string name) {
-		return m_attributes.add_attribute<T>(std::move(name));
+	SphereAttributeHandle add_attribute(StringView name) {
+		return m_attributes.add_attribute<T>(name);
 	}
 
 	void remove_attribute(StringView name) {

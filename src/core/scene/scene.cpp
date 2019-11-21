@@ -35,12 +35,27 @@ bool Scene::is_sane() const noexcept {
 	return true;
 }
 
+void Scene::reserve_objects(const std::size_t count) {
+	m_objects.reserve(count);
+}
+void Scene::reserve_instances(const std::size_t count) {
+	m_instances.reserve(count);
+}
+
 void Scene::add_instance(InstanceHandle hdl) {
 	auto iter = m_objects.find(&hdl->get_object());
-	if(iter == m_objects.end())
-		m_objects.emplace(&hdl->get_object(), std::vector<InstanceHandle>{hdl}).first;
-	else
-		iter->second.push_back(hdl);
+	if(iter == m_objects.end()) {
+		// A new object: reserve the maximum amount of instance handles this can have
+		const std::size_t offset = m_instances.size();
+		m_objects.emplace(&hdl->get_object(), InstanceRef{ offset, 1u }).first;
+		m_instances.resize(m_instances.size() + hdl->get_object().get_instance_counter());
+		m_instances[offset] = hdl;
+	} else {
+		const std::size_t offset = iter->second.offset + iter->second.count;
+		mAssert(offset < m_instances.size());
+		m_instances[offset] = hdl;
+		++iter->second.count;
+	}
 	// Check if we already have the object somewhere
 	m_boundingBox = ei::Box{ m_boundingBox, hdl->get_bounding_box(m_scenario.get_effective_lod(hdl)) };
 	clear_accel_structure();
@@ -174,11 +189,13 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 		for(auto& obj : m_objects) {
 			mAssert(obj.first != nullptr);
-			mAssert(obj.second.size() != 0u);
+			mAssert(obj.second.count != 0u);
 
 			// First gather which LoDs have which instance
 			lodMapping.clear();
-			for(InstanceHandle inst : obj.second) {
+			const auto endIndex = obj.second.offset + obj.second.count;
+			for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+				const auto inst = m_instances[i];
 				mAssert(inst != nullptr);
 				const u32 instanceLod = m_scenario.get_effective_lod(inst);
 				mAssert(instanceLod < obj.first->get_lod_slot_count());
@@ -212,7 +229,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 			}
 			lodDescs.back().previous = prevLevel;
 
-			instanceCount += obj.second.size();
+			instanceCount += obj.second.count;
 		}
 
 		// Allocate the device memory and copy over the descriptors
@@ -260,11 +277,13 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 
 		for(auto& obj : m_objects) {
 			mAssert(obj.first != nullptr);
-			mAssert(obj.second.size() != 0u);
+			mAssert(obj.second.count != 0u);
 
 			// First gather which LoDs have which instance
 			lodMapping.clear();
-			for(InstanceHandle inst : obj.second) {
+			const auto endIndex = obj.second.offset + obj.second.count;
+			for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+				const auto inst = m_instances[i];
 				mAssert(inst != nullptr);
 				const u32 instanceLod = m_scenario.get_effective_lod(inst);
 				mAssert(instanceLod < obj.first->get_lod_slot_count());
@@ -396,13 +415,16 @@ bool Scene::retessellate(const float tessLevel) {
 	// Track if we did perform tessellation and if we need to rebuild the light tree
 	bool performedTessellation = false;
 	bool needLighttreeRebuild = false;
+	// TODO: get rid of the mapping (too low performance)
 	std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
 	std::vector<ei::Mat3x4> instTrans;
 	for(auto& obj : m_objects) {
 		lodMapping.clear();
 
 		// First gather the instance-LoD-mapping
-		for(InstanceHandle inst : obj.second) {
+		const auto endIndex = obj.second.offset + obj.second.count;
+		for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+			const auto inst = m_instances[i];
 			const u32 instanceLod = m_scenario.get_effective_lod(inst);
 			lodMapping[instanceLod].push_back(inst);
 		}

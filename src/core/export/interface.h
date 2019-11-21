@@ -397,6 +397,9 @@ CORE_API Boolean CDECL instance_get_animation_frame(InstanceHdl inst, uint32_t* 
 
 // World container interface
 CORE_API void CDECL world_clear_all();
+CORE_API Boolean CDECL world_finalize();
+CORE_API void CDECL world_reserve_objects(const size_t count);
+CORE_API void CDECL world_reserve_instances(const size_t count);
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API InstanceHdl CDECL world_get_instance(const char* name, const uint32_t animationFrame);
