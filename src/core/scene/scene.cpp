@@ -202,7 +202,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 				lodMapping[instanceLod].push_back(inst);
 
 				instanceTransformations.push_back(inst->get_transformation_matrix());
-				invInstanceTransformations.push_back(inst->get_inverse_transformation_matrix());
+				invInstanceTransformations.push_back(inst->compute_inverse_transformation_matrix());
 			}
 
 			// Now that we know all instances a LoD has we can create the descriptors uniquely

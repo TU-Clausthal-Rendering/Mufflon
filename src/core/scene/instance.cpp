@@ -3,8 +3,7 @@
 
 namespace mufflon::scene {
 
-Instance::Instance(StringView name, Object& obj, ei::Mat3x4 trans) :
-	m_name(name),
+Instance::Instance(Object& obj, ei::Mat3x4 trans) :
 	m_objRef(&obj)
 {
 	this->set_transformation_matrix(std::move(trans));

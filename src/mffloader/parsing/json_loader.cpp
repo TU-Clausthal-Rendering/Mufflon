@@ -811,7 +811,8 @@ bool JsonLoader::load_materials() {
 	return true;
 }
 
-bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
+bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
+								const std::unordered_map<StringView, binary::InstanceMapping>& instances) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
 	sprintf(m_loadingStage.data(), "Parsing scenarios\0");
 	using namespace rapidjson;
@@ -925,30 +926,29 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				u32 frameStart, frameEnd;
 				world_get_frame_start(&frameStart);
 				world_get_frame_start(&frameEnd);
-				for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
-					InstanceHdl animInstHdl = world_get_instance(&instName[0u], frame);
-					if(animInstHdl == nullptr)
-						continue;
-					// Read LoD
-					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-						if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
-							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-					// Read masking information
-					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-					   && read<bool>(m_state, maskIter))
-						if(!scenario_mask_instance(scenarioHdl, animInstHdl))
-							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
-				}
+				if(const auto instIter = instances.find(&instName[0u]); instIter != instances.end()) {
+					InstanceHdl instHdl = instIter->second.handle;
+					if(instHdl == nullptr)
+						throw std::runtime_error("Error retrieving instance handle from name");
+					for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+						// Read LoD
+						if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+							if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
+								throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+						// Read masking information
+						if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+						   && read<bool>(m_state, maskIter))
+							if(!scenario_mask_instance(scenarioHdl, instHdl))
+								throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+					}
 
-				InstanceHdl instHdl = world_get_instance(&instName[0u], 0xFFFFFFFF);
-				if(instHdl != nullptr) {
 					// Read LoD
 					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
 						if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
 							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
 					// Read masking information
 					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-					   && read<bool>(m_state, maskIter))
+						&& read<bool>(m_state, maskIter))
 						if(!scenario_mask_instance(scenarioHdl, instHdl))
 							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
 				}
@@ -1102,7 +1102,7 @@ bool JsonLoader::load_file() {
 	sprintf(m_loadingStage.data(), "Parsing object properties\0");
 	// First parse binary file
 	std::unordered_map<StringView, u32> defaultObjectLods;
-	std::unordered_map<StringView, u32> defaultInstanceLods;
+	std::unordered_map<StringView, binary::InstanceMapping> defaultInstanceLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
@@ -1127,18 +1127,20 @@ bool JsonLoader::load_file() {
 	if(instPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("instanceProperties");
+		defaultInstanceLods.reserve(instPropsIter->value.MemberCount());
 		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the instance name
 			StringView instanceName = propIter->name.GetString();
 			m_state.objectNames.push_back(&instanceName[0u]);
 			const Value& instance = propIter->value;
 			assertObject(m_state, instance);
-			auto lodIter = get(m_state, instance, "lod", false);
-			if(lodIter != instance.MemberEnd()) {
-				const u32 localLod = read<u32>(m_state, lodIter);
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", instanceName, "'");
-				defaultInstanceLods.insert({ instanceName, localLod });
-			}
+			const u32 localLod = read_opt<u32>(m_state, instance, "lod", defaultGlobalLod);
+			const bool masked = read_opt<bool>(m_state, instance, "masked", false);
+			defaultInstanceLods.insert({ instanceName, {  localLod, nullptr } });
+
+			if(localLod != defaultGlobalLod)
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
+							"' for object '", instanceName, "'");
 		}
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
@@ -1171,7 +1173,7 @@ bool JsonLoader::load_file() {
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
-		if(!load_scenarios(m_binLoader.get_material_names()))
+		if(!load_scenarios(m_binLoader.get_material_names(), defaultInstanceLods))
 			return false;
 		sprintf(m_loadingStage.data(), "Finalize world loading\0");
 		if(!world_finalize())

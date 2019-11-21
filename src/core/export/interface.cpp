@@ -1238,13 +1238,6 @@ ObjectHdl world_get_object(const char* name) {
 	CATCH_ALL(nullptr)
 }
 
-InstanceHdl world_get_instance(const char* name, const std::uint32_t animationFrame) {
-	TRY
-	CHECK_NULLPTR(name, "instance name", nullptr);
-	return static_cast<InstanceHdl>(s_world.get_instance(name, animationFrame));
-	CATCH_ALL(nullptr)
-}
-
 const char* world_get_object_name(ObjectHdl obj) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
@@ -1252,11 +1245,11 @@ const char* world_get_object_name(ObjectHdl obj) {
 	CATCH_ALL(nullptr)
 }
 
-InstanceHdl world_create_instance(const char* name, ObjectHdl obj, const uint32_t animationFrame) {
+InstanceHdl world_create_instance(ObjectHdl obj, const uint32_t animationFrame) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(name, hdl, animationFrame));
+	return static_cast<InstanceHdl>(s_world.create_instance(hdl, animationFrame));
 	CATCH_ALL(nullptr)
 }
 

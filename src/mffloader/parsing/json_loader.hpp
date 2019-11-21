@@ -65,7 +65,8 @@ private:
 	bool load_cameras(const ei::Box& aabb);
 	bool load_lights();
 	bool load_materials();
-	bool load_scenarios(const std::vector<std::string>& binMatNames);
+	bool load_scenarios(const std::vector<std::string>& binMatNames,
+						const std::unordered_map<mufflon::StringView, binary::InstanceMapping>& instances);
 	rapidjson::Value load_scenario(const rapidjson::GenericMemberIterator<true, rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>>& scenarioIter, int maxRecursionDepth);
 
 	void selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& objectToCopyIn);

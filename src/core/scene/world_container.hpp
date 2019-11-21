@@ -59,20 +59,18 @@ public:
 	// Find an instance by name (for some objects with only one
 	// instance both names are equal, but do not need to be).
 	// The returned handle is valid over the entire lifetime of the instance.
-	InstanceHandle get_instance(const StringView& name, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	// Creates a new instance.
-	InstanceHandle create_instance(StringView name, ObjectHandle hdl, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
+	InstanceHandle create_instance(ObjectHandle hdl, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
 	// This is for interfacing - get the number of instances and the name of each
 	std::size_t get_highest_instance_frame() const noexcept { return m_animatedInstances.size(); }
 	std::size_t get_instance_count(const u32 frame) const noexcept {
 		if(frame == Instance::NO_ANIMATION_FRAME)
-			return m_instances.size(); 
+			return m_instances.size();
 		else if(frame >= m_animatedInstances.size())
 			return 0u;
-		if(m_animatedInstances[frame] == nullptr)
-			return 0u;
-		return m_animatedInstances[frame]->size();
+		else
+			return m_animatedInstances[frame].size();
 	};
 	// Gets the instance name - this reference invalidates when new instances are added!
 	// Add a created scenario and take ownership
@@ -247,9 +245,11 @@ private:
 
 	// All objects of the world.
 	std::unordered_map<StringView, Object> m_objects;
-	// All instances of the world
-	std::unordered_map<StringView, Instance> m_instances;
-	std::vector<std::unique_ptr<std::unordered_map<StringView, Instance>>> m_animatedInstances;
+	// All instances of the world (careful: reserve MUST have been called
+	// before adding instances)
+	std::vector<Instance> m_instances;
+	// TODO: for improved heap allocation, this should be a single vector/map
+	std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;
 	// List of all scenarios available (mapped to their names)
 	std::unordered_map<StringView, Scenario> m_scenarios;
 	// All materials in the scene.
